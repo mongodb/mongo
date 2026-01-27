@@ -157,7 +157,6 @@ MONGO_FAIL_POINT_DEFINE(hangTransitionBeforeIsCleaningServerMetadata);
 MONGO_FAIL_POINT_DEFINE(failAfterReachingTransitioningState);
 MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
 MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
-MONGO_FAIL_POINT_DEFINE(automaticallyCollmodToRecordIdsReplicatedFalse);
 MONGO_FAIL_POINT_DEFINE(setFCVPauseAfterReadingConfigDropPedingDBs);
 MONGO_FAIL_POINT_DEFINE(failDowngradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(failUpgradeValidationDueToIncompatibleFeature);
@@ -218,35 +217,31 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
 void maybeModifyDataOnDowngradeForTest(OperationContext* opCtx,
                                        const FCV requestedVersion,
                                        const FCV originalVersion) {
-    if (MONGO_unlikely(automaticallyCollmodToRecordIdsReplicatedFalse.shouldFail())) {
-        // If the test-only failpoint 'automaticallyCollmodToRecordIdsReplicatedFalse' is set,
-        // we automatically strip the 'recordIdsReplicated' parameter from the collection
-        // options when performing an FCV downgrade to a version that doesn't support replicated
-        // recordIds. Normally this is not the case: when a collection with
-        // recordIdsReplicated:true is found, we complain.
-        if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            LOGV2(8700500,
-                  "Automatically issuing collMod to strip recordIdsReplicated:true field.");
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_X,
-                    [&](const Collection* collection) {
-                        BSONObjBuilder responseBuilder;
-                        auto collMod = CollMod{collection->ns()};
-                        collMod.setRecordIdsReplicated(false);
-                        uassertStatusOK(processCollModCommand(
-                            opCtx, collection->ns(), collMod, nullptr, &responseBuilder));
-                        return true;
-                    },
-                    [&](const Collection* collection) {
-                        return collection->areRecordIdsReplicated();
-                        ;
-                    });
-            }
+    // TODO (SERVER-117265): Revisit the need of this function.
+    // We automatically strip the 'recordIdsReplicated' parameter from the collection
+    // options when performing an FCV downgrade to a version that doesn't support replicated
+    // recordIds.
+    if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+            requestedVersion, originalVersion)) {
+        LOGV2(8700500, "Automatically issuing collMod to strip recordIdsReplicated:true field.");
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            catalog::forEachCollectionFromDb(
+                opCtx,
+                dbName,
+                MODE_X,
+                [&](const Collection* collection) {
+                    BSONObjBuilder responseBuilder;
+                    auto collMod = CollMod{collection->ns()};
+                    collMod.setRecordIdsReplicated(false);
+                    uassertStatusOK(processCollModCommand(
+                        opCtx, collection->ns(), collMod, nullptr, &responseBuilder));
+                    return true;
+                },
+                [&](const Collection* collection) {
+                    return collection->areRecordIdsReplicated();
+                    ;
+                });
         }
     }
 }
@@ -1451,33 +1446,6 @@ private:
         if (MONGO_unlikely(failDowngradeValidationDueToIncompatibleFeature.shouldFail())) {
             uasserted(ErrorCodes::CannotDowngrade,
                       "Simulated dry-run validation failure via fail point.");
-        }
-
-        if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion) &&
-            MONGO_likely(!automaticallyCollmodToRecordIdsReplicatedFalse.shouldFail())) {
-            // so don't allow downgrading with such a collection.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_IS,
-                    [&](const Collection* collection) -> bool {
-                        uasserted(
-                            ErrorCodes::CannotDowngrade,
-                            fmt::format(
-                                "Cannot downgrade the cluster when there are collections with "
-                                "'recordIdsReplicated' enabled. Please unset the option or "
-                                "drop the collection(s) before downgrading. First detected "
-                                "collection with 'recordIdsReplicated' enabled: {} (UUID: {}).",
-                                collection->ns().toStringForErrorMsg(),
-                                collection->uuid().toString()));
-                    },
-                    [&](const Collection* collection) {
-                        return collection->areRecordIdsReplicated();
-                    });
-            }
         }
 
         if (gFeatureFlagErrorAndLogValidationAction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(

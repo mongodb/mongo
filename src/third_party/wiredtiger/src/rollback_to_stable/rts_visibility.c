@@ -96,18 +96,26 @@ __wti_rts_visibility_page_needs_abort(
     prepared = result = false;
 
     /*
-     * The rollback operation should be performed on this page when any one of the following is
+     * The rollback operation should be performed on this page when any of the following is true:
+     * 1. The btree is in-memory. In this case rollback should always be performed regardless of
+     * timestamps because in-memory trees do not have checkpoint metadata or a ref address
+     * so we cannot check if the page has modifications newer than the given timestamp.
+     *
+     * 2. Any one of the following timestamp is
      * greater than the given timestamp or during recovery if the newest transaction id on the page
      * is greater than or equal to recovered checkpoint snapshot min:
-     * 1. The reconciled replace page max durable timestamp.
-     * 2. The reconciled multi page max durable timestamp.
-     * 3. For just-instantiated deleted pages that have not otherwise been modified, the durable
+     *    - The reconciled replace page max durable timestamp.
+     *    - The reconciled multi page max durable timestamp.
+     *    - For just-instantiated deleted pages that have not otherwise been modified, the durable
      *    timestamp in the page delete information. This timestamp isn't reflected in the address's
      *    time aggregate.
-     * 4. The on page address max durable timestamp.
-     * 5. The off page address max durable timestamp.
+     *    - The on page address max durable timestamp.
+     *    - The off page address max durable timestamp.
      */
-    if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) {
+        tag = "in-memory";
+        result = true;
+    } else if (mod != NULL && mod->rec_result == WT_PM_REC_REPLACE) {
         tag = "reconciled replace block";
         durable_ts = __rts_visibility_get_ref_max_durable_timestamp(session, &mod->mod_replace.ta);
         prepared = mod->mod_replace.ta.prepare;

@@ -8,9 +8,9 @@ Level 1:
 Output plans (best plan 0):
 0.(0)[11] HJ
  -> left:
-    (0)[01][test.nss0] COLLSCAN
+    (0.0001)[01][test.nss0] COLLSCAN
  -> right:
-    (0)[10][test.nss1] COLLSCAN
+    (1.48174)[10][test.nss1] COLLSCAN
 
 
 RIGHT DEEP, 2 Nodes
@@ -23,7 +23,7 @@ Level 1:
 Output plans (best plan 0):
 0.(0)[11] HJ
  -> left:
-    (0)[01][test.nss0] COLLSCAN
+    (0.0001)[01][test.nss0] COLLSCAN
  -> right:
-    (0)[10][test.nss1] COLLSCAN
+    (1.48174)[10][test.nss1] COLLSCAN
 

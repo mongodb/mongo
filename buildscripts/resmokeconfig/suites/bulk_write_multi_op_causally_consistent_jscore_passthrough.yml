@@ -50,6 +50,7 @@ selector:
     - jstests/core/query/update/update_array_many_elements.js
     - jstests/core/index/wildcard/wildcard_index_type.js
     - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+    - jstests/core/query/map_reduce/map_reduce_timeseries.js
     - jstests/core/query/type/type3.js
     - jstests/core/txns/commit_prepared_transaction.js
     - jstests/core/timeseries/**/*.js

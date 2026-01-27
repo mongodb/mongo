@@ -5,7 +5,9 @@
  *  # This test performs explicit calls to shardCollection
  *  assumes_unsharded_collection,
  *  # TODO(SERVER-114426) Remove incompatible_aubsan tag
- *  incompatible_aubsan
+ *  incompatible_aubsan,
+ *  # resharding can't run during FCV transitions
+ *  cannot_run_during_upgrade_downgrade,
  * ]
  */
 

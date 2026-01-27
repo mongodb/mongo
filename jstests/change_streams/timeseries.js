@@ -13,7 +13,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {ChangeStreamTest, getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamTest, getClusterTime, getNextClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {describe, before, it} from "jstests/libs/mochalite.js";
 import {getRawOperationSpec, isRawOperationSupported} from "jstests/libs/raw_operation_utils.js";
 import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -564,12 +564,7 @@ describe("$changeStream", function () {
     };
 
     function generateEvents(db) {
-        // Compute the cluster time right before generating events, but bump the increment to ensure we don't emit last event.
-        const currentClusterTime = getClusterTime(db);
-        const clusterTimeBeforeGeneratingEvents = new Timestamp(
-            currentClusterTime.getTime(),
-            currentClusterTime.getInc() + 1,
-        );
+        const clusterTimeBeforeGeneratingEvents = getNextClusterTime(getClusterTime(db));
 
         const coll = assertCreateCollection(db, collName, {timeseries: {timeField: "ts", metaField: "meta"}});
         coll.createIndex({ts: 1, "meta.b": 1}, {name: "dropMe"});

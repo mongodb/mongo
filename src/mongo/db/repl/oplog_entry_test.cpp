@@ -47,6 +47,7 @@
 #include "mongo/db/repl/optime_base_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/version_context.h"
@@ -1089,6 +1090,251 @@ DEATH_TEST_F(OplogEntryTestDeathTest, ParseWrongCommandOperation, "CommandType")
     auto entry = makeCommandOplogEntry(
         entryOpTime, nss, BSON("applyOps" << "test.coll"), boost::none, UUID::gen());
     IndexBuildOplogEntry::parse(_opCtx.get(), entry).getValue();
+}
+
+TEST_F(OplogEntryTest, GetAndSetCommitTransactionTimestamp) {
+    const BSONObj doc = BSON("_id" << docId << "a" << 5);
+    auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss, doc);
+
+    // The commitTransactionTimestamp should start out uninitialized.
+    ASSERT(!entry.getCommitTransactionTimestamp());
+
+    // Set the commitTransactionTimestamp for the first time.
+    auto commitTransactionTimestamp0 = Timestamp(100, 1);
+    entry.setCommitTransactionTimestamp(commitTransactionTimestamp0);
+    ASSERT_EQ(entry.getCommitTransactionTimestamp(), commitTransactionTimestamp0);
+
+    // Set the commitTransactionTimestamp again.
+    auto commitTransactionTimestamp1 = Timestamp(101, 1);
+    entry.setCommitTransactionTimestamp(commitTransactionTimestamp1);
+    ASSERT_EQ(entry.getCommitTransactionTimestamp(), commitTransactionTimestamp1);
+}
+
+TEST_F(OplogEntryTest, ToBSONForLoggingIncludesCommitTransactionTimestamp) {
+    const BSONObj doc = BSON("_id" << docId << "a" << 5);
+    auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss, doc);
+
+    auto commitTransactionTimestamp = Timestamp(100, 1);
+    entry.setCommitTransactionTimestamp(commitTransactionTimestamp);
+    ASSERT_EQ(entry.getCommitTransactionTimestamp(), commitTransactionTimestamp);
+
+    auto obj = entry.toBSONForLogging();
+    auto elt = obj[kExtractedCommitTransactionTimestampField];
+    ASSERT(!elt.eoo());
+    ASSERT_EQ(elt.timestamp(), commitTransactionTimestamp);
+}
+
+TEST_F(OplogEntryTest, ToBSONForDurableOplogEntryDoesNotIncludeCommitTransactionTimestamp) {
+    const BSONObj doc = BSON("_id" << docId << "a" << 5);
+    auto entry = makeInsertDocumentOplogEntry(entryOpTime, nss, doc);
+
+    auto commitTransactionTimestamp = Timestamp(100, 1);
+    entry.setCommitTransactionTimestamp(commitTransactionTimestamp);
+    ASSERT_EQ(entry.getCommitTransactionTimestamp(), commitTransactionTimestamp);
+
+    auto obj = entry.getEntry().toBSON();
+    auto elt = obj[kExtractedCommitTransactionTimestampField];
+    ASSERT(elt.eoo());
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampSucceeds_CommitTransactionOplogEntry) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto commitTimestamp = Timestamp(100, 0);
+    auto opTime = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry = repl::makeCommitTransactionOplogEntry(opTime, osi, commitTimestamp, opTime);
+    ASSERT_EQ(entry.extractCommitTransactionTimestamp(), commitTimestamp);
+}
+
+TEST_F(OplogEntryTest,
+       ExtractCommitTransactionTimestampFails_CommitTransactionOplogEntryNoSessionId) {
+    OperationSessionInfo osi;
+    osi.setTxnNumber(0);
+
+    auto commitTimestamp = Timestamp(100, 0);
+    auto opTime = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry = repl::makeCommitTransactionOplogEntry(opTime, osi, commitTimestamp, opTime);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_CommitTransactionOplogEntryNoTxnNum) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+
+    auto commitTimestamp = Timestamp(100, 0);
+    auto opTime = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry = repl::makeCommitTransactionOplogEntry(opTime, osi, commitTimestamp, opTime);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest,
+       ExtractCommitTransactionTimestampSucceeds_TerminalApplyOpsOplogEntryUnpreparedTxn) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              boost::none /* multiOpType */);
+    ASSERT_EQ(entry.extractCommitTransactionTimestamp(), opTime.getTimestamp());
+}
+
+TEST_F(OplogEntryTest,
+       ExtractCommitTransactionTimestampFails_TerminalApplyOpsOplogEntryNoSessionId) {
+    OperationSessionInfo osi;
+    osi.setTxnNumber(0);
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              boost::none /* multiOpType */);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_TerminalApplyOpsOplogEntryNoTxnNum) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              boost::none /* multiOpType */);
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest,
+       ExtractCommitTransactionTimestampFails_TerminalApplyOpsOplogEntryRetryableWrite) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PartialApplyOpsOplogEntry) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              boost::none /* multiOpType */,
+                                              repl::ApplyOpsType::kPartial);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730801);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PrepareApplyOpsOplogEntry) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto uuid = UUID::gen();
+    auto op = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry = repl::makeApplyOpsOplogEntry(opTime,
+                                              {op},
+                                              osi,
+                                              Date_t::now(),
+                                              {} /* stmtIds */,
+                                              repl::OpTime() /* prevOpTime */,
+                                              boost::none /* multiOpType */,
+                                              repl::ApplyOpsType::kPrepare);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730801);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_AbortTransactionOplogEntry) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto commitTimestamp = Timestamp(100, 0);
+    auto opTime = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry = repl::makeAbortTransactionOplogEntry(opTime, osi, opTime);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730801);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_CRUDOplogEntry) {
+    OperationSessionInfo osi;
+    osi.setSessionId(makeLogicalSessionIdForTest());
+    osi.setTxnNumber(0);
+
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    BSONObj doc = BSON("_id" << 0 << "x" << 10);
+    auto entry = makeInsertDocumentOplogEntryWithSessionInfo(opTime, nss, doc, osi);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
+}
+
+TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_NoopOplogEntry) {
+    auto opTime = repl::OpTime(Timestamp(100, 0), 0);
+    auto uuid = UUID::gen();
+    auto sessionId = makeLogicalSessionIdForTest();
+    auto txnNumber = 0;
+    auto entry = makeNoopOplogEntry(
+        opTime, nss, uuid, sessionId, txnNumber, {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+
+    auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
+    ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
 }
 
 }  // namespace

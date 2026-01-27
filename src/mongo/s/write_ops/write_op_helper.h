@@ -93,6 +93,19 @@ private:
     const int _baseSizeEstimate;
 };
 
+class NoBatchCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
+public:
+    explicit NoBatchCommandSizeEstimator() {}
+
+    int getBaseSizeEstimate() const final {
+        return 0;
+    }
+    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final {
+        return 0;
+    }
+    void addOpToBatch(int opIdx, const ShardId& shardId) final {}
+};
+
 bool isRetryErrCode(int errCode);
 
 template <typename ItemType, typename GetCodeFn>

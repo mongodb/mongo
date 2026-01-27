@@ -80,8 +80,8 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : getExpCtx();
-        auto executor =
-            executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+        auto executor = uassertStatusOK(
+            executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
         auto spec = getMongotRemoteSpec();
         tassert(9497007,
                 "Cannot clone with an initialized cursor - it cannot be shared",

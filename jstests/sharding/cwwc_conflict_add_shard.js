@@ -119,6 +119,7 @@ createNewShard();
 // No CWWC set neither on shard nor cluster should succeed.
 testAddShard(undefined /* cwwcOnShard */, undefined /* cwwcOnCluster */, true /* shouldSucceed */);
 
+createNewShard();
 // No CWWC set on cluster while shard has CWWC should fail.
 testAddShard(
     cwwc[0] /* cwwcOnShard */,
@@ -132,10 +133,12 @@ createNewShard();
 testAddShard(undefined /* cwwcOnShard */, cwwc[0] /* cwwcOnCluster */, true /* shouldSucceed */);
 
 for (let i = 0; i < cwwc.length; i++) {
+    createNewShard();
     // Setting the same CWWC on shard and cluster should succeed.
     testAddShard(cwwc[i] /* cwwcOnShard */, cwwc[i] /* cwwcOnCluster */, true /* shouldSucceed */);
     for (let j = i + 1; j < cwwc.length; j++) {
         for (const fixCWWCOnShard of [true, false]) {
+            createNewShard();
             // Setting different CWWC on shard and cluster should fail.
             testAddShard(
                 cwwc[i] /* cwwcOnShard */,

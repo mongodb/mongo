@@ -185,7 +185,7 @@ public:
 
     WiredTigerStringKeyedContainer& getWiredTigerContainer();
 
-    StringData uri() const {
+    const std::string& uri() const {
         return _container.uri();
     }
 

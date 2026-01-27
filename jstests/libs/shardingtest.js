@@ -939,6 +939,32 @@ export class ShardingTest {
     }
 
     /**
+     * Restarts the replicaset of the given shard in a clean mode, meaning all data will be dropped
+     * on the given replicaset.
+     * If you remove a shard, then after this call it's safe to add the shard back again to the
+     * cluster.
+     * 
+     * @param {object} shard the shard to restart
+     */
+    restartShardClean(shard) {
+        const idx = this._shardReplSetToIndex[shard.shardName];
+        const prevShardName = this._connections[idx].shardName;
+        const rs = this._rs[idx].test;
+        const startOptions = {...rs.startOptions};
+        rs.stopSet(null, false, {skipValidation: true});
+        rs.startSet(startOptions);
+        rs.initiate();
+        rs.awaitNodesAgreeOnPrimary();
+        rs.awaitSecondaryNodes();
+        rs.awaitReplication();
+
+        this._connections[idx] = new Mongo(this["rs" + idx].getURL(), undefined, {gRPC: false});
+        this._connections[idx].shardName = prevShardName;
+        this._connections[idx].rs = this["rs" + idx];
+        this["shard" + idx] = this._connections[idx];
+    }
+
+    /**
      * @typedef {Object} ShardingTestOtherParams
      * @property {Object} [rs] Same `rs` parameter to ShardingTest constructor
      * @property {number} [chunkSize] Same as chunkSize parameter to ShardingTest constructor

@@ -1153,6 +1153,10 @@ private:
     // Returns the member's corresponding opTime for recency check
     OpTime _getMemberOpTimeForRecencyCheck(const MemberData& memberData, bool durablyWritten);
 
+    // Returns whether a member was not found in the current config due to a change in the
+    // `disableReplicationUsageOfPriorityPort` parameter.
+    bool _shouldRestartHeartbeatsForPriorityPortServerParameter(const HostAndPort& member);
+
     // This node's role in the replication protocol.
     Role _role;
 
@@ -1258,6 +1262,11 @@ private:
     ReadCommittedSupport _storageEngineSupportsReadCommitted{ReadCommittedSupport::kUnknown};
 
     RecentSyncSourceChanges _recentSyncSourceChanges;
+
+    // Whether we have seen the `disableReplicationUsageOfPriorityPort` parameter enabled at some
+    // point. This allows us to skip more costly checks of if this parameter was recently turned
+    // on/off in the normal case.
+    bool _priorityPortUsageEverDisabled = false;
 };
 
 /**

@@ -42,7 +42,11 @@ namespace MONGO_MOD_PUB mongo {
 namespace unified_write_executor {
 
 struct FindAndModifyCommandResponse {
+    // The reply of the findAndModify command.
     StatusWith<write_ops::FindAndModifyCommandReply> swReply;
+    // The shardId where the findAndModify command is executed if known.
+    boost::optional<ShardId> shardId;
+    // The write concern error if exists.
     boost::optional<WriteConcernErrorDetail> wce;
 };
 using WriteCommandResponse = std::variant<BatchedCommandResponse,

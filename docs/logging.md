@@ -206,7 +206,7 @@ Fatal level log statements using `LOGV2_FATAL` perform `fassert` after logging,
 using the provided ID as assert id. `LOGV2_FATAL_NOTRACE` perform
 `fassertNoTrace` and `LOGV2_FATAL_CONTINUE` does not `fassert` allowing for
 continued execution. `LOGV2_FATAL_CONTINUE` is meant to be used when a fatal
-error has occured but a different way of halting execution is desired such as
+error has occurred but a different way of halting execution is desired such as
 `std::terminate` or `fassertFailedWithStatus`.
 
 `LOGV2_FATAL_OPTIONS` performs `fassert` by default like `LOGV2_FATAL` but this

@@ -77,7 +77,7 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0},
+                writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
             });
             assertExpectedResults({
                 results: entry,
@@ -115,7 +115,7 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0},
+                writes: {nMatched: 1, nUpserted: 0, nModified: 1, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
             });
 
             assertExpectedResults({
@@ -156,7 +156,7 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0},
+                writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
             });
 
             assertExpectedResults({
@@ -200,7 +200,7 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
                 usedDisk: false,
                 fromMultiPlanner: false,
                 fromPlanCache: false,
-                writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0},
+                writes: {nMatched: 8, nUpserted: 0, nModified: 8, nDeleted: 0, nInserted: 0, nUpdateOps: 1},
             });
 
             assertExpectedResults({

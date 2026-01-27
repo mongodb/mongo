@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/auth/user_name.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
 
@@ -39,12 +40,12 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Client;
 class OperationContext;
 
-namespace auth {
+namespace MONGO_MOD_PUBLIC auth {
 
 class ValidatedTenancyScope {
 public:
@@ -185,5 +186,5 @@ private:
     TenantProtocol _tenantProtocol{TenantProtocol::kDefault};
 };
 
-}  // namespace auth
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace MONGO_MOD_PUBLIC mongo

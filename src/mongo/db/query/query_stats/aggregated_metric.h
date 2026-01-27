@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/summation.h"
@@ -187,6 +188,34 @@ struct AggregatedBool {
 
     uint32_t trueCount{0};
     uint32_t falseCount{0};
+};
+
+/**
+ * An aggregated metric for cardinality estimation methods used by the cost-based ranker.
+ * Aggregates counts across multiple query executions.
+ */
+struct AggregatedCardinalityEstimationMethods {
+
+    /**
+     * Aggregate counters for the cardinality estimation methods.
+     */
+    void aggregate(const CardinalityEstimationMethods& other) {
+        counts.setHistogram(counts.getHistogram().value_or(0) + other.getHistogram().value_or(0));
+        counts.setSampling(counts.getSampling().value_or(0) + other.getSampling().value_or(0));
+        counts.setHeuristics(counts.getHeuristics().value_or(0) +
+                             other.getHeuristics().value_or(0));
+        counts.setMixed(counts.getMixed().value_or(0) + other.getMixed().value_or(0));
+        counts.setMetadata(counts.getMetadata().value_or(0) + other.getMetadata().value_or(0));
+        counts.setCode(counts.getCode().value_or(0) + other.getCode().value_or(0));
+    }
+
+    /**
+     * Appends the counter data to a BSON builder as a sub-object.
+     * For query stats observability, always emits all fields including zeros.
+     */
+    void appendTo(BSONObjBuilder& builder, StringData fieldName) const;
+
+    CardinalityEstimationMethods counts;
 };
 
 

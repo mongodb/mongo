@@ -57,6 +57,7 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -74,10 +75,11 @@ OplogApplierBatcher::OplogApplierBatcher(OplogApplier* oplogApplier, OplogBuffer
     : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops() {}
 OplogApplierBatcher::~OplogApplierBatcher() {
     invariant(!_thread);
+    ObservableMutexRegistry::get().add("OplogApplierBatcher::_mutex", _mutex);
 }
 
 OplogApplierBatch OplogApplierBatcher::getNextBatch(Seconds maxWaitTime) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    stdx::unique_lock lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
     // 2. Shutdown.
@@ -412,7 +414,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
         int retryAttempts = 0;
         for (;;) {
             try {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
                 ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
                     opCtx.get(), AdmissionContext::Priority::kExempt);
 
@@ -491,9 +493,9 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
             }
         }
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock lock(_mutex);
         // Block until the previous batch has been taken.
-        _cv.wait(lk, [&] { return _ops.empty() && !_ops.termWhenExhausted(); });
+        _cv.wait(lock, [&] { return _ops.empty() && !_ops.termWhenExhausted(); });
         _ops = std::move(ops);
         _cv.notify_all();
         if (_ops.mustShutdown()) {

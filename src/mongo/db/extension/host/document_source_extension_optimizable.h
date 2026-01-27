@@ -394,7 +394,7 @@ protected:
      **/
     const std::string _stageName;
     const MongoExtensionStaticProperties _properties;
-    const LogicalAggStageHandle _logicalStage;
+    LogicalAggStageHandle _logicalStage;
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        AggStageAstNodeHandle astNode)
@@ -424,6 +424,12 @@ private:
     DocumentSourceExtensionOptimizable& operator=(const DocumentSourceExtensionOptimizable&) =
         delete;
     DocumentSourceExtensionOptimizable& operator=(DocumentSourceExtensionOptimizable&&) = delete;
+
+    // Limit value for the pipeline as a whole. This is not the limit that we send to mongot,
+    // rather, it is used when adding the $limit stage to the merging pipeline in a sharded cluster.
+    // This allows us to limit the documents that are returned from the shards as much as possible
+    // without adding complicated rules for pipeline splitting.
+    boost::optional<long long> _limit;
 };
 
 namespace helper {

@@ -355,7 +355,8 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 
 bool NamespaceString::isImplicitlyReplicated() const {
     if (db_deprecated() == DatabaseName::kConfig.db(omitTenant)) {
-        if (isChangeStreamPreImagesCollection() || isConfigImagesCollection()) {
+        if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
+            isConfigTransactionsCollection()) {
             // Implicitly replicated namespaces are replicated, although they only replicate a
             // subset of writes.
             invariant(isReplicated());

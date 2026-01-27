@@ -578,6 +578,31 @@ TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortSpecified) {
         true);
 }
 
+TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortDisabled) {
+    RAIIServerParameterControllerForTest disablePriorityPort(
+        "disableReplicationUsageOfPriorityPort", true);
+    testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 3)
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 4))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortDisabledMixedCluster) {
+    RAIIServerParameterControllerForTest disablePriorityPort(
+        "disableReplicationUsageOfPriorityPort", true);
+    testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2")
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 4))),
+        0,
+        false);
+}
+
+
 void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
                                                           int selfIndex,
                                                           bool expectPriority) {

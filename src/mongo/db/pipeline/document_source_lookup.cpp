@@ -478,7 +478,9 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (pipelineElem) {
         auto pipeline = parsePipelineFromBSON(pipelineElem);
-        liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline);
+        auto optsCopy = options;
+        optsCopy.makeSubpipelineOwned = true;
+        liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline, false, optsCopy);
     }
 
     return std::make_unique<DocumentSourceLookUp::LiteParsed>(

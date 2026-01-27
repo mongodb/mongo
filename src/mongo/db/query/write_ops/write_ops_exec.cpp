@@ -1604,6 +1604,7 @@ static SingleWriteResult performSingleUpdateOp(
         &hangWithLockDuringBatchUpdate, opCtx, "hangWithLockDuringBatchUpdate");
 
     auto& curOp = *CurOp::get(opCtx);
+    curOp.debug().getAdditiveMetrics().nUpdateOps = wholeOp.getUpdates().size();
 
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
         curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())

@@ -4,8 +4,8 @@
 [jsTest] Resetting collection. Inserting docs:
 [jsTest] ----
 
-{  "City" : "Buffalo",  "Country" : {  "_id" : "US" },  "State" : "NewYork",  "_id" : 1 }
-{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
+{ "City" : "Buffalo", "Country" : { "_id" : "US" }, "State" : "NewYork", "_id" : 1 }
+{ "City" : "SanFrancisco", "Country" : { "_id" : "US" }, "State" : "California", "_id" : 0 }
 Collection count: 2
 
 
@@ -13,7 +13,7 @@ Collection count: 2
 [jsTest] Creating indexes:
 [jsTest] ----
 
-{  "Country._id" : 1,  "State" : 1 }
+{ "Country._id" : 1, "State" : 1 }
 
 
 [jsTest] ----
@@ -42,7 +42,7 @@ Collection count: 2
 [jsTest] })
 [jsTest] ----
 
-{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
+{ "City" : "SanFrancisco", "Country" : { "_id" : "US" }, "State" : "California", "_id" : 0 }
 
 
 [jsTest] ----
@@ -74,4 +74,4 @@ Collection count: 2
 [jsTest] })
 [jsTest] ----
 
-{  "City" : "SanFrancisco",  "Country" : {  "_id" : "US" },  "State" : "California",  "_id" : 0 }
+{ "City" : "SanFrancisco", "Country" : { "_id" : "US" }, "State" : "California", "_id" : 0 }

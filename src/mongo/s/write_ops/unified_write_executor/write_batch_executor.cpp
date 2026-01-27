@@ -810,7 +810,7 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                                   std::vector<WriteOp> ops,
                                   bool inTransaction,
                                   boost::optional<HostAndPort> hostAndPort,
-                                  boost::optional<const ShardId&> shardId) {
+                                  boost::optional<ShardId> shardId) {
     tassert(11468109, "Expected at least one write op", !ops.empty());
 
     WriteCommandRef cmdRef = ops.front().getCommand();
@@ -832,7 +832,8 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                              boost::none /*wce*/,
                              std::move(ops),
                              transientTxnError,
-                             std::move(hostAndPort)};
+                             std::move(hostAndPort),
+                             std::move(shardId)};
     }
 
     const auto& response = swResponse.getValue();
@@ -867,7 +868,8 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                              std::move(wce),
                              std::move(ops),
                              transientTxnError,
-                             response.target};
+                             response.target,
+                             std::move(shardId)};
     }
 
     // If there were no local errors or top-level errors, parse the reply, and then return a
@@ -910,7 +912,8 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                          std::move(wce),
                          std::move(ops),
                          false /*transientTxnError*/,
-                         response.target};
+                         response.target,
+                         shardId};
 }
 
 ShardResponse ShardResponse::makeEmpty(std::vector<WriteOp> ops) {
@@ -936,24 +939,27 @@ NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     StatusWith<BatchWriteCommandReply> swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction) {
-    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+    bool inTransaction,
+    boost::optional<ShardId> shardId) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction, std::move(shardId));
 }
 
 NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     StatusWith<BulkWriteCommandReply> swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction) {
-    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+    bool inTransaction,
+    boost::optional<ShardId> shardId) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction, std::move(shardId));
 }
 
 NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     StatusWith<write_ops::FindAndModifyCommandReply> swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction) {
-    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+    bool inTransaction,
+    boost::optional<ShardId> shardId) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction, std::move(shardId));
 }
 
 template <typename ResponseType>
@@ -961,7 +967,8 @@ NoRetryWriteBatchResponse NoRetryWriteBatchResponse::makeImpl(
     StatusWith<ResponseType> swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction) {
+    bool inTransaction,
+    boost::optional<ShardId> shardId) {
     const auto& status = swResponse.getStatus();
     const bool transientTxnError = isTransientTxnError(inTransaction, status);
 
@@ -969,14 +976,21 @@ NoRetryWriteBatchResponse NoRetryWriteBatchResponse::makeImpl(
                                  : StatusWith<CommandReplyVariant>(status);
 
     return NoRetryWriteBatchResponse{
-        std::move(swReply), std::move(wce), std::vector<WriteOp>{op}, transientTxnError};
+        std::move(swReply),
+        std::move(wce),
+        std::vector<WriteOp>{op},
+        transientTxnError,
+        /* hostAndPort */ boost::none,
+        shardId,
+    };
 }
 
 NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     const StatusWith<BSONObj>& swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction) {
+    bool inTransaction,
+    boost::optional<ShardId> shardId) {
     WriteCommandRef cmdRef = op.getCommand();
     const auto& status = swResponse.getStatus();
 
@@ -987,21 +1001,21 @@ NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
                 ? StatusWith(parseBatchWriteCommandReplySingleOp(swResponse.getValue(), batchType))
                 : StatusWith<BatchWriteCommandReply>(status);
 
-            return make(std::move(swReply), std::move(wce), op, inTransaction);
+            return make(std::move(swReply), std::move(wce), op, inTransaction, shardId);
         },
         [&](const BulkWriteCommandRequest&) {
             auto swReply = status.isOK()
                 ? StatusWith(parseBulkWriteCommandReplySingleOp(swResponse.getValue(), op))
                 : StatusWith<BulkWriteCommandReply>(status);
 
-            return make(std::move(swReply), std::move(wce), op, inTransaction);
+            return make(std::move(swReply), std::move(wce), op, inTransaction, shardId);
         },
         [&](const write_ops::FindAndModifyCommandRequest&) {
             auto swReply = status.isOK()
                 ? StatusWith(parseFindAndModifyCommandReply(swResponse.getValue()))
                 : StatusWith<write_ops::FindAndModifyCommandReply>(status);
 
-            return make(std::move(swReply), std::move(wce), op, inTransaction);
+            return make(std::move(swReply), std::move(wce), op, inTransaction, shardId);
         }));
 }
 
@@ -1167,10 +1181,16 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto swRes =
         write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, std::move(cmdObj), wce);
 
+    boost::optional<ShardId> shardId = boost::none;
+    if (swRes.isOK()) {
+        shardId = ShardId(std::string(swRes.getValue().getShardId()));
+    }
+
     auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
                                    : StatusWith<BSONObj>{swRes.getStatus()};
 
-    return NoRetryWriteBatchResponse::make(swResponse, std::move(wce), writeOp, inTransaction);
+    return NoRetryWriteBatchResponse::make(
+        swResponse, std::move(wce), writeOp, inTransaction, std::move(shardId));
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,

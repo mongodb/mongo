@@ -28,7 +28,6 @@
  */
 
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -37,13 +36,11 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 
-#include <string>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

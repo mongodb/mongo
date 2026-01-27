@@ -29,12 +29,23 @@
 
 #pragma once
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/rewrites/rule_based_rewriter.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
+#include <concepts>
+#include <cstddef>
+#include <iterator>
 #include <type_traits>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::rule_based_rewrites::pipeline {
 

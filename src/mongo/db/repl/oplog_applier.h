@@ -43,6 +43,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <memory>
 #include <vector>
@@ -221,7 +222,7 @@ private:
     Observer* const _observer;
 
     // Protects member data of OplogApplier.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;

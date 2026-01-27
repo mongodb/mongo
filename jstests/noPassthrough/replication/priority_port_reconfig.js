@@ -2,14 +2,15 @@
  * Tests ReplSetReconfig with priorityPort specified.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfPriorityPort,
+ *  # The priority port is based on ASIO, so gRPC testing is excluded
+ *  grpc_incompatible,
+ *  requires_fcv_83,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
-import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {configureFailPointForRS, configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 describe("Tests for priority port usage within JS test helpers", function () {
     beforeEach(() => {
@@ -193,11 +194,9 @@ describe("Tests for priority port usage within JS test helpers", function () {
     });
 
     it("Initiate with priority port plus bindIp works when fast resolution works", () => {
-        let ips = "localhost," + get_ipaddr();
         const rs = new ReplSetTest({
             nodes: 1,
             usePriorityPorts: true,
-            nodeOptions: {bind_ip: ips},
         });
         rs.startSet();
         rs.initiate();
@@ -206,14 +205,14 @@ describe("Tests for priority port usage within JS test helpers", function () {
     });
 
     it("Initiate with priority port plus bindIp works when fast resolution does not", () => {
-        let ips = "localhost," + getHostName();
         const rs = new ReplSetTest({
             nodes: 1,
             usePriorityPorts: true,
-            nodeOptions: {bind_ip: ips},
         });
-        rs.startSet();
+        let nodes = rs.startSet();
+        let failFastResolution = configureFailPoint(nodes[0], "failIsSelfCheck", {fastPathOnly: true});
         rs.initiate();
+        failFastResolution.off();
 
         rs.stopSet();
     });

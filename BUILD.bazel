@@ -129,6 +129,10 @@ genrule(
     srcs = ["compile_commands.json"],
     outs = ["compile_commands_done"],
     cmd = "echo noop > $(location :compile_commands_done)",
+    tags = [
+        "no-cache",
+        "no-remote-exec",
+    ],
 )
 
 # This sets up targets for install-wiredtiger and archive-wiredtiger

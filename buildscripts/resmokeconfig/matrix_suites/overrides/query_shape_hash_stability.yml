@@ -44,6 +44,9 @@
       - jstests/core/index/express_id_eq.js
       # Tests the number of slow query logs which is changed by the override.
       - jstests/core/query/query_settings/query_shape_hash_in_slow_query_logs.js
+      # UUID mismatch on update explain
+      - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
+      - jstests/core/query/parsing/collection_uuid_write_commands.js
 
     exclude_with_any_tags:
       - does_not_support_repeated_reads
@@ -133,8 +136,6 @@
       - jstests/core/query/explain/explain_all_plans_execution_stats.js
       - jstests/core/timeseries/ddl/rename_timeseries.js
       - jstests/core/timeseries/write/timeseries_delete_with_meta.js
-      # UUID mismatch on second cluster.
-      - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
 
 - name: multiversion_aggregation_excludes
   value:

@@ -49,8 +49,8 @@ class UpdateDriver;
  *
  * Caller must hold the appropriate database locks.
  */
-MONGO_MOD_PUBLIC UpdateResult update(OperationContext* opCtx,
-                                     CollectionAcquisition& coll,
-                                     const UpdateRequest& request);
+MONGO_MOD_PUBLIC UpdateResult doUpdate(OperationContext* opCtx,
+                                       CollectionAcquisition& coll,
+                                       const UpdateRequest& request);
 
 }  // namespace mongo

@@ -26,13 +26,11 @@ variables:
   # - etc/evergreen_yml_components/variants/windows/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &windows_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     compile_variant: *windows_compile_variant_name
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
-    python: "/cygdrive/c/python/python310/python.exe"
+    python: "/cygdrive/c/python/python313/python.exe"
     ext: zip
     multiversion_platform: windows
     multiversion_edition: enterprise
@@ -59,8 +57,6 @@ buildvariants:
       - windows-2022-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     expansions: &windows_compile_expansions
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       exe: ".exe"
       ext: zip
       additional_package_targets: >-
@@ -70,7 +66,7 @@ buildvariants:
       content_type: application/zip
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=windows
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       compile_variant: *windows-compile-required
       xlarge_distro_name: windows-2022-expandedports-xlarge
     tasks:
@@ -133,7 +129,7 @@ buildvariants:
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
       exe: ".exe"
       content_type: application/zip
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       multiversion_platform: windows
       multiversion_edition: enterprise

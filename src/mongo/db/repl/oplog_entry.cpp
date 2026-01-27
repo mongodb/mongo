@@ -31,6 +31,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -487,11 +488,11 @@ bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
 }
 
 bool DurableOplogEntry::isInTransaction() const {
+    if (!getTxnNumber() || !getSessionId())
+        return false;
     if (getCommandType() == CommandTypeEnum::kAbortTransaction ||
         getCommandType() == CommandTypeEnum::kCommitTransaction)
         return true;
-    if (!getTxnNumber() || !getSessionId())
-        return false;
     if (getCommandType() != CommandTypeEnum::kApplyOps)
         return false;
     return applyOpsIsLinkedTransactionally();
@@ -668,6 +669,9 @@ BSONObj OplogEntry::toBSONForLogging() const {
 
     if (_isForCappedCollection) {
         builder.append("isForCappedCollection", _isForCappedCollection);
+    }
+    if (_commitTransactionTimestamp) {
+        builder.append(kExtractedCommitTransactionTimestampField, *_commitTransactionTimestamp);
     }
 
     return builder.obj();
@@ -887,6 +891,35 @@ const boost::optional<mongo::Date_t>& OplogEntry::getApplyOpsWallClockTime() con
 }
 void OplogEntry::setApplyOpsWallClockTime(boost::optional<mongo::Date_t> value) {
     _applyOpsWallClockTime = value;
+}
+
+const boost::optional<mongo::Timestamp>& OplogEntry::getCommitTransactionTimestamp() const {
+    return _commitTransactionTimestamp;
+}
+
+void OplogEntry::setCommitTransactionTimestamp(boost::optional<mongo::Timestamp> value) {
+    _commitTransactionTimestamp = value;
+}
+
+StatusWith<Timestamp> OplogEntry::extractCommitTransactionTimestamp() const {
+    if (!isInTransaction()) {
+        return Status{mongo::ErrorCodes::Error(11730800),
+                      str::stream() << "Expected a transaction oplog entry but found op type "
+                                    << repl::OpType_serializer(getOpType()) << " with session id "
+                                    << getSessionId() << " and txn number " << getTxnNumber()};
+    }
+    if (isTerminalApplyOps()) {
+        return getTimestamp();
+    }
+    if (getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
+        auto commitTxnObj = CommitTransactionOplogObject::parse(getObject());
+        return *commitTxnObj.getCommitTimestamp();
+    }
+    return Status{
+        mongo::ErrorCodes::Error(11730801),
+        str::stream() << "Expected a terminal applyOps oplog entry or a commitTransaction oplog "
+                         "entry but found op type "
+                      << repl::OpType_serializer(getOpType())};
 }
 
 mongo::Timestamp OplogEntry::getTimestampForPreImage() const {

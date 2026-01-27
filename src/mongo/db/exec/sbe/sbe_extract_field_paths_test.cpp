@@ -275,7 +275,25 @@ TEST_F(ExtractFieldPathsStageTest, TwoPathsArrayLength2Test) {
     std::vector<FieldPath> paths{"a.b", "a.c"};
     std::vector<std::string> inputs{"{a: [{b: 1, c: 2}, {b: 3, c: 4}]}"};
     std::vector<std::string> outputs{"[[1, 3], [2, 4]]"};
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
 
+TEST_F(ExtractFieldPathsStageTest, ThreePathsArrayLength2Test) {
+    std::vector<FieldPath> paths{"a.b", "a.c", "a.d"};
+    std::vector<std::string> inputs{"{a: [{b: 1, c: 2, d: 3}, {b: 4, c: 5, d: 6}]}"};
+    std::vector<std::string> outputs{"[[1, 4], [2, 5], [3, 6]]"};
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
+TEST_F(ExtractFieldPathsStageTest, TenPathsArrayLength2Test) {
+    std::vector<FieldPath> paths{
+        "a.b", "a.c", "a.d", "a.e", "a.f", "a.g", "a.h", "a.i", "a.j", "a.k"};
+    std::vector<std::string> inputs{
+        "{a: [{b: 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7, i: 8, j: 9, k: 10}, {b: 11, c: 12, d: 13, "
+        "e: 14, f: 15, g: 16, h: 17, i: 18, j: 19, k: 20}]}"};
+    std::vector<std::string> outputs{
+        "[[1, 11], [2, 12], [3, 13], [4, 14], [5, 15], [6, 16], [7, 17], [8, 18], [9, 19], [10, "
+        "20]]"};
     runExtractFieldPathsTest(paths, inputs, outputs);
 }
 
@@ -346,6 +364,19 @@ TEST_F(ExtractFieldPathsStageTest, OnePathExistsOneDoesntTest) {
     std::vector<FieldPath> paths{"a", "a.c"};
     std::vector<std::string> inputs{"{a: 1}", "{a: 2}", "{a: {b: 3}}"};
     std::vector<std::string> outputs{"[1]", "[2]", "[{b: 3}]"};
+
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
+TEST_F(ExtractFieldPathsStageTest, NinePathsExistOneDoesntTest) {
+    std::vector<FieldPath> paths{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"};
+    std::vector<std::string> inputs{
+        "{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9}",
+        "{a: 10, b: 11, c: 12, d: 13, e: 14, f: 15, g: 16, h: 17, i: 18}",
+        "{a: 19, b: 20, c: 21, d: 22, e: 23, f: 24, g: 25, h: 26, i: 27}"};
+    std::vector<std::string> outputs{"[1, 2, 3, 4, 5, 6, 7, 8, 9]",
+                                     "[10, 11, 12, 13, 14, 15, 16, 17, 18]",
+                                     "[19, 20, 21, 22, 23, 24, 25, 26, 27]"};
 
     runExtractFieldPathsTest(paths, inputs, outputs);
 }

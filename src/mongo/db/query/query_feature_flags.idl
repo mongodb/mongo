@@ -40,9 +40,9 @@ feature_flags:
     featureFlagSbeAccumulators:
         description: "Feature flag to enable single-purpose SBE $group accumulators."
         cpp_varname: gFeatureFlagSbeAccumulators
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeFull:
         description:
@@ -234,7 +234,7 @@ feature_flags:
         description: "Feature flag to enable N-ary ABT nodes"
         cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
@@ -307,7 +307,8 @@ feature_flags:
     featureFlagQueryStatsCBRMetrics:
         description: "Feature flag to enable cost-based ranker metrics in query stats."
         cpp_varname: gFeatureFlagQueryStatsCBRMetrics
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagQueryStatsMetricsSubsections:
@@ -320,8 +321,8 @@ feature_flags:
         description: "Feature flag to enable extract_field_paths SBE stage."
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage
         fcv_gated: false
-        default: true
-        incremental_rollout_phase: rollout
+        default: false
+        incremental_rollout_phase: in_development
 
     featureFlagPathArrayness:
         description: "Feature flag to enable tracking of path arrayness."
@@ -332,9 +333,9 @@ feature_flags:
     featureFlagUnifiedWriteExecutor:
         description: "Feature flag to use the unified write executor."
         cpp_varname: "gFeatureFlagUnifiedWriteExecutor"
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagOriginalQueryShapeHash:
         description: "Feature flag to to pass 'originalQueryShapeHash' field in commands from router to shards."
@@ -374,3 +375,9 @@ feature_flags:
         fcv_gated: false
         default: false
         incremental_rollout_phase: in_development
+
+    featureFlagExtensionViewsAndUnionWith:
+        description: "Feature flag to enable extension stages on views and in $unionWith."
+        cpp_varname: gFeatureFlagExtensionViewsAndUnionWith
+        default: false
+        fcv_gated: false

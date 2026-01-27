@@ -15,15 +15,22 @@ import {getCollectionModel} from "jstests/libs/property_test_helpers/models/coll
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {sbePushdownEligibleAggModel} from "jstests/libs/property_test_helpers/common_models.js";
+import {checkSbeStatus, kSbeRestricted, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
+import {trySbeRestrictedPushdownEligibleAggModel} from "jstests/libs/property_test_helpers/common_models.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
-const numRuns = 10;
-const numQueriesPerRun = 10;
+const sbeStatus = checkSbeStatus(db);
+if (sbeStatus === kSbeDisabled) {
+    jsTest.log.info("SBE is disabled, skipping test.");
+    quit();
+}
+
+const numRuns = 6;
+const numQueriesPerRun = 6;
 const jsTestLogExplain = false;
 
 const controlName = "match_pbt_control";
@@ -42,17 +49,18 @@ const correctnessProperty = createCorrectnessProperty(
 // The inner side of the lookup may be out-of-order between control and experiment. There are
 // $unwind's sprinkled in as a workaround. This blocks SBE pushdown for some suffix of the
 // pipeline.
-// TODO SERVER-115463 use a new comparator with kSortArrays.
 testProperty(
     correctnessProperty,
     {controlColl, experimentColl},
     // Control collection is foreign side.
     makeWorkloadModel({
         collModel: getCollectionModel(),
-        aggModel: sbePushdownEligibleAggModel(controlName),
+        aggModel: trySbeRestrictedPushdownEligibleAggModel(controlName),
         numQueriesPerRun,
     }),
     numRuns,
+    undefined /*examples*/,
+    true /*sortArrays*/,
 );
 
 testProperty(
@@ -61,8 +69,10 @@ testProperty(
     // Experiment collection is foreign side.
     makeWorkloadModel({
         collModel: getCollectionModel(),
-        aggModel: sbePushdownEligibleAggModel(experimentName),
+        aggModel: trySbeRestrictedPushdownEligibleAggModel(experimentName),
         numQueriesPerRun,
     }),
     numRuns,
+    undefined /*examples*/,
+    true /*sortArrays*/,
 );

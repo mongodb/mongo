@@ -216,6 +216,7 @@ target-version = "py310"
 [tool.ruff.lint]
 extend-select = [
     "I",   # isort
+    "W605",   # invalid-escape-sequence
 ]
 ignore = [
     "E402", # module-import-not-at-top-of-file

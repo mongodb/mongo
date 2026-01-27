@@ -29,13 +29,14 @@
 
 #pragma once
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class Client;
 class OperationContext;
 
-namespace auth {
+namespace MONGO_MOD_PUBLIC auth {
 
 class ValidatedTenancyScopeFactory {
 public:
@@ -125,5 +126,5 @@ private:
     boost::optional<auth::ValidatedTenancyScope::TenantProtocol> _tenantProtocol;
 };
 
-}  // namespace auth
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC auth
+}  // namespace MONGO_MOD_PUBLIC mongo

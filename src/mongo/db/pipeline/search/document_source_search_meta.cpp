@@ -158,8 +158,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
             elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     auto internalRemoteSpec = prepareInternalSearchMetaMongotSpec(specObj, expCtx);
 
     return {

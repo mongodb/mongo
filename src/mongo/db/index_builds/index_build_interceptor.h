@@ -197,11 +197,13 @@ public:
     }
 
     /**
-     * We need a getter for the sorter table for container writes and  to iterate through the sorter
-     * table.
+     * Creates a ContainerSpiller from the _sorterTable.
      */
-    std::unique_ptr<TemporaryRecordStore> getSorterTable() {
-        return std::move(_sorterTable);
+    IntegerKeyedContainer& getSorterContainer() {
+        invariant(_sorterTable);
+        return std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                   _sorterTable->rs()->getContainer())
+            .get();
     }
 
 private:

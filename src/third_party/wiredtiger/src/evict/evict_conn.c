@@ -135,20 +135,53 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
         evict->eviction_dirty_trigger = evict->eviction_trigger;
     }
 
+    bool precise_checkpoint = F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT);
     if (evict->eviction_updates_target < DBL_EPSILON) {
-        WT_CONFIG_DEBUG(session,
-          "config eviction_updates_target (%f) cannot be zero. Setting "
-          "to 50%% of eviction_dirty_target (%f).",
-          evict->eviction_updates_target, evict->eviction_dirty_target / 2);
-        evict->eviction_updates_target = evict->eviction_dirty_target / 2;
+        if (precise_checkpoint) {
+            /*
+             * If we are running with precise checkpoint enabled we want to discourage update based
+             * eviction. To do this we set the updates target to the dirty target by default. This
+             * change improves performance with regards to history store eviction as previously we
+             * were evicting history store pages ahead of the checkpoint as they would have updates
+             * on them. These pages would then be read back in due to checkpoint moving updates to
+             * the history store.
+             */
+            WT_CONFIG_DEBUG(session,
+              "config eviction_updates_target (%f) cannot be zero. Setting "
+              "to eviction_dirty_target (%f) for precise checkpoint.",
+              evict->eviction_updates_target, evict->eviction_dirty_target);
+            evict->eviction_updates_target = evict->eviction_dirty_target;
+        } else {
+            WT_CONFIG_DEBUG(session,
+              "config eviction_updates_target (%f) cannot be zero. Setting "
+              "to 50%% of eviction_dirty_target (%f).",
+              evict->eviction_updates_target, evict->eviction_dirty_target / 2);
+            evict->eviction_updates_target = evict->eviction_dirty_target / 2;
+        }
     }
 
     if (evict->eviction_updates_trigger < DBL_EPSILON) {
-        WT_CONFIG_DEBUG(session,
-          "config eviction_updates_trigger (%f) cannot be zero. Setting "
-          "to 50%% of eviction_dirty_trigger (%f).",
-          evict->eviction_updates_trigger, evict->eviction_dirty_trigger / 2);
-        evict->eviction_updates_trigger = evict->eviction_dirty_trigger / 2;
+        /*
+         * Generally we want to allow a reasonable amount of updates content, the default dirty
+         * targets of 5% target and 20% dirty would result in a 2.5% dirty target which is lower
+         * than ideal when precise checkpoints are configured. Allow more updates content to remain
+         * in cache, but handle cases where non-default dirty configurations would cause updates
+         * target to exceed the trigger value with an asymmetric formula.
+         */
+        if (precise_checkpoint &&
+          evict->eviction_dirty_trigger / 2 < evict->eviction_updates_target) {
+            WT_CONFIG_DEBUG(session,
+              "config eviction_updates_trigger (%f) cannot be zero. Setting "
+              "to eviction_dirty_trigger (%f) for precise checkpoint.",
+              evict->eviction_updates_trigger, evict->eviction_dirty_trigger);
+            evict->eviction_updates_trigger = evict->eviction_dirty_trigger;
+        } else {
+            WT_CONFIG_DEBUG(session,
+              "config eviction_updates_trigger (%f) cannot be zero. Setting "
+              "to 50%% of eviction_dirty_trigger (%f).",
+              evict->eviction_updates_trigger, evict->eviction_dirty_trigger / 2);
+            evict->eviction_updates_trigger = evict->eviction_dirty_trigger / 2;
+        }
     }
 
     /* Don't allow the trigger to be larger than the overall trigger. */

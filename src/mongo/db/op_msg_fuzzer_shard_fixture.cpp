@@ -135,7 +135,7 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
     DatabaseShardingStateFactory::set(_serviceContext,
                                       std::make_unique<DatabaseShardingStateFactoryShard>());
     DatabaseHolder::set(_serviceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(_serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(_serviceContext, std::make_unique<CollectionImplFactory>());
 
     // Setup the repl coordinator in standalone mode so we don't need an oplog etc.
     repl::ReplicationCoordinator::set(

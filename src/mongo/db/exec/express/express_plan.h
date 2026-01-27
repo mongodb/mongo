@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/exec/classic/projection.h"
-#include "mongo/db/exec/classic/update_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_access_method.h"
@@ -874,16 +873,8 @@ public:
                     bool isUserInitiatedWrite,
                     const UpdateRequest* request)
         : _updateDriver(updateDriver),
-          _returnDocs(request->getReturnDocs()),
-          _stmtIds(request->getStmtIds()),
-          _allowShardKeyUpdatesWithoutFullShardKeyInQuery(
-              request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()),
-          _isUserInitiatedWrite(isUserInitiatedWrite),
-          _isExplain(request->getIsExplain()),
-          _isMulti(request->isMulti()),
-          _source(request->source()),
-          _sampleId(request->getSampleId()) {
-
+          _request(request),
+          _isUserInitiatedWrite(isUserInitiatedWrite) {
         tassert(8375904, "Upserts not supported in Express.", !request->isUpsert());
     }
 
@@ -915,8 +906,25 @@ public:
             exceptionRecoveryPolicy,
             UpdateOperation::name,
             [&]() {
-                newObj = updateById(opCtx, collection, obj, rid, shouldWriteToOrphan, cursor);
-                if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_OLD) {
+                mutablebson::Document doc{};
+                bool docWasModified;
+                std::tie(newObj, docWasModified) =
+                    update::transformDocument(opCtx,
+                                              collection,
+                                              obj,
+                                              doc,
+                                              _isUserInitiatedWrite,
+                                              nullptr /* cq */,
+                                              rid,
+                                              _updateDriver,
+                                              _request,
+                                              shouldWriteToOrphan,
+                                              nullptr /* updatedRecordIds*/,
+                                              cursor);
+                if (docWasModified) {
+                    _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
+                }
+                if (_request->getReturnDocs() == UpdateRequest::ReturnDocOption::RETURN_OLD) {
                     newObj = obj.value();
                 }
                 _stats->setContainsDotsAndDollarsField(
@@ -927,7 +935,7 @@ public:
                 size_t numDocsMatched = 1;
                 _stats->incUpdatedStats(numDocsMatched);
 
-                if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_NONE) {
+                if (_request->getReturnDocs() == UpdateRequest::ReturnDocOption::RETURN_NONE) {
                     return Ready{};
                 } else {
                     return continuation(std::move(newObj));
@@ -935,196 +943,12 @@ public:
             });
     }
 
-    BSONObj updateById(OperationContext* opCtx,
-                       const CollectionAcquisition& collection,
-                       const Snapshotted<BSONObj>& oldObj,
-                       const RecordId& rid,
-                       bool shouldWriteToOrphan,
-                       const SeekableRecordCursor* cursor) const {
-        BSONObj logObj;
-        bool docWasModified = false;
-        FieldRefSet immutablePaths;
-        Status status = Status::OK();
-
-        mutablebson::Document doc(oldObj.value(),
-                                  (collection.getCollectionPtr()->updateWithDamagesSupported()
-                                       ? mutablebson::Document::kInPlaceEnabled
-                                       : mutablebson::Document::kInPlaceDisabled));
-        DamageVector damages;
-
-
-        if (_isUserInitiatedWrite) {
-            const auto& collDesc = collection.getShardingDescription();
-            if (collDesc.isSharded() && !OperationShardingState::isComingFromRouter(opCtx)) {
-                immutablePaths.fillFrom(collDesc.getKeyPatternFields());
-            }
-            immutablePaths.keepShortest(&idFieldRef);
-        }
-
-        // positional updates would not be simple _id queries, so match details should never be
-        // needed.
-        tassert(8375905,
-                "Positional updates not allowed in Express",
-                !_updateDriver->needMatchDetails());
-
-        status = _updateDriver->update(opCtx,
-                                       StringData(),
-                                       &doc,
-                                       _isUserInitiatedWrite,
-                                       immutablePaths,
-                                       false, /* isUpsert */
-                                       &logObj,
-                                       &docWasModified);
-        uassertStatusOK(status);
-
-        // Skip adding _id field if the collection is capped (since capped collection documents can
-        // neither grow nor shrink).
-        const auto createIdField = !collection.getCollectionPtr()->isCapped();
-        // Ensure _id is first if it exists, and generate a new OID if appropriate.
-        update::ensureIdFieldIsFirst(&doc, createIdField);
-
-        const char* source = nullptr;
-        const bool inPlace = doc.getInPlaceUpdates(&damages, &source);
-
-        if (inPlace && damages.empty()) {
-            // A modifier didn't notice that it was really a no-op during its 'prepare' phase. That
-            // represents a missed optimization, but we still shouldn't do any real work. Toggle
-            // 'docWasModified' to 'false'.
-            //
-            // Currently, an example of this is '{ $push : { x : {$each: [], $sort: 1} } }' when the
-            // 'x' array exists and is already sorted.
-            docWasModified = false;
-        }
-
-        if (!docWasModified) {
-            return oldObj.value();
-        }
-
-        // Prepare to modify the document
-        CollectionUpdateArgs args{oldObj.value()};
-        args.update = logObj;
-        if (_isUserInitiatedWrite) {
-            const auto& collDesc = collection.getShardingDescription();
-            args.criteria = collDesc.extractDocumentKey(oldObj.value());
-        } else {
-            const auto docId = oldObj.value()["_id"_sd];
-            args.criteria = docId ? docId.wrap() : oldObj.value();
-        }
-        uassert(8375909,
-                "Multi-update operations require all documents to have an '_id' field",
-                !_isMulti || args.criteria.hasField("_id"_sd));
-
-        args.source = shouldWriteToOrphan ? OperationSource::kFromMigrate : _source;
-        args.stmtIds = _stmtIds;
-        args.sampleId = _sampleId;
-
-        if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_NEW) {
-            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PostImage;
-        } else if (_returnDocs == UpdateRequest::ReturnDocOption::RETURN_OLD) {
-            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::PreImage;
-        } else {
-            args.storeDocOption = CollectionUpdateArgs::StoreDocOption::None;
-        }
-
-        args.mustCheckExistenceForInsertOperations =
-            _updateDriver->getUpdateExecutor()->getCheckExistenceForDiffInsertOperations();
-
-        args.retryableWrite = write_stage_common::isRetryableWrite(opCtx);
-
-        BSONObj newObj = doc.getObject();
-
-        if (inPlace) {
-            if (!_isExplain) {
-                if (_isUserInitiatedWrite) {
-                    ShardingChecksForUpdate scfu(collection,
-                                                 _allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                                 _isMulti,
-                                                 nullptr);
-                    scfu.checkUpdateChangesShardKeyFields(opCtx, doc, boost::none, oldObj);
-                }
-
-                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
-                WriteUnitOfWork wunit(opCtx);
-                bool indexesAffected = false;
-                newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
-                    opCtx,
-                    collection.getCollectionPtr(),
-                    rid,
-                    oldObj,
-                    source,
-                    damages,
-                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
-                    &indexesAffected,
-                    &CurOp::get(opCtx)->debug(),
-                    &args,
-                    cursor));
-
-                tassert(8375906,
-                        "Old and new snapshot ids must not change after update",
-                        oldObj.snapshotId() ==
-                            shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
-                wunit.commit();
-            }
-            _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
-        } else {
-            newObj = doc.getObject();
-            if (!DocumentValidationSettings::get(opCtx).isInternalValidationDisabled()) {
-                uassert(ErrorCodes::BSONObjectTooLarge,
-                        str::stream() << "Resulting document after update is larger than "
-                                      << BSONObjMaxUserSize,
-                        newObj.objsize() <= BSONObjMaxUserSize);
-            }
-
-            if (!_isExplain) {
-                if (_isUserInitiatedWrite) {
-                    ShardingChecksForUpdate scfu(collection,
-                                                 _allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                                 _isMulti,
-                                                 nullptr);
-                    scfu.checkUpdateChangesShardKeyFields(opCtx, doc, newObj, oldObj);
-                }
-
-                bool indexesAffected = false;
-                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
-                WriteUnitOfWork wunit(opCtx);
-                collection_internal::updateDocument(
-                    opCtx,
-                    collection.getCollectionPtr(),
-                    rid,
-                    oldObj,
-                    newObj,
-                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
-                    &indexesAffected,
-                    &CurOp::get(opCtx)->debug(),
-                    &args);
-                tassert(8375907,
-                        "Old and new snapshot ids must not change after update",
-                        oldObj.snapshotId() ==
-                            shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
-                wunit.commit();
-            }
-            _stats->incDocsUpdated(1);  // explains are also treated as though they wrote
-        }
-
-        // The general-purpose update stage tracks records ids of all updated documents so that it
-        // can avoid the Halloween problem, but that is not necessary for this stage, because it
-        // never writes more than one document.
-
-        return newObj;
-    }
-
 private:
     UpdateDriver* _updateDriver;
-    const UpdateRequest::ReturnDocOption _returnDocs;
-    const std::vector<StmtId> _stmtIds;
-    const OptionalBool _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
-    const bool _isUserInitiatedWrite;
-    const bool _isExplain;
-    const bool _isMulti;
-    const OperationSource _source;
-    const boost::optional<UUID> _sampleId;
-
+    const UpdateRequest* _request;
     WriteOperationStats* _stats{nullptr};
+
+    const bool _isUserInitiatedWrite;
 };
 
 class DeleteOperation {

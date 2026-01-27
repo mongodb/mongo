@@ -110,6 +110,7 @@ void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubse
 
 void CostBasedRankerEntry::toBSON(BSONObjBuilder& queryStatsBuilder) const {
     BSONObjBuilder cbrBuilder{sizeof(CostBasedRankerEntry) + kBSONOverhead};
+    cardinalityEstimationMethods.appendTo(cbrBuilder, "cardinalityEstimationMethods");
     nDocsSampled.appendTo(cbrBuilder, "nDocsSampled");
     queryStatsBuilder.append("costBasedRanker", cbrBuilder.obj());
 }
@@ -130,7 +131,6 @@ void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder,
 
     if (includeCBRMetrics) {
         planningTimeMicros.appendTo(*builder, "planningTimeMicros");
-
         costBasedRankerStats.toBSON(*builder);
     }
 
@@ -160,6 +160,7 @@ void WritesEntry::toBSON(BSONObjBuilder& queryStatsBuilder) const {
     nModified.appendTo(writesBuilder, "nModified");
     nDeleted.appendTo(writesBuilder, "nDeleted");
     nInserted.appendTo(writesBuilder, "nInserted");
+    nUpdateOps.appendTo(writesBuilder, "nUpdateOps");
     queryStatsBuilder.append("writes", writesBuilder.obj());
 }
 }  // namespace mongo::query_stats

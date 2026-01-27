@@ -764,7 +764,7 @@ void offlineValidate(OperationContext* opCtx) {
     invariant(!storageGlobalParams.queryableBackupMode);
 
     auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
-    serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx->getServiceContext());
+    serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
 
     bool allResultsValid = true;
 

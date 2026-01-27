@@ -5,7 +5,7 @@ filters:
       - 10gen/server-replication-reviewers
   - "fcv_changes_close_connections.js":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "read_after_optime.js":
     approvers:
       - 10gen/server-replication-reviewers

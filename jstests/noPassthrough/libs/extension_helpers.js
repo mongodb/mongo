@@ -171,6 +171,7 @@ export function withExtensionsAndMongot(
     testFn,
     topologiesToTest = ["standalone", "sharded"],
     shardingOptions = {},
+    additionalMongodOptions = {},
 ) {
     // Set up mongot mock.
     let mongotmock;
@@ -186,12 +187,18 @@ export function withExtensionsAndMongot(
         return testFn(connection, mongotmock, shardingTest);
     };
 
-    const additionalOptions = {
-        setParameter: {
-            mongotHost,
-            searchIndexManagementHostAndPort: mongotHost,
-        },
+    // Build mongod options with mongot settings, merging with any additional options.
+    // We need to deep-merge setParameter since both we and the caller may provide values.
+    const mongotSetParams = {
+        mongotHost,
+        searchIndexManagementHostAndPort: mongotHost,
     };
+    const callerSetParams = additionalMongodOptions.setParameter || {};
+    const mergedSetParams = Object.assign({}, mongotSetParams, callerSetParams);
+
+    const additionalOptions = Object.assign({}, additionalMongodOptions, {
+        setParameter: mergedSetParams,
+    });
 
     try {
         withExtensions(extToOptionsMap, wrappedTestFn, topologiesToTest, shardingOptions, additionalOptions);

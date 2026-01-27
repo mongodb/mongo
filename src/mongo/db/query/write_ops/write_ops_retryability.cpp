@@ -38,6 +38,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/write_ops/find_and_modify_image_lookup_util.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -63,6 +64,37 @@ namespace mongo {
 namespace {
 
 /**
+ * Returns an error message that the pre- or post-image for the given findAndModify oplog entry
+ * is no longer available. Expects the given oplog entry to have the 'needsRetryImage' field.
+ */
+std::string makePreOrPostImageNotFoundErrorMessage(const repl::OplogEntry& oplog) {
+    return fmt::format(
+        "Retrying a findAndModify operation with session id {} and txn number {} after it "
+        "has been executed but the {} is no longer available",
+        oplog.getSessionId()->toBSON().toString(),
+        *oplog.getTxnNumber(),
+        repl::RetryImage_serializer(*oplog.getNeedsRetryImage()));
+}
+
+/**
+ * Returns an error message that the pre- or post-image for the given findAndModify oplog entry
+ * and request is no longer available.
+ */
+std::string makePreOrPostImageNotFoundErrorMessage(
+    const write_ops::FindAndModifyCommandRequest& request,
+    const repl::OplogEntry& oplog,
+    const repl::OplogEntry& oplogWithCorrectLinks,
+    repl::RetryImageEnum imageType) {
+    return fmt::format(
+        "Retrying a findAndModify operation with session id {} and txn number {} after it "
+        "has been executed but the {} is no longer available: ",
+        oplogWithCorrectLinks.getSessionId()->toBSON().toString(),
+        *oplogWithCorrectLinks.getTxnNumber(),
+        repl::RetryImage_serializer(imageType),
+        redact(request.toBSON()).toString());
+}
+
+/**
  * Validates that the request is retry-compatible with the operation that occurred.
  * In the case of nested oplog entry where the correct links are in the top level
  * oplog, oplogWithCorrectLinks can be used to specify the outer oplog.
@@ -72,7 +104,14 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
-    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().has_value();
+    const auto needsRetryImage = oplogEntry.getNeedsRetryImage();
+
+    uassert(11731000,
+            "Expected oplog entry for a retryable findAndModify operation to have a session id",
+            oplogWithCorrectLinks.getSessionId());
+    uassert(11731001,
+            "Expected oplog entry for a retryable findAndModify operation to have a txn number",
+            oplogWithCorrectLinks.getTxnNumber());
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
@@ -82,10 +121,13 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
                           << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
             request.getRemove().value_or(false));
-        uassert(40607,
-                str::stream() << "No pre-image available for findAndModify retry request:"
-                              << redact(request.toBSON()),
-                oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
+
+        // Throw an error if the pre-image was not stored.
+        uassert(ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPreImage),
+                oplogWithCorrectLinks.getPreImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPreImage));
     } else if (opType == repl::OpTypeEnum::kInsert) {
         uassert(
             40608,
@@ -104,106 +146,153 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
             opType == repl::OpTypeEnum::kUpdate);
 
         if (request.getNew().value_or(false)) {
+            // Throw an error if the pre-image was stored.
             uassert(40611,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                                   << " wants the document after update returned, but only before "
                                      "update document is stored, oplogTs: "
                                   << ts.toString()
                                   << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
-                    oplogWithCorrectLinks.getPostImageOpTime() || needsRetryImage);
+                    !oplogWithCorrectLinks.getPreImageOpTime() &&
+                        (needsRetryImage != repl::RetryImageEnum::kPreImage));
+            // Throw an error if the post-image was not stored.
+            uassert(
+                ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPostImage),
+                oplogWithCorrectLinks.getPostImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPostImage));
         } else {
+            // Throw an error if the post-image was stored.
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                                   << " wants the document before update returned, but only after "
                                      "update document is stored, oplogTs: "
                                   << ts.toString()
                                   << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
-                    oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
+                    !oplogWithCorrectLinks.getPostImageOpTime() &&
+                        (needsRetryImage != repl::RetryImageEnum::kPostImage));
+            // Throw an error if the pre-image was not stored.
+            uassert(
+                ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPreImage),
+                oplogWithCorrectLinks.getPreImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPreImage));
         }
     }
 }
 
 /**
- * Extracts either the pre or post image (cannot be both) of the findAndModify operation from the
- * oplog.
+ * Fetches the pre- or post-image for the given findAndModify operation from the image collection.
  */
-BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
-    tassert(11052024,
-            "Expected OplogEntry with pre or post image",
-            oplog.getPreImageOpTime() || oplog.getPostImageOpTime() || oplog.getNeedsRetryImage());
+BSONObj fetchPreOrPostImageFromImageCollection(OperationContext* opCtx,
+                                               const repl::OplogEntry& oplog) {
+    invariant(oplog.getNeedsRetryImage());
+
+    LogicalSessionId sessionId = oplog.getSessionId().value();
+    TxnNumber txnNumber = oplog.getTxnNumber().value();
+    Timestamp ts = oplog.getTimestamp();
+
+    auto curOp = CurOp::get(opCtx);
+    const auto existingNS = curOp->getNSS();
+
     DBDirectClient client(opCtx);
-    if (oplog.getNeedsRetryImage()) {
-        // Extract image from side collection.
-        LogicalSessionId sessionId = oplog.getSessionId().value();
-        TxnNumber txnNumber = oplog.getTxnNumber().value();
-        Timestamp ts = oplog.getTimestamp();
-        auto curOp = CurOp::get(opCtx);
-        const auto existingNS = curOp->getNSS();
-        BSONObj imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace,
-                                          BSON("_id" << sessionId.toBSON()));
-        {
-            stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-            curOp->setNS(clientLock, existingNS);
-        }
-        if (imageDoc.isEmpty()) {
-            LOGV2_WARNING(5676402,
-                          "Image lookup for a retryable findAndModify was not found",
-                          "sessionId"_attr = sessionId,
-                          "txnNumber"_attr = txnNumber,
-                          "timestamp"_attr = ts);
-            uasserted(
-                5637601,
-                str::stream()
-                    << "image collection no longer contains the complete write history of this "
-                       "transaction, record with sessionId: "
-                    << sessionId.toBSON() << " cannot be found");
-        }
+    BSONObj imageDoc =
+        client.findOne(NamespaceString::kConfigImagesNamespace, BSON("_id" << sessionId.toBSON()));
 
-        auto entry = repl::ImageEntry::parse(imageDoc, IDLParserContext("ImageEntryForRequest"));
-        if (entry.getInvalidated()) {
-            // This case is expected when a node could not correctly compute a retry image due
-            // to data inconsistency while in initial sync.
-            uasserted(ErrorCodes::IncompleteTransactionHistory,
-                      str::stream() << "Incomplete transaction history for sessionId: "
-                                    << sessionId.toBSON() << " txnNumber: " << txnNumber);
-        }
-
-        if (entry.getTs() != oplog.getTimestamp() || entry.getTxnNumber() != oplog.getTxnNumber()) {
-            // We found a corresponding image document, but the timestamp and transaction number
-            // associated with the session record did not match the expected values from the oplog
-            // entry.
-
-            // Otherwise, it's unclear what went wrong.
-            LOGV2_WARNING(5676403,
-                          "Image lookup for a retryable findAndModify was unable to be verified",
-                          "sessionId"_attr = sessionId,
-                          "txnNumberRequested"_attr = txnNumber,
-                          "timestampRequested"_attr = ts,
-                          "txnNumberFound"_attr = entry.getTxnNumber(),
-                          "timestampFound"_attr = entry.getTs());
-            uasserted(
-                5637602,
-                str::stream()
-                    << "image collection no longer contains the complete write history of this "
-                       "transaction, record with sessionId: "
-                    << sessionId.toBSON() << " cannot be found");
-        }
-
-        return entry.getImage();
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        curOp->setNS(clientLock, existingNS);
     }
+
+    if (imageDoc.isEmpty()) {
+        LOGV2_WARNING(5676402,
+                      "Image lookup for a retryable findAndModify was not found",
+                      "sessionId"_attr = sessionId,
+                      "txnNumber"_attr = txnNumber,
+                      "timestamp"_attr = ts);
+        uasserted(5637601,
+                  str::stream()
+                      << "image collection no longer contains the complete write history of this "
+                         "transaction, record with sessionId: "
+                      << sessionId.toBSON() << " cannot be found");
+    }
+
+    auto entry = repl::ImageEntry::parse(imageDoc, IDLParserContext("ImageEntryForRequest"));
+    if (entry.getInvalidated()) {
+        // This case is expected when a node could not correctly compute a retry image due
+        // to data inconsistency while in initial sync.
+        uasserted(ErrorCodes::IncompleteTransactionHistory,
+                  str::stream() << "Incomplete transaction history for sessionId: "
+                                << sessionId.toBSON() << " txnNumber: " << txnNumber);
+    }
+
+    if (entry.getTs() != oplog.getTimestamp() || entry.getTxnNumber() != oplog.getTxnNumber()) {
+        // We found a corresponding image document, but the timestamp and transaction number
+        // associated with the session record did not match the expected values from the oplog
+        // entry.
+
+        // Otherwise, it's unclear what went wrong.
+        LOGV2_WARNING(5676403,
+                      "Image lookup for a retryable findAndModify was unable to be verified",
+                      "sessionId"_attr = sessionId,
+                      "txnNumberRequested"_attr = txnNumber,
+                      "timestampRequested"_attr = ts,
+                      "txnNumberFound"_attr = entry.getTxnNumber(),
+                      "timestampFound"_attr = entry.getTs());
+        uasserted(5637602,
+                  str::stream()
+                      << "image collection no longer contains the complete write history of this "
+                         "transaction, record with sessionId: "
+                      << sessionId.toBSON() << " cannot be found");
+    }
+
+    return entry.getImage();
+}
+
+/**
+ * Fetches the pre- or post-image for the given findAndModify operation from the oplog.
+ */
+BSONObj fetchPreOrPostImageFromOplog(OperationContext* opCtx, const repl::OplogEntry& oplog) {
+    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime());
 
     auto opTime = oplog.getPreImageOpTime() ? oplog.getPreImageOpTime().value()
                                             : oplog.getPostImageOpTime().value();
+
+    DBDirectClient client(opCtx);
     auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
-    uassert(40613,
-            str::stream() << "oplog no longer contains the complete write history of this "
-                             "transaction, log with opTime "
+    uassert(ErrorCodes::IncompleteTransactionHistory,
+            str::stream() << "The oplog no longer contains the "
+                          << (oplog.getPreImageOpTime() ? "pre-image" : "post-image")
+                          << " for this findAndModify "
+                             "operation, The oplog entry with opTime "
                           << opTime.toString() << " cannot be found",
             !oplogDoc.isEmpty());
 
     auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(oplogDoc));
     return oplogEntry.getObject().getOwned();
+}
+
+/**
+ * Fetches the pre- or post-image for the given findAndModify operation.
+ */
+BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
+    tassert(11052024,
+            "Expected OplogEntry with pre or post image",
+            oplog.getPreImageOpTime() || oplog.getPostImageOpTime() || oplog.getNeedsRetryImage());
+    if (oplog.getNeedsRetryImage()) {
+        if (disallowFindAndModifyImageCollection(opCtx)) {
+            auto image = fetchPreOrPostImageFromSnapshot(opCtx, oplog);
+            uassert(ErrorCodes::IncompleteTransactionHistory,
+                    makePreOrPostImageNotFoundErrorMessage(oplog),
+                    image);
+            return *image;
+        }
+        return fetchPreOrPostImageFromImageCollection(opCtx, oplog);
+    }
+    return fetchPreOrPostImageFromOplog(opCtx, oplog);
 }
 
 /**

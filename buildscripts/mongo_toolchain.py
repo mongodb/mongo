@@ -182,6 +182,9 @@ def get_mongo_toolchain(
         from_bazel_value = os.environ.get("MONGO_TOOLCHAIN_FROM_BAZEL", "true")
         from_bazel = _parse_from_bazel_envvar(from_bazel_value)
 
+    if not from_bazel:
+        from_bazel = not os.path.exists(_get_installed_toolchain_path(version))
+
     if from_bazel:
         return _get_bazel_toolchain(version)
     return _get_installed_toolchain(version)

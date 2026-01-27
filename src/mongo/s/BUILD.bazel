@@ -293,6 +293,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:shardsvr_join_ddl_coordinators_request_gen",
         "//src/mongo/db/global_catalog/ddl:shardsvr_join_migrations_request_gen",
         "//src/mongo/db/global_catalog/ddl:untrack_unsplittable_collection_gen",
+        "//src/mongo/db/global_catalog/ddl:upgrade_downgrade_viewless_timeseries_gen",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:check_metadata_consistency_gen",
         "//src/mongo/db/router_role/routing_cache:shard_cannot_refresh_due_to_locks_held_exception.cpp",
         "//src/mongo/db/shard_role/ddl:clone_catalog_data_gen",
@@ -385,26 +386,13 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "sharding_task_executor",
-    srcs = [
-        "sharding_task_executor.cpp",
-    ],
-    deps = [
-        ":sharding_router_api",
-        "//src/mongo/db:operation_time_tracker",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/sharding_environment/client:sharding_client",
-        "//src/mongo/executor:thread_pool_task_executor",
-    ],
-)
-
-mongo_cc_library(
     name = "sharding_write_without_shard_key_api",
     srcs = [
         "//src/mongo/s/write_ops:write_without_shard_key_util.cpp",
     ],
     deps = [
         ":sharding_router_api",
+        "//src/mongo/db:query_exec",
         "//src/mongo/db/query/write_ops:canonical_update_and_delete",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
@@ -693,7 +681,6 @@ mongo_cc_unit_test(
         "load_balancer_support_test.cpp",
         "query_analysis_sample_tracker_test.cpp",
         "query_analysis_sampler_test.cpp",
-        "sharding_task_executor_test.cpp",
         "transaction_router_test.cpp",
         "//src/mongo/db/global_catalog:chunk_manager_query_test.cpp",
         "//src/mongo/db/global_catalog:chunk_manager_test.cpp",
@@ -727,6 +714,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/router_role/routing_cache:catalog_cache_refresh_test.cpp",
         "//src/mongo/db/router_role/routing_cache:catalog_cache_test.cpp",
         "//src/mongo/db/sharding_environment:cluster_identity_loader_test.cpp",
+        "//src/mongo/db/sharding_environment:sharding_task_executor_test.cpp",
         "//src/mongo/db/sharding_environment/client:config_shard_wrapper_test.cpp",
         "//src/mongo/db/sharding_environment/client:shard_remote_test.cpp",
         "//src/mongo/db/topology:mongos_topology_coordinator_test.cpp",
@@ -754,7 +742,6 @@ mongo_cc_unit_test(
         ":load_balancer_support",
         ":mongos_topology_coordinator",
         ":sharding_api",
-        ":sharding_task_executor",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:vector_clock",
         "//src/mongo/db/auth:authmocks",
@@ -769,6 +756,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/sharding_environment:sharding_initialization",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
+        "//src/mongo/db/sharding_environment:sharding_task_executor",
         "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_options",

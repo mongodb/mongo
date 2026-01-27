@@ -29,4 +29,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "rewriteCollection",
     "abortRewriteCollection",
     "recreateRangeDeletionTasks",
+    "upgradeDowngradeViewlessTimeseries",
 ];

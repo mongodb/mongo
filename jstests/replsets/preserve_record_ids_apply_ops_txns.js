@@ -3,11 +3,7 @@
  * flag set even when inserting from within a transaction or when using the applyOps command.
  *
  * @tags: [
- *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): Remove tag.
- *   # Incompatible with the recordIdsReplicated:true builder, as it sets the option
- *   # on all collections.
- *   exclude_when_record_ids_replicated
+ *   featureFlagRecordIdsReplicated
  * ]
  */
 import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
@@ -19,18 +15,21 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-const secondary = replSet.getSecondaries()[0];
-
 const unRepRidlNs = "unreplRecIdColl";
 const replRidNs = "replRecIdColl";
 const dbName = "test";
 
 const primDB = primary.getDB(dbName);
-const secDB = secondary.getDB(dbName);
-primDB.runCommand({create: unRepRidlNs, recordIdsReplicated: false});
-primDB.runCommand({create: replRidNs, recordIdsReplicated: true});
+
+// Create collection WITH replicated record Ids.
+primDB.runCommand({create: replRidNs});
+
+// Create collection WITHOUT replicated record Ids.
+assert.commandWorked(primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}));
+primDB.runCommand({create: unRepRidlNs});
 
 const session = primDB.getMongo().startSession();
+
 const unReplRidColl = session.getDatabase(dbName)[unRepRidlNs];
 const replRidColl = session.getDatabase(dbName)[replRidNs];
 

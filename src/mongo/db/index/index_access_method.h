@@ -300,6 +300,8 @@ public:
      * new index build.
      */
     virtual std::unique_ptr<BulkBuilder> initiateBulk(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
@@ -631,7 +633,9 @@ public:
                                     int64_t* keysInserted,
                                     int64_t* keysDeleted) final;
 
-    std::unique_ptr<BulkBuilder> initiateBulk(const IndexCatalogEntry* entry,
+    std::unique_ptr<BulkBuilder> initiateBulk(OperationContext* opCtx,
+                                              const CollectionPtr& collection,
+                                              const IndexCatalogEntry* entry,
                                               size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,
                                               const DatabaseName& dbName,

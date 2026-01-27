@@ -107,10 +107,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_memberId) {
         validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
 }
 
-// TODO (SERVER-112863): Remove feature flag controller and FF Disabled test
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFEnabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfPriorityPort", true);
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
@@ -125,6 +122,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFEnabled) {
         validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
 }
 
+// TODO (SERVER-112863): Remove feature flag controller and FF Disabled test
 TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFDisabled) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagReplicationUsageOfPriorityPort", false);
@@ -833,9 +831,6 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_NonDefaultGetLastErrorDefau
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVEnabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfPriorityPort", true);
-
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -857,6 +852,8 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVEnabled) {
     ASSERT_OK(validateConfigForReconfig(kNoVersionContext, oldConfig, newConfig, false, false));
 }
 
+// TODO (SERVER-112863): Remove feature flag disabled test once the feature flag is enabled on
+// lastLTS.
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVDisabled) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagReplicationUsageOfPriorityPort", false);
@@ -885,9 +882,6 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortFCVDisabled) {
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortForceAddPortDisallowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfPriorityPort", true);
-
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -912,9 +906,6 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortForceAddPortDis
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortForceAddNodeDisallowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfPriorityPort", true);
-
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
@@ -941,9 +932,6 @@ TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortForceAddNodeDis
 }
 
 TEST_F(ServiceContextTest, ValidateConfigForReconfig_PriorityPortForceAllowed) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfPriorityPort", true);
-
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 

@@ -12,6 +12,8 @@
  *   # untrackCollection requires a custom value for the minSnapshotHistoryWindowInSeconds server
  *   # parameter, which is reset when a node is killed.
  *   does_not_support_stepdowns,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

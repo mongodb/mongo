@@ -541,7 +541,7 @@ that connections from internal clients with a lower binary version are closed wh
 FCV. This logic is expected to stay across LTS releases as it is not specific to a particular
 release version.
 
-**_Using these generic constants and helpers indicates to the Replication team that the FCV logic
+**_Using these generic constants and helpers indicates to the Catalog and Routing team that the FCV logic
 should not be removed after the next LTS release._**
 
 ## Linter Rule
@@ -720,8 +720,8 @@ An FCV-independent feature that is not practical to implement to IFR requirement
 binary-compatible feature flag, avoiding the need to account for the possibility of the feature
 becoming enabled or disabled at runtime.
 
-If in doubt about whether your feature needs to be FCV gated, please reach out to the Replication
-team in #server-featureflags and add the Replication team as a reviewer to your code review.
+If in doubt about whether your feature needs to be FCV gated, please reach out to the Catalog and Routing
+team in #server-featureflags and add the Catalog and Routing team as a reviewer to your code review.
 
 ## Lifecycle of a feature flag
 
@@ -1024,7 +1024,7 @@ should use one of these options instead:
 - Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the
   latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
   even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
-- Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team.
+- Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Catalog and Routing team.
 
 ### Additional FCV-gated feature flag guidelines
 

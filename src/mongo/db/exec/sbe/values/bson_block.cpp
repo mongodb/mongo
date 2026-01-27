@@ -100,12 +100,12 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
     tassert(
         11089616, "Number of Tags doesn't match the number of Values", tags.size() == vals.size());
 
-    auto node = _root.getChildren.find(topLevelField);
+    auto node = _root.findChild(topLevelField);
 
     // Caller should always ask us to extract a top level field that's in the reqs.  We could
     // relax this if needed, and return a bunch of Nothing CellBlocks, but it's a non-use case
     // for now.
-    tassert(11093600, "Top level field doesn't exist", node != _root.getChildren.end());
+    tassert(11093600, "Top level field doesn't exist", node != nullptr);
 
     for (size_t i = 0; i < tags.size(); ++i) {
         for (auto& rec : _filterPositionInfoRecorders) {
@@ -115,11 +115,12 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
             rec.newDoc();
         }
 
-        walkField<BlockProjectionPositionInfoRecorder>(node->second.get(),
+        walkField<BlockProjectionPositionInfoRecorder>(node,
                                                        tags[i],
                                                        vals[i],
                                                        nullptr /* bsonPtr */,
-                                                       visitElementExtractorCallback);
+                                                       visitElementExtractorCallback,
+                                                       /*traverseArrays*/ true);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -145,7 +146,8 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromBsons(
         walkBsonObj<BlockProjectionPositionInfoRecorder>(&_root,
                                                          bitcastFrom<const char*>(obj.objdata()),
                                                          obj.objdata(),
-                                                         visitElementExtractorCallback);
+                                                         visitElementExtractorCallback,
+                                                         true /* traverseArrays */);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -200,7 +202,8 @@ std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
 }
 
 std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
-                                                      value::PathRequest pathRequest) {
+                                                      value::PathRequest pathRequest,
+                                                      bool traverseArrays) {
     std::vector<value::PathRequest> pathrequests{pathRequest};
     auto extractor = BSONExtractorImpl(pathrequests);
 
@@ -223,7 +226,8 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
     walkBsonObj<BlockProjectionPositionInfoRecorder>(extractor.getRoot(),
                                                      bitcastFrom<const char*>(obj.objdata()),
                                                      obj.objdata(),
-                                                     recordValuePointer);
+                                                     recordValuePointer,
+                                                     traverseArrays);
     return bsonPointers;
 }
 }  // namespace mongo::sbe::value

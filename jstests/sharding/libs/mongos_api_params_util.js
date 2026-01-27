@@ -485,6 +485,9 @@ export let MongosAPIParametersUtil = (function () {
                 runsAgainstAdminDb: true,
                 configServerCommandName: "_configsvrAddShard",
                 shardCommandName: "_addShard",
+                skipFlushOnRs: () => {
+                    return [st.rs1];
+                },
                 shardPrimary: () => {
                     return st.rs1.getPrimary();
                 },
@@ -493,6 +496,7 @@ export let MongosAPIParametersUtil = (function () {
                     // Remove shard0 so we can add it back.
                     assert.commandWorked(st.s0.getDB("db").dropDatabase());
                     awaitRemoveShard(st.shard1.shardName);
+                    st.restartShardClean(st.shard1);
                 },
                 command: () => ({addShard: st.rs1.getURL()}),
             },
@@ -1422,6 +1426,7 @@ export let MongosAPIParametersUtil = (function () {
                 cleanUp: () => {
                     // Wait for the shard to be removed completely before re-adding it.
                     awaitRemoveShard(st.shard1.shardName);
+                    st.restartShardClean(st.shard1);
                     assert.commandWorked(
                         st.s0.getDB("admin").runCommand({addShard: st.rs1.getURL(), name: st.shard1.shardName}),
                     );
@@ -1738,6 +1743,7 @@ export let MongosAPIParametersUtil = (function () {
             commandName: "testVersions1And2",
             skip: "executes locally on mongos (not sent to any remote node)",
         },
+        {commandName: "upgradeDowngradeViewlessTimeseries", skip: "internal API"},
         {
             commandName: "update",
             run: {
@@ -2038,7 +2044,6 @@ export let MongosAPIParametersUtil = (function () {
                     );
 
                     configPrimary = st.configRS.getPrimary();
-                    shardPrimary = runOrExplain.shardPrimary ? runOrExplain.shardPrimary() : st.rs0.getPrimary();
 
                     const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
                     if (inTransaction) {
@@ -2055,6 +2060,8 @@ export let MongosAPIParametersUtil = (function () {
                         jsTestLog(`setUp function for ${commandName} completed`);
                     }
 
+                    shardPrimary = runOrExplain.shardPrimary ? runOrExplain.shardPrimary() : st.rs0.getPrimary();
+
                     // Make a copy of the test's command body, and set its API parameters.
                     const commandBody = runOrExplain.command(context);
                     const commandWithAPIParams = Object.assign(Object.assign({}, commandBody), apiParameters);
@@ -2067,7 +2074,11 @@ export let MongosAPIParametersUtil = (function () {
                         ` ${inTransaction ? "in" : "outside"} transaction` +
                         ` on "${commandDbName}" database`;
 
-                    flushRoutersAndRefreshShardMetadata(st, {ns: "db.collection"});
+                    flushRoutersAndRefreshShardMetadata(
+                        st,
+                        {ns: "db.collection"},
+                        runOrExplain.skipFlushOnRs?.() || [],
+                    );
 
                     jsTestLog(`Running ${message}`);
                     setLogVerbosity([configPrimary, st.rs0.getPrimary(), st.rs1.getPrimary()], {

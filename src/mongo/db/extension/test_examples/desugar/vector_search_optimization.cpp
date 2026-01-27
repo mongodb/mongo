@@ -72,6 +72,25 @@ public:
     bool isSortedByVectorSearchScore() const override {
         return true;
     }
+
+    mongo::BSONObj serialize() const override {
+        return BSON(_name << _buildSpecWithExtractedLimit());
+    }
+
+    mongo::BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const override {
+        return BSON(_name << _buildSpecWithExtractedLimit());
+    }
+
+private:
+    // Helper to build the stage spec including the extracted limit value for testing purposes.
+    mongo::BSONObj _buildSpecWithExtractedLimit() const {
+        mongo::BSONObjBuilder builder;
+        builder.appendElements(_arguments);
+        if (auto limit = getExtractedLimitVal()) {
+            builder.append("extractedLimit", *limit);
+        }
+        return builder.obj();
+    }
 };
 
 class TestVectorSearchAstNode : public sdk::TestAstNode<TestVectorSearchLogicalStage> {

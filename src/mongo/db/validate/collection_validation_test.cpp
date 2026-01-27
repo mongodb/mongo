@@ -61,6 +61,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -113,6 +115,7 @@ struct ForegroundValidateTestResults {
     int numErrors{0};
     int numWarnings{0};
     auto operator<=>(const ForegroundValidateTestResults&) const = default;
+    friend std::ostream& operator<<(std::ostream& os, const ForegroundValidateTestResults& results);
 };
 
 inline std::string stringify_forTest(const ForegroundValidateTestResults& fgRes) {
@@ -123,6 +126,10 @@ inline std::string stringify_forTest(const ForegroundValidateTestResults& fgRes)
         fgRes.numInvalidDocuments,
         fgRes.numErrors,
         fgRes.numWarnings);
+}
+std::ostream& operator<<(std::ostream& os, const ForegroundValidateTestResults& results) {
+    os << stringify_forTest(results);
+    return os;
 }
 
 /**
@@ -137,20 +144,23 @@ std::vector<ValidateResults> foregroundValidate(
     const ForegroundValidateTestResults& expected,
     std::initializer_list<CollectionValidation::ValidateMode> modes =
         {CollectionValidation::ValidateMode::kForeground,
-         CollectionValidation::ValidateMode::kForegroundFull},
+         CollectionValidation::ValidateMode::kForegroundFull,
+         CollectionValidation::ValidateMode::kForegroundFullCheckBSON},
     CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone) {
 
     std::vector<ValidateResults> results;
 
-    for (auto mode : modes) {
+    for (const auto mode : modes) {
         ValidateResults validateResults;
-        ASSERT_OK(CollectionValidation::validate(
-            opCtx,
-            nss,
-            CollectionValidation::ValidationOptions{mode,
-                                                    repairMode,
-                                                    /*logDiagnostics=*/false},
-            &validateResults));
+        EXPECT_EQ(ErrorCodes::OK,
+                  CollectionValidation::validate(
+                      opCtx,
+                      nss,
+                      CollectionValidation::ValidationOptions{mode,
+                                                              repairMode,
+                                                              /*logDiagnostics=*/false},
+                      &validateResults))
+            << "Validation Mode: " << static_cast<int>(mode);
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
         auto validateResultsObj = validateResultsBuilder.obj();
@@ -172,7 +182,7 @@ std::vector<ValidateResults> foregroundValidate(
             .numErrors = observedNumErrors,
             .numWarnings = static_cast<int>(validateResults.getWarnings().size())};
 
-        ASSERT_EQ(expected, actual) << validateResultsObj;
+        EXPECT_EQ(expected, actual) << validateResultsObj;
         results.push_back(std::move(validateResults));
     }
     return results;
@@ -532,7 +542,7 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
                                              .numInvalidDocuments = 0,
                                              .numErrors = 0,
                                              .numWarnings = 1});
-    ASSERT_EQ(results.size(), 2);
+    EXPECT_EQ(results.size(), 3);
 
     for (const auto& validateResults : results) {
         const auto obj = resultToBSON(validateResults);
@@ -625,24 +635,109 @@ TEST_F(CollectionValidationTest, HashPrefixesCases) {
         ErrorCodes::InvalidOptions);
 }
 
+enum class SchemaViolationTestMode { ExpectFailOnDocumentInsert, ExpectFailOnCollectionValidation };
+std::ostream& operator<<(std::ostream& os, SchemaViolationTestMode mode) {
+    switch (mode) {
+        case SchemaViolationTestMode::ExpectFailOnDocumentInsert:
+            os << "ExpectFailOnDocumentInsert";
+            break;
+        case SchemaViolationTestMode::ExpectFailOnCollectionValidation:
+            os << "ExpectFailOnCollectionValidation";
+            break;
+    }
+    return os;
+}
+
+using CollectionValidationSchemaViolationParams = std::tuple<BSONObj, SchemaViolationTestMode>;
+class CollectionValidationSchemaViolationTest
+    : public CatalogTestFixture,
+      public ::testing::WithParamInterface<CollectionValidationSchemaViolationParams> {
+protected:
+    CollectionValidationSchemaViolationTest(Options options = {})
+        : CatalogTestFixture(std::move(options)) {}
+
+private:
+    OperationContext* _opCtx{nullptr};
+    void setUp() override {
+        CatalogTestFixture::setUp();
+    }
+};
+
+TEST_P(CollectionValidationSchemaViolationTest, SchemaViolation) {
+    // Schema violation in non-timeseries emits a warning
+    auto opCtx = operationContext();
+    const auto [doc, mode] = GetParam();
+    const auto validatorDoc = fromjson(R"BSON(
+        { $jsonSchema:
+          {
+            bsonType: "object",
+            required: ["requiredField"],
+            properties: {
+              requiredField: { bsonType: "int", minimum: 1, maximum: 100 }
+            }
+          }
+        }
+        )BSON");
+    const auto validationAction = mode == SchemaViolationTestMode::ExpectFailOnDocumentInsert
+        ? ValidationActionEnum::errorAndLog
+        : ValidationActionEnum::warn;
+
+    {
+        ASSERT_OK(storageInterface()->createCollection(
+            opCtx, kNss, {.validator = validatorDoc, .validationAction = validationAction}));
+        WriteUnitOfWork wuow(opCtx);
+        const AutoGetCollection coll(opCtx, kNss, MODE_IX);
+        ASSERT_FALSE(coll->isTimeseriesCollection());
+
+        switch (mode) {
+            case SchemaViolationTestMode::ExpectFailOnDocumentInsert:
+                ASSERT_EQ(Helpers::insert(opCtx, *coll, doc).code(),
+                          ErrorCodes::DocumentValidationFailure);
+                return;
+            case SchemaViolationTestMode::ExpectFailOnCollectionValidation:
+                ASSERT_OK(Helpers::insert(opCtx, *coll, doc));
+                wuow.commit();
+                break;
+        }
+    }
+    foregroundValidate(kNss, opCtx, {.valid = true, .numRecords = 1, .numWarnings = 1});
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    SchemaViolations,
+    CollectionValidationSchemaViolationTest,
+    testing::Combine(testing::Values(BSON("_id" << "x" << "requiredField" << "y"),
+                                     BSON("_id" << "x"),
+                                     BSON("_id" << "x" << "requiredField" << 142)),
+                     testing::Values(SchemaViolationTestMode::ExpectFailOnCollectionValidation,
+                                     SchemaViolationTestMode::ExpectFailOnDocumentInsert)));
+
 template <class T = BSONObj>
 BSONObj replaceNestedField(const BSONObj& bson,
                            std::span<const StringData> nestedFieldNames,
-                           const T& replacement) {
+                           const T& replacement,
+                           boost::optional<StringData> replacementFieldName = boost::none) {
     invariant(!nestedFieldNames.empty());
     const StringData cur = nestedFieldNames.front();
     BSONObjBuilder bob;
-    // Ordering must be preserved to avoid out of order errors, so fields must be added one-by-one.
+    // Ordering must be preserved to avoid out of order errors, so fields must be added
+    // one-by-one.
     for (const auto& elem : bson) {
         if (elem.fieldNameStringData() == cur) {
             if (nestedFieldNames.size() == 1) {
-                bob.append(cur, replacement);
+                // Allow for changing the field name to inject schema naming errors.
+                if constexpr (std::is_same_v<T, BSONElement>) {
+                    bob.appendAs(replacement, replacementFieldName.value_or(cur));
+                } else {
+                    bob.append(replacementFieldName.value_or(cur), replacement);
+                }
             } else {
                 bob.append(
                     cur,
                     replaceNestedField(elem.Obj(),
                                        {nestedFieldNames.begin() + 1, nestedFieldNames.end()},
-                                       replacement));
+                                       replacement,
+                                       replacementFieldName));
             }
         } else {
             bob.append(elem);
@@ -670,14 +765,14 @@ BSONObj removeNestedField(const BSONObj& bson, std::span<const StringData> neste
 
 class TimeseriesCollectionValidationTest : public CatalogTestFixture {
 public:
-protected:
     TimeseriesCollectionValidationTest(Options options = {})
         : CatalogTestFixture(std::move(options)) {
         _nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
     }
 
     static BSONObj getSampleDoc() {
-        return ::mongo::fromjson(R"BSON({
+        return ::mongo::fromjson(R"BSON(
+        {
             "_id" : {"$oid": "61be04541ad72e8d5d257550"},
             "control" : {
                 "version" : 2,
@@ -695,7 +790,7 @@ protected:
                 },
                 "count" : 5
             },
-            "ticker" : "MDB",
+            "meta": {"ticker" : "MDB"}, 
             "data" : {
                 "_id" : {"$binary": "BwBpEgidgwL3sOyO70WAGwAAAAAAAAAA", "$type":"07"},
                 "date" : {"$binary": "CQAg6EDOfQEAAIEMTB0AAAAAAA4AAAAAAAAAAA==", "$type":"07"},
@@ -705,12 +800,66 @@ protected:
         })BSON");
     }
 
-    void insertDoc(BSONObj doc) {
+    static std::vector<BSONObj> getAllSampleDocs() {
+        return std::vector<BSONObj>{getSampleDoc(),
+                                    // version 3 control block
+                                    ::mongo::fromjson(R"BSON(
+        {
+            "_id": {"$oid": "69690e4c8bee049fcc1c4d87"},
+            "control": {
+                "version": 3,
+                "min": {
+                    "date": {"$date": "2026-01-15T15:57:00Z"},
+                    "data": "a",
+                    "_id": {"$oid": "69690e642a688d1103284d0c"}
+                },
+                "max": {
+                    "date": {"$date": "2026-01-15T15:57:32.636Z"},
+                    "data": "d",
+                    "_id": {"$oid": "69690ea22a688d1103284d10"}
+                },
+                "count": 5
+            },
+            "data": {
+                "data": {"$binary": {"base64": "AgACAAAAYQCBLAAAAgAgAADOPwwAAAAAAAA=", "subType": "07"}},
+                "date": {"$binary": {"base64": "CQDpOGDCmwEAAICLLuFtJFWCTwA=", "subType": "07"}},
+                "_id": {"$binary": {"base64": "BwBpaQ5kKmiNEQMoTQyAK2AAEPwXANQA", "subType": "07"}}
+            }
+        })BSON"),
+                                    // pre-epoch timestamps
+                                    ::mongo::fromjson(R"BSON(
+        {
+            "_id": {"$oid":"e980f6cc8bee049fcc1c4d88"},
+            "control": {
+                "version": 2,
+                "min": {
+                    "date": {"$date": {"$numberLong": "-377424180000"}},
+                    "data": "bb",
+                    "_id": {"$oid":"6969340c2a688d1103284d11"}
+                },
+                "max": {
+                    "date": {"$date": {"$numberLong": "-377424151000"}},
+                    "data": "bb",
+                    "_id": {"$oid":"6969340c2a688d1103284d11"}
+                },
+                "count": 1
+            },
+            "data": {
+                "data": {"$binary": {"base64": "AgADAAAAYmIAAA==", "subType": "07"}},
+                "date": {"$binary": {"base64": "CQAofsQfqP///wA=", "subType": "07"}},
+                "_id": {"$binary": {"base64": "BwBpaTQMKmiNEQMoTREA", "subType": "07"}}
+            }
+        })BSON")};
+    }
+
+    static constexpr auto replacementIncorrectTimeField = "t"_sd;
+
+    void insertDoc(BSONObj doc, ErrorCodes::Error expected = ErrorCodes::OK) {
         ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
         WriteUnitOfWork wuow(_opCtx);
         const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
-        ASSERT_OK(Helpers::insert(_opCtx, *coll, doc));
+        EXPECT_EQ(expected, Helpers::insert(_opCtx, *coll, doc));
         wuow.commit();
     }
 
@@ -739,7 +888,7 @@ protected:
     CollectionValidation::ValidateMode _validateMode{
         CollectionValidation::ValidateMode::kForeground};
 
-private:
+protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         _options.uuid = UUID::gen();
@@ -749,25 +898,65 @@ private:
         _options.timeseries->setMetaField("ticker"_sd);
         _options.timeseries->setGranularity(BucketGranularityEnum::Seconds);
         _options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+        _options.validationAction = ValidationActionEnum::errorAndLog;
+        _options.validator = timeseries::generateTimeseriesValidator(
+            timeseries::kTimeseriesControlCompressedSortedVersion,
+            _options.timeseries->getTimeField());
         _opCtx = operationContext();
     };
 };
 
-TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationGoodData) {
-    const BSONObj bson = getSampleDoc();
+class TimeseriesCollectionValidationValidBucketsTest : public TimeseriesCollectionValidationTest,
+                                                       public testing::WithParamInterface<BSONObj> {
+};
+TEST_P(TimeseriesCollectionValidationValidBucketsTest, TimeseriesValidationGoodData) {
+    const BSONObj bson = GetParam();
     ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
     {
         WriteUnitOfWork wuow(_opCtx);
-        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
         ASSERT_OK(Helpers::insert(_opCtx, *coll, bson));
         wuow.commit();
     }
-    foregroundValidate(_nss,
-                       _opCtx,
-                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0},
-                       {_validateMode});
+    foregroundValidate(
+        _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0});
 }
+INSTANTIATE_TEST_SUITE_P(ValidBuckets,
+                         TimeseriesCollectionValidationValidBucketsTest,
+                         testing::ValuesIn(TimeseriesCollectionValidationTest::getAllSampleDocs()));
+
+class TimeseriesCollectionValidationSchemaViolationTest
+    : public TimeseriesCollectionValidationTest,
+      public testing::WithParamInterface<SchemaViolationTestMode> {
+protected:
+    void setUp() override {
+        TimeseriesCollectionValidationTest::setUp();
+        switch (GetParam()) {
+            case SchemaViolationTestMode::ExpectFailOnDocumentInsert:
+                // no-op
+                break;
+            case SchemaViolationTestMode::ExpectFailOnCollectionValidation:
+                _options.validationAction = ValidationActionEnum::warn;
+                break;
+        }
+    }  // namespace
+};  // namespace mongo
+
+INSTANTIATE_TEST_SUITE_P(SchemaViolations,
+                         TimeseriesCollectionValidationSchemaViolationTest,
+                         testing::Values(SchemaViolationTestMode::ExpectFailOnDocumentInsert,
+                                         SchemaViolationTestMode::ExpectFailOnCollectionValidation),
+                         [](const ::testing::TestParamInfo<SchemaViolationTestMode>& info)
+                             -> std::string {
+                             switch (info.param) {
+                                 case SchemaViolationTestMode::ExpectFailOnDocumentInsert:
+                                     return "OnDocumentInsert";
+                                 case SchemaViolationTestMode::ExpectFailOnCollectionValidation:
+                                     return "OnCollectionValidation";
+                             }
+                             MONGO_UNREACHABLE;
+                         });
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadBucketSpan) {
     _options.timeseries->setBucketMaxSpanSeconds(30);
@@ -787,22 +976,32 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadControlCount) 
                        {_validateMode});
 }
 
-TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMin) {
+TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMissingMin) {
     static constexpr std::array nested = {"control"_sd, "min"_sd};
-    insertDoc(removeNestedField(getSampleDoc(), nested));
-    foregroundValidate(_nss,
-                       _opCtx,
-                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1},
-                       {_validateMode});
+    const auto doc = removeNestedField(getSampleDoc(), nested);
+    if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
+        insertDoc(doc, ErrorCodes::DocumentValidationFailure);
+    } else {
+        insertDoc(doc);
+        foregroundValidate(_nss,
+                           _opCtx,
+                           {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                           {_validateMode});
+    }
 }
 
-TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMax) {
+TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationMissingMax) {
     static constexpr std::array nested = {"control"_sd, "max"_sd};
-    insertDoc(removeNestedField(getSampleDoc(), nested));
-    foregroundValidate(_nss,
-                       _opCtx,
-                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1},
-                       {_validateMode});
+    const auto doc = removeNestedField(getSampleDoc(), nested);
+    if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
+        insertDoc(doc, ErrorCodes::DocumentValidationFailure);
+    } else {
+        insertDoc(doc);
+        foregroundValidate(_nss,
+                           _opCtx,
+                           {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                           {_validateMode});
+    }
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectMinTimestamp) {
@@ -928,6 +1127,64 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingDate) {
                        {_validateMode});
 }
 
+TEST_P(TimeseriesCollectionValidationSchemaViolationTest, TimeseriesValidationIncorrectTimeField) {
+    const auto doc = std::invoke([&] {
+        BSONObj doc = getSampleDoc();
+
+        const auto minDate = doc["control"]["min"]["date"];
+        doc = replaceNestedField(doc,
+                                 std::array{"control"_sd, "min"_sd, "date"_sd},
+                                 minDate.Date(),
+                                 replacementIncorrectTimeField);
+
+        const auto maxDate = doc["control"]["max"]["date"];
+        doc = replaceNestedField(doc,
+                                 std::array{"control"_sd, "max"_sd, "date"_sd},
+                                 maxDate.Date(),
+                                 replacementIncorrectTimeField);
+
+        doc = replaceNestedField(doc,
+                                 std::array{"data"_sd, "date"_sd},
+                                 doc["data"]["date"],
+                                 replacementIncorrectTimeField);
+        return doc;
+    });
+    if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
+        insertDoc(doc, ErrorCodes::DocumentValidationFailure);
+    } else {
+        insertDoc(doc);
+        foregroundValidate(_nss,
+                           _opCtx,
+                           {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                           {_validateMode});
+        if (testing::Test::HasFailure()) {
+            // For documentary purposes
+            ADD_FAILURE() << "Document inserted into collection: " << doc;
+        };
+    }
+}
+
+
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationIncorrectTimeFieldInDataOnly) {
+    const auto doc = std::invoke([&] {
+        BSONObj doc = getSampleDoc();
+        doc = replaceNestedField(doc,
+                                 std::array{"data"_sd, "date"_sd},
+                                 doc["data"]["date"],
+                                 "clearlyIncorrectReplacementTimeField"_sd);
+        return doc;
+    });
+    insertDoc(doc);
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                       {_validateMode});
+    if (testing::Test::HasFailure()) {
+        // For documentary purposes
+        ADD_FAILURE() << "Document inserted into collection: " << doc;
+    }
+}
+
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationMissingMeasurementClose) {
     static constexpr std::array nested = {"data"_sd, "close"_sd};
     insertDoc(removeNestedField(getSampleDoc(), nested));
@@ -1009,6 +1266,21 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationCorruptData) {
                        _opCtx,
                        {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 2},
                        {_validateMode});
+}
+
+TEST_P(TimeseriesCollectionValidationSchemaViolationTest,
+       TimeseriesValidationNonTimeseriesDocument) {
+    const auto doc = BSON("_id" << "x");
+    if (GetParam() == SchemaViolationTestMode::ExpectFailOnDocumentInsert) {
+        insertDoc(doc,
+                  ErrorCodes::DocumentValidationFailure);  // insert a non-timeseries document
+    } else {
+        insertDoc(doc);
+        foregroundValidate(_nss,
+                           _opCtx,
+                           {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
+                           {CollectionValidation::ValidateMode::kForegroundFullCheckBSON});
+    }
 }
 
 }  // namespace

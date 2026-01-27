@@ -66,6 +66,9 @@ const cleanupFuncs = {
     },
     removeShardIfExists: function () {
         removeShard(st, newShardName);
+        newShard.stopSet(null, false, {skipValidation: true});
+        newShard.startSet({shardsvr: ""});
+        newShard.initiate();
     },
 };
 
@@ -176,8 +179,8 @@ checkCommandConfigSvr(
 );
 
 // removeShard
-checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
-checkCommandConfigSvr({_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
+checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.removeShardIfExists);
+checkCommandConfigSvr({_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.removeShardIfExists);
 
 // dropCollection
 // We can't use the checkCommandMongos wrapper because it calls adminCommand and dropping admin

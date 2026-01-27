@@ -42,9 +42,13 @@ class WiredTigerContainer {
 public:
     WiredTigerContainer(std::string uri, uint64_t tableId);
 
-    StringData uri() const;
+    const std::string& uri() const {
+        return _uri;
+    }
 
-    uint64_t tableId() const;
+    uint64_t tableId() const {
+        return _tableId;
+    }
 
 private:
     std::shared_ptr<Ident> _ident;

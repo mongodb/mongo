@@ -39,11 +39,15 @@
 #include "mongo/db/collection_crud/capped_collection_maintenance.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replicated_size_and_count_metadata_manager/uncommitted_changes.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -385,7 +389,9 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         }
     }
 
-    if (!nss.isImplicitlyReplicated()) {
+    // We call the OpObserver on config.transaction even when it is implicitly replicated
+    // because we need to observe the direct writes to it to validate those writes.
+    if (!nss.isImplicitlyReplicated() || nss.isConfigTransactionsCollection()) {
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             collection,
@@ -394,6 +400,16 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             recordIds,
             /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
+        if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            UncommittedMetaChange::write(opCtx).record(
+                collection->uuid(),
+                records.size(),
+                std::accumulate(records.begin(), records.end(), 0LL, [](auto acc, const Record& r) {
+                    return acc + r.data.size();
+                }));
+        }
     }
 
     collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
@@ -755,6 +771,13 @@ void updateDocument(OperationContext* opCtx,
     args->updatedDoc = newDoc;
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
+
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        UncommittedMetaChange::write(opCtx).record(
+            collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+    }
 }
 
 StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
@@ -847,6 +870,12 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     }
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        UncommittedMetaChange::write(opCtx).record(
+            collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+    }
     return newDoc;
 }
 
@@ -935,6 +964,12 @@ void deleteDocument(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onDelete(
         opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        UncommittedMetaChange::write(opCtx).record(collection->uuid(), -1, -doc.value().objsize());
+    }
+
     if (opDebug) {
         opDebug->getAdditiveMetrics().incrementKeysDeleted(keysDeleted);
         // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
@@ -985,6 +1020,11 @@ repl::OpTime truncateRange(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        UncommittedMetaChange::write(opCtx).record(collection->uuid(), -docsDeleted, -bytesDeleted);
+    }
     return opTime;
 }
 }  // namespace collection_internal

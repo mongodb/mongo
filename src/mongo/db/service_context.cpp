@@ -161,13 +161,9 @@ ServiceContext::~ServiceContext() {
     invariant(_clients.empty());
 }
 
-Service* ServiceContext::getService(ClusterRole role) const {
-    return _serviceSet->getService(role);
-}
-
 Service* ServiceContext::getService() const {
     for (auto role : {ClusterRole::ShardServer, ClusterRole::RouterServer})
-        if (auto p = getService(role))
+        if (auto p = _serviceSet->getService(role))
             return p;
     MONGO_UNREACHABLE;
 }
@@ -346,6 +342,21 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
 
     return UniqueOperationContext(opCtx.release());
 };
+
+ServiceContext::UniqueOperationContext ServiceContext::makeKillOpsExemptOperationContext(
+    Client* client) {
+    for (unsigned caught = 0;; ++caught) {
+        auto opCtx = makeOperationContext(client);
+        ClientLock clientLock(client);
+        try {
+            opCtx->setKillOpsExempt();
+            return opCtx;
+        } catch (const ExceptionFor<ErrorCodes::OpCtxKilledOnMarkKillOpsExempt>&) {
+            if (caught >= 100)
+                throw;
+        }
+    }
+}
 
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();

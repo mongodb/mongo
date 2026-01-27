@@ -41,7 +41,6 @@ executor:
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1
-        failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
         featureFlagPrimaryDrivenIndexBuilds: 1
         featureFlagRecordIdsReplicated: 1
     num_nodes: 3
@@ -99,7 +98,6 @@ selector:
     - requires_commit_quorum
     - requires_capped
     - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
-    - exclude_when_record_ids_replicated
   roots:
     - jstests/core/**/*.js
 test_kind: js_test

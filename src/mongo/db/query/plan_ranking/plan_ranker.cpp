@@ -48,9 +48,26 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                     QueryPlannerParams& plannerParams,
                                                     PlanYieldPolicy::YieldPolicy yieldPolicy,
                                                     const MultipleCollectionAccessor& collections,
-                                                    PlannerData plannerData) {
+                                                    PlannerData plannerData,
+                                                    bool isClassic) {
     auto rankerMode = plannerParams.planRankerMode;
     // TODO SERVER-115496. Enumerate solutions here and pass them to the right ranking strategy.
+
+    if (rankerMode == QueryPlanRankerModeEnum::kMultiPlanning || !isClassic) {
+        /**
+         * This is a special plan ranking strategy in that it does not actually rank plans, but
+         * rather returns all enumerated plans. This will result in multi-planning being used
+         * to select a winning plan at runtime.
+         */
+        // TODO SERVER-115496 enumerate solutions once
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
+        _ws = std::move(plannerData.workingSet);
+        if (!statusWithMultiPlanSolns.isOK()) {
+            return statusWithMultiPlanSolns.getStatus();
+        }
+        return PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
+    }
+
     switch (rankerMode) {
         case QueryPlanRankerModeEnum::kSamplingCE:
         case QueryPlanRankerModeEnum::kExactCE:
@@ -99,19 +116,6 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                     MONGO_UNREACHABLE;
             }
         }
-        case QueryPlanRankerModeEnum::kMultiPlanning: {
-            /**
-             * This is a special plan ranking strategy in that it does not actually rank plans, but
-             * rather returns all enumerated plans. This will result in multi-planning being used
-             * to select a winning plan at runtime.
-             */
-            auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-            _ws = std::move(plannerData.workingSet);
-            if (!statusWithMultiPlanSolns.isOK()) {
-                return statusWithMultiPlanSolns.getStatus();
-            }
-            return plan_ranking::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
-        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -124,8 +128,23 @@ std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
     return result;
 }
 
-bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRankerMode) {
-    if (planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
+bool delayOrSkipSubplanner(const CanonicalQuery& query,
+                           const QueryPlannerParams& params,
+                           bool isClassic) {
+    // With CBR enabled there should be no changes to the SBE planning path.
+    // TODO SERVER-117707: Decide what to do with this restriction.
+    if (!isClassic) {
+        return false;
+    }
+
+    if (params.planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
+        return false;
+    }
+
+    // Always use the subplanner for clustered collections to enable clustered index scans for $or
+    // branches.
+    // TODO SERVER-117766: Avoid subplanner for $or queries over clustered collections.
+    if (params.clusteredInfo) {
         return false;
     }
 

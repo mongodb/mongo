@@ -582,6 +582,7 @@ export const MirrorReadsHelpers = {
     getSecondariesWithTargetedTag,
     getMirroredReadsStats,
     getStatDifferences,
+    getProcessedAsSecondaryTotal,
     sendReads,
     sendAndCheckReadsSucceedWithRate,
     verifyProcessedAsSecondaryOnEarlyError,

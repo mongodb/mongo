@@ -803,6 +803,8 @@ tasks:
 
   - <<: *task_template
     name: external_auth_windows
+    # Disabled until windows-2016-dc is replaced with newer DC distro with Python 3.13 (see SERVER-117162)
+    disable: true
     tags: ["assigned_to_jira_team_server_security", "experimental"]
     commands:
       - func: "do setup"
@@ -1873,7 +1875,6 @@ tasks:
         "sharding",
         "jscore",
         "common",
-        "requires_all_feature_flags",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2203,28 +2204,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "release_critical",
-        "incompatible_mac",
-        "incompatible_ppc",
-        "incompatible_s390x",
-        "incompatible_debug_mode",
-        "concurrency",
-        "common",
-        "read_concern_maj",
-        "large",
-        "sharded",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_sharded_multi_stmt_txn_gen
     tags:
       [
@@ -2401,14 +2380,8 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "jscore",
-        "exclude_when_record_ids_replicated",
-      ]
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2418,14 +2391,8 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_primary_step_down_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "jscore",
-        "exclude_when_record_ids_replicated",
-      ]
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2681,13 +2648,11 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
-        "exclude_when_record_ids_replicated",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2699,13 +2664,11 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
-        "exclude_when_record_ids_replicated",
       ]
     commands:
       - func: "generate resmoke tasks"

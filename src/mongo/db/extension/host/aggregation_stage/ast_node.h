@@ -32,7 +32,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -62,8 +62,7 @@ public:
      */
     BSONObj getIdLookupSpec() const {
         const auto* idLookup =
-            dynamic_cast<const DocumentSourceInternalSearchIdLookUp::LiteParsed*>(
-                _liteParsed.get());
+            dynamic_cast<const LiteParsedInternalSearchIdLookUp*>(_liteParsed.get());
         uassert(11160700,
                 str::stream() << "Expected $_internalSearchIdLookup stage, but got: "
                               << _liteParsed->getParseTimeName(),
@@ -170,8 +169,7 @@ private:
             auto* hostAstNode = static_cast<const HostAggStageAstNode*>(astNode);
             auto spec = hostAstNode->getIdLookupSpec();
             auto clonedLiteParsed =
-                std::make_unique<DocumentSourceInternalSearchIdLookUp::LiteParsed>(
-                    spec.firstElement(), spec);
+                std::make_unique<LiteParsedInternalSearchIdLookUp>(spec.firstElement(), spec);
             auto clonedAstNode = std::make_unique<AggStageAstNode>(std::move(clonedLiteParsed));
             *output = new HostAggStageAstNode(std::move(clonedAstNode));
         });

@@ -131,4 +131,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
     num_nodes: 2

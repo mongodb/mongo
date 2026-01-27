@@ -1158,11 +1158,18 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansSimple) {
     ASSERT_OK(mps->pickBestPlan());
     ASSERT_TRUE(mps->bestPlanChosen());
 
-    auto rejected = mps->extractRejectedPlansAndStages();
-    ASSERT_EQ(rejected.size(), 1);
-    ASSERT_TRUE(rejected[0].solution);
-    ASSERT_TRUE(rejected[0].planStage);
-    ASSERT_EQ(rejected[0].planStage->stageType(), STAGE_COLLSCAN);
+    auto planExplainerData = mps->extractPlanExplainerData();
+    auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
+    ASSERT_EQ(rejectedPlansWithStages.size(), 1);
+    ASSERT_TRUE(rejectedPlansWithStages[0].solution);
+    ASSERT_TRUE(rejectedPlansWithStages[0].planStage);
+    ASSERT_EQ(rejectedPlansWithStages[0].planStage->stageType(), STAGE_COLLSCAN);
+    auto& mpWinningPlanTrialStats = planExplainerData.multiPlannerWinningPlanTrialStats;
+    ASSERT_EQ(mpWinningPlanTrialStats->common.works,
+              11);  // SEEK + 10 advances
+    ASSERT_EQ(mpWinningPlanTrialStats->common.advanced, 10);
+    ASSERT(planExplainerData.multiPlannerWinningPlanScore >
+           rejectedPlansWithStages[0].solution->score);
 }
 
 TEST_F(QueryStageMultiPlanTest, NoRejectedPlansExtractedWhenBackupPlanIsLast) {
@@ -1219,9 +1226,15 @@ TEST_F(QueryStageMultiPlanTest, NoRejectedPlansExtractedWhenBackupPlanIsLast) {
     // A backup plan will be set since the the winner plan includes a blocking SORT stage.
     ASSERT(mps->hasBackupPlan());
 
-    auto rejected = mps->extractRejectedPlansAndStages();
+    auto planExplainerData = mps->extractPlanExplainerData();
     // We expect no rejected plan as the backup plan is not considered rejected.
-    ASSERT_EQ(rejected.size(), 0);
+    ASSERT_EQ(planExplainerData.rejectedPlansWithStages.size(), 0);
+    auto& multiplannerWinningTrialStats = planExplainerData.multiPlannerWinningPlanTrialStats;
+    ASSERT_EQ(multiplannerWinningTrialStats->common.works,
+              2);  // SEEK + 1 needs time
+    ASSERT_EQ(multiplannerWinningTrialStats->common.needTime, 1);
+    ASSERT_EQ(multiplannerWinningTrialStats->common.advanced, 0);
+    ASSERT(planExplainerData.multiPlannerWinningPlanScore.value() > 0);
 }
 
 TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
@@ -1282,9 +1295,10 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
     // A backup plan will be set since the winner plan includes a blocking SORT stage.
     ASSERT(mps->hasBackupPlan());
 
-    auto rejected = mps->extractRejectedPlansAndStages();
-    ASSERT_EQ(rejected.size(), 1);
-    ASSERT_TRUE(rejected[0].solution);
+    auto planExplainerData = mps->extractPlanExplainerData();
+    auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
+    ASSERT_EQ(rejectedPlansWithStages.size(), 1);
+    ASSERT_TRUE(rejectedPlansWithStages[0].solution);
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         ""
         "{sort:{"
@@ -1294,9 +1308,16 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
         "    }}"
         "  }}"
         "}}",
-        rejected[0].solution->root()));
-    ASSERT_TRUE(rejected[0].planStage);
-    ASSERT_EQ(rejected[0].planStage->stageType(), STAGE_SORT_SIMPLE);
+        rejectedPlansWithStages[0].solution->root()));
+    ASSERT_TRUE(rejectedPlansWithStages[0].planStage);
+    ASSERT_EQ(rejectedPlansWithStages[0].planStage->stageType(), STAGE_SORT_SIMPLE);
+    auto& mpWinningTrialStats = planExplainerData.multiPlannerWinningPlanTrialStats;
+    ASSERT_EQ(mpWinningTrialStats->common.works,
+              2);  // SEEK + 1 needs time
+    ASSERT_EQ(mpWinningTrialStats->common.needTime, 1);
+    ASSERT_EQ(mpWinningTrialStats->common.advanced, 0);
+    ASSERT(planExplainerData.multiPlannerWinningPlanScore >
+           planExplainerData.rejectedPlansWithStages[0].solution->score);
 }
 
 TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
@@ -1339,14 +1360,16 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
     mps->abandonTrials();
     ASSERT_FALSE(mps->bestPlanChosen());
 
-    auto rejected = mps->extractRejectedPlansAndStages();
-
+    auto planExplainerData = mps->extractPlanExplainerData();
+    auto& rejectedPlansWithStages = planExplainerData.rejectedPlansWithStages;
     // Both plans should be returned as rejected.
-    ASSERT_EQ(rejected.size(), 2UL);
-    ASSERT_TRUE(rejected[0].solution);
-    ASSERT_TRUE(rejected[0].planStage);
-    ASSERT_TRUE(rejected[1].solution);
-    ASSERT_TRUE(rejected[1].planStage);
+    ASSERT_EQ(rejectedPlansWithStages.size(), 2UL);
+    ASSERT_TRUE(rejectedPlansWithStages[0].solution);
+    ASSERT_TRUE(rejectedPlansWithStages[0].planStage);
+    ASSERT_TRUE(rejectedPlansWithStages[1].solution);
+    ASSERT_TRUE(rejectedPlansWithStages[1].planStage);
+    ASSERT_EQ(planExplainerData.multiPlannerWinningPlanTrialStats, nullptr);
+    ASSERT_EQ(planExplainerData.multiPlannerWinningPlanScore, boost::none);
 }
 
 DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
@@ -1389,7 +1412,64 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
 
     ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
     // Verify calling extraction before picking best plan or abandoning triggers assertion.
-    auto rejected = mps->extractRejectedPlansAndStages();
+    auto rejected = mps->extractPlanExplainerData();
+}
+
+TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
+    // Insert a dummy object, just so the collection exists.
+    insert(BSON("foo" << 0));
+    auto coll = getCollection();
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_FALSE(mps->isStateSaved());
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    ASSERT_TRUE(mps->isStateSaved());
+    mps->abandonTrials();
+    ASSERT_FALSE(mps->isStateSaved());
+}
+
+TEST_F(QueryStageMultiPlanTest, ManagesStateAroundPickingBestPlan) {
+    // Insert a dummy object, just so the collection exists.
+    insert(BSON("foo" << 0));
+    auto coll = getCollection();
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    mps->addPlan(createQuerySolution(),
+                 getCollScanPlan(expCtx.get(), coll, sharedWs.get(), {}),
+                 sharedWs.get());
+
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_FALSE(mps->isStateSaved());
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    ASSERT_TRUE(mps->isStateSaved());
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT(mps->bestPlanChosen());
+    ASSERT_FALSE(mps->isStateSaved());
 }
 
 }  // namespace

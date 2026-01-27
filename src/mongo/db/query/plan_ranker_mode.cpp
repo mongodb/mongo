@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -52,7 +53,12 @@ void QueryPlanRankerMode::append(OperationContext*,
 }
 
 Status QueryPlanRankerMode::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryPlanRankerMode_parse(value, IDLParserContext("planRankerMode"));
+    QueryPlanRankerModeEnum mode =
+        QueryPlanRankerMode_parse(value, IDLParserContext("planRankerMode"));
+    if (mode == QueryPlanRankerModeEnum::kHistogramCE && !getTestCommandsEnabled()) {
+        return Status(ErrorCodes::BadValue, "histogramCE not allowed");
+    }
+    _data = mode;
     return Status::OK();
 }
 

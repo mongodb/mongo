@@ -125,7 +125,7 @@ int runDbTests(unittest::MainProgress& progress) {
     catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc());
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     auto registry = std::make_unique<OpObserverRegistry>();
     serviceContext->setOpObserver(std::move(registry));

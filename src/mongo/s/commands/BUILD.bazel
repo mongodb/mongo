@@ -128,6 +128,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:cluster_set_allow_migrations_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_shard_collection_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:cluster_untrack_unsplittable_collection.cpp",
+        "//src/mongo/db/global_catalog/ddl:cluster_upgrade_downgrade_viewless_timeseries_cmd.cpp",
         "//src/mongo/db/global_catalog/ddl:recreate_range_deletion_tasks_gen",
         "//src/mongo/db/global_catalog/ddl:refine_collection_shard_key_gen",
         "//src/mongo/db/global_catalog/ddl:shard_collection_gen",

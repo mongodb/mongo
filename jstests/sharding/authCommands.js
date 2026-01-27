@@ -259,6 +259,7 @@ let checkRemoveShard = function (hasWriteAuth) {
             return res.msg == "removeshard completed successfully";
         };
         assert.soon(checkRemoveShard, "failed to remove shard");
+        st.restartShardClean(st.shard1);
     } else {
         checkCommandFailed(adminDB, {removeshard: st.rs1.name});
     }

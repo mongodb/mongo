@@ -248,6 +248,7 @@ struct QueryStatsSnapshot {
     bool fromMultiPlanner;
     bool fromPlanCache;
     int64_t planningTimeMicros;
+    CardinalityEstimationMethods cardinalityEstimationMethods;
     uint64_t nDocsSampled;
 
     uint64_t nMatched;
@@ -255,6 +256,7 @@ struct QueryStatsSnapshot {
     uint64_t nModified;
     uint64_t nDeleted;
     uint64_t nInserted;
+    uint64_t nUpdateOps;
 
     int64_t totalTimeQueuedMicros;
     uint64_t totalAdmissions;

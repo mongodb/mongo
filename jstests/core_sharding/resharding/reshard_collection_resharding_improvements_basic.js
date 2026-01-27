@@ -11,6 +11,8 @@
  *  assumes_unsharded_collection,
  *  # This test asserts specific chunk placements.
  *  assumes_balancer_off,
+ *  # resharding can't run during FCV transitions
+ *  cannot_run_during_upgrade_downgrade,
  * ]
  */
 

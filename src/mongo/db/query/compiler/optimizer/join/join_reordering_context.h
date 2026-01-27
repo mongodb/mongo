@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -53,6 +54,7 @@ struct JoinReorderingContext {
     const std::vector<ResolvedPath>& resolvedPaths;
     QuerySolutionMap cbrCqQsns;
     AvailableIndexes perCollIdxs;
+    CatalogStats catStats;
 
     // Whether or not we are explaining the query. Based on this flag we may, for example, keep
     // around costing/CE information to display in the explain output.

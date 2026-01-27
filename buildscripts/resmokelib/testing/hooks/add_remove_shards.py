@@ -544,7 +544,7 @@ class _AddRemoveShardThread(threading.Thread):
             # moveCollections for the same bucket collection. We can exclude the bucket collections
             # from the list of collections to move since it doesn't give us any extra test coverage.
             for collection in self._client.get_database(database["_id"]).list_collections(
-                filter={"name": {"$not": {"$regex": ".*system\.buckets.*"}}}
+                filter={"name": {"$not": {"$regex": r".*system\.buckets.*"}}}
             ):
                 namespace = database["_id"] + "." + collection["name"]
                 coll_doc = self._client.config.collections.find_one({"_id": namespace})

@@ -20,8 +20,6 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-x86-dynamic-enterprise-compile-expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --dtlto=False
@@ -49,8 +47,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -87,8 +83,6 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -120,8 +114,6 @@ variables:
     run_on:
       - rhel8.8-small
     expansions: &enterprise-rhel-8-64-bit-expansions-template
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
@@ -227,8 +219,6 @@ buildvariants:
     display_name: "* Linux x86 Stitch Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *linux-stitch-compile-suggested
     tasks:
       - name: .stitch
@@ -238,8 +228,6 @@ buildvariants:
     display_name: "* Linux x86 Crypt Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *linux-crypt-compile
     tasks:
       - name: .crypt
@@ -276,8 +264,9 @@ buildvariants:
       - name: compile_test_parallel_dbtest_stream_TG
       - name: generate_buildid_to_debug_symbols_mapping
       # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
-      # and processes to be used with TLS on a single host.
-      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.txns
+      # and processes to be used with TLS on a single host and
+      # sharding_jscore_passthrough_priority_ports_gen does not support GRPC.
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !sharding_jscore_passthrough_priority_ports_gen !.auth !.txns !.feature_flag_guarded
       - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       # concurrency suites that use a ReplicaSetFixture will fail on this build variant.
@@ -370,8 +359,6 @@ buildvariants:
     run_on:
       - rhel8.8-large
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
         --dbg_level=1
@@ -504,7 +491,7 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
-      - name: .jscore .common !.requires_large_host
+      - name: .jscore .common !.requires_large_host !.feature_flag_guarded
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
         distros:
@@ -605,9 +592,9 @@ buildvariants:
         patch_only: true
       - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
         patch_only: true
-      - name: .jscore .common !.requires_large_host
+      - name: .jscore .common !.requires_large_host !.feature_flag_guarded
         patch_only: true
-      - name: .jscore .common .requires_large_host
+      - name: .jscore .common .requires_large_host !.feature_flag_guarded
         patch_only: true
         distros:
           - rhel8.8-large
@@ -700,7 +687,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --runAllFeatureFlagTests
-        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe
     tasks:
       - name: .aggfuzzer
       - name: .change_stream_fuzzer
@@ -720,7 +707,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
-        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe
     tasks:
       - name: .aggfuzzer
       - name: .change_stream_fuzzer

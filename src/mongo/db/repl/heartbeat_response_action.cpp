@@ -67,6 +67,12 @@ HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int prim
     return result;
 }
 
+HeartbeatResponseAction HeartbeatResponseAction::makeRestartHeartbeatsAction() {
+    HeartbeatResponseAction result;
+    result._action = RestartHeartbeats;
+    return result;
+}
+
 HeartbeatResponseAction::HeartbeatResponseAction() : _action(NoAction), _primaryIndex(-1) {}
 
 void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {

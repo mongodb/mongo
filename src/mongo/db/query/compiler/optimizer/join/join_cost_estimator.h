@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 
 namespace mongo::join_ordering {
@@ -61,6 +62,31 @@ public:
      * need to modify this function.
      */
     virtual JoinCostEstimate costIndexScanFragment(NodeId) = 0;
+
+    /**
+     * Estimate the cost of a hash join plan fragment.
+     */
+    virtual JoinCostEstimate costHashJoinFragment(const JoinPlanNode& left,
+                                                  const JoinPlanNode& right) = 0;
+
+    /**
+     * Estimate the cost of an indexed nested loop join plan fragment.
+     */
+    virtual JoinCostEstimate costINLJFragment(
+        const JoinPlanNode& left,
+        NodeId right,
+        std::shared_ptr<const IndexCatalogEntry> indexProbe) = 0;
+
+    /**
+     * Estiamte the cost of a nested loop join plan fragment.
+     */
+    virtual JoinCostEstimate costNLJFragment(const JoinPlanNode& left,
+                                             const JoinPlanNode& right) = 0;
+
+    /**
+     * Estimate the cost of a single table access path.
+     */
+    virtual JoinCostEstimate costBaseCollectionAccess(NodeId nodeId) = 0;
 };
 
 }  // namespace mongo::join_ordering

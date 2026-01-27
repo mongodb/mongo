@@ -1105,7 +1105,6 @@ tasks:
         "replica_sets",
         "san",
         "large",
-        "requires_all_feature_flags",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1428,12 +1427,7 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_jscore_passthrough_priority_ports_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -1447,12 +1441,7 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_jscore_stepdown_passthrough_priority_ports_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
@@ -1464,23 +1453,13 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_kill_primary_jscore_passthrough_priority_ports_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 
@@ -1492,12 +1471,7 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough_priority_ports_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "requires_all_feature_flags",
-      ]
+    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
 

@@ -428,8 +428,12 @@ common:remote_test --strategy=TestRunner=remote
 common:remote_test --features=-thin_archive
 common:remote_test --remote_download_outputs=minimal
 common:remote_test --test_output=summary
-common:remote_test --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebugInfo|StripDebugInfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=-no-remote-cache
-common:remote_test --remote_download_regex=.*\.core$
+
+# The below line unsets the no-remote-cache execution info for the given strategies
+# even though upon first glance it looks like it's setting it.
+common:remote_test --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebugInfo|StripDebugInfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=-no-remote-cache
+common:remote_test --remote_download_regex=.*\.(zip|core|mdmp|gz)$
+
 test:remote_test --test_tag_filters=-incompatible_with_bazel_remote_test
 
 # Coverage

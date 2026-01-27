@@ -89,7 +89,7 @@ def _find_linter(linter, config_dict):
     python_dir = os.path.dirname(sys.executable)
     if sys.platform == "win32":
         # On Windows, these scripts are installed in %PYTHONDIR%\scripts like
-        # 'C:\python\python310\scripts', and have .exe extensions.
+        # 'C:\python\python313\scripts', and have .exe extensions.
         python_dir = os.path.join(python_dir, "scripts")
 
         cmd_str = os.path.join(python_dir, linter.cmd_name)

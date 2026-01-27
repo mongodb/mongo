@@ -4,6 +4,7 @@ py_library(
     name = "resmokelib",
     srcs = [
         "__init__.py",
+        "bazel_suite_parser.py",
         "cli.py",
         "config.py",
         "configure_resmoke.py",

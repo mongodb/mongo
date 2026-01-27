@@ -876,6 +876,26 @@ export function getClusterTime(db) {
 }
 
 /**
+ * Returns the next cluster time by incrementing the 'inc' field of the provided 'clusterTime'.
+ */
+export function getNextClusterTime(clusterTime) {
+    const UINT32_MAX = 0xffffffff;
+
+    const t = clusterTime.getTime();
+    const i = clusterTime.getInc();
+    if (i === UINT32_MAX) {
+        if (t === UINT32_MAX) {
+            throw new Error("clusterTime overflow: cannot advance Timestamp any further");
+        }
+
+        // Move to the next second and reset increment.
+        return new Timestamp(t + 1, 0);
+    }
+
+    return new Timestamp(t, i + 1);
+}
+
+/**
  * Distributes collection data across multiple shards by splitting and moving chunks.
  *
  * @param {Object} db - The database object to execute admin commands on

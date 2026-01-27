@@ -69,6 +69,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
@@ -427,7 +428,7 @@ public:
         // plans.
         auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
         if (needsSubplanning &&
-            !plan_ranking::delayOrSkipSubplanner(*_cq, _plannerParams->planRankerMode)) {
+            !plan_ranking::delayOrSkipSubplanner(*_cq, *_plannerParams, usingClassic())) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
@@ -442,9 +443,15 @@ public:
             return buildSubPlan();
         }
 
+
         plan_ranking::PlanRanker planRanker;
-        auto rankerResult = planRanker.rankPlans(
-            _opCtx, *_cq, *_plannerParams, _yieldPolicy, getCollections(), makePlannerData());
+        auto rankerResult = planRanker.rankPlans(_opCtx,
+                                                 *_cq,
+                                                 *_plannerParams,
+                                                 _yieldPolicy,
+                                                 getCollections(),
+                                                 makePlannerData(),
+                                                 usingClassic());
         if (!rankerResult.isOK()) {
             // In case the plan ranker failed to return a result, distinguish two cases:
             // - a rooted $or query exceeded kMaxNumberOfOrPlans plans, in which case we need to
@@ -453,10 +460,13 @@ public:
             if (rankerResult.getStatus().code() != ErrorCodes::MaxNumberOfOrPlansExceeded) {
                 return rankerResult.getStatus();
             }
-            // We can reach this point only for rooted $or queries.
+            // We can reach this point only for rooted $or queries in automaticCE mode. The
+            // automaticCE mode ignores the server parameter
+            // 'internalQueryPlanOrChildrenIndependently' and hence we check here only the query
+            // properties.
             tassert(11260301,
                     "The subplanner can be called only for rooted $or queries",
-                    needsSubplanning);
+                    SubplanStage::canUseSubplanning(*_cq));
             uassert(ErrorCodes::IllegalOperation,
                     "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
                     !_cq->getForcedPlanSolutionHash());
@@ -484,23 +494,50 @@ public:
             }
         }
 
-        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
-        // manually update the plan cache instead without multiplanning but this is simpler.
-        if (1 == solutions.size() && !_cq->getExpCtxRaw()->getForcePlanCache() &&
-            !_cq->getExpCtxRaw()
-                 ->getQueryKnobConfiguration()
-                 .getUseMultiplannerForSingleSolutions()) {
-            // Only one possible plan. Build the stages from the solution.
-            solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
-            return buildSingleSolutionPlan(std::move(solutions[0]),
-                                           std::move(rankerResult.getValue().maybeExplainData));
+        if (1 == solutions.size()) {
+            // The plan ranker returns a single solution when CBR is used to pick the best plan.
+            captureCardinalityEstimationMethodForQueryStats(
+                rankerResult.getValue().maybeExplainData, solutions[0].get());
+
+            if (!shouldMultiPlanForSingleSolution(rankerResult.getValue(), _cq)) {
+                // Only one possible plan. Build the stages from the solution.
+                solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
+                return buildSingleSolutionPlan(std::move(solutions[0]),
+                                               std::move(rankerResult.getValue().maybeExplainData));
+            }
         }
+
         return buildMultiPlan(std::move(solutions),
                               std::move(rankerResult.getValue().maybeExplainData));
     }
 
     const QueryPlannerParams& getPlannerParams() {
         return *_plannerParams.get();
+    }
+
+    bool shouldMultiPlanForSingleSolution(const plan_ranking::PlanRankingResult& rankerResult,
+                                          const CanonicalQuery* cq) {
+        auto expCtx = _cq->getExpCtxRaw();
+
+        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
+        // manually update the plan cache instead without multiplanning but this is simpler.
+        bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
+            expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
+
+        // TODO: SERVER-115226: Remove check for rejectedPlansWithStages once we no longer go
+        // through costing for single solution plans.
+        const bool hasRejectedPlans = rankerResult.maybeExplainData &&
+            !rankerResult.maybeExplainData->rejectedPlansWithStages.empty();
+
+        // If there is rejected plans in the  result from 'rankPlans()' and the
+        // 'needsWorksMeasured' flag is set, we run the single CBR picked solution through
+        // multiplanner to measure its number of works and add the plan to the plan cache. If
+        // 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+        // 'needsWorksMeasured' and the number of rejected plans and instead only check whether
+        // we should force running the single solution plan through the multiplanner.
+        return (!internalQueryDisablePlanCache.load() && hasRejectedPlans &&
+                rankerResult.needsWorksMeasured) ||
+            forceMultiPlanForSingleSolution;
     }
 
 protected:
@@ -523,6 +560,12 @@ protected:
     auto releaseResult() {
         return std::move(_result);
     }
+
+    /**
+     * Returns true if we intend to use the classic engine to execute the winning plan and false if
+     * we intend to use SBE.
+     */
+    virtual bool usingClassic() = 0;
 
     /**
      * Attempts to build a special cased fast-path query plan for a find-by-_id query. Returns
@@ -587,6 +630,44 @@ protected:
         return boost::none;
     }
 
+    /**
+     * Captures the cardinality estimation method (if it exists) from the winning plan's root node
+     * and stores it in CurOp for query stats collection.
+     */
+    void captureCardinalityEstimationMethodForQueryStats(
+        const boost::optional<PlanExplainerData>& maybeExplainData, const QuerySolution* solution) {
+        if (maybeExplainData && !maybeExplainData->estimates.empty() && solution) {
+            auto it = maybeExplainData->estimates.find(solution->root());
+            if (it != maybeExplainData->estimates.end()) {
+                auto& ceMethods =
+                    CurOp::get(_opCtx)->debug().getAdditiveMetrics().cardinalityEstimationMethods;
+                switch (it->second.outCE.source()) {
+                    case cost_based_ranker::EstimationSource::Histogram:
+                        ceMethods.setHistogram(ceMethods.getHistogram().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Sampling:
+                        ceMethods.setSampling(ceMethods.getSampling().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Heuristics:
+                        ceMethods.setHeuristics(ceMethods.getHeuristics().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Mixed:
+                        ceMethods.setMixed(ceMethods.getMixed().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Metadata:
+                        ceMethods.setMetadata(ceMethods.getMetadata().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Code:
+                        ceMethods.setCode(ceMethods.getCode().value_or(0) + 1);
+                        break;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(11560600);
+                        break;
+                }
+            }
+        }
+    }
+
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
@@ -635,6 +716,10 @@ private:
                            _plannerParams,
                            _yieldPolicy,
                            _cachedPlanHash};
+    }
+
+    bool usingClassic() final {
+        return true;
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildIdHackPlan() final {
@@ -813,6 +898,10 @@ protected:
             _useSbePlanCache};
     }
 
+    bool usingClassic() final {
+        return false;
+    }
+
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildIdHackPlan() final {
         // We expect idhack queries to always use the classic engine.
         return nullptr;
@@ -821,6 +910,8 @@ protected:
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
         boost::optional<PlanExplainerData> maybeExplainData) final {
+        this->captureCardinalityEstimationMethodForQueryStats(maybeExplainData, solution.get());
+
         // TODO SERVER-92589: Support CBR with SBE plans
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(

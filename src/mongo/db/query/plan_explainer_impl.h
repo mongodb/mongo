@@ -76,6 +76,14 @@ public:
                                                      ExplainOptions::Verbosity) const;
 
 private:
+    /**
+     * A helper that formats the plan stats into a BSON object and collects summary stats.
+     */
+    PlanStatsDetails _formatPlanStats(const PlanStageStats* stats,
+                                      ExplainOptions::Verbosity verbosity,
+                                      boost::optional<size_t> planIdx,
+                                      boost::optional<double> score) const;
+
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
     PlanExplainerData _explainData;

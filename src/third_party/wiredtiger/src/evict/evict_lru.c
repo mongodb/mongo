@@ -2500,6 +2500,20 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
     if (__wt_atomic_load_uint64_relaxed(&page->read_gen) == WT_READGEN_NOTSET)
         __wti_evict_read_gen_new(session, page);
 
+    /*
+     * Don't queue clean history store pages for updates eviction targets while a precise checkpoint
+     * is running, it tends to evict history pages that are needed soon.
+     */
+    if (WT_IS_HS(btree->dhandle) && F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+        if (F_ISSET(evict, WT_EVICT_CACHE_UPDATES) &&
+          !F_ISSET(evict, WT_EVICT_CACHE_UPDATES_HARD) && !F_ISSET(evict, WT_EVICT_CACHE_CLEAN) &&
+          !modified && __wt_atomic_load_bool_v_relaxed(&conn->txn_global.checkpoint_running)) {
+            WT_STAT_CONN_INCR(
+              session, eviction_server_skip_history_store_pages_with_updates_during_checkpoint);
+            return;
+        }
+    }
+
     /* Pages being forcibly evicted go on the urgent queue. */
     if (modified &&
       (__wt_atomic_load_uint64_relaxed(&page->read_gen) == WT_READGEN_EVICT_SOON ||

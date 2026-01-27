@@ -42,6 +42,7 @@ namespace mongo {
  * interruption. This Client must have a role with the killop action type or own the targeted
  * OperationContext. The Client must also be a member of the same ServiceContext as the targeted
  * OperationContext.
+ * This class should only be used for the killOp command.
  */
 class OperationKiller {
 public:
@@ -59,6 +60,7 @@ public:
 
     /**
      * Kill an operation running on this instance of mongod or mongos.
+     * This will ignore kill-exempt operations.
      */
     void killOperation(OperationId opId, ErrorCodes::Error killCode = ErrorCodes::Interrupted);
     void killOperation(const OperationKey& opKey,

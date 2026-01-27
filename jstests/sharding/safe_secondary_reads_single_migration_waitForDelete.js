@@ -426,6 +426,7 @@ let testCases = {
     testRemoval: {skip: "does not return user data"},
     testVersions1And2: {skip: "does not return user data"},
     testVersion2: {skip: "does not return user data"},
+    upgradeDowngradeViewlessTimeseries: {skip: "primary only"},
     transitionFromDedicatedConfigServer: {skip: "primary only"},
     transitionToDedicatedConfigServer: {skip: "primary only"},
     transitionToShardedCluster: {skip: "primary only"},

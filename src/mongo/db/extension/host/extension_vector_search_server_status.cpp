@@ -29,43 +29,17 @@
 
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 
-#include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 
-namespace mongo {
+namespace mongo::vector_search_metrics {
 
-VectorSearchServerStatusMetrics sVectorSearchMetrics{};
+Counter64& legacyVectorSearchQueryCount =
+    *MetricBuilder<Counter64>("extension.vectorSearch.legacyVectorSearchUsed");
 
-namespace {
-class VectorSearchServerStatusSection : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
+Counter64& extensionVectorSearchQueryCount =
+    *MetricBuilder<Counter64>("extension.vectorSearch.extensionVectorSearchUsed");
 
-    bool includeByDefault() const override {
-        return true;
-    }
+Counter64& onViewKickbackRetryCount =
+    *MetricBuilder<Counter64>("extension.vectorSearch.onViewKickbackRetries");
 
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        BSONObjBuilder builder;
-        builder.append(
-            "legacyVectorSearchUsed",
-            static_cast<long long>(sVectorSearchMetrics.legacyVectorSearchQueryCount.load()));
-        builder.append(
-            "extensionVectorSearchUsed",
-            static_cast<long long>(sVectorSearchMetrics.extensionVectorSearchQueryCount.load()));
-        builder.append(
-            "onViewKickbackRetries",
-            static_cast<long long>(sVectorSearchMetrics.onViewKickbackRetryCount.load()));
-        builder.append(
-            "inSubpipelineKickbackRetries",
-            static_cast<long long>(sVectorSearchMetrics.inSubpipelineKickbackCount.load()));
-        return builder.obj();
-    }
-};
-
-auto& extensionVectorSearchSection =
-    *ServerStatusSectionBuilder<VectorSearchServerStatusSection>("extension.vectorSearch")
-         .forShard()
-         .forRouter();
-}  // namespace
-}  // namespace mongo
+}  // namespace mongo::vector_search_metrics

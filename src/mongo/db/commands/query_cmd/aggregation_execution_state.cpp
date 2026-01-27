@@ -46,6 +46,7 @@
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 #include <fmt/format.h>
@@ -819,15 +820,19 @@ BSONObj AggCatalogState::getShardKey() const {
 }
 
 void AggCatalogState::validate() const {
+    const bool isTimeseriesQuery = isTimeseries();
     uassert(10557301,
             "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-            !(_aggExState.isHybridSearchPipeline() && isTimeseries()));
+            !(_aggExState.isHybridSearchPipeline() && isTimeseriesQuery));
+    uassert(11574101,
+            "mapReduce on a timeseries collection is not supported",
+            !(_aggExState.getRequest().getIsMapReduceCommand() && isTimeseriesQuery));
 
     if (_aggExState.getRequest().getResumeAfter() || _aggExState.getRequest().getStartAt()) {
         const auto& collectionOrView = getMainCollectionOrView();
         uassert(ErrorCodes::InvalidPipelineOperator,
                 "$_resumeAfter is not supported on timeseries collections",
-                !isTimeseries()
+                !isTimeseriesQuery
                     // Consider special case where user queries directly on underlying bucket ns
                     // for a view-ful timeseries. The $_resumeAfter token should still be allowed
                     // here. This is equivalent to querying on a timeseries coll with 'rawData'

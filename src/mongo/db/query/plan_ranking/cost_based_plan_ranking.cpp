@@ -121,6 +121,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query, plannerParams, topLevelSampleFieldNames);
     if (!statusWithMultiPlanSolns.isOK()) {
+        _ws = std::move(plannerData.workingSet);
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << query.toStringForErrorMsg()
                           << " planner returned error");

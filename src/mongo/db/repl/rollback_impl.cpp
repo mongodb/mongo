@@ -164,14 +164,15 @@ boost::optional<long long> _parseDroppedCollectionCount(const OplogEntry& oplogE
         return boost::none;
     }
 
-    long long count = 0;
-    // TODO: Use IDL to parse o2 object. See txn_cmds.idl for example.
-    auto status = bsonExtractIntegerField(*obj2, kNumRecordsFieldName, &count);
-    if (!status.isOK()) {
+    long long count;
+    try {
+        const auto o2_parsed = repl::DropAndRenameOplogEntryO2::parse(*obj2);
+        count = o2_parsed.getNumRecords();
+    } catch (const DBException& e) {
         LOGV2_WARNING(21635,
                       "Failed to parse oplog entry for collection count",
                       "type"_attr = desc,
-                      "error"_attr = status,
+                      "error"_attr = e.toStatus(),
                       "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         return boost::none;
     }

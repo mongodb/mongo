@@ -69,7 +69,7 @@ public:
     /**
      * There is no additional state required for offline validation.
      */
-    void initializeStateRequiredForOfflineValidation(ServiceContext*) override;
+    void initializeStateRequiredForOfflineValidation(OperationContext*) override;
 
     /**
      * There are no specific persistence threads that must outlive the storage engine.

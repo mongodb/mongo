@@ -119,6 +119,8 @@ last-continuous:
       ticket: SERVER-116089
     - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
       ticket: SERVER-117009
+    - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+      ticket: SERVER-117623
   suites: null
 last-lts:
   all:

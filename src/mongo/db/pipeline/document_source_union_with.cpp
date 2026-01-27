@@ -280,8 +280,9 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
             // The pipeline returned to us by the IDL is owned by us, but since it is a local
             // variable, it will not be saved after parse() returns. We call makeOwned() so that the
             // LiteParsedPipeline will own the BSON after this point.
-            liteParsedPipeline = LiteParsedPipeline(unionNss, *pipeline);
-            liteParsedPipeline->makeOwned();
+            auto optsCopy = options;
+            optsCopy.makeSubpipelineOwned = true;
+            liteParsedPipeline = LiteParsedPipeline(unionNss, *pipeline, false, optsCopy);
         }
     }
 

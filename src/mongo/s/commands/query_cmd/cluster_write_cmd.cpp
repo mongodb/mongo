@@ -736,6 +736,8 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
                 debug.getAdditiveMetrics().nMatched = response.getN();
             }
             debug.getAdditiveMetrics().nModified = response.getNModified();
+            debug.getAdditiveMetrics().nUpdateOps =
+                _batchedRequest.getUpdateRequest().getUpdates().size();
 
             for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
                 incrementUpdateMetrics(update.getU(),

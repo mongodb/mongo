@@ -121,7 +121,7 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
     // Extract paths from input data in a single pass.
     for (auto _ : state) {
         walkField<value::ScalarProjectionPositionInfoRecorder>(
-            &tree, inputTag, inputVal, nullptr /* bsonPtr */, callback);
+            &tree, inputTag, inputVal, nullptr /* bsonPtr */, callback, true /*traverseArrays*/);
     }
 }
 

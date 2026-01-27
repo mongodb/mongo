@@ -27,8 +27,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
 
   # THIS HAS COPIES IN
@@ -78,8 +76,6 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       use_wt_develop: true
       resmoke_jobs_factor: 0.5 # Avoid starting too many mongod's
       large_distro_name: rhel8.8-medium
@@ -105,7 +101,7 @@ buildvariants:
       - name: .clustered_collections !.requires_extra_system_deps
       - name: .misc_js
       - name: disk_wiredtiger
-      - name: .jscore .common
+      - name: .jscore .common !.feature_flag_guarded
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: query_golden_classic
@@ -115,7 +111,7 @@ buildvariants:
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
       - name: .ocsp
       - name: .read_write_concern
-      - name: .replica_sets !.encrypt !.fcbis
+      - name: .replica_sets !.encrypt !.fcbis !.feature_flag_guarded
       - name: replica_sets_reconfig_jscore_passthrough_gen
       - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
       - name: .retry
@@ -135,8 +131,6 @@ buildvariants:
     modules:
       - wtdevelop
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
@@ -145,7 +139,7 @@ buildvariants:
       content_type: application/zip
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=windows
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       multiversion_platform: windows
       multiversion_edition: enterprise

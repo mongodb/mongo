@@ -40,6 +40,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_task_executor.h"
 #include "mongo/db/topology/add_shard_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/topology_change_helpers.h"
@@ -49,7 +50,6 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 
@@ -136,17 +136,16 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 _doc.setChosenName(shardName);
 
-                // Check that a different shardIdentity is not present on the replicaset
+                // Check if the replicaset has any residue sharding related data
                 if (!_doc.getIsConfigShard()) {
-                    uassert(
-                        ErrorCodes::IllegalOperation,
-                        fmt::format("Can't add shard {} because the replica set already contains a "
-                                    "shard identity which does not match the current operation.",
-                                    _doc.getConnectionString().toString()),
-                        _validateShardIdentityDocumentOnReplicaSet(opCtx));
+                    uassert(ErrorCodes::IllegalOperation,
+                            fmt::format("Can't add shard {} because the replica set already "
+                                        "contains sharding data",
+                                        _doc.getConnectionString().toString()),
+                            !_hasShardingDataOnReplicaSet(opCtx));
                 }
 
-                _blockFCVChangesOnReplicaSet(opCtx, **executor);
+                _blockFCVChangesOnReplicaSet(opCtx, _executorWithoutGossip);
 
                 auto isWriteBlockedNewReplicaSet = _tryBlockNewReplicaSet(opCtx, targeter);
 
@@ -411,7 +410,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 ConfigsvrCoordinatorService::getService(opCtx)->waitForAllOngoingCoordinatorsOfType(
                     opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode);
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
-                    opCtx, _getTargeter(opCtx), _executorWithoutGossip);
+                    opCtx, _getTargeter(opCtx), **executor);
                 _unblockFCVChangesOnNewShard(opCtx, **executor);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
                                                                 /*removeRecoveryDocument*/ false);
@@ -486,19 +485,18 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const Status& status) noexcept {
-    return ExecutorFuture<void>(**executor)
-        .then([this, token, status, _ = shared_from_this(), executor] {
-            const auto opCtxHolder = makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
+    return ExecutorFuture<void>(**executor).then([this, token, status, _ = shared_from_this()] {
+        const auto opCtxHolder = makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
 
-            if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
-                _restoreUserWrites(opCtx);
-            }
-            _dropBlockFCVChangesCollection(opCtx, **executor);
-            topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                            /*removeRecoveryDocument*/ false);
-            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
-        });
+        if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
+            _restoreUserWrites(opCtx);
+        }
+        _dropBlockFCVChangesCollection(opCtx, _executorWithoutGossip);
+        topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                        /*removeRecoveryDocument*/ false);
+        topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
+    });
 }
 
 void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
@@ -606,7 +604,7 @@ RemoteCommandTargeter& AddShardCoordinator::_getTargeter(OperationContext* opCtx
     return *(_shardConnection->getTargeter());
 }
 
-bool AddShardCoordinator::_validateShardIdentityDocumentOnReplicaSet(OperationContext* opCtx) {
+bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) {
     auto& targeter = _getTargeter(opCtx);
     BSONObj existingShardIdentity;
     auto fetcherStatus =
@@ -633,17 +631,43 @@ bool AddShardCoordinator::_validateShardIdentityDocumentOnReplicaSet(OperationCo
     uassertStatusOK(fetcher->join(opCtx));
     uassertStatusOK(fetcherStatus);
 
-    if (existingShardIdentity.isEmpty()) {
+    if (!existingShardIdentity.isEmpty()) {
         return true;
     }
 
-    BSONObj shardIdentity =
-        topology_change_helpers::createShardIdentity(opCtx, std::string{*_doc.getChosenName()})
-            .toShardIdentityDocument();
-    return shardIdentity.woCompare(existingShardIdentity,
-                                   {},
-                                   BSONObj::ComparisonRules::kConsiderFieldName |
-                                       BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0;
+    for (const auto& nss : std::vector<NamespaceString>{
+             NamespaceString::kShardCollectionCatalogNamespace,
+             NamespaceString::kConfigShardCatalogDatabasesNamespace,
+             NamespaceString::kConfigShardCatalogCollectionsNamespace,
+             NamespaceString::kConfigShardCatalogChunksNamespace,
+             NamespaceString::kVectorClockNamespace,
+         }) {
+        auto fetcherStatus =
+            Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+        bool hasDocument = false;
+        auto fetcher = topology_change_helpers::createFindFetcher(
+            opCtx,
+            targeter,
+            nss,
+            BSONObj() /* filter */,
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            [&](const std::vector<BSONObj>& docs) -> bool {
+                if (!docs.empty()) {
+                    hasDocument = true;
+                }
+                return true;
+            },
+            [&](const Status& status) { fetcherStatus = status; },
+            _executorWithoutGossip);
+        uassertStatusOK(fetcher->schedule());
+        uassertStatusOK(fetcher->join(opCtx));
+        uassertStatusOK(fetcherStatus);
+        if (hasDocument) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void AddShardCoordinator::_runWithRetries(std::function<void()>&& function,

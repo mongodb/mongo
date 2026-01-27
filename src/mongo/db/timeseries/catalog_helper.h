@@ -72,6 +72,23 @@ std::pair<CollectionOrViewAcquisition, bool> acquireCollectionOrViewWithBucketsL
 std::pair<CollectionAcquisition, bool> acquireCollectionWithBucketsLookup(
     OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode);
 
+/**
+ * Similar to `acquireCollectionOrViewWithBucketsLookup`, but it will acquire _both_ the buckets
+ * collection and the view for viewful timeseries collections.
+ * This is useful for DDLs like `collMod` or `drop`, which operate over both.
+ */
+struct CollectionOrViewAcquisitionPlusTimeseriesView {
+    // The acquired collection or view.
+    // For viewful timeseries, this is the system.buckets collection.
+    CollectionOrViewAcquisition target;
+    // If target is a system.buckets collection with timeseries options,
+    // the corresponding timeseries view, if one exists.
+    boost::optional<ViewAcquisition> timeseriesView;
+};
+
+CollectionOrViewAcquisitionPlusTimeseriesView acquireCollectionOrViewPlusTimeseriesView(
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode);
+
 struct TimeseriesLookupInfo {
     // If the namespace refer to a timeseries collection
     bool isTimeseries;

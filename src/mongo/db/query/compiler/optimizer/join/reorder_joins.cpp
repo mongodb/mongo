@@ -36,7 +36,6 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -155,18 +154,19 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
     return preds;
 }
 
-void addEstimateIfExplain(const JoinReorderingContext& ctx,
-                          const PlanEnumeratorContext& peCtx,
-                          QuerySolutionNode* node,
-                          NodeSet set,
-                          cost_based_ranker::EstimateMap& estimates) {
+void addEstimatesIfExplain(const JoinReorderingContext& ctx,
+                           const PlanEnumeratorContext& peCtx,
+                           QuerySolutionNode* node,
+                           NodeSet set,
+                           const JoinCostEstimate& cost,
+                           cost_based_ranker::EstimateMap& estimates) {
     if (!ctx.explain) {
         return;
     }
 
-    // TODO SERVER-116505: Populate estimates map with cost information when available.
     auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
-    estimates.emplace(node, cost_based_ranker::QSNEstimate{.outCE = ce});
+    estimates.emplace(node,
+                      cost_based_ranker::QSNEstimate{.outCE = ce, .cost = cost.getTotalCost()});
 }
 
 // Forward-declare because of mutual recursion.
@@ -181,21 +181,22 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingCont
                                                         JoinPlanNodeId nodeId,
                                                         cost_based_ranker::EstimateMap& estimates) {
     std::unique_ptr<QuerySolutionNode> qsn;
-    std::visit(
-        OverloadedVisitor{[&](const JoiningNode& join) {
-                              qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
-                              addEstimateIfExplain(ctx, peCtx, qsn.get(), join.bitset, estimates);
-                          },
-                          [&](const BaseNode& base) {
-                              // TODO SERVER-111913: Avoid this clone
-                              qsn = base.soln->root()->clone();
-                              addEstimateIfExplain(
-                                  ctx, peCtx, qsn.get(), NodeSet().set(base.node), estimates);
-                          },
-                          [&](const INLJRHSNode& ip) {
-                              qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
-                          }},
-        peCtx.registry().get(nodeId));
+    std::visit(OverloadedVisitor{
+                   [&](const JoiningNode& join) {
+                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
+                       addEstimatesIfExplain(
+                           ctx, peCtx, qsn.get(), join.bitset, join.cost, estimates);
+                   },
+                   [&](const BaseNode& base) {
+                       // TODO SERVER-111913: Avoid this clone
+                       qsn = base.soln->root()->clone();
+                       addEstimatesIfExplain(
+                           ctx, peCtx, qsn.get(), NodeSet().set(base.node), base.cost, estimates);
+                   },
+                   [&](const INLJRHSNode& ip) {
+                       qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
+                   }},
+               peCtx.registry().get(nodeId));
     return qsn;
 }
 
@@ -418,9 +419,10 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                 std::unique_ptr<JoinCardinalityEstimator> estimator,
+                                                std::unique_ptr<JoinCostEstimator> coster,
                                                 PlanTreeShape shape,
                                                 bool enableHJOrderPruning) {
-    PlanEnumeratorContext peCtx(ctx, std::move(estimator), enableHJOrderPruning);
+    PlanEnumeratorContext peCtx(ctx, std::move(estimator), std::move(coster), enableHJOrderPruning);
 
     peCtx.enumerateJoinSubsets(shape);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();

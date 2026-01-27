@@ -376,6 +376,7 @@ class Distro(object):
             return ["suse11", "suse12", "suse15"]
         elif re.search("(redhat|fedora|centos)", self.dname):
             return [
+                "rhel10",
                 "rhel93",
                 "rhel90",
                 "rhel88",
@@ -941,6 +942,17 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
         "-D",
         f"dynamic_release {spec.prelease()}",
     ]
+
+    # Some build environments may not define a `pathfix` RPM macro even though our spec files
+    # reference it during %prep. Define it here (if available) so rpmbuild can always expand
+    # `%{pathfix}` to an actual file path.
+    pathfix = None
+    for candidate in ("/usr/bin/pathfix.py", "/usr/lib/rpm/redhat/pathfix.py"):
+        if os.path.exists(candidate):
+            pathfix = candidate
+            break
+    if pathfix:
+        flags.extend(["-D", f"pathfix {pathfix}"])
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild

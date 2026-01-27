@@ -295,8 +295,7 @@ void statsToBSON(const QuerySolutionNode* node,
     // Cost and cardinality of the stage.
     if (estimates.contains(node)) {
         const auto& est = estimates.at(node);
-        // TODO SERVER-116505: Add cost here when available, possibly differentiating costs from the
-        // join module vs CBR.
+        bob->append("costEstimate", est.cost.toDouble());
         bob->append("cardinalityEstimate", est.outCE.toDouble());
         BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
         metadataBob.append("ceSource", toStringData(est.outCE.source()));

@@ -12,10 +12,9 @@ buildvariants:
     run_on:
       - rhel8.8-small
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       multiversion_platform: rhel8
       multiversion_edition: enterprise
+      evergreen_remote_exec: on
       compile_variant: *stm-daily-cron
     stepback: false
     tasks:
@@ -34,6 +33,9 @@ buildvariants:
         distros:
           - ubuntu2204-small
       - name: create_todo_tickets
+      - name: verify_ci_wrapper_coredump
+        distros:
+          - amazon2023-arm64-latest-m8g-2xlarge
 
   # Experimental variant running bazel targets for integration tests. To be removed with SERVER-103537.
   - name: bazel-integration-tests
@@ -44,8 +46,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: bazel-integration-tests
       evergreen_remote_exec: on
       multiversion_platform: amazon2023

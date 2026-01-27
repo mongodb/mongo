@@ -210,7 +210,7 @@ feature_flags:
     featureFlagDedicatedPortForPriorityOperations:
         description: "Feature flag to enable a dedicated port for high priority operations on mongoD and mongoS"
         cpp_varname: gFeatureFlagDedicatedPortForPriorityOperations
-        default: false
+        default: true
         fcv_gated: false
     featureFlagPreparedTransactionsPreciseCheckpoints:
         description: "Enables logic necessary to recover prepared transactions with precise checkpoints"
@@ -231,6 +231,11 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+    featureFlagReplicatedSizeAndCount:
+        description: "Track collection size and count in replicated internal collections"
+        cpp_varname: gFeatureFlagReplicatedSizeAndCount
+        default: false
+        fcv_gated: true
     featureFlagOtelMetrics:
         description: "Feature flag to enable exporting OpenTelemetry metrics"
         cpp_varname: gFeatureFlagOtelMetrics
@@ -248,3 +253,8 @@ feature_flags:
         default: false
         fcv_gated: true
         check_against_fcv: operation_fcv_only
+    featureFlagDisallowFindAndModifyImageCollection:
+        description: "Disallow storing findAndModify pre/post-images to a side collection."
+        cpp_varname: gFeatureFlagDisallowFindAndModifyImageCollection
+        default: false
+        fcv_gated: true

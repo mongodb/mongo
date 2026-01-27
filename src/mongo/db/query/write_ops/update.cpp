@@ -59,9 +59,9 @@
 
 namespace mongo {
 
-UpdateResult update(OperationContext* opCtx,
-                    CollectionAcquisition& coll,
-                    const UpdateRequest& request) {
+UpdateResult doUpdate(OperationContext* opCtx,
+                      CollectionAcquisition& coll,
+                      const UpdateRequest& request) {
     // Explain should never use this helper.
     tassert(11052009, "Unexpected explain on UpdateRequest", !request.explain());
 

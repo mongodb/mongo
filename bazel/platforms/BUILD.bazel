@@ -29,6 +29,7 @@ constraint_setting(name = "distro")
         "debian12",
         "rhel8",
         "rhel9",
+        "rhel10",
         "suse12",
         "suse15",
     ]
@@ -52,6 +53,7 @@ constraint_setting(name = "distro")
         "debian12",
         "rhel8",
         "rhel9",
+        "rhel10",
         "suse15",
     ]
     for cache_silo in [

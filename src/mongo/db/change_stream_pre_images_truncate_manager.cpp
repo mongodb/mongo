@@ -31,11 +31,16 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/mutex.h"
+
+#include <shared_mutex>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -52,20 +57,18 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(Operat
         opCtx, AdmissionContext::Priority::kExempt);
 
     try {
-        auto tenantTruncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx);
-        if (!tenantTruncateMarkers) {
-            return {};
+        if (auto truncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx)) {
+            return truncateMarkers->truncateExpiredPreImages(opCtx);
         }
-
-        return tenantTruncateMarkers->truncateExpiredPreImages(opCtx);
+        return {};
     } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& ex) {
         LOGV2_INFO(9023601,
                    "Pre-image truncation process interrupted due to storage change. Clearing "
                    "stale in-memory state",
                    "reason"_attr = ex.toStatus());
-        // Pre-image truncate markers across tenants were created with an old storage engine and are
-        // no longer reliable.
-        _tenantMap.clear();
+        // Pre-image truncate markers were created with an old storage engine and are no longer
+        // reliable.
+        _setTruncateMarkers(nullptr);
         throw;
     } catch (const DBException&) {
         throw;
@@ -83,62 +86,70 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, nsUUID = std::move(nsUUID), recordId = std::move(recordId), bytesInserted, wallTime](
             OperationContext* opCtx, boost::optional<Timestamp>) {
-            // TODO SERVER-109269: Remove _tenantMap usage.
-            auto tenantTruncateMarkers = _tenantMap.find(boost::none);
-            if (!tenantTruncateMarkers) {
-                return;
+            if (auto truncateMarkers = _getTruncateMarkers()) {
+                truncateMarkers->updateOnInsert(recordId, nsUUID, wallTime, bytesInserted);
             }
-
-            tenantTruncateMarkers->updateOnInsert(recordId, nsUUID, wallTime, bytesInserted);
         });
 }
 
-std::shared_ptr<PreImagesTenantMarkers>
+bool PreImagesTruncateManager::areTruncateMarkersPopulated_forTest() const {
+    return _getTruncateMarkers() != nullptr;
+}
+
+std::shared_ptr<PreImagesTruncateMarkers>
 PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(OperationContext* opCtx) {
-    auto tenantMarkers = _tenantMap.find(boost::none);
-    if (tenantMarkers) {
-        return tenantMarkers;
+    // If this lookup returns that '_truncateMarkers' is not set, we will be setting the value of
+    // '_truncateMarkers' via the call to '_createAndInstallMarkers()' below.
+    // However, there is the possibility that a concurrent thread also determines that
+    // '_truncateMarkers' is not yet set, and also decides to populate it. In this case, the last
+    // write to '_truncateMarkers' wins.
+    auto truncateMarkers = _getTruncateMarkers();
+    if (truncateMarkers) {
+        return truncateMarkers;
     }
 
     // Truncate markers need to be initialized for the pre-images collection. Truncate markers
     // should track the highest seen RecordId and wall time across pre-images to guarantee all
     // pre-images are eventually truncated.
     //
-    // Minimize the likelihood that pre-images inserted during initialization are unaccounted for by
-    // relaxing constraints (to view the most up to date data). This is safe even during secondary
-    // batch application because the truncate marker mechanism is designed to handle unserialized
-    // inserts of pre-images.
+    // Minimize the likelihood that pre-images inserted during initialization are unaccounted
+    // for by relaxing constraints (to view the most up to date data). This is safe even during
+    // secondary batch application because the truncate marker mechanism is designed to handle
+    // unserialized inserts of pre-images.
     ON_BLOCK_EXIT([opCtx, isEnforcingConstraints = opCtx->isEnforcingConstraints()] {
         opCtx->setEnforceConstraints(isEnforcingConstraints);
     });
     opCtx->setEnforceConstraints(false);
 
-    // Guard against an early exit with incomplete truncate markers installed in the '_tenantMap'.
-    ScopeGuard uninstallIncompleteTruncateMarkers([&] { _tenantMap.erase(boost::none); });
+    // Guard against an early exit with incomplete truncate markers installed in
+    // '_truncateMarkers'.
+    ScopeGuard uninstallIncompleteTruncateMarkers([&] { _setTruncateMarkers(nullptr); });
+
     try {
         // (A) Create 'PreImagesTenantMarkers' for the pre-images collection and install
-        // them into the _tenantMap. The 'tenantMarkers' might not account for concurrent pre-image
-        // insertions beyond the snapshot used to create the markers.
-        tenantMarkers = _createAndInstallMarkers(opCtx);
-        if (!tenantMarkers) {
+        // them into the '_truncateMarkers' instance. The '_truncateMarkers' instance might not
+        // account for concurrent pre-image insertions beyond the snapshot used to create the
+        // markers.
+        truncateMarkers = _createAndInstallMarkers(opCtx);
+        if (!truncateMarkers) {
             return nullptr;
         }
         LOGV2_DEBUG(9023602,
                     1,
-                    "Installed pre-image truncate markers in tenant map. Markers must be finalized "
-                    "for safe truncation",
-                    "preImagesCollectionUUID"_attr = tenantMarkers->getPreImagesCollectionUUID());
+                    "Installed pre-image truncate markers. Markers must be finalized for safe "
+                    "truncation",
+                    "preImagesCollectionUUID"_attr = truncateMarkers->getPreImagesCollectionUUID());
 
-        // (B) Ensure that 'tenantMarkers' account for the most recent pre-image inserts -
+        // (B) Ensure that 'truncateMarkers' account for the most recent pre-image inserts -
         // specifically, any inserts that occurred during (A) at a later snapshot than the
-        // snapshot used to create the markers in (A). Otherwise, the truncate markers won't know
-        // there are pre-images past the snapshot from (A) until a new insert comes along for each
-        // pre-image nsUUID out of date.
-        tenantMarkers->refreshMarkers(opCtx);
+        // snapshot used to create the markers in (A). Otherwise, the truncate markers won't
+        // know there are pre-images past the snapshot from (A) until a new insert comes along
+        // for each pre-image nsUUID out of date.
+        truncateMarkers->refreshMarkers(opCtx);
 
         LOGV2(9023600,
-              "Completed initialization of pre-image tenant truncate markers",
-              "preImagesCollectionUUID"_attr = tenantMarkers->getPreImagesCollectionUUID());
+              "Completed initialization of pre-image truncate markers",
+              "preImagesCollectionUUID"_attr = truncateMarkers->getPreImagesCollectionUUID());
     } catch (const DBException& ex) {
         LOGV2_INFO(9030100,
                    "Failed to complete pre-image truncate marker initialization",
@@ -147,16 +158,16 @@ PreImagesTruncateManager::_getInitializedMarkersForPreImagesCollection(Operation
     }
 
     uninstallIncompleteTruncateMarkers.dismiss();
-    return tenantMarkers;
+    return truncateMarkers;
 }
 
-std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInstallMarkers(
+std::shared_ptr<PreImagesTruncateMarkers> PreImagesTruncateManager::_createAndInstallMarkers(
     OperationContext* opCtx) {
     return writeConflictRetry(
         opCtx,
-        "Generating and installing pre image truncate markers for tenant",
+        "Generating and installing pre image truncate markers",
         NamespaceString::kChangeStreamPreImagesNamespace,
-        [&]() -> std::shared_ptr<PreImagesTenantMarkers> {
+        [&]() -> std::shared_ptr<PreImagesTruncateMarkers> {
             const auto preImagesCollection =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
@@ -173,12 +184,29 @@ std::shared_ptr<PreImagesTenantMarkers> PreImagesTruncateManager::_createAndInst
                 return nullptr;
             }
 
-            // Serialize installation under the collection's lock to guarantee the markers installed
-            // aren't for a stale, dropped version of the collection.
-            auto baseMarkers = PreImagesTenantMarkers::createMarkers(opCtx, preImagesCollection);
-            auto tenantMapEntry = _tenantMap.getOrEmplace(boost::none, std::move(baseMarkers));
-            return tenantMapEntry;
+            // Serialize installation under the collection's lock to guarantee the markers
+            // installed aren't for a stale, dropped version of the collection.
+            auto baseMarkers = PreImagesTruncateMarkers::createMarkers(opCtx, preImagesCollection);
+
+            auto truncateMarkers =
+                std::make_shared<PreImagesTruncateMarkers>(std::move(baseMarkers));
+            _setTruncateMarkers(truncateMarkers);
+            return truncateMarkers;
         });
+}
+
+std::shared_ptr<PreImagesTruncateMarkers> PreImagesTruncateManager::_getTruncateMarkers() const {
+    // Copy the shared_ptr under the mutex to ensure thread-safety. The returned shared_ptr itself
+    // is not protected by this mutex, but it has its own concurrency mechanisms.
+    std::shared_lock guard{_mutex};
+    return _truncateMarkers;
+}
+
+void PreImagesTruncateManager::_setTruncateMarkers(
+    std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers) {
+    // Acquire exclusive lock to overwrite value of the '_truncateMarkers'.
+    std::unique_lock guard{_mutex};
+    _truncateMarkers = std::move(truncateMarkers);
 }
 
 }  // namespace mongo

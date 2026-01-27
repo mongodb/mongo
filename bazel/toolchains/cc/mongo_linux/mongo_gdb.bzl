@@ -1,5 +1,5 @@
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb_version_v5.bzl", "TOOLCHAIN_MAP_V5")
-load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
+load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract", "write_python_pyc_cache_prefix_customization")
 
 def _gdb_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
@@ -35,6 +35,9 @@ def _gdb_download(ctx):
     external = str(ctx.path(".."))
     pythonhome = external + "/gdb_" + ctx.attr.version + "/stow/python3-" + ctx.attr.version
 
+    gdbhome = external + "/gdb_" + ctx.attr.version + "/stow/gdb-" + ctx.attr.version
+    gdb_prefix = external + "/gdb_" + ctx.attr.version + "/" + ctx.attr.version
+
     mongodb_toolchain_path = external + "/mongo_toolchain_" + ctx.attr.version
     stdlib_pp_dir = mongodb_toolchain_path + "/stow/gcc-" + ctx.attr.version + "/share"
     readelf = mongodb_toolchain_path + "/" + ctx.attr.version + "/bin/llvm-readelf"
@@ -43,9 +46,32 @@ def _gdb_download(ctx):
         # our toolchain python version requires newer openssl, which is not available on AL2
         # so we can use pretty printers on AL2
         python_env = "{}"
+        wrapper_python_setup = ""
     else:
         # here we only have one dependency for our pretty printers to run. It must be installed into the python
         # that gdb was built with. We use pip since this is a single dependency that we own.
+        #
+        # NOTE: The bundled python is dynamically linked against libpython. Ensure it can locate its shared
+        # library during repository fetch (and later at runtime) by providing LD_LIBRARY_PATH.
+        python_lib_path = ":".join([
+            pythonhome + "/lib",
+            pythonhome + "/lib64",
+        ])
+        python_execute_env = {
+            "PYTHONHOME": pythonhome,
+            "LD_LIBRARY_PATH": python_lib_path,
+            "PYTHONDONTWRITEBYTECODE": "1",
+        }
+
+        # Ensure the bundled Python does not write .pyc files into the toolchain/runfiles tree.
+        write_python_pyc_cache_prefix_customization(
+            ctx,
+            "stow/python3-{version}/lib/python{pyver}/site-packages/sitecustomize.py".format(
+                version = ctx.attr.version,
+                pyver = python3_version,
+            ),
+        )
+
         result = ctx.execute([
             pythonhome + "/bin/python3",
             "-m",
@@ -53,7 +79,7 @@ def _gdb_download(ctx):
             "install",
             "pymongo==4.12.0",
             "--target=" + pythonhome + "/lib/python" + python3_version + "/site-packages",
-        ])
+        ], environment = python_execute_env)
         if result.return_code != 0:
             if ctx.getenv("CI"):
                 fail("Failed to install python module:\n" + result.stdout + "\n" + result.stderr)
@@ -64,17 +90,54 @@ def _gdb_download(ctx):
         python_env = """{
         "PYTHONPATH": "%s/lib/python3.10",
         "PYTHONHOME": "%s",
+        "LD_LIBRARY_PATH": "%s",
         "MONGO_GDB_PP_DIR": "%s",
         "MONGO_GDB_READELF": "%s",
-    }""" % (pythonhome, pythonhome, stdlib_pp_dir, readelf)
+    }""" % (pythonhome, pythonhome, python_lib_path, stdlib_pp_dir, readelf)
+
+        # The wrapper scripts must also export these so gdb can load its python runtime (and pretty printers)
+        # when invoked via bazel run/test.
+        wrapper_python_setup = """
+PYTHONHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/python3-%s"
+export PYTHONHOME
+export PYTHONPATH="${PYTHONHOME}/lib/python%s:${PYTHONPATH:-}"
+export LD_LIBRARY_PATH="${PYTHONHOME}/lib:${PYTHONHOME}/lib64:${LD_LIBRARY_PATH:-}"
+""" % (ctx.attr.version, ctx.attr.version, python3_version)
+
+    # GDB itself is dynamically linked against its own runtime libraries (e.g. libopcodes). Ensure those are
+    # available in runfiles and on the loader path regardless of platform.
+    wrapper_gdb_setup = """
+GDB_PREFIX="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s"
+GDBHOME="${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/stow/gdb-%s"
+export LD_LIBRARY_PATH="${GDB_PREFIX}/lib:${GDBHOME}/lib:${LD_LIBRARY_PATH:-}"
+""" % (ctx.attr.version, ctx.attr.version, ctx.attr.version, ctx.attr.version)
 
     ctx.file(
         "BUILD.bazel",
         """
+filegroup(
+    name = "python_runtime",
+    srcs = glob(["stow/python3-%s/**"]),
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "gdb_runtime",
+    srcs = glob([
+        "%s/lib/**",
+        "stow/gdb-%s/**",
+    ]),
+    visibility = ["//visibility:private"],
+)
+
 sh_binary(
     name = "gdb",
     srcs = ["working_dir_gdb.sh"],
-    data = ["%s/bin/gdb"],
+    data = [
+        "%s/bin/gdb",
+        ":gdb_runtime",
+        ":python_runtime",
+    ],
     env = %s,
     visibility = ["//visibility:public"],
 )
@@ -85,10 +148,12 @@ sh_binary(
     data = [
         "gdb",
         "%s/bin/gdbserver",
+        ":gdb_runtime",
+        ":python_runtime",
     ],
     visibility = ["//visibility:public"],
 )
-""" % (ctx.attr.version, python_env, ctx.attr.version),
+""" % (ctx.attr.version, ctx.attr.version, ctx.attr.version, ctx.attr.version, python_env, ctx.attr.version),
     )
 
     ctx.file(
@@ -106,8 +171,10 @@ if [ -z $BUILD_WORKING_DIRECTORY ]; then
 fi
 
 cd $BUILD_WORKING_DIRECTORY
+%s
+%s
 ${RUNFILES_WORKING_DIRECTORY}/../gdb_%s/%s/bin/gdb -iex "set auto-load safe-path %s/.gdbinit" "${@:1}"
-""" % (ctx.attr.version, ctx.attr.version, str(ctx.workspace_root)),
+""" % (wrapper_gdb_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version, str(ctx.workspace_root)),
     )
 
     ctx.file(
@@ -128,8 +195,10 @@ cd $BUILD_WORKING_DIRECTORY
 
 # RUNTEST_PRESERVE_CWD forces us to reconstruct the binary path
 original_args="${@:1}"
+%s
+%s
 ${RUNFILES_WORKING_DIRECTORY}/external/gdb_%s/%s/bin/gdbserver localhost:1234 ${TEST_SRCDIR}/_main/${original_args[0]} "${@:2}"
-""" % (ctx.attr.version, ctx.attr.version),
+""" % (wrapper_gdb_setup, wrapper_python_setup, ctx.attr.version, ctx.attr.version),
     )
 
     return None

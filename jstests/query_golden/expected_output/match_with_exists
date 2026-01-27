@@ -4,13 +4,13 @@
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 0 }
-{  "_id" : 1,  "a" : null }
-{  "_id" : 2,  "a" : 1 }
-{  "_id" : 3,  "b" : null }
-{  "_id" : 4,  "b" : 2 }
-{  "_id" : 5,  "a" : {  "b" : 3 } }
-{  "_id" : 6,  "a" : [ { "b" : 4 } ] }
+{ "_id" : 0 }
+{ "_id" : 1, "a" : null }
+{ "_id" : 2, "a" : 1 }
+{ "_id" : 3, "b" : null }
+{ "_id" : 4, "b" : 2 }
+{ "_id" : 5, "a" : { "b" : 3 } }
+{ "_id" : 6, "a" : [ { "b" : 4 } ] }
 Collection count: 7
 
 
@@ -18,63 +18,63 @@ Collection count: 7
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : null }
-{  "_id" : 2,  "a" : 1 }
-{  "_id" : 5,  "a" : {  "b" : 3 } }
-{  "_id" : 6,  "a" : [ { "b" : 4 } ] }
+{ "_id" : 1, "a" : null }
+{ "_id" : 2, "a" : 1 }
+{ "_id" : 5, "a" : { "b" : 3 } }
+{ "_id" : 6, "a" : [ { "b" : 4 } ] }
 
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$not" : { "$exists" : false } } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : null }
-{  "_id" : 2,  "a" : 1 }
-{  "_id" : 5,  "a" : {  "b" : 3 } }
-{  "_id" : 6,  "a" : [ { "b" : 4 } ] }
+{ "_id" : 1, "a" : null }
+{ "_id" : 2, "a" : 1 }
+{ "_id" : 5, "a" : { "b" : 3 } }
+{ "_id" : 6, "a" : [ { "b" : 4 } ] }
 
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : false } } } ]
 [jsTest] ----
 
-{  "_id" : 0 }
-{  "_id" : 3,  "b" : null }
-{  "_id" : 4,  "b" : 2 }
+{ "_id" : 0 }
+{ "_id" : 3, "b" : null }
+{ "_id" : 4, "b" : 2 }
 
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "b" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 3,  "b" : null }
-{  "_id" : 4,  "b" : 2 }
+{ "_id" : 3, "b" : null }
+{ "_id" : 4, "b" : 2 }
 
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a.b" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 5,  "a" : {  "b" : 3 } }
-{  "_id" : 6,  "a" : [ { "b" : 4 } ] }
+{ "_id" : 5, "a" : { "b" : 3 } }
+{ "_id" : 6, "a" : [ { "b" : 4 } ] }
 
 
 [jsTest] ----
 [jsTest] Query: [ { "$match" : { "a.b" : { "$exists" : false } } } ]
 [jsTest] ----
 
-{  "_id" : 0 }
-{  "_id" : 1,  "a" : null }
-{  "_id" : 2,  "a" : 1 }
-{  "_id" : 3,  "b" : null }
-{  "_id" : 4,  "b" : 2 }
+{ "_id" : 0 }
+{ "_id" : 1, "a" : null }
+{ "_id" : 2, "a" : 1 }
+{ "_id" : 3, "b" : null }
+{ "_id" : 4, "b" : 2 }
 
 
 [jsTest] ----
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ ] }
+{ "_id" : 1, "a" : [ ] }
 Collection count: 1
 
 
@@ -82,7 +82,7 @@ Collection count: 1
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ ] }
+{ "_id" : 1, "a" : [ ] }
 
 
 [jsTest] ----
@@ -96,7 +96,7 @@ Collection count: 1
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 1,  "a" : false }
+{ "_id" : 1, "a" : false }
 Collection count: 1
 
 
@@ -104,7 +104,7 @@ Collection count: 1
 [jsTest] Query: [ { "$match" : { "a" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : false }
+{ "_id" : 1, "a" : false }
 
 
 [jsTest] ----
@@ -118,7 +118,7 @@ Collection count: 1
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ { "b" : 2 }, { "a" : 1 } ] }
+{ "_id" : 1, "a" : [ { "b" : 2 }, { "a" : 1 } ] }
 Collection count: 1
 
 
@@ -126,7 +126,7 @@ Collection count: 1
 [jsTest] Query: [ { "$match" : { "a.a" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ { "b" : 2 }, { "a" : 1 } ] }
+{ "_id" : 1, "a" : [ { "b" : 2 }, { "a" : 1 } ] }
 
 
 [jsTest] ----
@@ -140,14 +140,14 @@ Collection count: 1
 [jsTest] Query: [ { "$match" : { "a.b" : { "$exists" : true } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ { "b" : 2 }, { "a" : 1 } ] }
+{ "_id" : 1, "a" : [ { "b" : 2 }, { "a" : 1 } ] }
 
 
 [jsTest] ----
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ [ { "b" : 1 } ] ] }
+{ "_id" : 1, "a" : [ [ { "b" : 1 } ] ] }
 Collection count: 1
 
 
@@ -155,7 +155,7 @@ Collection count: 1
 [jsTest] Query: [ { "$match" : { "a.b" : { "$exists" : false } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ [ { "b" : 1 } ] ] }
+{ "_id" : 1, "a" : [ [ { "b" : 1 } ] ] }
 
 
 [jsTest] ----
@@ -169,8 +169,8 @@ Collection count: 1
 [jsTest] Inserting docs:
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ 1 ] }
-{  "_id" : 2,  "a" : [ 2 ] }
+{ "_id" : 1, "a" : [ 1 ] }
+{ "_id" : 2, "a" : [ 2 ] }
 Collection count: 2
 
 
@@ -178,8 +178,8 @@ Collection count: 2
 [jsTest] Query: [ { "$match" : { "a" : { "$elemMatch" : { "$exists" : true } } } } ]
 [jsTest] ----
 
-{  "_id" : 1,  "a" : [ 1 ] }
-{  "_id" : 2,  "a" : [ 2 ] }
+{ "_id" : 1, "a" : [ 1 ] }
+{ "_id" : 2, "a" : [ 2 ] }
 
 
 [jsTest] ----

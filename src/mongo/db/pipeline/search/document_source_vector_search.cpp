@@ -203,13 +203,13 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
 
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
     return make_intrusive<DocumentSourceVectorSearch>(
-        expCtx, executor::getMongotTaskExecutor(serviceContext), spec.getOwned());
+        expCtx, uassertStatusOK(executor::getMongotTaskExecutor(serviceContext)), spec.getOwned());
 }
 
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
-    auto executor =
-        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext()));
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
         make_intrusive<DocumentSourceVectorSearch>(

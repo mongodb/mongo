@@ -3,15 +3,11 @@
  * based on those collections' indexes and cardinalities. Regression test for SERVER-114340.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 
-import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
-
-function joinOptimizerUsed(explain) {
-    const stages = getAllPlanStages(getWinningPlanFromExplain(explain)).map((stage) => stage.stage);
-    return stages.some((stage) => stage.includes("JOIN_EMBEDDING"));
-}
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -61,6 +57,6 @@ assert.eq(res.length, 1);
 assert.docEq(res[0], {_id: 1, a: 1, b: 1, c: 1, coll2: {_id: 1, a: 1, b: 1, c: 1}});
 
 const explain = coll1.explain().aggregate(pipeline);
-assert(joinOptimizerUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));
+assert(joinOptUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));
 
 MongoRunner.stopMongod(conn);

@@ -156,6 +156,12 @@ configs:
         short_name: loadExtensions
         arg_vartype: StringVector
         duplicate_behavior: append
+    "processManagement.extensionsSignaturePublicKeyPath":
+        description: "File path to extensions signature public key when not in secure compile mode"
+        short_name: extensionsSignaturePublicKeyPath
+        arg_vartype: String
+        condition:
+            preprocessor: "!defined(MONGO_CONFIG_EXT_SIG_SECURE)"
 
     objcheck:
         description: "Inspect client data for validity on receipt (DEFAULT)"

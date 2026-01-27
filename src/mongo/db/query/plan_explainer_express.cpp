@@ -66,7 +66,11 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
         bob.append("projection"_sd, _projection);
         bob.append("projectionCovered"_sd, _iteratorStats->projectionCovered());
     }
-
+    // Express queries are ineligible for join optimization so if the knob is enabled, indicate
+    // in the explain output that the join optimization was not applied.
+    if (internalEnableJoinOptimization.load()) {
+        bob.append("usedJoinOptimization", false);
+    }
     PlanSummaryStats stats;
     getSummaryStats(&stats);
 

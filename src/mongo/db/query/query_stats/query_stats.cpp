@@ -294,6 +294,8 @@ void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
     queryPlannerEntryToUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
     queryPlannerEntryToUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
     queryPlannerEntryToUpdate.planningTimeMicros.aggregate(snapshot.planningTimeMicros);
+    queryPlannerEntryToUpdate.costBasedRankerStats.cardinalityEstimationMethods.aggregate(
+        snapshot.cardinalityEstimationMethods);
     queryPlannerEntryToUpdate.costBasedRankerStats.nDocsSampled.aggregate(snapshot.nDocsSampled);
 }
 
@@ -303,6 +305,7 @@ void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnap
     writeEntryToUpdate.nModified.aggregate(snapshot.nModified);
     writeEntryToUpdate.nDeleted.aggregate(snapshot.nDeleted);
     writeEntryToUpdate.nInserted.aggregate(snapshot.nInserted);
+    writeEntryToUpdate.nUpdateOps.aggregate(snapshot.nUpdateOps);
 }
 
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
@@ -513,12 +516,14 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         metrics.fromMultiPlanner,
         metrics.fromPlanCache.value_or(false),
         metrics.planningTime.value_or(Microseconds(0)).count(),
+        metrics.cardinalityEstimationMethods,
         static_cast<uint64_t>(metrics.nDocsSampled.value_or(0)),
         static_cast<uint64_t>(metrics.nMatched.value_or(0)),
         static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
         static_cast<uint64_t>(metrics.nModified.value_or(0)),
         static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
         static_cast<uint64_t>(metrics.ninserted.value_or(0)),
+        static_cast<uint64_t>(metrics.nUpdateOps.value_or(0)),
         metrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count(),
         static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
         metrics.wasLoadShed.value_or(false),

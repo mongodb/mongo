@@ -368,7 +368,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMixedToMultipleStagesSplicingIntoPipeline
 
     ASSERT(dynamic_cast<MatchLiteParsed*>(stages[3].get()));
 
-    ASSERT(dynamic_cast<DocumentSourceInternalSearchIdLookUp::LiteParsed*>(stages[4].get()));
+    ASSERT(dynamic_cast<LiteParsedInternalSearchIdLookUp*>(stages[4].get()));
 
     ASSERT(dynamic_cast<ProjectLiteParsed*>(stages[5].get()));
 

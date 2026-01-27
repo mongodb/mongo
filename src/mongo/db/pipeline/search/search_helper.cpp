@@ -128,8 +128,8 @@ BSONObj getSearchRemoteExplain(const ExpressionContext* expCtx,
                                size_t remoteCursorId,
                                boost::optional<BSONObj> sortSpec,
                                const mongot_cursor::OptimizationFlags& optimizationFlags) {
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     auto explainObj = mongot_cursor::getSearchExplainResponse(
         expCtx, searchQuery, executor.get(), optimizationFlags);
     BSONObjBuilder builder;
@@ -482,8 +482,8 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
         return;
     }
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage);
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
 
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
         expCtx, searchStage->getMongotRemoteSpec(), executor, boost::none, std::move(yieldPolicy));
@@ -514,8 +514,8 @@ void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>&
     }
 
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
         expCtx,
         searchStage->getSearchQuery(),
@@ -703,8 +703,13 @@ void promoteStoredSourceOrAddIdLookup(
         // an idLookup to go get it.
     } else {
         // idLookup must always be immediately after the first stage in the desugared pipeline
-        auto idLookupStage =
-            make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx, limit, view);
+        std::unique_ptr<Pipeline> viewPipeline;
+        if (view) {
+            viewPipeline = pipeline_factory::makePipeline(
+                view->getEffectivePipeline(), expCtx, pipeline_factory::kOptionsMinimal);
+        }
+        auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+            expCtx, limit, std::move(viewPipeline));
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
 
         // Check if the first stage in the pipeline is a mongotRemoteStage (only exists for

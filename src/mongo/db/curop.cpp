@@ -121,6 +121,9 @@ auto& overdueInterruptTotalTimeMillis =
 auto& overdueInterruptApproxMaxTimeMillis =
     *MetricBuilder<Atomic64Metric>("operation.interrupt.overdueInterruptApproxMaxMillisFromSample");
 
+// The total number of slow queries logged.
+auto& totalSlowQueryLogs = *MetricBuilder<Counter64>("query.totalSlowQueryLogs");
+
 /*
  * Helper for reporting stats on an operation that was sampled for interrupt check tracking.
  */
@@ -873,6 +876,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         Date_t deadline = opCtx->getDeadline();
         logv2::DynamicAttributes attr = _reportDebugAndStats(logOptions, &deadline, true);
         LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
+        totalSlowQueryLogs.increment();
 
         _checkForFailpointsAfterCommandLogged();
     }

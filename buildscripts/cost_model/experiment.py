@@ -128,7 +128,7 @@ def print_trees(calibration_df: pd.DataFrame, qsn_df: pd.DataFrame, row_index: i
     row = calibration_df.loc[qsn_df.iloc[row_index].source]
     print("CLASSIC")
     row.classic.print()
-    print("\QSN")
+    print(r"\QSN")
     row.qsn.print()
 
 

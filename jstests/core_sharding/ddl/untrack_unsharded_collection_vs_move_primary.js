@@ -12,6 +12,8 @@
  *   assumes_no_track_upon_creation,
  *   # movePrimary is not an idempotent command
  *   does_not_support_stepdowns,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getRandomShardName, verifyCollectionTrackingState} from "jstests/libs/sharded_cluster_fixture_helpers.js";

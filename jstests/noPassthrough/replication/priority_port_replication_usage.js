@@ -3,7 +3,11 @@
  * priority port.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfPriorityPort,
+ *    # The priority port is based on ASIO, so gRPC testing is excluded
+ *    grpc_incompatible,
+ *    requires_fcv_83,
+ *    # This test restarts nodes in a replica set, so it requires persistence.
+ *    requires_persistence,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -123,6 +127,7 @@ describe("Tests for priority port usage within replication internals", function 
         let config = this.rs.getReplSetConfig();
         config.settings = {
             heartbeatTimeoutSecs: 1,
+            heartbeatIntervalMillis: 500,
             electionTimeoutMillis: 1000,
         };
         this.rs.initiate(config);

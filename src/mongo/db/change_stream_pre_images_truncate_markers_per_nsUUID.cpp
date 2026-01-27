@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <tuple>
 #include <utility>
 
 #include <boost/none.hpp>

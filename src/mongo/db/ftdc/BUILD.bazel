@@ -93,6 +93,7 @@ mongo_cc_library(
         ":ftdc",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/search:search_task_executors",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/rpc:command_status",

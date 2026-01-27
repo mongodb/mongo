@@ -151,3 +151,6 @@ filters:
   - "*user_write_block*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "set_fcv*.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

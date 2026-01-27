@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
 
 namespace mongo {
 namespace MONGO_MOD_PUB repl {
@@ -147,7 +148,7 @@ protected:
 
 private:
     // Protects member data of this OplogWriter.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // Used to schedule task for oplog write loop.
     // Not owned by us.

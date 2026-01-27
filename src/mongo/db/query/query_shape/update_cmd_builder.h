@@ -53,7 +53,7 @@ struct UpdateCmdBuilder {
     boost::optional<BSONObj> c;
     BSONObj let = BSONObj();
     BSONObj collation = BSONObj();
-    boost::optional<BSONArray> arrayFilters;
+    boost::optional<BSONObj> arrayFilters;
 
     BSONObj toBSON() const {
         BSONObjBuilder builder;
@@ -70,11 +70,9 @@ struct UpdateCmdBuilder {
         if (c.has_value()) {
             updateObj.append("c", *c);
         }
-
         if (arrayFilters.has_value()) {
             updateObj.appendArray("arrayFilters", *arrayFilters);
         }
-
         if (multi.has_value()) {
             updateObj.append("multi", *multi);
         }
@@ -84,6 +82,7 @@ struct UpdateCmdBuilder {
         if (!collation.isEmpty()) {
             updateObj.append("collation", collation);
         }
+
         updates.append(updateObj.obj());
         updates.done();
         if (!let.isEmpty()) {

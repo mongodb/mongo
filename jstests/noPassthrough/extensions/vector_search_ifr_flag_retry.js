@@ -57,13 +57,7 @@ function getAdminDB(connection) {
  * @returns {number} The metric value if found, otherwise 0.
  */
 function extractVectorSearchMetric(serverStatus, metricName) {
-    if (serverStatus.hasOwnProperty("extension.vectorSearch")) {
-        const vectorSearchSection = serverStatus["extension.vectorSearch"];
-        if (vectorSearchSection.hasOwnProperty(metricName)) {
-            return vectorSearchSection[metricName];
-        }
-    }
-    return 0;
+    return serverStatus.metrics.extension.vectorSearch[metricName];
 }
 
 /**
@@ -332,6 +326,14 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runViewVectorSearchTests(conn, mongotMock, false, shardingTest);
 }
 
-withExtensionsAndMongot({"libvector_search_extension.so": {}}, runTests, ["standalone", "sharded"], {
-    shards: kNumShards,
-});
+withExtensionsAndMongot(
+    {"libvector_search_extension.so": {}},
+    runTests,
+    ["standalone", "sharded"],
+    {
+        shards: kNumShards,
+    },
+    {
+        setParameter: {featureFlagExtensionViewsAndUnionWith: false},
+    },
+);

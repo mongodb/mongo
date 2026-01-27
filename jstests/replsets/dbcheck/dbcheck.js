@@ -6,9 +6,6 @@
  *   requires_persistence,
  *   assumes_against_mongod_not_mongos,
  *   requires_fcv_80,
- *   # TODO SERVER-88309: Re-enable when 'injectInconsistencyOnSecondary' is compatible with
- *   # replicated recordIds.
- *   exclude_when_record_ids_replicated,
  * ]
  */
 

@@ -37,6 +37,7 @@ import {
     extensionNodeOptions,
     generateMultiversionExtensionConfigs,
     deleteMultiversionExtensionConfigs,
+    wrapOptionsWithStubParserFeatureFlag,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -50,9 +51,9 @@ const extensionNames = generateMultiversionExtensionConfigs();
 
 try {
     const fooOptions = extensionNodeOptions(extensionNames[0]);
-
+    const upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(fooOptions);
     testPerformUpgradeReplSet({
-        upgradeNodeOptions: fooOptions,
+        upgradeNodeOptions,
         setupFn: setupCollection,
         whenFullyDowngraded: assertFooStageRejected,
         // TODO SERVER-115501 Add validation.
@@ -62,7 +63,7 @@ try {
     });
 
     testPerformUpgradeSharded({
-        upgradeNodeOptions: fooOptions,
+        upgradeNodeOptions,
         setupFn: setupCollection,
         whenFullyDowngraded: assertFooStageRejected,
         whenOnlyConfigIsLatestBinary: assertFooStageRejected,

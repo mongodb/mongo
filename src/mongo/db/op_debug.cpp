@@ -38,6 +38,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1379,6 +1380,29 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setNUpserted(additiveMetrics.nUpserted.value_or(0));
 
     metrics.setPlanningTimeMicros(additiveMetrics.planningTime.value_or(Microseconds(0)).count());
+
+    // Only set non-zero CE method counts for sparser wire protocol.
+    CardinalityEstimationMethods ceMethods;
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getHistogram(); val && *val > 0) {
+        ceMethods.setHistogram(*val);
+    }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getSampling(); val && *val > 0) {
+        ceMethods.setSampling(*val);
+    }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getHeuristics(); val && *val > 0) {
+        ceMethods.setHeuristics(*val);
+    }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getMixed(); val && *val > 0) {
+        ceMethods.setMixed(*val);
+    }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getMetadata(); val && *val > 0) {
+        ceMethods.setMetadata(*val);
+    }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getCode(); val && *val > 0) {
+        ceMethods.setCode(*val);
+    }
+    metrics.setCardinalityEstimationMethods(ceMethods);
+
     metrics.setNDocsSampled(additiveMetrics.nDocsSampled.value_or(0));
     return metrics;
 }
@@ -1491,6 +1515,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     ninserted = addOptionals(ninserted, otherMetrics.ninserted);
     ndeleted = addOptionals(ndeleted, otherMetrics.ndeleted);
     nUpserted = addOptionals(nUpserted, otherMetrics.nUpserted);
+    nUpdateOps = nUpdateOps.has_value() ? nUpdateOps : otherMetrics.nUpdateOps;
     keysInserted = addOptionals(keysInserted, otherMetrics.keysInserted);
     keysDeleted = addOptionals(keysDeleted, otherMetrics.keysDeleted);
     readingTime = addOptionals(readingTime, otherMetrics.readingTime);
@@ -1529,6 +1554,25 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     *fromPlanCache = *fromPlanCache && otherMetrics.fromPlanCache.value_or(true);
 
     planningTime = addOptionals(planningTime, otherMetrics.planningTime);
+
+    cardinalityEstimationMethods.setHistogram(
+        cardinalityEstimationMethods.getHistogram().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getHistogram().value_or(0));
+    cardinalityEstimationMethods.setSampling(
+        cardinalityEstimationMethods.getSampling().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getSampling().value_or(0));
+    cardinalityEstimationMethods.setHeuristics(
+        cardinalityEstimationMethods.getHeuristics().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0));
+    cardinalityEstimationMethods.setMixed(
+        cardinalityEstimationMethods.getMixed().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getMixed().value_or(0));
+    cardinalityEstimationMethods.setMetadata(
+        cardinalityEstimationMethods.getMetadata().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getMetadata().value_or(0));
+    cardinalityEstimationMethods.setCode(
+        cardinalityEstimationMethods.getCode().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getCode().value_or(0));
     nDocsSampled = addOptionals(nDocsSampled, otherMetrics.nDocsSampled);
 }
 
@@ -1574,6 +1618,25 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     *fromPlanCache = *fromPlanCache && metrics.fromPlanCache;
 
     planningTime = planningTime.value_or(Microseconds(0)) + metrics.planningTime;
+
+    cardinalityEstimationMethods.setHistogram(
+        cardinalityEstimationMethods.getHistogram().value_or(0) +
+        metrics.cardinalityEstimationMethods.getHistogram().value_or(0));
+    cardinalityEstimationMethods.setSampling(
+        cardinalityEstimationMethods.getSampling().value_or(0) +
+        metrics.cardinalityEstimationMethods.getSampling().value_or(0));
+    cardinalityEstimationMethods.setHeuristics(
+        cardinalityEstimationMethods.getHeuristics().value_or(0) +
+        metrics.cardinalityEstimationMethods.getHeuristics().value_or(0));
+    cardinalityEstimationMethods.setMixed(
+        cardinalityEstimationMethods.getMixed().value_or(0) +
+        metrics.cardinalityEstimationMethods.getMixed().value_or(0));
+    cardinalityEstimationMethods.setMetadata(
+        cardinalityEstimationMethods.getMetadata().value_or(0) +
+        metrics.cardinalityEstimationMethods.getMetadata().value_or(0));
+    cardinalityEstimationMethods.setCode(
+        cardinalityEstimationMethods.getCode().value_or(0) +
+        metrics.cardinalityEstimationMethods.getCode().value_or(0));
     nDocsSampled = nDocsSampled.value_or(0) + metrics.nDocsSampled;
 }
 
@@ -1611,6 +1674,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         metrics.getWasLoadShed(),
         metrics.getWasDeprioritized(),
         Microseconds(metrics.getPlanningTimeMicros()),
+        metrics.getCardinalityEstimationMethods(),
         static_cast<uint64_t>(metrics.getNDocsSampled())});
 }
 
@@ -1632,6 +1696,7 @@ void OpDebug::AdditiveMetrics::reset() {
     keysInserted = boost::none;
     keysDeleted = boost::none;
     executionTime = boost::none;
+    nUpdateOps = boost::none;
 }
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
@@ -1640,7 +1705,8 @@ bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const
         nBatches == otherMetrics.nBatches && nModified == otherMetrics.nModified &&
         ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
         nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted && executionTime == otherMetrics.executionTime;
+        keysDeleted == otherMetrics.keysDeleted && executionTime == otherMetrics.executionTime &&
+        nUpdateOps == otherMetrics.nUpdateOps;
 }
 
 void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {

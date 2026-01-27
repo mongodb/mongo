@@ -183,6 +183,8 @@ public:
     }
 
 private:
+    static VersionContext& _getDecoration(OperationContext* opCtx);
+
     void _assertHasNoOperationFCV() const;
 
     bool _isMatchingOFCV(FCV fcv) const;

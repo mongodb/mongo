@@ -206,8 +206,9 @@ public:
 
     /**
      * Extracts all rejected plans along with their PlanStages for explain purposes.
+     * Also extracts multiplanning stats of the winning plan, if any.
      */
-    [[nodiscard]] std::vector<SolutionWithPlanStage> extractRejectedPlansAndStages();
+    [[nodiscard]] PlanExplainerData extractPlanExplainerData();
 
     /**
      * Rejects all candidate plans without picking a best plan. Needed before extracting rejected
@@ -216,10 +217,18 @@ public:
      */
     void abandonTrials();
 
-protected:
-    void doSaveStateRequiresCollection() final {}
+    bool isStateSaved() {
+        return _isStateSaved;
+    }
 
-    void doRestoreStateRequiresCollection() final {}
+protected:
+    void doSaveStateRequiresCollection() final {
+        _isStateSaved = true;
+    }
+
+    void doRestoreStateRequiresCollection() final {
+        _isStateSaved = false;
+    }
 
 private:
     //
@@ -304,6 +313,8 @@ private:
 
     // Stats
     MultiPlanStats _specificStats;
+
+    bool _isStateSaved = false;
 };
 
 }  // namespace mongo

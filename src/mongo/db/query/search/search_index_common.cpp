@@ -142,7 +142,8 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
         std::move(promise));
 
     // Schedule and run the RemoteCommandRequest on the TaskExecutor.
-    auto taskExecutor = executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext());
+    auto taskExecutor =
+        uassertStatusOK(executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext()));
     auto scheduleResult = taskExecutor->scheduleRemoteCommand(
         std::move(request), [promisePtr](const auto& args) { promisePtr->emplaceValue(args); });
     if (!scheduleResult.isOK()) {

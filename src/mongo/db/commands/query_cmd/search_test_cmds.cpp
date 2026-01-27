@@ -47,7 +47,8 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto mongotExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());
+        auto mongotExec =
+            uassertStatusOK(executor::getMongotTaskExecutor(opCtx->getServiceContext()));
         // The metrics reported through appendConnectionPoolStats do not map cleanly to gRPC's
         // networking concepts, so when gRPC is enabled, we report the metrics separately. This stat
         // reporting will be revisited in SERVER-100677
@@ -99,7 +100,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder&) override {
         auto hps = cmdObj["hostAndPort"].Array();
-        auto mongotExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());
+        auto mongotExec =
+            uassertStatusOK(executor::getMongotTaskExecutor(opCtx->getServiceContext()));
         for (auto&& hp : hps) {
             mongotExec->dropConnections(HostAndPort(hp.String()),
                                         Status(ErrorCodes::PooledConnectionsDropped,

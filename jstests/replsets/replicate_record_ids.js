@@ -4,10 +4,6 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): Remove tag.
- *   # Incompatible with the recordIdsReplicated:true builder, as it sets the option
- *   # on all collections.
- *   exclude_when_record_ids_replicated
  * ]
  */
 import {
@@ -57,14 +53,7 @@ const validateRidInOplogs = function (oplogQuery, expectedRid) {
 
 let docA = {"a": 1};
 
-// Create a collection without the 'recordIdsReplicated' param set. This shouldn't
-// insert the recordId (rid) into the oplog.
-primDB[unReplRidCollName].insert(docA);
-const oplogNoRid = replSet.findOplog(primary, {ns: `${unReplRidNs}`}).toArray()[0];
-assert(!oplogNoRid.rid, `Unexpectedly found rid in entry: ${tojson(oplogNoRid)}`);
-
-// Create a collection with the param set. This time the recordId should show up
-// in the oplog.
+// Create a collection with the param set. The recordId should show up in the oplog.
 primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
 const docAInsertOpTime = assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
 replSet.awaitReplication();

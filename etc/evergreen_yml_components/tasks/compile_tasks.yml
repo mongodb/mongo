@@ -366,6 +366,13 @@ tasks:
       - func: bazel run
         vars:
           target: //evergreen:validate_compile_commands
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+          bazel_args: --intree_compdb
+      - func: bazel run
+        vars:
+          target: //evergreen:validate_compile_commands
 
   - name: compile_upload_benchmarks
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
@@ -1027,8 +1034,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions|private}
-          visibility: ${mciuploads_binary_visibility|signed}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           skip_existing: ${is_release}
@@ -1039,8 +1046,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions|private}
-          visibility: ${mciuploads_binary_visibility|signed}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           skip_existing: ${is_release}
@@ -1050,8 +1057,8 @@ tasks:
           aws_secret: ${aws_secret}
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions|private}
-          visibility: ${mciuploads_binary_visibility|signed}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           bucket: ${push_bucket}
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
@@ -1061,8 +1068,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-          permissions: ${mciuploads_binary_permissions|private}
-          visibility: ${mciuploads_binary_visibility|signed}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
           content_type: text/plain
@@ -1075,8 +1082,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions|private}
-          visibility: ${mciuploads_binary_visibility|signed}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}

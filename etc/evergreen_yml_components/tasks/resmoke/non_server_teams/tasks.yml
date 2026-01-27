@@ -475,6 +475,7 @@ tasks:
 
   - name: resmoke_tests
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    priority: 5 # Boost the priority since this is often the longest running task in the merge queue
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version

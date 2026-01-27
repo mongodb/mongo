@@ -775,9 +775,12 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
     auto mirrorCount =
         std::ceil(_paramsSnapshot->getSamplingRate() * hostsForGeneralMirroring.size());
 
-    auto swHosts = getCachedHostsForTargetedMirroring();
-    invariant(swHosts);
-    const auto& hostsForTargetedMirroring = swHosts.getValue();
+    std::vector<HostAndPort> hostsForTargetedMirroring;
+    if (mirrorMode.targetedEnabled) {
+        auto swHosts = getCachedHostsForTargetedMirroring();
+        invariant(swHosts);
+        hostsForTargetedMirroring = std::move(swHosts.getValue());
+    }
 
     // If there are no hosts to target, and general mirroring is disabled, there is no work to do.
     if (hostsForTargetedMirroring.empty() && !mirrorMode.generalEnabled) {

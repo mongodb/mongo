@@ -74,7 +74,8 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str, include_terminatin
 
 
 def find_files(file_name: str, path: str) -> List[str]:
-    return glob.glob(f"{path}/**/{file_name}", recursive=True)
+    matches = glob.glob(f"{path}/**/{file_name}", recursive=True)
+    return [f for f in matches if os.path.isfile(f)]
 
 
 def filter_core_dumps(
@@ -866,7 +867,8 @@ class GDBDumper(Dumper):
             return 0, "skip"
 
         if len(binary_files) > 1:
-            logger.error("More than one file found in %s matching %s", install_dir, binary_name)
+            logger.error("More than one file found in %s matching %s", search_dir, binary_name)
+            logger.error(f"Files: {binary_files}")
             return 1, "fail"
 
         binary_path = os.path.realpath(os.path.abspath(binary_files[0]))

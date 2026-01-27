@@ -43,9 +43,6 @@
 #include <deque>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 /**
  * The pre-images collection contains pre-images for every collection 'nsUUID' with pre-images
  * enabled. The pre-images collection is ordered by collection 'nsUUID', so that pre-images
@@ -140,7 +137,7 @@ private:
                                   const RecordId& highestSeenRecordId,
                                   const Date_t& highestSeenWallTime) const override;
 
-    UUID _nsUUID;
+    const UUID _nsUUID;
 };
 
 }  // namespace mongo

@@ -16,8 +16,6 @@ variables:
     stepback: false
 
   - &linux-arm64-dynamic-enterprise-compile-expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
@@ -47,8 +45,6 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_arm64_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
@@ -85,8 +81,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --config=local
@@ -105,8 +99,6 @@ buildvariants:
       - rhel81-power8-large
     stepback: false
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *rhel81-ppc64le-bazel-compile
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel81
@@ -220,8 +212,6 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     stepback: true
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: amazon-linux2023-arm64-lto-pgo-bolt
       has_packages: false
       jstestfuzz_num_generated_files: 40
@@ -405,8 +395,6 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-m6g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       build_timeout_seconds: 900
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
@@ -439,7 +427,7 @@ buildvariants:
       exec_timeout_factor: 1.5
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-        --excludeWithAnyTags=resource_intensive
+        --excludeWithAnyTags=resource_intensive,requires_sbe
     # This set of tasks is not able to be reused on the all-feature-flags variant. Any changes
     # here should be duplicated to
     # enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only.
@@ -491,10 +479,6 @@ buildvariants:
       - name: query_cbr_histogram_aggregation_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_cbr_histogram
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_passthrough_gen
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_no_passthrough_with_mongod_gen
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
@@ -695,18 +679,17 @@ buildvariants:
       tss_enabled: false
       test_flags: >-
         --runAllFeatureFlagTests
-        --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
-        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,exclude_when_record_ids_replicated,disables_test_commands
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,disables_test_commands
     tasks:
-      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
-      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-m8g-2xlarge
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-m8g-2xlarge
-      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
-      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion
         distros:
           - amazon2023-arm64-latest-m8g-2xlarge

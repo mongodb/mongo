@@ -312,11 +312,15 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
                     ServiceContext* const ctx,
                     Milliseconds timeout) {
     ctx->waitForStartupComplete();
-    if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
-        LOGV2(6605000,
-              "failIsSelfCheck failpoint activated, returning false from isSelfSlowPath",
-              "hostAndPort"_attr = hostAndPort);
-        return false;
+
+    if (auto scopedFailPoint = failIsSelfCheck.scoped();
+        MONGO_unlikely(scopedFailPoint.isActive())) {
+        if (!scopedFailPoint.getData().hasField("fastPathOnly")) {
+            LOGV2(6605000,
+                  "failIsSelfCheck failpoint activated, returning false from isSelfSlowPath",
+                  "hostAndPort"_attr = hostAndPort);
+            return false;
+        }
     }
 
     // If a priority port is specified, we need to verify that we can connect both to the

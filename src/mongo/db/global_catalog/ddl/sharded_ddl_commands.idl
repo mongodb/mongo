@@ -75,6 +75,14 @@ enums:
             # will to start accepting sharded DDL operations again.
             kComplete: "complete"
 
+    # TODO (SERVER-116499): Remove this command once 9.0 becomes last LTS.
+    TimeseriesUpgradeDowngradeMode:
+        description: "Conversion direction for a time-series collection."
+        type: string
+        values:
+            kToViewless: "upgradeToViewless"
+            kToLegacy: "downgradeToLegacy"
+
 structs:
     ConfigsvrCreateDatabaseResponse:
         description: "Response for the create database command"
@@ -139,6 +147,15 @@ structs:
                 type: shard_version
                 description: "Latest version of the collection"
                 optional: false
+
+    # TODO (SERVER-116499): Remove this command once 9.0 becomes last LTS.
+    TimeseriesUpgradeDowngradeRequest:
+        description: "Per-namespace request to convert a time-series collection between legacy and viewless formats."
+        strict: false
+        fields:
+            mode:
+                type: TimeseriesUpgradeDowngradeMode
+                description: "Conversion mode for time-series collections."
 
     ShardsvrCreateCollectionRequest:
         description: "All the parameters sent by the router."
@@ -863,6 +880,17 @@ commands:
         chained_structs:
             ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
 
+    # TODO (SERVER-116499): Remove this command once 9.0 becomes last LTS.
+    _shardsvrUpgradeDowngradeViewlessTimeseries:
+        command_name: _shardsvrUpgradeDowngradeViewlessTimeseries
+        cpp_name: ShardsvrUpgradeDowngradeViewlessTimeseries
+        description: "The internal command for shards to convert timeseries collections between viewless and legacy."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            TimeseriesUpgradeDowngradeRequest: TimeseriesUpgradeDowngradeRequest
+
     _shardsvrConvertToCappedParticipant:
         command_name: _shardsvrConvertToCappedParticipant
         cpp_name: ShardsvrConvertToCappedParticipant
@@ -876,6 +904,36 @@ commands:
             targetUUID:
                 type: uuid
                 description: "UUID of the new capped collection"
+        reply_type: OkReply
+
+    # TODO (SERVER-116499): Remove these commands once 9.0 becomes last LTS.
+    _shardsvrTimeseriesUpgradeDowngradePrepare:
+        command_name: _shardsvrTimeseriesUpgradeDowngradePrepare
+        cpp_name: ShardsvrTimeseriesUpgradeDowngradePrepare
+        description: "Internal command to validate timeseries upgrade/downgrade feasibility on a shard"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            TimeseriesUpgradeDowngradeRequest: TimeseriesUpgradeDowngradeRequest
+        reply_type: OkReply
+
+    _shardsvrTimeseriesUpgradeDowngradeCommit:
+        command_name: _shardsvrTimeseriesUpgradeDowngradeCommit
+        cpp_name: ShardsvrTimeseriesUpgradeDowngradeCommit
+        description: "Internal command to perform timeseries upgrade/downgrade on a shard"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            TimeseriesUpgradeDowngradeRequest: TimeseriesUpgradeDowngradeRequest
+        fields:
+            isTracked:
+                type: bool
+                description: "Whether the collection is tracked in the sharding catalog."
+            databasePrimaryShardId:
+                type: shard_id
+                description: "The shard id of the database primary shard."
         reply_type: OkReply
 
     _shardsvrUntrackUnsplittableCollection:

@@ -30,6 +30,10 @@
 #include "mongo/db/extension/sdk/host_services.h"
 
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
+#include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
+#include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -44,6 +48,50 @@ public:
     void setUp() override {
         sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get());
     }
+
+    auto getExpCtx() {
+        return _expCtx;
+    }
+
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx = new ExpressionContextForTest();
+};
+
+/**
+ * This parse node is meant to mimic how $vectorSearch will parse and serialize its 'filter' field.
+ * It wraps the filter expression in a $match node, uses HostServices::createHostAggStageParseNode()
+ * to generate a parse node, then calls getQueryShape() on that node to generate the 'filter' shape.
+ */
+class NestedFilterParseNode : public sdk::AggStageParseNode {
+public:
+    NestedFilterParseNode(const mongo::BSONObj& arguments)
+        : sdk::AggStageParseNode("$nestedFilter"),
+          _arguments(arguments.getOwned()),
+          _parseNode(nullptr) {
+        auto& hostServices = sdk::HostServicesAPI::getInstance();
+        mongo::BSONObj matchFilter = BSON("$match" << _arguments["filter"].Obj());
+        _parseNode = hostServices->createHostAggStageParseNode(matchFilter);
+    }
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<mongo::extension::VariantNodeHandle> expand() const override {
+        return {};
+    }
+
+    mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& opts) const override {
+        auto matchNodeShape = _parseNode->getQueryShape(*opts.get());
+        return BSON("$nestedFilter" << BSON("filter" << matchNodeShape["$match"]));
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<NestedFilterParseNode>(_arguments);
+    }
+
+private:
+    mongo::BSONObj _arguments;
+    mongo::extension::AggStageParseNodeHandle _parseNode;
 };
 
 /**
@@ -178,6 +226,72 @@ TEST_F(HostServicesTest, CreateIdLookup_InvalidSpecFails) {
     ASSERT_THROWS_CODE(extension::sdk::HostServicesAPI::getInstance()->createIdLookup(bsonSpec),
                        DBException,
                        11134200);
+}
+
+TEST_F(HostServicesTest, NestedFilterParseNodeBasicPredicate) {
+    auto filterSpec = BSON("filter" << BSON("status" << "A"));
+    auto parseNode = new extension::sdk::ExtensionAggStageParseNode(
+        std::make_unique<NestedFilterParseNode>(filterSpec));
+    auto handle = extension::AggStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    auto queryShape = handle->getQueryShape(adapter);
+    ASSERT_BSONOBJ_EQ(
+        queryShape,
+        BSON("$nestedFilter" << BSON("filter" << BSON("status" << BSON("$eq" << "?string")))));
+}
+
+TEST_F(HostServicesTest, NestedFilterParseNodeComplexPredicate) {
+    auto filterSpec =
+        BSON("filter" << BSON("$and" << BSON_ARRAY(
+                                  BSON("status" << BSON("$not" << BSON("$eq" << "true")))
+                                  << BSON("age" << BSON("$gt" << 30))
+                                  << BSON("$or" << BSON_ARRAY(BSON("score" << BSON("$gte" << 80))
+                                                              << BSON("level" << "advanced"))))));
+    auto parseNode = new extension::sdk::ExtensionAggStageParseNode(
+        std::make_unique<NestedFilterParseNode>(filterSpec));
+    auto handle = extension::AggStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+    auto queryShape = handle->getQueryShape(adapter);
+    ASSERT_BSONOBJ_EQ(
+        queryShape,
+        BSON("$nestedFilter" << BSON(
+                 "filter" << BSON(
+                     "$and" << BSON_ARRAY(
+                         BSON("status" << BSON("$not" << BSON("$eq" << "?string")))
+                         << BSON("age" << BSON("$gt" << "?number"))
+                         << BSON("$or"
+                                 << BSON_ARRAY(BSON("score" << BSON("$gte" << "?number"))
+                                               << BSON("level" << BSON("$eq" << "?string")))))))));
+}
+
+TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate1) {
+    auto filterSpec = BSON("filter" << BSON("$invalidOperator" << 5));
+    auto parseNode = new extension::sdk::ExtensionAggStageParseNode(
+        std::make_unique<NestedFilterParseNode>(filterSpec));
+    auto handle = extension::AggStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+
+    ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
+}
+
+TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate2) {
+    // The inner $or predicate must take an array, so it is rejected.
+    auto filterSpec = BSON(
+        "filter" << BSON("$and" << BSON_ARRAY(BSON("status" << "A") << BSON("$or" << BSONObj()))));
+    auto parseNode = new extension::sdk::ExtensionAggStageParseNode(
+        std::make_unique<NestedFilterParseNode>(filterSpec));
+    auto handle = extension::AggStageParseNodeHandle{parseNode};
+
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
+
+    ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
 }
 
 }  // namespace

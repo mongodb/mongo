@@ -33,9 +33,9 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
+#include "mongo/db/sharding_environment/sharding_task_executor.h"
 #include "mongo/db/topology/add_shard_coordinator_document_gen.h"
 #include "mongo/db/topology/topology_change_helpers.h"
-#include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -86,7 +86,7 @@ private:
 
     RemoteCommandTargeter& _getTargeter(OperationContext* opCtx);
 
-    bool _validateShardIdentityDocumentOnReplicaSet(OperationContext* opCtx);
+    bool _hasShardingDataOnReplicaSet(OperationContext* opCtx);
 
     void _runWithRetries(std::function<void()>&& function,
                          std::shared_ptr<executor::ScopedTaskExecutor> executor,

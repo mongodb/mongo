@@ -582,7 +582,6 @@ Status _createLegacyTimeseries(
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, bucketsNs)
             ->checkShardVersionOrThrow(opCtx);
         if (!ns.isTimeseriesBucketsCollection()) {
-            Lock::CollectionLock viewLock(opCtx, ns, MODE_IS);
             // Check the shard version of the view namespace here to prevent failing due to needing
             // to refresh the metadata after creating the buckets collection.
             // When creating an untracked legacy timeseries collection on a sharded cluster,
@@ -591,8 +590,7 @@ Status _createLegacyTimeseries(
             // in different WUOWs, checkMetadataConsistency can report a transient
             // MalformedTimeseriesBucketsCollection inconsistency. See SERVER-110952 for details.
             // This is a best effort check; this inconsistency can still be caused by stepdowns.
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns)
-                ->checkShardVersionOrThrow(opCtx);
+            CollectionShardingState::acquire(opCtx, ns)->checkShardVersionOrThrow(opCtx);
         }
 
         WriteUnitOfWork wuow(opCtx);

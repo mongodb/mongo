@@ -29,7 +29,9 @@
 
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/death_test.h"
@@ -92,6 +94,13 @@ public:
                 NamespaceString::createNamespaceString_forTest("test", str::stream() << "nss" << i);
             std::string fieldName = str::stream() << "a" << i;
             auto filterBSON = bsonStorage.emplace_back(BSON(fieldName << BSON("$gt" << 0)));
+
+            // Pick some cardinalities.
+            collCards.push_back(makeCard(i * 1000.0));
+            subsetCards.emplace(makeNodeSet((NodeId)i), makeCard((i % 2) * 999.0 + 1.0));
+            catStats.collStats[nss] =
+                CollectionStats{.allocatedDataPageBytes = collCards[i].toDouble() * 420.0};
+
             auto cq = makeCanonicalQuery(nss, filterBSON);
             cbrCqQsns.emplace(cq.get(),
                               makeCollScanPlan(nss, cq->getPrimaryMatchExpression()->clone()));
@@ -107,7 +116,18 @@ public:
     }
 
     std::unique_ptr<JoinCardinalityEstimator> makeFakeEstimator(const JoinReorderingContext& jCtx) {
-        return std::make_unique<FakeJoinCardinalityEstimator>(jCtx);
+        return std::make_unique<FakeJoinCardinalityEstimator>(jCtx, subsetCards, collCards);
+    }
+
+    auto makeCoster(const JoinReorderingContext& jCtx, JoinCardinalityEstimator& ce) {
+        return std::make_unique<JoinCostEstimatorImpl>(jCtx, ce);
+    }
+
+    PlanEnumeratorContext makeEnumeratorContext(const JoinReorderingContext& ctx,
+                                                bool pruneHJ = false) {
+        auto ce = makeFakeEstimator(ctx);
+        auto coster = makeCoster(ctx, *ce);
+        return {ctx, std::move(ce), std::move(coster), pruneHJ};
     }
 
     // Asserts that for all HJ enumerated at every level of enumeration, the CE for the LHS of the
@@ -148,7 +168,7 @@ public:
         auto jCtx = makeContext();
 
         // Note: These tests run with pruning enabled to keep the large output understandable.
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), true /* HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
         ctx.enumerateJoinSubsets(shape);
         ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
         for (size_t k = 1; k < numNodes; ++k) {
@@ -181,7 +201,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     graph.addSimpleEqualityEdge((NodeId)0, (NodeId)1, 0, 1);
     auto jCtx = makeContext();
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -198,7 +218,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -226,7 +246,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     auto jCtx = makeContext();
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -250,7 +270,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -283,7 +303,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
 
     auto jCtx = makeContext();
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -307,7 +327,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), false /* disable HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx);
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         auto& level0 = ctx.getSubsets(0);
@@ -340,7 +360,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeWithPruning) {
 
     auto jCtx = makeContext();
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), true /* HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
         ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
 
         goldenCtx.outStream() << "LEFT DEEP, 3 Nodes with pruning" << "\n";
@@ -348,7 +368,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeWithPruning) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), true /* HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
         ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
 
         goldenCtx.outStream() << "RIGHT DEEP, 3 Nodes with pruning" << "\n";
@@ -356,7 +376,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeWithPruning) {
     }
 
     {
-        PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), true /* HJ pruning */};
+        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
         ctx.enumerateJoinSubsets(PlanTreeShape::ZIG_ZAG);
 
         goldenCtx.outStream() << "ZIG ZAG, 3 Nodes with pruning" << "\n";
@@ -375,7 +395,7 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsFourWithPruning) {
     graph.addSimpleEqualityEdge(NodeId(2), NodeId(3), 2, 3);
 
     auto jCtx = makeContext();
-    PlanEnumeratorContext ctx{jCtx, makeFakeEstimator(jCtx), true /* HJ pruning */};
+    auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
     ctx.enumerateJoinSubsets(PlanTreeShape::ZIG_ZAG);
 
     goldenCtx.outStream() << "ZIG ZAG, 4 Nodes with pruning" << "\n";

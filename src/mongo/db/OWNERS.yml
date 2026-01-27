@@ -216,7 +216,7 @@ filters:
       - 10gen/server-rw-concerns
   - "feature_compatibility*":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "traffic*":
     approvers:
       - 10gen/query-optimization
@@ -253,6 +253,9 @@ filters:
   - "multi_key_path_tracker*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "multitenancy*":
+    approvers:
+      - 10gen/server-security
   - "yieldable.h":
     approvers:
       - 10gen/query-execution-yielding

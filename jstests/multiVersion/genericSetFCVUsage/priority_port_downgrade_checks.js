@@ -3,7 +3,9 @@
  * reconfigs are drained correctly to ensure stability of these checks.
  *
  * @tags: [
- *      featureFlagReplicationUsageOfPriorityPort
+ *      # The priority port is based on ASIO, so gRPC testing is excluded
+ *      grpc_incompatible,
+ *      requires_fcv_83,
  * ]
  */
 

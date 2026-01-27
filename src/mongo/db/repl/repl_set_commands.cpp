@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                               \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
-
 #include <cstdint>
 #include <cstring>
 
@@ -104,6 +99,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 namespace mongo {
 namespace repl {

@@ -12,7 +12,6 @@ executor:
       global_vars:
         TestData:
           setParameters:
-            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
       nodb: ""
@@ -24,7 +23,6 @@ selector:
     - requires_commit_quorum
     - requires_capped
     - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
-    - exclude_when_record_ids_replicated
   roots:
     - jstests/replsets/*index_build*.js
     - jstests/replsets/**/*index_build*.js

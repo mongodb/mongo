@@ -135,6 +135,7 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -1023,15 +1024,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    auto shardService = serviceContext->getService();
-    SessionKiller::set(shardService,
-                       std::make_shared<SessionKiller>(shardService, killSessionsLocal));
-
-    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        auto routerService = serviceContext->getService(ClusterRole::RouterServer);
-        SessionKiller::set(routerService,
-                           std::make_shared<SessionKiller>(routerService, killSessionsRemote));
-    }
+    SessionKiller::set(
+        serviceContext->getService(),
+        std::make_shared<SessionKiller>(serviceContext->getService(), killSessionsLocal));
 
     // Start up a background task to periodically check for and kill expired transactions; and a
     // background task to periodically check for and decrease cache pressure by decreasing the
@@ -1278,7 +1273,7 @@ void startupConfigActions(const std::vector<std::string>& args) {
 
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
 }
 
 auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
@@ -1876,6 +1871,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                                         true /* memLeakAllowed */);
     }
 
+    // Shut down the thread managing fast size and count information.
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        ReplicatedSizeAndCountMetadataManager::get(serviceContext).shutdown();
+    }
+
     // Depending on the underlying implementation, there may be some state that needs to be shut
     // down after the replication subsystem and the storage engine.
     auto& serviceLifecycle =
@@ -1942,9 +1944,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // SessionKiller relies on the network stack being cleanly shutdown which only occurs under
     // sanitizers
     SessionKiller::shutdown(serviceContext->getService());
-    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        SessionKiller::shutdown(serviceContext->getService(ClusterRole::RouterServer));
-    }
 #endif
 
     FlowControl::shutdown(serviceContext);

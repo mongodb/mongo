@@ -208,6 +208,16 @@ idl_generator(
 )
 
 idl_generator(
+    name = "timeseries_upgrade_downgrade_coordinator_document_gen",
+    src = "timeseries_upgrade_downgrade_coordinator_document.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
+        "//src/mongo/db/global_catalog/ddl:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
     name = "sharding_ddl_coordinator_gen",
     src = "sharding_ddl_coordinator.idl",
     deps = [
@@ -403,6 +413,15 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "upgrade_downgrade_viewless_timeseries_gen",
+    src = "upgrade_downgrade_viewless_timeseries.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
     ],
 )
 

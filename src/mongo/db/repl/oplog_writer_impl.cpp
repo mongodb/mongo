@@ -166,7 +166,7 @@ void OplogWriterImpl::_run() {
     invariant(!_replCoord->getMemberState().arbiter());
 
     const auto flushJournal = !getGlobalServiceContext()->getStorageEngine()->isEphemeral();
-    const auto opCtxHolder = cc().makeOperationContext();
+    const auto opCtxHolder = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
     auto opCtx = opCtxHolder.get();
 
     // Oplog writes are crucial to the stability of the replica set. We give the operations

@@ -701,8 +701,8 @@ class TestGenerator(testcase.IDLTestcase):
         """)
         )
 
-        expectedParserContext = "IDLParserContext tempContext\(.*kVariantFieldFieldName.*\)"
-        expectedCastedObject = "NestedStruct::parse\(localObject, tempContext.*\)"
+        expectedParserContext = r"IDLParserContext tempContext\(.*kVariantFieldFieldName.*\)"
+        expectedCastedObject = r"NestedStruct::parse\(localObject, tempContext.*\)"
 
         self.assertRegex(source, expectedParserContext)
         self.assertRegex(source, expectedCastedObject)

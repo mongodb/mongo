@@ -517,6 +517,35 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 stateBeforeChange = Value(
                     Document{{"collectionOptions", o2Field.getField("collectionOptions_old"_sd)},
                              {"indexOptions", o2Field.getField("indexOptions_old"_sd)}});
+            } else if (auto timeseriesCollName =
+                           oField.getField("upgradeDowngradeViewlessTimeseries"_sd);
+                       !timeseriesCollName.missing()) {
+                operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
+
+                auto bucketsNss = NamespaceStringUtil::deserialize(
+                                      nss.dbName(), timeseriesCollName.getStringData())
+                                      .makeTimeseriesBucketsNamespace();
+                auto regularNss = NamespaceStringUtil::deserialize(
+                    nss.dbName(), timeseriesCollName.getStringData());
+
+                NamespaceString renameTargetNss;
+                if (oField.getField("isUpgrade").getBool()) {
+                    nss = bucketsNss;
+                    renameTargetNss = regularNss;
+                } else {
+                    nss = regularNss;
+                    renameTargetNss = bucketsNss;
+                }
+
+                // The "to" field contains the target namespace for the rename.
+                const auto renameTarget = makeChangeStreamNsField(renameTargetNss);
+                doc.addField(DocumentSourceChangeStream::kRenameTargetNssField, renameTarget);
+
+                // Include full details of the rename in 'operationDescription'.
+                MutableDocument opDescBuilder;
+                opDescBuilder.setField(DocumentSourceChangeStream::kRenameTargetNssField,
+                                       renameTarget);
+                operationDescription = opDescBuilder.freezeToValue();
             } else {
                 // We should never see an unknown command.
                 LOGV2_WARNING(11352604,

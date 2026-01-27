@@ -34,7 +34,6 @@
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
-#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
@@ -62,23 +61,24 @@ namespace {
 // This function returns the Status for a given ItemVariant ('itemVar'). If 'itemVar' is Unexecuted,
 // this function will return an OK status.
 Status getItemStatus(const ItemVariant& itemVar) {
-    return visit(
-        OverloadedVisitor([&](const Unexecuted&) { return Status::OK(); },
-                          [&](const SucceededWithoutItem&) { return Status::OK(); },
-                          [&](const BulkWriteReplyItem& item) { return item.getStatus(); },
-                          [&](const FindAndModifyReplyItem& item) { return item.getStatus(); }),
-        itemVar);
+    return visit(OverloadedVisitor(
+                     [&](const Unexecuted&) { return Status::OK(); },
+                     [&](const SucceededWithoutItem&) { return Status::OK(); },
+                     [&](const BulkWriteReplyItem& item) { return item.getStatus(); },
+                     [&](const FindAndModifyReplyItem& item) { return item.swReply.getStatus(); }),
+                 itemVar);
 }
 
 // This function returns the error code for a given ItemVariant ('itemVar'). If 'itemVar' is
 // Unexecuted, this function will return ErrorCodes::OK.
 ErrorCodes::Error getErrorCode(const ItemVariant& itemVar) {
-    return visit(OverloadedVisitor(
-                     [&](const Unexecuted&) { return ErrorCodes::OK; },
-                     [&](const SucceededWithoutItem&) { return ErrorCodes::OK; },
-                     [&](const BulkWriteReplyItem& item) { return item.getStatus().code(); },
-                     [&](const FindAndModifyReplyItem& item) { return item.getStatus().code(); }),
-                 itemVar);
+    return visit(
+        OverloadedVisitor(
+            [&](const Unexecuted&) { return ErrorCodes::OK; },
+            [&](const SucceededWithoutItem&) { return ErrorCodes::OK; },
+            [&](const BulkWriteReplyItem& item) { return item.getStatus().code(); },
+            [&](const FindAndModifyReplyItem& item) { return item.swReply.getStatus().code(); }),
+        itemVar);
 }
 
 // Like getErrorCode(), but takes a 'std::pair<ShardId,ItemVariant>' as its input.
@@ -149,32 +149,6 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
             10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
 }
-
-bool isTimeseriesInsert(OperationContext* opCtx,
-                        const RoutingContext& routingCtx,
-                        const WriteOp& op) {
-    if (getWriteOpType(op) != WriteType::kInsert) {
-        return false;
-    }
-
-    if (isRawDataOperation(opCtx)) {
-        return false;
-    }
-
-    const auto& nss = op.getNss();
-    const auto& bucketsNss = nss.makeTimeseriesBucketsNamespace();
-    const bool hasBucketsNss = routingCtx.hasNss(bucketsNss);
-    const bool isViewfulTimeseries = nss.isTimeseriesBucketsCollection() || hasBucketsNss;
-    bool isTrackedTimeseries = false;
-    if (routingCtx.hasNss(nss)) {
-        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
-        isTrackedTimeseries =
-            cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
-    }
-
-    return isViewfulTimeseries || isTrackedTimeseries;
-}
-
 }  // namespace
 
 ProcessorResult WriteBatchResponseProcessor::onWriteBatchResponse(
@@ -319,7 +293,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                     return true;
                 },
                 [&](const FindAndModifyReplyItem& item) {
-                    const auto& status = item.getStatus();
+                    const auto& status = item.swReply.getStatus();
                     if (!write_op_helpers::isRetryErrCode(status.code()) || inTransaction) {
                         // Add 'item' to _results.
                         recordResult(opCtx, op, std::move(item));
@@ -351,62 +325,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     result.collsToCreate = std::move(collsToCreate);
     result.successfulShardSet = std::move(successfulShardSet);
 
-    const auto batchSize = itemsByOp.size();
+    // For "RetryableWriteWithId" batches, if the "hangAfterCompletingWriteWithoutShardKeyWithId"
+    // failpoint is set, call pauseWhileSet().
     if (response.isRetryableWriteWithId) {
-        // In the event of a retryable write with id with a batch size of 1, we can ignore any
-        // errors from the shards as long as one shard has reported a successful write. This is
-        // because for this write type, we broadcast the write to all shards with the shard version
-        // attached. As such, a successful write on a single shard means that the write succeeded on
-        // the intended shard.
-        if (batchSize == 1) {
-            const auto opIt = itemsByOp.begin();
-            tassert(11472500, "Expected a non empty 'itemsByOp' map", opIt != itemsByOp.end());
-            const auto& [op, _] = *opIt;
-            const auto opId = getWriteOpId(op);
-            auto resIt = _results.find(opId);
-            tassert(11472501,
-                    "Should have a write op result for single write op",
-                    resIt != _results.end());
-            auto& res = *resIt;
-            const auto* opResults = get_if<BulkWriteOpResults>(&res.second);
-            tassert(11472502, "Expected BulkWriteOpResults", opResults != nullptr);
-
-            if (opResults->hasSuccess && opResults->hasError) {
-                auto& items = opResults->items;
-                std::vector<BulkWriteReplyItem> noErrorItems;
-                auto foundWCOSError = false;
-                for (auto& item : items) {
-                    // One exception to the above rule: if we've encountered a WCOS error, we should
-                    // surface this to the user.
-                    const bool isWCOS = item.getStatus() == ErrorCodes::WouldChangeOwningShard;
-                    if (item.getOk() || isWCOS) {
-                        noErrorItems.emplace_back(std::move(item));
-                        if (isWCOS) {
-                            foundWCOSError = true;
-                        }
-                    } else {
-                        LOGV2_DEBUG(11472503,
-                                    4,
-                                    "Ignoring write without shard key with id op error, as at "
-                                    "least one shard has reported success",
-                                    "error"_attr = redact(item.toBSON()));
-                    }
-                }
-                BulkWriteOpResults newResult;
-                newResult.items = std::move(noErrorItems);
-                newResult.hasError = foundWCOSError;
-                newResult.hasSuccess = true;
-                tassert(11472504, "nErrors should be non-zero", _nErrors > 0);
-                if (!foundWCOSError) {
-                    _nErrors--;
-                }
-
-                res.second = std::move(newResult);
-            }
-        }
-
-        // For "RetryableWriteWithId" batches, if the
-        // "hangAfterCompletingWriteWithoutShardKeyWithId" failpoint is set, call pauseWhileSet().
         auto& fp = getHangAfterCompletingWriteWithoutShardKeyWithIdFailPoint();
         if (MONGO_unlikely(fp.shouldFail())) {
             fp.pauseWhileSet();
@@ -502,7 +423,8 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                   processCountersAndRetriedStmtIds(parsedReply);
               },
               [&](const write_ops::FindAndModifyCommandReply& parsedReply) {
-                  recordResult(opCtx, op, parsedReply);
+                  recordResult(
+                      opCtx, op, FindAndModifyReplyItem{parsedReply, response.getShardId()});
               }),
           response.getReply());
 
@@ -598,7 +520,7 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
                 const auto& firstOp = *std::min_element(ops.begin(), ops.end());
                 for (const auto& op : ops) {
                     if (op == firstOp) {
-                        result.items.emplace_back(op, makeErrorItem(op, status));
+                        result.items.emplace_back(op, makeErrorItem(op, status, shardId));
                     } else {
                         result.items.emplace_back(op, Unexecuted{});
                     }
@@ -606,7 +528,7 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
             }
         } else {
             for (const auto& op : ops) {
-                result.items.emplace_back(op, makeErrorItem(op, status));
+                result.items.emplace_back(op, makeErrorItem(op, status, shardId));
             }
         }
 
@@ -629,7 +551,7 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
                   tassert(11272108, "Expected single write op for findAndModify", ops.size() == 1);
                   const auto& op = ops.front();
 
-                  result.items.emplace_back(op, FindAndModifyReplyItem(parsedReply));
+                  result.items.emplace_back(op, FindAndModifyReplyItem{parsedReply, shardId});
               }),
           response.getReply());
 
@@ -675,7 +597,7 @@ void WriteBatchResponseProcessor::recordResult(OperationContext* opCtx,
 void WriteBatchResponseProcessor::recordResult(OperationContext* opCtx,
                                                const WriteOp& op,
                                                FindAndModifyReplyItem item) {
-    const bool isOK = item.getStatus().isOK();
+    const bool isOK = item.swReply.getStatus().isOK();
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     if (isOK) {
@@ -686,7 +608,7 @@ void WriteBatchResponseProcessor::recordResult(OperationContext* opCtx,
             LOGV2_DEBUG(10413100,
                         2,
                         "Aborting write command due to error in transaction",
-                        "error"_attr = redact(item.getStatus()));
+                        "error"_attr = redact(item.swReply.getStatus()));
         }
 
         ++_nErrors;
@@ -716,11 +638,12 @@ void WriteBatchResponseProcessor::recordError(OperationContext* opCtx,
 }
 
 ItemVariant WriteBatchResponseProcessor::makeErrorItem(const WriteOp& op,
-                                                       const Status& status) const {
+                                                       const Status& status,
+                                                       const ShardId& shardId) const {
     tassert(11182208, "Expected non-OK status", !status.isOK());
 
     if (op.isFindAndModify()) {
-        return ItemVariant{FindAndModifyReplyItem{status}};
+        return ItemVariant{FindAndModifyReplyItem{status, shardId}};
     } else {
         auto item = BulkWriteReplyItem(getWriteOpId(op), status);
         if (getWriteOpType(op) == WriteType::kUpdate) {
@@ -838,15 +761,12 @@ void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
     const std::vector<WriteOp>& ops,
     const std::vector<BulkWriteReplyItem>& items,
     ShardResult& result) {
-    const bool ordered = _cmdRef.getOrdered();
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const bool orderedOrInTxn = _cmdRef.getOrdered() || TransactionRouter::get(opCtx);
+    const bool isBulkWrite = _cmdRef.isBulkWriteCommand();
 
-    Status finalErrorForBatch = Status::OK();
-    bool finalErrorForBatchIsRetryable = false;
-
+    bool assumeOpsWithNoItemWereExecuted = true;
+    boost::optional<Status> finalRetryableErrorForLogging;
     std::vector<WriteOp> opsAfterFinalRetryableError;
-    const bool logOpsAfterFinalRetryableError =
-        !inTransaction && shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4));
 
     size_t itemIndex = 0;
 
@@ -872,36 +792,34 @@ void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
                     noteRetryableError(opCtx, routingCtx, status);
                 }
 
-                // If 'item' is an error and 'ordered || inTransaction' is true, -OR- if 'item' is
-                // a retryable error and it's the last reply item, then for remaining ops without
-                // reply items we will assume the ops did not execute.
-                if (ordered || inTransaction || (isRetryableErr && itemIndex >= items.size())) {
-                    finalErrorForBatch = status;
-                    finalErrorForBatchIsRetryable = isRetryableErr;
+                const bool isFinalRetryableErrorInBulkWriteReply =
+                    isBulkWrite && isRetryableErr && itemIndex >= items.size();
+
+                // If 'orderedOrInTxn' or 'isFinalRetryableErrorInBulkWriteReply' is true, then
+                // we assume the remaining ops without reply items did not execute.
+                if (orderedOrInTxn || isFinalRetryableErrorInBulkWriteReply) {
+                    assumeOpsWithNoItemWereExecuted = false;
+                }
+
+                // If 'isFinalRetryableErrorInBulkWriteReply' is true and 'shouldLog()' returns
+                // true, store the error into 'finalRetryableErrorForLogging'.
+                if (isFinalRetryableErrorInBulkWriteReply &&
+                    shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4))) {
+                    finalRetryableErrorForLogging.emplace(status);
                 }
             }
 
             result.items.emplace_back(op, std::move(item));
         } else {
-            // Handle the case where we don't have a reply item for 'shardOpId'. Note that if we are
-            // executing an unordered timeseries insert, then any item beyond the final error must
-            // have succeeded (otherwise, we would have recieved an error for that item). This is
-            // because unlike other writes, unordered timeseries inserts will continue in the face
-            // of stale config errors.
-            // TODO SERVER-80796: This logic can be removed once it is the case that unordered
-            // timeseries inserts stop on the first stale config.
-            if (finalErrorForBatch.isOK() ||
-                (write_op_helpers::isRetryErrCode(finalErrorForBatch.code()) &&
-                 !_cmdRef.getOrdered() && isTimeseriesInsert(opCtx, routingCtx, op))) {
-
+            // Handle the case where we don't have a reply item for 'shardOpId'.
+            if (assumeOpsWithNoItemWereExecuted) {
                 result.items.emplace_back(op, SucceededWithoutItem{});
             } else {
                 result.items.emplace_back(op, Unexecuted{});
 
-                // If this op comes after the final error in the batch and the final error is
-                // retryable -AND- if 'logOpsAfterFinalRetryableError' is true, then add this
-                // op to 'opsAfterFinalRetryableError'.
-                if (logOpsAfterFinalRetryableError && finalErrorForBatchIsRetryable) {
+                // Add 'op' to 'opsAfterFinalRetryableError' if 'finalRetryableErrorForLogging'
+                // is set.
+                if (finalRetryableErrorForLogging) {
                     opsAfterFinalRetryableError.emplace_back(op);
                 }
             }
@@ -909,7 +827,7 @@ void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
     }
 
     // Log the contents of 'opsAfterFinalRetryableError' if it's not empty.
-    if (logOpsAfterFinalRetryableError && !opsAfterFinalRetryableError.empty()) {
+    if (finalRetryableErrorForLogging && !opsAfterFinalRetryableError.empty()) {
         std::stringstream opsStream;
         size_t numOpsInStream = 0;
         for (const auto& op : opsAfterFinalRetryableError) {
@@ -920,7 +838,7 @@ void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
                     4,
                     "Retryable error occurred during batch, op(s) may need to be retried",
                     "opIdx"_attr = opsStream.str(),
-                    "error"_attr = finalErrorForBatch);
+                    "error"_attr = *finalRetryableErrorForLogging);
     }
 }
 
@@ -1437,7 +1355,7 @@ WriteBatchResponseProcessor::generateClientResponseForFindAndModifyCommand() {
         wce = WriteConcernErrorDetail{totalWcError->toStatus()};
     }
 
-    return FindAndModifyCommandResponse{*reply, std::move(wce)};
+    return FindAndModifyCommandResponse{reply->swReply, reply->shardId, std::move(wce)};
 }
 
 }  // namespace mongo::unified_write_executor

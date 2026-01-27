@@ -32,7 +32,6 @@ resmoke_suite_test(
         "//jstests/core_sharding/ddl:shard_collection_basic.js",
         "//jstests/core_sharding/ddl:untrack_unsharded_collection_basic.js",
         "//jstests/core_sharding/global_catalog:sharded_data_distribution.js",
-        "//jstests/core_sharding/sharded_cluster_topology:add_remove_shard.js",
         "//jstests/core_sharding/sharded_cluster_topology:list_shards_vs_get_shard_map.js",
         "//jstests/core_sharding/versioning_protocol:get_database_version.js",
         "//jstests/core_sharding/versioning_protocol:get_shard_version.js",

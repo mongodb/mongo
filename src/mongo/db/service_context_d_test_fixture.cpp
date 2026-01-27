@@ -172,7 +172,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
     if (options._createShardingState) {
         ShardingState::create(serviceContext);
     }

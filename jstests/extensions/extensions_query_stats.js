@@ -7,24 +7,12 @@ import {kDefaultQueryStatsHmacKey, getQueryStatsWithTransform} from "jstests/lib
 
 // Use a unique db and coll for every test so burn_in_tests can run this test multiple times.
 const collName = jsTestName() + Random.srand();
+const foreignCollName = collName + "_foreign";
 const testDb = db.getSiblingDB("extensions_query_stats_db" + Random.srand());
 const coll = testDb[collName];
+const foreignColl = testDb[foreignCollName];
 coll.drop();
-
-function insertEmptyShape(coll) {
-    coll.aggregate([{$shapify: {}}]).toArray();
-
-    // Expected shape.
-    return [{"$shapify": {}}];
-}
-
-function insertShapeForDesugarStage(coll) {
-    const spec = {$shapifyDesugar: {a: 1, b: 2}};
-    coll.aggregate([spec]).toArray();
-
-    // Expected shape.
-    return [spec];
-}
+foreignColl.drop();
 
 function insertLiteralShape(coll) {
     // Shape with literals. Test different values to ensure they all map to the same shape.
@@ -211,48 +199,176 @@ function fetchQueryStats(db, transformIdentifiers) {
     );
 }
 
+// Track the number of query stats entries to ensure each test adds exactly one new shape.
+let statsSoFar = 0;
+
 /**
- * Helper that runs the provided function to insert a single query shape and validates
- * the results returned by $queryStats. Returns an updated count of query stats entries
- * for the collection.
+ * Runs a query stats test: executes aggregation(s) and validates the resulting query shape.
+ *
+ * Supports two modes:
+ *   1. Direct: provide `pipeline` and `expectedShape` for simple single-aggregation tests.
+ *   2. Callback: provide `runFn` for complex tests that run multiple aggregations
+ *      (e.g., testing that different literal values map to the same shape).
+ *
+ * @param {Object} opts - Test options.
+ * @param {string} opts.desc - Test description for logging.
+ * @param {Array} [opts.pipeline] - (Direct) The aggregation pipeline to run.
+ * @param {Array} [opts.expectedShape] - (Direct) The expected query shape.
+ * @param {Function} [opts.runFn] - (Callback) Function that runs aggregation(s) and returns expected shape.
+ * @param {boolean} [opts.transformIdentifiers=false] - Whether to transform identifiers in $queryStats.
  */
-function insertShapeAndValidateResults(db, insertShapeFn, statsSoFar, transformIdentifiers = false) {
-    const coll = db[collName];
+function runQueryStatsTest({desc, pipeline, expectedShape, runFn, transformIdentifiers = false}) {
+    jsTest.log.info("Testing $queryStats for " + desc);
 
-    const expectedShape = insertShapeFn(coll);
-    const stats = fetchQueryStats(db, transformIdentifiers);
+    let expected;
+    if (runFn) {
+        // Callback mode: runFn executes aggregation(s) and returns expected shape.
+        expected = runFn(coll);
+    } else {
+        // Direct mode: run the provided pipeline.
+        coll.aggregate(pipeline).toArray();
+        expected = expectedShape;
+    }
 
+    const stats = fetchQueryStats(testDb, transformIdentifiers);
+
+    // Verify that exactly one new shape was added. This catches cases where multiple queries
+    // that should map to the same shape accidentally create distinct shapes.
     assert.eq(statsSoFar + 1, stats.length, stats);
     statsSoFar = stats.length;
 
-    const actualShape = stats[0].key.queryShape.pipeline;
-    assert.docEq(expectedShape, actualShape, stats);
+    const latestShape = stats[0].key.queryShape.pipeline;
+    assert.docEq(expected, latestShape, stats);
 
     // We purposefully sleep for a very short amount of time here. It is possible for the
     // tests to run so fast that two of the queries have the same `lastSeenTimestamp`, which
     // messes up the query stats sorting since the minimum resolution is 1ms.
     sleep(100);
-
-    return stats.length;
 }
 
 // Enable query stats collection.
 testDb.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1});
 
-let statsSoFar = fetchQueryStats(testDb).length;
+// =============================================================================
+// Basic extension stage shape tests
+// =============================================================================
+runQueryStatsTest({
+    desc: "empty shape",
+    pipeline: [{$shapify: {}}],
+    expectedShape: [{$shapify: {}}],
+});
 
-statsSoFar = insertShapeAndValidateResults(testDb, insertEmptyShape, statsSoFar);
-statsSoFar = insertShapeAndValidateResults(testDb, insertLiteralShape, statsSoFar);
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithSubobj, statsSoFar);
+// Test that a desugar stage's query shape is calculated from the pre-desugared stage.
+runQueryStatsTest({
+    desc: "desugar stage shape",
+    pipeline: [{$shapifyDesugar: {a: 1, b: 2}}],
+    expectedShape: [{$shapifyDesugar: {a: 1, b: 2}}],
+});
 
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithIdentifiers1, statsSoFar);
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithIdentifiers2, statsSoFar);
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithIdentifiers3, statsSoFar);
+// Test that different literal values all map to the same shape.
+runQueryStatsTest({
+    desc: "literal shape with multiple variations",
+    runFn: insertLiteralShape,
+});
 
-// Transformed identifiers/field paths tests.
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers4, statsSoFar, true);
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers5, statsSoFar, true);
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeWithTransformedIdentifiers6, statsSoFar, true);
+runQueryStatsTest({
+    desc: "shape with nested objects",
+    runFn: insertShapeWithSubobj,
+});
 
-// Test that a desugar stage's query shape is calculated from the pre-desugared stage, not the post-desugared stages.
-statsSoFar = insertShapeAndValidateResults(testDb, insertShapeForDesugarStage, statsSoFar);
+// =============================================================================
+// Identifier shape tests (without transformation)
+// =============================================================================
+runQueryStatsTest({
+    desc: "shape with identifiers (Alice)",
+    runFn: insertShapeWithIdentifiers1,
+});
+
+runQueryStatsTest({
+    desc: "shape with identifiers (Bob)",
+    runFn: insertShapeWithIdentifiers2,
+});
+
+runQueryStatsTest({
+    desc: "shape with identifiers (nested field path)",
+    runFn: insertShapeWithIdentifiers3,
+});
+
+// =============================================================================
+// Identifier shape tests (with HMAC transformation)
+// =============================================================================
+runQueryStatsTest({
+    desc: "transformed identifiers (Caroline)",
+    runFn: insertShapeWithTransformedIdentifiers4,
+    transformIdentifiers: true,
+});
+
+runQueryStatsTest({
+    desc: "transformed identifiers (d.e.f field path)",
+    runFn: insertShapeWithTransformedIdentifiers5,
+    transformIdentifiers: true,
+});
+
+runQueryStatsTest({
+    desc: "transformed identifiers (g.h.1 field path)",
+    runFn: insertShapeWithTransformedIdentifiers6,
+    transformIdentifiers: true,
+});
+
+// =============================================================================
+// $unionWith with extension stages
+// =============================================================================
+runQueryStatsTest({
+    desc: "extension stage in $unionWith subpipeline",
+    pipeline: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapify: {a: 1}}]}}],
+    expectedShape: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapify: {a: "?number"}}]}}],
+});
+
+// Test desugar extension stage in $unionWith subpipeline.
+// The query shape should preserve the pre-desugared $shapifyDesugar stage.
+// $shapifyDesugar does not anonymize its arguments.
+runQueryStatsTest({
+    desc: "desugar extension stage in $unionWith subpipeline",
+    pipeline: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapifyDesugar: {a: 1, b: 2}}]}}],
+    expectedShape: [{$unionWith: {coll: foreignCollName, pipeline: [{$shapifyDesugar: {a: 1, b: 2}}]}}],
+});
+
+// Test extension stage with regular stages in $unionWith subpipeline.
+runQueryStatsTest({
+    desc: "mixed pipeline with extension stage in $unionWith",
+    pipeline: [
+        {$match: {x: 1}},
+        {$unionWith: {coll: foreignCollName, pipeline: [{$shapify: {val: 100}}, {$limit: 5}]}},
+    ],
+    expectedShape: [
+        {$match: {x: {$eq: "?number"}}},
+        {$unionWith: {coll: foreignCollName, pipeline: [{$shapify: {val: "?number"}}, {$limit: "?number"}]}},
+    ],
+});
+
+// Test nested $unionWith with extension stages.
+runQueryStatsTest({
+    desc: "nested $unionWith with extension stages",
+    pipeline: [
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [
+                    {$shapify: {outer: true}},
+                    {$unionWith: {coll: collName, pipeline: [{$shapify: {inner: false}}]}},
+                ],
+            },
+        },
+    ],
+    expectedShape: [
+        {
+            $unionWith: {
+                coll: foreignCollName,
+                pipeline: [
+                    {$shapify: {outer: "?bool"}},
+                    {$unionWith: {coll: collName, pipeline: [{$shapify: {inner: "?bool"}}]}},
+                ],
+            },
+        },
+    ],
+});

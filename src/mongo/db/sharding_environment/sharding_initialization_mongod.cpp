@@ -650,7 +650,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        auto result = update(opCtx, collection, updateReq);
+        auto result = doUpdate(opCtx, collection, updateReq);
         if (result.numMatched == 0) {
             LOGV2_WARNING(22076,
                           "Failed to update config server connection string of shard identity "

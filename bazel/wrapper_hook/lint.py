@@ -47,6 +47,7 @@ SUPPORTED_EXTENSIONS = (
     ".idl",
     ".yml",
     ".yaml",
+    ".md",
 )
 
 
@@ -447,6 +448,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
         lr.run_bazel("//buildscripts:poetry_lock_check")
 
     if lint_all or any(file.endswith(".yml") for file in files_to_lint):
+        print("Linting evergreen yaml...")
         lr.run_bazel(
             "buildscripts:validate_evg_project_config",
             [
@@ -454,6 +456,10 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
             ],
         )
         lr.run_bazel("//buildscripts:yamllinters")
+        print("No errors found in evergreen yaml")
+
+    if lint_all or any(file.endswith(".md") for file in files_to_lint):
+        lr.run_bazel("//buildscripts:markdown_link_linter", ["--root=src/mongo", "--verbose"])
 
     if lint_all or parsed_args.large_files:
         lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])

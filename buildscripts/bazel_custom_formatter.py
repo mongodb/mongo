@@ -184,7 +184,7 @@ def validate_bazel_groups(generate_report, fix):
             [
                 bazel_bin,
                 "query",
-                'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))',
+                r'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))',
             ]
             + query_opts,
             capture_output=True,
@@ -212,7 +212,7 @@ def validate_bazel_groups(generate_report, fix):
                 [
                     bazel_bin,
                     "query",
-                    f'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest_{group}_group[,\]]", //src/...))',
+                    rf'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest_{group}_group[,\]]", //src/...))',
                 ]
                 + query_opts,
                 capture_output=True,

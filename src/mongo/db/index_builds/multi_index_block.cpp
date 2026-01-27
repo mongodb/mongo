@@ -443,11 +443,17 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
-            index.bulk = index.real->initiateBulk(indexCatalogEntry,
-                                                  eachIndexBuildMaxMemoryUsageBytes,
-                                                  stateInfo,
-                                                  collection->ns().dbName(),
-                                                  _method);
+            // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
+            // at the same call site.
+            if (_method != IndexBuildMethodEnum::kPrimaryDriven) {
+                index.bulk = index.real->initiateBulk(opCtx,
+                                                      collection.get(),
+                                                      indexCatalogEntry,
+                                                      eachIndexBuildMaxMemoryUsageBytes,
+                                                      stateInfo,
+                                                      collection->ns().dbName(),
+                                                      _method);
+            }
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -639,6 +645,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         for (auto& index : _indexes) {
             auto indexCatalogEntry = index.block->getEntry(opCtx, collection->getCollectionPtr());
             index.bulk = index.real->initiateBulk(
+                opCtx,
+                collection->getCollectionPtr(),
                 indexCatalogEntry,
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
@@ -657,6 +665,22 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         timer.reset();
 
         try {
+            // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
+            // at the same call site.
+            if (_method == IndexBuildMethodEnum::kPrimaryDriven) {
+                for (auto& index : _indexes) {
+                    auto indexCatalogEntry =
+                        index.block->getEntry(opCtx, collection->getCollectionPtr());
+                    index.bulk = index.real->initiateBulk(
+                        opCtx,
+                        collection->getCollectionPtr(),
+                        indexCatalogEntry,
+                        getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
+                        /*stateInfo=*/boost::none,
+                        collection->nss().dbName(),
+                        _method);
+                }
+            }
             // Resumable index builds can only be resumed prior to the oplog recovery phase of
             // startup. When restarting the collection scan, any saved index build progress is lost.
             _doCollectionScan(opCtx,

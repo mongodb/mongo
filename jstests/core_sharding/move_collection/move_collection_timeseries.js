@@ -6,6 +6,8 @@
  *   # we need 2 shards to perform moveCollection
  *   requires_2_or_more_shards,
  *   assumes_no_implicit_collection_creation_on_get_collection,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

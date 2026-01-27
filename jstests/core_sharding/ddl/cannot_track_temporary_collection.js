@@ -10,6 +10,8 @@
  *   assumes_unsharded_collection,
  *   # Temporary collections are dropped on stepdowns.
  *   does_not_support_stepdowns,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -43,25 +44,29 @@ namespace mongo {
 using boost::intrusive_ptr;
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalSearchIdLookup,
-                                     DocumentSourceInternalSearchIdLookUp::LiteParsed::parse,
+                                     LiteParsedInternalSearchIdLookUp::parse,
                                      AllowedWithApiStrict::kInternal);
+DocumentSourceContainer _internalSearchIdLookupStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto* typedParams = dynamic_cast<InternalSearchIdLookupStageParams*>(stageParams.get());
+    std::unique_ptr<Pipeline> viewPipeline;
+    if (typedParams->viewPipeline) {
+        viewPipeline = Pipeline::parseFromLiteParsed(typedParams->viewPipeline.get(), expCtx);
+    }
+    return {make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+        expCtx, typedParams->limit, std::move(viewPipeline))};
+}
 
-REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalSearchIdLookup,
-                                                   DocumentSourceInternalSearchIdLookUp,
-                                                   InternalSearchIdLookupStageParams);
+ALLOCATE_AND_REGISTER_STAGE_PARAMS(_internalSearchIdLookup, InternalSearchIdLookupStageParams)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearchIdLookUp::id);
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,
     long long limit,
-    boost::optional<SearchQueryViewSpec> view)
-    : DocumentSource(kStageName, expCtx),
-      _limit(limit),
-      _viewPipeline(view ? pipeline_factory::makePipeline(view->getEffectivePipeline(),
-                                                          getExpCtx(),
-                                                          pipeline_factory::kOptionsMinimal)
-                         : nullptr) {
+    std::unique_ptr<Pipeline> viewPipeline)
+    : DocumentSource(kStageName, expCtx), _limit(limit), _viewPipeline(std::move(viewPipeline)) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is

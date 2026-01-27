@@ -3,10 +3,6 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): Remove tag.
- *   # Incompatible with the recordIdsReplicated:true builder, as it sets the option
- *   # on all collections.
- *   exclude_when_record_ids_replicated
  * ]
  */
 
@@ -49,8 +45,6 @@ const rst = new ReplSetTest({
         setParameter: {
             // On restart we will have no history to consult to figure out the highest leaf node.
             minSnapshotHistoryWindowInSeconds: 0,
-            "failpoint.overrideRecordIdsReplicatedDefault": "{mode: 'alwaysOn'}",
-            "failpoint.automaticallyCollmodToRecordIdsReplicatedFalse": "{mode: 'alwaysOn'}",
         },
     },
 });

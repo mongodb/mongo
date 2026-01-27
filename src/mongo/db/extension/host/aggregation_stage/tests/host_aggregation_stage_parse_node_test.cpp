@@ -137,14 +137,6 @@ DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, 
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST(HostParseNodeTestDeathTest, HostGetQueryShapeUnimplemented, "10977800") {
-    auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = AggStageParseNodeHandle{noOpParseNode};
-
-    ::MongoExtensionByteBuf* shape = {};
-    handle->vtable().get_query_shape(noOpParseNode, nullptr, &shape);
-}
-
 DEATH_TEST(HostParseNodeTestDeathTest, HostGetExpandedSizeUnimplemented, "11113803") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};

@@ -33,6 +33,7 @@
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/util/modules.h"
@@ -190,11 +191,11 @@ public:
     }
 
     HostAndPort getHostAndPortPriority() const {
-        if (getPriorityPort()) {
+        if (getPriorityPort() &&
+            !MONGO_unlikely(repl::disableReplicationUsageOfPriorityPort.load())) {
             return HostAndPort(getHostAndPort().host(), *getPriorityPort());
-        } else {
-            return getHostAndPort();
         }
+        return getHostAndPort();
     }
 
     boost::optional<int> getPriorityPort() const {

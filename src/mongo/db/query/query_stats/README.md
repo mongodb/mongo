@@ -234,7 +234,10 @@ following way:
   not use the plan cache, respectively. A query is considered to have not used the plan cache if
   any internal query generated as part of its execution did not use the plan cache.
 - `metrics.planningTimeMicros`: The wall-clock time in microseconds from the moment a planning
-  request is received to the moment the winning plan is finalized. This metric is expected to be positive regardless of whether the plan came from (e.g. multi-planner, cost-based ranker, plan cache).
+  request is received to the moment the winning plan is finalized. This metric is expected to be positive
+  regardless of whether the plan came from (e.g. multi-planner, cost-based ranker, plan cache).
+- `metrics.cardinalityEstimationMethods`: Aggregate counts of the number of times a source of query plan cost
+  estimate was used (e.g. sampling, heuristics). The count will be 0 if the source was not used.
 - `metrics.costBasedRanker.nDocsSampled`: The number of documents sampled when using cost-based ranker (CBR)
   with sampling method. This metric is expected to be 0 if CBR was not used to generate the plan or another CE
   method was used, like histogram.
@@ -263,6 +266,7 @@ following way:
 - `metrics.writes.nModified`: The number of existing documents updated.
 - `metrics.writes.nDeleted`: The number of documents deleted.
 - `metrics.writes.nInserted`: The number of documents inserted (excluding upserts).
+- `metrics.writes.nUpdateOps`: The number of updates in the original update request.
 
 #### Permissions
 

@@ -65,7 +65,7 @@ public:
         : TestLogicalStage(stageName, arguments) {}
 
     std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
-        return make();
+        return std::make_unique<TransformLogicalAggStage>(_name, _arguments);
     }
 
     static std::unique_ptr<sdk::LogicalAggStage> make() {

@@ -2,6 +2,7 @@
  * Ensures that the join optimizer populates estimate information (e.g., CE) in the explain output.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 
@@ -53,9 +54,15 @@ function runTest(pipeline) {
         if (stage.stage.includes("JOIN_EMBEDDING") || stage.stage.includes("COLLSCAN")) {
             assert(
                 stage.hasOwnProperty("cardinalityEstimate"),
-                "Estimates not found in stage: " + tojson(stage) + ", " + tojson(explain),
+                "Cardinality estimate not found in stage: " + tojson(stage) + ", " + tojson(explain),
             );
             assert.gt(stage.cardinalityEstimate, 0, "Cardinality estimate is not greater than 0");
+            assert(
+                stage.hasOwnProperty("costEstimate"),
+                "Cost estimate not found in stage: " + tojson(stage) + ", " + tojson(explain),
+            );
+            // TODO SERVER-117480: Change this assert to be strictly greater than zero.
+            assert.gte(stage.costEstimate, 0, "Cost estimate is not greater than 0");
         }
     }
 }

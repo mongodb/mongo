@@ -297,7 +297,7 @@ const unpackTests = [
 // 3. Stages that can only run in stream processors.
 // 4. Stages that cannot be made by user requests and run on oplog data.
 const skippedStages = [
-    // All change stream stages are temporarily here. TODO SERVER-113494 enable tests here.
+    // $changeStream over timeseries collections is tested separately in dedicated change stream tests.
     "$changeStream",
     "$changeStreamSplitLargeEvent",
     "$_internalChangeStreamAddPostImage",

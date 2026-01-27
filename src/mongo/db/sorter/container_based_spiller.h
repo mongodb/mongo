@@ -36,6 +36,7 @@
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -302,8 +303,8 @@ public:
     };
 
     boost::optional<boost::filesystem::path> getSpillDirPath() override {
-        return boost::filesystem::path(
-            std::string{ident::getDirectory(_container.ident()->getIdent())});
+        // TODO SERVER-117548 Call ident::getDirectory when function returns full path.
+        return boost::filesystem::path(storageGlobalParams.dbpath + "/_tmp");
     };
 
     /**
@@ -403,7 +404,7 @@ private:
         const SortOptions& opts,
         const SorterSpillerBase<Key, Value>::Settings& settings,
         std::span<std::pair<Key, Value>> data,
-        uint32_t idx) {
+        uint32_t idx) override {
         auto writer = this->_storage->makeWriter(opts, settings);
         for (auto&& [key, value] : data.subspan(idx)) {
             writer->addAlreadySorted(key, value);

@@ -156,6 +156,9 @@ const allCommands = {
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrConvertToCappedParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
+    _shardsvrUpgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
+    _shardsvrTimeseriesUpgradeDowngradePrepare: {skip: isAnInternalCommand},
+    _shardsvrTimeseriesUpgradeDowngradeCommit: {skip: isAnInternalCommand},
     _shardsvrUntrackUnsplittableCollection: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
@@ -1633,6 +1636,7 @@ const allCommands = {
     testVersions1And2: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},
     timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
+    upgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
     top: {
         command: {top: 1},
         isAdminCommand: true,

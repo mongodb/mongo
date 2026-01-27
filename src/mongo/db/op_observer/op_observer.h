@@ -86,13 +86,17 @@ struct OpTimeBundle {
 struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     OpStateAccumulator() = default;
 
-    // Use either 'opTime' for non-insert operations or 'insertOpTimes', but not both.
+    // Use either 'opTime' for single operations or 'batchOpTimes' for operations wrapped in
+    // applyOps.
     OpTimeBundle opTime;
-    std::vector<repl::OpTime> insertOpTimes;
+    std::vector<repl::OpTime> batchOpTimes;
 
     // Temporary pre/post image information for a retryable findAndModify operation to be written
     // to the image collection (config.image_collection).
     boost::optional<repl::ReplOperation::ImageBundle> retryableFindAndModifyImageToWrite;
+
+    // ApplyOpsEntries used for changestreams with batched writes.
+    std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
 
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
@@ -627,21 +631,26 @@ public:
 
     /**
      * This method is called when a transaction transitions into prepare while it is not primary,
-     * e.g. during secondary oplog application or recoverying prepared transactions from the
-     * oplog after restart. The method explicitly requires a session id (i.e. does not use the
-     * session id attached to the opCtx) because transaction oplog application currently applies the
-     * oplog entries for each prepared transaction in multiple internal sessions acquired from the
+     * e.g. during secondary oplog application, recovering prepared transactions from the
+     * oplog after restart or recovering prepared transactions from a precise checkpoint after
+     * restart. The method explicitly requires a session id (i.e. does not use the session id
+     * attached to the opCtx) because transaction oplog application currently applies the oplog
+     * entries for each prepared transaction in multiple internal sessions acquired from the
      * InternalSessionPool. Currently, those internal sessions are completely unrelated to the
      * session for the transaction itself. For a non-retryable internal transaction, not using the
      * transaction session id in the codepath here can cause the opTime for the transaction to
      * show up in the chunk migration opTime buffer although the writes they correspond to are not
      * retryable and therefore are discarded anyway.
      *
+     * WARNING: This should only be used by chunk migration. Statements and prepareOpTime are not
+     * available when a prepared transaction is recovered from a precise checkpoint, and chunk
+     * migration has special handling for this case.
      */
-    virtual void onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                                const LogicalSessionId& lsid,
-                                                const std::vector<repl::OplogEntry>& statements,
-                                                const repl::OpTime& prepareOpTime) = 0;
+    virtual void onTransactionPrepareNonPrimaryForChunkMigration(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        boost::optional<const std::vector<repl::OplogEntry>&> statements,
+        boost::optional<const repl::OpTime&> prepareOpTime) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
@@ -752,12 +761,10 @@ public:
      * Logs an single oplog entry, so that all changes done for the upgrade/downgrade (create/drop
      * view, rename system.buckets, metadata fixup) are replicated and applied atomically.
      *
-     * The resulting format is the one consistent with the FCV; i.e. it is an upgrade if the
-     * viewless timeseries feature flag is enabled, and a downgrade if it is disabled.
-     *
      * `nss` is the main namespace (i.e. without the 'system.buckets' prefix).
      * `uuid` is the UUID associated of the time series collection.
      * For viewful time series collections, that is the UUID of the system.buckets collection.
+     * `isUpgrade` is true when upgrading to viewless, false when downgrading to viewful.
      * `skipViewCreation` when true, indicates that the view should not be created during
      * downgrade. This is used for non-primary shards in a sharded cluster, where only the
      * primary shard of the database should have the view.
@@ -767,6 +774,7 @@ public:
     virtual void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const UUID& uuid,
+                                                      bool isUpgrade,
                                                       bool skipViewCreation = false) = 0;
 
     struct Times;

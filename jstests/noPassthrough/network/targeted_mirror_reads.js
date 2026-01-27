@@ -11,6 +11,7 @@
 
 import {MirrorReadsHelpers} from "jstests/libs/mirror_reads_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kDbName = "targeted_mirror_reads_test";
 const kCollName = "coll";
@@ -245,6 +246,54 @@ rsConfig.members.forEach(function (member) {
         maxRate: samplingRate,
         burstCount: MirrorReadsHelpers.kBurstCount,
     });
+}
+
+{
+    jsTestLog(`Verify that the targeted sampling rate behaves independently from the general rate`);
+    // MirrorMaestro caches a list of hosts for targeted reads but skips caching if the targeted
+    // sampling rate is 0. To test host list caching without sending targeted reads, we use a
+    // sampling rate > 0 and rely on this failpoint to ensure no targeted reads are sent.
+    const fp = configureFailPoint(primary.getDB("admin"), "disableTargetedMirroring");
+
+    let options = {
+        "samplingRate": 1,
+        "targetedMirroring": {
+            "samplingRate": 0.5, // The value here doesn't matter as long as it's not zero.
+            "tag": {"tag": "one"},
+        },
+    };
+    assert.commandWorked(MirrorReadsHelpers.setParameter({nodeToReadFrom: primary, value: options}));
+
+    // Insert data to be read
+    const db = primary.getDB(kDbName);
+    let ret = db.runCommand({insert: kCollName, documents: [{x: 1}]});
+    assert.commandWorked(ret);
+
+    let before = MirrorReadsHelpers.getMirroredReadsStats(primary, kDbName);
+    let initialStatsOnSecondaries = {};
+    for (const secondary of rst.getSecondaries()) {
+        initialStatsOnSecondaries[secondary.nodeId] = MirrorReadsHelpers.getMirroredReadsStats(secondary, kDbName);
+    }
+    db.runCommand({find: kCollName, filter: {}});
+
+    assert.soon(
+        () =>
+            MirrorReadsHelpers.getProcessedAsSecondaryTotal(
+                rst,
+                MirrorReadsHelpers.kGeneralMode,
+                kDbName,
+                initialStatsOnSecondaries,
+                [],
+            ) == 3,
+        `Expected 3 general mirrored reads to be processed.`,
+    );
+    assert.eq(
+        before.targetedSent,
+        MirrorReadsHelpers.getMirroredReadsStats(primary, kDbName).targetedSent,
+        `Expected 0 targeted mirrored reads to be sent.`,
+    );
+
+    fp.off();
 }
 
 // Reset param to avoid mirroring before next test case

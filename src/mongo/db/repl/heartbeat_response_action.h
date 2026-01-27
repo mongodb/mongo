@@ -51,7 +51,8 @@ public:
         StepDownSelf,
         PriorityTakeover,
         CatchupTakeover,
-        RetryReconfig
+        RetryReconfig,
+        RestartHeartbeats
     };
 
     /**
@@ -88,6 +89,13 @@ public:
      * It is an error to call this with primaryIndex != the index of the current node.
      */
     static HeartbeatResponseAction makeStepDownSelfAction(int primaryIndex);
+
+    /**
+     * Makes a new action telling the current node to cancel and restart all heartbeats. This should
+     * be very rare and only used if the `disableReplicationUsageOfPriorityPort` parameter is
+     * modified.
+     */
+    static HeartbeatResponseAction makeRestartHeartbeatsAction();
 
     /**
      * Construct an action with unspecified action and a next heartbeat start date in the

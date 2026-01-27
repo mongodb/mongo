@@ -275,10 +275,11 @@ public:
                                 const std::vector<OplogSlot>& reservedSlots,
                                 const TransactionOperations& transactionOperations) final {}
 
-    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                        const LogicalSessionId& lsid,
-                                        const std::vector<repl::OplogEntry>& statements,
-                                        const repl::OpTime& prepareOpTime) final;
+    void onTransactionPrepareNonPrimaryForChunkMigration(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        boost::optional<const std::vector<repl::OplogEntry>&> statements,
+        boost::optional<const repl::OpTime&> prepareOpTime) final {};
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
@@ -301,6 +302,7 @@ public:
     void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const UUID& uuid,
+                                              bool isUpgrade,
                                               bool skipViewCreation = false) final;
 
 private:

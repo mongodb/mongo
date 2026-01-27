@@ -31,6 +31,8 @@ variables:
       - enterprise-rhel-90-arm64
       - enterprise-rhel-93-64-bit
       - enterprise-rhel-93-arm64
+      - enterprise-rhel-10-64-bit
+      - enterprise-rhel-10-arm64
       - enterprise-suse15-64
       - enterprise-ubuntu2004-arm64
       - enterprise-ubuntu2204-arm64
@@ -164,9 +166,6 @@ tasks:
       - func: "fetch packages"
       - func: "fetch msi files"
       - func: "fetch dist tarball"
-      - func: "fetch binaries"
-        vars:
-          local_file: src/mongo-dist-test.tgz
       # Fetch mongocryptd
       - command: s3.get
         params:
@@ -192,18 +191,6 @@ tasks:
           args:
             - "./src/evergreen/garasign_gpg_sign.sh"
 
-      # Put the dist-test binaries tarball/zipfile
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          local_file: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-          aws_key: ${aws_key}
-          bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|private}
-          visibility: ${mciuploads_binary_visibility_push|signed}
-          content_type: ${content_type|application/gzip}
-          remote_file: ${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-          skip_existing: ${is_release}
       # Put the binaries tarball/zipfile
       - command: s3.put
         params:
@@ -245,18 +232,6 @@ tasks:
           skip_existing: ${is_release}
           optional: true
 
-      # Put the binaries tarball signature
-      - command: s3.put
-        params:
-          aws_secret: ${aws_secret}
-          local_file: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
-          aws_key: ${aws_key}
-          bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|private}
-          visibility: ${mciuploads_binary_visibility_push|signed}
-          content_type: ${content_type|application/gzip}
-          remote_file: ${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
-          skip_existing: ${is_release}
       # Put the binaries tarball signature
       - command: s3.put
         params:
@@ -653,16 +628,6 @@ tasks:
           skip_existing: ${is_release}
           content_type: text/plain
 
-      # Put the binaries tarball md5
-      - command: s3.put
-        params:
-          role_arn: ${push_role_arn}
-          local_file: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-          bucket: ${push_bucket_new}
-          permissions: private
-          content_type: text/plain
-          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-          skip_existing: ${is_release}
       # Put the binaries tarball md5
       - command: s3.put
         params:
@@ -717,8 +682,6 @@ tasks:
           env:
             SERVER_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
             SERVER_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-            DIST_TEST_TARBALL_PATH: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-            DIST_TEST_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
             CRYPTD_TARBALL_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
             CRYPTD_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
             SOURCE_TARBALL_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}
@@ -727,8 +690,6 @@ tasks:
             DEBUG_SYMBOLS_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
             SERVER_TARBALL_SIGNATURE_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
             SERVER_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
-            DIST_TEST_TARBALL_SIGNATURE_PATH: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
-            DIST_TEST_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
             CRYPTD_TARBALL_SIGNATURE_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
             CRYPTD_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
             SOURCE_TARBALL_SIGNATURE_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
@@ -739,8 +700,6 @@ tasks:
             MSI_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
             SERVER_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
             SERVER_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            DIST_TEST_TARBALL_SHA1_PATH: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            DIST_TEST_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
             CRYPTD_TARBALL_SHA1_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
             CRYPTD_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
             SOURCE_TARBALL_SHA1_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
@@ -751,8 +710,6 @@ tasks:
             MSI_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
             SERVER_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
             SERVER_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-            DIST_TEST_TARBALL_SHA256_PATH: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-            DIST_TEST_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
 
             CRYPTD_TARBALL_SHA256_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
             CRYPTD_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
@@ -764,8 +721,6 @@ tasks:
             MSI_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
             SERVER_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
             SERVER_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            DIST_TEST_TARBALL_MD5_PATH: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            DIST_TEST_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
             CRYPTD_TARBALL_MD5_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
             CRYPTD_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
             SOURCE_TARBALL_MD5_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5

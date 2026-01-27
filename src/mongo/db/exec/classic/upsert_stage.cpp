@@ -65,7 +65,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
 
 #include <string>

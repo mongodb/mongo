@@ -20,10 +20,19 @@ is_s390x_or_ppc64le() {
 
 ulimit -c unlimited
 
-eval ${@:1} &
+# If RUNFILES_DIR is set, prepend "_main/" to the path to find the binary in the runfiles tree.
+# With --nolegacy_external_runfiles, binaries are located under $RUNFILES_DIR/_main/...
+test_bin="$1"
+if [[ -n "${RUNFILES_DIR:-}" && ! -x "$test_bin" ]]; then
+    test_bin="${RUNFILES_DIR}/_main/${test_bin}"
+fi
+
+"${test_bin}" "${@:2}" &
 main_pid=$!
 echo "Process-under-test started with PID: ${main_pid}"
 
+# This is mocked out in buildscripts/bazel_testbuilds/verify_coredump_test.sh, make sure
+# to update the test if this is changed.
 timeout_seconds=600
 
 if is_s390x_or_ppc64le; then
@@ -47,8 +56,8 @@ RET=$?
 
 CORE_FILE=$(find -L ./ -name "*.core")
 if [ -f "$CORE_FILE" ]; then
-    CORE_FILENAME="dump_$(date +%s%N).core"
-    mv $CORE_FILE "$TEST_UNDECLARED_OUTPUTS_DIR/$CORE_FILENAME"
+    CORE_FILENAME="dump_$(date +%s%N).core.gz"
+    gzip -c $CORE_FILE >"$TEST_UNDECLARED_OUTPUTS_DIR/$CORE_FILENAME"
     echo "Writing coredump to $CORE_FILENAME..."
 fi
 

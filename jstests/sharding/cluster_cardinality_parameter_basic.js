@@ -9,6 +9,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
+const createShard = (name) => {
+    const shard = new ReplSetTest({name: name, nodes: 1});
+    shard.startSet({shardsvr: ""});
+    shard.initiate();
+    return shard;
+};
+
 const st = new ShardingTest({shards: 1});
 
 jsTest.log("Checking the cluster parameter while the cluster contains one shard");
@@ -17,9 +24,7 @@ checkClusterParameter(st.configRS, false);
 checkClusterParameter(st.rs0, false);
 
 const shard1Name = "shard1";
-const shard1Rst = new ReplSetTest({name: shard1Name, nodes: 1});
-shard1Rst.startSet({shardsvr: ""});
-shard1Rst.initiate();
+let shard1Rst = createShard(shard1Name);
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
 jsTest.log("Checking the cluster parameter while the cluster contains two shards");
@@ -35,6 +40,8 @@ jsTest.log("Checking the cluster parameter while the cluster contains one shard 
 checkClusterParameter(st.configRS, true);
 checkClusterParameter(st.rs0, true);
 
+shard1Rst.stopSet();
+shard1Rst = createShard(shard1Name);
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
 jsTest.log("Checking the cluster parameter while the cluster contains two shards again");
@@ -44,9 +51,7 @@ checkClusterParameter(st.rs0, true);
 checkClusterParameter(shard1Rst, true);
 
 const shard2Name = "shard2";
-const shard2Rst = new ReplSetTest({name: shard2Name, nodes: 1});
-shard2Rst.startSet({shardsvr: ""});
-shard2Rst.initiate();
+const shard2Rst = createShard(shard2Name);
 assert.commandWorked(st.s.adminCommand({addShard: shard2Rst.getURL(), name: shard2Name}));
 
 jsTest.log("Checking the cluster parameter while the cluster contains three shards");

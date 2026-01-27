@@ -46,6 +46,7 @@ function getAllMongosConnections(conn) {
         jsTest.log.debug(`Settings the mongos connections array...`);
         if (isMultiShardedClusterFixture) {
             const connections = conn.getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
+
             assert.eq(connections.length, 2);
             // Set the connections array to include both when using a multi-cluster fixture.
             topologyCache.mongosConnectionsArr = connections.map((doc) => connectFn(doc.connectionString));
@@ -54,6 +55,11 @@ function getAllMongosConnections(conn) {
         }
     }
     return topologyCache.mongosConnectionsArr;
+}
+
+function isPrimary(db) {
+    const res = db.runCommand({hello: 1});
+    return res.me && res.me == res.primary && res.isWritablePrimary;
 }
 
 /**
@@ -67,10 +73,17 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
         // conditions where indexes created on the primary haven't replicated to secondaries yet.
         FixtureHelpers.awaitReplication(conn.getDB("admin"));
 
+        const commandName = getCommandName(getInnerCommand(explainCmd));
+
         // We run explain on all connections in the topology and assert that the query shape hash is
         // the same on all nodes.
         explainResults = getTopologyConnections(conn)
             .map((conn) => conn.getDB(dbName))
+            .filter((db) => {
+                // For updates, filter out all secondary and mongos nodes
+                // Secondary nodes don't allow explains on write commands, and mongos nodes don't return the QueryShapeHash
+                return commandName !== "update" || isPrimary(db);
+            })
             .map((db) => {
                 jsTest.log.info("About to run the explain", {host: db.getMongo().host});
                 const explainResult = retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
@@ -80,10 +93,15 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
         // Fuzzer may generate invalid commands, which will fail on assert.commandWorked().
         // If explain command failed, ignore the exception.
         if (TestData.isRunningQueryShapeHashFuzzer) {
+            jsTest.log.info(`Explain failed, ignoring when running fuzzer: ${ex}`);
             return;
         }
 
-        const expectedErrorCodes = [ErrorCodes.CommandOnShardedViewNotSupportedOnMongod, ErrorCodes.NamespaceNotFound];
+        const expectedErrorCodes = [
+            ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.InvalidLength, // Can happen on bulk write commands with >1 write
+        ];
         if (expectedErrorCodes.includes(ex.code)) {
             return;
         }
@@ -113,7 +131,9 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
     }
 
     // Check that all the explain commands executed on all nodes returned the same 'queryShapeHash'.
+    // 'queryShapeHash' may not be returned, in which case it should be unset across all the nodes
     assert.gt(explainResults.length, 0, `Found explain results array to be empty`);
+
     const firstQueryShapeHash = explainResults[0].queryShapeHash;
     assert(
         explainResults.every((explainRes) => explainRes.queryShapeHash === firstQueryShapeHash),
@@ -128,7 +148,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // we are expecting an error when calling getMore() on that cursor.
     const hasBatchSizeZero = cmdObj.cursor && cmdObj.cursor.batchSize === 0;
     const res = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-    if (res.ok && !hasBatchSizeZero) {
+    if (!hasBatchSizeZero && res.ok && !(res.hasOwnProperty("writeErrors") && res.writeErrors.length > 0)) {
         // Only run the test if the original command works. Some tests assert on commands failing,
         // so we should simply bubble these commands through without any additional checks.
         OverrideHelpers.withPreOverrideRunCommand(() => {
@@ -145,7 +165,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 FixtureHelpers.awaitReplication(secondClusterMongos.getDB("admin"));
             }
             const innerCmd = getInnerCommand(cmdObj);
-            if (!QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd))) {
+            // update is supported by the query shape has stability tests but not PQS
+            const commandName = getCommandName(innerCmd);
+            if (!(QuerySettingsUtils.isSupportedCommand(commandName) || commandName === "update")) {
                 return;
             }
             // Wrap command into explain, if it's not explain yet.

@@ -534,6 +534,17 @@ public:
      */
     UniqueOperationContext makeOperationContext(Client* client);
 
+    /**
+     * Makes a new operation context representing an operation on "client", and mark this
+     * operation context killOps exempt.
+     * This should be used when creating a context for an internal operation that a killOp command
+     * should not be able to kill.
+     * Can throw ExceptionFor<ErrorCodes::OpCtxKilledOnMarkKillOpsExempt> if we weren't able to
+     * create an operation context without it being killed before marking it as killOps exempt (this
+     * should never happen).
+     */
+    UniqueOperationContext makeKillOpsExemptOperationContext(Client* client);
+
     //
     // Storage
     //
@@ -544,21 +555,6 @@ public:
      * clearStorageEngine().
      */
     void setStorageEngine(std::unique_ptr<StorageEngine> engine);
-
-    /**
-     * Takes a function and applies it to all service objects associated with the service context.
-     * The function must accept a service as an argument.
-     */
-    template <typename F>
-    void applyToAllServices(F fn) {
-        if (auto service = getService(ClusterRole::RouterServer); service) {
-            fn(service);
-        }
-
-        if (auto service = getService(ClusterRole::ShardServer); service) {
-            fn(service);
-        }
-    }
 
     /**
      * Return the storage engine instance we're using.
@@ -760,9 +756,6 @@ public:
     }
 
     ClientLock getLockedClient(OperationId id);
-
-    /** The `role` must be ShardServer or RouterServer exactly. */
-    Service* getService(ClusterRole role) const;
 
     /**
      * Returns the shard service if it exists.

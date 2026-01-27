@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
@@ -50,8 +51,15 @@ void QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::append(
 
 Status QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::setFromString(
     StringData value, const boost::optional<TenantId>&) {
-    _data = QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode_parse(
+    auto mode = QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode_parse(
         value, IDLParserContext("automaticCEPlanRankingStrategy"));
+    if (mode ==
+            QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
+                kHistogramCEWithHeuristicFallback &&
+        !getTestCommandsEnabled()) {
+        return Status(ErrorCodes::BadValue, "histogramCE not allowed");
+    }
+    _data = mode;
     return Status::OK();
 }
 

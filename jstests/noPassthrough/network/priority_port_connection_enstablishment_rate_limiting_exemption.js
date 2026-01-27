@@ -7,7 +7,7 @@
  *      grpc_incompatible,
  *      requires_replication,
  *      requires_sharding,
- *      featureFlagDedicatedPortForPriorityOperations,
+ *      requires_fcv_83,
  * ]
  */
 

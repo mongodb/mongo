@@ -161,8 +161,10 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     std::vector<LiteParsedPipeline> liteParsedPipelines;
 
+    auto subpipelineParseOptions = options;
+    subpipelineParseOptions.makeSubpipelineOwned = true;
     for (auto&& rawPipeline : extractRawPipelines(spec)) {
-        liteParsedPipelines.emplace_back(nss, rawPipeline.second);
+        liteParsedPipelines.emplace_back(nss, rawPipeline.second, false, subpipelineParseOptions);
     }
 
     return std::make_unique<DocumentSourceFacet::LiteParsed>(spec, std::move(liteParsedPipelines));

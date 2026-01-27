@@ -54,6 +54,8 @@ struct SolutionWithPlanStage {
 
 struct PlanExplainerData {
     std::vector<SolutionWithPlanStage> rejectedPlansWithStages;
+    std::unique_ptr<mongo::PlanStageStats> multiPlannerWinningPlanTrialStats;
+    boost::optional<double> multiPlannerWinningPlanScore;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
 };

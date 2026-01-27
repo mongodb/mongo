@@ -11,3 +11,13 @@ for core_file in $core_files; do
         ln -sf $core_file $base_name
     fi
 done
+
+# Find all gzipped core files and decompress them to src
+gzipped_core_files=$(/usr/bin/find -H .. bazel-testlogs -name "*.core.gz" 2>/dev/null)
+for gzipped_core_file in $gzipped_core_files; do
+    base_name=$(echo $gzipped_core_file | sed "s/.*\///" | sed "s/\.gz$//")
+    # Decompress file if it does not already exist
+    if [ ! -f $base_name ]; then
+        gunzip -c $gzipped_core_file >$base_name
+    fi
+done

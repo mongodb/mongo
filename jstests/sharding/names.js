@@ -38,20 +38,6 @@ assert.eq(
 );
 assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB 2");
 
-// Re-add shard; the command may need to be retried as the request may be not be immediately
-// fulfillable after the completion of a removeShard (the RSM associated to the removed shard may
-// still raise some spurious failure as it gets dropped).
-assert.soon(() => {
-    let res = mongos.adminCommand({addShard: rsB.getURL(), name: rsA.name});
-    return res.ok;
-});
-
-printjson(config.shards.find().toArray());
-
-assert.eq(TestData.configShard ? 3 : 2, config.shards.count(), "Error re-adding a shard");
-assert.eq(rsB.getURL(), config.shards.findOne({_id: rsA.name})["host"], "Wrong host for shard rsA 3");
-assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB 3");
-
 rsA.stopSet();
 rsB.stopSet();
 st.stop();

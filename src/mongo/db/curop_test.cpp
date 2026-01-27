@@ -95,6 +95,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.ndeleted = 2;
     currentAdditiveMetrics.nUpserted = 7;
     additiveMetricsToAdd.nUpserted = 8;
+    currentAdditiveMetrics.nUpdateOps = 5;
+    additiveMetricsToAdd.nUpdateOps = 6;
     currentAdditiveMetrics.keysInserted = 6;
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
@@ -152,6 +154,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.ndeleted + *additiveMetricsToAdd.ndeleted);
     ASSERT_EQ(*currentAdditiveMetrics.nUpserted,
               *additiveMetricsBeforeAdd.nUpserted + *additiveMetricsToAdd.nUpserted);
+    // For nUpdateOps, we keep the existing value as the value to return.
+    ASSERT_EQ(*currentAdditiveMetrics.nUpdateOps, additiveMetricsBeforeAdd.nUpdateOps);
     ASSERT_EQ(*currentAdditiveMetrics.keysInserted,
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
@@ -221,6 +225,7 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetricsToAdd.planningTime = Microseconds(100);
     additiveMetricsToAdd.nDocsSampled = 10;
+    additiveMetricsToAdd.nUpdateOps = 5;
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -250,6 +255,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // The 'nUpserted' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so nUpserted should still be uninitialized after the add.
     ASSERT_EQ(currentAdditiveMetrics.nUpserted, boost::none);
+
+    // The 'nUpdateOps' field for the current AdditiveMetrics object was not initialized, so it
+    // should return the AdditiveMEtrics object to add value.
+    ASSERT_EQ(currentAdditiveMetrics.nUpdateOps, *additiveMetricsToAdd.nUpdateOps);
 
     // The 'executionTime' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so executionTime should still be uninitialized after the
@@ -361,6 +370,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 1 /* nModified */,
                                 0 /* nDeleted */,
                                 0 /* nInserted */);
+    CardinalityEstimationMethods ceMethods1;
+    ceMethods1.setHistogram(1);
+    ceMethods1.setSampling(1);
+    cursorMetrics.setCardinalityEstimationMethods(ceMethods1);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
@@ -395,6 +408,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
 }
 
@@ -483,6 +502,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.planningTime = Microseconds(100);
+    additiveMetrics.cardinalityEstimationMethods.setHeuristics(2);
     additiveMetrics.nDocsSampled = 10;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
@@ -502,6 +522,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.numInterruptChecks = 1;
     remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
     remoteMetrics.planningTime = Microseconds(150);
+    remoteMetrics.cardinalityEstimationMethods.setHeuristics(1);
+    remoteMetrics.cardinalityEstimationMethods.setHistogram(1);
+    remoteMetrics.cardinalityEstimationMethods.setSampling(1);
     remoteMetrics.nDocsSampled = 15;
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
@@ -522,6 +545,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 3);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
 }
 
@@ -585,8 +614,14 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateStorageStats) {
 
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     // 'basicFields' should always be present in the logs and profiler, for any operation.
-    std::vector<std::string> basicFields{
-        "op", "ns", "command", "numYield", "locks", "millis", "flowControl"};
+    std::vector<std::string> basicFields{"op",
+                                         "ns",
+                                         "isFromPriorityPortConnection",
+                                         "command",
+                                         "numYield",
+                                         "locks",
+                                         "millis",
+                                         "flowControl"};
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

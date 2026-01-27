@@ -39,8 +39,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -60,8 +58,6 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -771,7 +767,7 @@ buildvariants:
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine, internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
         --mongosSetParameters="{maxRoundsWithoutProgressParameter: 20}"
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
-        --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan
+        --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan,requires_sbe
     tasks:
       - name: .aggregation !.sbe_only
       - name: .auth
@@ -789,7 +785,7 @@ buildvariants:
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-      - name: .jscore .common !.sbe_only
+      - name: .jscore .common !.sbe_only !.feature_flag_guarded
       - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
@@ -797,7 +793,7 @@ buildvariants:
       - name: .query_fuzzer
       - name: .read_write_concern
       - name: replica_sets_large_txns_format_jscore_passthrough
-      - name: .replica_sets !.multi_oplog !.uninitialized_fcv
+      - name: .replica_sets !.multi_oplog !.uninitialized_fcv !.feature_flag_guarded
       - name: .replica_sets .encrypt
       - name: .resharding_fuzzer
       - name: .retry

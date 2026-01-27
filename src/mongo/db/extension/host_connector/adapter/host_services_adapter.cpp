@@ -92,8 +92,8 @@ namespace mongo::extension::host_connector {
                         DocumentSourceInternalSearchIdLookUp::kStageName &&
                     specObj.firstElementType() == BSONType::object);
 
-        auto liteParsed = std::make_unique<DocumentSourceInternalSearchIdLookUp::LiteParsed>(
-            specObj.firstElement(), specObj);
+        auto liteParsed =
+            std::make_unique<LiteParsedInternalSearchIdLookUp>(specObj.firstElement(), specObj);
 
         *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNode(
             std::make_unique<host::AggStageAstNode>(std::move(liteParsed))));

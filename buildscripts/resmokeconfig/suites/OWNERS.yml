@@ -62,7 +62,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "extensions*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-integration-extensions-api
   - "fle*":
     approvers:
       - 10gen/query-integration-features
@@ -107,7 +107,10 @@ filters:
       - 10gen/server-rw-concerns
   - "fcv*":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "feature_flag_multiversion*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "jstestfuzz_replication*":
     approvers:
       - 10gen/server-jstest-infra

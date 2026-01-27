@@ -164,6 +164,7 @@ shell:
   meta:
     slack: ask-devprod-correctness
     jira: DevProd Correctness
+    fully_marked: true
   files:
     - src/mongo/shell/
     - src/mongo/db/modules/enterprise/src/fle/shell
@@ -241,7 +242,6 @@ query:
     - src/mongo/s/query/shard_targeting_helpers*
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/s/commands/*document_shard_key_*
-    - src/mongo/util/safe_num*
     - src/mongo/db/s/*analyze_shard_key*
     - src/mongo/s/*analyze_shard_key*
     - src/mongo/s/*query_analyze*
@@ -381,7 +381,7 @@ transactions:
 fcv:
   meta:
     slack: server-fcv
-    jira: Replication
+    jira: Catalog and Routing
     fully_marked: true
   files:
     - src/mongo/db/feature_compatibility*
@@ -767,6 +767,7 @@ collection_write_path: # authoritative: @10gen/server-collection-write-path
   files:
     - src/mongo/db/collection_crud
     - src/mongo/db/commands/collection_to_capped*
+    - src/mongo/db/replicated_size_and_count_metadata_manager
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn
   meta:

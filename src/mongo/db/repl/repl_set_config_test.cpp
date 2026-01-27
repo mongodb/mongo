@@ -43,7 +43,6 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/safe_num.h"
 #include "mongo/util/scopeguard.h"
 
 #include <cstdint>

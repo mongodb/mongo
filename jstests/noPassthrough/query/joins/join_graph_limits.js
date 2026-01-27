@@ -2,7 +2,8 @@
  * Validate join graph limits.
  *
  * @tags: [
- *   requires_fcv_83
+ *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 

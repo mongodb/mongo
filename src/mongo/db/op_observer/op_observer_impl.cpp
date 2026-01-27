@@ -840,7 +840,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     }
 
     if (opAccumulator) {
-        opAccumulator->insertOpTimes = std::move(opTimeList);
+        opAccumulator->batchOpTimes = std::move(opTimeList);
     }
 }
 
@@ -902,6 +902,14 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         }
         if (!args.updateArgs->replicatedRecordId.isNull()) {
             operation.setRecordId(args.updateArgs->replicatedRecordId);
+        }
+        if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
+            invariant(!args.updateArgs->preImageDoc.isEmpty(),
+                      str::stream()
+                          << "Pre-image document must be present for pre-image recording");
+            operation.setPreImage(args.updateArgs->preImageDoc.getOwned());
+            operation.setChangeStreamPreImageRecordingMode(
+                ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
         operation.setInitializedStatementIds(args.updateArgs->stmtIds);
         batchedWriteContext.addBatchedOperation(opCtx, operation);
@@ -1060,12 +1068,17 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
-
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
+        if (args.changeStreamPreAndPostImagesEnabledForCollection) {
+            invariant(!doc.isEmpty(),
+                      str::stream() << "Deleted document must be present for pre-image recording");
+            operation.setPreImage(doc.getOwned());
+            operation.setChangeStreamPreImageRecordingMode(
+                ChangeStreamPreImageRecordingMode::kPreImagesCollection);
+        }
         operation.setInitializedStatementIds({stmtId});
-
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
@@ -2021,25 +2034,12 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
 void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                                           WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                                           OpStateAccumulator* opAccumulator) {
-    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
-        !opCtx->writesAreReplicated()) {
-        return;
-    }
-
     // A batched write with oplogGroupingFormat kGroupForTransaction is a one-shot non-retryable
     // transaction without a transaction number, which is forbidden in retryable writes and
     // multi-document transactions.
     dassert(oplogGroupingFormat != WriteUnitOfWork::kGroupForTransaction || !opCtx->getTxnNumber());
 
     auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    // After the commit, make sure the batch is clear so we don't attempt to commit the same
-    // operations twice.  The BatchedWriteContext is attached to the operation context, so multiple
-    // sequential WriteUnitOfWork blocks can use the same batch context.
-    ON_BLOCK_EXIT([&] {
-        batchedWriteContext.clearBatchedOperations(opCtx);
-        batchedWriteContext.setWritesAreBatched(false);
-    });
-
     auto* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
 
     if (batchedOps->isEmpty()) {
@@ -2063,10 +2063,16 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             case repl::OpTypeEnum::kContainerInsert: {
                 auto opTime = logOperation(
                     opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+                auto wallClockTime = oplogEntry.getWallClockTime();
+
+                if (opAccumulator) {
+                    opAccumulator->opTime.writeOpTime = opTime;
+                    opAccumulator->opTime.wallClockTime = wallClockTime;
+                }
 
                 SessionTxnRecord sessionTxnRecord;
                 sessionTxnRecord.setLastWriteOpTime(opTime);
-                sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
+                sessionTxnRecord.setLastWriteDate(wallClockTime);
                 onWriteOpCompleted(
                     opCtx, oplogEntry.getStatementIds(), sessionTxnRecord, oplogEntry.getNss());
 
@@ -2081,7 +2087,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     // entries.
     // By providing limits on operation count and size, this makes the processing of batched writes
     // more consistent with our treatment of multi-doc transactions.
-    const auto applyOpsOplogSlotAndOperationAssignment =
+    auto applyOpsOplogSlotAndOperationAssignment =
         batchedOps->getApplyOpsInfo(getMaxNumberOfBatchedOperationsInSingleOplogEntry(),
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
@@ -2187,9 +2193,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     }
 
     if (opAccumulator) {
+        opAccumulator->opTime.wallClockTime = wallClockTime;
         for (const auto& entry : applyOpsOplogSlotAndOperationAssignment.applyOpsEntries) {
-            opAccumulator->insertOpTimes.emplace_back(oplogSlots[entry.oplogSlotIndex]);
+            opAccumulator->batchOpTimes.emplace_back(oplogSlots[entry.oplogSlotIndex]);
         }
+        opAccumulator->applyOpsEntries =
+            std::move(applyOpsOplogSlotAndOperationAssignment.applyOpsEntries);
     }
 }
 
@@ -2339,11 +2348,6 @@ void OpObserverImpl::onTransactionPrepare(
     }
 }
 
-void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                                    const LogicalSessionId& lsid,
-                                                    const std::vector<repl::OplogEntry>& statements,
-                                                    const repl::OpTime& prepareOpTime) {}
-
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
                                         boost::optional<OplogSlot> abortOplogEntryOpTime) {
     invariant(opCtx->getTxnNumber());
@@ -2422,6 +2426,7 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                           const NamespaceString& nss,
                                                           const UUID& uuid,
+                                                          bool isUpgrade,
                                                           bool skipViewCreation) {
     tassert(11450500,
             "Expecting the main namespace for timeseries upgrade/downgrade ops",
@@ -2434,7 +2439,7 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
         return;
     }
 
-    UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()});
+    UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()}, isUpgrade);
     if (skipViewCreation) {
         objectEntry.setSkipViewCreation(true);
     }

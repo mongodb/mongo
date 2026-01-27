@@ -663,13 +663,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                                       "are: (configsvr|shardsvr)",
                                       clusterRoleParam));
         }
-
-        // Every node in a sharded cluster will have by default the RouterServer role. As a
-        // consequence, the only possible combinations are:
-        // - { ShardServer, RouterServer }
-        // - { ShardServer, ConfigServer, RouterServer }
-        // - { RouterServer }
-        serverGlobalParams.clusterRole += ClusterRole::RouterServer;
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
                    kNoVersionContext, fcvSnapshot) &&
                serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {

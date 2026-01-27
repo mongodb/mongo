@@ -1770,7 +1770,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             MONGO_UNREACHABLE;
     }
 
-    LOGV2(465611, "Cleaned up index build after abort. ", "buildUUID"_attr = replState->buildUUID);
+    LOGV2(465611, "Cleaned up index build after abort", "buildUUID"_attr = replState->buildUUID);
 }
 
 void IndexBuildsCoordinator::_completeExternalAbort(OperationContext* opCtx,
@@ -3049,6 +3049,11 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
               "Index build: skipping cleanup for primary-driven index build on step down",
               "buildUUD"_attr = replState->buildUUID,
               "error"_attr = status);
+        // We reached here after calling ReplIndexBuildState::setPostFailureState(). This state
+        // disallows concurrent aborts and blocks ReplIndexBuildState::tryAbort() from proceeding.
+        // Since we are exiting early without completing the self abort, change the state to allow
+        // external aborts.
+        replState->requestAbortFromPrimary();
         return;
     }
 
@@ -3778,7 +3783,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // are allowed because we cannot control them as they bypass the routine abort machinery.
         invariant(!replState->isExternalAbort());
 
-        // Index build commit may not fail on secondaries because it implies diverenge with data on
+        // Index build commit may not fail on secondaries because it implies divergence with data on
         // the primary. The only exception is single-phase builds started on primaries, which may
         // fail after a state transition. In this case, we have not replicated anything to
         // roll-back. With two-phase index builds, if a primary replicated an abortIndexBuild oplog

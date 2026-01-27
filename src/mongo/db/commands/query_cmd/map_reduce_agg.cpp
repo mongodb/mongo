@@ -108,6 +108,10 @@ auto makeExpressionContext(OperationContext* opCtx,
 
     const auto& coll = collOrView.getCollection();
 
+    uassert(11574100,
+            "mapReduce on a timeseries collection is not supported",
+            !(coll.exists() && coll.getCollectionPtr()->isTimeseriesCollection()));
+
     auto [resolvedCollator, _] = resolveCollator(
         opCtx, parsedMr.getCollation().get_value_or(BSONObj()), coll.getCollectionPtr());
 

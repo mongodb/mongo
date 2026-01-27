@@ -94,12 +94,11 @@ public:
     JoinReorderingContext makeContext() {
         joinGraphStorage = JoinGraph(std::move(graph));
 
-        JoinReorderingContext jCtx{
-            .joinGraph = joinGraphStorage.value(),
-            .resolvedPaths = std::move(resolvedPaths),
-            .cbrCqQsns = std::move(cbrCqQsns),
-            .perCollIdxs = std::move(perCollIdxs),
-        };
+        JoinReorderingContext jCtx{.joinGraph = joinGraphStorage.value(),
+                                   .resolvedPaths = std::move(resolvedPaths),
+                                   .cbrCqQsns = std::move(cbrCqQsns),
+                                   .perCollIdxs = std::move(perCollIdxs),
+                                   .catStats = std::move(catStats)};
 
         return jCtx;
     }
@@ -112,6 +111,9 @@ protected:
     std::vector<ResolvedPath> resolvedPaths;
     QuerySolutionMap cbrCqQsns;
     AvailableIndexes perCollIdxs;
+    SubsetCardinalities subsetCards;
+    NodeCardinalities collCards;
+    CatalogStats catStats;
 
     std::vector<int> seeds;
     std::vector<NamespaceString> namespaces;

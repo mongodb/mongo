@@ -135,25 +135,45 @@ PlanState ExtractFieldPathsStage::getNext() {
 
         if (value::TypeTags::bsonObject == inputTag) {
             value::walkBsonObj<value::ScalarProjectionPositionInfoRecorder>(
-                _root.get(), inputVal, value::bitcastTo<const char*>(inputVal), walk);
+                _root.get(),
+                inputVal,
+                value::bitcastTo<const char*>(inputVal),
+                walk,
+                true /*traverseArrays*/);
         } else if (value::TypeTags::Object == inputTag) {
             value::walkObject<value::ScalarProjectionPositionInfoRecorder>(
-                _root.get(), inputVal, walk);
+                _root.get(), inputVal, walk, true /*traverseArrays*/);
         }
 
     } else {
         // Important this is only for toplevel fields. For nested fields, we would need knowledge of
         // arrayness. We would also need to check for input accessors during the tree traversal.
-        for (const auto& child : _root->getChildren) {
-            const auto& childWalkNode = child.second;
-            if (childWalkNode->inputAccessor) {
-                auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
-                value::walkField<value::ScalarProjectionPositionInfoRecorder>(
-                    childWalkNode.get(),
-                    childTag,
-                    childVal,
-                    value::bitcastTo<const char*>(childVal),
-                    walk);
+        if (_root->getChildren) {
+            for (const auto& child : *(_root->getChildren)) {
+                const auto& childWalkNode = child.second;
+                if (childWalkNode->inputAccessor) {
+                    auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
+                    value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                        childWalkNode.get(),
+                        childTag,
+                        childVal,
+                        value::bitcastTo<const char*>(childVal),
+                        walk,
+                        true /* traverseArrays */);
+                }
+            }
+        } else {
+            for (const auto& [_, childWalkNode] : _root->getChildrenVector) {
+                if (childWalkNode->inputAccessor) {
+                    auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
+                    value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                        childWalkNode.get(),
+                        childTag,
+                        childVal,
+                        value::bitcastTo<const char*>(childVal),
+                        walk,
+                        true /* traverseArrays */);
+                }
             }
         }
     }

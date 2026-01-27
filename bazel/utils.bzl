@@ -46,6 +46,28 @@ def retry_download(ctx, tries, **kwargs):
             ctx.execute(["sleep", str(sleep_time)])
             sleep_time *= 2
 
+def write_python_pyc_cache_prefix_customization(ctx, customization_file, pycache_dirname = "bazel_pycache"):
+    """Write a site/usercustomize module to redirect .pyc writes to /tmp.
+
+    Toolchain and runtime Python distributions often live under Bazel-managed paths
+    (external repositories, runfiles, etc.). If Python writes `__pycache__/*.pyc`
+    there, it can cause non-hermetic filesystem changes and Bazel cache churn.
+
+    This helper writes either `sitecustomize.py` or `usercustomize.py` (callers
+    choose the filename) to set `sys.pycache_prefix` to a temp directory.
+    """
+    ctx.file(
+        customization_file,
+        """
+import os
+import sys
+import tempfile
+
+# Prevent bytecode cache writes under Bazel-managed paths (external/, runfiles/).
+sys.pycache_prefix = os.path.join(tempfile.gettempdir(), "{pycache_dirname}")
+""".format(pycache_dirname = pycache_dirname),
+    )
+
 def generate_noop_toolchain(ctx, substitutions):
     # BUILD file is required for a no-op
     ctx.file(
@@ -139,6 +161,7 @@ def get_host_distro_major_version(repository_ctx):
         "Debian GNU/Linux 12": "debian12",
         "Red Hat Enterprise Linux 8*": "rhel8",
         "Red Hat Enterprise Linux 9*": "rhel9",
+        "Red Hat Enterprise Linux 10*": "rhel10",
         "SLES 15*": "suse15",
     }
 

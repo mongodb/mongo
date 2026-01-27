@@ -2,6 +2,7 @@
  * Verifies that we correcly process overrding local fields by foreign documents.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 

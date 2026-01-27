@@ -43,9 +43,15 @@ public:
 
     mongo::BSONObj getProperties() const override {
         mongo::extension::MongoExtensionStaticProperties properties;
-        properties.setAllowedInLookup(false);
         properties.setAllowedInUnionWith(false);
-        properties.setAllowedInFacet(false);
+
+        // Right now these constraints are hardcoded to 'kNotAllowed' so we want to test that even
+        // if a developer tried to enable them in the extension it wouldn't work.
+
+        // TODO SERVER-117259 Change this to false.
+        properties.setAllowedInLookup(true);
+        // TODO SERVER-117260 Change this to false.
+        properties.setAllowedInFacet(true);
 
         mongo::BSONObjBuilder builder;
         properties.serialize(&builder);

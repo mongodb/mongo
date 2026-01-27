@@ -20,7 +20,8 @@ typedef struct __wt_disagg_checkpoint_meta {
 } WT_DISAGG_CHECKPOINT_META;
 
 /* Function prototypes for disaggregated storage and layered tables. */
-
+static void __disagg_set_crypt_header(WT_SESSION_IMPL *session, WT_CRYPT_KEYS *crypt);
+static void __disagg_get_crypt_header(const WT_ITEM *key_item, WT_CRYPT_HEADER *header);
 static int __disagg_copy_shared_metadata_one(WT_SESSION_IMPL *session, const char *uri);
 static int __layered_drain_ingest_tables(WT_SESSION_IMPL *session);
 static void __layered_update_prune_timestamps_print_update_logs(WT_SESSION_IMPL *session,
@@ -307,6 +308,17 @@ __disagg_get_crypt_key(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn,
 }
 
 /*
+ * __disagg_get_crypt_header --
+ *     Copy and byte-swap the crypt header from the key item. Note: This function is not idempotent.
+ */
+static void
+__disagg_get_crypt_header(const WT_ITEM *key_item, WT_CRYPT_HEADER *header)
+{
+    memcpy(header, key_item->data, sizeof(WT_CRYPT_HEADER));
+    __wt_crypt_header_byteswap(header);
+}
+
+/*
  * __disagg_validate_crypt --
  *     Validate the crypt header and payload stored in key_item.
  */
@@ -316,32 +328,36 @@ __disagg_validate_crypt(WT_SESSION_IMPL *session, const WT_ITEM *key_item, WT_CR
     WT_DECL_RET;
     uint32_t checksum = 0;
 
-    if (key_item->size < sizeof(WT_CRYPT_HEADER)) {
+    if (key_item->size < sizeof(WT_CRYPT_HEADER))
         WT_ERR_MSG(session, EIO,
           "Encryption key data too small: expected at least %" WT_SIZET_FMT ", got %" WT_SIZET_FMT,
           sizeof(WT_CRYPT_HEADER), key_item->size);
-    }
-    memcpy(header, key_item->data, sizeof(WT_CRYPT_HEADER));
-    __wt_crypt_header_byteswap(header);
+    __disagg_get_crypt_header(key_item, header);
+
+    /* Check for compatibility versions before validating header fields. */
+    if (header->compatible_version > WT_CRYPT_HEADER_COMPATIBLE_VERSION)
+        WT_ERR_MSG(session, ENOTSUP,
+          "Unsupported encryption key data version %" PRIu8 ", min %" PRIu8, header->version,
+          header->compatible_version);
 
     WT_ASSERT_ALWAYS(session, header->signature == WT_CRYPT_HEADER_SIGNATURE,
       "Invalid encryption key data signature: expected 0x%08" PRIx32 ", got 0x%08" PRIx32,
       WT_CRYPT_HEADER_SIGNATURE, header->signature);
-    WT_ASSERT_ALWAYS(session, header->version == WT_CRYPT_HEADER_VERSION,
-      "Unsupported encryption key data version: expected %u, got %u", WT_CRYPT_HEADER_VERSION,
-      header->version);
-    if (key_item->size - sizeof(WT_CRYPT_HEADER) != header->crypt_size) {
-        WT_ERR_MSG(session, EIO, "Encryption key data size mismatch: expected %u, got %u",
-          header->crypt_size, (uint32_t)(key_item->size - sizeof(WT_CRYPT_HEADER)));
-    }
 
-    checksum =
-      __wt_checksum((uint8_t *)key_item->data + sizeof(WT_CRYPT_HEADER), header->crypt_size);
-    if (checksum != header->checksum) {
+    if (header->header_size < sizeof(WT_CRYPT_HEADER))
+        WT_ERR_MSG(session, EIO,
+          "Encryption key header is too small: expected at least %" WT_SIZET_FMT ", got %" PRIu8,
+          sizeof(WT_CRYPT_HEADER), header->header_size);
+
+    if (key_item->size - header->header_size != header->crypt_size)
+        WT_ERR_MSG(session, EIO, "Encryption key data size mismatch: expected %u, got %u",
+          header->crypt_size, (uint32_t)(key_item->size - header->header_size));
+
+    checksum = __wt_checksum((uint8_t *)key_item->data + header->header_size, header->crypt_size);
+    if (checksum != header->checksum)
         WT_ERR_MSG(session, EIO,
           "Encryption key data checksum mismatch: expected %" PRIx32 ", got %" PRIx32,
           header->checksum, checksum);
-    }
 
 err:
     return (ret);
@@ -349,7 +365,8 @@ err:
 
 /*
  * __disagg_put_page --
- *     Write a page to disaggregated storage.
+ *     Write a page to disaggregated storage. This is intended for pages that are not part of a
+ *     btree, such as shared turtle files and encryption key.
  */
 static int
 __disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64_t page_id,
@@ -363,6 +380,7 @@ __disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
     WT_CLEAR(put_args);
+
     put_args.backlink_lsn = last_page_lsn[page_id];
 
     WT_RET(page_log->plh_put(page_log, &session->iface, page_id, 0, &put_args, item));
@@ -421,6 +439,31 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
 }
 
 /*
+ * __disagg_set_crypt_header --
+ *     Pack and byte-swap the crypt header information into the struct. Note: This function is not
+ *     idempotent.
+ */
+static void
+__disagg_set_crypt_header(WT_SESSION_IMPL *session, WT_CRYPT_KEYS *crypt)
+{
+    WT_CRYPT_HEADER crypt_header;
+
+    WT_CLEAR(crypt_header);
+    WT_ASSERT(session, crypt->keys.data != NULL);
+    /* Prepare the crypt header. */
+    crypt_header.signature = WT_CRYPT_HEADER_SIGNATURE;
+    crypt_header.version = WT_CRYPT_HEADER_VERSION;
+    crypt_header.compatible_version = WT_CRYPT_HEADER_COMPATIBLE_VERSION;
+    crypt_header.header_size = sizeof(WT_CRYPT_HEADER);
+    crypt_header.crypt_size = (uint32_t)crypt->keys.size;
+    crypt_header.checksum = __wt_checksum(crypt->keys.data, crypt->keys.size);
+
+    __wt_crypt_header_byteswap(&crypt_header);
+    memcpy(crypt->keys.mem, &crypt_header, sizeof(WT_CRYPT_HEADER));
+    crypt->keys.data = crypt->keys.mem;
+    crypt->keys.size += sizeof(WT_CRYPT_HEADER);
+}
+/*
  * __wt_disagg_put_crypt_helper --
  *     If new encryption key data information is detected, update the metadata page log and callback
  *     to the key provider upon completion.
@@ -429,7 +472,6 @@ int
 __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_CRYPT_HEADER crypt_header;
     WT_CRYPT_KEYS crypt;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
@@ -439,7 +481,6 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     conn = S2C(session);
     key_provider = conn->key_provider;
     WT_CLEAR(crypt.keys);
-    WT_CLEAR(crypt_header);
     lsn = 0;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
@@ -462,17 +503,8 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     WT_ERR(key_provider->get_key(key_provider, (WT_SESSION *)session, &crypt));
     WT_ASSERT(session, crypt.keys.size != 0 && crypt.keys.data != NULL);
 
-    /* Prepare the crypt header. */
-    crypt_header.signature = WT_CRYPT_HEADER_SIGNATURE;
-    crypt_header.version = WT_CRYPT_HEADER_VERSION;
-    crypt_header.header_size = sizeof(WT_CRYPT_HEADER);
-    crypt_header.crypt_size = (uint32_t)crypt.keys.size;
-    crypt_header.checksum = __wt_checksum(crypt.keys.data, crypt.keys.size);
-
-    __wt_crypt_header_byteswap(&crypt_header);
-    memcpy(crypt.keys.mem, &crypt_header, sizeof(WT_CRYPT_HEADER));
-    crypt.keys.data = crypt.keys.mem;
-    crypt.keys.size += sizeof(WT_CRYPT_HEADER);
+    /* Pack the crypt header information into the struct. */
+    __disagg_set_crypt_header(session, &crypt);
 
     /* Write the encryption key data to disaggregated storage. */
     ret = __disagg_put_crypt_key(session, WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID, &crypt.keys, &lsn);
@@ -721,7 +753,7 @@ __disagg_load_crypt_key(WT_SESSION_IMPL *session, WT_DISAGG_METADATA *metadata)
     WT_ERR(__disagg_validate_crypt(session, &key_item, &crypt_header));
 
     /* Prepare the crypt keys for loading. */
-    crypt.keys.data = (uint8_t *)key_item.data + sizeof(WT_CRYPT_HEADER);
+    crypt.keys.data = (uint8_t *)key_item.data + crypt_header.header_size;
     crypt.keys.size = crypt_header.crypt_size;
     crypt.r.lsn = lsn;
 
@@ -2661,10 +2693,7 @@ __layered_drain_ingest_tables(WT_SESSION_IMPL *session)
     WT_RET(__wt_spin_init(
       session, &conn->layered_drain_data.queue_lock, "layered drain work queue lock"));
 
-    __wt_spin_lock(session, &conn->layered_drain_data.queue_lock);
-    /* WiredTiger doesn't have sequentially consistent stores so we lock around this store. */
-    __wt_atomic_store_bool_relaxed(&conn->layered_drain_data.running, true);
-    __wt_spin_unlock(session, &conn->layered_drain_data.queue_lock);
+    __wt_atomic_store_bool(&conn->layered_drain_data.running, true);
 
     /* Open the internal session early so we can close it on error. */
     bool multithreaded = conn->layered_drain_data.thread_count > 1;
@@ -3086,3 +3115,24 @@ err:
 
     return (ret);
 }
+
+#ifdef HAVE_UNITTEST
+void
+__ut_disagg_set_crypt_header(WT_SESSION_IMPL *session, WT_CRYPT_KEYS *crypt)
+{
+    __disagg_set_crypt_header(session, crypt);
+}
+
+int
+__ut_disagg_validate_crypt(
+  WT_SESSION_IMPL *session, const WT_ITEM *key_item, WT_CRYPT_HEADER *header)
+{
+    return (__disagg_validate_crypt(session, key_item, header));
+}
+
+void
+__ut_disagg_get_crypt_header(const WT_ITEM *key_item, WT_CRYPT_HEADER *header)
+{
+    __disagg_get_crypt_header(key_item, header);
+}
+#endif

@@ -16,6 +16,7 @@ selector:
     - assumes_no_implicit_collection_creation_on_get_collection
     - assumes_no_implicit_collection_creation_after_drop
     - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
 
 executor:
   archive:

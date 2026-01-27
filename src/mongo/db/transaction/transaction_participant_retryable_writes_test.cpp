@@ -48,6 +48,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -129,68 +130,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none,                   // ShardId of resharding recipient
         boost::none,                   // _id
         boost::none)};                 // needsRetryImage
-}
-
-repl::MutableOplogEntry makeNoopMutableOplogEntry(const NamespaceString& nss,
-                                                  UUID uuid,
-                                                  const LogicalSessionId& lsid,
-                                                  TxnNumber txnNumber,
-                                                  const std::vector<StmtId>& stmtIds,
-                                                  repl::OpTime prevOpTime) {
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setObject(BSON("TestValue" << 0));
-    oplogEntry.setWallClockTime(Date_t::now());
-    if (stmtIds.front() != kUninitializedStmtId) {
-        oplogEntry.setSessionId(lsid);
-        oplogEntry.setTxnNumber(txnNumber);
-        oplogEntry.setStatementIds(stmtIds);
-        oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
-    }
-    return oplogEntry;
-}
-
-repl::MutableOplogEntry makeApplyOpsMutableOplogEntry(
-    std::vector<repl::ReplOperation> ops,
-    OperationSessionInfo sessionInfo,
-    Date_t wallClockTime,
-    const std::vector<StmtId>& stmtIds,
-    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-    boost::optional<repl::MultiOplogEntryType> multiOpType = boost::none) {
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
-    oplogEntry.setOperationSessionInfo(sessionInfo);
-    oplogEntry.setWallClockTime(wallClockTime);
-    oplogEntry.setStatementIds(stmtIds);
-    oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
-    oplogEntry.setMultiOpType(multiOpType);
-
-    BSONObjBuilder applyOpsBuilder;
-    BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
-    for (const auto& op : ops) {
-        opsArrayBuilder.append(op.toBSON());
-    }
-    opsArrayBuilder.done();
-    applyOpsBuilder.doneFast();
-    oplogEntry.setObject(applyOpsBuilder.obj());
-
-    return oplogEntry;
-}
-
-repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
-                                        std::vector<repl::ReplOperation> ops,
-                                        OperationSessionInfo sessionInfo,
-                                        Date_t wallClockTime,
-                                        const std::vector<StmtId>& stmtIds,
-                                        boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                                        boost::optional<repl::MultiOplogEntryType> multiOpType) {
-    auto mutableOplogEntry = makeApplyOpsMutableOplogEntry(
-        ops, sessionInfo, wallClockTime, stmtIds, prevWriteOpTimeInTransaction, multiOpType);
-    mutableOplogEntry.setOpTime(opTime);
-    return uassertStatusOK(repl::OplogEntry::parse(mutableOplogEntry.toBSON()));
 }
 
 class OpObserverMock : public OpObserverNoop {
@@ -321,7 +260,7 @@ protected:
                                           const std::vector<StmtId>& stmtIds,
                                           repl::OpTime prevOpTime) {
         auto oplogEntry =
-            makeNoopMutableOplogEntry(nss, uuid, lsid, txnNumber, stmtIds, prevOpTime);
+            repl::makeNoopMutableOplogEntry(nss, uuid, lsid, txnNumber, stmtIds, prevOpTime);
         return repl::logOp(opCtx, &oplogEntry);
     }
 
@@ -342,8 +281,8 @@ protected:
         OperationSessionInfo osi;
         osi.setSessionId(lsid);
         osi.setTxnNumber(txnNumber);
-        auto oplogEntry =
-            makeApplyOpsMutableOplogEntry(ops, osi, Date_t::now(), {} /* stmtIds */, prevOpTime);
+        auto oplogEntry = repl::makeApplyOpsMutableOplogEntry(
+            ops, osi, Date_t::now(), {} /* stmtIds */, prevOpTime);
         return repl::logOp(opCtx, &oplogEntry);
     }
 
@@ -754,6 +693,495 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     ASSERT(childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+}
+
+TEST_F(ShardTransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedIncludeCommitTimestamp_UnpreparedTransactionSingleApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    OperationSessionInfo osi;
+    osi.setSessionId(childLsid);
+    osi.setTxnNumber(childTxnNumber);
+
+    auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto stmtId0 = 0;
+    op0.setStatementIds({stmtId0});
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry0 = repl::makeApplyOpsOplogEntry(
+        opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+
+    insertOplogEntry(entry0);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(childLsid);
+        sessionRecord.setParentSessionId(parentLsid);
+        sessionRecord.setTxnNum(childTxnNumber);
+        sessionRecord.setLastWriteOpTime(entry0.getOpTime());
+        sessionRecord.setLastWriteDate(entry0.getWallClockTime());
+        sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+        return sessionRecord.toBSON();
+    }());
+
+    opCtx()->setTxnNumber(parentTxnNumber);
+    opContextSession.emplace(opCtx());
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement0 was executed in a transaction so the oplog entry should have a commit timestamp
+    // whether or not the history check is performed in the session that ran the transaction.
+    auto fetchedOplogEntry =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(),
+              entry0.getOpTime().getTimestamp());
+
+    fetchedOplogEntry =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(),
+              entry0.getOpTime().getTimestamp());
+}
+
+TEST_F(ShardTransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedIncludeCommitTimestamp_UnpreparedTransactionMultiApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    OperationSessionInfo osi;
+    osi.setSessionId(childLsid);
+    osi.setTxnNumber(childTxnNumber);
+
+    auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto stmtId0 = 0;
+    op0.setStatementIds({stmtId0});
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                               {op0},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               repl::OpTime() /* prevOpTime */,
+                                               boost::none /* multiOpType */,
+                                               repl::ApplyOpsType::kPartial);
+
+    insertOplogEntry(entry0);
+
+    auto op1 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+    auto opTime1 = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry1 = repl::makeApplyOpsOplogEntry(opTime1,
+                                               {op1},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               entry0.getOpTime() /* prevOpTime */,
+                                               boost::none /* multiOpType */,
+                                               repl::ApplyOpsType::kTerminal);
+
+    insertOplogEntry(entry1);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(childLsid);
+        sessionRecord.setParentSessionId(parentLsid);
+        sessionRecord.setTxnNum(childTxnNumber);
+        sessionRecord.setLastWriteOpTime(entry1.getOpTime());
+        sessionRecord.setLastWriteDate(entry1.getWallClockTime());
+        sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+        return sessionRecord.toBSON();
+    }());
+
+    opCtx()->setTxnNumber(parentTxnNumber);
+    opContextSession.emplace(opCtx());
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement0 was executed in a transaction so the oplog entry should have a commit timestamp
+    // whether or not the history check is performed in the session that ran the transaction.
+    auto fetchedOplogEntry =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(),
+              entry1.getOpTime().getTimestamp());
+
+    fetchedOplogEntry =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(),
+              entry1.getOpTime().getTimestamp());
+}
+
+TEST_F(ShardTransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedIncludeCommitTimestamp_PreparedTransactionSingleApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    OperationSessionInfo osi;
+    osi.setSessionId(childLsid);
+    osi.setTxnNumber(childTxnNumber);
+
+    auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto stmtId0 = 0;
+    op0.setStatementIds({stmtId0});
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                               {op0},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               repl::OpTime() /* prevOpTime */,
+                                               boost::none /* multiOpType */,
+                                               repl::ApplyOpsType::kPrepare);
+
+    insertOplogEntry(entry0);
+
+    auto commitTimestamp = Timestamp(101, 0);
+    auto opTime1 = repl::OpTime(Timestamp(102, 0), 0);
+    auto entry1 = repl::makeCommitTransactionOplogEntry(opTime1, osi, commitTimestamp, opTime0);
+
+    insertOplogEntry(entry1);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(childLsid);
+        sessionRecord.setParentSessionId(parentLsid);
+        sessionRecord.setTxnNum(childTxnNumber);
+        sessionRecord.setLastWriteOpTime(entry1.getOpTime());
+        sessionRecord.setLastWriteDate(entry1.getWallClockTime());
+        sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+        return sessionRecord.toBSON();
+    }());
+
+    opCtx()->setTxnNumber(parentTxnNumber);
+    opContextSession.emplace(opCtx());
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement0 was executed in a transaction so the oplog entry should have a commit timestamp
+    // whether or not the history check is performed in the session that ran the transaction.
+    auto fetchedOplogEntry =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(), commitTimestamp);
+
+    fetchedOplogEntry =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(), commitTimestamp);
+}
+
+TEST_F(ShardTransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedIncludeCommitTimestamp_PreparedTransactionMultiApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    OperationSessionInfo osi;
+    osi.setSessionId(childLsid);
+    osi.setTxnNumber(childTxnNumber);
+
+    auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto stmtId0 = 0;
+    op0.setStatementIds({stmtId0});
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                               {op0},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               repl::OpTime() /* prevOpTime */,
+                                               boost::none /* multiOpType */,
+                                               repl::ApplyOpsType::kPartial);
+
+    insertOplogEntry(entry0);
+
+    auto op1 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+    auto opTime1 = repl::OpTime(Timestamp(101, 0), 0);
+    auto entry1 = repl::makeApplyOpsOplogEntry(opTime1,
+                                               {op1},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               entry0.getOpTime() /* prevOpTime */,
+                                               boost::none /* multiOpType */,
+                                               repl::ApplyOpsType::kPrepare);
+
+    insertOplogEntry(entry1);
+
+    auto commitTimestamp = Timestamp(102, 0);
+    auto opTime2 = repl::OpTime(Timestamp(103, 0), 0);
+    auto entry2 = repl::makeCommitTransactionOplogEntry(opTime2, osi, commitTimestamp, opTime1);
+
+    insertOplogEntry(entry2);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(childLsid);
+        sessionRecord.setParentSessionId(parentLsid);
+        sessionRecord.setTxnNum(childTxnNumber);
+        sessionRecord.setLastWriteOpTime(entry2.getOpTime());
+        sessionRecord.setLastWriteDate(entry2.getWallClockTime());
+        sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+        return sessionRecord.toBSON();
+    }());
+
+    opCtx()->setTxnNumber(parentTxnNumber);
+    opContextSession.emplace(opCtx());
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement0 was executed in a transaction so the oplog entry should have a commit timestamp
+    // whether or not the history check is performed in the session that ran the transaction.
+    auto fetchedOplogEntry =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(), commitTimestamp);
+
+    fetchedOplogEntry =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId0);
+    ASSERT(fetchedOplogEntry);
+    ASSERT_EQ(fetchedOplogEntry->getCommitTransactionTimestamp(), commitTimestamp);
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedNotIncludeCommitTimestamp_RetryableWritesNotApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    OperationSessionInfo osi;
+    osi.setSessionId(childLsid);
+    osi.setTxnNumber(childTxnNumber);
+
+    auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+        kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+    auto stmtId0 = 0;
+    op0.setStatementIds({stmtId0});
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto entry0 = repl::makeApplyOpsOplogEntry(
+        opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+
+    insertOplogEntry(entry0);
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(childLsid);
+        sessionRecord.setParentSessionId(parentLsid);
+        sessionRecord.setTxnNum(childTxnNumber);
+        sessionRecord.setLastWriteOpTime(entry0.getOpTime());
+        sessionRecord.setLastWriteDate(entry0.getWallClockTime());
+        sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+        return sessionRecord.toBSON();
+    }());
+
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+    parentTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    auto stmtId1 = 1;
+    opCtx()->setTxnNumber(parentTxnNumber);
+    parentTxnParticipant.beginOrContinue(opCtx(),
+                                         {parentTxnNumber},
+                                         boost::none /* autocommit */,
+                                         TransactionParticipant::TransactionActions::kNone);
+
+    writeTxnRecord(parentTxnNumber, {stmtId1}, {}, boost::none);
+
+    // statement1 was executed as a retryable write so the oplog entry should not have a commit
+    // timestamp.
+    auto fetchedOplogEntry =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId1);
+    ASSERT(fetchedOplogEntry);
+    ASSERT(!fetchedOplogEntry->getCommitTransactionTimestamp());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement1 was executed as a retryable write so the oplog entry should not have a commit
+    // timestamp, even when the history check was performed in a session that ran a transaction
+    // (to execute statement0).
+    fetchedOplogEntry =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId1);
+    ASSERT(fetchedOplogEntry);
+    ASSERT(!fetchedOplogEntry->getCommitTransactionTimestamp());
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedNotIncludeCommitTimestamp_RetryableWritesApplyOps) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+    const auto uuid = UUID::gen();
+
+    auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
+    auto stmtId0 = 0;
+    {
+        OperationSessionInfo osi;
+        osi.setSessionId(childLsid);
+        osi.setTxnNumber(childTxnNumber);
+
+        auto op0 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+        op0.setStatementIds({stmtId0});
+        auto entry0 = repl::makeApplyOpsOplogEntry(
+            opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+
+        insertOplogEntry(entry0);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+            SessionTxnRecord sessionRecord;
+            sessionRecord.setSessionId(childLsid);
+            sessionRecord.setParentSessionId(parentLsid);
+            sessionRecord.setTxnNum(childTxnNumber);
+            sessionRecord.setLastWriteOpTime(entry0.getOpTime());
+            sessionRecord.setLastWriteDate(entry0.getWallClockTime());
+            sessionRecord.setState(DurableTxnStateEnum::kCommitted);
+            return sessionRecord.toBSON();
+        }());
+    }
+
+    auto stmtId1 = 1;
+    auto stmtId2 = 2;
+    {
+        OperationSessionInfo osi;
+        osi.setSessionId(parentLsid);
+        osi.setTxnNumber(parentTxnNumber);
+
+        auto op1 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+        op1.setStatementIds({stmtId1});
+        auto opTime1 = repl::OpTime(Timestamp(101, 0), 0);
+        auto entry1 =
+            repl::makeApplyOpsOplogEntry(opTime1,
+                                         {op1},
+                                         osi,
+                                         Date_t::now(),
+                                         {} /* stmtIds */,
+                                         repl::OpTime() /* prevOpTime */,
+                                         repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        insertOplogEntry(entry1);
+
+        auto op2 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, uuid, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+        op2.setStatementIds({stmtId2});
+        auto opTime2 = repl::OpTime(Timestamp(102, 0), 0);
+        auto entry2 =
+            repl::makeApplyOpsOplogEntry(opTime2,
+                                         {op2},
+                                         osi,
+                                         Date_t::now(),
+                                         {} /* stmtIds */,
+                                         opTime1,
+                                         repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        insertOplogEntry(entry2);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+            SessionTxnRecord sessionRecord;
+            sessionRecord.setSessionId(parentLsid);
+            sessionRecord.setTxnNum(parentTxnNumber);
+            sessionRecord.setLastWriteOpTime(entry2.getOpTime());
+            sessionRecord.setLastWriteDate(entry2.getWallClockTime());
+            return sessionRecord.toBSON();
+        }());
+    }
+
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+    parentTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement1 and statement2 were executed as retryable writes so their oplog entries should not
+    // have a commit timestamp.
+    auto fetchedOplogEntry1 =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId1);
+    ASSERT(fetchedOplogEntry1);
+    ASSERT(!fetchedOplogEntry1->getCommitTransactionTimestamp());
+
+    auto fetchedOplogEntry2 =
+        parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId2);
+    ASSERT(fetchedOplogEntry2);
+    ASSERT(!fetchedOplogEntry2->getCommitTransactionTimestamp());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opCtx()->setTxnNumber(childTxnNumber);
+    opCtx()->setInMultiDocumentTransaction();
+    opContextSession.emplace(opCtx());
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    // statement1 and statement2 were executed as retryable writes so their oplog entries should not
+    // have a commit timestamp, even when the history check was performed in a session that ran a
+    // transaction (to execute statement0).
+    fetchedOplogEntry1 =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId1);
+    ASSERT(fetchedOplogEntry1);
+    ASSERT(!fetchedOplogEntry1->getCommitTransactionTimestamp());
+
+    fetchedOplogEntry2 =
+        childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), stmtId2);
+    ASSERT(fetchedOplogEntry2);
+    ASSERT(!fetchedOplogEntry2->getCommitTransactionTimestamp());
 }
 
 using TransactionParticipantRetryableWritesTestDeathTest =
@@ -1197,7 +1625,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
         insert0.setStatementIds({0});
         insert1.setStatementIds({1});
         insert2.setStatementIds({2});
-        auto entry0 = makeApplyOpsOplogEntry(
+        auto entry0 = repl::makeApplyOpsOplogEntry(
             repl::OpTime(Timestamp(100, 0), 0),  // optime
             {insert0, insert1, insert2},         // operations
             osi,                                 // session info
@@ -1258,7 +1686,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
         insert5.setStatementIds({6});
         const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
         const repl::OpTime lastOpTime(Timestamp(100, 2), 1);
-        auto entry0 = makeApplyOpsOplogEntry(
+        auto entry0 = repl::makeApplyOpsOplogEntry(
             firstOpTime,                  // optime
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
@@ -1267,7 +1695,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             repl::OpTime(),               // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
-        auto entry1 = makeApplyOpsOplogEntry(
+        auto entry1 = repl::makeApplyOpsOplogEntry(
             lastOpTime,                   // optime
             {insert3, insert4, insert5},  // operations
             osi,                          // session info
@@ -1335,7 +1763,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
         const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
         const repl::OpTime secondOpTime(Timestamp(100, 2), 1);
         const repl::OpTime lastOpTime(Timestamp(100, 3), 1);
-        auto entry0 = makeApplyOpsOplogEntry(
+        auto entry0 = repl::makeApplyOpsOplogEntry(
             firstOpTime,                  // optime
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
@@ -1344,7 +1772,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
             repl::OpTime(),               // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
-        auto entry1 = makeApplyOpsOplogEntry(
+        auto entry1 = repl::makeApplyOpsOplogEntry(
             secondOpTime,                 // optime
             {insert3, insert4, insert5},  // operations
             osi,                          // session info

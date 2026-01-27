@@ -136,8 +136,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 }
 
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
-    auto executor =
-        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(getExpCtx()->getOperationContext()->getServiceContext()));
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline;
     // 'getBoolField' returns false if the field is not present.
     bool storedSource = _spec.getMongotQuery().getBoolField(mongot_cursor::kReturnStoredSourceArg);

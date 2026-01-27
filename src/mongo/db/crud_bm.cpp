@@ -123,7 +123,7 @@ void setupReplication(ServiceContext* svcCtx, ClusterRole role) {
 
 void setupCatalog(ServiceContext* svcCtx) {
     DatabaseHolder::set(svcCtx, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(svcCtx, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(svcCtx, std::make_unique<CollectionImplFactory>());
 }
 
 void setupShardingState(ServiceContext* svcCtx) {

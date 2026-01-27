@@ -37,7 +37,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/safe_num.h"
 
 #include <string>
 #include <utility>

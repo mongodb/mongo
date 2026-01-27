@@ -229,7 +229,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
 
             struct RootPath {
                 boost::container::small_vector<const char*, 1> elementsToMaterialize(
-                    BSONObj refObj) {
+                    BSONObj refObj, bool traverseArrays) {
                     return {refObj.objdata()};
                 }
             };

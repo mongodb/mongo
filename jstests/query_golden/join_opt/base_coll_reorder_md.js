@@ -2,7 +2,8 @@
  * Tests base collection reordering.
  *
  * @tags: [
- *   requires_fcv_83
+ *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";

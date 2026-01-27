@@ -137,12 +137,12 @@ public:
      * one, and commits the transaction. If the original command is part of a transaction, deletes
      * the original document and inserts the new one.
      */
-    static void handleWouldChangeOwningShardError(OperationContext* opCtx,
-                                                  const ShardId& shardId,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj& cmdObj,
-                                                  const Status& responseStatus,
-                                                  BSONObjBuilder* result);
+    static void handleWouldChangeOwningShardErrorUsingTransactionApi(OperationContext* opCtx,
+                                                                     const ShardId& shardId,
+                                                                     const NamespaceString& nss,
+                                                                     const BSONObj& cmdObj,
+                                                                     const Status& responseStatus,
+                                                                     BSONObjBuilder* result);
 
 protected:
     void doInitializeClusterRole(ClusterRole role) override {
@@ -200,6 +200,15 @@ private:
         const BSONObj& cmdObj,
         bool isTimeseriesViewRequest,
         BSONObjBuilder* result);
+
+    static void handleWouldChangeOwningShardError(OperationContext* opCtx,
+                                                  const ShardId& shardId,
+                                                  const CollectionRoutingInfo& cri,
+                                                  const NamespaceString& nss,
+                                                  const Status& responseStatus,
+                                                  const BSONObj& cmdObj,
+                                                  bool isTimeseriesViewRequest,
+                                                  BSONObjBuilder* result);
 
     // Update related command execution metrics.
     boost::optional<UpdateMetrics> _updateMetrics;

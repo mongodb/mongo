@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
@@ -48,7 +49,6 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::join_ordering {
@@ -74,7 +74,13 @@ bool anySecondaryNamespacesDontExist(const MultipleCollectionAccessor& mca) {
 
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
                                     const Pipeline& pipeline) {
-    if (!pipeline.getContext()->getQueryKnobConfiguration().isJoinOrderingEnabled()) {
+    const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
+
+    if (!queryKnob.isJoinOrderingEnabled()) {
+        return false;
+    }
+
+    if (queryKnob.isForceClassicEngineEnabled()) {
         return false;
     }
 
@@ -86,6 +92,15 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     if (mca.getMainCollectionAcquisition().getShardingDescription().isSharded()) {
         // We don't permit a sharded base collection.
         return false;
+    }
+
+    // Check that no foreign collection is sharded.
+    for (const auto& [_, collAcq] : mca.getSecondaryCollectionAcquisitions()) {
+        if (collAcq.collectionExists() &&
+            collAcq.getCollection().getShardingDescription().isSharded()) {
+            // We don't permit sharded foreign collections.
+            return false;
+        }
     }
 
     if (mca.isAnySecondaryNamespaceAViewOrNotFullyLocal() || anySecondaryNamespacesDontExist(mca)) {
@@ -140,6 +155,22 @@ AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& solns,
         perCollIdxs.emplace(ns, std::move(entries));
     }
     return perCollIdxs;
+}
+
+CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectionAccessor& mca) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    CatalogStats catStats;
+    mca.forEach([&catStats, &ru](const CollectionPtr& coll) {
+        auto* recordStore = coll->getRecordStore();
+        double allocatedDataPageBytes =
+            recordStore->storageSize(ru) - recordStore->freeStorageSize(ru);
+        // TODO SERVER-117620: set .pageSizeBytes.
+        catStats.collStats.emplace(coll->ns(),
+                                   CollectionStats{
+                                       .allocatedDataPageBytes = allocatedDataPageBytes,
+                                   });
+    });
+    return catStats;
 }
 
 }  // namespace
@@ -214,17 +245,20 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .resolvedPaths = model.resolvedPaths,
                               .cbrCqQsns = std::move(solns),
                               .perCollIdxs = std::move(indexesPerColl),
+                              .catStats = createCatalogStats(opCtx, mca),
                               .explain = expCtx->getExplain().has_value()};
 
     ReorderedJoinSolution reordered;
     switch (qkc.getJoinReorderMode()) {
         case JoinReorderModeEnum::kBottomUp: {
             // Optimize join order using bottom-up Sellinger-style algorithm.
-            auto estimator =
+            auto cardEstimator =
                 std::make_unique<JoinCardinalityEstimator>(JoinCardinalityEstimator::make(
                     ctx, swAccessPlans.getValue().estimate, samplingEstimators));
+            auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(ctx, *cardEstimator);
             reordered = constructSolutionBottomUp(ctx,
-                                                  std::move(estimator),
+                                                  std::move(cardEstimator),
+                                                  std::move(costEstimator),
                                                   getPlanTreeShape(qkc.getJoinPlanTreeShape()),
                                                   qkc.getEnableJoinEnumerationHJOrderPruning());
             break;

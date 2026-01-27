@@ -531,9 +531,10 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeRename) {
     ASSERT(rewrittenMatchExpression);
 
     auto rewrittenPredicate = rewrittenMatchExpression->serialize();
-    ASSERT_BSONOBJ_EQ(
-        rewrittenPredicate,
-        fromjson("{$and: [{op: {$eq: 'c'}}, {'o.renameCollection': {$exists: true}}]}"));
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$and: [ { $or: [ { 'o.renameCollection': { $exists: true } }, { "
+                               "'o.upgradeDowngradeViewlessTimeseries': { $exists: true } } ] }, { "
+                               "op: { $eq: 'c' } } ]}"));
 }
 
 TEST_F(ChangeStreamRewriteTest, CanRewriteEqPredicateOnOperationTypeDropDatabase) {

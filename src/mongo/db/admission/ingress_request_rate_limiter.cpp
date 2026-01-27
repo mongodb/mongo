@@ -30,6 +30,7 @@
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -176,7 +177,8 @@ void IngressRequestRateLimiterAppExemptions::append(OperationContext*,
     auto snapshot = ingressRequestRateLimiterAppExemptions.makeSnapshot();
 
     if (snapshot) {
-        BSONArrayBuilder bb(bob->subarrayStart(name));
+        BSONObjBuilder subObj(bob->subobjStart(name));
+        BSONArrayBuilder bb(bob->subarrayStart("appNames"));
         for (const auto& appName : *snapshot) {
             bb << appName;
         }

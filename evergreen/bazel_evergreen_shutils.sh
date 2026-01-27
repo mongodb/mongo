@@ -86,6 +86,11 @@ bazel_evergreen_shutils::compute_local_arg() {
     elif [[ "$mode" == "test" && "${task_name:-}" == "unit_tests" ]]; then
         local_arg+=" --config=remote_test"
         local_arg+=" --test_timeout=660" # Allow extra 60s for coredump on abort
+
+        # Don't cache test results for merge queue and waterfall tasks initially
+        if [[ "${is_commit_queue:-}" != "true" && "${requester:-}" != "commit" ]]; then
+            local_arg+=" --cache_test_results=auto"
+        fi
     fi
 
     if bazel_evergreen_shutils::is_ppc64le; then
@@ -260,11 +265,11 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
     # Once we detect an OOM/server-death, we enable the guard for subsequent attempts.
     local use_oom_guard=false
-    local -r OOM_GUARD_FLAG='--local_resources=HOST_CPUS*.5'
+    local -r OOM_GUARD_FLAG='--local_resources=cpu=HOST_CPUS*.5'
 
     # Helper: does the current command string already include a local_resources flag?
     _cmd_has_local_resources() {
-        [[ "$1" == *"--local_resources"* ]]
+        [[ "$1" == *"--local_cpu_resources"* ]] || [[ "$1" == *"--local_ram_resources"* ]] || [[ "$1" == *"--local_resources"* ]]
     }
 
     local RET=1

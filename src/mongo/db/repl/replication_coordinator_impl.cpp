@@ -3655,9 +3655,8 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                     // client with a new opCtx to avoid propagating the OFCV from the reconfig
                     // command. Because the below command is a read command, it is safe to not
                     // propagate the OFCV across shards.
-                    auto newClient = opCtx->getServiceContext()
-                                         ->getService(ClusterRole::ShardServer)
-                                         ->makeClient("GetCWWCFromConfig");
+                    auto newClient =
+                        opCtx->getServiceContext()->getService()->makeClient("GetCWWCFromConfig");
                     AlternativeClientRegion acr(newClient);
                     auto newCtx = Client::getCurrent()->makeOperationContext();
                     if (!_externalState->isCWWCSetOnConfigShard(newCtx.get())) {

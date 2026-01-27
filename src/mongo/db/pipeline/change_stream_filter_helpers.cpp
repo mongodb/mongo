@@ -177,6 +177,24 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto dropEvent = backingBsonObjs.emplace_back(BSON("o.drop" << collMatch.firstElement()));
     auto renameFromEvent =
         backingBsonObjs.emplace_back(BSON("o.renameCollection" << nsMatch.firstElement()));
+    auto upgradeDowngradeViewlessTimeseriesEvent = [&]() {
+        const auto& nss = expCtx->getNamespaceString();
+        auto streamType = ChangeStream::getChangeStreamType(nss);
+
+        if (streamType == ChangeStreamType::kCollection) {
+            // A single timeseries collection change stream is invalidated when migrating from
+            // system.buckets to viewless timeseries collections and back.
+            auto filterBSON = nss.isTimeseriesBucketsCollection()
+                ? BSON("o.upgradeDowngradeViewlessTimeseries"
+                       << nss.getTimeseriesViewNamespace().coll())
+                : BSON("o.upgradeDowngradeViewlessTimeseries" << nss.coll());
+
+            return backingBsonObjs.emplace_back(filterBSON);
+        } else {
+            return backingBsonObjs.emplace_back(
+                BSON("o.upgradeDowngradeViewlessTimeseries" << BSON("$exists" << true)));
+        }
+    }();
     auto renameToEvent = backingBsonObjs.emplace_back(
         BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << nsMatch.firstElement()));
     const auto createEvent =
@@ -193,6 +211,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     auto orCmdEvents = std::make_unique<OrMatchExpression>();
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameFromEvent, expCtx));
+    orCmdEvents->add(
+        MatchExpressionParser::parseAndNormalize(upgradeDowngradeViewlessTimeseriesEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(renameToEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createEvent, expCtx));
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(createIndexesEvent, expCtx));
@@ -279,6 +299,15 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
             BSON("o.renameCollection"
                  << BSON("$exists" << true) << "o.to"
                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
+
+        // A single timeseries collection change stream is invalidated when migrating from
+        // system.buckets to viewless timeseries collections and back.
+        if (nss.isTimeseriesBucketsCollection()) {
+            invalidatingCommands.append(BSON("o.upgradeDowngradeViewlessTimeseries"
+                                             << nss.getTimeseriesViewNamespace().coll()));
+        } else {
+            invalidatingCommands.append(BSON("o.upgradeDowngradeViewlessTimeseries" << nss.coll()));
+        }
     } else {
         // For a whole-db streams, only 'dropDatabase' will cause an invalidation event.
         invalidatingCommands.append(BSON("o.dropDatabase" << BSON("$exists" << true)));

@@ -4,8 +4,8 @@
 [jsTest] Resetting collection. Inserting docs:
 [jsTest] ----
 
-{  "_id" : 187,  "a" : NumberInt(0),  "array" : [ ],  "b" : NumberInt(0),  "m" : {  "m1" : NumberInt(0),  "m2" : NumberInt(0) },  "t" : ISODate("1970-01-01T00:00:00Z") }
-{  "_id" : 83,  "a" : NumberInt(0),  "array" : "",  "b" : NumberInt(0),  "m" : {  "m1" : NumberInt(0),  "m2" : ISODate("1970-01-01T00:00:00Z") },  "t" : ISODate("1970-01-01T00:00:00Z") }
+{ "_id" : 187, "a" : NumberInt(0), "array" : [ ], "b" : NumberInt(0), "m" : { "m1" : NumberInt(0), "m2" : NumberInt(0) }, "t" : ISODate("1970-01-01T00:00:00Z") }
+{ "_id" : 83, "a" : NumberInt(0), "array" : "", "b" : NumberInt(0), "m" : { "m1" : NumberInt(0), "m2" : ISODate("1970-01-01T00:00:00Z") }, "t" : ISODate("1970-01-01T00:00:00Z") }
 Collection count: 2
 
 
@@ -13,7 +13,7 @@ Collection count: 2
 [jsTest] Creating indexes:
 [jsTest] ----
 
-{  "array" : 1,  "t" : 1 }
+{ "array" : 1, "t" : 1 }
 ### Pipeline
 ```json
 [
@@ -50,7 +50,7 @@ Collection count: 2
 ```
 ### Results
 ```json
-{  "_id" : 83,  "a" : 0,  "array" : "",  "b" : 0,  "m" : {  "m1" : 0,  "m2" : ISODate("1970-01-01T00:00:00Z") },  "t" : ISODate("1970-01-01T00:00:00Z") }
+{ "_id" : 83, "a" : 0, "array" : "", "b" : 0, "m" : { "m1" : 0, "m2" : ISODate("1970-01-01T00:00:00Z") }, "t" : ISODate("1970-01-01T00:00:00Z") }
 ```
 ### Summarized explain
 Execution Engine: classic

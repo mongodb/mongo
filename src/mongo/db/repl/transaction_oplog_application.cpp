@@ -723,9 +723,10 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             txnParticipant.prepareTransaction(opCtx, prepareOp.getOpTime());
 
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
+            auto prepareOpTime = prepareOp.getOpTime();
             invariant(opObserver);
-            opObserver->onTransactionPrepareNonPrimary(
-                opCtx, *prepareOp.getSessionId(), txnOps, prepareOp.getOpTime());
+            opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
+                opCtx, *prepareOp.getSessionId(), txnOps, prepareOpTime);
 
             // Prepare transaction success.
             abortOnError.dismiss();
@@ -926,10 +927,15 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
         }
 
         // Reload transaction participant state based on the transaction record.
+        const auto lsid = txnRecord.getSessionId();
         txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx, std::move(txnRecord));
 
-        // TODO SERVER-113740: Trigger the op observers for chunk migrations once they support
-        // not having the full operations list. e.g. onTransactionPrepareNonPrimary()
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        // Statements and prepareOpTime are not recoverable from a precise checkpoint, so we don't
+        // pass them to the op-observer.
+        opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
+            opCtx, lsid, boost::none /* statements */, boost::none /* prepareOpTime */);
 
         // Stash the transaction so it yields its resources and can be resumed by future user
         // operations.

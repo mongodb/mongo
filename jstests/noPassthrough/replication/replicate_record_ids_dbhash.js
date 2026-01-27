@@ -3,9 +3,6 @@
  *
  * @tags: [
  *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): This test requires some collections to be created with
- *   # recordIdsReplicated:false.
- *   exclude_when_record_ids_replicated
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
@@ -43,9 +40,17 @@ const insertDocWithInconsistentRids = function (primaryDB, secondaryDB, docToIns
 const runTest = function (replicatedRecordIds) {
     const primaryDB = primary.getDB(dbName);
     const secondaryDB = secondary.getDB(dbName);
-    const createOpts = replicatedRecordIds ? {recordIdsReplicated: true} : {};
 
-    assertDropAndRecreateCollection(primaryDB, collName, createOpts);
+    if (replicatedRecordIds) {
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "off"}),
+        );
+    } else {
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "overrideRecordIdsReplicatedFalse", mode: "alwaysOn"}),
+        );
+    }
+    assertDropAndRecreateCollection(primaryDB, collName, {});
     rst.awaitReplication();
     assert.doesNotThrow(() => rst.checkReplicatedDataHashes());
 

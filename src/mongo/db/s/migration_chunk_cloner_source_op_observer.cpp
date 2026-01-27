@@ -168,7 +168,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     }
 
     int index = 0;
-    const auto& opTimeList = opAccumulator->insertOpTimes;
+    const auto& opTimeList = opAccumulator->batchOpTimes;
     for (auto it = first; it != last; it++, index++) {
         auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
 
@@ -314,14 +314,25 @@ void MigrationChunkClonerSourceOpObserver::postTransactionPrepare(
             *opCtx->getLogicalSessionId(), statements, prepareOpTime));
 }
 
-void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimary(
+void MigrationChunkClonerSourceOpObserver::onTransactionPrepareNonPrimaryForChunkMigration(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
-    const std::vector<repl::OplogEntry>& statements,
-    const repl::OpTime& prepareOpTime) {
+    boost::optional<const std::vector<repl::OplogEntry>&> statements,
+    boost::optional<const repl::OpTime&> prepareOpTime) {
+    if (!statements || !prepareOpTime) {
+        // Statements or prepareOpTime not being available means that the prepared transaction was
+        // recovered from a precise checkpoint. In this case, we intentionally do not (and cannot)
+        // install a LogTransactionOperationsForShardingHandler here. During chunk migration, the
+        // donor’s cloning phase enforces prepare conflicts, so the shard key index scan will wait
+        // until this recovered prepared transaction is committed/aborted and its effects are
+        // visible. As a result, we do not need an onCommit hook to populate the donation’s internal
+        // buffers after cloning starts.
+        return;
+    }
+
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<LogTransactionOperationsForShardingHandler>(
-            lsid, statements, prepareOpTime));
+            lsid, *statements, *prepareOpTime));
 }
 
 void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
@@ -335,7 +346,7 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
     }
 
     // Return early if this isn't a retryable batched write.
-    if (!opAccumulator || opAccumulator->insertOpTimes.empty() ||
+    if (!opAccumulator || opAccumulator->batchOpTimes.empty() ||
         oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations ||
         !opCtx->getTxnNumber() || !opCtx->getLogicalSessionId()) {
         return;
@@ -348,7 +359,7 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
 
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<LogRetryableApplyOpsForShardingHandler>(std::move(namespaces),
-                                                                 opAccumulator->insertOpTimes));
+                                                                 opAccumulator->batchOpTimes));
 }
 
 }  // namespace mongo

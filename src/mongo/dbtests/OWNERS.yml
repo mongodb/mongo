@@ -18,6 +18,9 @@ filters:
   - "insert_test.cpp":
     approvers:
       - 10gen/query-optimization
+  - "jstests.cpp":
+    approvers:
+      - 10gen/query-integration-features
   - "jsobjtests.cpp":
     approvers:
       - 10gen/server-programmability

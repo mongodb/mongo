@@ -19,6 +19,11 @@ const rst = new ReplSetTest({
             },
         },
     ],
+    nodeOptions: {
+        setParameter: {
+            "failpoint.overrideRecordIdsReplicatedFalse": "{mode: 'alwaysOn'}",
+        },
+    },
 });
 const nodes = rst.startSet();
 rst.initiate();

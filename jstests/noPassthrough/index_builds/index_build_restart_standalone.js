@@ -51,6 +51,9 @@ IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
 // Wait for the stable timestamps on each node to advance, so that the  write is included in the
 // stable checkpoint taken on shutdown.
 jsTest.log("Wait for stable timestamps to advance.");
+const targetTs = primary.adminCommand({replSetGetStatus: 1}).optimes.readConcernMajorityOpTime.ts;
+rst.waitForStableTimestampTobeAdvanced(primary, targetTs);
+rst.waitForStableTimestampTobeAdvanced(secondary, targetTs);
 rst.awaitLastStableRecoveryTimestamp();
 
 TestData.skipCheckDBHashes = true;

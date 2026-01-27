@@ -14,7 +14,7 @@ filters:
       - 10gen/query-integration-observability
   - "example_fcv_upgrade_downgrade_test.js":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "ident_suffix_compatability.js":
     approvers:
       - 10gen/server-storage-engine-integration
@@ -23,19 +23,22 @@ filters:
       - 10gen/server-storage-engine-integration
   - "minor_version*":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "mixed_cluster_roles.js":
     approvers:
       - 10gen/server-replication-reviewers
   - "mixed_replica_set_with_latest_primary.js":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "register_query_feature_flag.js":
     approvers:
       - 10gen/query
   - "remove_invalid_index_options.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "skip_level_upgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "upgrade_during_vectored_insert.js":
     approvers:
       - 10gen/server-replication-reviewers

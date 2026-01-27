@@ -103,7 +103,13 @@ const StringMap<Document> kOpTypeRewriteMap = {
     {"abortIndexBuild", {{"op", "c"_sd}, {"o.abortIndexBuild"_sd, kExistsTrue}}},
     {"dropIndexes", {{"op", "c"_sd}, {"o.dropIndexes"_sd, kExistsTrue}}},
     {"modify", {{"op", "c"_sd}, {"o.collMod"_sd, kExistsTrue}}},
-    {"rename", {{"op", "c"_sd}, {"o.renameCollection"_sd, kExistsTrue}}},
+
+    {"rename",
+     {{"op", "c"_sd},
+      {"$or"_sd,
+       std::vector<Value>{Value({{"o.renameCollection"_sd, kExistsTrue}}),
+                          Value({{"o.upgradeDowngradeViewlessTimeseries"_sd, kExistsTrue}})}}}},
+
     {"dropDatabase", {{"op", "c"_sd}, {"o.dropDatabase"_sd, kExistsTrue}}}};
 
 // $exists and null-equality checks on 'updateDescription' or its immediate subfields are AlwaysTrue

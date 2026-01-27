@@ -348,5 +348,130 @@ UpdateSpec getUpdateSpec(const PipelineComplexity& complexity) {
             MONGO_UNREACHABLE_TASSERT(11400601);
     }
 }
+
+const UpdateSpec kModifierUpdateSimple = {.u = fromjson(R"(
+        { $set: { "grades.questions": 2 } }
+    )")};
+
+const UpdateSpec kModifierUpdateSimpleWithArrayFilters = {
+    .u = fromjson(R"(
+        { $set: { "grades.$[t].questions.$[score]": 2 } }
+    )"),
+    .arrayFilters = fromjson(R"([{"t.type": "quiz"}, {"score": {"$gte": 80}}])")};
+
+// Moderate complexity: 3 operators for progressive trend analysis
+const UpdateSpec kModifierUpdateMildlyComplex = {.u = fromjson(R"(
+        {
+            $set: { "name": "updated", "status": "active" },
+            $inc: { "count": 1, "version": 5 },
+            $push: { "tags": "newTag", "events": { "timestamp": 1234567890 } }
+        }
+    )")};
+
+const UpdateSpec kModifierUpdateMildlyComplexWithArrayFilters = {.u = fromjson(R"(
+        {
+            $set: { "items.$[i].name": "updated", "items.$[i].status": "active" },
+            $inc: { "items.$[i].count": 1, "items.$[j].version": 5 },
+            $push: { "items.$[i].tags": "newTag", "items.$[j].events": { "timestamp": 1234567890 } }
+        }
+    )"),
+                                                                 .arrayFilters = fromjson(R"([
+        {"i.price": {"$gte": 100}},
+        {"j.type": "product"}
+    ])")};
+
+// Medium complexity: 6 operators for mid-range analysis
+const UpdateSpec kModifierUpdateComplex = {.u = fromjson(R"(
+        {
+            $set: { "name": "updated", "status": "active", "metadata.version": 2 },
+            $inc: { "count": 1, "version": 5 },
+            $push: { "tags": "newTag", "events": { "timestamp": 1234567890 } },
+            $pullAll: { "queue": [1, 2, 3] },
+            $pop: { "lastInQueue": 1 },
+            $unset: { "deprecated_field": "" }
+        }
+    )")};
+
+const UpdateSpec kModifierUpdateComplexWithArrayFilters = {.u = fromjson(R"(
+        {
+            $set: { "items.$[i].name": "updated", "items.$[i].status": "active", "items.$[i].metadata.version": 2 },
+            $inc: { "items.$[i].count": 1, "items.$[j].version": 5 },
+            $push: { "items.$[i].tags": "newTag", "items.$[j].events": { "timestamp": 1234567890 } },
+            $pullAll: { "items.$[i].queue": [1, 2, 3] },
+            $pop: { "items.$[j].lastInQueue": 1 },
+            $unset: { "items.$[i].deprecated_field": "" }
+        }
+    )"),
+                                                           .arrayFilters = fromjson(R"([
+        {"i.price": {"$gte": 100}},
+        {"j.type": "product"}
+    ])")};
+
+const UpdateSpec kModifierUpdateVeryComplex = {.u = fromjson(R"(
+        {
+            $set: { "name": "updated", "status": "active", "metadata.version": 2 },
+            $inc: { "count": 1, "version": 5, "iteration": -3 },
+            $push: { "tags": "newTag", "events": { "timestamp": 1234567890, "type": "update" } },
+            $pullAll: { "queue": [1, 2, 3], "invalidIds": ["id1", "id2"] },
+            $pop: { "firstInQueue": -1, "lastInQueue": 1 },
+            $rename: { "old_field": "new_field", "legacyName": "currentName" },
+            $unset: { "deprecated_field": "", "temporary": "" },
+            $min: { "score": 50, "minRating": 1 },
+            $max: { "rating": 5, "maxAttempts": 100 },
+            $mul: { "price": 0.9, "discount": 0.8 },
+            $bit: { "flags": { "and": 255 }, "permissions": { "or": 8 }, "switches": { "xor": 3 } }
+        }
+    )")};
+
+const UpdateSpec kModifierUpdateVeryComplexWithArrayFilters = {.u = fromjson(R"(
+        {
+            $set: { "items.$[i].name": "updated", "items.$[i].status": "active" },
+            $inc: { "items.$[i].count": 1, "items.$[j].iteration": 5 },
+            $push: { "items.$[i].tags": "newTag", "items.$[j].events": { "type": "modified" } },
+            $pullAll: { "items.$[i].queue": [1, 2], "items.$[j].invalidIds": ["id1"] },
+            $pop: { "items.$[i].firstInQueue": -1, "items.$[j].lastInQueue": 1 },
+            $unset: { "items.$[i].deprecated_field": "", "items.$[j].temporary": "" },
+            $min: { "items.$[i].score": 50, "items.$[j].minRating": 1 },
+            $max: { "items.$[i].rating": 5, "items.$[j].maxAttempts": 100 },
+            $mul: { "items.$[i].price": 0.9, "items.$[j].discount": 0.8 },
+            $bit: { "items.$[i].flags": { "and": 255 }, "items.$[j].permissions": { "or": 8 } }
+        }
+    )"),
+                                                               .arrayFilters = fromjson(R"([
+        {"i.price": {"$gte": 100}},
+        {"j.type": "product"}
+    ])")};
+
+
+const UpdateSpec& getUpdateSpec(const ModifierUpdateComplexity& complexity, bool useArrayFilters) {
+    if (useArrayFilters) {
+        switch (complexity) {
+            case ModifierUpdateComplexity::kSimple:
+                return kModifierUpdateSimpleWithArrayFilters;
+            case ModifierUpdateComplexity::kMildlyComplex:
+                return kModifierUpdateMildlyComplexWithArrayFilters;
+            case ModifierUpdateComplexity::kComplex:
+                return kModifierUpdateComplexWithArrayFilters;
+            case ModifierUpdateComplexity::kVeryComplex:
+                return kModifierUpdateVeryComplexWithArrayFilters;
+            default:
+                MONGO_UNREACHABLE_TASSERT(11596700);
+        }
+    } else {
+        switch (complexity) {
+            case ModifierUpdateComplexity::kSimple:
+                return kModifierUpdateSimple;
+            case ModifierUpdateComplexity::kMildlyComplex:
+                return kModifierUpdateMildlyComplex;
+            case ModifierUpdateComplexity::kComplex:
+                return kModifierUpdateComplex;
+            case ModifierUpdateComplexity::kVeryComplex:
+                return kModifierUpdateVeryComplex;
+            default:
+                MONGO_UNREACHABLE_TASSERT(11596701);
+        }
+    }
+}
+
 }  // namespace query_benchmark_constants
 }  // namespace mongo

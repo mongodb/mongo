@@ -440,3 +440,206 @@ buildvariants:
       - name: .release_critical .requires_large_host
         distros:
           - rhel93-arm64-m8g-4xlarge
+
+  - name: rhel10-64-bit
+    display_name: RHEL 10.0
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel10.0-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
+      push_name: linux
+      push_arch: x86_64-rhel10
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel10
+        --build_enterprise=False
+        --remote_executor=
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source
+        --modules=none
+      multiversion_platform: rhel10
+      multiversion_edition: targeted
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: x86_64
+      packager_distro: rhel10
+      repo_edition: org
+      large_distro_name: rhel10.0-large
+      compile_variant: rhel10-64-bit
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - rhel10.0-large
+      - name: run_unit_tests_TG
+        distros:
+          - rhel10.0-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel10_org
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel10.0-large
+      - name: .release_critical !.requires_large_host !.incompatible_community !.publish
+      - name: .release_critical .requires_large_host !.incompatible_community !.publish
+        distros:
+          - rhel10.0-large
+
+  - name: enterprise-rhel-10-64-bit
+    display_name: "Enterprise RHEL 10.0"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel10.0-small
+    expansions:
+      additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: linux
+      push_arch: x86_64-enterprise-rhel10
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      bazel_compile_flags: --define=MONGO_DISTMOD=rhel10 --remote_executor=
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: --excludeWithAnyTags=requires_external_data_source
+      multiversion_platform: rhel10
+      multiversion_edition: enterprise
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: x86_64
+      packager_distro: rhel10
+      repo_edition: enterprise
+      compile_variant: enterprise-rhel-10-64-bit
+      core_analyzer_distro_name: rhel10-large
+      large_distro_name: rhel10.0-large
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - rhel10.0-large
+      - name: run_unit_tests_TG
+        distros:
+          - rhel10.0-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-large
+      - name: selinux_rhel10_enterprise
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel10.0-large
+      - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+      - name: .release_critical .requires_large_host !.publish !.publish_crypt
+        distros:
+          - rhel10.0-large
+
+  - name: rhel10-arm64
+    display_name: RHEL 10.0 arm64
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel10.0-arm64-small
+    expansions:
+      push_path: linux
+      push_bucket: downloads.mongodb.org
+      push_bucket_new: cdn-origin-mongodb-server-community
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
+      push_name: linux
+      push_arch: aarch64-rhel10
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel10
+        --build_enterprise=False
+        --remote_executor=
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: >-
+        --excludeWithAnyTags=requires_external_data_source
+        --modules=none
+      has_packages: true
+      packager_script: packager.py
+      packager_arch: aarch64
+      packager_distro: rhel10
+      repo_edition: org
+      large_distro_name: rhel10.0-arm64-large
+      compile_variant: rhel10-arm64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - rhel10.0-arm64-large
+      - name: run_unit_tests_TG
+        distros:
+          - rhel10.0-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-small
+      - name: .development_critical !.requires_large_host !.incompatible_community
+      - name: .development_critical .requires_large_host !.incompatible_community
+        distros:
+          - rhel10.0-arm64-large
+      - name: .release_critical !.requires_large_host !.incompatible_community !.publish
+      - name: .release_critical .requires_large_host !.incompatible_community !.publish
+        distros:
+          - rhel10.0-arm64-large
+
+  - name: enterprise-rhel-10-arm64
+    display_name: "Enterprise RHEL 10.0 arm64"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - rhel10.0-arm64-small
+    expansions:
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      push_path: linux
+      push_bucket: downloads.10gen.com
+      push_bucket_new: cdn-origin-mongodb-server-enterprise
+      push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
+      push_name: linux
+      push_arch: aarch64-enterprise-rhel10
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=rhel10
+        --remote_executor=
+      compile_all_but_not_unittests_flags: >-
+        --linkopt=-s
+      test_flags: --excludeWithAnyTags=requires_external_data_source
+      has_packages: true
+      packager_script: packager_enterprise.py
+      packager_arch: aarch64
+      packager_distro: rhel10
+      repo_edition: enterprise
+      large_distro_name: rhel10.0-arm64-large
+      compile_variant: enterprise-rhel-10-arm64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+        distros:
+          - rhel10.0-arm64-large
+      - name: run_unit_tests_TG
+        distros:
+          - rhel10.0-arm64-large
+      - name: test_packages
+        distros:
+          - ubuntu2204-arm64-small
+      - name: .development_critical !.requires_large_host
+      - name: .development_critical .requires_large_host
+        distros:
+          - rhel10.0-arm64-large
+      - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+      - name: .release_critical .requires_large_host !.publish !.publish_crypt
+        distros:
+          - rhel10.0-arm64-large

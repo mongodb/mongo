@@ -13,7 +13,6 @@ executor:
         TestData:
           roleGraphInvalidationIsFatal: true
           setParameters:
-            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true
           setParametersMongos:

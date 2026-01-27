@@ -47,6 +47,8 @@
 namespace mongo {
 namespace {
 
+PseudoRandom _random{SecureRandom().nextInt64()};
+
 class TimeseriesCatalogHelperTest : public CatalogTestFixture {
 public:
     TimeseriesCatalogHelperTest() {
@@ -427,10 +429,12 @@ TEST_F(TimeseriesCatalogHelperTest, acquireWithUpgradeDowngrade) {
     });
     ON_BLOCK_EXIT([&] { _upgradeDowngradeInBackground.store(false); });
     for (int i = 0; i < 10000; i++) {
+        // acquire either through main or buckets namespace
+        auto nss = _random.nextInt32(2) ? _mainNss : _bucketsNss;
         auto [acq, wasTranslated] = timeseries::acquireCollectionWithBucketsLookup(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(
-                opCtx, _mainNss, AcquisitionPrerequisites::OperationType::kRead),
+                opCtx, nss, AcquisitionPrerequisites::OperationType::kRead),
             LockMode::MODE_IS);
         ASSERT_TRUE(acq.exists());
         ASSERT_TRUE(acq.getCollectionPtr()->isTimeseriesCollection());

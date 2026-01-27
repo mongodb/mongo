@@ -2,11 +2,10 @@
  * Tests that applyOps correctly respects the 'oplogApplicationMode' and 'alwaysUpsert' flags.
  * 'alwaysUpsert' defaults to false and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
  * that these default values do not lead to command failure.
- * @tags: [
- *  # The test explicitly uses "InitialSync" mode that has a stronger constraint on replicated record ids.
- *  exclude_when_record_ids_replicated,
- * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+let rid = 1;
 
 let standalone = MongoRunner.runMongod();
 var db = standalone.getDB("test");
@@ -24,6 +23,9 @@ for (let updateOp of [
 ]) {
     coll.drop();
     assert.writeOK(coll.insert({_id: 1}));
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "RecordIdsReplicated")) {
+        updateOp["rid"] = rid++;
+    }
 
     jsTestLog(`Test applyOps with the following op:\n${tojson(updateOp)}`);
     assert.commandFailed(db.adminCommand({applyOps: [updateOp]}));

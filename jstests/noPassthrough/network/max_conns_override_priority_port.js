@@ -3,9 +3,10 @@
  *
  * Maximum connection overrides are not implemented for gRPC.
  * @tags: [
+ *      # The priority port is based on ASIO, so gRPC testing is excluded
  *      grpc_incompatible,
  *      requires_sharding,
- *      featureFlagDedicatedPortForPriorityOperations,
+ *      requires_fcv_83,
  * ]
  */
 import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";

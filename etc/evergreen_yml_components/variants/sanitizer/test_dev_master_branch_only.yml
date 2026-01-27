@@ -12,8 +12,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -51,8 +49,6 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -264,7 +260,7 @@ buildvariants:
         --opt=on
         --define=MONGO_DISTMOD=windows
         --build_enterprise=False
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       multiversion_platform: windows
       multiversion_edition: enterprise
@@ -310,7 +306,7 @@ buildvariants:
         --dbg=True
         --opt=off
         --define=MONGO_DISTMOD=windows
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       resmoke_jobs_max: 1
       test_flags: >-
@@ -686,7 +682,8 @@ buildvariants:
       # aggregation_sharded_collections_passthrough, and
       # sharding_jscore_passthrough_with_balancer_gen are too resource intensive with TLS and
       # gRPC to run under the sanitizer.
-      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !sharding_jscore_passthrough_with_balancer_gen !.auth !.txns
+      # sharding_jscore_passthrough_priority_ports_gen does not support GRPC.
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !sharding_jscore_passthrough_with_balancer_gen !sharding_jscore_passthrough_priority_ports_gen !.auth !.txns !.feature_flag_guarded
       - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen !aggregation_sharded_collections_causally_consistent_passthrough !aggregation_sharded_collections_passthrough
       - name: .grpc_misc_js

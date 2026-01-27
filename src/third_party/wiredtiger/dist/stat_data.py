@@ -408,6 +408,7 @@ conn_stats = [
     # Note eviction_server_evict_attempt - eviction_server_evict_fail = evict page successes by eviction server.
     EvictStat('eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
     EvictStat('eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
+    EvictStat('eviction_server_skip_history_store_pages_with_updates_during_checkpoint', 'eviction server skips clean history store pages with updates when a precise checkpoint is in progress'),
     EvictStat('eviction_server_skip_ingest_trees', 'eviction server skips ingest btrees in disagg'),
     EvictStat('eviction_server_skip_intl_page_non_aggressive', 'eviction server skipped the internal pages if eviction is not in aggressive mode.'),
     EvictStat('eviction_server_skip_intl_page_with_active_child', 'eviction server skips internal pages as it has an active child.'),
@@ -1317,12 +1318,14 @@ conn_dsrc_stats = [
     BlockDisaggStat('disagg_block_hs_put', 'Disaggregated block manager put to the shared history store in SLS'),
     BlockDisaggStat('disagg_block_page_discard', 'Disaggregated block manager page discard calls'),
     BlockDisaggStat('disagg_block_put', 'Disaggregated block manager put '),
+    BlockDisaggStat('disagg_block_put_cold', 'Disaggregated block manager put cold page'),
     BlockDisaggStat('disagg_block_read_ahead_frontier', 'Disaggregated block manager read ahead of materialization frontier'),
 
     ##########################################
     # Layered table statistics
     ##########################################
     LayeredStat('layered_curs_insert', 'Layered table cursor insert operations'),
+    LayeredStat('layered_curs_modify', 'Layered table cursor modify operations'),
     LayeredStat('layered_curs_next', 'Layered table cursor next operations'),
     LayeredStat('layered_curs_next_ingest', 'Layered table cursor next operations from the ingest btrees'),
     LayeredStat('layered_curs_next_stable', 'Layered table cursor next operations from the stable btrees'),

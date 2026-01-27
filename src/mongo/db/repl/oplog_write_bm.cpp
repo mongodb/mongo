@@ -159,7 +159,7 @@ public:
 
         setGlobalServiceContext(std::move(svcCtx));
 
-        Collection::Factory::set(_svcCtx, std::make_unique<CollectionImpl::FactoryImpl>());
+        Collection::Factory::set(_svcCtx, std::make_unique<CollectionImplFactory>());
         storageGlobalParams.engine = "wiredTiger";
         storageGlobalParams.engineSetByUser = true;
 

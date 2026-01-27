@@ -84,7 +84,10 @@ public:
      */
     struct SucceededWithoutItem {};
 
-    using FindAndModifyReplyItem = StatusWith<write_ops::FindAndModifyCommandReply>;
+    struct FindAndModifyReplyItem {
+        StatusWith<write_ops::FindAndModifyCommandReply> swReply;
+        boost::optional<ShardId> shardId;
+    };
 
     using OpResultVariant = std::variant<BulkWriteOpResults, FindAndModifyReplyItem>;
 
@@ -283,9 +286,11 @@ private:
                          CollectionsToCreate& collsToCreate) const;
 
     /**
-     * Generate an ItemVariant for 'op' with an error given by 'status'.
+     * Generate an ItemVariant for 'op' with an error given by 'status', returned from 'shardId'.
      */
-    ItemVariant makeErrorItem(const WriteOp& op, const Status& status) const;
+    ItemVariant makeErrorItem(const WriteOp& op,
+                              const Status& status,
+                              const ShardId& shardId) const;
 
     /**
      * This method scans the items from 'shardResults' and groups the items together by op. This
