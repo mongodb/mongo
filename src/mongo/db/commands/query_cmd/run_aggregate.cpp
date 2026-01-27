@@ -1046,8 +1046,6 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // require reparse from the modified LPP).
     // TODO SPM-4488: Once query shape can be generated from LiteParsed, a reparse will no
     // longer be required. Simplify the logic as such.
-    // TODO SERVER-117322 Increase the reparse granularity here so that we only reparse stages that
-    // have been modified by desugaring or view processing.
     auto desugaredLPP = aggExState.getOriginalLiteParsedPipeline().clone();
     const auto desugaredHere = LiteParsedDesugarer::desugar(&desugaredLPP);
     auto secondParseRequirement =
