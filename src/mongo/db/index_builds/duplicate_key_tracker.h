@@ -79,7 +79,9 @@ public:
      * Must not be in a WriteUnitOfWork.
      */
     boost::optional<SortedDataInterface::DuplicateKey> checkConstraints(
-        OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const;
+        OperationContext* opCtx,
+        const CollectionPtr& coll,
+        const IndexCatalogEntry* indexCatalogEntry) const;
 
     std::string getTableIdent() const {
         return std::string{_keyConstraintsTable->rs()->getIdent()};

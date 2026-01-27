@@ -158,7 +158,9 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
 }
 
 boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkConstraints(
-    OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const {
+    OperationContext* opCtx,
+    const CollectionPtr& coll,
+    const IndexCatalogEntry* indexCatalogEntry) const {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     auto constraintsCursor =
@@ -188,8 +190,22 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
         }
 
         WriteUnitOfWork wuow(opCtx);
-        _keyConstraintsTable->rs()->deleteRecord(
-            opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+        if (auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+            uassertStatusOK(
+                container_write::remove(opCtx,
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        coll,
+                                        std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                                            _keyConstraintsTable->rs()->getContainer())
+                                            .get(),
+                                        record->id.getLong()));
+        } else {
+            _keyConstraintsTable->rs()->deleteRecord(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx), record->id);
+        }
 
         constraintsCursor->save();
         wuow.commit();

@@ -135,7 +135,7 @@ Status IndexBuildInterceptor::checkDuplicateKeyConstraints(
     if (!_duplicateKeyTracker) {
         return Status::OK();
     }
-    if (auto duplicate = _duplicateKeyTracker->checkConstraints(opCtx, indexCatalogEntry)) {
+    if (auto duplicate = _duplicateKeyTracker->checkConstraints(opCtx, coll, indexCatalogEntry)) {
         return buildDupKeyErrorStatus(duplicate->key,
                                       coll->ns(),
                                       indexCatalogEntry->descriptor()->indexName(),
