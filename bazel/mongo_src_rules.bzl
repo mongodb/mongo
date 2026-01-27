@@ -664,7 +664,7 @@ def _mongo_cc_binary_and_test(
         "visibility": visibility,
         "testonly": testonly,
         "copts": copts,
-        "data": data + SANITIZER_DATA,
+        "data": data + SANITIZER_DATA + ["//bazel:test_wrapper"],
         "tags": tags,
         "linkopts": linkopts + rpath_flags + select({
             "//bazel/config:thin_lto_enabled": ["-Wl,--threads=" + str(NUM_CPUS)],
@@ -738,22 +738,6 @@ def _mongo_cc_binary_and_test(
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
-            visibility = visibility,
-            exec_properties = exec_properties,
-        )
-
-        native.sh_test(
-            name = name + "_ci_wrapper",
-            srcs = [
-                "//bazel:test_wrapper",
-            ],
-            tags = original_tags + ["wrapper_target"],
-            args = [
-                "$(location " + name + ")",
-            ],
-            data = args["data"] + [name],
-            env = args["env"],
-            target_compatible_with = target_compatible_with,
             visibility = visibility,
             exec_properties = exec_properties,
         )

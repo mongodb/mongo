@@ -80,7 +80,6 @@ FOUND=()
 for label in "${RAW_LABELS[@]}"; do
     [[ -z "$label" ]] && continue
     [[ "$label" == *"_with_debug"* ]] && continue
-    [[ "$label" == *"_ci_wrapper"* ]] && continue
     [[ "$label" == *"third_party"* ]] && continue
     [[ "$label" != //* ]] && continue
 

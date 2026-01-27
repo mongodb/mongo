@@ -62,7 +62,7 @@ def _copy_bins_to_upload(upload_bin_dir: str, upload_lib_dir: str):
             dsyms.append(Path(dirpath))
         for f in filenames:
             file = Path(f)
-            if file.stem.endswith(("_with_debug", "_ci_wrapper")):
+            if file.stem.endswith("_with_debug"):
                 continue
             if file.suffix in [".so", ".so.debug", ".dylib"]:
                 libs.append(Path(os.path.join(dirpath, file)))
