@@ -217,7 +217,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             rs->reclaimOplog(opCtx);
         }
     } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
-        LOGV2(11212204, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
+        LOGV2_DEBUG(
+            11212204, 1, "OplogCapMaintainerThread interrupted", "reason"_attr = ex.reason());
         interruptCount.fetchAndAdd(1);
     } catch (const std::exception& e) {
         LOGV2_FATAL_NOTRACE(22243, "Error in OplogCapMaintainerThread", "error"_attr = e.what());

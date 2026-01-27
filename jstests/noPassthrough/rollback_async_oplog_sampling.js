@@ -82,6 +82,8 @@ assert.soon(() => {
     return checkLog.checkContainsWithCountJson(primary, 22382, {}, /*expectedCount=*/ 1);
 });
 
+let admin = primary.getDB("admin");
+admin.setLogLevel(1);
 rollbackTest.transitionToSteadyStateOperations();
 rollbackTest.stop();
 
