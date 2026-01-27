@@ -3543,17 +3543,13 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
                     RecoveryUnit::ReadSource::kNoTimestamp);
         invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
-        // Primary-driven index builds need to replicate container writes.
-        auto operationType = isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))
-            ? AcquisitionPrerequisites::kWrite
-            : AcquisitionPrerequisites::kUnreplicatedWrite;
         const auto collection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(
                 NamespaceStringOrUUID{replState->dbName, replState->collectionUUID},
                 PlacementConcern::kPretendUnsharded,
                 repl::ReadConcernArgs::get(opCtx),
-                operationType),
+                AcquisitionPrerequisites::kUnreplicatedWrite),
             MODE_IX);
 
         tassert(7683105, "Expected collection to exist", collection.exists());
@@ -3580,12 +3576,9 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        // Primary-driven index builds need to replicate container writes.
-        auto intent = isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))
-            ? rss::consensus::IntentRegistry::Intent::Write
-            : rss::consensus::IntentRegistry::Intent::LocalWrite;
-        auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
-            Lock::GlobalLockOptions{.explicitIntent = intent});
+        auto autoGetCollOptions =
+            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
+                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(

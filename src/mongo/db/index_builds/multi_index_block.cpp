@@ -519,14 +519,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     const NamespaceStringOrUUID& nssOrUUID,
     const boost::optional<RecordId>& resumeAfterRecordId) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    // Primary-driven index builds need to replicate container writes.
-    auto operationType = _method == IndexBuildMethodEnum::kPrimaryDriven
-        ? AcquisitionPrerequisites::kWrite
-        : AcquisitionPrerequisites::kUnreplicatedWrite;
     // TODO SERVER-109542: Use regular ShardRole acquisitions for read.
     boost::optional<CollectionAcquisition> collection =
         shard_role_nocheck::acquireLocalCollectionNoConsistentCatalog(
-            opCtx, nssOrUUID, operationType, MODE_IX);
+            opCtx, nssOrUUID, AcquisitionPrerequisites::kUnreplicatedWrite, MODE_IX);
     tassert(7683100, "Expected collection to exist", collection->exists());
 
     // This is stable under the collection lock. If the index build had been aborted, this opCtx
