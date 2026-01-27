@@ -35,7 +35,7 @@ LOCAL_ARG="$(bazel_evergreen_shutils::maybe_release_flag "$LOCAL_ARG")"
 bazel_evergreen_shutils::maybe_scale_test_timeout_and_append
 
 # Build the shared flags and persist the --config subset
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} --define=MONGO_VERSION=${version} ${patch_compile_flags:-}"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} --define=MONGO_VERSION=${version} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
 # to capture exit codes
