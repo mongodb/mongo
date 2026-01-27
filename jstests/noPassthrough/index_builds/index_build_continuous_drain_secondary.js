@@ -11,8 +11,6 @@
  *   # TODO SERVER-111896 - This test may also not be relevant for primary driven index builds overall.
  *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
- *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
- *   primary_driven_index_builds_incompatible,
  * ]
  *
  */

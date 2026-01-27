@@ -3,13 +3,9 @@
  * state.
  *
  * @tags: [
- *   # TODO(SERVER-110840): Primary-driven index builds don't support draining side writes yet.
- *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  *   uses_prepare_transaction,
  *   uses_transactions,
- *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
- *   primary_driven_index_builds_incompatible,
  * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
