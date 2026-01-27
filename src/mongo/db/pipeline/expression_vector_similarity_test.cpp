@@ -432,10 +432,12 @@ Value createInt8BinDataVector(const std::vector<int8_t>& values) {
 }
 
 // Creates a FLOAT32 binData vector from a list of float values.
+// BSON vectors are always little-endian, so we must write floats in little-endian format.
 Value createFloat32BinDataVector(const std::vector<float>& values) {
     std::vector<char> data = {0x27, 0x00};  // FLOAT32 dType + padding.
     for (auto v : values) {
-        auto* bytes = reinterpret_cast<const char*>(&v);
+        char bytes[sizeof(float)];
+        DataView(bytes).write<LittleEndian<float>>(v);
         data.insert(data.end(), bytes, bytes + sizeof(float));
     }
     return Value(BSONBinData(data.data(), data.size(), BinDataType::Vector));
