@@ -1154,6 +1154,7 @@ error_codes:
       name: OpCtxKilledOnMarkKillOpsExempt,
       categories: [CancellationError, InternalOnly],
     }
+  - {code: 484, name: KeyExists}
 
   # ^^^^
   # Add new codes, sequentially numbered, above.
