@@ -7,7 +7,7 @@
  *
  * @param {string} oldStr - The original string to compare from
  * @param {string} newStr - The new string to compare to
- * @returns {*} A patch representation of the differences between oldStr and newStr
+ * @returns {string} A patch representation of the differences between oldStr and newStr
  * @throws {AssertionError} If oldStr is not a string
  * @throws {AssertionError} If newStr is not a string
  *

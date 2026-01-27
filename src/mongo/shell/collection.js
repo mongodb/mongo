@@ -44,10 +44,16 @@ DBCollection.prototype.verify = function () {
     assert(this.getMongo(), "no mongo from getMongo()");
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.getName = function () {
     return this._shortName;
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.help = function () {
     let shortName = this.getName();
     print("DBCollection help");
@@ -268,12 +274,23 @@ DBCollection.prototype.help = function () {
     return __magicNoPrint;
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.getFullName = function () {
     return this._fullName;
 };
+
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.getMongo = function () {
     return this._db.getMongo();
 };
+
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.getDB = function () {
     return this._db;
 };
@@ -325,6 +342,9 @@ DBCollection.prototype._massageObject = function (q) {
     throw Error("don't know how to massage : " + type);
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.find = function (filter, projection, limit, skip, batchSize, options) {
     // Verify that API version parameters are not supplied via the shell helper.
     assert.noAPIParams(options);
@@ -360,6 +380,10 @@ DBCollection.prototype.find = function (filter, projection, limit, skip, batchSi
     return cursor;
 };
 
+/**
+ * @param {*} filter
+ * @returns {*}
+ */
 DBCollection.prototype.findOneWithRawData = function (filter) {
     return this.findOne(
         filter,
@@ -371,6 +395,9 @@ DBCollection.prototype.findOneWithRawData = function (filter) {
     );
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.findOne = function (filter, projection, options, readConcern, collation, rawData) {
     let cursor = this.find(filter, projection, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
 
@@ -393,9 +420,15 @@ DBCollection.prototype.findOne = function (filter, projection, options, readConc
     return ret;
 };
 
-// Returns a WriteResult for a single insert or a BulkWriteResult for a multi-insert if write
-// command succeeded, but may contain write errors.
-// Returns a WriteCommandError if the write command responded with ok:0.
+/**
+ * Returns a WriteResult for a single insert or a BulkWriteResult for a multi-insert if write
+ * command succeeded, but may contain write errors.
+ * Returns a WriteCommandError if the write command responded with ok:0.
+ *
+ * @param {*} obj
+ * @param {*} options
+ * @returns {WriteResult | BulkWriteResult | WriteCommandError}
+ */
 DBCollection.prototype.insert = function (obj, options) {
     if (!obj) throw Error("no object passed to insert!");
 
@@ -498,8 +531,14 @@ DBCollection.prototype._parseRemove = function (t, justOne) {
     };
 };
 
-// Returns a WriteResult if write command succeeded, but may contain write errors.
-// Returns a WriteCommandError if the write command responded with ok:0.
+/**
+ * Returns a WriteResult if write command succeeded, but may contain write errors.
+ * Returns a WriteCommandError if the write command responded with ok:0.
+ *
+ * @param {*} t
+ * @param {*} justOne
+ * @returns {WriteResult | WriteCommandError}
+ */
 DBCollection.prototype.remove = function (t, justOne) {
     let parsed = this._parseRemove(t, justOne);
     let query = parsed.query;
@@ -608,8 +647,16 @@ DBCollection.prototype._parseUpdate = function (query, updateSpec, upsert, multi
     };
 };
 
-// Returns a WriteResult if write command succeeded, but may contain write errors.
-// Returns a WriteCommandError if the write command responded with ok:0.
+/**
+ * Returns a WriteResult if write command succeeded, but may contain write errors.
+ * Returns a WriteCommandError if the write command responded with ok:0.
+ *
+ * @param {*} query
+ * @param {*} updateSpec
+ * @param {*} upsert
+ * @param {*} multi
+ * @returns {WriteResult | WriteCommandError}
+ */
 DBCollection.prototype.update = function (query, updateSpec, upsert, multi) {
     let parsed = this._parseUpdate(query, updateSpec, upsert, multi);
     query = parsed.query;
@@ -677,6 +724,11 @@ DBCollection.prototype.update = function (query, updateSpec, upsert, multi) {
     return result;
 };
 
+/**
+ * @param {*} obj
+ * @param {*} opts
+ * @returns {WriteResult | BulkWriteResult | WriteCommandError}
+ */
 DBCollection.prototype.save = function (obj, opts) {
     if (obj == null) throw Error("can't save a null");
 
@@ -802,6 +854,9 @@ DBCollection.prototype.drop = function (options = {}) {
     return true;
 };
 
+/**
+ * @this {DBCollection}
+ */
 DBCollection.prototype.findAndModify = function (args) {
     let cmd = {findandmodify: this.getName()};
     for (let key in args) {
@@ -1125,6 +1180,11 @@ DBCollection.prototype.getUUID = function () {
 //
 // CRUD specification aggregation cursor extension
 //
+/**
+ * @param {Array | *} pipeline
+ * @param {*} aggregateOptions
+ * @returns {AggregationCursor | *}
+ */
 DBCollection.prototype.aggregate = function (pipeline, aggregateOptions) {
     if (!(pipeline instanceof Array)) {
         // Support legacy varargs form. Also handles db.foo.aggregate().
@@ -1564,6 +1624,11 @@ DBCollection.prototype.enableAutoMerger = function () {
  *     collection.
  * @return {number}
  *
+ */
+/**
+ * @param {*} query
+ * @param {*} options
+ * @returns {number}
  */
 DBCollection.prototype.count = function (query, options) {
     const cmd = {count: this.getName(), query: this._massageObject(query || {}), ...options};

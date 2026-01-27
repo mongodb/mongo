@@ -3,6 +3,10 @@
 // normally.
 //
 
+/**
+ * @param {*} verbosity
+ * @returns {string}
+ */
 let parseVerbosity = function (verbosity) {
     // Truthy non-strings are interpreted as "allPlansExecution" verbosity.
     if (verbosity && typeof verbosity !== "string") {
@@ -19,6 +23,10 @@ let parseVerbosity = function (verbosity) {
     return verbosity;
 };
 
+/**
+ * @param {*} explainResult
+ * @returns {*}
+ */
 let throwOrReturn = function (explainResult) {
     if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
         throw _getErrorWithCode(explainResult, "explain failed: " + tojson(explainResult));
@@ -27,6 +35,11 @@ let throwOrReturn = function (explainResult) {
     return explainResult;
 };
 
+/**
+ * @param {*} innerCmd
+ * @param {string} verbosity
+ * @returns {*}
+ */
 let buildExplainCmd = function (innerCmd, verbosity) {
     let explainCmd = {"explain": innerCmd, verbosity};
     // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level

@@ -45,6 +45,9 @@ Mongo.prototype.getSecondaryOk = function () {
     return this.secondaryOk || false;
 };
 
+/**
+ * @this {Mongo}
+ */
 Mongo.prototype.getDB = function (name) {
     if (jsTest.options().keyFile && (typeof this.authenticated == "undefined" || !this.authenticated)) {
         jsTest.authenticate(this);
@@ -237,6 +240,9 @@ Mongo.prototype.getDBNames = function () {
     });
 };
 
+/**
+ * @this {Mongo}
+ */
 Mongo.prototype.getCollection = function (ns) {
     let idx = ns.indexOf(".");
     if (idx < 0) throw Error("need . in ns");

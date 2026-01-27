@@ -7,10 +7,18 @@
 
 const kShellDefaultShouldRetryWrites = typeof _shouldRetryWrites === "function" ? _shouldRetryWrites() : false;
 
+/**
+ * @param {*} obj
+ * @returns {boolean}
+ */
 function isNonNullObject(obj) {
     return typeof obj === "object" && obj !== null;
 }
 
+/**
+ * @param {*} cmdObj
+ * @returns {boolean}
+ */
 function isAcknowledged(cmdObj) {
     if (isNonNullObject(cmdObj.writeConcern)) {
         const writeConcern = cmdObj.writeConcern;
@@ -23,6 +31,9 @@ function isAcknowledged(cmdObj) {
     return true;
 }
 
+/**
+ * @param {*} rawOptions
+ */
 function SessionOptions(rawOptions = {}) {
     if (!(this instanceof SessionOptions)) {
         return new SessionOptions(rawOptions);
@@ -104,6 +115,11 @@ const kWireVersionSupportingLogicalSession = 6;
 const kWireVersionSupportingRetryableWrites = 6;
 const kWireVersionSupportingMultiDocumentTransactions = 7;
 
+/**
+ * @param {*} driverSession
+ * @param {*} client
+ * @param {*} res
+ */
 function processCommandResponse(driverSession, client, res) {
     if (res.hasOwnProperty("operationTime")) {
         driverSession.advanceOperationTime(res.operationTime);
@@ -115,6 +131,9 @@ function processCommandResponse(driverSession, client, res) {
     }
 }
 
+/**
+ * @param {*} client
+ */
 function SessionAwareClient(client) {
     this.getReadPreference = function getReadPreference(driverSession) {
         const sessionOptions = driverSession.getOptions();
@@ -859,14 +878,23 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
 
         this._isExplicit = true;
 
+        /**
+         * @returns {Mongo}
+         */
         this.getClient = function getClient() {
             return client;
         };
 
+        /**
+         * @returns {SessionAwareClient}
+         */
         this._getSessionAwareClient = function _getSessionAwareClient() {
             return sessionAwareClient;
         };
 
+        /**
+         * @returns {SessionOptions}
+         */
         this.getOptions = function getOptions() {
             return _options;
         };
@@ -921,6 +949,9 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
             _clusterTime = undefined;
         };
 
+        /**
+         * @returns {DB}
+         */
         this.getDatabase = function getDatabase(dbName) {
             const db = client.getDB(dbName);
             db._session = this;
@@ -1014,14 +1045,27 @@ const DriverSession = makeDriverSessionConstructor({
 function DelegatingDriverSession(client, originalSession) {
     const sessionAwareClient = new SessionAwareClient(client);
 
+    /**
+     * Get the MongoDB client.
+     * @returns {Mongo}
+     */
     this.getClient = function () {
         return client;
     };
 
+    /**
+     * Get the session-aware client wrapper.
+     * @returns {SessionAwareClient}
+     */
     this._getSessionAwareClient = function () {
         return sessionAwareClient;
     };
 
+    /**
+     * Get a database object for this session.
+     * @param {string} dbName Database name
+     * @returns {DB}
+     */
     this.getDatabase = function (dbName) {
         const db = client.getDB(dbName);
         db._session = this;

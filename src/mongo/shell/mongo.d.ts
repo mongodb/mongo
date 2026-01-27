@@ -224,20 +224,116 @@ class None {}
 type MergeKeys<A, B> = Omit<A, keyof B> & B;
 type GenericReplyFieldsAnd<T> = MergeKeys<GenericReplyFields, T>;
 
+/**
+ * MongoDB connection object.
+ * Represents a connection to a MongoDB server or cluster.
+ */
 declare class Mongo {
+    /**
+     * Create a connection to MongoDB.
+     * @param uri Connection string URI (e.g., "mongodb://localhost:27017" or "mongodb+srv://..."). Omit for default localhost.
+     * @param encryptedDBClientCallback Optional callback for client-side field level encryption
+     * @param options Connection options object
+     */
     constructor(uri?: string, encryptedDBClientCallback?, options?: object);
-    startSession(opts?): DriverSession;
-    find(ns, query, fields, limit, skip, batchSize, options);
-    insert(ns, obj);
-    remove(ns, pattern);
-    update(ns, query, obj, upsert);
-    setSlaveOk(value);
-    getSlaveOk();
-    setSecondaryOk(value = true);
-    getSecondaryOk();
-    getDB(name: string): DB;
-    getDBs(driverSession);
 
+    /**
+     * Start a new explicit client session.
+     * Sessions enable causal consistency and are required for transactions.
+     * @param opts Session options like causalConsistency, retryWrites, readPreference, readConcern, writeConcern
+     * @returns New session object
+     */
+    startSession(opts?): DriverSession;
+
+    /**
+     * Low-level find operation on a collection namespace.
+     * Most users should use db.collection.find() instead.
+     * @param ns Full namespace (database.collection)
+     * @param query Query filter document
+     * @param fields Projection document
+     * @param limit Number of documents to return
+     * @param skip Number of documents to skip
+     * @param batchSize Batch size for cursor
+     * @param options Query options bitmask
+     * @returns Query cursor
+     */
+    find(ns: string, query: object, fields: object, limit: number, skip: number, batchSize: number, options: number): DBQuery;
+
+    /**
+     * Low-level insert operation on a collection namespace.
+     * Most users should use db.collection.insertOne/insertMany() instead.
+     * @param ns Full namespace (database.collection)
+     * @param obj Document or array of documents to insert
+     * @returns Write result
+     */
+    insert(ns: string, obj: object | object[]): WriteResult;
+
+    /**
+     * Low-level remove operation on a collection namespace.
+     * Most users should use db.collection.deleteOne/deleteMany() instead.
+     * @param ns Full namespace (database.collection)
+     * @param pattern Query filter for documents to remove
+     * @returns Write result
+     */
+    remove(ns: string, pattern: object): WriteResult;
+
+    /**
+     * Low-level update operation on a collection namespace.
+     * Most users should use db.collection.updateOne/updateMany() instead.
+     * @param ns Full namespace (database.collection)
+     * @param query Query filter for documents to update
+     * @param obj Update document or replacement document
+     * @param upsert If true, insert if no documents match
+     * @returns Write result
+     */
+    update(ns: string, query: object, obj: object, upsert: boolean): WriteResult;
+
+    /**
+     * @deprecated Use setSecondaryOk() instead
+     * Allow or disallow queries on secondary replica set members.
+     * @param value True to allow secondary reads
+     */
+    setSlaveOk(value: boolean): void;
+
+    /**
+     * @deprecated Use getSecondaryOk() instead
+     * Check if secondary reads are allowed.
+     * @returns True if secondary reads are enabled
+     */
+    getSlaveOk(): boolean;
+
+    /**
+     * Allow queries to run on secondary replica set members.
+     * Affects all databases on this connection.
+     * @param value True to allow secondary reads (default: true)
+     */
+    setSecondaryOk(value?: boolean): void;
+
+    /**
+     * Check if queries are allowed on secondary replica set members.
+     * @returns True if secondary reads are enabled
+     */
+    getSecondaryOk(): boolean;
+
+    /**
+     * Get a database object for the specified database name.
+     * @param name Database name
+     * @returns Database object
+     */
+    getDB(name: string): DB;
+
+    /**
+     * Get a list of all databases on the server.
+     * @param driverSession Optional session to use for the operation
+     * @returns Object with databases array and totalSize
+     */
+    getDBs(driverSession?): object;
+
+    /**
+     * Run a command against the admin database.
+     * @param command Command object with command name and parameters
+     * @returns Command result with ok field and command-specific fields
+     */
     adminCommand<Req extends Partial<Commands[keyof Commands]["req"]>>(
       command: GenericArguments & Req,
     ): GenericReplyFieldsAnd<GetResponseType<Req>>;
@@ -246,41 +342,180 @@ declare class Mongo {
       command: GenericArguments & ReqType,
     ): GenericReplyFieldsAnd<Commands[ReqType]["res"]>;
 
+    /**
+     * Run a command against a specific database.
+     * Low-level method; most users should use db.runCommand() instead.
+     * @param dbName Database name to run command against
+     * @param command Command object with command name and parameters
+     * @param options Additional options
+     * @returns Command result
+     */
     runCommand<Req extends Partial<Commands[keyof Commands]["req"]>>(
-      dbName: str,
+      dbName: string,
       command: GenericArguments & Req,
       options: object,
     ): MergeKeys<GenericReplyFields, GetResponseType<Req>>;
 
     runCommand<ReqType extends keyof Commands>(
-      dbName: str,
+      dbName: string,
       command: GenericArguments & ReqType,
       options: object,
     ): GenericReplyFieldsAnd<Commands[ReqType]["res"]>;
 
-    getLogComponents(driverSession);
-    setLogLevel();
-    getDBNames();
-    getCollection(ns);
-    toString();
-    tojson();
-    setReadPref(mode, tagSet);
-    getReadPrefMode();
-    getReadPrefTagSet();
-    getReadPref();
-    setReadConcern(level);
-    getReadConcern();
-    setWriteConcern(wc);
-    getWriteConcern();
-    unsetWriteConcern();
-    advanceClusterTime(newTime);
-    resetClusterTime_forTesting();
-    getClusterTime();
-    startSession(options = {});
-    isCausalConsistency();
-    setCausalConsistency(causalConsistency = true);
-    waitForClusterTime(maxRetries = 10);
-    watch(pipeline, options);
+    /**
+     * Get the current log verbosity levels for all components.
+     * @param driverSession Optional session to use
+     * @returns Object with verbosity levels by component
+     */
+    getLogComponents(driverSession?): object;
+
+    /**
+     * Set the log verbosity level for a component.
+     * @param level Verbosity level (-1 to 5, where 0 is default)
+     * @param component Component name (e.g., "query") or omit for global
+     * @returns Command result
+     */
+    setLogLevel(level: number, component?: string): object;
+
+    /**
+     * Get the names of all databases on the server.
+     * @returns Array of database name strings
+     */
+    getDBNames(): string[];
+
+    /**
+     * Get a collection object by full namespace.
+     * @param ns Full namespace (database.collection)
+     * @returns Collection object
+     */
+    getCollection(ns: string): DBCollection;
+
+    /**
+     * Get a string representation of the connection.
+     * @returns Connection string or description
+     */
+    toString(): string;
+
+    /**
+     * Convert the connection to JSON string.
+     * @returns JSON representation
+     */
+    tojson(): string;
+
+    /**
+     * Set the read preference for this connection.
+     * Affects which replica set members are used for read operations.
+     * @param mode Read preference mode ("primary", "primaryPreferred", "secondary", "secondaryPreferred", "nearest")
+     * @param tagSet Optional array of tag sets for server selection
+     */
+    setReadPref(mode: string, tagSet?: object[]): void;
+
+    /**
+     * Get the current read preference mode.
+     * @returns Read preference mode string
+     */
+    getReadPrefMode(): string;
+
+    /**
+     * Get the current read preference tag set.
+     * @returns Array of tag set objects
+     */
+    getReadPrefTagSet(): object[];
+
+    /**
+     * Get the full read preference object.
+     * @returns Read preference object with mode and tags
+     */
+    getReadPref(): object;
+
+    /**
+     * Set the read concern level for this connection.
+     * @param level Read concern level ("local", "majority", "linearizable", "snapshot", or "available")
+     */
+    setReadConcern(level: string): void;
+
+    /**
+     * Get the current read concern level.
+     * @returns Read concern level string or undefined if not set
+     */
+    getReadConcern(): string | undefined;
+
+    /**
+     * Set the write concern for this connection.
+     * @param wc Write concern object with w, j, wtimeout fields
+     */
+    setWriteConcern(wc: object): void;
+
+    /**
+     * Get the current write concern.
+     * @returns Write concern object or undefined if not set
+     */
+    getWriteConcern(): object | undefined;
+
+    /**
+     * Unset (remove) the write concern for this connection.
+     */
+    unsetWriteConcern(): void;
+
+    /**
+     * Manually advance the cluster time for this connection.
+     * Used internally for causal consistency; most users don't need this.
+     * @param newTime New cluster time object
+     */
+    advanceClusterTime(newTime: object): void;
+
+    /**
+     * Reset the cluster time to null (testing only).
+     * @internal
+     */
+    resetClusterTime_forTesting(): void;
+
+    /**
+     * Get the current cluster time for this connection.
+     * @returns Cluster time object or undefined
+     */
+    getClusterTime(): object | undefined;
+
+    /**
+     * Start a new explicit client session.
+     * @param options Session options
+     * @returns New session object
+     */
+    startSession(options?: object): DriverSession;
+
+    /**
+     * Check if causal consistency is enabled for this connection.
+     * @returns True if causal consistency is enabled
+     */
+    isCausalConsistency(): boolean;
+
+    /**
+     * Enable or disable causal consistency for this connection.
+     * @param causalConsistency True to enable (default: true)
+     */
+    setCausalConsistency(causalConsistency?: boolean): void;
+
+    /**
+     * Wait for the cluster time to advance (for testing).
+     * @param maxRetries Maximum number of retry attempts (default: 10)
+     */
+    waitForClusterTime(maxRetries?: number): void;
+
+    /**
+     * Open a change stream to watch for changes across all databases.
+     * @param pipeline Optional aggregation pipeline to filter change events
+     * @param options Options like fullDocument, resumeAfter, startAtOperationTime
+     * @returns Change stream cursor
+     */
+    watch(pipeline?: object[], options?: object): DBCommandCursor;
 }
 
-declare function connect();
+/**
+ * Connect to MongoDB and return a connection object.
+ * @param connectionString MongoDB connection string (e.g., "mongodb://localhost:27017" or "mongodb+srv://...")
+ * @returns Mongo connection object
+ * @example
+ * let conn = connect("mongodb://localhost:27017");
+ * let db = conn.getDB("test");
+ */
+declare function connect(connectionString: string): Mongo;

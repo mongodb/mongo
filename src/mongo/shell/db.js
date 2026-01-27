@@ -18,17 +18,26 @@ DB.prototype.rotateCertificates = function (message) {
     return this._adminCommand({rotateCertificates: 1, message});
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getMongo = function () {
     assert(this._mongo, "why no mongo!");
     return this._mongo;
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getSiblingDB = function (name) {
     return this.getSession().getDatabase(name);
 };
 
 DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getName = function () {
     return this._name;
 };
@@ -36,6 +45,7 @@ DB.prototype.getName = function () {
 /**
  * Gets DB level statistics. opt can be a number representing the scale for backwards compatibility
  * or a document with options passed along to the dbstats command.
+ * @this {DB}
  */
 DB.prototype.stats = function (opt) {
     let cmd = {dbstats: 1};
@@ -46,6 +56,9 @@ DB.prototype.stats = function (opt) {
     return this.runCommand(Object.extend(cmd, opt));
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getCollection = function (name) {
     return new DBCollection(this._mongo, this, name, this._name + "." + name);
 };
@@ -157,6 +170,10 @@ DB.prototype._mergeCommandOptions = function (obj, extraKeys) {
 
 // Like runCommand but applies readPreference if one has been set
 // on the connection. Also sets slaveOk if a (non-primary) readPref has been set.
+/**
+ * Run a read command with appropriate read preference.
+ * @this {DB}
+ */
 DB.prototype.runReadCommand = function (obj, extra, queryOptions) {
     "use strict";
 
@@ -184,7 +201,10 @@ DB.prototype.runReadCommand = function (obj, extra, queryOptions) {
     return this.runCommand(obj, null, queryOptions);
 };
 
-// runCommand uses this impl to actually execute the command
+/**
+ * Run command implementation. Used internally by runCommand.
+ * @this {DB}
+ */
 DB.prototype._runCommandImpl = function (name, obj, options) {
     const session = this.getSession();
     const result = session._getSessionAwareClient().runCommand(session, name, obj, options);
@@ -199,6 +219,10 @@ DB.prototype._runCommandImpl = function (name, obj, options) {
     return result;
 };
 
+/**
+ * Run a database command.
+ * @this {DB}
+ */
 DB.prototype.runCommand = function (obj, extra, queryOptions) {
     "use strict";
 
@@ -227,6 +251,10 @@ DB.prototype.runCommand = function (obj, extra, queryOptions) {
 DB.prototype._dbCommand = DB.prototype.runCommand;
 DB.prototype._dbReadCommand = DB.prototype.runReadCommand;
 
+/**
+ * Run a command on the admin database.
+ * @this {DB}
+ */
 DB.prototype.adminCommand = function (obj, extra) {
     if (this._name == "admin") return this.runCommand(obj, extra);
     return this.getSiblingDB("admin").runCommand(obj, extra);
@@ -1647,6 +1675,9 @@ DB.prototype.setWriteConcern = function (wc) {
     }
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getWriteConcern = function () {
     if (this._writeConcern) return this._writeConcern;
 
@@ -1656,14 +1687,23 @@ DB.prototype.getWriteConcern = function () {
     }
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.unsetWriteConcern = function () {
     delete this._writeConcern;
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.getLogComponents = function () {
     return this.getMongo().getLogComponents(this.getSession());
 };
 
+/**
+ * @this {DB}
+ */
 DB.prototype.setLogLevel = function (logLevel, component) {
     return this.getMongo().setLogLevel(logLevel, component, this.getSession());
 };
@@ -1681,6 +1721,9 @@ DB.prototype.watch = function (pipeline, options) {
 // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must
 // resort to using the function explicitly ourselves.
 (function (hasOwnProperty) {
+    /**
+     * @returns {DriverSession}
+     */
     DB.prototype.getSession = function () {
         if (!hasOwnProperty.call(this, "_session")) {
             this._session = this.getMongo()._getDefaultSession();
