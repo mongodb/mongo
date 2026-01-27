@@ -1,6 +1,11 @@
 // Test basic behavior for no-op writes.
 // Use a high enough number of documents so background operations in passthrough tests, e.g.
 // failovers or migrations, can reliably occur.
+//
+// @tags: [
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
+// ]
 const kNumDocs = 20;
 
 const coll = db[jsTestName()];

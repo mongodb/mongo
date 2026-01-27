@@ -4,6 +4,8 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
  * ]
  */
 

@@ -4,6 +4,8 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   # Update operator results in document without a time field.
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 
 // Integration tests for collation-aware findAndModify.

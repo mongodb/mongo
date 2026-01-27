@@ -9,6 +9,8 @@
  *   requires_non_retryable_writes,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_getmore,
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
  * ]
  */
 

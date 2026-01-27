@@ -6,6 +6,8 @@
  *   # For inserts on time-series collections, mongod does _not_ replace empty timestamp values
  *   # with the current time.
  *   exclude_from_timeseries_crud_passthrough,
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
  * ]
  */
 

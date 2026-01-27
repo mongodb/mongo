@@ -5,6 +5,8 @@
 //   requires_non_retryable_writes,
 //   does_not_support_transactions,
 //   requires_getmore,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 

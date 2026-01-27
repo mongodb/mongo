@@ -23,6 +23,8 @@
  *   requires_getmore,
  *   # $text is not supported on views.
  *   incompatible_with_views,
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

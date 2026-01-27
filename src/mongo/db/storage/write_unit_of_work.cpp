@@ -35,6 +35,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 
 #include <ostream>
@@ -43,12 +45,36 @@
 #include <boost/none.hpp>
 
 namespace mongo {
+namespace {
+
+/**
+ * Returns the grouping type to be used, converting kDontGroup to
+ * kGroupForPossiblyRetryableOperations for a top-level WriteUnitOfWork if the operation is not a
+ * multi-document transaction and primary-driven index builds are enabled.
+ */
+WriteUnitOfWork::OplogEntryGroupType getGroupType(OperationContext* opCtx,
+                                                  WriteUnitOfWork::OplogEntryGroupType groupType,
+                                                  bool topLevel) {
+    if (opCtx->inMultiDocumentTransaction() ||
+        groupType != WriteUnitOfWork::OplogEntryGroupType::kDontGroup || !topLevel) {
+        return groupType;
+    }
+
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)
+        ? WriteUnitOfWork::OplogEntryGroupType::kGroupForPossiblyRetryableOperations
+        : groupType;
+}
+
+}  // namespace
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupOplogEntries)
     : _opCtx(opCtx),
       _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork),
-      _groupOplogEntries(groupOplogEntries) {  // Grouping oplog entries doesn't support WUOW
-                                               // nesting (e.g. multi-doc transactions).
+      _groupOplogEntries(getGroupType(opCtx, groupOplogEntries, _toplevel)) {
+    // Grouping oplog entries doesn't support WUOW nesting (e.g. multi-doc transactions).
     invariant(_toplevel || !_isGroupingOplogEntries());
 
     if (_isGroupingOplogEntries()) {

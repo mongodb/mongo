@@ -13,6 +13,8 @@
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   references_foreign_collection,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 
 let colName = "jstests_index_stats";

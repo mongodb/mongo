@@ -6,6 +6,8 @@
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 
 // Test basic inserts and updates with document validation.

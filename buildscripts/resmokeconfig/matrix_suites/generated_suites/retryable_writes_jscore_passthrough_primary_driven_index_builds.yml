@@ -70,6 +70,7 @@ selector:
     - requires_commit_quorum
     - requires_capped
     - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
+    - primary_driven_index_builds_incompatible_with_retryable_writes
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
