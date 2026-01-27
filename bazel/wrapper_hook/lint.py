@@ -358,8 +358,8 @@ def get_parsed_args(args):
     parser.add_argument(
         "--origin-branch",
         type=str,
-        default="origin/master",
-        help="Base branch to compare changes against",
+        default="auto",
+        help="Base branch to compare changes against (example: origin/master).",
     )
     parser.add_argument("--large-files", action="store_true", default=False)
     parser.add_argument(
@@ -383,6 +383,14 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
     if platform.system() == "Windows":
         print("eslint not supported on windows")
         raise LinterFail("Unsupported platform")
+
+    if parsed_args.origin_branch == "auto":
+        from git import Repo
+
+        from buildscripts.bazel_rules_mongo.utils.evergreen_git import get_mongodb_remote
+
+        remote = get_mongodb_remote(Repo())
+        parsed_args.origin_branch = f"{remote.name}/master"
 
     if parsed_args.fix:
         create_build_files_in_new_js_dirs()
