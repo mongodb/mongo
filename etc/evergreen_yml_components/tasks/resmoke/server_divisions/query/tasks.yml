@@ -2520,6 +2520,23 @@ tasks:
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
+  - <<: *gen_task_template
+    name: disagg_aggregation_sharded_collections_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_aggregation_sharded_collections_passthrough
+          use_large_distro: "true"
+          resmoke_jobs_max: 10
+
   - <<: *task_template
     name: query_stats_aggregation_passthrough
     tags: ["assigned_to_jira_team_server_query_integration", "default"]
