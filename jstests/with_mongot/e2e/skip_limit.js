@@ -30,7 +30,7 @@ function verifyNReturned(explainOutput, stageType, nReturned) {
 }
 
 function runTest({mongotStage, mongotStageLimit = null, skip, limit}) {
-    const pipeline = [mongotStage, {$skip: skip}, {$limit: limit}, {$project: {embedding: 0}}];
+    const pipeline = [mongotStage, {$skip: skip}, {$limit: limit}, {$project: {embedding: 0, plot_embedding: 0}}];
 
     // First, check that the query returns the expected number of results.
     const numExpectedResults = mongotStageLimit ? Math.min(mongotStageLimit - skip, limit) : limit;
@@ -89,12 +89,20 @@ function runSearchTest({skip = 0, limit}) {
 runSearchTest({limit: lowLimit});
 runSearchTest({skip, limit: lowLimit});
 
-function runIdLookupTest({skip = 0, limit}) {
-    runTest({mongotStage: {$_internalSearchIdLookup: {}}, skip, limit});
+function runIdLookupTest({skip = 0, limit, idLookupLimit = null}) {
+    const mongotStage = {$_internalSearchIdLookup: idLookupLimit ? {limit: idLookupLimit} : {}};
+    runTest({mongotStage, mongotStageLimit: idLookupLimit, skip, limit});
 }
 
 runIdLookupTest({limit: lowLimit});
 runIdLookupTest({skip, limit: lowLimit});
+runIdLookupTest({limit: lowLimit, idLookupLimit: highLimit});
+
+// In this case, the $idLookup limit is the most restrictive; but since $idLookup is always pushed down to shards and
+// does not provide DistributedPlanLogic to apply the limit when merging, this case only applies on non-sharded collections.
+if (!FixtureHelpers.isSharded(coll)) {
+    runIdLookupTest({skip, limit: highLimit, idLookupLimit: lowLimit});
+}
 
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
