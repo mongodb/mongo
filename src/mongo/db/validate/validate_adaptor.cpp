@@ -1298,12 +1298,35 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           << " invalid documents.");
     }
 
-    const auto fastCount = coll->numRecords(opCtx);
-    if (_validateState->shouldEnforceFastCount() && fastCount != _numRecords) {
-        results->addError(str::stream()
-                          << "fast count (" << fastCount << ") does not match number of records ("
-                          << _numRecords << ") for collection '" << coll->ns().toStringForErrorMsg()
-                          << "'");
+    if (_validateState->shouldEnforceFastCount()) {
+        auto fastCountType = _validateState->getDetectedFastCountType(opCtx);
+        switch (fastCountType) {
+            case CollectionValidation::FastCountType::legacySizeStorer:
+                if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
+                    results->addError(str::stream() << "fast count (" << fastCount
+                                                    << ") does not match number of records ("
+                                                    << _numRecords << ") for collection '"
+                                                    << coll->ns().toStringForErrorMsg() << "'");
+                }
+                break;
+            case CollectionValidation::FastCountType::replicated:
+                if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
+                    results->addError(str::stream() << "replicated fast count (" << fastCount
+                                                    << ") does not match number of records ("
+                                                    << _numRecords << ") for collection '"
+                                                    << coll->ns().toStringForErrorMsg() << "'");
+                }
+                break;
+            case CollectionValidation::FastCountType::both:
+                uasserted(ErrorCodes::InvalidOptions, "Both FastCount tables found");
+                break;
+            case CollectionValidation::FastCountType::none:
+                uasserted(ErrorCodes::InvalidOptions, "No FastCount tables found");
+                break;
+            case CollectionValidation::FastCountType::invalid:
+                uasserted(ErrorCodes::InvalidOptions, "No FastCount tables found");
+                break;
+        }
     }
 
     // Do not update the record store stats if we're in the background as we've validated a
