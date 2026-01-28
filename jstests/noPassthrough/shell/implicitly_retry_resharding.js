@@ -6,15 +6,16 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function failNextCommandWithCode(db, command, errorCode) {
+function failNextCommandWithCode(db, command, {errorCode, errorMsg}) {
+    const data = {errorCode, failCommands: [command]};
+    if (errorMsg) {
+        data.errorMsg = errorMsg;
+    }
     assert.commandWorked(
         db.adminCommand({
             configureFailPoint: "failCommand",
             mode: {times: 1},
-            data: {
-                errorCode,
-                failCommands: [command],
-            },
+            data,
         }),
     );
 }
@@ -49,17 +50,20 @@ for (let i = 0; i < numDocs; i++) {
 }
 assert.commandWorked(testColl.insert(docs));
 
-const retryableErrorCodes = [
-    ErrorCodes.OplogQueryMinTsMissing,
-    ErrorCodes.SnapshotUnavailable,
-    ErrorCodes.SnapshotTooOld,
+const testCases = [
+    {errorCode: ErrorCodes.OplogQueryMinTsMissing},
+    {errorCode: ErrorCodes.SnapshotUnavailable},
+    {errorCode: ErrorCodes.SnapshotTooOld},
+    {errorCode: ErrorCodes.ReshardCollectionTruncatedError, errorMsg: "OplogQueryMinTsMissing"},
+    {errorCode: ErrorCodes.ReshardCollectionTruncatedError, errorMsg: "SnapshotUnavailable"},
+    {errorCode: ErrorCodes.ReshardCollectionTruncatedError, errorMsg: "SnapshotTooOld"},
 ];
 
 // Test complete workflow (reshard -> rewrite -> unshard -> move) for each retryable error code.
-for (const errorCode of retryableErrorCodes) {
-    jsTest.log("Testing retryable error:" + errorCode);
+for (const testCase of testCases) {
+    jsTest.log("Testing retryable error:" + tojson(testCase));
 
-    failNextCommandWithCode(testDB, "reshardCollection", errorCode);
+    failNextCommandWithCode(testDB, "reshardCollection", testCase);
     assert.commandWorked(
         st.s.adminCommand({
             reshardCollection: ns,
@@ -67,14 +71,14 @@ for (const errorCode of retryableErrorCodes) {
         }),
     );
 
-    failNextCommandWithCode(testDB, "rewriteCollection", errorCode);
+    failNextCommandWithCode(testDB, "rewriteCollection", testCase);
     assert.commandWorked(
         st.s.adminCommand({
             rewriteCollection: ns,
         }),
     );
 
-    failNextCommandWithCode(testDB, "unshardCollection", errorCode);
+    failNextCommandWithCode(testDB, "unshardCollection", testCase);
     assert.commandWorked(
         st.s.adminCommand({
             unshardCollection: ns,
@@ -82,7 +86,7 @@ for (const errorCode of retryableErrorCodes) {
         }),
     );
 
-    failNextCommandWithCode(testDB, "moveCollection", errorCode);
+    failNextCommandWithCode(testDB, "moveCollection", testCase);
     assert.commandWorked(
         st.s.adminCommand({
             moveCollection: ns,
@@ -100,7 +104,7 @@ for (const errorCode of retryableErrorCodes) {
 }
 
 jsTest.log("Testing non-retryable error");
-failNextCommandWithCode(testDB, "reshardCollection", ErrorCodes.InternalError);
+failNextCommandWithCode(testDB, "reshardCollection", {errorCode: ErrorCodes.InternalError});
 assert.commandFailedWithCode(
     st.s.adminCommand({
         reshardCollection: ns,
@@ -109,7 +113,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InternalError,
 );
 
-failNextCommandWithCode(testDB, "rewriteCollection", ErrorCodes.InternalError);
+failNextCommandWithCode(testDB, "rewriteCollection", {errorCode: ErrorCodes.InternalError});
 assert.commandFailedWithCode(
     st.s.adminCommand({
         rewriteCollection: ns,
@@ -117,7 +121,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InternalError,
 );
 
-failNextCommandWithCode(testDB, "unshardCollection", ErrorCodes.InternalError);
+failNextCommandWithCode(testDB, "unshardCollection", {errorCode: ErrorCodes.InternalError});
 assert.commandFailedWithCode(
     st.s.adminCommand({
         unshardCollection: ns,
@@ -130,7 +134,7 @@ const unshardedCollName = "unshardedColl";
 const unshardedNs = dbName + "." + unshardedCollName;
 assert.commandWorked(testDB[unshardedCollName].insert({y: 1}));
 
-failNextCommandWithCode(testDB, "moveCollection", ErrorCodes.InternalError);
+failNextCommandWithCode(testDB, "moveCollection", {errorCode: ErrorCodes.InternalError});
 assert.commandFailedWithCode(
     st.s.adminCommand({
         moveCollection: unshardedNs,
@@ -140,7 +144,7 @@ assert.commandFailedWithCode(
 );
 
 // Test that other commands are not retried.
-failNextCommandWithCode(testDB, "ping", ErrorCodes.OplogQueryMinTsMissing);
+failNextCommandWithCode(testDB, "ping", {errorCode: ErrorCodes.OplogQueryMinTsMissing});
 assert.commandFailedWithCode(st.s.adminCommand({ping: 1}), ErrorCodes.OplogQueryMinTsMissing);
 
 st.stop();

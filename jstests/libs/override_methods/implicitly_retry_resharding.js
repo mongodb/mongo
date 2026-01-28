@@ -20,6 +20,8 @@ const kRetryableErrorCodes = [
     ErrorCodes.SnapshotTooOld,
 ];
 
+const kRetryableErrorNames = ["OplogQueryMinTsMissing", "SnapshotUnavailable", "SnapshotTooOld"];
+
 function isRetryableOplogOrSnapshotError(cmdObj, res) {
     const commandName = getCommandName(cmdObj);
     if (!kRetryableCommands.includes(commandName)) {
@@ -27,6 +29,13 @@ function isRetryableOplogOrSnapshotError(cmdObj, res) {
     }
     if (res && kRetryableErrorCodes.includes(res.code)) {
         return true;
+    }
+    if (res.code === ErrorCodes.ReshardCollectionTruncatedError) {
+        for (const errName of kRetryableErrorNames) {
+            if (res.errmsg.includes(errName)) {
+                return true;
+            }
+        }
     }
     return false;
 }
