@@ -263,7 +263,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
     bool local = _timestampFormat == LogTimestampFormat::kISO8601Local;
     size_t attributeMaxSize = truncation != LogTruncation::Enabled
         ? 0
-        : (_maxAttributeSizeKB != 0 ? _maxAttributeSizeKB->loadRelaxed() * 1024
+        : (_maxAttributeSizeKB != 0 ? static_cast<size_t>(_maxAttributeSizeKB->loadRelaxed()) * 1024
                                     : c::kDefaultMaxAttributeOutputSizeKB * 1024);
     auto write = [&](StringData s) {
         buffer.append(s.data(), s.data() + s.size());

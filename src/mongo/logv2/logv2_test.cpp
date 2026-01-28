@@ -2080,6 +2080,18 @@ TEST_F(LogV2Test, StringTruncation) {
     }
 }
 
+// While having a very large maxAttributeSizeKB is impractical, this test should catch any potential
+// issues due to that (e.g., from sanitizers).
+TEST_F(LogV2Test, MaxIntMaxAttributeSize) {
+    const AtomicWord<int32_t> maxAttributeSizeKB(std::numeric_limits<int32_t>::max());
+    auto lines = makeLineCapture(JSONFormatter(&maxAttributeSizeKB));
+
+    LOGV2(11792000, "name", "name"_attr = "some_name");
+    BSONObj obj = fromjson(lines->back());
+    auto str = obj[constants::kAttributesFieldName]["name"].checkAndGetStringData();
+    ASSERT_EQ(str, "some_name");
+}
+
 TEST_F(LogV2Test, Threads) {
     auto linesPlain = makeLineCapture(PlainFormatter());
     auto linesText = makeLineCapture(TextFormatter());
