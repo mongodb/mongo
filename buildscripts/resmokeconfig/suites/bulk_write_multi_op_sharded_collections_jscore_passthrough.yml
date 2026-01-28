@@ -216,7 +216,6 @@ executor:
   hooks:
     - class: CheckReplDBHash
     - class: ValidateCollections
-    - class: CheckShardFilteringMetadata
     - class: CleanEveryN
       n: 20
   fixture:

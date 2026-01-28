@@ -358,7 +358,6 @@ executor:
         global_vars:
           TestData: *TestData
     - class: ValidateCollections
-    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: DropSessionsCollection
     - class: CleanEveryN

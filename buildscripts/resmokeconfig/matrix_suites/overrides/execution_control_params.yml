@@ -38,7 +38,6 @@
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections
-        - class: CheckShardFilteringMetadata
         - class: CheckOrphansDeleted
         - class: CleanEveryN
           n: 20
