@@ -66,6 +66,7 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
@@ -3177,6 +3178,22 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     checkTransformation(noOp, boost::none);
 }
 
+// A `ci` (container insert) is an internal storage operation used for inserting into containers.
+// `ci` ops should always be filtered out by the change stream.
+TEST_F(ChangeStreamStageTest, MatchFiltersCi) {
+    auto ci = repl::makeContainerInsertOplogEntry(
+        repl::OpTime(), nss, "containerIdent"_sd, 1LL, BSONBinData("V", 1, BinDataGeneral));
+
+    checkTransformation(ci, boost::none);
+}
+
+// A `cd` (container delete) is an internal storage operation used for deleting from containers.
+// `cd` ops should always be filtered out by the change stream.
+TEST_F(ChangeStreamStageTest, MatchFiltersCd) {
+    auto cd = repl::makeContainerDeleteOplogEntry(repl::OpTime(), nss, "containerIdent"_sd, 1LL);
+
+    checkTransformation(cd, boost::none);
+}
 
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSupportedEvents) {
     auto expCtx = getExpCtx();
