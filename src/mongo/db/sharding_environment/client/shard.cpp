@@ -53,15 +53,40 @@
 namespace mongo {
 namespace {
 
-auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    -> AdaptiveRetryStrategy::RetryCriteria {
-    return [retryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
-        return shard->isRetriableError(s, errorLabels, retryPolicy);
-    };
+Shard::RetryPolicy getPolicyForStartTransaction(
+    Shard::RetryPolicy retryPolicy,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction) {
+    // If startTransaction is true, it is not safe to retry unless the response includes a
+    // retryable error label, so we demote the policy (unless it is already kNoRetry). If the error
+    // was due to an unclean shutdown, the transaction may not be reaped on participant shards,
+    // which can cause the retry to fail due to readConcern conflicts with the stale metadata on the
+    // participants.
+    if (retryPolicy != Shard::RetryPolicy::kNoRetry &&
+        isStartTransaction ==
+            Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction) {
+        return Shard::RetryPolicy::kStrictlyNotIdempotent;
+    } else {
+        return retryPolicy;
+    }
 }
 
-auto makeRetryCriteriaForConnectionType(ConnectionString::ConnectionType connectionType,
-                                        Shard::RetryPolicy retryPolicy)
+auto makeRetryCriteriaForShard(
+    const Shard& shard,
+    Shard::RetryPolicy retryPolicy,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+    -> AdaptiveRetryStrategy::RetryCriteria {
+    Shard::RetryPolicy validatedRetryPolicy =
+        getPolicyForStartTransaction(retryPolicy, isStartTransaction);
+    return
+        [validatedRetryPolicy, shard = &shard](Status s, std::span<const std::string> errorLabels) {
+            return shard->isRetriableError(s, errorLabels, validatedRetryPolicy);
+        };
+}
+
+auto makeRetryCriteriaForConnectionType(
+    ConnectionString::ConnectionType connectionType,
+    Shard::RetryPolicy retryPolicy,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
     -> AdaptiveRetryStrategy::RetryCriteria {
     tassert(10944501,
             str::stream() << "Unexpected ConnectionString type "
@@ -69,14 +94,17 @@ auto makeRetryCriteriaForConnectionType(ConnectionString::ConnectionType connect
             connectionType == ConnectionString::ConnectionType::kLocal ||
                 connectionType == ConnectionString::ConnectionType::kReplicaSet);
 
+    Shard::RetryPolicy validatedRetryPolicy =
+        getPolicyForStartTransaction(retryPolicy, isStartTransaction);
+
     switch (connectionType) {
         case ConnectionString::ConnectionType::kLocal:
-            return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
-                return Shard::localIsRetriableError(s, errorLabels, retryPolicy);
+            return [validatedRetryPolicy](Status s, std::span<const std::string> errorLabels) {
+                return Shard::localIsRetriableError(s, errorLabels, validatedRetryPolicy);
             };
         case ConnectionString::ConnectionType::kReplicaSet:
-            return [retryPolicy](Status s, std::span<const std::string> errorLabels) {
-                return Shard::remoteIsRetriableError(s, errorLabels, retryPolicy);
+            return [validatedRetryPolicy](Status s, std::span<const std::string> errorLabels) {
+                return Shard::remoteIsRetriableError(s, errorLabels, validatedRetryPolicy);
             };
         default:
             MONGO_UNREACHABLE;
@@ -134,32 +162,33 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
 
 }  // namespace
 
-Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy),
+Shard::RetryStrategy::RetryStrategy(
+    const Shard& shard,
+    Shard::RetryPolicy retryPolicy,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy, isStartTransaction),
                     DefaultRetryStrategy::getRetryParametersFromServerParameters(),
                     *shard._sharedState} {}
 
-Shard::RetryStrategy::RetryStrategy(const Shard& shard,
-                                    Shard::RetryPolicy retryPolicy,
-                                    std::int32_t maxRetryAttempts)
-    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy),
+Shard::RetryStrategy::RetryStrategy(
+    const Shard& shard,
+    Shard::RetryPolicy retryPolicy,
+    std::int32_t maxRetryAttempts,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+    : RetryStrategy{makeRetryCriteriaForShard(shard, retryPolicy, isStartTransaction),
                     backoffFromMaxRetryAttempts(maxRetryAttempts),
                     *shard._sharedState} {}
 
-Shard::RetryStrategy::RetryStrategy(ConnectionString::ConnectionType connectionType,
-                                    ShardSharedStateCache::State& state,
-                                    Shard::RetryPolicy retryPolicy)
-    : RetryStrategy{makeRetryCriteriaForConnectionType(connectionType, retryPolicy),
-                    DefaultRetryStrategy::getRetryParametersFromServerParameters(),
-                    state} {}
+Shard::RetryStrategy::RetryStrategy(
+    ConnectionString::ConnectionType connectionType,
+    ShardSharedStateCache::State& state,
+    Shard::RetryPolicy retryPolicy,
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+    : RetryStrategy{
+          makeRetryCriteriaForConnectionType(connectionType, retryPolicy, isStartTransaction),
+          DefaultRetryStrategy::getRetryParametersFromServerParameters(),
+          state} {}
 
-Shard::RetryStrategy::RetryStrategy(ConnectionString::ConnectionType connectionType,
-                                    ShardSharedStateCache::State& state,
-                                    Shard::RetryPolicy retryPolicy,
-                                    std::int32_t maxRetryAttempts)
-    : RetryStrategy{makeRetryCriteriaForConnectionType(connectionType, retryPolicy),
-                    backoffFromMaxRetryAttempts(maxRetryAttempts),
-                    state} {}
 
 Shard::RetryStrategy::RetryStrategy(AdaptiveRetryStrategy::RetryCriteria retryCriteria,
                                     AdaptiveRetryStrategy::RetryParameters parameters,
@@ -446,8 +475,10 @@ StatusWith<Shard::CommandResponse> Shard::_runCommandImpl(OperationContext* opCt
                                                           Milliseconds maxTimeMSOverride,
                                                           RetryPolicy retryPolicy,
                                                           std::int32_t maxRetryAttempt) {
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(cmdObj);
     auto retryStrategy = RetryStrategyWithFailureRetryHook{
-        RetryStrategy{*this, retryPolicy, maxRetryAttempt}, [&](Status status) {
+        RetryStrategy{*this, retryPolicy, maxRetryAttempt, isStartTransaction}, [&](Status status) {
             LOGV2(22720,
                   "Command failed with a retryable error and will be retried",
                   "command"_attr = redact(cmdObj),
@@ -468,7 +499,9 @@ StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     Milliseconds maxTimeMSOverride) {
-    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(cmdObj);
+    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent, isStartTransaction};
 
     return runWithRetryStrategy(
         opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
@@ -488,8 +521,9 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     const boost::optional<BSONObj>& hint) {
     // Do not allow exhaustive finds to be run against regular shards.
     invariant(isConfig());
-
-    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent};
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(query);
+    RetryStrategy retryStrategy{*this, RetryPolicy::kIdempotent, isStartTransaction};
     return runWithRetryStrategy(
         opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
             return _exhaustiveFindOnConfig(opCtx,
@@ -511,7 +545,10 @@ Status Shard::runAggregation(
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> onBatch,
     std::function<void(const Status&)> onRetry) {
-    RetryStrategyWithFailureRetryHook retryStrategy{RetryStrategy{*this, retryPolicy}, onRetry};
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(aggRequest.getGenericArguments());
+    RetryStrategyWithFailureRetryHook retryStrategy{
+        RetryStrategy{*this, retryPolicy, isStartTransaction}, onRetry};
 
     auto status =
         runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {
@@ -526,8 +563,10 @@ BatchedCommandResponse Shard::_submitBatchWriteCommand(OperationContext* opCtx,
                                                        const DatabaseName& dbName,
                                                        Milliseconds maxTimeMS,
                                                        RetryPolicy retryPolicy) {
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(serialisedBatchRequest);
     auto retryStrategy = RetryStrategyWithFailureRetryHook{
-        RetryStrategy{*this, retryPolicy}, [&](Status status) {
+        RetryStrategy{*this, retryPolicy, isStartTransaction}, [&](Status status) {
             LOGV2_DEBUG(22721,
                         2,
                         "Batch write command failed with retryable error and will be retried",
@@ -591,11 +630,12 @@ StatusWith<std::vector<BSONObj>> Shard::runAggregationWithResult(
                          std::make_move_iterator(batch.end()));
         return true;
     };
-
-    RetryStrategyWithFailureRetryHook retryStrategy{RetryStrategy{*this, retryPolicy},
-                                                    [&](Status s) {
-                                                        aggResult.clear();
-                                                    }};
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        Shard::RetryStrategy::extractRequestTransactionState(aggRequest.getGenericArguments());
+    RetryStrategyWithFailureRetryHook retryStrategy{
+        RetryStrategy{*this, retryPolicy, isStartTransaction}, [&](Status s) {
+            aggResult.clear();
+        }};
 
     auto status =
         runWithRetryStrategy(opCtx, retryStrategy, [&](const TargetingMetadata& targetingMetadata) {

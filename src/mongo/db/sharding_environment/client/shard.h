@@ -50,6 +50,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/duration.h"
@@ -155,11 +156,30 @@ public:
     class RetryStrategy final : public mongo::RetryStrategy {
     public:
         /**
+         * Enum indicating whether the request associated with this RetryStrategy is starting a
+         * transaction or not. Transaction-initiating requests can only be retried under certain
+         * circumstances, regardless of the provided RetryPolicy.
+         */
+        enum class RequestStartTransactionState {
+            /**
+             * This request is either not initating a transaction or is not part of a transaction
+             * altogether.
+             */
+            kNotStartingTransaction,
+            /**
+             * This request is initiating a new transaction (i.e. includes startTransaction: true).
+             */
+            kStartingTransaction
+        };
+
+        /**
          * Constructs a RetryStrategy object given a shard object and a retryPolicy.
          * Note that, if this constructor is used, the returned instance of this class cannot
          * outlive the shard passed in as it internally holds a pointer to the shard.
          */
-        RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy);
+        RetryStrategy(const Shard& shard,
+                      Shard::RetryPolicy retryPolicy,
+                      Shard::RetryStrategy::RequestStartTransactionState isStartTransaction);
 
         /**
          * Same as the previous constructor but will use a custom 'maxRetryAttempts' parameter
@@ -167,7 +187,8 @@ public:
          */
         RetryStrategy(const Shard& shard,
                       Shard::RetryPolicy retryPolicy,
-                      std::int32_t maxRetryAttempts);
+                      std::int32_t maxRetryAttempts,
+                      Shard::RetryStrategy::RequestStartTransactionState isStartTransaction);
 
         /**
          * Constructs a RetryStrategy object given the connectionType and the shardState of a shard.
@@ -176,16 +197,9 @@ public:
          */
         RetryStrategy(ConnectionString::ConnectionType connectionType,
                       ShardSharedStateCache::State& shardState,
-                      Shard::RetryPolicy retryPolicy);
-
-        /**
-         * Same as the previous constructor but will use a custom 'maxRetryAttempts' parameter
-         * instead of the default one.
-         */
-        RetryStrategy(ConnectionString::ConnectionType connectionType,
-                      ShardSharedStateCache::State& shardState,
                       Shard::RetryPolicy retryPolicy,
-                      std::int32_t maxRetryAttempts);
+                      Shard::RetryStrategy::RequestStartTransactionState isStartTransaction);
+
 
         bool recordFailureAndEvaluateShouldRetry(Status s,
                                                  const boost::optional<HostAndPort>& target,
@@ -200,6 +214,20 @@ public:
 
         const TargetingMetadata& getTargetingMetadata() const override {
             return _underlyingStrategy.getTargetingMetadata();
+        }
+
+        static Shard::RetryStrategy::RequestStartTransactionState extractRequestTransactionState(
+            BSONObj request) {
+            return request.getField("startTransaction").booleanSafe()
+                ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+                : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
+        }
+
+        static Shard::RetryStrategy::RequestStartTransactionState extractRequestTransactionState(
+            const GenericArguments& args) {
+            return args.getStartTransaction().value_or(false)
+                ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+                : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
         }
 
     private:
@@ -226,28 +254,26 @@ public:
      */
     class OwnerRetryStrategy final : public mongo::RetryStrategy {
     public:
-        OwnerRetryStrategy(std::shared_ptr<Shard> shard, Shard::RetryPolicy retryPolicy)
-            : _underlyingStrategy{*shard, retryPolicy},
+        OwnerRetryStrategy(std::shared_ptr<Shard> shard,
+                           Shard::RetryPolicy retryPolicy,
+                           Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+            : _underlyingStrategy{*shard, retryPolicy, isStartTransaction},
               _stateOwner{shard->_sharedState},
               _shardOwner{std::move(shard)} {}
 
         OwnerRetryStrategy(std::shared_ptr<Shard> shard,
                            Shard::RetryPolicy retryPolicy,
-                           std::int32_t maxRetryAttempts)
-            : _underlyingStrategy{*shard, retryPolicy, maxRetryAttempts},
+                           std::int32_t maxRetryAttempts,
+                           Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+            : _underlyingStrategy{*shard, retryPolicy, maxRetryAttempts, isStartTransaction},
               _stateOwner{shard->_sharedState},
               _shardOwner{std::move(shard)} {}
 
         OwnerRetryStrategy(ConnectionString::ConnectionType connectionType,
                            std::shared_ptr<ShardSharedStateCache::State> shardState,
-                           Shard::RetryPolicy retryPolicy)
-            : _underlyingStrategy{connectionType, *shardState, retryPolicy},
-              _stateOwner{std::move(shardState)} {}
-        OwnerRetryStrategy(ConnectionString::ConnectionType connectionType,
-                           std::shared_ptr<ShardSharedStateCache::State> shardState,
                            Shard::RetryPolicy retryPolicy,
-                           std::int32_t maxRetryAttempts)
-            : _underlyingStrategy{connectionType, *shardState, retryPolicy, maxRetryAttempts},
+                           Shard::RetryStrategy::RequestStartTransactionState isStartTransaction)
+            : _underlyingStrategy{connectionType, *shardState, retryPolicy, isStartTransaction},
               _stateOwner{std::move(shardState)} {}
 
         bool recordFailureAndEvaluateShouldRetry(

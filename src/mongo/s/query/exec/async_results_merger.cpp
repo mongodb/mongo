@@ -145,9 +145,16 @@ Shard::OwnerRetryStrategy buildRetryStrategy(OperationContext* opCtx, const Shar
         return ConnectionString::ConnectionType::kReplicaSet;
     });
 
+    BSONObj cmdObj = CurOp::get(opCtx)->originatingCommand();
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        cmdObj.getField("startTransaction").booleanSafe()
+        ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+        : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
+
     return Shard::OwnerRetryStrategy(connType,
                                      ShardSharedStateCache::get(opCtx).getShardState(shardId),
-                                     Shard::RetryPolicy::kStrictlyNotIdempotent);
+                                     Shard::RetryPolicy::kStrictlyNotIdempotent,
+                                     isStartTransaction);
 }
 
 }  // namespace

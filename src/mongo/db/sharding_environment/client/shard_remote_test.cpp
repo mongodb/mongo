@@ -189,7 +189,10 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetCapacityServerParameter) {
 
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
     auto& retryBudget = shard->getRetryBudget_forTest();
-    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
 
     auto initialBalance = retryBudget.getBalance_forTest();
 
@@ -207,7 +210,10 @@ TEST_F(ShardRemoteTest, GridSetRetryBudgetReturnRateServerParameter) {
 
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
     auto& retryBudget = shard->getRetryBudget_forTest();
-    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
 
     auto initialBalance = retryBudget.getBalance_forTest();
     auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
@@ -238,7 +244,10 @@ TEST_F(ShardRemoteTest, ShardRetryStrategy) {
     auto& [retryBudget, stats] = *shardState;
 
     auto shard = uassertStatusOK(shardRegistry()->getShard(operationContext(), firstShard));
-    auto retryStrategy = Shard::RetryStrategy{*shard, Shard::RetryPolicy::kIdempotent};
+    auto retryStrategy = Shard::RetryStrategy{
+        *shard,
+        Shard::RetryPolicy::kIdempotent,
+        Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction};
 
     auto initialBalance = retryBudget.getBalance_forTest();
     auto error = Status(ErrorCodes::PrimarySteppedDown, "Interrupted at shutdown");
