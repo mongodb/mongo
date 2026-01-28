@@ -45,6 +45,10 @@ BSONObj ListCollectionsFilter::makeTypeViewFilter() {
     return BSON("type" << "view");
 }
 
+BSONObj ListCollectionsFilter::makeExcludeViewsFilter() {
+    return BSON("type" << BSON("$ne" << "view"));
+}
+
 BSONObj ListCollectionsFilter::addTypeCollectionFilter(const BSONObj& filter) {
     if (filter.isEmpty())
         return makeTypeCollectionFilter();

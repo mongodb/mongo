@@ -52,6 +52,12 @@ public:
     static BSONObj makeTypeViewFilter();
 
     /**
+     * Returns an object that can be passed to the listCollections command as a filter to exclude
+     * view namespaces (type !== "view").
+     */
+    static BSONObj makeExcludeViewsFilter();
+
+    /**
      * Injects into an existing listCollections filter a clause to limit results to collection
      * namespaces.
      */

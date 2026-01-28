@@ -518,10 +518,17 @@ public:
                     }
 
                     // Skipping views is only necessary for internal cloning operations.
-                    bool skipViews = listCollRequest.getFilter() &&
-                        SimpleBSONObjComparator::kInstance.evaluate(
-                            *listCollRequest.getFilter() ==
-                            ListCollectionsFilter::makeTypeCollectionFilter());
+                    // Skip views if filter matches makeTypeCollectionFilter() or
+                    // makeExcludeViewsFilter().
+                    bool skipViews = false;
+                    if (listCollRequest.getFilter()) {
+                        const auto& filter = *listCollRequest.getFilter();
+                        skipViews =
+                            SimpleBSONObjComparator::kInstance.evaluate(
+                                filter == ListCollectionsFilter::makeTypeCollectionFilter()) ||
+                            SimpleBSONObjComparator::kInstance.evaluate(
+                                filter == ListCollectionsFilter::makeExcludeViewsFilter());
+                    }
 
                     if (!skipViews) {
                         catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
