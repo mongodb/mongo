@@ -13,6 +13,20 @@ $ buildscripts/resmoke.py run \
   jstests/query_golden/plan_stability.js
 ```
 
+There are several resmoke suites predefined for different plan ranking modes, for which it is not needed to add mongod parameters:
+
+```bash
+  query_golden_cbr_automatic
+  query_golden_cbr_automatic_no_multiplanning_results
+  query_golden_cbr_automatic_cost_choice
+  query_golden_cbr_sampling
+  query_golden_cbr_histogram
+```
+
+```bash
+$ buildscripts/resmoke.py run --suites=query_golden_cbr_automatic jstests/query_golden/plan_stability.js
+```
+
 # Displaying failures
 
 ## Using the standard golden test functionality
@@ -160,7 +174,7 @@ If you want to run a comparison between estimation methods `X` and `Y`:
 
 ## Accepting the modified query plans
 
-To accept the new plans, use `buildscripts/query_golden.py accept`, as with any other golden test.
+To accept the new plans, use `buildscripts/golden_test.py accept`, as with any other golden test.
 
 ## Removing individual pipelines
 
