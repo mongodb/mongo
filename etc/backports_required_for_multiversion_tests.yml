@@ -123,8 +123,6 @@ last-continuous:
       ticket: SERVER-114384
     - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
       ticket: SERVER-116089
-    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
-      ticket: SERVER-117009
     - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
       ticket: SERVER-116528
     - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
@@ -754,8 +752,6 @@ last-lts:
       ticket: SERVER-114384
     - test_file: jstests/sharding/chunk_migration_does_not_block_indefinitely_acquiring_strong_locks.js
       ticket: SERVER-116089
-    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
-      ticket: SERVER-117009
     - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
       ticket: SERVER-116528
   suites: null
