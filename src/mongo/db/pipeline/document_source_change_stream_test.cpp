@@ -952,13 +952,6 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV1ChangeStream) {
                     }
                 },
                 {
-                    "o.applyOps.isTimeseries": {
-                        "$not": {
-                            "$eq": true
-                        }
-                    }
-                },
-                {
                     "o.partialTxn": {
                         "$not": {
                             "$eq": true
@@ -1099,13 +1092,6 @@ TEST_F(ChangeStreamStageTest, BuildTransactionFilterForV2ChangeStream) {
                         {
                             "op": {
                                 "$eq": "c"
-                            }
-                        },
-                        {
-                            "o.applyOps.isTimeseries": {
-                                "$not": {
-                                    "$eq": true
-                                }
                             }
                         },
                         {
