@@ -8,8 +8,6 @@
  *   not_allowed_with_signed_security_token,
  *   uses_transactions,
  *   uses_prepare_transaction,
- *   # TODO (SERVER-117495): Re-enable this test with primary-driven index builds.
- *   primary_driven_index_builds_incompatible,
  * ]
  */
 
