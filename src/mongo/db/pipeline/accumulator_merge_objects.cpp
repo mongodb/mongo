@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/accumulator_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -54,6 +55,8 @@ Value ExpressionFromAccumulator<AccumulatorMergeObjects>::evaluate(const Documen
 REGISTER_ACCUMULATOR(mergeObjects,
                      genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
 REGISTER_STABLE_EXPRESSION(mergeObjects, ExpressionFromAccumulator<AccumulatorMergeObjects>::parse);
+REGISTER_STABLE_WINDOW_FUNCTION(
+    mergeObjects, (window_function::ExpressionFromAccumulator<AccumulatorMergeObjects>::parse));
 
 AccumulatorMergeObjects::AccumulatorMergeObjects(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx) {
@@ -88,6 +91,6 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 }
 
 Value AccumulatorMergeObjects::getValue(bool toBeMerged) {
-    return _output.freezeToValue();
+    return Value(_output.peek());
 }
 }  // namespace mongo

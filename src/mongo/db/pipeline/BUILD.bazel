@@ -1266,6 +1266,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/window_function:window_function_exec_non_removable_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_removable_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_integral_test.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_merge_objects_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_min_max_scaler_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_min_max_scaler_util_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_min_max_test.cpp",

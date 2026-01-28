@@ -219,6 +219,11 @@ assert.commandWorked(
         $setWindowFields: {sortBy: {ts: 1}, output: {v: {$min: "$a", window: {documents: ["unbounded", "current"]}}}},
     }),
 );
+assert.commandWorked(
+    run({
+        $setWindowFields: {output: {v: {$mergeObjects: "$a"}}},
+    }),
+);
 
 // Not every accumulator is automatically a window function.
 let err = assert.commandFailedWithCode(
@@ -235,12 +240,6 @@ assert.includes(err.errmsg, "Expected a $-prefixed window function, sum");
 
 err = assert.commandFailedWithCode(run({$setWindowFields: {output: {total: {}}}}), ErrorCodes.FailedToParse);
 assert.includes(err.errmsg, "Expected a $-prefixed window function");
-
-err = assert.commandFailedWithCode(
-    run({$setWindowFields: {output: {v: {$mergeObjects: "$a"}}}}),
-    ErrorCodes.FailedToParse,
-);
-assert.includes(err.errmsg, "Unrecognized window function, $mergeObjects");
 
 err = assert.commandFailedWithCode(
     run({$setWindowFields: {output: {v: {$accumulator: "$a"}}}}),
