@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 
-from buildscripts.resmokelib import errors
+from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.mongo_fuzzer_configs import generate_normal_mongo_parameters
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster, standalone
@@ -21,6 +21,13 @@ def validate_runtime_parameter_spec(spec):
             raise ValueError(
                 f"Invalid runtime parameter fuzz config entry for key '{key}' : {value}"
             )
+
+
+def build_client(node, auth_options):
+    """Build a pymongo MongoClient for the given node with the given auth options."""
+    if config.IS_ASAN:
+        return fixture_interface.build_client(node, auth_options, timeout_millis=120000)
+    return fixture_interface.build_client(node, auth_options)
 
 
 class RuntimeParametersState:
@@ -222,7 +229,7 @@ class FuzzRuntimeParameters(interface.Hook):
 
     def _invoke_get_parameter_and_log(self, node):
         """Helper to print the current state of a node's runtime-fuzzable parameters. Only usable once before_suite has initialized the runtime state of the parameters."""
-        client = fixture_interface.build_client(node, self._auth_options)
+        client = build_client(node, self._auth_options)
         params_to_get = (
             self._mongos_param_state.get_spec()
             if client.is_mongos
@@ -366,9 +373,7 @@ class _SetParameterThread(threading.Thread):
                 mongod_params_to_set,
             )
             for node in repl_set.nodes:
-                invoke_set_parameter(
-                    fixture_interface.build_client(node, self._auth_options), mongod_params_to_set
-                )
+                invoke_set_parameter(build_client(node, self._auth_options), mongod_params_to_set)
 
         for standalone in self._standalone_fixtures:
             self.logger.info(
@@ -376,9 +381,7 @@ class _SetParameterThread(threading.Thread):
                 standalone.port,
                 mongod_params_to_set,
             )
-            invoke_set_parameter(
-                fixture_interface.build_client(standalone, self._auth_options), mongod_params_to_set
-            )
+            invoke_set_parameter(build_client(standalone, self._auth_options), mongod_params_to_set)
 
         for mongos in self._mongos_fixtures:
             self.logger.info(
@@ -386,6 +389,4 @@ class _SetParameterThread(threading.Thread):
                 mongos.port,
                 mongos_params_to_set,
             )
-            invoke_set_parameter(
-                fixture_interface.build_client(mongos, self._auth_options), mongos_params_to_set
-            )
+            invoke_set_parameter(build_client(mongos, self._auth_options), mongos_params_to_set)

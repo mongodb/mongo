@@ -3,7 +3,7 @@
 import collections
 import datetime
 import itertools
-import os.path
+import os
 import time
 
 import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
@@ -817,3 +817,6 @@ VALIDATE_SELECTOR_PATHS = True
 # If set, resmoke.py will set Testdata.pauseAfterPopulate to allow tests that check this
 # flag to pause after populating their initial datasets.
 PAUSE_AFTER_POPULATE = None
+
+# Whether ASAN (AddressSanitizer) is enabled, determined by the presence of ASAN_OPTIONS.
+IS_ASAN = bool(os.environ.get("ASAN_OPTIONS"))
