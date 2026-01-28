@@ -4,7 +4,9 @@
 
 "use strict";
 
-import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {isPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {getParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Test initialization.
 
@@ -65,7 +67,7 @@ for (let i = 0; i < 5000; ++i) {
 
 assert.commandWorked(coll.insertMany(docs));
 
-function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKeyPatterns) {
+function setParamsAndRunCommand(isTieBreakingHeuristicEnabled, filter) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -74,6 +76,20 @@ function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKey
     );
 
     const explain = assert.commandWorked(coll.find(filter).explain(true));
+    return explain;
+}
+
+function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKeyPatterns, explain = null) {
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlanTieBreakingWithIndexHeuristics: isTieBreakingHeuristicEnabled,
+        }),
+    );
+
+    if (explain === null) {
+        explain = assert.commandWorked(coll.find(filter).explain(true));
+    }
 
     const indexScans = getPlanStages(explain, "IXSCAN");
 
@@ -182,7 +198,15 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
     if (indexPruningActive) {
         assertIndexScan(false, filter, [{a: 1, b: 1}]);
     } else {
-        assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}]);
+        const explain = setParamsAndRunCommand(false, filter);
+        const winningPlan = getWinningPlanFromExplain(explain);
+
+        // If we fall back to CBR, we will choose the smaller index regardless of whether index pruning is used or not.
+        if (isPlanCosted(winningPlan)) {
+            assertIndexScan(false, filter, [{a: 1, b: 1}], explain);
+        } else {
+            assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}], explain);
+        }
     }
     assertIndexScan(true, filter, [{a: 1, b: 1}]);
 
@@ -264,7 +288,16 @@ function multiIndexScan() {
     assert.commandWorked(coll.createIndexes(indexes));
 
     assertIndexScan(false, filter, [{a: 1, b: 1}, {d: 1}]);
-    assertIndexScan(true, filter, [{a: 1, b: 1, c: 1}, {d: 1}]);
+
+    if (
+        getParameter(conn, "planRankerMode") == "automaticCE" &&
+        getParameter(conn, "automaticCEPlanRankingStrategy") == "CBRForNoMultiplanningResults"
+    ) {
+        // When automaticCE is enabled, even if we don't fall back to CBR we do not call the subplanner in this case. This yields a different result.
+        assertIndexScan(true, filter, [{a: 1, b: 1}, {d: 1}]);
+    } else {
+        assertIndexScan(true, filter, [{a: 1, b: 1, c: 1}, {d: 1}]);
+    }
 
     for (const index of indexes) {
         assert.commandWorked(coll.dropIndex(index));
