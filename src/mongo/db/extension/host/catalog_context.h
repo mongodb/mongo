@@ -51,9 +51,11 @@ public:
                                               SerializationContext::stateCommandRequest())),
           _collName(expCtx.getNamespaceString().coll()),
           _uuid(expCtx.getUUID().has_value() ? expCtx.getUUID()->toString() : ""),
+          _inRouter(expCtx.getInRouter()),
           _api(::MongoExtensionNamespaceString(stringDataAsByteView(StringData(_dbName)),
                                                stringDataAsByteView(StringData(_collName))),
-               stringDataAsByteView(StringData(_uuid))) {}
+               stringDataAsByteView(StringData(_uuid)),
+               _inRouter) {}
 
     ~CatalogContext() = default;
 
@@ -65,6 +67,7 @@ private:
     const std::string _dbName;
     const std::string _collName;
     const std::string _uuid;
+    const bool _inRouter;
     const ::MongoExtensionCatalogContext _api;
 };
 };  // namespace mongo::extension::host
