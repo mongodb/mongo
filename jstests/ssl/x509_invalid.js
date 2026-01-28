@@ -1,10 +1,10 @@
 // Test X509 auth when --tlsAllowInvalidCertificates is enabled
 
 const CLIENT_NAME = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
-const CLIENT_CERT = "jstests/libs/client.pem";
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
-const SELF_SIGNED_CERT = "jstests/libs/client-self-signed.pem";
+const CLIENT_CERT = getX509Path("client.pem");
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
+const SELF_SIGNED_CERT = getX509Path("client-self-signed.pem");
 
 function hasX509AuthSucceeded(conn) {
     if (checkLog.checkContainsOnce(conn, "No verified subject name available from client")) {

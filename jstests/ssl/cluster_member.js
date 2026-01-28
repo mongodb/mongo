@@ -42,7 +42,7 @@ function authAndDo(port, cert, cmd = ";") {
         port,
         "--tls",
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--tlsCertificateKeyFile",
         cert,
         "--eval",
@@ -53,10 +53,10 @@ function authAndDo(port, cert, cmd = ";") {
 
 function runTest(conn) {
     const SERVER_RDN = "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
-    const SERVER = "jstests/libs/server.pem";
-    const FOO_MEMBER = "jstests/ssl/libs/cluster-member-foo.pem";
-    const BAR_MEMBER = "jstests/ssl/libs/cluster-member-bar.pem";
-    const FOO_MEMBER_ALT = "jstests/ssl/libs/cluster-member-foo-alt-rdn.pem";
+    const SERVER = getX509Path("server.pem");
+    const FOO_MEMBER = getX509Path("cluster-member-foo.pem");
+    const BAR_MEMBER = getX509Path("cluster-member-bar.pem");
+    const FOO_MEMBER_ALT = getX509Path("cluster-member-foo-alt-rdn.pem");
     const FOO_MEMBER_ALT_RDN = "CN=Doer,OU=Business,O=Company,L=Fakesville,ST=Example,C=ZZ";
 
     const admin = conn.getDB("admin");
@@ -99,8 +99,8 @@ function runTest(conn) {
     const opts = {
         auth: "",
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/ssl/libs/cluster-member-foo.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("cluster-member-foo.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         clusterAuthMode: "x509",
         tlsClusterAuthX509ExtensionValue: "foo",
         setParameter: {

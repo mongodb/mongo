@@ -11,9 +11,9 @@ executor:
       nodb: ""
       ssl: ""
       sslAllowInvalidCertificates: ""
-      sslCAFile: jstests/libs/ca.pem
+      sslCAFile: ${x509ObjDir}/ca.pem
       # We use server.pem so that shell can auth as __system.
-      sslPEMKeyFile: jstests/libs/server.pem
+      sslPEMKeyFile: ${x509ObjDir}/server.pem
       global_vars:
         TestData:
           setParameters:

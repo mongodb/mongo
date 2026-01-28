@@ -11,5 +11,5 @@ executor:
       ssl: ""
       tlsAllowInvalidHostnames: ""
       tlsAllowInvalidCertificates: ""
-      tlsCAFile: jstests/libs/ca.pem
-      tlsCertificateKeyFile: jstests/libs/client.pem
+      tlsCAFile: ${x509ObjDir}/ca.pem
+      tlsCertificateKeyFile: ${x509ObjDir}/client.pem

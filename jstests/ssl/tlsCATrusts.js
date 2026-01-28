@@ -2,23 +2,23 @@
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 requireSSLProvider("openssl", function () {
-    const SERVER_CERT = "jstests/libs/server.pem";
-    const COMBINED_CA_CERT = "jstests/ssl/x509/root-and-trusted-ca.pem";
-    const CA_HASH = cat("jstests/libs/ca.pem.digest.sha256");
-    const TRUSTED_CA_HASH = cat("jstests/libs/trusted-ca.pem.digest.sha256");
+    const SERVER_CERT = getX509Path("server.pem");
+    const COMBINED_CA_CERT = getX509Path("root-and-trusted-ca.pem");
+    const CA_HASH = cat(getX509Path("ca.pem.digest.sha256"));
+    const TRUSTED_CA_HASH = cat(getX509Path("trusted-ca.pem.digest.sha256"));
 
     // Common suffix, keep the lines short.
     const RDN_SUFFIX = ",O=MongoDB,L=New York City,ST=New York,C=US";
     const USERS = [];
 
     const CLIENT = {
-        cert: "jstests/libs/client.pem",
+        cert: getX509Path("client.pem"),
         roles: [],
     };
     USERS.push("CN=client,OU=KernelUser");
 
     const CLIENT_ROLES = {
-        cert: "jstests/libs/client_roles.pem",
+        cert: getX509Path("client_roles.pem"),
         roles: [
             {role: "backup", db: "admin"},
             {role: "readAnyDatabase", db: "admin"},
@@ -27,7 +27,7 @@ requireSSLProvider("openssl", function () {
     USERS.push("CN=Kernel Client Peer Role,OU=Kernel Users");
 
     const TRUSTED_CLIENT_TESTDB_ROLES = {
-        cert: "jstests/ssl/x509/trusted-client-testdb-roles.pem",
+        cert: getX509Path("trusted-client-testdb-roles.pem"),
         roles: [
             {role: "role1", db: "testDB"},
             {role: "role2", db: "testDB"},

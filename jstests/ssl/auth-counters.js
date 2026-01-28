@@ -4,8 +4,8 @@ const x509 = "MONGODB-X509";
 const mongod = MongoRunner.runMongod({
     auth: "",
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     clusterAuthMode: "x509",
 });
 const admin = mongod.getDB("admin");
@@ -67,9 +67,9 @@ function assertSuccessInternal() {
             "--port",
             mongod.port,
             "--tlsCertificateKeyFile",
-            "jstests/libs/server.pem",
+            getX509Path("server.pem"),
             "--tlsCAFile",
-            "jstests/libs/ca.pem",
+            getX509Path("ca.pem"),
             "--authenticationDatabase",
             "$external",
             "--authenticationMechanism",

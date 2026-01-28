@@ -57,8 +57,8 @@ executor:
           command: 2
         enableTestCommands: 1
       tlsMode: preferTLS
-      tlsCAFile: jstests/libs/ca.pem
-      tlsCertificateKeyFile: jstests/libs/server.pem
+      tlsCAFile: ${x509ObjDir}/ca.pem
+      tlsCertificateKeyFile: ${x509ObjDir}/server.pem
       keyFile: *keyFile
       clusterAuthMode: sendX509
       auth: ""

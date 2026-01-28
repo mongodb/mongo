@@ -15,10 +15,10 @@ function deleteFile(file) {
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
 
-copyCertificateFile("jstests/libs/ca.pem", dbPath + "/ca-test.pem");
-copyCertificateFile("jstests/libs/client.pem", dbPath + "/client-test.pem");
-copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
-copyCertificateFile("jstests/libs/crl.pem", dbPath + "/crl-test.pem");
+copyCertificateFile(getX509Path("ca.pem"), dbPath + "/ca-test.pem");
+copyCertificateFile(getX509Path("client.pem"), dbPath + "/client-test.pem");
+copyCertificateFile(getX509Path("server.pem"), dbPath + "/server-test.pem");
+copyCertificateFile(getX509Path("crl.pem"), dbPath + "/crl-test.pem");
 
 const mongod = MongoRunner.runMongod({
     tlsMode: "requireTLS",
@@ -35,10 +35,10 @@ if (determineSSLProvider() !== "apple") {
 }
 
 for (let certType of certTypes) {
-    copyCertificateFile("jstests/libs/ca.pem", dbPath + "/ca-test.pem");
-    copyCertificateFile("jstests/libs/client.pem", dbPath + "/client-test.pem");
-    copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
-    copyCertificateFile("jstests/libs/crl.pem", dbPath + "/crl-test.pem");
+    copyCertificateFile(getX509Path("ca.pem"), dbPath + "/ca-test.pem");
+    copyCertificateFile(getX509Path("client.pem"), dbPath + "/client-test.pem");
+    copyCertificateFile(getX509Path("server.pem"), dbPath + "/server-test.pem");
+    copyCertificateFile(getX509Path("crl.pem"), dbPath + "/crl-test.pem");
     assert.commandWorked(mongod.adminCommand({rotateCertificates: 1}));
 
     deleteFile(`${dbPath}/${certType}-test.pem`);

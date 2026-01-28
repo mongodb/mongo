@@ -1,9 +1,9 @@
 // Test mongo shell output logs correct messages when not including certificates or using bad
 // certificates.
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
 
-const BAD_CLIENT_CERT = "jstests/libs/trusted-client.pem";
+const BAD_CLIENT_CERT = getX509Path("trusted-client.pem");
 
 function testConnect(outputLog, ...args) {
     const command = ["mongo", "--host", "localhost", "--port", mongod.port, "--tls", ...args];

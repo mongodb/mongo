@@ -12,13 +12,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 let opts = {
     tlsMode: "allowTLS",
-    tlsCertificateKeyFile: "jstests/libs/client.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("client.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     shardsvr: "",
 };
 requireSSLProvider("openssl", function () {
     // Only the OpenSSL provider supports encrypted PKCS#8
-    opts.tlsCertificateKeyFile = "jstests/libs/password_protected.pem";
+    opts.tlsCertificateKeyFile = getX509Path("password_protected.pem");
     opts.tlsCertificateKeyFilePassword = "qwerty";
 });
 

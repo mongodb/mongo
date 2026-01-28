@@ -1,7 +1,7 @@
-const SERVER1_CERT = "jstests/libs/server_SAN.pem";
-const SERVER2_CERT = "jstests/libs/server_SAN2.pem";
-const CA_CERT = "jstests/libs/ca.pem";
-const CLIENT_CERT = "jstests/libs/client.pem";
+const SERVER1_CERT = getX509Path("server_SAN.pem");
+const SERVER2_CERT = getX509Path("server_SAN2.pem");
+const CA_CERT = getX509Path("ca.pem");
+const CLIENT_CERT = getX509Path("client.pem");
 
 // Some test machines lack ipv6 so test for by starting a mongod that needs to bind to an ipv6
 // address.

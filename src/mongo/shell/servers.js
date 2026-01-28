@@ -40,6 +40,10 @@ function getMongoSuffixPath(binary_name) {
     return binary_name;
 }
 
+function getX509Path(x509_name) {
+    return MongoRunner.getInstallPath("x509", x509_name);
+}
+
 MongoRunner.getMongodPath = function () {
     return getMongoSuffixPath("mongod");
 };
@@ -1693,4 +1697,4 @@ function startMongoProgramNoConnect(...args) {
     return _startMongoProgram(..._getMongoProgramArguments(args));
 }
 
-export {MongoRunner, runMongoProgram, startMongoProgram, startMongoProgramNoConnect};
+export {MongoRunner, runMongoProgram, startMongoProgram, startMongoProgramNoConnect, getX509Path};

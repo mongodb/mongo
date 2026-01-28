@@ -4,10 +4,10 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const CLIENT_NAME = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
-const CLIENT_CERT = "jstests/libs/client.pem";
-const SERVER_CERT = "jstests/libs/server.pem";
-const CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
-const CA_CERT = "jstests/libs/ca.pem";
+const CLIENT_CERT = getX509Path("client.pem");
+const SERVER_CERT = getX509Path("server.pem");
+const CLUSTER_CERT = getX509Path("cluster_cert.pem");
+const CA_CERT = getX509Path("ca.pem");
 
 const options = {
     tlsMode: "requireTLS",

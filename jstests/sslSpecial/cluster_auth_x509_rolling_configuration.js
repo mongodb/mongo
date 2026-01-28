@@ -19,8 +19,8 @@ if (determineSSLProvider() !== "openssl") {
  */
 // Subject: C=US, ST=New York, L=New York, O=MongoDB, OU=Kernel, CN=server
 const originalDNAttributes = "O=MongoDB, OU=Kernel";
-const originalCert = "jstests/libs/server.pem";
-const originalCACert = "jstests/libs/ca.pem";
+const originalCert = getX509Path("server.pem");
+const originalCACert = getX509Path("ca.pem");
 const defaultPolicyClusterAuthX509Override = {
     attributes: originalDNAttributes,
 };
@@ -30,7 +30,7 @@ const defaultPolicyClusterAuthX509Override = {
  */
 // Subject: C=US, ST=New York, L=New York City, CN=server, title=foo
 const fooTitleDNAttributes = "C=US, ST=New York, L=New York City, title=foo";
-const fooTitleDNCert = "jstests/libs/server_title_foo_no_o_ou_dc.pem";
+const fooTitleDNCert = getX509Path("server_title_foo_no_o_ou_dc.pem");
 const fooTitleClusterAuthX509Override = {
     attributes: fooTitleDNAttributes,
 };
@@ -40,21 +40,21 @@ const fooTitleClusterAuthX509Override = {
  */
 // Subject: C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel, CN=server, title=bar
 const barTitleDNAttributes = "C=US, ST=New York, L=New York City, title=bar";
-const barTitleDNCert = "jstests/libs/server_title_bar.pem";
+const barTitleDNCert = getX509Path("server_title_bar.pem");
 const barTitleClusterAuthX509Override = {
     attributes: barTitleDNAttributes,
 };
 /**
  * This is the path of the certificate containing the cluster membership extension set to 'foo'.
  */
-const fooExtensionCert = "jstests/ssl/libs/cluster-member-foo.pem";
+const fooExtensionCert = getX509Path("cluster-member-foo.pem");
 const fooExtensionClusterAuthX509Override = {
     extensionValue: "foo",
 };
 /**
  * This is the path of the certificate containing the cluster membership extension set to 'bar'.
  */
-const barExtensionCert = "jstests/ssl/libs/cluster-member-bar.pem";
+const barExtensionCert = getX509Path("cluster-member-bar.pem");
 const barExtensionClusterAuthX509Override = {
     extensionValue: "bar",
 };

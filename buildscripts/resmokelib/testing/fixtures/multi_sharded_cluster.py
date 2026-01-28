@@ -6,7 +6,7 @@ import os.path
 import pymongo
 
 from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.utils import dictionary
+from buildscripts.resmokelib.utils import certs, dictionary
 
 
 class MultiShardedClusterFixture(interface.MultiClusterFixture):
@@ -38,8 +38,13 @@ class MultiShardedClusterFixture(interface.MultiClusterFixture):
             raise ValueError("num_sharded_clusters must be greater or equal to 2")
         self.num_sharded_clusters = num_sharded_clusters
 
-        self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
-        self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, [])
+        self.common_mongod_options = certs.expand_x509_paths(
+            self.fixturelib.default_if_none(common_mongod_options, {})
+        )
+        self.per_mongod_options = [
+            certs.expand_x509_paths(opts)
+            for opts in self.fixturelib.default_if_none(per_mongod_options, [])
+        ]
         self.common_sharded_cluster_options = common_sharded_cluster_options
         self.per_sharded_cluster_options = self.fixturelib.default_if_none(
             per_sharded_cluster_options, []

@@ -2,10 +2,10 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const SERVER_SAN_CERT = "jstests/libs/server_SAN.pem";
-const CLIENT_CERT = "jstests/libs/client.pem";
-const CA_CERT = "jstests/libs/ca.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const SERVER_SAN_CERT = getX509Path("server_SAN.pem");
+const CLIENT_CERT = getX509Path("client.pem");
+const CA_CERT = getX509Path("ca.pem");
 
 const SERVER_USER = "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const SERVER_SAN_USER = "CN=Kernel Client Peer Role,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";

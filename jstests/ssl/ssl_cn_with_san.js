@@ -4,8 +4,8 @@
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // server-intermediate-ca was signed by ca.pem, not trusted-ca.pem
-const CA = "jstests/libs/ca.pem";
-const SERVER = "jstests/ssl/libs/localhost-cn-with-san.pem";
+const CA = getX509Path("ca.pem");
+const SERVER = getX509Path("localhost-cn-with-san.pem");
 
 const mongod = MongoRunner.runMongod({
     tlsMode: "requireTLS",

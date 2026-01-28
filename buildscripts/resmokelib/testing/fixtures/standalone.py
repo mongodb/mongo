@@ -19,6 +19,7 @@ from buildscripts.resmokelib.extensions import (
 )
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+from buildscripts.resmokelib.utils import certs
 from buildscripts.resmokelib.utils.history import HistoryDict
 
 
@@ -61,7 +62,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {})
+            certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
         self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS
         if self.load_all_extensions:

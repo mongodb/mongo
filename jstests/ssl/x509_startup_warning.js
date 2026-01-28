@@ -30,8 +30,8 @@ function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostn
                 {
                     auth: "",
                     tlsMode: "preferTLS",
-                    tlsCertificateKeyFile: "jstests/libs/server.pem",
-                    tlsCAFile: "jstests/libs/ca.pem",
+                    tlsCertificateKeyFile: getX509Path("server.pem"),
+                    tlsCAFile: getX509Path("ca.pem"),
                     waitForConnect: false,
                 },
                 opts,

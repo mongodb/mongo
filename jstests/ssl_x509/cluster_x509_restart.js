@@ -13,8 +13,8 @@ const rst = new ReplSetTest({
         tlsMode: "requireTLS",
         clusterAuthMode: "x509",
         keyFile: "jstests/libs/key1",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         tlsAllowInvalidHostnames: "",
     },
 });

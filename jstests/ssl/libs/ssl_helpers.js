@@ -12,14 +12,14 @@ TestData.ignoreUnterminatedProcesses = true;
 
 export var KEYFILE = "jstests/libs/key1";
 
-export var SERVER_CERT = "jstests/libs/server.pem";
-export var TRUSTED_SERVER_CERT = "jstests/libs/trusted-server.pem";
-export var CA_CERT = "jstests/libs/ca.pem";
-export var TRUSTED_CA_CERT = "jstests/libs/trusted-ca.pem";
-export var CLIENT_CERT = "jstests/libs/client.pem";
-export var TRUSTED_CLIENT_CERT = "jstests/libs/trusted-client.pem";
+export var SERVER_CERT = getX509Path("server.pem");
+export var TRUSTED_SERVER_CERT = getX509Path("trusted-server.pem");
+export var CA_CERT = getX509Path("ca.pem");
+export var TRUSTED_CA_CERT = getX509Path("trusted-ca.pem");
+export var CLIENT_CERT = getX509Path("client.pem");
+export var TRUSTED_CLIENT_CERT = getX509Path("trusted-client.pem");
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
-export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
+export var CLUSTER_CERT = getX509Path("cluster_cert.pem");
 
 // Note: "tlsAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
@@ -386,7 +386,7 @@ export function copyCertificateFile(a, b) {
         assert.eq(0, runProgram("cmd.exe", "/c", "copy", a, b));
         return;
     }
-    assert.eq(0, runProgram("cp", a, b));
+    assert.eq(0, runProgram("cp", "-f", a, b));
 }
 
 export function clientSupportsTLS1_1() {

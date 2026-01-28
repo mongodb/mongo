@@ -30,6 +30,9 @@ NAME_TO_OID["L"] = NAME_TO_OID["localityName"]
 NAME_TO_OID["SN"] = NAME_TO_OID["surname"]
 NAME_TO_OID["CN"] = NAME_TO_OID["commonName"]
 
+# The (partial) ordering of OIDs in subject name expected by our jstests.
+OID_ORDER = [NAME_TO_OID[n].dotted_string for n in ["C", "ST", "L", "O", "OU", "CN"]]
+
 # Path to the file specifying the config.
 CONFIGFILE = None
 
@@ -114,15 +117,6 @@ def find_certificate_definition(name):
     return None
 
 
-def get_header_comment(cert):
-    """Get the correct header comment for the certificate."""
-    if not cert.get("include_header", True):
-        return ""
-    """Header comment for every generated file."""
-    comment = "# " + cert.get("description", "").replace("\n", "\n# ") + "\n"
-    return comment
-
-
 def get_cert_and_key(cert_name):
     """Locate the cert and key file for a given cert name, load them, and return them."""
     if DRY_RUN:
@@ -197,7 +191,14 @@ def set_subject(builder, cert, set_issuer=False):
         for key, val in cert["Subject"].items():
             oid = get_oid(key)
             attr_dict[oid] = val
-        name = x509.Name([x509.NameAttribute(key, val) for key, val in attr_dict.items()])
+
+        ordered_attrs = sorted(
+            attr_dict.items(),
+            key=lambda item: "." + str(OID_ORDER.index(item[0].dotted_string))
+            if item[0].dotted_string in OID_ORDER
+            else item[0].dotted_string,
+        )
+        name = x509.Name([x509.NameAttribute(oid, val) for oid, val in ordered_attrs])
     else:
         # Multivalued RDN case
         assert isinstance(cert["Subject"], list)
@@ -209,8 +210,19 @@ def set_subject(builder, cert, set_issuer=False):
             attrs = []
             for key, val in rdn_def.items():
                 oid = get_oid(key)
-                attrs.append(x509.NameAttribute(oid, val))
-            rdns.append(x509.RelativeDistinguishedName(attrs))
+                attrs.append((oid, val))
+
+            ordered_attrs = sorted(
+                attrs,
+                key=lambda item: "." + str(OID_ORDER.index(item[0].dotted_string) + 1)
+                if item[0].dotted_string in OID_ORDER
+                else item[0].dotted_string,
+            )
+            rdns.append(
+                x509.RelativeDistinguishedName(
+                    [x509.NameAttribute(oid, val) for oid, val in ordered_attrs]
+                )
+            )
         name = x509.Name(rdns)
 
     if set_issuer:  # When issuer = self, set the issuer as well
@@ -468,11 +480,21 @@ def sign_ecdsa_deterministic(key, cert):
     # Get just the certificate content and sign it.
     cert_bytes = seq["cert_content"].dump()
     sig = ecdsa_pkey.sign_deterministic(cert_bytes, hashfunc=hashlib.sha256)
-    # Encode the signature -- Split it in half and make a sequence with the two halves.
     assert len(sig) == 64
     r = sig[:32]
     s = sig[32:]
-    ber_sig = b"\x30\x44\x02\x20" + r + b"\x02\x20" + s
+    # Prepend a 0x00 byte if the high bit is set, to indicate positive integer in ASN.1.
+    if r[0] & 0x80:
+        r_der = b"\x02\x21\x00" + r
+    else:
+        r_der = b"\x02\x20" + r
+    if s[0] & 0x80:
+        s_der = b"\x02\x21\x00" + s
+    else:
+        s_der = b"\x02\x20" + s
+    # Encode the signature -- Split it in half and make a sequence with the two halves.
+    len_byte = len(r_der) + len(s_der)
+    ber_sig = b"\x30" + len_byte.to_bytes(1, byteorder="big") + r_der + s_der
     # Set this as the signature, then dump the new certificate.
     seq["signature"] = to_bits(ber_sig)
     signed_bytes = seq.dump()
@@ -543,18 +565,17 @@ def process_normal_cert(cert):
             issuer_ski=issuer_ski,
         )
 
-        if isinstance(key, ec.EllipticCurvePrivateKey):
+        if isinstance(issuer_key, ec.EllipticCurvePrivateKey):
             # For EC, we need to compute a deterministic signature ourselves. While newer versions of OpenSSL support deterministic signing with ECDSA, some of the platforms we run tests on use old versions, so we unfortunately cannot use this feature.
-            bad_sig_obj = builder.sign(key, hashes.SHA256())
-            cert_obj = sign_ecdsa_deterministic(key, bad_sig_obj)
+            bad_sig_obj = builder.sign(issuer_key, hashes.SHA256())
+            cert_obj = sign_ecdsa_deterministic(issuer_key, bad_sig_obj)
         else:
-            cert_obj = builder.sign(key, hashes.SHA256())
+            cert_obj = builder.sign(issuer_key, hashes.SHA256())
 
-        header = get_header_comment(cert)
         cert_path = make_filename(cert)
-        # Write header + certificate PEM + key PEM to the output file.
+        # Write certificate PEM + key PEM to the output file.
         with open(cert_path, "wt") as f:
-            f.write(header + cert_obj.public_bytes(serialization.Encoding.PEM).decode("ascii"))
+            f.write(cert_obj.public_bytes(serialization.Encoding.PEM).decode("ascii"))
             with open(str(STATIC_PATH / idx(cert, "keyfile")), "r") as keyf:
                 f.write(keyf.read())
         LOADED_CERT_AND_KEYS[cert["name"]] = (cert_obj, key)
@@ -568,10 +589,10 @@ def process_normal_cert(cert):
         key_name = cert["name"][: -len(".pem")] + ".key"
         if not DRY_RUN:
             with open(OUTPUT_PATH / crt_name, "wt") as f:
-                f.write(header + cert_obj.public_bytes(serialization.Encoding.PEM).decode("ascii"))
+                f.write(cert_obj.public_bytes(serialization.Encoding.PEM).decode("ascii"))
             with open(OUTPUT_PATH / key_name, "wt") as f:
                 with open(str(STATIC_PATH / idx(cert, "keyfile")), "r") as keyf:
-                    f.write(header + keyf.read())
+                    f.write(keyf.read())
 
 
 def process_cert(cert):
@@ -586,12 +607,7 @@ def process_cert(cert):
     explicit_empty_subject = cert.get("explicit_subject", False) and not subject
     if subject or explicit_empty_subject:
         process_normal_cert(cert)
-    elif append_certs:
-        # Pure composing certificate. Start with a basic preamble.
-        if not DRY_RUN:
-            with open(make_filename(cert), "wt") as f:
-                f.write(get_header_comment(cert) + "\n")
-    else:
+    elif not append_certs:
         raise CertificateGenerationError(
             "Certificate definitions must have at least one of 'Subject' and/or 'append_cert'"
         )
@@ -600,11 +616,8 @@ def process_cert(cert):
         return
     for cert_name in append_certs:
         append_cert = get_cert_and_key(cert_name)[0]
-        header = (
-            "# Certificate from " + cert_name + "\n" if cert.get("include_header", True) else ""
-        )
         with open(make_filename(cert), "at") as f:
-            f.write(header + append_cert.public_bytes(serialization.Encoding.PEM).decode("ascii"))
+            f.write(append_cert.public_bytes(serialization.Encoding.PEM).decode("ascii") + "\n")
 
 
 DIGEST_NAME_TO_HASH = {"sha256": hashes.SHA256(), "sha1": hashes.SHA1()}
@@ -740,7 +753,6 @@ def validate_config():
         "append_cert",
         "extensions",
         "passphrase",
-        "include_header",
         "keyfile",
         "split_cert_and_key",
         "explicit_subject",

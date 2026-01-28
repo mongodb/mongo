@@ -42,8 +42,8 @@ requireSSLProvider("apple", function () {
     const trusted_server_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
     const trusted_client_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
 
-    const expected_server_thumbprint = cat("jstests/libs/trusted-server.pem.digest.sha1").toUpperCase();
-    const expected_client_thumbprint = cat("jstests/libs/trusted-client.pem.digest.sha1").toUpperCase();
+    const expected_server_thumbprint = cat(getX509Path("trusted-server.pem.digest.sha1")).toUpperCase();
+    const expected_client_thumbprint = cat(getX509Path("trusted-client.pem.digest.sha1")).toUpperCase();
 
     // If we fall into this case, our trusted certificates are not installed on the machine's
     // certificate keychain. This probably means that certificates have just been renewed, but have
@@ -53,7 +53,7 @@ requireSSLProvider("apple", function () {
         expected_client_thumbprint !== trusted_client_thumbprint
     ) {
         jsTest.log.error(
-            "macOS host has an unexpected version of the trusted server certificate (jstests/libs/trusted-server.pem) or trusted client certificate (jstests/libs/trusted-client.pem) installed.",
+            "macOS host has an unexpected version of the trusted server certificate (trusted-server.pem) or trusted client certificate (trusted-client.pem) installed.",
         );
         jsTest.log.error(
             "Expecting server thumbprint: " + expected_server_thumbprint + ", got: " + trusted_server_thumbprint,

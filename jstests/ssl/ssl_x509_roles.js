@@ -2,13 +2,13 @@
 // Also validates RFC2253
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
-const CLIENT_CERT = "jstests/libs/client_roles.pem";
-const CLIENT_ESCAPE_CERT = "jstests/libs/client_escape.pem";
-const CLIENT_UTF8_CERT = "jstests/libs/client_utf8.pem";
-const CLIENT_EMAIL_CERT = "jstests/libs/client_email.pem";
-const CLIENT_CERT_NO_ROLES = "jstests/libs/client.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
+const CLIENT_CERT = getX509Path("client_roles.pem");
+const CLIENT_ESCAPE_CERT = getX509Path("client_escape.pem");
+const CLIENT_UTF8_CERT = getX509Path("client_utf8.pem");
+const CLIENT_EMAIL_CERT = getX509Path("client_email.pem");
+const CLIENT_CERT_NO_ROLES = getX509Path("client.pem");
 const CLIENT_USER_NO_ROLES = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 const smokeScript = "assert(db.getSiblingDB('$external').auth({ mechanism: 'MONGODB-X509' }));";
 

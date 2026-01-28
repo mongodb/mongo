@@ -1,7 +1,7 @@
-let CA_CERT = "jstests/libs/ca.pem";
-let SERVER_CERT = "jstests/libs/server.pem";
-let CLIENT_CERT = "jstests/libs/client.pem";
-let BAD_SAN_CERT = "jstests/libs/badSAN.pem";
+let CA_CERT = getX509Path("ca.pem");
+let SERVER_CERT = getX509Path("server.pem");
+let CLIENT_CERT = getX509Path("client.pem");
+let BAD_SAN_CERT = getX509Path("badSAN.pem");
 
 let mongod = MongoRunner.runMongod({
     tlsMode: "requireTLS",

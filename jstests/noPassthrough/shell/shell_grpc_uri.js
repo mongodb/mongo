@@ -38,11 +38,11 @@ function testGRPCConnect(ok, ...args) {
 testGRPCConnect(true);
 
 // Options currently prohibited when using gRPC.
-testGRPCConnect(false, "--tlsCRLFile", "jstests/libs/crl.pem");
+testGRPCConnect(false, "--tlsCRLFile", getX509Path("crl.pem"));
 testGRPCConnect(
     false,
     "--tlsCertificateKeyFile",
-    "jstests/libs/password_protected.pem",
+    getX509Path("password_protected.pem"),
     "--tlsCertificateKeyFilePassword",
     "qwerty",
 );

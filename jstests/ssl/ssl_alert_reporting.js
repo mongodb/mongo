@@ -5,9 +5,9 @@ import {determineSSLProvider, sslProviderSupportsTLS1_1} from "jstests/ssl/libs/
 const clientOptions = [
     "--tls",
     "--tlsCertificateKeyFile",
-    "jstests/libs/client.pem",
+    getX509Path("client.pem"),
     "--tlsCAFile",
-    "jstests/libs/ca.pem",
+    getX509Path("ca.pem"),
     "--eval",
     ";",
 ];
@@ -33,8 +33,8 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
 
     let md = MongoRunner.runMongod({
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsCertificateKeyFile: getX509Path("server.pem"),
         tlsDisabledProtocols: serverDisabledProtos,
     });
 

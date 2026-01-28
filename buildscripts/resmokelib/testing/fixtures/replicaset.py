@@ -17,6 +17,7 @@ from buildscripts.resmokelib.extensions import (
     find_and_generate_extension_configs,
 )
 from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.utils import certs
 
 
 def compare_timestamp(timestamp1, timestamp2):
@@ -90,7 +91,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         self.mongod_executable = mongod_executable
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {})
+            certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
 
         self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS

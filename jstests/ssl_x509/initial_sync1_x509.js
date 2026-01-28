@@ -5,8 +5,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 let common_options = {
     keyFile: "jstests/libs/key1",
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidHostnames: "",
 };
 
@@ -58,7 +58,7 @@ function runInitialSyncTest() {
 
 // Standard case, clusterAuthMode: x509
 var x509_options1 = Object.merge(common_options, {
-    tlsClusterFile: "jstests/libs/cluster_cert.pem",
+    tlsClusterFile: getX509Path("cluster_cert.pem"),
     clusterAuthMode: "x509",
 });
 var x509_options2 = x509_options1;
@@ -66,7 +66,7 @@ runInitialSyncTest();
 
 // Mixed clusterAuthMode: sendX509 and sendKeyFile and try adding --auth
 x509_options1 = Object.merge(common_options, {
-    tlsClusterFile: "jstests/libs/cluster_cert.pem",
+    tlsClusterFile: getX509Path("cluster_cert.pem"),
     clusterAuthMode: "sendX509",
     auth: "",
 });

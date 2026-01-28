@@ -23,8 +23,8 @@ assertCorrectConfig({sslMode: "disabled"}, defaultConfig);
 assertCorrectConfig(
     {
         sslMode: "allowSSL",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
+        sslPEMKeyFile: getX509Path("server.pem"),
+        sslCAFile: getX509Path("ca.pem"),
     },
     defaultConfig,
 );
@@ -33,8 +33,8 @@ assertCorrectConfig(
 assertCorrectConfig(
     {
         sslMode: "allowSSL",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
+        sslPEMKeyFile: getX509Path("server.pem"),
+        sslCAFile: getX509Path("ca.pem"),
         setParameter: "opensslCipherConfig=HIGH",
     },
     "HIGH",
@@ -43,8 +43,8 @@ assertCorrectConfig(
 assertCorrectConfig(
     {
         sslMode: "allowSSL",
-        sslPEMKeyFile: "jstests/libs/server.pem",
-        sslCAFile: "jstests/libs/ca.pem",
+        sslPEMKeyFile: getX509Path("server.pem"),
+        sslCAFile: getX509Path("ca.pem"),
         tlsCipherConfig: "HIGH",
     },
     "HIGH",

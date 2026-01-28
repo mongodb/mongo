@@ -1,8 +1,8 @@
 // Test mongo shell connect strings.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const CAFILE = "jstests/libs/ca.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CAFILE = getX509Path("ca.pem");
 
 let opts = {
     tlsMode: "allowTLS",

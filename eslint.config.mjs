@@ -90,6 +90,7 @@ export default [
                 ___it___: true,
 
                 // src/mongo/shell/servers_global.js
+                getX509Path: true,
                 MongoRunner: true,
                 myPort: true,
                 runMongoProgram: true,

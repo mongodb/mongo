@@ -6,8 +6,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const x509Options = {
     clusterAuthMode: "x509",
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidCertificates: "",
 };
 
@@ -42,8 +42,8 @@ const subShellCommands = async function () {
 const subShellArgs = [
     "mongo",
     "--ssl",
-    "--tlsCAFile=jstests/libs/ca.pem",
-    "--tlsCertificateKeyFile=jstests/libs/server.pem",
+    "--tlsCAFile=" + getX509Path("ca.pem"),
+    "--tlsCertificateKeyFile=" + getX509Path("server.pem"),
     "--tlsAllowInvalidHostnames",
     "--authenticationDatabase=$external",
     "--authenticationMechanism=MONGODB-X509",

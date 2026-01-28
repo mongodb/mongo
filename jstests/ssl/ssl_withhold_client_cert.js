@@ -26,8 +26,8 @@ function testRS(opts, expectWarning) {
 
 const base_options = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidHostnames: "",
     useLogFiles: true,
 };

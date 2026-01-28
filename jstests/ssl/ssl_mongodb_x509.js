@@ -25,8 +25,8 @@ let startOptions = {
     configsvr: "",
     storageEngine: "wiredTiger",
     tlsMode: "allowTLS",
-    tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
 };
 
 let configRS = new ReplSetTest(rstOptions);
