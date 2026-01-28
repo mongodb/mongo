@@ -48,6 +48,10 @@ struct TrialPhaseConfig {
     // How many results per plan are we targeting to retrieve during the trial period.
     // If a plan returns this many results, we can stop the trial period early.
     size_t targetNumResults;
+
+    // True if this trial phase uses a capped subset of the total work budget for the query,
+    // with the expectation that the same multi-planner may be resumed in a later trial phase.
+    bool isCappedTrialPhase{false};
 };
 
 /**
