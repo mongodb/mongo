@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -1146,11 +1147,34 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
         return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
     }
 
+    // 1. Execute the request by performing a snapshot read.
     HistoricalPlacementReader reader(opCtx, nss, vcTime, _localCatalogClient.get());
-    if (ignoreRemovedShards) {
-        return reader.getHistoricalPlacementIgnoreRemovedShardsMode(atClusterTime);
+    auto response = ignoreRemovedShards
+        ? reader.getHistoricalPlacementIgnoreRemovedShardsMode(atClusterTime)
+        : reader.getHistoricalPlacementStrictMode(atClusterTime);
+
+    // 2. After collecting the response, check if the "V2 change stream readers" feature is
+    //    currently enabled on the config server; This is the only way to ensure that the retrieved
+    //    placement atClusterTime plus the sequence of later events produced on each shard is
+    //    actually consistent.
+    //
+    // TODO (SERVER-98118): This step once featureFlagChangeStreamPreciseShardTargeting reaches
+    // last-lts.
+    {
+        FixedFCVRegion fcvRegion(opCtx);
+        if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
+            !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+            LOGV2(10909800,
+                  "Forcing a NotAvailable response to getHistoricalPlacement() request due to the "
+                  "current FCV state of the config server",
+                  "nss"_attr = nss,
+                  "atClusterTime"_attr = atClusterTime);
+            return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
+        }
     }
-    return reader.getHistoricalPlacementStrictMode(atClusterTime);
+
+    return response;
 }
 
 void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
