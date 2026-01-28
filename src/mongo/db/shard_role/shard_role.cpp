@@ -365,10 +365,11 @@ void assertReadConcernSupported(OperationContext* opCtx,
 std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalCollectionOrView(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
-    const AcquisitionPrerequisites& prerequisites) {
+    const AcquisitionPrerequisites& prerequisites,
+    const bool forRestore = false) {
     const auto& nss = prerequisites.nss;
 
-    auto coll = [&]() {
+    auto getCollection = [&](const NamespaceString& nss) {
         if (prerequisites.useConsistentCatalog) {
             auto readTimestamp =
                 shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
@@ -376,9 +377,29 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
                 opCtx, NamespaceStringOrUUID(nss), readTimestamp));
         } else {
             return CollectionPtr::CollectionPtr_UNSAFE(
-                catalog.lookupCollectionByNamespace(opCtx, prerequisites.nss));
+                catalog.lookupCollectionByNamespace(opCtx, nss));
         }
-    }();
+    };
+
+    auto coll = getCollection(nss);
+
+    if (!coll && forRestore) {
+        // Throw `InterruptedDueToTimeseriesUpgradeDowngrade` if this is a timeseries collection
+        // that has been concurrently upgraded/downgraded.
+        // TODO SERVER-117477 remove this logic once 9.0 becomes last LTS and all timeseries
+        // collection are viewless.
+        const auto otherTimeseriesNss = nss.isTimeseriesBucketsCollection()
+            ? nss.getTimeseriesViewNamespace()
+            : nss.makeTimeseriesBucketsNamespace();
+        auto otherTimeseriesColl = getCollection(otherTimeseriesNss);
+        if (otherTimeseriesColl && otherTimeseriesColl->isTimeseriesCollection()) {
+            uasserted(
+                ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                fmt::format("Operation on collection '{}' was interrupted due to a time-series "
+                            "metadata change during FCV transition. Retry the operation.",
+                            nss.toStringForErrorMsg()));
+        }
+    }
 
     checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, prerequisites.uuid);
 
@@ -418,16 +439,19 @@ struct SnapshotedServices {
 
 SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
                                            const CollectionCatalog& catalog,
-                                           const AcquisitionPrerequisites& prerequisites) {
+                                           const AcquisitionPrerequisites& prerequisites,
+                                           const bool forRestore = false) {
     if (holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
             prerequisites.placementConcern)) {
         return SnapshotedServices{
-            acquireLocalCollectionOrView(opCtx, catalog, prerequisites), boost::none, boost::none};
+            acquireLocalCollectionOrView(opCtx, catalog, prerequisites, forRestore),
+            boost::none,
+            boost::none};
     }
 
     const auto& placementConcern = get<PlacementConcern>(prerequisites.placementConcern);
 
-    auto collOrView = acquireLocalCollectionOrView(opCtx, catalog, prerequisites);
+    auto collOrView = acquireLocalCollectionOrView(opCtx, catalog, prerequisites, forRestore);
     const auto& nss = prerequisites.nss;
 
     const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
@@ -1943,7 +1967,8 @@ void restoreTransactionResourcesToOperationContext(
                 // Just reacquire the CollectionPtr. Reads don't care about placement changes
                 // because they have already established a ScopedCollectionFilter that acts as
                 // RangePreserver.
-                auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
+                auto collOrView = acquireLocalCollectionOrView(
+                    opCtx, *catalog, prerequisites, true /* forRestore */);
 
                 if (!holds_alternative<CollectionPtr>(collOrView)) {
                     uassertedCollectionIsAViewAfterRestore();
@@ -1963,7 +1988,7 @@ void restoreTransactionResourcesToOperationContext(
                 }
 
                 auto reacquiredServicesSnapshot =
-                    acquireServicesSnapshot(opCtx, *catalog, prerequisites);
+                    acquireServicesSnapshot(opCtx, *catalog, prerequisites, true /* forRestore */);
 
                 if (!holds_alternative<CollectionPtr>(
                         reacquiredServicesSnapshot.collectionPtrOrView)) {
@@ -2000,7 +2025,8 @@ void restoreTransactionResourcesToOperationContext(
 
         for (auto& acquiredView : transactionResources.acquiredViews) {
             const auto& prerequisites = acquiredView.prerequisites;
-            auto collOrView = acquireLocalCollectionOrView(opCtx, *catalog, prerequisites);
+            auto collOrView =
+                acquireLocalCollectionOrView(opCtx, *catalog, prerequisites, true /* forRestore */);
 
             uassert(ErrorCodes::QueryPlanKilled,
                     str::stream() << "Namespace '" << prerequisites.nss.toStringForErrorMsg()

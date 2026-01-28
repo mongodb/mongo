@@ -27,7 +27,9 @@ const isIgnorableError = function ignorableError(codeName) {
         codeName == "CommandNotSupportedOnView" ||
         codeName == "InterruptedAtShutdown" ||
         codeName == "InvalidViewDefinition" ||
-        codeName == "CommandNotSupported"
+        codeName == "CommandNotSupported" ||
+        // TODO SERVER-117477 remove this error code once 9.0 becomes last LTS and all timeseries collection are viewless.
+        codeName == "InterruptedDueToTimeseriesUpgradeDowngrade"
     ) {
         return true;
     }

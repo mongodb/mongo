@@ -180,7 +180,6 @@ error_codes:
       name: InterruptedDueToFCVChange,
       categories: [Interruption, RetriableError],
     }
-
   - {code: 10171600, name: ReadThroughCacheTimeMonotonicityViolation}
 
   # Add new codes at the bottom of this file, not here. They are to be
@@ -1155,6 +1154,12 @@ error_codes:
       categories: [CancellationError, InternalOnly],
     }
   - {code: 484, name: KeyExists}
+
+  - {
+      code: 485,
+      name: InterruptedDueToTimeseriesUpgradeDowngrade,
+      categories: [Interruption, RetriableError],
+    }
 
   # ^^^^
   # Add new codes, sequentially numbered, above.
