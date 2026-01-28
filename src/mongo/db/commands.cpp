@@ -818,7 +818,9 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                 }
             };
 
-            static constexpr auto failpointMsg = "Failing command via 'failCommand' failpoint"_sd;
+            std::string failpointMsg;
+            uassertStatusOK(bsonExtractStringFieldWithDefault(
+                data, "errorMsg", "Failing command via 'failCommand' failpoint", &failpointMsg));
 
             if (closeConnection) {
                 opCtx->getClient()->session()->end();
