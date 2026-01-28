@@ -181,10 +181,8 @@ StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingCont
             const auto& cm = cri.getChunkManager();
 
             // Throw a StaleEpoch exception if the collection's epoch does not match.
-            uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
-                    "Collection has been dropped",
-                    cm.hasRoutingTable());
-            uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
+            uassert(StaleEpochInfo(firstNss), "Collection has been dropped", cm.hasRoutingTable());
+            uassert(StaleEpochInfo(firstNss),
                     "Collection epoch has changed",
                     cm.getVersion().epoch() == _targetEpoch);
         }

@@ -112,7 +112,9 @@ class MONGO_MOD_NEEDS_REPLACEMENT StaleEpochInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::StaleEpoch;
 
-    StaleEpochInfo(NamespaceString nss, ShardVersion received, ShardVersion wanted)
+    StaleEpochInfo(NamespaceString nss,
+                   boost::optional<ShardVersion> received = boost::none,
+                   boost::optional<ShardVersion> wanted = boost::none)
         : _nss(std::move(nss)), _received(received), _wanted(wanted) {}
 
     const auto& getNss() const {
@@ -133,8 +135,8 @@ public:
 private:
     NamespaceString _nss;
 
-    ShardVersion _received;
-    ShardVersion _wanted;
+    boost::optional<ShardVersion> _received;
+    boost::optional<ShardVersion> _wanted;
 };
 
 class MONGO_MOD_NEEDS_REPLACEMENT StaleDbRoutingVersion final : public ErrorExtraInfo {
