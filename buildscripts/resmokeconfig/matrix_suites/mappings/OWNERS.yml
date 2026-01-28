@@ -89,3 +89,6 @@ filters:
   - "replica_sets_reconfig*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "sharding_kill_stepdown*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -9,6 +9,12 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export function areViewlessTimeseriesEnabled(db) {
+    if (TestData.isRunningFCVUpgradeDowngradeSuite) {
+        jsTest.log(
+            "Skipping test because it is unsafe to call areViewlessTimeseriesEnabled in a suite performing FCV transitions",
+        );
+        quit();
+    }
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 }
 

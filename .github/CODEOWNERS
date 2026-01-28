@@ -137,6 +137,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*execution_control* @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/replica_sets_reconfig* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/generated_suites/sharding_kill_stepdown* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/mappings/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
@@ -168,6 +169,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*execution_control* @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_reconfig* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/resmokeconfig/matrix_suites/mappings/**/sharding_kill_stepdown* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/overrides/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
