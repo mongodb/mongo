@@ -110,6 +110,10 @@
 #include <utility>
 #include <vector>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/core/swap.hpp>
@@ -297,6 +301,76 @@ public:
 private:
     synchronized_value<std::vector<std::string>>* _sv;
 };
+
+#ifndef _WIN32
+class ScopedStderrCapture {
+public:
+    ScopedStderrCapture() = default;
+    ScopedStderrCapture(const ScopedStderrCapture&) = delete;
+    ScopedStderrCapture& operator=(const ScopedStderrCapture&) = delete;
+
+    void start() {
+        ASSERT_FALSE(_active);
+
+        // Create a pipe between two FDs
+        ASSERT_EQ(pipe(_pipeFds), 0);
+
+        // Store a FD to the original stderr.
+        _oldStderr = dup(STDERR_FILENO);
+        ASSERT_NE(_oldStderr, -1);
+
+        // Make the write end of the pipe refer to the same FD as stderr. This means that data
+        // written to stderr is now readable through the read end of the pipe.
+        ASSERT_EQ(dup2(_pipeFds[1], STDERR_FILENO), STDERR_FILENO);
+        _active = true;
+    }
+
+    std::string stopAndRead() {
+        ASSERT_TRUE(_active);
+
+        // Restore stderr first so anything after this point is not captured.
+        ASSERT_EQ(dup2(_oldStderr, STDERR_FILENO), STDERR_FILENO);
+
+        ::close(_oldStderr);
+        _oldStderr = -1;
+
+        ::close(_pipeFds[1]);
+        _pipeFds[1] = -1;
+
+        std::string out;
+        char buf[4096];
+        ssize_t n;
+        while ((n = ::read(_pipeFds[0], buf, sizeof(buf))) > 0) {
+            out.append(buf, n);
+        }
+
+        ::close(_pipeFds[0]);
+        _pipeFds[0] = -1;
+
+        _active = false;
+        return out;
+    }
+
+    ~ScopedStderrCapture() {
+        if (!_active)
+            return;
+
+        if (_oldStderr != -1) {
+            (void)dup2(_oldStderr, STDERR_FILENO);
+            (void)::close(_oldStderr);
+        }
+        if (_pipeFds[0] != -1)
+            (void)::close(_pipeFds[0]);
+        if (_pipeFds[1] != -1)
+            (void)::close(_pipeFds[1]);
+    }
+
+private:
+    int _oldStderr = -1;
+    int _pipeFds[2] = {-1, -1};
+    bool _active = false;
+};
+#endif  // !_WIN32
 
 class LogDuringInitShutdownTester {
 public:
@@ -2507,6 +2581,39 @@ TEST_F(LogV2Test, UserAssert) {
                                  ASSERT_EQUALS(ex.reason(), "uasserting log");
                                  ASSERT_EQUALS((**syncedLines).front(), ex.reason());
                              });
+}
+
+TEST_F(LogV2Test, UserAssertAfterLogDoesNotEmitSafeLogOnExpectedThrow) {
+#ifdef _WIN32
+    GTEST_SKIP() << "This test captures stderr via file descriptor redirection, which is "
+                    "not implemented for Windows in this file.";
+#else
+    synchronized_value<std::vector<std::string>> syncedLines;
+    auto sink = wrapInSynchronousSink(wrapInCompositeBackend(
+        boost::make_shared<LogCaptureBackend>(std::make_unique<Listener>(&syncedLines), true),
+        boost::make_shared<UserAssertSink>()));
+    applyDefaultFilterToSink(sink);
+    sink->set_formatter(PlainFormatter());
+    attachSink(sink);
+
+    ScopedStderrCapture stderrCapture;
+    stderrCapture.start();
+
+    ASSERT_THROWS_WITH_CHECK(
+        LOGV2_OPTIONS(4652010, {UserAssertAfterLog(ErrorCodes::BadValue)}, "uasserting log"),
+        DBException,
+        [&](const DBException& ex) {
+            ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
+            ASSERT_EQUALS(ex.reason(), "uasserting log");
+            ASSERT_EQUALS((**syncedLines).front(), ex.reason());
+        });
+
+    const auto captured = stderrCapture.stopAndRead();
+
+    // A safe log should not be emitted if the exception comes from the UserAssertAfterLog.
+    ASSERT(captured.find("Exception while creating log record") == std::string::npos) << captured;
+
+#endif
 }
 
 
