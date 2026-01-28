@@ -73,6 +73,7 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -828,6 +829,22 @@ public:
                     // config.dropPendingDBs.
                     handleDropPendingDBsGarbage(opCtx);
                 }
+
+                // Before starting the FCV transition on this replica set, emit a 'placement history
+                // metadata change' no op entry, expected to be consumed by V2 (a.k.a. precise)
+                // change stream readers on mongos nodes; these will react by sending a retargeting
+                // request to the config server and ultimately receive instructions to transition to
+                // the V1 operational mode.
+                // TODO (SERVER-98118): Remove once v9.0 become last-lts.
+                if (role && role->has(ClusterRole::ShardServer) &&
+                    feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting
+                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
+                                                                      actualVersion)) {
+                    const auto now = VectorClock::get(opCtx)->getTime();
+                    PlacementHistoryMetadataChanged notification(now.configTime().asTimestamp());
+                    notifyChangeStreamsOnPlacementHistoryMetadataChanged(opCtx, notification);
+                }
+
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
