@@ -39,6 +39,6 @@ extern Counter64& extensionVectorSearchQueryCount;
 
 extern Counter64& onViewKickbackRetryCount;
 
-// TODO SERVER-116049: add metric for inSubpipelineKickbackRetries.
+extern Counter64& inUnionWithKickbackRetryCount;
 
 }  // namespace mongo::vector_search_metrics

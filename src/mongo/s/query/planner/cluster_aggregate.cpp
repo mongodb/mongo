@@ -46,7 +46,6 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
-#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
@@ -1231,17 +1230,17 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
                             alreadyDesugared);
 }
 
-Status ClusterAggregate::retryOnViewError(
+Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
-    const ResolvedView& resolvedView,
+    const std::variant<ResolvedView, IFRFlagRetryInfo>& errInfo,
     const NamespaceString& requestedNss,
     const PrivilegeVector& privileges,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    struct RetryOnViewState {
-        ResolvedView resolvedView;
+    struct RetryOnViewOrIFRKickbackState {
+        boost::optional<ResolvedView> resolvedView;
         stdx::unordered_set<IncrementalRolloutFeatureFlag*> ifrFlagsToDisableOnRetries;
     };
 
@@ -1251,7 +1250,7 @@ Status ClusterAggregate::retryOnViewError(
         ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
     }
 
-    auto viewRetryBody = [&](RetryOnViewState& state) {
+    auto viewRetryBody = [&](RetryOnViewOrIFRKickbackState& state) {
         auto& currentResolvedView = state.resolvedView;
         auto& ifrFlagsToDisableOnRetries = state.ifrFlagsToDisableOnRetries;
 
@@ -1268,12 +1267,21 @@ Status ClusterAggregate::retryOnViewError(
             ifrContext->disableFlag(*ifrFlag);
         }
 
-        // Build the resolved aggregation request from the view, handling special cases for mongot
-        // pipelines, timeseries views, and invoking ViewPolicy callbacks for extension stages.
-        PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
-                                                        resolveInvolvedNamespaces};
-        auto resolvedViewRequestResult = PipelineResolver::buildResolvedMongosViewRequest(
-            opCtx, request, currentResolvedView, requestedNss, verbosity, ifrContext, helpers);
+        auto [resolvedAggRequest, userLPP] = [&] {
+            if (!currentResolvedView) {
+                // We don't have a view to resolve (i.e. this is an IFR flag retry). Just make a
+                // copy of the original agg request for the retry.
+                return PipelineResolver::MongosViewRequestResult{request, boost::none};
+            }
+
+            // Build the resolved aggregation request from the view, handling special cases for
+            // mongot pipelines, timeseries views, and invoking ViewPolicy callbacks for
+            // extension stages.
+            PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
+                                                            resolveInvolvedNamespaces};
+            return PipelineResolver::buildResolvedMongosViewRequest(
+                opCtx, request, *currentResolvedView, requestedNss, verbosity, ifrContext, helpers);
+        }();
 
         result->resetToEmpty();
 
@@ -1287,19 +1295,18 @@ Status ClusterAggregate::retryOnViewError(
         // killCursors calls against the view have access.
         Namespaces nsStruct;
         nsStruct.requestedNss = requestedNss;
-        nsStruct.executionNss = currentResolvedView.getNamespace();
+        nsStruct.executionNss =
+            currentResolvedView ? currentResolvedView->getNamespace() : requestedNss;
 
         uassert(ErrorCodes::OptionNotSupportedOnView,
                 "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-                !(currentResolvedView.timeseries() && request.getIsHybridSearch()));
+                !currentResolvedView ||
+                    !(currentResolvedView->timeseries() && request.getIsHybridSearch()));
 
         sharding::router::CollectionRouter router(opCtx, nsStruct.executionNss);
         router.routeWithRoutingContext(
-            "ClusterAggregate::retryOnViewError",
+            "ClusterAggregate::retryOnViewOrIFRKickbackError",
             [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-                auto& resolvedAggRequest = resolvedViewRequestResult.resolvedRequest;
-                const auto& userLPP = resolvedViewRequestResult.liteParsedPipeline;
-
                 // For a sharded time-series collection, the routing is based on both routing table
                 // and the bucketMaxSpanSeconds value. We need to make sure we use the
                 // bucketMaxSpanSeconds of the same version as the routing table, instead of the one
@@ -1348,7 +1355,7 @@ Status ClusterAggregate::retryOnViewError(
                                                  true,
                                                  LiteParserOptions{.ifrContext = ifrContext}),
                     privileges,
-                    boost::make_optional(currentResolvedView),
+                    currentResolvedView,
                     boost::make_optional(request),
                     verbosity,
                     result,
@@ -1361,7 +1368,7 @@ Status ClusterAggregate::retryOnViewError(
 
     // Retry if IFRFlagRetry is thrown. On retry, disable the flag in the ifrContext.
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
-                          RetryOnViewState& state) {
+                          RetryOnViewOrIFRKickbackState& state) {
         state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
             ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
     };
@@ -1369,18 +1376,34 @@ Status ClusterAggregate::retryOnViewError(
     // If the underlying namespace was changed to a view during retry, then re-run the aggregation
     // on the new resolved namespace.
     auto onError = [&](ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
-                       RetryOnViewState& state) {
+                       RetryOnViewOrIFRKickbackState& state) {
         state.resolvedView = *ex.extraInfo<ResolvedView>();
     };
+
+    RetryOnViewOrIFRKickbackState retryState;
+    visit(OverloadedVisitor{[&](const ResolvedView& resolvedView) {
+                                // Note that we initialize the IFR flags to disable with the vector
+                                // search extension feature
+                                // flag. This is because we know that the extension is not allowed
+                                // to run on views, so we might as well pre-disable it regardless of
+                                // the feature flag value to prevent unnecessary retries. This is
+                                // purely an optimization - the retry logic would work with or
+                                // without this initialization.
+                                // TODO SERVER-116994 Initialize this as an empty set.
+                                retryState.ifrFlagsToDisableOnRetries.insert(
+                                    &feature_flags::gFeatureFlagVectorSearchExtension);
+                                retryState.resolvedView = resolvedView;
+                            },
+                            [&](const IFRFlagRetryInfo& ifrRetryInfo) {
+                                retryState.ifrFlagsToDisableOnRetries.insert(
+                                    IncrementalRolloutFeatureFlag::findByName(
+                                        ifrRetryInfo.getDisabledFlagName()));
+                            }},
+          errInfo);
+
     return retryOnWithState(
-        "ClusterAggregate::retryOnViewError",
-        // Note that we initialize the IFR flags to disable with the vector search extension feature
-        // flag. This is because we know that the extension is not allowed to run on views, so we
-        // might as well pre-disable it regardless of the feature flag value to prevent unnecessary
-        // retries. This is purely an optimization - the retry logic would work with or without this
-        // initialization.
-        // TODO SERVER-116994 Initialize this as an empty set.
-        RetryOnViewState{resolvedView, {&feature_flags::gFeatureFlagVectorSearchExtension}},
+        "ClusterAggregate::retryOnViewOrIFRKickbackError",
+        std::move(retryState),
         kMaxViewRetries,
         viewRetryBody,
         makeErrorHandler<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>(onError),

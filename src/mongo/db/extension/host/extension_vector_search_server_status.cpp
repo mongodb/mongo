@@ -42,4 +42,7 @@ Counter64& extensionVectorSearchQueryCount =
 Counter64& onViewKickbackRetryCount =
     *MetricBuilder<Counter64>("extension.vectorSearch.onViewKickbackRetries");
 
+Counter64& inUnionWithKickbackRetryCount =
+    *MetricBuilder<Counter64>("extension.vectorSearch.inUnionWithKickbackRetries");
+
 }  // namespace mongo::vector_search_metrics

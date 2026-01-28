@@ -863,7 +863,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                         aggRequestOnView.setQuerySettings(query->getExpCtx()->getQuerySettings());
                     }
 
-                    uassertStatusOK(ClusterAggregate::retryOnViewError(
+                    uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
                         opCtx,
                         aggRequestOnView,
                         *ex.extraInfo<ResolvedView>(),

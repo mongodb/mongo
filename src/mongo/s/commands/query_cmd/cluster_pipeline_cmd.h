@@ -165,15 +165,15 @@ public:
                     !ex->getNamespace().isTimeseriesBucketsCollection()) {
                     // If the aggregation failed because the namespace is a view, re-run the command
                     // with the resolved view pipeline and namespace.
-                    uassertStatusOK(
-                        ClusterAggregate::retryOnViewError(opCtx,
-                                                           _aggregationRequest,
-                                                           *ex.extraInfo<ResolvedView>(),
-                                                           nss,
-                                                           _privileges,
-                                                           verbosity,
-                                                           result,
-                                                           _ifrContext));
+                    uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
+                        opCtx,
+                        _aggregationRequest,
+                        *ex.extraInfo<ResolvedView>(),
+                        nss,
+                        _privileges,
+                        verbosity,
+                        result,
+                        _ifrContext));
                 } else {
                     // If the resolved view is on a time-series collection and the command request
                     // was for raw data, we want to run aggregate on the buckets namespace instead
@@ -191,6 +191,19 @@ public:
                         "ClusterAggregate::runAggregate"_sd,
                         _ifrContext));
                 }
+            } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
+                // TODO SERVER-117797 Move retry loop for IFR retry to top-level
+                // ClusterAggregate::runAggregate(). We got an IFR retry error - retry the command
+                // with the feature flag disabled.
+                uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
+                    opCtx,
+                    _aggregationRequest,
+                    *ex.extraInfo<IFRFlagRetryInfo>(),
+                    nss,
+                    _privileges,
+                    verbosity,
+                    result,
+                    _ifrContext));
             }
             _extensionMetrics.markSuccess();
         }

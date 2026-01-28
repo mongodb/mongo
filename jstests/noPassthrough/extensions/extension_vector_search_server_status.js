@@ -29,7 +29,7 @@ function getTargetSection(serverStatusOutput) {
     assert(vectorSearchSection.hasOwnProperty("legacyVectorSearchUsed"), vectorSearchSection);
     assert(vectorSearchSection.hasOwnProperty("extensionVectorSearchUsed"), vectorSearchSection);
     assert(vectorSearchSection.hasOwnProperty("onViewKickbackRetries"), vectorSearchSection);
-    // TODO SERVER-116049: add test for inSubpipelineKickbackRetries.
+    assert(vectorSearchSection.hasOwnProperty("inUnionWithKickbackRetries"), vectorSearchSection);
 })();
 
 (function VectorSearchServerStatusMetricsCanBeRequested() {
@@ -69,7 +69,7 @@ MongoRunner.stopMongod(conn);
             const initialExtensionCount = initialMetrics.extensionVectorSearchUsed;
             const initialLegacyCount = initialMetrics.legacyVectorSearchUsed;
             const initialOnViewKickbackCount = initialMetrics.onViewKickbackRetries;
-            // const initialInSubpipelineKickbackCount = initialMetrics.inSubpipelineKickbackRetries;
+            const initialInUnionWithKickbackCount = initialMetrics.inUnionWithKickbackRetries;
 
             // Run a vector search query to trigger the extension.
             const pipeline = [{$vectorSearch: {}}];
@@ -94,7 +94,7 @@ MongoRunner.stopMongod(conn);
             // Verify other metrics remain at 0.
             const finalLegacyCount = finalMetrics.legacyVectorSearchUsed;
             const finalOnViewKickbackCount = finalMetrics.onViewKickbackRetries;
-            // TODO SERVER-116049: add test for inSubpipelineKickbackRetries.
+            const finalInUnionWithKickbackCount = finalMetrics.inUnionWithKickbackRetries;
 
             assert.eq(
                 finalLegacyCount,
@@ -105,6 +105,11 @@ MongoRunner.stopMongod(conn);
                 finalOnViewKickbackCount,
                 initialOnViewKickbackCount,
                 `onViewKickbackRetries should remain at ${initialOnViewKickbackCount}, got ${finalOnViewKickbackCount}`,
+            );
+            assert.eq(
+                finalInUnionWithKickbackCount,
+                initialInUnionWithKickbackCount,
+                `inUnionWithKickbackRetries should remain at ${initialInUnionWithKickbackCount}, got ${finalInUnionWithKickbackCount}`,
             );
         },
         ["standalone"],

@@ -1943,8 +1943,21 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                         "Preparing pipeline for execution",
                         "pipeline"_attr = pipelineToTarget->serializeForLogging());
 
-            const auto& aggRequest = AggregateCommandRequest(expCtx->getNamespaceString(),
-                                                             pipelineToTarget->serializeToBson());
+            auto aggRequest = AggregateCommandRequest(expCtx->getNamespaceString(),
+                                                      pipelineToTarget->serializeToBson());
+
+            // Propagate IFR flags from the pipeline to the agg request. This is necessary
+            // because we are executing an entire pipeline here, so it will not be treated as a
+            // command coming from a router.
+            // We gate this behavior on cluster FCV in order to avoid sending a field from a new
+            // version shard to an old version shard that doesn't understand it.
+            if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
+                    multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
+                if (auto ifrCtx = pipelineToTarget->getContext()->getIfrContext()) {
+                    aggRequest.setIfrFlags(ifrCtx->serializeFlagValues(
+                        {&feature_flags::gFeatureFlagVectorSearchExtension}));
+                }
+            }
 
             return targetShardsAndAddMergeCursorsWithRoutingCtx(
                 expCtx,
