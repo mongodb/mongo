@@ -99,8 +99,7 @@ std::string generateNewIndexIdent(
 std::string generateNewInternalIdent(StringData identStem = ""_sd);
 
 /**
- * Returns an ident in the form of 'internal-<identStem>-<indexUniqueTag>' or
- * '<db>/internal-<identStem>-<indexUniqueTag>' when 'indexIdent' contains a db component.
+ * Returns an ident in the form of 'internal-<identStem>-<indexIdent>'.
  */
 std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent);
 

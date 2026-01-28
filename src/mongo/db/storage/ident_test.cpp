@@ -381,12 +381,15 @@ TEST_F(IdentGenerationTest, ValidInternalIndexBuildIdent) {
 
     testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
         kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */));
-    testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */));
-    testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */));
-    testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
-        kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */));
+
+    // TODO SERVER-109146: Either reformat internal index build idents or disallow using with index
+    // idents with directoryPerDB or directoryForIndexes
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */));
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */));
+    // testValidInternalIndexBuildIdents(ident::generateNewIndexIdent(
+    //     kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */));
 }
 }  // namespace
 }  // namespace mongo

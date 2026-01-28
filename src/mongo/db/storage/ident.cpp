@@ -133,7 +133,6 @@ boost::optional<IdentType> getIdentType(StringData str) {
 struct ParsedIdent {
     IdentType identType;
     StringData uniqueTag;
-    boost::optional<StringData> dbName;
 };
 
 boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
@@ -157,7 +156,7 @@ boost::optional<ParsedIdent> validateIdent(boost::optional<StringData> dbName,
         }
     }
 
-    return ParsedIdent{*parsedIdentType, uniqueTag, dbName};
+    return ParsedIdent{*parsedIdentType, uniqueTag};
 }
 
 // Valid idents can be one of the following formats:
@@ -216,13 +215,13 @@ boost::optional<ParsedIdent> parseIdent(StringData str) {
         // Format 3: "$dbName/$identType-$uniqueTag"
         if (!ident::validateTag(tok2->tail))
             return boost::none;
-        return ParsedIdent{*identType, tok2->tail, tok1->head};
+        return ParsedIdent{*identType, tok2->tail};
     }
     if (auto identType = getIdentType(tok1->head)) {
         // Format 2: "$identType/$uniqueTag"
         if (!ident::validateTag(tok1->tail))
             return boost::none;
-        return ParsedIdent{*identType, tok1->tail, boost::none};
+        return ParsedIdent{*identType, tok1->tail};
     }
     return boost::none;
 }
@@ -251,21 +250,7 @@ std::string generateNewInternalIdent(StringData identStem) {
 }
 
 std::string generateNewInternalIndexBuildIdent(StringData identStem, StringData indexIdent) {
-    auto parsed = parseIdent(indexIdent);
-    massert(11570700,
-            str::stream() << "Invalid ident supplied to generateNewInternalIndexBuildIdent: "
-                          << indexIdent,
-            parsed);
-    massert(11570701,
-            str::stream() << "Non-index ident supplied to generateNewInternalIndexBuildIdent: "
-                          << indexIdent,
-            parsed->identType == IdentType::index);
-    StringBuilder buf;
-    if (parsed->dbName) {
-        buf << *parsed->dbName << '/';
-    }
-    buf << kInternalIdentStem << '-' << identStem << '-' << parsed->uniqueTag;
-    return buf.str();
+    return fmt::format("{}-{}-{}", kInternalIdentStem, identStem, indexIdent);
 }
 
 StringData getCollectionIdentUniqueTag(StringData ident,
