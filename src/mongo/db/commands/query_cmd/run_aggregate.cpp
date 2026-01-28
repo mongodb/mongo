@@ -1146,7 +1146,7 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
         aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
     }
 
-    if (search_helpers::isMongotPipeline(pipeline.get())) {
+    if (search_helpers::shouldPreValidateMetaDependencies(pipeline.get())) {
         // Before preparing the pipeline executor, we need to do dependency analysis to validate
         // the metadata dependencies.
         // TODO SERVER-40900 Consider performing $meta validation for all queries at this point
