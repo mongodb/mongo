@@ -11,8 +11,7 @@
  * commit and completion of the replicated index build.
  *
  * @tags: [
- *   # Primary-driven index builds aren't resumable.
- *   primary_driven_index_builds_incompatible,
+ *   requires_index_build_resumability,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,

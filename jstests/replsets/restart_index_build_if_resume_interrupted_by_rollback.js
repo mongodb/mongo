@@ -3,11 +3,10 @@
  * fails to run to completion before a subsequent rollback, it will restart from the beginning.
  *
  * @tags: [
- *   # Primary-driven index builds aren't resumable.
- *   primary_driven_index_builds_incompatible,
  *   requires_majority_read_concern,
- *   requires_persistence,
  *   requires_mongobridge,
+ *   requires_persistence,
+ *   requires_rollbacks,
  * ]
  */
 import {RollbackResumableIndexBuildTest} from "jstests/replsets/libs/rollback_resumable_index_build.js";

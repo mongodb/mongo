@@ -41,6 +41,9 @@
       - rolling_index_builds
       - requires_commit_quorum
       - requires_capped
+      - requires_rollbacks
+      # Primary-driven index builds are not resumable.
+      - requires_index_build_resumability
       # Tests marked with this tag are excluded because primary-driven index builds do not restart
       # on failover (or that was otherwise the last known reason).
       # This is also an easy way to identify and control tests specifically excluded as part of 111661.

@@ -1,9 +1,8 @@
 /**
  * Tests different permutations of rolling-back index build start and commit oplog entries.
  * @tags: [
- *   # We don't need to handle rollbacks in primary-driven index builds.
- *   primary_driven_index_builds_incompatible,
  *   requires_mongobridge,
+ *   requires_rollbacks,
  * ]
  */
 import {RollbackIndexBuildsTest} from "jstests/replsets/libs/rollback_index_builds_test.js";
