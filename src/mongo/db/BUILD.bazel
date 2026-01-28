@@ -3545,3 +3545,26 @@ mongo_cc_library(
         "//src/mongo/db/validate:validate_state",
     ],
 )
+
+mongo_cc_library(
+    name = "action_duration_metrics",
+    srcs = [
+        "action_duration_metrics.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "action_duration_metrics_test",
+    srcs = [
+        "action_duration_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        "action_duration_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)

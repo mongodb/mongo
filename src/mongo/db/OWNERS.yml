@@ -346,3 +346,6 @@ filters:
   - "logical_session_cache_factory_mongod*":
     approvers:
       - 10gen/server-transactions
+  - "action_duration_metrics*":
+    approvers:
+      - 10gen/server-storage-engine-integration

@@ -851,6 +851,7 @@ storage_engine_integration:
     fully_marked: true
   files:
     - src/mongo/db/storage # excluding ./key_string, ./wiredtiger, ./devnull, some of ./kv
+    - src/mongo/db/action_duration_metrics*
     - src/mongo/db/record_id*
     - src/mongo/db/server_recovery*
     - src/mongo/db/mongod_options_storage*
