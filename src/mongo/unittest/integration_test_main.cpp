@@ -97,19 +97,12 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 int main(int argc, char** argv) {
     unittest::MainProgress progress(
         {
-            .suppressGlobalInitializers = true,
             .testSuites = testSuites,
             .testFilter = testFilter,
             .fileNameFilter = fileNameFilter,
         },
         std::vector<std::string>(argv, argv + argc));
     progress.initialize();
-    if (auto ec = progress.parseAndAcceptOptions())
-        quickExit(static_cast<int>(*ec));
-    setupSynchronousSignalHandlers();
-    TestingProctor::instance().setEnabled(true);
-    runGlobalInitializersOrDie(progress.args());
-    setTestCommandsEnabled(true);
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));
     quickExit(progress.test());

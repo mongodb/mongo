@@ -28,6 +28,7 @@
  */
 
 #include "mongo/unittest/unittest_main_core.h"
+#include "mongo/util/quick_exit.h"
 
 int main(int argc, char** argv) {
     std::vector<std::string> argVec(argv, argv + argc);

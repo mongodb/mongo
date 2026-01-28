@@ -76,14 +76,11 @@ namespace dbtests {
 unittest::MainProgress initializeDbTests(std::vector<std::string> argVec) {
     unittest::MainProgress progress(
         {
-            .suppressGlobalInitializers = true,
             .testSuites = frameworkGlobalParams.suites,
             .runsPerTest = frameworkGlobalParams.runsPerTest,
         },
         std::move(argVec));
     progress.initialize();
-    if (auto ec = progress.parseAndAcceptOptions())
-        quickExit(static_cast<int>(*ec));
     return progress;
 }
 

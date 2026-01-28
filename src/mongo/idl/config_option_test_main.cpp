@@ -36,7 +36,6 @@
 
 int main(int argc, char** argv) {
     mongo::unittest::MainProgress progress({}, std::vector<std::string>(argv, argv + argc));
-    progress.initialize();
     if (GTEST_FLAG_GET(internal_run_death_test).empty()) {
         auto& args = progress.args();
         args.insert(args.end(),
@@ -51,5 +50,6 @@ int main(int argc, char** argv) {
                         "set14",
                     });
     }
+    progress.initialize();
     return progress.test();
 }
