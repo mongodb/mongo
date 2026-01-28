@@ -39,6 +39,7 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/icu.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>

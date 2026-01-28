@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -45,7 +46,7 @@ class SaslClientConversation;
  * Implementation of the client side of a SASL authentication conversation using the
  * native SASL implementation.
  */
-class NativeSaslClientSession : public SaslClientSession {
+class MONGO_MOD_PUBLIC NativeSaslClientSession : public SaslClientSession {
     NativeSaslClientSession(const NativeSaslClientSession&) = delete;
     NativeSaslClientSession& operator=(const NativeSaslClientSession&) = delete;
 

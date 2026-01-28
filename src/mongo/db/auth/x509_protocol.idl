@@ -29,6 +29,7 @@
 global:
     cpp_namespace: "mongo::auth"
     cpp_includes: []
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

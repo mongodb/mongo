@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

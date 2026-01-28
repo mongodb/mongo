@@ -39,6 +39,7 @@
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -51,7 +52,7 @@ class BSONObj;
 class Client;
 class OperationContext;
 
-namespace auth {
+namespace MONGO_MOD_PUBLIC auth {
 
 /**
  * User management commands accept rolenames as either `{ role: 'x', db: 'y' }`
@@ -103,5 +104,5 @@ void checkAuthForTypedCommand(OperationContext*, const InvalidateUserCacheComman
 void checkAuthForTypedCommand(OperationContext*, const GetUserCacheGenerationCommand&);
 void checkAuthForTypedCommand(OperationContext*, const MergeAuthzCollectionsCommand&);
 
-}  // namespace auth
+}  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

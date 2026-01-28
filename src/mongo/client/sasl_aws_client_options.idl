@@ -7,6 +7,7 @@ global:
         source: [cli]
     cpp_includes:
         - mongo/client/sasl_aws_client_options.h
+    mod_visibility: private
 
 configs:
     awsIamSessionToken:

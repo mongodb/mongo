@@ -30,8 +30,9 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /// String name of the saslStart command.
 constexpr auto saslStartCommandName = "saslStart"_sd;
@@ -99,4 +100,4 @@ constexpr auto saslCommandOIDCAccessToken = "oidcAccessToken"_sd;
 // Field in saslStart.options for mechanisms which omit empty "OK" exchange.
 constexpr auto saslCommandOptionSkipEmptyExchange = "skipEmptyExchange"_sd;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 
 #include <string>
