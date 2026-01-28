@@ -7,6 +7,11 @@
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
+// The test attempts to run the $debugLog stage and expect to see specific log lines on the mongos (via getLog).
+// In case of multiple mongos, the stage and the getLog may hit different nodes, causing test failures.
+// pinToSingleMongos due to getLog command.
+TestData.pinToSingleMongos = true;
+
 const coll = db[jsTestName()];
 
 function checkLogs(db, debugLogLevel, shouldLog, extensionAttrs) {
