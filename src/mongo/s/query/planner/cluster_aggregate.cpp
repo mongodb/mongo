@@ -184,7 +184,7 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
 
     // If the featureFlagVectorSearchExtension IFR flag is enabled, all nodes are upgraded and can
     // parse IFR flags.
-    // TODO SERVER-116118: Remove FCV gate once multiversion testing can handle IFR flags.
+    // TODO SERVER-117721: Remove FCV gate once multiversion testing can handle IFR flags.
     if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
             multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
         // TODO SERVER-116219: Expand IFR flag serialization beyond $vectorSearch.

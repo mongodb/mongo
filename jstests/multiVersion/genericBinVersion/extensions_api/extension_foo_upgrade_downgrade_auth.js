@@ -18,10 +18,10 @@ import {
     assertFooStageAcceptedV1Only,
     setupCollection,
     extensionNodeOptions,
-    generateMultiversionExtensionConfigs,
+    generateExtensionUpgradeDowngradeConfigs,
     deleteMultiversionExtensionConfigs,
     wrapOptionsWithStubParserFeatureFlag,
-} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
+} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_upgrade_downgrade_utils.js";
 import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
@@ -30,7 +30,7 @@ if (!isLinux()) {
     quit();
 }
 
-const extensionNames = generateMultiversionExtensionConfigs();
+const extensionNames = generateExtensionUpgradeDowngradeConfigs();
 
 try {
     const fooV1Options = extensionNodeOptions(extensionNames[0]);

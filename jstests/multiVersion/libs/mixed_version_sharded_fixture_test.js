@@ -33,13 +33,17 @@ export function testPerformShardedClusterRollingRestart({
     restartVersion = latestVersion,
     startingNodeOptions = {},
     restartNodeOptions = {},
+    ifrFlags = {},
     setupFn,
     beforeRestart,
     afterConfigHasRestarted,
     afterSecondaryShardHasRestarted,
     afterPrimaryShardHasRestarted,
     afterMongosHasRestarted,
+    afterIfrFlagToggle = null,
     afterFCVBump = null,
+    whenOnlyRouterHasIFRFlag = null,
+    whenOnlyShardHasIFRFlag = null,
 }) {
     jsTest.log.info(
         "Starting a 2-shard cluster with all nodes on version " +
@@ -138,6 +142,62 @@ export function testPerformShardedClusterRollingRestart({
     jsTest.log.info("Calling the afterMongosHasRestarted function");
     afterMongosHasRestarted(st.s);
 
+    // We test scenarios in which the router is toggled first and in which the shards are toggled first.
+    // This is because the order of nodes on which IFR flags are toggled is not defined - so we
+    // want to test all possible scenarios that we could potentially end up in.
+    if (whenOnlyRouterHasIFRFlag) {
+        jsTest.log.info("Testing when only router has IFR flag enabled");
+        const adminDb = st.s.getDB("admin");
+        const shard0Admin = st.rs0.getPrimary().getDB("admin");
+        const shard1Admin = st.rs1.getPrimary().getDB("admin");
+
+        // Enable flag on router only.
+        for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
+            assert.commandWorked(adminDb.runCommand({setParameter: 1, [flagName]: flagValue}));
+            // Disable flag on shards.
+            assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: false}));
+            assert.commandWorked(shard1Admin.runCommand({setParameter: 1, [flagName]: false}));
+        }
+
+        jsTest.log.info("Calling the whenOnlyRouterHasIFRFlag function");
+        whenOnlyRouterHasIFRFlag(st.s, st);
+    }
+
+    if (whenOnlyShardHasIFRFlag) {
+        jsTest.log.info("Testing when only shard has IFR flag enabled");
+        const adminDb = st.s.getDB("admin");
+        const shard0Admin = st.rs0.getPrimary().getDB("admin");
+        const shard1Admin = st.rs1.getPrimary().getDB("admin");
+
+        // Disable flag on router.
+        for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
+            assert.commandWorked(adminDb.runCommand({setParameter: 1, [flagName]: false}));
+            // Enable flag on the shards.
+            assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: flagValue}));
+            assert.commandWorked(shard1Admin.runCommand({setParameter: 1, [flagName]: flagValue}));
+        }
+
+        jsTest.log.info("Calling the whenOnlyShardHasIFRFlag function");
+        whenOnlyShardHasIFRFlag(st.s, st);
+    }
+
+    if (afterIfrFlagToggle) {
+        // Enable IFR flags on all nodes (router and shards).
+        jsTest.log.info("Enabling IFR flags on all nodes");
+        const adminDb = st.s.getDB("admin");
+        const shard0Admin = st.rs0.getPrimary().getDB("admin");
+        const shard1Admin = st.rs1.getPrimary().getDB("admin");
+
+        for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
+            assert.commandWorked(adminDb.runCommand({setParameter: 1, [flagName]: flagValue}));
+            assert.commandWorked(shard0Admin.runCommand({setParameter: 1, [flagName]: flagValue}));
+            assert.commandWorked(shard1Admin.runCommand({setParameter: 1, [flagName]: flagValue}));
+        }
+
+        jsTest.log.info("Calling the afterIfrFlagToggle function");
+        afterIfrFlagToggle(st.s, st);
+    }
+
     if (afterFCVBump) {
         // Upgrade the FCV.
         jsTest.log.info("Upgrading the FCV to " + tojsononeline(latestFCV));
@@ -170,26 +230,34 @@ export function testPerformShardedClusterRollingRestart({
 export function testPerformUpgradeSharded({
     startingNodeOptions = {},
     upgradeNodeOptions = {},
+    ifrFlags = {},
     setupFn,
     whenFullyDowngraded,
     whenOnlyConfigIsLatestBinary,
     whenSecondariesAndConfigAreLatestBinary,
     whenMongosBinaryIsLastLTS,
     whenBinariesAreLatestAndFCVIsLastLTS,
+    whenIfrFlagsAreToggled,
     whenFullyUpgraded,
+    whenOnlyRouterHasIFRFlag = null,
+    whenOnlyShardHasIFRFlag = null,
 }) {
     testPerformShardedClusterRollingRestart({
         startingVersion: lastLTSVersion,
         restartVersion: latestVersion,
         startingNodeOptions,
         restartNodeOptions: upgradeNodeOptions,
+        ifrFlags: ifrFlags,
         setupFn,
         beforeRestart: whenFullyDowngraded,
         afterConfigHasRestarted: whenOnlyConfigIsLatestBinary,
         afterSecondaryShardHasRestarted: whenSecondariesAndConfigAreLatestBinary,
         afterPrimaryShardHasRestarted: whenMongosBinaryIsLastLTS,
         afterMongosHasRestarted: whenBinariesAreLatestAndFCVIsLastLTS,
+        afterIfrFlagToggle: whenIfrFlagsAreToggled,
         afterFCVBump: whenFullyUpgraded,
+        whenOnlyRouterHasIFRFlag: whenOnlyRouterHasIFRFlag,
+        whenOnlyShardHasIFRFlag: whenOnlyShardHasIFRFlag,
     });
 }
 
