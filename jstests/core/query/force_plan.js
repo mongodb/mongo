@@ -23,7 +23,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 
 // Enabling SBE affects plan enumeration under CBR.
-if (checkSbeFullyEnabled(db) && getPlanRankerMode(db) != "multiPlanning") {
+if (checkSbeFullyEnabled(db) || getPlanRankerMode(db) != "multiPlanning") {
     jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
     quit();
 }
