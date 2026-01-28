@@ -37,10 +37,13 @@
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/util/scoped_timer_metric.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
-auto& totalAggStageExecMicros = *MetricBuilder<Counter64>("extension.totalAggStageExecMicros");
+using ExecTimeDuration = Microseconds;
+auto& totalAggStageExecTime =
+    *MetricBuilder<DurationCounter64<ExecTimeDuration>>("extension.totalAggStageExecMicros");
 
 using namespace extension::host;
 
@@ -102,8 +105,7 @@ void ExtensionStage::setSource(Stage* source) {
 GetNextResult ExtensionStage::doGetNext() {
     using namespace mongo::extension;
     // Track and report time spent in this method:
-    ScopedTimerMetric<decltype(totalAggStageExecMicros), Microseconds> timer(
-        getContext()->getOperationContext(), totalAggStageExecMicros);
+    ScopedTimerMetric timer(getContext()->getOperationContext(), totalAggStageExecTime);
 
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(pExpCtx.get());

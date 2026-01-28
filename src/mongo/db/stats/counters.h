@@ -40,6 +40,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
@@ -947,5 +948,13 @@ public:
 
 /** Returns the appropriate QueryCounters instance for `opCtx`'s service. */
 QueryCounters& getQueryCounters(OperationContext* opCtx);
+
+template <typename DurationType>
+class DurationCounter64 : public Counter64 {
+public:
+    void increment(DurationType d) {
+        Counter64::increment(d.count());
+    }
+};
 
 }  // namespace MONGO_MOD_PUBLIC mongo
