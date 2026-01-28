@@ -22,3 +22,15 @@ LOCAL_SEARCH_DIRS = [
     os.path.join(cwd, "bazel-bin", "install-dist-test", "lib"),
     os.path.join(cwd, "bazel-bin", "install-extensions", "lib"),
 ]
+
+# Path to test extensions signing public key.
+TEST_PUBLIC_KEY_PATH = os.path.join(
+    cwd,
+    "src",
+    "mongo",
+    "db",
+    "extension",
+    "test_examples",
+    "test_extensions_signing_keys",
+    "test_extensions_signing_public_key.asc",
+)

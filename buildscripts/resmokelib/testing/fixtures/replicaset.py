@@ -12,6 +12,7 @@ import pymongo.errors
 import pymongo.write_concern
 
 from buildscripts.resmokelib.extensions import (
+    add_extensions_signature_pub_key_path,
     delete_extension_configs,
     find_and_generate_extension_configs,
 )
@@ -99,6 +100,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 logger=self.logger,
                 mongod_options=self.mongod_options,
             )
+            add_extensions_signature_pub_key_path(self.mongod_options)
 
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node

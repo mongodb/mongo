@@ -10,6 +10,7 @@ import yaml
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.extensions import (
+    add_extensions_signature_pub_key_path,
     delete_extension_configs,
     find_and_generate_extension_configs,
 )
@@ -80,6 +81,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.loaded_extensions = find_and_generate_extension_configs(
                 is_evergreen=self.config.EVERGREEN_TASK_ID,
                 logger=self.logger,
+                mongod_options=self.mongod_options,
+                mongos_options=self.mongos_options,
+            )
+            add_extensions_signature_pub_key_path(
                 mongod_options=self.mongod_options,
                 mongos_options=self.mongos_options,
             )
