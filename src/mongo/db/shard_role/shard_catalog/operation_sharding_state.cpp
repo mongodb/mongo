@@ -75,7 +75,15 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
     return shardingMetadataDecoration(opCtx);
 }
 
-bool OperationShardingState::isComingFromRouter(OperationContext* opCtx) {
+bool OperationShardingState::isVersioned(OperationContext* opCtx, const DatabaseName& dbName) {
+    return get(opCtx).getDbVersion(dbName).has_value();
+}
+
+bool OperationShardingState::isVersioned(OperationContext* opCtx, const NamespaceString& nss) {
+    return get(opCtx).getShardVersion(nss).has_value();
+}
+
+bool OperationShardingState::isShardingAware(OperationContext* opCtx) {
     const auto& oss = get(opCtx);
     return !oss._databaseVersions.empty() || !oss._shardVersions.empty();
 }

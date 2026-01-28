@@ -66,7 +66,7 @@ void assertPlacementConflictTimePresentWhenRequired(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const boost::optional<LogicalTime> placementConflictTime) {
-    if (opCtx->inMultiDocumentTransaction() && OperationShardingState::isComingFromRouter(opCtx) &&
+    if (opCtx->inMultiDocumentTransaction() && OperationShardingState::isVersioned(opCtx, dbName) &&
         repl::ReadConcernArgs::get(opCtx).getLevel() !=
             repl::ReadConcernLevel::kSnapshotReadConcern) {
         if (placementConflictTime.has_value()) {
@@ -152,7 +152,7 @@ void checkPlacementConflictTimestamp(OperationContext* opCtx,
 boost::optional<DatabaseVersion> getOperationReceivedVersion(OperationContext* opCtx,
                                                              const DatabaseName& dbName) {
     // If there is a version attached to the OperationContext, use it as the received version.
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
+    if (OperationShardingState::isVersioned(opCtx, dbName)) {
         return OperationShardingState::get(opCtx).getDbVersion(dbName);
     }
 
@@ -205,7 +205,8 @@ DatabaseShardingRuntime::ScopedExclusiveDatabaseShardingRuntime::
     : _scopedDss(std::move(scopedDss)) {}
 
 void DatabaseShardingRuntime::checkDbVersionOrThrow(OperationContext* opCtx) const {
-    const auto optReceivedDatabaseVersion = getOperationReceivedVersion(opCtx, _dbName);
+    const auto optReceivedDatabaseVersion =
+        OperationShardingState::get(opCtx).getDbVersion(_dbName);
     if (optReceivedDatabaseVersion) {
         checkDbVersionOrThrow(opCtx, *optReceivedDatabaseVersion);
     }

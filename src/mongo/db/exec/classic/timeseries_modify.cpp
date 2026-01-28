@@ -210,7 +210,8 @@ const std::vector<std::unique_ptr<FieldRef>>& TimeseriesModifyStage::_getImmutab
     }
 
     const auto& collDesc = collectionAcquisition().getShardingDescription();
-    if (!collDesc.isSharded() || OperationShardingState::isComingFromRouter(opCtx())) {
+    if (!collDesc.isSharded() ||
+        OperationShardingState::isVersioned(opCtx(), collectionAcquisition().nss())) {
         return _immutablePaths;
     }
 

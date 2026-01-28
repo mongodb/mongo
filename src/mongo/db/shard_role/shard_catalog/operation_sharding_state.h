@@ -108,11 +108,23 @@ public:
     static OperationShardingState& get(OperationContext* opCtx);
 
     /**
+     * Returns true if this operation has database version information for the given database,
+     * indicating it was issued with sharding awareness at the database level.
+     */
+    static bool isVersioned(OperationContext* opCtx, const DatabaseName& dbName);
+
+    /**
+     * Returns true if this operation has shard or database version information for the given
+     * namespace, indicating it was issued with sharding awareness.
+     */
+    static bool isVersioned(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Returns true if the the current operation was sent from an upstream router, rather than it
      * being a direct connection against the shard. The way this decision is made is based on
      * whether there is shard version declared for any namespace.
      */
-    static bool isComingFromRouter(OperationContext* opCtx);
+    static bool isShardingAware(OperationContext* opCtx);
 
     /**
      * Similar to 'isComingFromRouter()' but also considers '_treatAsFromRouter'. This should be

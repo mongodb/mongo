@@ -679,7 +679,7 @@ NamespaceStringOrUUIDRequests toNamespaceStringOrUUIDs(
 void validateRequests(OperationContext* opCtx,
                       const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     const auto& oss = OperationShardingState::get(opCtx);
-    const bool isComingFromRouter = oss.isComingFromRouter(opCtx);
+    const bool isShardingAware = oss.isShardingAware(opCtx);
 
     for (const auto& ar : acquisitionRequests) {
         if (ar.nssOrUUID.isNamespaceString()) {
@@ -718,7 +718,7 @@ void validateRequests(OperationContext* opCtx,
                 return true;
             }
 
-            return !isComingFromRouter || oss.getBypassCheckAllShardRoleAcquisitionsVersioned() ||
+            return !isShardingAware || oss.getBypassCheckAllShardRoleAcquisitionsVersioned() ||
                 declaresPlacementVersion(ar) || doesNotNeedPlacementVersion(ar);
         };
 
@@ -1572,7 +1572,7 @@ CollectionAcquisition shard_role_nocheck::acquireCollectionForLocalCatalogOnlyWi
     tassert(10566706,
             "Cannot use acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss on "
             "sharding-aware operations",
-            !OperationShardingState::isComingFromRouter(opCtx));
+            !OperationShardingState::isVersioned(opCtx, nss));
 
     auto& txnResources = TransactionResources::get(opCtx);
 
@@ -1632,9 +1632,13 @@ CollectionAcquisition shard_role_nocheck::acquireLocalCollectionNoConsistentCata
         MONGO_UNREACHABLE_TASSERT(7683107);
     }();
 
+    auto isShardingAware = (nsOrUUID.isUUID())
+        ? OperationShardingState::isShardingAware(opCtx)
+        : OperationShardingState::isVersioned(opCtx, nsOrUUID.nss());
+
     tassert(7683108,
             "Cannot use acquireCollectionNoConsistentCatalog on sharding-aware operations",
-            !OperationShardingState::isComingFromRouter(opCtx));
+            !isShardingAware);
 
     auto& txnResources = TransactionResources::get(opCtx);
 

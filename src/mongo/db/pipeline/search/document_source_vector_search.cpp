@@ -62,7 +62,7 @@ REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
         tassert(11632200,
                 "Router sent featureFlagVectorSearchExtension=true but the extension is not loaded "
                 "on this shard.",
-                !(options.opCtx && OperationShardingState::isComingFromRouter(options.opCtx) &&
+                !(options.opCtx && OperationShardingState::isShardingAware(options.opCtx) &&
                   options.ifrContext &&
                   options.ifrContext->getSavedFlagValue(
                       feature_flags::gFeatureFlagVectorSearchExtension)));

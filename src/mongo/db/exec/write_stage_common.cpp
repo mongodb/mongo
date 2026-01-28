@@ -80,8 +80,8 @@ PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
     if (docBelongsToMe)
         return Action::kWrite;
     else
-        return OperationShardingState::isComingFromRouter(_opCtx) ? Action::kSkip
-                                                                  : Action::kWriteAsFromMigrate;
+        return OperationShardingState::isShardingAware(_opCtx) ? Action::kSkip
+                                                               : Action::kWriteAsFromMigrate;
 }
 
 bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {

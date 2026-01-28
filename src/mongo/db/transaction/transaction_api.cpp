@@ -558,8 +558,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     uassert(6638800,
             "Transaction API does not currently support use within operations with shard or "
             "database versions without using router commands",
-            !OperationShardingState::isComingFromRouter(opCtx) ||
-                _txnClient->runsClusterOperations());
+            !OperationShardingState::isShardingAware(opCtx) || _txnClient->runsClusterOperations());
     {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 

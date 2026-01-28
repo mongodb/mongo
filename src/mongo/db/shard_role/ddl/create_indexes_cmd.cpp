@@ -442,7 +442,7 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (!fcvSnapshot.isVersionInitialized() ||
             !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
-            !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+            !OperationShardingState::get(opCtx).isVersioned(opCtx, ns) ||
             opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite()) {
             allowCollectionCreation.emplace(opCtx, ns);
         }

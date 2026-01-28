@@ -63,7 +63,7 @@ MONGO_MOD_PUBLIC bool initializeAutoGet(
     bool isAnySecondaryCollectionNotLocal = false;
     auto* grid = Grid::get(opCtx->getServiceContext());
     if (grid->isInitialized() && grid->isShardingInitialized() &&
-        OperationShardingState::get(opCtx).isComingFromRouter(opCtx)) {
+        OperationShardingState::get(opCtx).isVersioned(opCtx, nss)) {
         std::vector<NamespaceString> secondaryExecNssListJustNss;
         for (const auto& nsOrUuid : secondaryExecNssList) {
             tassert(8322005, "Expected NamespaceString, not UUID", nsOrUuid.isNamespaceString());

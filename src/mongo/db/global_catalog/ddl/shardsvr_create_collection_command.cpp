@@ -106,7 +106,7 @@ bool requestsShouldBeSerialized(OperationContext* opCtx,
 boost::optional<ScopedSetShardRole> setShardRoleToShardVersionIgnoredIfNeeded(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto& oss = OperationShardingState::get(opCtx);
-    if (!oss.getShardVersion(nss) && OperationShardingState::isComingFromRouter(opCtx)) {
+    if (!oss.getShardVersion(nss) && OperationShardingState::isVersioned(opCtx, nss.dbName())) {
         return ScopedSetShardRole{opCtx,
                                   nss,
                                   ShardVersionFactory::make(ChunkVersion::IGNORED()),

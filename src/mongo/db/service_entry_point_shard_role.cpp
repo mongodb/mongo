@@ -377,7 +377,7 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                        wcCode,
                        isInternalClient,
                        false /* isMongos */,
-                       OperationShardingState::isComingFromRouter(opCtx) /* isComingFromRouter */,
+                       OperationShardingState::isShardingAware(opCtx) /* isComingFromRouter */,
                        lastOpBeforeRun,
                        lastOpAfterRun);
     commandBodyFieldsBob->appendElements(errorLabels);
@@ -1993,7 +1993,7 @@ void ExecCommandDatabase::_commandExec() {
         try {
             // TODO (SERVER-90204) Replace with a more accurate check of whether the command is
             // coming from a router.
-            if (OperationShardingState::isComingFromRouter(opCtx)) {
+            if (OperationShardingState::isShardingAware(opCtx)) {
                 ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             }
             _runCommandOpTimes.emplace(opCtx);
@@ -2093,7 +2093,7 @@ bool ExecCommandDatabase::canRetryCommand(const Status& execError) {
         // accessing the grid and so retrying is not necessarily safe.
         // TODO (SERVER-90204) Replace with a more accurate check of whether the command is coming
         // from a router.
-        return OperationShardingState::isComingFromRouter(opCtx);
+        return OperationShardingState::isShardingAware(opCtx);
     }
 
     if (execError == ErrorCodes::StaleDbVersion || execError == ErrorCodes::StaleConfig ||
