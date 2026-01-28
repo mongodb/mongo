@@ -106,6 +106,7 @@ executor:
       randomize_pit: True
   fixture:
     class: ShardedClusterFixture
+    num_mongos: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1
