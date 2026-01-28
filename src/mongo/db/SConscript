@@ -651,6 +651,31 @@ env.Library(
 )
 
 env.Library(
+    target='local_executor',
+    source=[
+        "local_executor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/executor/network_interface_factory",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
+        'service_context',
+    ],
+)
+
+env.CppUnitTest(
+    target='local_executor_test',
+    source=[
+        'local_executor_test.cpp',
+    ],
+    LIBDEPS=[
+        'local_executor',
+        'service_context_test_fixture',
+    ],
+)
+
+env.Library(
     target='not_primary_error_tracker',
     source=[
         "not_primary_error_tracker.cpp",
@@ -2425,6 +2450,7 @@ env.Library(
         'index/index_access_method',
         'index_builds_coordinator_mongod',
         'keys_collection_client_direct',
+        'local_executor',
         'log_process_details',
         'mirror_maestro',
         'mongod_initializers',
