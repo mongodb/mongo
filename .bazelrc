@@ -442,6 +442,7 @@ common:remote_unittest --cache_test_results=auto
 common:remote_unittest --dev_stacktrace=False
 common:remote_unittest --run_under=//bazel:test_wrapper
 common:remote_unittest --test_timeout=660
+common:remote_unittest --define GIT_COMMIT_HASH=nogitversion
 test:remote_unittest --test_tag_filters=mongo_unittest,-intermediate_debug,-incompatible_with_bazel_remote_test
 
 # Coverage
