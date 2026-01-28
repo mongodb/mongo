@@ -231,7 +231,8 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
     return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
                           _astNode->getFirstStageViewApplicationPolicy()),
                       .callback = [this](const ViewInfo& viewInfo, StringData stageName) {
-                          _astNode->bindViewInfo(viewInfo.viewName.coll().data());
+                          _astNode->bindViewInfo(
+                              toStdStringViewForInterop(viewInfo.viewName.coll()));
                       }};
 }
 

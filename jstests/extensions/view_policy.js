@@ -25,27 +25,27 @@ function dropView(viewName) {
     assert.commandWorked(db.runCommand({drop: viewName}));
 }
 
-function verifyViewName(results, expectedViewNss) {
+function verifyViewName(results, expectedViewName) {
     results.forEach((doc, index) => {
         assert(doc.hasOwnProperty("viewName"), `Document ${index} should have viewName field: ${tojson(doc)}`);
         assert.eq(
             doc.viewName,
-            expectedViewNss,
-            `Document ${index} should have viewName field equal to "${expectedViewNss}": ${tojson(doc)}`,
+            expectedViewName,
+            `Document ${index} should have viewName field equal to "${expectedViewName}": ${tojson(doc)}`,
         );
     });
 }
 
-function testViewNameOnView(view, pipeline, expectedViewNss, viewPipeline, shouldPrepend) {
+function testViewNameOnView(view, pipeline, expectedViewName, viewPipeline, shouldPrepend) {
     const result = view.view.aggregate(pipeline).toArray();
-    verifyViewName(result, expectedViewNss);
+    verifyViewName(result, expectedViewName);
     // Verify stages are in expected order
     assertViewHandledCorrectly(view, pipeline, viewPipeline, shouldPrepend);
 }
 
-function testViewNameWithTemporaryView(viewName, viewPipeline, pipeline, expectedViewNss, shouldPrepend) {
+function testViewNameWithTemporaryView(viewName, viewPipeline, pipeline, shouldPrepend) {
     const testView = createView(viewName, viewPipeline);
-    testViewNameOnView(testView, pipeline, expectedViewNss, viewPipeline, shouldPrepend);
+    testViewNameOnView(testView, pipeline, viewName, viewPipeline, shouldPrepend);
     dropView(testView.viewName);
 }
 
@@ -99,11 +99,11 @@ function testNestedViewsWithViewNameStage(suffix, userPipeStage) {
 
     const outerView = {view: db[outerViewName], viewName: outerViewName, viewNss: outerViewNss};
     // Verify outer view name is present when running on outerView
-    testViewNameOnView(outerView, userPipe, outerViewNss, innerViewPipe.concat(outerViewPipe), shouldPrepend);
+    testViewNameOnView(outerView, userPipe, outerViewName, innerViewPipe.concat(outerViewPipe), shouldPrepend);
 
     const innerView = {view: db[innerViewName], viewName: innerViewName, viewNss: innerViewNss};
     // Verify inner view name is present when running on innerView
-    testViewNameOnView(innerView, userPipe, innerViewNss, innerViewPipe, shouldPrepend);
+    testViewNameOnView(innerView, userPipe, innerViewName, innerViewPipe, shouldPrepend);
     dropView(outerViewName);
     dropView(innerViewName);
 }
@@ -209,42 +209,33 @@ describe("View policy extension stages", function () {
         it("should add view name when $addViewName is used on a regular view", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$addViewName: {}}];
+            const viewName = "test_view";
             const shouldPrepend = false; // ViewPolicy is kDoNothing
-            testViewNameWithTemporaryView("test_view", viewPipe, userPipe, `${db.getName()}.test_view`, shouldPrepend);
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
         it("should add view name when $addViewName is used on an extension view", function () {
             const viewPipe = [{$testFoo: {}}];
             const userPipe = [{$addViewName: {}}];
-            const expectedViewNss = `${db.getName()}.foo_view`;
+            const viewName = "foo_view";
             const shouldPrepend = false; // ViewPolicy is kDoNothing
-            testViewNameWithTemporaryView("foo_view", viewPipe, userPipe, expectedViewNss, shouldPrepend);
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
         it("should add view name when $addViewName is used later in the pipeline", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$project: {_id: 1}}, {$addViewName: {}}];
+            const viewName = "test_view_later";
             const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
-            testViewNameWithTemporaryView(
-                "test_view_later",
-                viewPipe,
-                userPipe,
-                `${db.getName()}.test_view_later`,
-                shouldPrepend,
-            );
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
         it("should add view name when $desugarAddViewName is used", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$project: {_id: 1}}, {$desugarAddViewName: {}}];
+            const viewName = "test_view_desugar";
             const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
-            testViewNameWithTemporaryView(
-                "test_view_desugar",
-                viewPipe,
-                userPipe,
-                `${db.getName()}.test_view_desugar`,
-                shouldPrepend,
-            );
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
         it("should assert when $disallowViews is used", function () {
@@ -274,14 +265,8 @@ describe("View policy extension stages", function () {
         it("should handle multiple $addViewName stages in user pipeline", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$addViewName: {}}, {$project: {_id: 1, viewName: 1}}, {$addViewName: {}}];
-            const expectedViewNss = `${db.getName()}.multi_add_viewname_view`;
-            testViewNameWithTemporaryView(
-                "multi_add_viewname_view",
-                viewPipe,
-                userPipe,
-                expectedViewNss,
-                false /* shouldPrepend */,
-            );
+            const viewName = "multi_add_viewname_view";
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, false /* shouldPrepend */);
         });
     });
 
@@ -290,7 +275,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$addViewName: {}}];
             const userPipe = [{$testFoo: {}}];
             const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
-            testViewNameWithTemporaryView("add_viewname_in_view", viewPipe, userPipe, "", shouldPrepend);
+            testViewNameAbsentInView("add_viewname_in_view", viewPipe, userPipe, shouldPrepend);
         });
 
         it("should not add view name when view has $desugarAddViewName in definition and desugaring should work in view def", function () {
@@ -343,17 +328,17 @@ describe("View policy extension stages", function () {
         it("should add view name when $addViewName is both in the view definition and in the user pipeline", function () {
             const viewPipe = [{$addViewName: {}}, {$addFields: {a: 1}}];
             const userPipe = [{$addViewName: {}}];
-            const expectedViewNss = `${db.getName()}.view_with_add_viewname`;
+            const viewName = "view_with_add_viewname";
             const shouldPrepend = false; // ViewPolicy is kDoNothing
-            testViewNameWithTemporaryView("view_with_add_viewname", viewPipe, userPipe, expectedViewNss, shouldPrepend);
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
         it("should add view name when $desugarAddViewName is both in the view definition and in the user pipeline", function () {
             const viewPipe = [{$desugarAddViewName: {}}, {$addFields: {a: 1}}];
             const userPipe = [{$desugarAddViewName: {}}];
-            const expectedViewNss = `${db.getName()}.view_with_desugar`;
+            const viewName = "view_with_desugar";
             const shouldPrepend = false; // ViewPolicy is kDoNothing
-            testViewNameWithTemporaryView("view_with_desugar", viewPipe, userPipe, expectedViewNss, shouldPrepend);
+            testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
     });
 });
