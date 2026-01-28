@@ -79,6 +79,7 @@ executor:
         global_vars:
           TestData:
             skipEnforceFastCountOnValidate: true
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
