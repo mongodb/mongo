@@ -13,7 +13,9 @@
  *  transitioning_replicaset_incompatible,
  *  # The test uses a failpoint that is only available on mongod.
  *  assumes_against_mongod_not_mongos,
- *  # TODO (SERVER-115947): Re-enable this test on primary driven index builds
+ *  # The test requires uncommitted writes with timestamps earlier than committed writes.
+ *  # This is not compatible with primary driven index builds where batched writes are enabled
+ *  # by default because timestamps are only assigned when committing a write.
  *  primary_driven_index_builds_incompatible
  * ]
  */
