@@ -316,6 +316,114 @@ describe("View policy extension stages", function () {
         });
     });
 
+    describe("Extension stage in $unionWith on view", function () {
+        it("should add view name when $addViewName is in $unionWith subpipeline targeting a view", function () {
+            const viewName = "union_with_view";
+            const viewPipe = [{$addFields: {fromView: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // $addViewName has kDoNothing policy, so the view pipeline is NOT prepended.
+            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$addViewName: {}}]}}];
+            const results = coll.aggregate(pipeline).toArray();
+
+            const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
+            assert.gt(viewDocs.length, 0, "Expected some documents with viewName field from $unionWith");
+
+            // Verify the view docs have the correct viewName.
+            verifyViewName(viewDocs, view.viewName);
+
+            dropView(viewName);
+        });
+
+        it("should add view name when $desugarAddViewName is in $unionWith subpipeline targeting a view", function () {
+            const viewName = "union_with_desugar_view";
+            const viewPipe = [{$addFields: {fromView: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // $desugarAddViewName desugars to $addViewName + $doNothingViewPolicy.
+            // Since it starts the pipeline, view pipeline is NOT prepended (kDoNothing policy).
+            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$desugarAddViewName: {}}]}}];
+            const results = coll.aggregate(pipeline).toArray();
+
+            const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
+            assert.gt(viewDocs.length, 0, "Expected some documents with viewName field from $unionWith");
+
+            // Verify the view docs have the correct viewName.
+            verifyViewName(viewDocs, view.viewName);
+
+            dropView(viewName);
+        });
+
+        it("should fail when $disallowViews is in $unionWith subpipeline targeting a view", function () {
+            const viewName = "union_with_disallow_view";
+            const viewPipe = [{$addFields: {fromView: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // $disallowViews should fail when the $unionWith targets a view.
+            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$disallowViews: {}}]}}];
+            testDisallowViewsFails(collName, pipeline);
+
+            dropView(view.viewName);
+        });
+
+        it("should fail when $disallowViews isn't first in $unionWith subpipeline targeting a view", function () {
+            const viewName = "union_with_multi_policy_view";
+            const viewPipe = [{$addFields: {fromView: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // Even though $addViewName has kDoNothing policy, subsequent $disallowViews should fail.
+            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$addViewName: {}}, {$disallowViews: {}}]}}];
+            testDisallowViewsFails(collName, pipeline);
+
+            dropView(view.viewName);
+        });
+
+        it("should not prepend view pipeline when first stage in $unionWith subpipeline has kDoNothing policy", function () {
+            const viewName = "union_with_donothing_first";
+            const viewPipe = [{$addFields: {fromViewPipeline: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // $addViewName has kDoNothing policy, so view pipeline should NOT be prepended.
+            const pipeline = [{$unionWith: {coll: viewName, pipeline: [{$addViewName: {}}]}}];
+            const results = coll.aggregate(pipeline).toArray();
+
+            const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
+            // Since kDoNothing doesn't prepend view pipeline, fromViewPipeline should be absent.
+            viewDocs.forEach((doc) => {
+                assert(
+                    !doc.hasOwnProperty("fromViewPipeline"),
+                    `Document should not have fromViewPipeline when view pipeline is not prepended: ${tojson(doc)}`,
+                );
+            });
+
+            dropView(view.viewName);
+        });
+
+        it("should prepend view pipeline when non-first stage in $unionWith subpipeline has kDoNothing policy", function () {
+            const viewName = "union_with_donothing_later";
+            const viewPipe = [{$addFields: {fromViewPipeline: true}}];
+            const view = createView(viewName, viewPipe);
+
+            // $match has kDefaultPrepend policy, so view pipeline SHOULD be prepended.
+            // The subsequent $addViewName doesn't affect the prepend decision.
+            const pipeline = [
+                {$unionWith: {coll: viewName, pipeline: [{$match: {_id: {$exists: true}}}, {$addViewName: {}}]}},
+            ];
+            const results = coll.aggregate(pipeline).toArray();
+
+            const viewDocs = results.filter((doc) => doc.hasOwnProperty("viewName"));
+            // Since first stage has kDefaultPrepend, view pipeline should be prepended.
+            viewDocs.forEach((doc) => {
+                assert(
+                    doc.hasOwnProperty("fromViewPipeline"),
+                    `Document should have fromViewPipeline when view pipeline is prepended: ${tojson(doc)}`,
+                );
+            });
+
+            dropView(view.viewName);
+        });
+    });
+
     describe("Combined scenarios, nested views, etc.", function () {
         it("should add outer view name but not inner view name when using nested views", function () {
             testNestedViewsWithViewNameStage("_base", {$addViewName: {}});

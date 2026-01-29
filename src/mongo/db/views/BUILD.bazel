@@ -40,9 +40,14 @@ mongo_cc_library(
     srcs = [
         "pipeline_resolver.cpp",
     ],
+    # This library has a mutual dependency with //src/mongo/db/pipeline:pipeline.
+    # pipeline_factory.cpp (in pipeline) uses PipelineResolver::applyViewToLiteParsed,
+    # while pipeline_resolver.cpp uses Pipeline::parseFromLiteParsed. To break the cycle,
+    # pipeline depends on pipeline_resolver, and the Pipeline symbols are resolved at
+    # link time when both libraries are combined.
+    no_undefined_ref_DO_NOT_USE = False,
     deps = [
         ":resolved_view",
-        "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
     ],
 )

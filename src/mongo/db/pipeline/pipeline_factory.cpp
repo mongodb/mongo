@@ -34,12 +34,48 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 
 #include <algorithm>
 #include <iterator>
 
 namespace mongo::pipeline_factory {
+
+namespace {
+std::unique_ptr<Pipeline> finalizePipeline(std::unique_ptr<Pipeline> pipeline,
+                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const MakePipelineOptions& opts) {
+    expCtx->initializeReferencedSystemVariables();
+
+    bool alreadyOptimized = opts.alreadyOptimized;
+
+    if (opts.optimize) {
+        pipeline_optimization::optimizePipeline(*pipeline);
+        alreadyOptimized = true;
+    }
+
+    pipeline->validateCommon(alreadyOptimized);
+
+    if (opts.attachCursorSource) {
+        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
+        // preparePipelineForExecution().
+        AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
+                                           pipeline->serializeToBson());
+        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
+            expCtx,
+            aggRequest,
+            std::move(pipeline),
+            boost::none,
+            opts.shardTargetingPolicy,
+            std::move(opts.readConcern),
+            opts.useCollectionDefaultCollator);
+    }
+
+    return pipeline;
+}
+}  // namespace
+
 std::unique_ptr<Pipeline> makePipeline(BSONElement rawPipelineElement,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MakePipelineOptions opts) {
@@ -78,33 +114,7 @@ std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
 
     auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
 
-    expCtx->initializeReferencedSystemVariables();
-
-    bool alreadyOptimized = opts.alreadyOptimized;
-
-    if (opts.optimize) {
-        pipeline_optimization::optimizePipeline(*pipeline);
-        alreadyOptimized = true;
-    }
-
-    pipeline->validateCommon(alreadyOptimized);
-
-    if (opts.attachCursorSource) {
-        // Creating AggregateCommandRequest in order to pass all necessary 'opts' to the
-        // preparePipelineForExecution().
-        AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
-                                           pipeline->serializeToBson());
-        pipeline = expCtx->getMongoProcessInterface()->preparePipelineForExecution(
-            expCtx,
-            aggRequest,
-            std::move(pipeline),
-            boost::none /* shardCursorsSortSpec */,
-            opts.shardTargetingPolicy,
-            std::move(opts.readConcern),
-            opts.useCollectionDefaultCollator);
-    }
-
-    return pipeline;
+    return finalizePipeline(std::move(pipeline), expCtx, opts);
 }
 
 std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
@@ -203,18 +213,34 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
             subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
     }
 
-    auto resolvedPipeline = std::move(resolvedNs.pipeline);
-    // When we get a resolved pipeline back, we may not yet have its namespaces available in the
-    // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
-    LiteParsedPipeline liteParsedPipeline(resolvedNs.ns, resolvedPipeline);
-    subPipelineExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
+    {
+        // When we get a resolved pipeline back, we may not yet have its namespaces available in the
+        // expression context, e.g. if the view's pipeline contains a $lookup on another collection.
+        // This is scoped as to ensure that viewLiteParsedPipeline gets destroyed while
+        // resolvedNs.pipeline is still alive. There is a call to std::move(resolvedNs.pipeline)
+        // below.
+        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
+        subPipelineExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
+    }
 
-    resolvedPipeline.reserve(currentPipeline.size() + resolvedPipeline.size());
-    resolvedPipeline.insert(resolvedPipeline.end(),
-                            std::make_move_iterator(currentPipeline.begin()),
-                            std::make_move_iterator(currentPipeline.end()));
+    // Create a LiteParsedPipeline for the user pipeline and apply view handling with ViewPolicy
+    // callbacks.
+    LiteParsedPipeline userLiteParsedPipeline(resolvedNs.ns, currentPipeline);
+    if (opts.desugar) {
+        LiteParsedDesugarer::desugar(&userLiteParsedPipeline);
+    }
 
-    return makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
+    // Apply the view to the user pipeline.
+    const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
+    PipelineResolver::applyViewToLiteParsed(&userLiteParsedPipeline, resolvedView, originalNs);
+
+    // Parse from the modified LiteParsedPipeline. Skip desugar since we already did it above.
+    auto optsWithoutDesugar = opts;
+    optsWithoutDesugar.desugar = false;
+    auto pipeline =
+        Pipeline::parseFromLiteParsed(userLiteParsedPipeline, subPipelineExpCtx, opts.validator);
+
+    return finalizePipeline(std::move(pipeline), subPipelineExpCtx, opts);
 }
 
 std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,
