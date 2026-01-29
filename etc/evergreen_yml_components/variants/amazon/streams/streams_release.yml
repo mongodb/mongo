@@ -26,6 +26,8 @@ buildvariants:
       push_arch: x86_64-enterprise-amazon2023-streams
       mciuploads_binary_permissions_push: public-read
       mciuploads_binary_visibility_push: public
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --streams_release_build=True
