@@ -74,6 +74,19 @@ def cpu_info() -> str:
         return _UNKNOWN
 
 
+def cpu_architecture() -> str:
+    """CPU architecture - works on all platforms"""
+    try:
+        arch = platform.machine()
+        # Normalize aarch64 to arm64
+        if arch == "aarch64":
+            return "arm64"
+        return arch
+    except Exception as _e:
+        wrapper_debug(f"Failed to get CPU architecture {_e}")
+        return _UNKNOWN
+
+
 def memory_info(mem_type: str) -> str:
     """Memory - Linux only"""
     memory_gb = _UNKNOWN

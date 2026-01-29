@@ -9,6 +9,7 @@ import sys
 import git
 
 from bazel.wrapper_hook.wrapper_util import (
+    cpu_architecture,
     cpu_info,
     filesystem_info,
     memory_info,
@@ -83,6 +84,7 @@ def write_workstation_bazelrc(args):
 
     # Collect system resource information
     cpu_count = cpu_info()  # CPU count - works on all platforms
+    cpu_arch = cpu_architecture()  # CPU architecture - works on all platforms
     total_memory_gb = memory_info("MemTotal")  # Total memory - Linux only
     available_memory_gb = memory_info("MemAvailable")  # Available memory - Linux only
     filesystem_type, best_mountpoint_len = filesystem_info()  # Filesystem type - Linux only
@@ -106,6 +108,7 @@ common --bes_keywords=engflow:BuildScmStatus={status}
 common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
 common --bes_keywords=base_branch={base_branch}
 common --bes_keywords=client_system:cpu_count={cpu_count}
+common --bes_keywords=client_system:cpu_architecture={cpu_arch}
 common --bes_keywords=client_system:total_memory_gb={total_memory_gb}
 common --bes_keywords=client_system:available_memory_gb={available_memory_gb}
 common --bes_keywords=client_system:filesystem_type={filesystem_type}
