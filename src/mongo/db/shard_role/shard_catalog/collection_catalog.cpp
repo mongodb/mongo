@@ -283,7 +283,16 @@ void assertViewCatalogValid(const ViewsForDatabase& viewsForDb) {
     uassert(ErrorCodes::InvalidViewDefinition,
             "Invalid view definition detected in the view catalog. Remove the invalid view "
             "manually to prevent disallowing any further usage of the view catalog.",
-            viewsForDb.valid());
+            viewsForDb.allViewsAreValid());
+}
+
+void assertViewIsValid(const ViewsForDatabase& viewsForDb, const NamespaceString& viewName) {
+    uassert(ErrorCodes::InvalidViewDefinition,
+            str::stream()
+                << "Invalid view definition detected in the view catalog. Remove the invalid view "
+                   "manually to prevent disallowing any further usage of the view catalog. nss: "
+                << viewName.toStringForErrorMsg(),
+            viewsForDb.isViewValid(viewName));
 }
 
 ViewsForDatabase loadViewsForDatabase(OperationContext* opCtx,
@@ -294,10 +303,10 @@ ViewsForDatabase loadViewsForDatabase(OperationContext* opCtx,
     // The system.views is a special collection that is always present in the catalog and can't be
     // modified or dropped. The Collection* returned by the lookup can't disappear. The
     // initialization here is therefore safe.
-    if (auto status =
-            viewsForDb.reload(opCtx,
-                              CollectionPtr::CollectionPtr_UNSAFE(
-                                  catalog.lookupCollectionByNamespace(opCtx, systemDotViews)));
+    if (auto status = viewsForDb.reloadAllViews(
+            opCtx,
+            CollectionPtr::CollectionPtr_UNSAFE(
+                catalog.lookupCollectionByNamespace(opCtx, systemDotViews)));
         !status.isOK()) {
         LOGV2_WARNING_OPTIONS(20326,
                               {logv2::LogTag::kStartupWarnings},
@@ -935,7 +944,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
         writable.remove(opCtx, systemViews, viewName);
 
         // Reload the view catalog with the changes applied.
-        result = writable.reload(opCtx, systemViews);
+        result = writable.reloadAllViews(opCtx, systemViews);
         if (result.isOK()) {
             auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
             uncommittedCatalogUpdates.removeView(viewName);
@@ -1894,7 +1903,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
         return nullptr;
     }
 
-    if (!viewsForDb->valid() && opCtx->getClient()->isFromUserConnection()) {
+    if (!viewsForDb->allViewsAreValid() && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
         if (!NamespaceString::validCollectionName(NamespaceStringUtil::serializeForCatalog(ns))) {
             return nullptr;
@@ -1903,7 +1912,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
         // ApplyOps should work on a valid existing collection, despite the presence of bad views
         // otherwise the server would crash. The view catalog will remain invalid until the bad view
         // definitions are removed.
-        assertViewCatalogValid(*viewsForDb);
+        assertViewIsValid(*viewsForDb, ns);
     }
 
     return viewsForDb->lookup(ns);

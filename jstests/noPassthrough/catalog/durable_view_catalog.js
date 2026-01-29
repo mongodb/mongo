@@ -2,7 +2,9 @@
  * Tests that view creation and modification is correctly persisted.
  *
  * This test requires persistence to ensure data survives a restart.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ * ]
  */
 // The following test verifies that writeConcern: {j: true} ensures that the view catalog is
 // durable.
@@ -60,14 +62,16 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod(mongodArgs);
 assert.neq(null, conn, "after inserting bad views, failed to restart mongod with options: " + tojson(mongodArgs));
 
-// Now that the database's view catalog has been marked as invalid, all view operations in that
-// database should fail.
+// Now that we have an invalid view definition, operations on that specific invalid view should
+// fail, but operations on valid views should still work. DDL catalog operations should still fail.
 viewsDB = conn.getDB("test");
-assert.commandFailedWithCode(viewsDB.runCommand({find: "view2"}), ErrorCodes.InvalidViewDefinition);
+assert.commandWorked(viewsDB.runCommand({find: "view2"}), "find on valid view should work");
+// Creating a new view is still not allowed. This is to prevent chaining against invalid views.
 assert.commandFailedWithCode(
     viewsDB.runCommand({create: "view4", viewOn: "collection"}),
     ErrorCodes.InvalidViewDefinition,
 );
+// Modifying an existing view (valid or invalid) is not allowed. This is to prevent chaining against invalid views.
 assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}), ErrorCodes.InvalidViewDefinition);
 
 // Checks that dropping a nonexistent view or collection is not affected by an invalid view existing

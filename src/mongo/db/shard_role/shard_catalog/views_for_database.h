@@ -78,8 +78,12 @@ public:
         kAlreadyDurable,
     };
 
-    bool valid() const {
-        return _valid;
+    bool allViewsAreValid() const {
+        return _invalidViewNames.empty() && !_hasInvalidNss;
+    }
+
+    bool isViewValid(const NamespaceString& nss) const {
+        return !_invalidViewNames.contains(nss);
     }
 
     Stats stats() const {
@@ -91,9 +95,16 @@ public:
     void iterate(const std::function<bool(const ViewDefinition& view)>& callback) const;
 
     /**
-     * Reloads views from the system.views collection.
+     * Reloads all the valid views from the system.views collection.
+     * Invalid views are noted internally
      */
-    Status reload(OperationContext* opCtx, const CollectionPtr& systemViews);
+    void reloadValidViews(OperationContext* opCtx, const CollectionPtr& systemViews);
+
+    /**
+     * Reloads views from the system.views collection and reports error if at least one view is
+     * invalid
+     */
+    Status reloadAllViews(OperationContext* opCtx, const CollectionPtr& systemViews);
 
     Status insert(OperationContext* opCtx,
                   const CollectionPtr& systemViews,
@@ -119,10 +130,11 @@ public:
     void clear(OperationContext* opCtx);
 
 private:
+    Status _reload(OperationContext* opCtx, const CollectionPtr& systemViews, bool errorOnInvalid);
     /**
      * Inserts or updates the given view into the view map.
      */
-    Status _upsertIntoMap(OperationContext* opCtx, std::shared_ptr<ViewDefinition> view);
+    void _upsertIntoMap(OperationContext* opCtx, std::shared_ptr<ViewDefinition> view);
 
     /**
      * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
@@ -153,7 +165,15 @@ private:
     StringMap<std::shared_ptr<ViewDefinition>> _viewMap;
     ViewGraph _viewGraph;
 
-    bool _valid = false;
+    // Store the list of views nss that are corrupted. At lookup time, we throw only if the specific
+    // requested nss is corrupted.
+    stdx::unordered_set<NamespaceString> _invalidViewNames;
+    // The flag indicates whether the catalog contains at least one view with an invalid namespace.
+    // We cannot store invalid namespaces directly (parsing would fail), and there's no need to
+    // since invalid namespaces cannot be queried anyway. We therefore store the catalog is
+    // corrupted so that certain operations on views can still be prevented while allowing lookups
+    // on valid views.
+    bool _hasInvalidNss = false;
     bool _viewGraphNeedsRefresh = true;
 
     Stats _stats;

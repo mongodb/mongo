@@ -109,14 +109,16 @@ void ViewsForDatabase::iterate(
     }
 }
 
-Status ViewsForDatabase::reload(OperationContext* opCtx, const CollectionPtr& systemViews) {
+Status ViewsForDatabase::_reload(OperationContext* opCtx,
+                                 const CollectionPtr& systemViews,
+                                 bool errorOnInvalid) {
     _viewMap.clear();
-    _valid = false;
+    _invalidViewNames.clear();
+    _hasInvalidNss = false;
     _viewGraphNeedsRefresh = true;
     _stats = {};
 
     if (!systemViews) {
-        _valid = true;
         return Status::OK();
     }
 
@@ -134,38 +136,43 @@ Status ViewsForDatabase::reload(OperationContext* opCtx, const CollectionPtr& sy
         try {
             view_util::validateViewDefinitionBSON(opCtx, view, systemViews->ns().dbName());
         } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-
-        auto collatorElem = view["collation"];
-        auto collator = parseCollator(opCtx, collatorElem ? collatorElem.Obj() : BSONObj{});
-        if (!collator.isOK()) {
-            return collator.getStatus();
+            _hasInvalidNss = true;
+            if (errorOnInvalid) {
+                return ex.toStatus();
+            }
+            continue;
         }
 
         auto viewName = NamespaceStringUtil::deserialize(systemViews->ns().tenantId(),
                                                          view.getStringField("_id"),
                                                          SerializationContext::stateDefault());
-
-        if (auto status = _upsertIntoMap(
-                opCtx,
-                std::make_shared<ViewDefinition>(viewName.dbName(),
-                                                 viewName.coll(),
-                                                 view.getStringField("viewOn"),
-                                                 BSONArray{view.getObjectField("pipeline")},
-                                                 std::move(collator.getValue())));
-            !status.isOK()) {
-            LOGV2(22547,
-                  "Could not load view catalog for database",
-                  logAttrs(systemViews->ns().dbName()),
-                  "error"_attr = status);
-
-            return status;
+        auto collatorElem = view["collation"];
+        auto collator = parseCollator(opCtx, collatorElem ? collatorElem.Obj() : BSONObj{});
+        if (!collator.isOK()) {
+            _invalidViewNames.insert(viewName);
+            if (errorOnInvalid) {
+                return collator.getStatus();
+            }
+            continue;
         }
+
+        _upsertIntoMap(opCtx,
+                       std::make_shared<ViewDefinition>(viewName.dbName(),
+                                                        viewName.coll(),
+                                                        view.getStringField("viewOn"),
+                                                        BSONArray{view.getObjectField("pipeline")},
+                                                        std::move(collator.getValue())));
     }
 
-    _valid = true;
     return Status::OK();
+}
+
+Status ViewsForDatabase::reloadAllViews(OperationContext* opCtx, const CollectionPtr& systemViews) {
+    return _reload(opCtx, systemViews, true /*errorOnInvalid*/);
+}
+
+void ViewsForDatabase::reloadValidViews(OperationContext* opCtx, const CollectionPtr& systemViews) {
+    (void)_reload(opCtx, systemViews, false /*errorOnInvalid*/);
 }
 
 Status ViewsForDatabase::insert(OperationContext* opCtx,
@@ -176,7 +183,6 @@ Status ViewsForDatabase::insert(OperationContext* opCtx,
                                 const PipelineValidatorFn& validatePipeline,
                                 const BSONObj& collator,
                                 Durability durability) {
-    _valid = false;
 
     auto parsedCollator = parseCollator(opCtx, collator);
     if (!parsedCollator.isOK()) {
@@ -193,21 +199,19 @@ Status ViewsForDatabase::insert(OperationContext* opCtx,
     if (auto status = _upsertIntoGraph(
             opCtx, *view, validatePipeline, durability == Durability::kNotYetDurable);
         !status.isOK()) {
+        _invalidViewNames.insert(viewName);
         return status;
     }
 
     if (durability == Durability::kNotYetDurable) {
         if (auto status = _upsertIntoCatalog(opCtx, systemViews, *view); !status.isOK()) {
+            _invalidViewNames.insert(viewName);
             return status;
         }
     }
 
-    if (auto status = _upsertIntoMap(opCtx, std::move(view)); !status.isOK()) {
-        LOGV2(5387000, "Could not insert view", logAttrs(viewName.dbName()), "error"_attr = status);
-        return status;
-    }
+    _upsertIntoMap(opCtx, std::move(view));
 
-    _valid = true;
     return Status::OK();
 };
 
@@ -218,29 +222,27 @@ Status ViewsForDatabase::update(OperationContext* opCtx,
                                 const BSONArray& pipeline,
                                 const PipelineValidatorFn& validatePipeline,
                                 std::unique_ptr<CollatorInterface> collator) {
-    _valid = false;
 
     auto view = std::make_shared<ViewDefinition>(
         viewName.dbName(), viewName.coll(), viewOn.coll(), pipeline, std::move(collator));
 
     if (auto status = _upsertIntoGraph(opCtx, *view, validatePipeline, true); !status.isOK()) {
+        _invalidViewNames.insert(viewName);
         return status;
     }
 
     if (auto status = _upsertIntoCatalog(opCtx, systemViews, *view); !status.isOK()) {
+        _invalidViewNames.insert(viewName);
         return status;
     }
 
-    if (auto status = reload(opCtx, systemViews); !status.isOK()) {
-        return status;
-    }
+    reloadValidViews(opCtx, systemViews);
 
-    _valid = true;
     return Status::OK();
 }
 
-Status ViewsForDatabase::_upsertIntoMap(OperationContext* opCtx,
-                                        std::shared_ptr<ViewDefinition> view) {
+void ViewsForDatabase::_upsertIntoMap(OperationContext* opCtx,
+                                      std::shared_ptr<ViewDefinition> view) {
     if (!view->name().isOnInternalDb() && !view->name().isSystem()) {
         if (view->timeseries()) {
             _stats.userTimeseries += 1;
@@ -252,7 +254,6 @@ Status ViewsForDatabase::_upsertIntoMap(OperationContext* opCtx,
     }
 
     _viewMap[view->name().coll()] = view;
-    return Status::OK();
 }
 
 Status ViewsForDatabase::_upsertIntoGraph(OperationContext* opCtx,
@@ -401,7 +402,7 @@ void ViewsForDatabase::clear(OperationContext* opCtx) {
 
     _viewMap.clear();
     _viewGraph.clear();
-    _valid = true;
+    _invalidViewNames.clear();
     _viewGraphNeedsRefresh = false;
     _stats = {};
 }
