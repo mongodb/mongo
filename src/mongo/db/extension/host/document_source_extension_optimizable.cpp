@@ -52,14 +52,6 @@ DocumentSourceContainer expandableStageParamsToDocumentSourceFn(
     auto* expandableParams = static_cast<ExpandableStageParams*>(stageParams.get());
     auto parseNode = expandableParams->releaseParseNode();
 
-    if (expCtx->getFromRouter()) {
-        // Because run_aggregate prevents a re-desugar when coming from mongos, it's necessary to
-        // directly construct a DocumentSourceExtensionOptimizable from the parse node. This is
-        // allowed because the desugar has been performed on the mongos already, meaning that the
-        // BSON serialized and sent to the shards is from DocumentSourceExtensionOptimizable.
-        return {DocumentSourceExtensionOptimizable::create(expCtx, std::move(parseNode))};
-    }
-
     return {DocumentSourceExtensionForQueryShape::create(expCtx, std::move(parseNode))};
 }
 
