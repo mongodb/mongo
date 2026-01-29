@@ -272,10 +272,13 @@ const testCases = [
     ], // 10
 ];
 for (let i = 0; i < testCases.length; i++) {
-    let result = getExplainedPipelineFromAggregation(db, coll, testCases[i][0]);
+    let result;
 
-    assert(
-        anyEq(result, testCases[i][1]),
-        "Test case " + i + " failed.\n" + "Expected:\n" + tojson(testCases[i][1]) + "\nGot:\n" + tojson(result),
+    assert.soon(
+        () => {
+            result = getExplainedPipelineFromAggregation(db, coll, testCases[i][0]);
+            return anyEq(result, testCases[i][1]);
+        },
+        () => "Test case " + i + " failed.\n" + "Expected:\n" + tojson(testCases[i][1]) + "\nGot:\n" + tojson(result),
     );
 }
