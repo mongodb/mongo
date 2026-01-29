@@ -1853,6 +1853,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                       << redact(op.toBSONForLogging()),
                         o.hasField("_id"));
 
+                // TODO SERVER-117929 fix comment and logic for applyOps command.
+                // Notice: Below comment may be missleading with respect to applyOps commands as
+                // they don't seem to have a wrapping WriteUnitOfWork as indicated below. In the
+                // same way, the flow the applyOps command is not what we could anticipate from
+                // the comment as applyOps commands will have needToDoUpsert = false unless it
+                // encounters a DuplicateKey error.
+                //
                 // 1. Insert if
                 //   a) we do not have a wrapping WriteUnitOfWork, which implies we are not part of
                 //      an "applyOps" command, OR
@@ -1874,8 +1881,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 //     steady-state replication and existing users of applyOps.
 
                 const bool inTxn = opCtx->inMultiDocumentTransaction();
-                bool isApplyOpsCmd = haveWrappingWriteUnitOfWork && !inTxn;
-                bool needToDoUpsert = isApplyOpsCmd;
+                bool isApplyOpsCmd = (mode == OplogApplication::Mode::kApplyOpsCmd);
+                bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
 
                 Timestamp timestamp;
                 if (assignOperationTimestamp) {
@@ -1958,10 +1965,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         }
 
                         if (auto opRid = op.getDurableReplOperation().getRecordId();
-                            opRid.has_value()) {
+                            opRid.has_value() && !isApplyOpsCmd) {
                             // For collections with replicated recordIds we are taking the hard
-                            // stance that getting a DuplicatedKey error while applying an insert
-                            // oplog entry is a constraint violation.
+                            // stance in steady state that getting a DuplicatedKey error while
+                            // applying an insert oplog entry is a constraint violation.
                             LOGV2_FATAL_NOTRACE(8830900,
                                                 "Got DuplicateKey error while applying insert "
                                                 "oplog entry with recordId",

@@ -360,12 +360,8 @@ DEATH_TEST_F(InsertDisabledSteadyStateConstraintsTest,
 class ApplyOpsInsertTest : public InsertTest {
 protected:
     Status runOpApplyOpsCmd(const OplogEntry& op) {
-        // The applyOps cmd will have a WriteUnitOfWork and it is used when processing the oplog
-        // entry to define a behavior specific for this command.
-        shard_role_details::getLocker(_opCtx.get())->beginWriteUnitOfWork();
         Status status = _applyOplogEntryOrGroupedInsertsWrapper(
             _opCtx.get(), ApplierOperation{&op}, OplogApplication::Mode::kApplyOpsCmd);
-        shard_role_details::getLocker(_opCtx.get())->endWriteUnitOfWork();
         return status;
     }
 };

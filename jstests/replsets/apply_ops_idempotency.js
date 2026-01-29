@@ -1,7 +1,6 @@
 /**
  * @tags: [
- *   # TODO (SERVER-117836): Reenable this test.
- *   featureFlagRecordIdsReplicated_incompatible,
+ *   featureFlagRecordIdsReplicated,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
