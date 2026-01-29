@@ -223,11 +223,6 @@ struct BaseCandidatePlan {
     bool fromPlanCache{false};
     // Any results produced during the plan's execution prior to scoring are retained here.
     std::deque<ResultType> results;
-    // This is used to track the original plan with clean PlanStage tree and the auxiliary data.
-    // The 'root' and 'data' in this struct could be used to execute trials in multi-planner before
-    // caching the winning plan, which requires necessary values bound to 'data'. These values
-    // should not be stored in the plan cache.
-    boost::optional<std::pair<PlanStageType, Data>> clonedPlan;
 };
 
 using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;
