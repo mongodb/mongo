@@ -325,6 +325,20 @@ bool isExtensionVectorSearchStage(std::string stageName) {
         stageName == DocumentSourceVectorSearch::kStageName;
 }
 
+bool isExtensionVectorSearchPipeline(const Pipeline* pipeline) {
+    if (!pipeline || pipeline->empty()) {
+        return false;
+    }
+    const auto& stages = pipeline->getSources();
+    return std::any_of(stages.begin(), stages.end(), [](const auto& stage) {
+        return isExtensionVectorSearchStage(stage->getSourceName());
+    });
+}
+
+bool shouldPreValidateMetaDependencies(const Pipeline* pipeline) {
+    return isExtensionVectorSearchPipeline(pipeline) || isMongotPipeline(pipeline);
+}
+
 void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,
                                  ExpressionContext* expCtx) {
     if (pipeline.empty()) {

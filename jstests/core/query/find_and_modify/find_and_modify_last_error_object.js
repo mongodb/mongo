@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
+ * ]
+ */
 const t = db[jsTestName()];
 
 t.drop();

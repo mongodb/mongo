@@ -192,6 +192,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
               RemoteCommandRequest request(
                   _source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout);
               request.sslMode = sslMode;
+              request.timeoutCode = ErrorCodes::MaxTimeMSExpired;
               return request;
           }(),
           [this](const auto& x) { return this->_callback(x, kFirstBatchFieldName); },
@@ -343,6 +344,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
     RemoteCommandRequest request(
         _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout);
     request.sslMode = _sslMode;
+    request.timeoutCode = ErrorCodes::MaxTimeMSExpired;
 
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(

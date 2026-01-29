@@ -339,6 +339,11 @@ void doLogImpl(int32_t id,
                    AttributeStorage{"original_msg"_attr = message, "what"_attr = ex.what()});
 
         invariant(!kDebugBuild, fmt::format("Exception during log: {}", ex.what()));
+    } catch (const DBException& ex) {
+        if (options.uassertErrorCode() != ex.code()) {
+            doSafeLog("Exception while creating log record", id, severity, options, message, attrs);
+        }
+        throw;
     } catch (...) {
         doSafeLog("Exception while creating log record", id, severity, options, message, attrs);
         throw;

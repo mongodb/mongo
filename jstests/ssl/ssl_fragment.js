@@ -21,17 +21,17 @@ function runTest(conn) {
 
 let options = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
     networkMessageCompressors: "disabled",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidCertificates: "",
 };
 
 let mongosOptions = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
     networkMessageCompressors: "disabled",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidCertificates: "",
 };
 

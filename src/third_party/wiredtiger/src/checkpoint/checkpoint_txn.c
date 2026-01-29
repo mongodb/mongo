@@ -1119,6 +1119,65 @@ __checkpoint_clear_time(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __checkpoint_db_debug_crash_points --
+ *     Parse and apply the checkpoint_crash_point setting.
+ */
+static int
+__checkpoint_db_debug_crash_points(WT_SESSION_IMPL *session, const char *cfg[])
+{
+
+    WT_CONFIG_ITEM cval;
+    u_int crash_point;
+
+    /* Perform a crash at a relative point in checkpoint. */
+    WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_crash_point", &cval));
+    crash_point = (u_int)cval.val;
+    if (crash_point > 0) {
+        u_int ckpt_total_crash_points;
+        /*
+         * Calculate total checkpoint crash points. The total checkpoint points required are the
+         * number of data handles that need to be checkpointed.
+         */
+        ckpt_total_crash_points = session->ckpt.handle_next + CKPT_CRASH_PROGRESS_ENUM_END - 1;
+
+        /*
+         * Calculate the relative crash point. The input crash_point ranges from
+         * 1 to 1000; convert it to its corresponding crash point position.
+         */
+        session->ckpt.crash_point =
+          (((crash_point - 1) * ckpt_total_crash_points) / (WT_THOUSAND - 1)) + 1;
+
+        /*
+         * If the crash point exceeds the number of handles, crash in the final phase after all
+         * regular tables are checkpointed. Use the crash trigger points to achieve this. Calculate
+         * and set the appropriate trigger point.
+         */
+        if (session->ckpt.crash_point > session->ckpt.handle_next)
+            session->ckpt.crash_trigger_point =
+              session->ckpt.crash_point - session->ckpt.handle_next;
+    }
+
+    /* Perform a crash at a specific point in checkpoint. */
+    WT_RET(__wt_config_gets(session, cfg, "debug.checkpoint_crash_trigger_point", &cval));
+    if (cval.len > 0) {
+        if (WT_CONFIG_LIT_MATCH("before_metadata_sync", cval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_BEFORE_METADATA_SYNC;
+        else if (WT_CONFIG_LIT_MATCH("before_metadata_update", cval))
+            session->ckpt.crash_trigger_point = CKPT_CRASH_BEFORE_METADATA_UPDATE;
+        else if (WT_CONFIG_LIT_MATCH("before_key_rotation", cval))
+            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION;
+        else if (WT_CONFIG_LIT_MATCH("during_key_rotation", cval))
+            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_DURING_KEY_ROTATION;
+        else if (WT_CONFIG_LIT_MATCH("after_key_rotation", cval))
+            session->ckpt.crash_trigger_point = KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION;
+        else
+            WT_RET_MSG(session, EINVAL, "Debug checkpoint crash point %.*s is invalid",
+              (int)cval.len, cval.str);
+    }
+    return (0);
+}
+
+/*
  * __checkpoint_db_internal --
  *     Checkpoint a database or a list of objects in the database.
  */
@@ -1140,11 +1199,9 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     uint64_t ckpt_tree_duration_usecs, fsync_duration_usecs, generation, hs_ckpt_duration_usecs;
     uint64_t num_meta_put, time_start_ckpt_tree, time_start_fsync, time_start_hs,
       time_stop_ckpt_tree, time_stop_fsync, time_stop_hs;
-    u_int i, ckpt_total_crash_points, ckpt_relative_crash_point;
-    int ckpt_crash_point;
+    u_int i;
     const char *name;
     bool can_skip, failed, idle, logging, tracking, use_timestamp;
-    bool ckpt_crash_before_metadata_sync, ckpt_crash_before_metadata_update;
     char ts_string[WT_TS_INT_STRING_SIZE];
     void *saved_meta_next;
 
@@ -1157,7 +1214,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     txn_global = &conn->txn_global;
     saved_isolation = session->isolation;
     idle = tracking = use_timestamp = false;
-    ckpt_crash_before_metadata_sync = ckpt_crash_before_metadata_update = false;
 
     WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ESTABLISH);
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
@@ -1271,34 +1327,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_WITH_SCHEMA_LOCK(session, ret = __checkpoint_prepare(session, &tracking, cfg));
     WT_ERR(ret);
 
-    WT_ERR(__wt_config_gets(session, cfg, "debug.key_provider_trigger_crash_points", &cval));
-    session->ckpt.key_provider_crash_point = (int)cval.val;
-
-    WT_ERR(__wt_config_gets(session, cfg, "debug.checkpoint_crash_point", &cval));
-    ckpt_crash_point = (int)cval.val;
-
-    if (ckpt_crash_point >= 0) {
-        /*
-         * Calculate total checkpoint crash points. The total checkpoint points required are the
-         * number of data handles that need to be checkpointed plus the additional crash points.
-         */
-        ckpt_total_crash_points = session->ckpt.handle_next + CKPT_CRASH_ENUM_END;
-        ckpt_relative_crash_point =
-          ((u_int)ckpt_crash_point / (WT_THOUSAND / ckpt_total_crash_points));
-
-        if (ckpt_relative_crash_point < session->ckpt.handle_next)
-            /* Adjust crash step if it's between checkpointing tables. */
-            session->ckpt.crash_point = ckpt_relative_crash_point + 1;
-        else {
-            if ((ckpt_total_crash_points - ckpt_relative_crash_point) ==
-              CKPT_CRASH_BEFORE_METADATA_SYNC)
-                ckpt_crash_before_metadata_sync = true;
-            else {
-                /* CKPT_CRASH_BEFORE_METADATA_UPDATE. */
-                ckpt_crash_before_metadata_update = true;
-            }
-        }
-    }
+    WT_ERR(__checkpoint_db_debug_crash_points(session, cfg));
 
     /* Log the final checkpoint prepare progress message if needed. */
     if (conn->ckpt.progress.msg_count > 0)
@@ -1482,7 +1511,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(__wt_txn_commit(session, NULL));
 
     /* Crash before updating the metadata if checkpoint crash point is configured. */
-    if (ckpt_crash_before_metadata_update)
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_UPDATE)
         __wt_debug_crash(session);
 
     /*
@@ -1499,14 +1528,14 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
          * a valid recoverable checkpoint.
          */
         /* Crash before metadata sync if checkpoint crash point is configured. */
-        if (ckpt_crash_before_metadata_sync)
+        if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_SYNC)
             __wt_debug_crash(session);
 
         WT_ERR(__wt_log_flush(session, WT_LOG_FSYNC));
     }
 
     /* Crash before metadata sync if checkpoint crash point is configured. */
-    if (ckpt_crash_before_metadata_sync)
+    if (session->ckpt.crash_trigger_point == CKPT_CRASH_BEFORE_METADATA_SYNC)
         __wt_debug_crash(session);
 
     /*
@@ -1699,9 +1728,8 @@ err:
     conn->disaggregated_storage.cur_checkpoint_timestamp = WT_TS_NONE;
 
     __wt_free(session, session->ckpt.handle);
-    WT_ASSERT(session, session->ckpt.crash_point == 0);
-    session->ckpt.handle_allocated = session->ckpt.handle_next = session->ckpt.crash_point = 0;
-    session->ckpt.key_provider_crash_point = KEY_PROVIDER_CRASH_NONE;
+    WT_ASSERT(session, session->ckpt.crash_trigger_point == 0 && session->ckpt.crash_point == 0);
+    session->ckpt.handle_allocated = session->ckpt.handle_next = 0;
 
     session->isolation = txn->isolation = saved_isolation;
     WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_INACTIVE);

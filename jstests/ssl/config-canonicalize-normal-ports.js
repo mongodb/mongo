@@ -2,8 +2,8 @@
 
 const mongod = MongoRunner.runMongod({
     tlsOnNormalPorts: "",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
 });
 assert(mongod);
 assert.commandWorked(mongod.getDB("admin").runCommand({hello: 1}));

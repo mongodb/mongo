@@ -23,30 +23,30 @@ const validityMessage = "The provided SSL certificate is expired or not yet vali
 // Test that startup fails with certificate that has yet to become valid.
 const notYetValid = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/not_yet_valid.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("not_yet_valid.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
 };
 runTest("not-yet-valid", notYetValid, validityMessage);
 
 // Test that startup fails with expired certificate.
 const expired = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/expired.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("expired.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
 };
 runTest("expired", expired, validityMessage);
 
 // Test that startup fails with no certificate at all.
 const needKeyFile = "need tlsCertificateKeyFile or certificateSelector when TLS is enabled";
-runTest("no-key-file", {tlsMode: "requireTLS", tlsCAFile: "jstests/libs/ca.pem"}, needKeyFile);
+runTest("no-key-file", {tlsMode: "requireTLS", tlsCAFile: getX509Path("ca.pem")}, needKeyFile);
 
 // Test that startup also fails if only tlsClusterFile is provided
 runTest(
     "cluster-file-only",
     {
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsClusterFile: "jstests/libs/client.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsClusterFile: getX509Path("client.pem"),
     },
     needKeyFile,
 );
@@ -59,7 +59,7 @@ requireSSLProvider(["windows", "apple"], function () {
         "cluster-selector-only",
         {
             tlsMode: "requireTLS",
-            tlsCAFile: "jstests/libs/ca.pem",
+            tlsCAFile: getX509Path("ca.pem"),
             tlsClusterCertificateSelector: selector,
         },
         needKeyFile,
@@ -68,8 +68,8 @@ requireSSLProvider(["windows", "apple"], function () {
     // Test that startup fails if both key file and cert selector are provided
     const keyFileAndSelector = {
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsCertificateKeyFile: "jstests/libs/client.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsCertificateKeyFile: getX509Path("client.pem"),
         tlsCertificateSelector: selector,
     };
     runTest(
@@ -81,8 +81,8 @@ requireSSLProvider(["windows", "apple"], function () {
     // Test that startup fails if both cluster file and cluster cert selector are provided
     const clusterFileAndSelector = {
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsClusterFile: "jstests/libs/client.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsClusterFile: getX509Path("client.pem"),
         tlsClusterCertificateSelector: selector,
     };
     runTest(

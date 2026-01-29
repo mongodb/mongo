@@ -300,6 +300,27 @@ tasks:
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
+  - name: hydrate_bazel_unit_tests
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "bazel_cache_hydration",
+        "auxiliary",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel test"
+        vars:
+          compiling_for_test: true
+          test_timeout_sec: 660 # Allow extra 60s for coredump on abort
+          no_mongo_version: true
+          targets: //src/mongo/...
+          bazel_args: >-
+            --config=remote_unittest
+            --keep_going
+
   - name: run_bazel_clang_tidy
     tags:
       [
@@ -1314,6 +1335,7 @@ task_groups:
       - hydrate_bazel_profile_dbg
       - hydrate_bazel_profile_dbg_aubsan
       - hydrate_bazel_profile_dbg_tsan
+      - hydrate_bazel_unit_tests
 
   - <<: *compile_task_group_template
     name: hydrate_all_headers_TG

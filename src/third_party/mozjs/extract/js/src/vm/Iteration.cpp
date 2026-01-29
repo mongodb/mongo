@@ -39,6 +39,7 @@
 #include "vm/Shape.h"
 #include "vm/StringType.h"
 #include "vm/TypedArrayObject.h"
+#include "vm/Watchtower.h"
 #include "vm/NativeObject-inl.h"
 #include "vm/PlainObject-inl.h"  // js::PlainObject::createWithTemplate
 
@@ -278,6 +279,10 @@ template <bool CheckForDuplicates>
 bool PropertyEnumerator::enumerateNativeProperties(JSContext* cx) {
   Handle<NativeObject*> pobj = obj_.as<NativeObject>();
 
+  if (Watchtower::watchesPropertyValueChange(pobj)) {
+    markIndicesUnsupported();
+  }
+
   // We don't need to iterate over the shape's properties if we're only
   // interested in enumerable properties and the object is known to have no
   // enumerable properties.
@@ -394,7 +399,7 @@ bool PropertyEnumerator::enumerateNativeProperties(JSContext* cx) {
         continue;
       }
 
-      PropertyIndex index = iter->isDataProperty()
+      PropertyIndex index = iter->isDataProperty() && iter->writable()
                                 ? PropertyIndex::ForSlot(pobj, iter->slot())
                                 : PropertyIndex::Invalid();
       if (!enumerate<CheckForDuplicates>(cx, id, iter->enumerable(), index)) {

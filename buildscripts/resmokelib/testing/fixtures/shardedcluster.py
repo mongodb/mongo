@@ -14,6 +14,7 @@ from buildscripts.resmokelib.extensions import (
     find_and_generate_extension_configs,
 )
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
+from buildscripts.resmokelib.utils import certs
 from buildscripts.resmokelib.utils.sharded_cluster_util import (
     inject_catalog_metadata_on_the_csrs,
     refresh_logical_session_cache_with_retry,
@@ -64,7 +65,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             raise ValueError("Cannot specify mongod_options.dbpath")
 
         self.mongos_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongos_options, {})
+            certs.expand_x509_paths(self.fixturelib.default_if_none(mongos_options, {}))
         )
         # The mongotHost and searchIndexManagementHostAndPort options cannot be set on mongos_options yet because
         # the port value is only assigned in MongoDFixture initialization, which happens later.
@@ -72,7 +73,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         # mongod options
         self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {})
+            certs.expand_x509_paths(self.fixturelib.default_if_none(mongod_options, {}))
         )
 
         self.load_all_extensions = load_all_extensions or self.config.LOAD_ALL_EXTENSIONS

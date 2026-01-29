@@ -4,14 +4,14 @@
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // server-intermediate-ca was signed by ca.pem, not trusted-ca.pem
-const VALID_CA = "jstests/libs/ca.pem";
-const INVALID_CA = "jstests/libs/trusted-ca.pem";
+const VALID_CA = getX509Path("ca.pem");
+const INVALID_CA = getX509Path("trusted-ca.pem");
 
 function runTest(inbound, outbound) {
     const mongod = MongoRunner.runMongod({
         tlsMode: "requireTLS",
         tlsAllowConnectionsWithoutCertificates: "",
-        tlsCertificateKeyFile: "jstests/libs/server-intermediate-ca.pem",
+        tlsCertificateKeyFile: getX509Path("server-intermediate-ca.pem"),
         tlsCAFile: outbound,
         tlsClusterCAFile: inbound,
     });
@@ -32,7 +32,7 @@ runTest(VALID_CA, INVALID_CA);
     const mongod = MongoRunner.runMongod({
         tlsMode: "requireTLS",
         tlsAllowConnectionsWithoutCertificates: "",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
         tlsCAFile: VALID_CA,
     });
     assert(mongod);
@@ -48,7 +48,7 @@ runTest(VALID_CA, INVALID_CA);
         "--tlsCAFile",
         VALID_CA,
         "--tlsCertificateKeyFile",
-        "jstests/libs/server-intermediate-ca.pem",
+        getX509Path("server-intermediate-ca.pem"),
         "--eval",
         "1;",
     );
@@ -69,8 +69,8 @@ if (determineSSLProvider() === "apple") {
     const mongod = MongoRunner.runMongod({
         tlsMode: "requireTLS",
         tlsAllowConnectionsWithoutCertificates: "",
-        tlsCertificateKeyFile: "jstests/libs/server-intermediate-leaf.pem",
-        tlsCAFile: "jstests/libs/intermediate-ca-chain.pem",
+        tlsCertificateKeyFile: getX509Path("server-intermediate-leaf.pem"),
+        tlsCAFile: getX509Path("intermediate-ca-chain.pem"),
     });
     assert(mongod);
     assert.eq(mongod.getDB("admin").system.users.find({}).toArray(), []);
@@ -85,7 +85,7 @@ if (determineSSLProvider() === "apple") {
         "--tlsCAFile",
         VALID_CA,
         "--tlsCertificateKeyFile",
-        "jstests/libs/client.pem",
+        getX509Path("client.pem"),
         "--eval",
         "1;",
     );

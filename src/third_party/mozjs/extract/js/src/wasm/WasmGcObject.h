@@ -176,6 +176,13 @@ class WasmArrayObject : public WasmGcObject,
     return offsetToPointer<uint8_t>(offsetOfInlineStorage());
   }
 
+  // Actual array data that follows DataHeader. The array data is a part of the
+  // `inlineStorage`.
+  template <typename T>
+  T* inlineArrayElements() {
+    return offsetToPointer<T>(offsetOfInlineArrayData());
+  }
+
   // This tells us how big the object is if we know the number of inline bytes
   // it was created with.
   static inline constexpr size_t sizeOfIncludingInlineStorage(
@@ -537,9 +544,8 @@ class MOZ_RAII StableWasmArrayObjectElements {
         // elements.
         MOZ_CRASH();
       }
-      std::copy(array->inlineStorage(),
-                array->inlineStorage() + array->numElements_ * sizeof(T),
-                ownElements_->begin());
+      const T* src = array->inlineArrayElements<T>();
+      std::copy(src, src + array->numElements_, ownElements_->begin());
       elements_ = ownElements_->begin();
     } else {
       elements_ = reinterpret_cast<T*>(array->data_);

@@ -38,6 +38,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <memory>
@@ -46,7 +47,7 @@
 
 #include <boost/move/utility_core.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONObj;
 class SaslClientSession;
 
@@ -121,4 +122,4 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
                                    const BSONObj& inputObj,
                                    std::string targetDatabase,
                                    int saslLogLevel);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

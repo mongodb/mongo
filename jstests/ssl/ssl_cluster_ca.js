@@ -48,12 +48,12 @@ const valid_options = {
     tlsMode: "requireTLS",
     // Servers present trusted-server.pem to clients and each other for inbound connections.
     // Peers validate trusted-server.pem using trusted-ca.pem when making those connections.
-    tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
-    tlsCAFile: "jstests/libs/trusted-ca.pem",
+    tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
+    tlsCAFile: getX509Path("trusted-ca.pem"),
     // Servers making outbound connections to other servers present server.pem to their peers
     // which their peers validate using ca.pem.
-    tlsClusterFile: "jstests/libs/server.pem",
-    tlsClusterCAFile: "jstests/libs/ca.pem",
+    tlsClusterFile: getX509Path("server.pem"),
+    tlsClusterCAFile: getX509Path("ca.pem"),
     // SERVER-36895: IP based hostname validation with SubjectAlternateName
     tlsAllowInvalidHostnames: "",
 };
@@ -69,12 +69,12 @@ testRS(wrong_key_file, wrong_key_file, false);
 // Test self-signed clusterFile validated against peer's CAFile
 const cafile_only_options = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidHostnames: "",
     clusterAuthMode: "x509",
 };
-const selfsigned_cluster_file = Object.merge(cafile_only_options, {tlsClusterFile: "jstests/libs/smoke.pem"});
+const selfsigned_cluster_file = Object.merge(cafile_only_options, {tlsClusterFile: getX509Path("smoke.pem")});
 testRS(cafile_only_options, selfsigned_cluster_file, false);
 
 const mongod = MongoRunner.runMongod(valid_options);
@@ -100,7 +100,7 @@ function testConnect(cert, succeed) {
     assert.eq(mongo === 0, succeed);
 }
 
-testConnect("jstests/libs/client.pem", true);
-testConnect("jstests/libs/trusted-client.pem", false);
+testConnect(getX509Path("client.pem"), true);
+testConnect(getX509Path("trusted-client.pem"), false);
 
 MongoRunner.stopMongod(mongod);

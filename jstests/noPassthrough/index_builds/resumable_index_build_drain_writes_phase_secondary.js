@@ -7,9 +7,7 @@
  * required for the commit quorum to be satisfied.
  *
  * @tags: [
- *   # Primary-driven index builds aren't resumable.
- *   # This test uses a failpoint that is only available for hybrid index builds.
- *   primary_driven_index_builds_incompatible,
+ *   requires_index_build_resumability,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,

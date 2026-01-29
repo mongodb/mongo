@@ -639,13 +639,13 @@ public:
             if (resolvedView.has_value()) {
                 // If running explain distinct on view, then aggregate is executed without privilege
                 // checks and without response formatting.
-                uassertStatusOK(ClusterAggregate::retryOnViewError(opCtx,
-                                                                   distinctAggRequest,
-                                                                   *resolvedView,
-                                                                   nss,
-                                                                   PrivilegeVector(),
-                                                                   verbosity,
-                                                                   &bob));
+                uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(opCtx,
+                                                                                distinctAggRequest,
+                                                                                *resolvedView,
+                                                                                nss,
+                                                                                PrivilegeVector(),
+                                                                                verbosity,
+                                                                                &bob));
                 // Skip routingCtx validation here as a new context and routing table will be
                 // acquired for the resolved view.
                 routingCtx.skipValidation();
@@ -674,7 +674,7 @@ public:
                                             true /* isMongos */));
         if (resolvedView.has_value()) {
             // Query against a view.
-            uassertStatusOK(ClusterAggregate::retryOnViewError(
+            uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
                 opCtx, distinctAggRequest, *resolvedView, nss, privileges, verbosity, &bob));
             // Skip routingCtx validation here as new contexts and routing tables will be acquired
             // for the resolved view.

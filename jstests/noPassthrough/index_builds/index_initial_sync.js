@@ -3,7 +3,7 @@
  * the index should not be visible on the secondary until it has processed the commitIndexBuild
  * oplog entry.
  * @tags: [
- *   # TODO(SERVER-110840): Primary-driven index builds don't support draining side writes yet.
+ *   # Primary-driven index builds don't support initial sync.
  *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]

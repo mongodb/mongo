@@ -5,6 +5,7 @@ from typing import Optional
 
 from buildscripts.resmokelib import core, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
+from buildscripts.resmokelib.utils import certs
 
 
 class CPPIntegrationTestCase(interface.ProcessTestCase):
@@ -39,6 +40,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         process_kwargs = copy.deepcopy(self.program_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
         self.program_options["process_kwargs"] = process_kwargs
+        self.program_options = certs.expand_x509_paths(self.program_options)
 
     def _make_process(self):
         return core.programs.generic_program(

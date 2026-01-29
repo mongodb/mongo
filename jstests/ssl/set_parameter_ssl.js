@@ -2,8 +2,8 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-let SERVER_CERT = "jstests/libs/server.pem";
-let CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = getX509Path("server.pem");
+let CA_CERT = getX509Path("ca.pem");
 
 class TransportMode {
     constructor(sslName, tlsName) {

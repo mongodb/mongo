@@ -5,27 +5,26 @@
 import {isUbuntu1804} from "jstests/libs/os_helpers.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-export const OCSP_CA_PEM = "jstests/libs/ocsp/ca_ocsp.pem";
-export const OCSP_CA_CERT = "jstests/libs/ocsp/ca_ocsp.crt";
-export const OCSP_CA_KEY = "jstests/libs/ocsp/ca_ocsp.key";
-export const CLUSTER_CA_CERT = "jstests/libs/ca.pem";
-export const CLUSTER_KEY = "jstests/libs/server.pem";
-export const OCSP_SERVER_CERT = "jstests/libs/ocsp/server_ocsp.pem";
-export const OCSP_NO_OCSP_SERVER_CERT = "jstests/libs/ocsp/server_no_ocsp.pem";
-export const OCSP_CLIENT_CERT = "jstests/libs/ocsp/client_ocsp.pem";
-export const OCSP_SERVER_MUSTSTAPLE_CERT = "jstests/libs/ocsp/server_ocsp_mustStaple.pem";
-export const OCSP_SERVER_CERT_REVOKED = "jstests/libs/ocsp/server_ocsp_revoked.pem";
-export const OCSP_SERVER_CERT_INVALID = "jstests/libs/ocsp/server_ocsp_invalid.pem";
-export const OCSP_RESPONDER_CERT = "jstests/libs/ocsp/ocsp_responder.crt";
-export const OCSP_RESPONDER_KEY = "jstests/libs/ocsp/ocsp_responder.key";
-export const OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM = "jstests/libs/ocsp/intermediate_ca_with_root_ocsp.pem";
-export const OCSP_INTERMEDIATE_CA_ONLY_CERT = "jstests/libs/ocsp/intermediate_ca_only_ocsp.crt";
-export const OCSP_INTERMEDIATE_CA_ONLY_KEY = "jstests/libs/ocsp/intermediate_ca_only_ocsp.key";
+export const OCSP_CA_PEM = getX509Path("ca_ocsp.pem");
+export const OCSP_CA_CERT = getX509Path("ca_ocsp.crt");
+export const OCSP_CA_KEY = getX509Path("ca_ocsp.key");
+export const CLUSTER_CA_CERT = getX509Path("ca.pem");
+export const CLUSTER_KEY = getX509Path("server.pem");
+export const OCSP_SERVER_CERT = getX509Path("server_ocsp.pem");
+export const OCSP_NO_OCSP_SERVER_CERT = getX509Path("server_no_ocsp.pem");
+export const OCSP_CLIENT_CERT = getX509Path("client_ocsp.pem");
+export const OCSP_SERVER_MUSTSTAPLE_CERT = getX509Path("server_ocsp_mustStaple.pem");
+export const OCSP_SERVER_CERT_REVOKED = getX509Path("server_ocsp_revoked.pem");
+export const OCSP_SERVER_CERT_INVALID = getX509Path("server_ocsp_invalid.pem");
+export const OCSP_RESPONDER_CERT = getX509Path("ocsp_responder.crt");
+export const OCSP_RESPONDER_KEY = getX509Path("ocsp_responder.key");
+export const OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM = getX509Path("intermediate_ca_with_root_ocsp.pem");
+export const OCSP_INTERMEDIATE_CA_ONLY_CERT = getX509Path("intermediate_ca_only_ocsp.crt");
+export const OCSP_INTERMEDIATE_CA_ONLY_KEY = getX509Path("intermediate_ca_only_ocsp.key");
 
-export const OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM = "jstests/libs/ocsp/server_signed_by_intermediate_ca_ocsp.pem";
+export const OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM = getX509Path("server_signed_by_intermediate_ca_ocsp.pem");
 
-export const OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM =
-    "jstests/libs/ocsp/server_and_intermediate_ca_appended_ocsp.pem";
+export const OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM = getX509Path("server_and_intermediate_ca_appended_ocsp.pem");
 
 export var clearOCSPCache = function () {
     let provider = determineSSLProvider();

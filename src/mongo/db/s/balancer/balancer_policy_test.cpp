@@ -830,6 +830,36 @@ TEST(BalancerPolicy, BalancerRespectsZonesWhenDraining) {
     ASSERT_EQ(MigrationReason::drain, reason);
 }
 
+TEST(BalancerPolicy, DrainingMigratesOnlyNonJumboChunksWithDoNotForce) {
+    auto [cluster, cm] = generateCluster({{3, 3 * kDefaultMaxChunkSizeBytes, true /* isDraining */},
+                                          {0, 0 * kDefaultMaxChunkSizeBytes, false}});
+    const auto& nonJumboChunk = cluster.second[getShardId(0)][0];
+
+    std::vector<ChunkType> chunks;
+    cm.forEachChunk([&](const auto& chunk) {
+        ChunkType ct{collUUID(), chunk.getRange(), chunk.getLastmod(), chunk.getShardId()};
+        if (chunk.getLastmod() == nonJumboChunk.getVersion())
+            ct.setJumbo(false);
+        else
+            ct.setJumbo(true);
+        chunks.emplace_back(std::move(ct));
+        return true;
+    });
+
+    const auto [migrations, reason] =
+        balanceChunks(cluster.first, makeDistStatus(makeChunkManager(chunks)), false, false);
+
+    // Jumbo chunks are skipped, only the non-jumbo chunk should be migrated.
+    ASSERT_EQ(1U, migrations.size());
+    ASSERT_EQ(getShardId(0), migrations[0].from);
+    ASSERT_EQ(getShardId(1), migrations[0].to);
+    ASSERT_BSONOBJ_EQ(nonJumboChunk.getMin(), migrations[0].minKey);
+    ASSERT_EQ(MigrationReason::drain, reason);
+
+    // Verify migration uses ForceJumbo::kDoNotForce while draining.
+    ASSERT_EQ(ForceJumbo::kDoNotForce, migrations[0].forceJumbo);
+}
+
 TEST(BalancerPolicy, BalancerRespectsZonePolicyBeforeImbalance) {
     // There is a large imbalance between shard0 and shard1, but the balancer must first fix the
     // chunks, which are on a wrong shard due to zone policy

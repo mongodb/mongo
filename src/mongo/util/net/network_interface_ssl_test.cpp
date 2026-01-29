@@ -38,12 +38,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/ssl_options.h"
 
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace executor {
@@ -68,9 +68,11 @@ public:
 
         internalSecurity.setUser(user);
 
-        sslGlobalParams.sslCAFile = "jstests/libs/ca.pem";
+        installDir = std::getenv("INSTALL_DIR");
+
+        sslGlobalParams.sslCAFile = (installDir / "x509/ca.pem").string();
         // Set a client cert that should be ignored if we use the transient cert correctly.
-        sslGlobalParams.sslPEMKeyFile = "jstests/libs/client.pem";
+        sslGlobalParams.sslPEMKeyFile = (installDir / "x509/client.pem").string();
 
         // Set the internal user auth parameters so we auth with X.509 externally
         auth::setInternalUserAuthParams(
@@ -84,10 +86,11 @@ public:
                                                transport::TransportProtocol protocol) override {
         LOGV2(5181101, "Initializing the test connection with transient SSL params");
         ConnectionPool::Options options = makeDefaultConnectionPoolOptions();
-        options.transientSSLParams.emplace([] {
+        options.transientSSLParams.emplace([this]() {
             ClusterConnection clusterConnection;
             clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
-            clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server.pem");
+            clusterConnection.sslClusterPEMPayload =
+                loadFile((installDir / "x509/server.pem").string());
 
             TransientSSLParams params(clusterConnection);
             return params;
@@ -99,6 +102,9 @@ public:
         NetworkInterfaceIntegrationFixture::tearDown();
         resetIsInternalClient(false);
     }
+
+private:
+    std::filesystem::path installDir;
 };
 
 TEST_F(NetworkInterfaceSSLFixture, Ping) {

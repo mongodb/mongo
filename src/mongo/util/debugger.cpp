@@ -34,8 +34,10 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <mutex>
+#include <string_view>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
@@ -145,7 +147,7 @@ void setupSIGTRAPforDebugger() {
     }
 #endif
 #endif
-}
+}  // namespace
 
 /**
  * If the environment variable "MONGODB_WAIT_FOR_DEBUGGER" is set, then raise SIGSTOP signal
@@ -167,4 +169,33 @@ void waitForDebugger() {
 
 #endif
 }
+
+// isDebuggerActive code taken from
+// https://github.com/catchorg/Catch2/blob/v3.12.0/src/catch2/internal/catch_debugger.cpp
+bool isDebuggerActive() {
+#if defined(__linux__)
+    // Preserve `errno`, which might be clobbered by `std::ifstream` operations.
+    struct ErrnoGuard {
+        ~ErrnoGuard() {
+            errno = saved;
+        }
+        int saved = errno;
+    };
+
+    ErrnoGuard errnoGuard;
+    std::ifstream in("/proc/self/status");
+    for (std::string line; std::getline(in, line);) {
+        static constexpr std::string_view prefix("TracerPid:\t");
+        if (line.starts_with(prefix))
+            return line.substr(prefix.size()) != "0";
+    }
+
+    return false;
+#elif defined(_WIN32)
+    return IsDebuggerPresent() != 0;
+#else
+    return false;
+#endif
+}
+
 }  // namespace mongo

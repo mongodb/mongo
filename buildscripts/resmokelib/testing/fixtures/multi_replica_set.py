@@ -4,7 +4,7 @@ import copy
 import os.path
 
 from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.utils import dictionary
+from buildscripts.resmokelib.utils import certs, dictionary
 
 
 class MultiReplicaSetFixture(interface.MultiClusterFixture):
@@ -38,8 +38,13 @@ class MultiReplicaSetFixture(interface.MultiClusterFixture):
             raise ValueError("num_replica_sets must be greater or equal to 2")
         self.num_nodes_per_replica_set = num_nodes_per_replica_set
 
-        self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
-        self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, [])
+        self.common_mongod_options = certs.expand_x509_paths(
+            self.fixturelib.default_if_none(common_mongod_options, {})
+        )
+        self.per_mongod_options = [
+            certs.expand_x509_paths(opts)
+            for opts in self.fixturelib.default_if_none(per_mongod_options, [])
+        ]
         self.common_replica_set_options = common_replica_set_options
         self.per_replica_set_options = self.fixturelib.default_if_none(per_replica_set_options, [])
         self.persist_connection_strings = persist_connection_strings

@@ -6,13 +6,13 @@
  * 1. Trigger the SIGABRT signal from test_wrapper.sh
  * 2. Generate a coredump file
  *
- * When run via the _ci_wrapper target, this test should:
+ * When run via the --run_under=//bazel:test_wrapper param, this test should:
  * - Get killed by SIGABRT after 10 minutes (or 40 on ppc64le/s390x)
  * - Produce a coredump file that gets saved to TEST_UNDECLARED_OUTPUTS_DIR
  *
  * Usage:
  *   bazel test --config=remote_test
- * //buildscripts/bazel_testbuilds:ci_wrapper_timeout_test_ci_wrapper
+ * //buildscripts/bazel_testbuilds:ci_wrapper_timeout_test --run_under=//bazel:test_wrapper
  */
 
 #include "mongo/unittest/assert.h"

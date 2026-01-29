@@ -402,7 +402,7 @@ public:
                 aggRequestOnView.setQuerySettings(querySettings);
             }
 
-            uassertStatusOK(ClusterAggregate::retryOnViewError(
+            uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
                 opCtx, aggRequestOnView, resolvedView, ns(), privileges, verbosity, &bodyBuilder));
         }
 

@@ -1,4 +1,5 @@
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
+load("@poetry//:dependencies.bzl", "dependency")
 
 py_binary(
     name = "rules_lint_format_wrapper",
@@ -24,6 +25,11 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:bazel_custom_formatter",
+        "@bazel_rules_mongo//utils:evergreen_git",
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
     ],
 )
 

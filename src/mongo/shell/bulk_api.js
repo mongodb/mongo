@@ -8,6 +8,9 @@ const WRITE_CONCERN_FAILED = 64;
 
 /**
  * Helper function to define properties
+ * @param {*} self
+ * @param {string} name
+ * @param {*} value
  */
 let defineReadOnlyProperty = function (self, name, value) {
     Object.defineProperty(self, name, {
@@ -26,6 +29,9 @@ let defineReadOnlyProperty = function (self, name, value) {
  *  fsync: waits for data flush (either journal, nor database files depending on server conf)
  *
  * Accepts { w : x, j : x, wtimeout : x, fsync: x } or w, wtimeout, j
+ * @param {*} wValue
+ * @param {number} wTimeout
+ * @param {boolean} jValue
  */
 function WriteConcern(wValue, wTimeout, jValue) {
     if (!(this instanceof WriteConcern)) {
@@ -87,6 +93,9 @@ function WriteConcern(wValue, wTimeout, jValue) {
  * single results & errors (returns the last one if there are multiple).
  * singleBatchType is passed in on bulk operations consisting of a single batch and
  * are used to filter the WriteResult to only include relevant result fields.
+ * @param {*} bulkResult
+ * @param {number} singleBatchType
+ * @param {WriteConcern} writeConcern
  */
 function WriteResult(bulkResult, singleBatchType, writeConcern) {
     if (!(this instanceof WriteResult)) return new WriteResult(bulkResult, singleBatchType, writeConcern);
@@ -195,6 +204,9 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
 
 /**
  * Wraps the result for the commands
+ * @param {*} bulkResult
+ * @param {number} singleBatchType
+ * @param {WriteConcern} writeConcern
  */
 function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
     if (!(this instanceof BulkWriteResult) && !(this instanceof BulkWriteError))
@@ -330,6 +342,11 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
 
 /**
  * Represents a bulk write error, identical to a BulkWriteResult but thrown
+ *
+ * @param {*} bulkResult
+ * @param {number} singleBatchType
+ * @param {WriteConcern} writeConcern
+ * @param {string} message
  */
 function BulkWriteError(bulkResult, singleBatchType, writeConcern, message) {
     if (!(this instanceof BulkWriteError))
@@ -373,6 +390,7 @@ let getEmptyBulkResult = function () {
 
 /**
  * Wraps a command error
+ * @param {*} commandError
  */
 function WriteCommandError(commandError) {
     if (!(this instanceof WriteCommandError)) return new WriteCommandError(commandError);
@@ -409,6 +427,7 @@ WriteCommandError.prototype.constructor = WriteCommandError;
 
 /**
  * Wraps an error for a single write
+ * @param {*} err
  */
 function WriteError(err) {
     if (!(this instanceof WriteError)) return new WriteError(err);

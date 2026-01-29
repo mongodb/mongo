@@ -1,7 +1,7 @@
 // Test that clients support "BEGIN PRIVATE KEY" pems with RSA keys
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
-const CLIENT_CERT = "jstests/libs/client_privatekey.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
+const CLIENT_CERT = getX509Path("client_privatekey.pem");
 
 function authAndTest(port) {
     const mongo = runMongoProgram(

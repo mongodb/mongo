@@ -19,8 +19,8 @@ let shouldFail = function (uri) {
 // Start up a mongod with ssl required.
 let tlsMongo = MongoRunner.runMongod({
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("ca.pem"),
 });
 
 let tlsURI = "mongodb://localhost:" + tlsMongo.port + "/admin";
@@ -36,9 +36,9 @@ let connectWithURI = function (uri) {
         "--tls",
         "--tlsAllowInvalidCertificates",
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--tlsCertificateKeyFile",
-        "jstests/libs/client.pem",
+        getX509Path("client.pem"),
         uri,
         "--eval",
         "db.runCommand({hello: 1})",

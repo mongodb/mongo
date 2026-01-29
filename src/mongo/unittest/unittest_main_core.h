@@ -68,21 +68,19 @@ public:
         : _options{std::move(options)}, _argVec{std::move(argVec)} {}
 
     /**
-     * The `uto` options are validated and take effect within this function.
-     * The `argVec` should have already been parsed to produce `uto`. It isn't used
-     * except for possible user-friendly messaging.
-     * Returns an exit code if the program should immediately end.
-     * This is done as part of `testMain`, but is provided for standalone reuse.
-     */
-    boost::optional<ExitCode> parseAndAcceptOptions();
-
-    /**
-     * Parses and removes flags relevant to test framework.
-     * Call this at the top of main and then call `testMain` later.
+     * Parses and removes flags relevant to test framework. Then performs
+     * initialization, which includes initializing GoogleTest and calling Mongo's
+     * global initializers.
+     *
+     * Call this at the top of main and then call `test` later.
      */
     void initialize();
 
-    /** Call `initializeMain` before calling this. */
+    /**
+     * Calls into GoogleTest's `RUN_ALL_TESTS` and performs post test cleanup.
+     *
+     * Call `initialize` before calling this.
+     */
     int test();
 
     std::vector<std::string>& args() {
@@ -90,6 +88,12 @@ public:
     }
 
 private:
+    /**
+     * Parses, validates, and applies unit test options.
+     * Returns an exit code if the program should immediately end.
+     */
+    boost::optional<ExitCode> _parseAndAcceptOptions();
+
     MainOptions _options;
     std::vector<std::string> _argVec;
 };

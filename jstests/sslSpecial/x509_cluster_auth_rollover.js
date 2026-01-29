@@ -14,8 +14,8 @@ const rst = new ReplSetTest({
     nodeOptions: {
         tlsMode: "preferTLS",
         clusterAuthMode: "x509",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         tlsAllowInvalidHostnames: "",
     },
 });
@@ -96,8 +96,8 @@ const rolloverConfig = function (newConfig) {
 
 jsTestLog("Rolling over CA certificate to combined old and new CA's");
 rolloverConfig({
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/rollover_ca_merged.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("rollover_ca_merged.pem"),
     setParameter: {
         tlsX509ClusterAuthDNOverride: rolloverDN,
     },
@@ -105,8 +105,8 @@ rolloverConfig({
 
 jsTestLog("Rolling over to new certificate with new cluster DN and new CA");
 rolloverConfig({
-    tlsCertificateKeyFile: "jstests/libs/rollover_server.pem",
-    tlsCAFile: "jstests/libs/rollover_ca_merged.pem",
+    tlsCertificateKeyFile: getX509Path("rollover_server.pem"),
+    tlsCAFile: getX509Path("rollover_ca_merged.pem"),
     setParameter: {
         tlsX509ClusterAuthDNOverride: originalDN,
     },
@@ -114,8 +114,8 @@ rolloverConfig({
 
 jsTestLog("Rolling over to new CA only");
 rolloverConfig({
-    tlsCertificateKeyFile: "jstests/libs/rollover_server.pem",
-    tlsCAFile: "jstests/libs/rollover_ca.pem",
+    tlsCertificateKeyFile: getX509Path("rollover_server.pem"),
+    tlsCAFile: getX509Path("rollover_ca.pem"),
 });
 
 rst.stopSet();

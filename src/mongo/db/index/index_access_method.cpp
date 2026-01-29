@@ -230,20 +230,6 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
     return multikeyPaths;
 }
 
-// TODO SERVER-111867: Remove disallowing writes during primary driven index build
-Status allowedToWriteIfIndexBuildInProgress(OperationContext* opCtx,
-                                            const IndexCatalogEntry* entry) {
-    if (entry->indexBuildInterceptor() != nullptr) {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        if (fcvSnapshot.isVersionInitialized() &&
-            feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-            return {ErrorCodes::ConflictingOperationInProgress,
-                    "Cannot write to collection while building primary driven index"};
-        }
-    }
-    return Status::OK();
-}
 }  // namespace
 
 auto& insertFailedDueToDuplicateKeyError =
@@ -479,8 +465,11 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              _newInterface->getContainer(),
                                              keyString.getView(),
                                              keyString.getTypeBitsView());
-            if (auto status = std::get<Status>(result);
-                insertDup && status.isOK() && onDuplicateKey) {
+            if (auto& status = std::get<Status>(result); status == ErrorCodes::KeyExists) {
+                // It's okay if the entire key (including record id) matches a key already inserted.
+                status = Status::OK();
+            } else if (auto status = std::get<Status>(result);
+                       insertDup && status.isOK() && onDuplicateKey) {
                 result = onDuplicateKey(coll, keyString);
             }
         } else {
@@ -1646,11 +1635,6 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
 
-    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
-    if (status = allowedToWriteIfIndexBuildInProgress(opCtx, entry); !status.isOK()) {
-        return status;
-    }
-
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
@@ -1704,10 +1688,6 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
-
-    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
-    uassertStatusOK(allowedToWriteIfIndexBuildInProgress(opCtx, entry));
-
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.

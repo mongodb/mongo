@@ -47,11 +47,8 @@ namespace mongo {
 /**
  * Entry point for the lock manager scheduling functionality. Don't use it directly, but
  * instead go through the Locker interface.
- *
- * TODO (SERVER-113920): Remove the only direct usage of the LockManager outside of the shard local
- * catalog module and make this class MONGO_MOD_PRIVATE
  */
-class MONGO_MOD_USE_REPLACEMENT("Lock Acquisition RAII Classes") LockManager {
+class MONGO_MOD_PRIVATE LockManager {
     LockManager(const LockManager&) = delete;
     LockManager& operator=(const LockManager&) = delete;
 

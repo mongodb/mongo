@@ -2,10 +2,16 @@ globalThis.__quiet = false;
 let __magicNoPrint = {__magicNoPrint: 1111};
 let _verboseShell = false;
 
+/**
+ * @param {string} s
+ */
 function chatty(s) {
     if (!globalThis.__quiet) print(s);
 }
 
+/**
+ * @param {DB} db
+ */
 function reconnect(db) {
     assert.soon(function () {
         try {
@@ -17,6 +23,11 @@ function reconnect(db) {
     });
 }
 
+/**
+ * @param {*} codeOrObj
+ * @param {string} message
+ * @returns {Error}
+ */
 function _getErrorWithCode(codeOrObj, message) {
     let e = new Error(message);
     if (typeof codeOrObj === "object" && codeOrObj !== null) {
@@ -64,9 +75,13 @@ function _getErrorWithCode(codeOrObj, message) {
  * If it exhausts the number of allowed retries, it simply throws the last exception.
  * Additional error codes can also be specified to be retried.
  *
- * Returns the return value of the input call.
+ * @template T
+ * @param {() => T} func Function to execute
+ * @param {number} numRetries Number of retries allowed
+ * @param {number} sleepMs Sleep time in milliseconds between retries
+ * @param {number[]} additionalCodesToRetry Additional error codes to consider retryable
+ * @returns {T} The return value of the input function
  */
-
 function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry) {
     numRetries ||= 1;
     sleepMs ||= 1000;
@@ -97,6 +112,12 @@ function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry
  * error. If it exhausts the number of allowed retries, it simply throws the last exception.
  *
  * Returns the return value of the input call.
+ *
+ * @template T
+ * @param {() => T} func
+ * @param {number} numRetries
+ * @param {number} sleepMs
+ * @returns {T}
  */
 function retryOnNetworkError(func, numRetries, sleepMs) {
     numRetries ||= 1;
@@ -282,6 +303,14 @@ function compareOn(field) {
     };
 }
 
+/**
+ * Capture all print() output from a function execution.
+ *
+ * @template T
+ * @param {(...args: any[]) => T} fn Function to execute
+ * @param {...any} args Arguments to pass to the function
+ * @returns {{output: string[], result: T}} Object containing captured output array and function result
+ */
 print.captureAllOutput = function (fn, ...args) {
     let res = {};
     res.output = [];

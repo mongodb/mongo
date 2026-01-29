@@ -2,9 +2,6 @@
  * This test ensures that $vectorSearch works with an $addFields view pipeline.
  *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
- *
- * TODO SERVER-106939: Run $vectorSearch with and without storedSource.
- *
  */
 import {
     createMoviesViewAndIndex,

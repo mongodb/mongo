@@ -4,9 +4,6 @@
  * index build to confirm that the resulting behavior is failure.
  *
  * @tags: [
- *   # TODO (SERVER-107052): Remove this exclusion once primary-driven index builds handle concurrent
- *   # writes and TODO (SERVER-111867): Remove once primary-driven index builds support side writes.
- *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */
@@ -171,7 +168,7 @@ let runTest = function (config) {
         case 4:
             doDuringFailpoint(
                 "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
-                new RegExp('"id":4841707'),
+                new RegExp('"id":(4841707|7568001)'),
                 buildIndex,
                 doOperation,
             );

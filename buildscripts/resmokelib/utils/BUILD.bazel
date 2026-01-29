@@ -7,6 +7,7 @@ py_library(
         "archival.py",
         "autoloader.py",
         "batched_baggage_span_processor.py",
+        "certs.py",
         "check_has_tag.py",
         "dictionary.py",
         "evergreen_conn.py",

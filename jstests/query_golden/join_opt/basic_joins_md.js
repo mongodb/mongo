@@ -18,6 +18,8 @@ assert.commandWorked(
         {_id: 0, a: 1, b: "foo"},
         {_id: 1, a: 1, b: "bar"},
         {_id: 2, a: 2, b: "bar"},
+        {_id: 3, a: null, b: "bar"},
+        {_id: 4, b: "bar"},
     ]),
 );
 
@@ -29,6 +31,8 @@ assert.commandWorked(
         {_id: 0, a: 1, c: "zoo", d: 1},
         {_id: 1, a: 2, c: "blah", d: 2},
         {_id: 2, a: 2, c: "x", d: 3},
+        {_id: 3, a: null, c: "x", d: 4},
+        {_id: 4, c: "x", d: 5},
     ]),
 );
 
@@ -38,6 +42,7 @@ assert.commandWorked(
     foreignColl2.insertMany([
         {_id: 0, b: "bar", d: 2},
         {_id: 1, b: "bar", d: 6},
+        {_id: 2, b: "baz", d: 7},
     ]),
 );
 

@@ -41,12 +41,20 @@
       - rolling_index_builds
       - requires_commit_quorum
       - requires_capped
+      - requires_rollbacks
+      # Primary-driven index builds are not resumable.
+      - requires_index_build_resumability
       # Tests marked with this tag are excluded because primary-driven index builds do not restart
       # on failover (or that was otherwise the last known reason).
       # This is also an easy way to identify and control tests specifically excluded as part of 111661.
       # TODO SERVER-112247, TODO SERVER-112251: We may be able to enable this test if either we
       # emulate this restart behavior while testing, or when resumability is added.
       - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
+- name: exclude_primary_driven_index_builds_incompatible_with_retryable_writes_tag
+  value:
+    exclude_with_any_tags:
+      # TODO (SERVER-116395): Remove this tag.
+      - primary_driven_index_builds_incompatible_with_retryable_writes
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

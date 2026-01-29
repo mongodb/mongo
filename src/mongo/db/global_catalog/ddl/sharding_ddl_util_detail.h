@@ -167,8 +167,12 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedVersionedCommandTarg
                         originalOpts->exec, opCtx, shardId, readPref);
                 auto shard =
                     uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+                Shard::RetryStrategy::RequestStartTransactionState startTxnState =
+                    originalOpts->cmd.getStartTransaction().value_or(false)
+                    ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+                    : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
                 auto retryStrategy = std::make_shared<Shard::OwnerRetryStrategy>(
-                    shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+                    shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTxnState);
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
                     originalOpts->exec, cancelSource.token(), std::move(request), retryStrategy);
                 futures.push_back(
@@ -209,8 +213,13 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                         originalOpts->exec, opCtx, shardIds[i], readPref);
                 auto shard = uassertStatusOK(
                     Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
+                Shard::RetryStrategy::RequestStartTransactionState startTxnState =
+                    originalOpts->cmd.getStartTransaction().value_or(false)
+                    ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+                    : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
                 auto retryStrategy = std::make_shared<Shard::OwnerRetryStrategy>(
-                    shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+                    shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTxnState);
+
                 auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
                     originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryStrategy);
                 if (shardVersions) {

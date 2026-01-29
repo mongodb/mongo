@@ -12,8 +12,8 @@ import {CA_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 function test(suppress) {
     const opts = {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         waitForConnect: false,
         tlsAllowConnectionsWithoutCertificates: "",
         setParameter: {suppressNoTLSPeerCertificateWarning: suppress},

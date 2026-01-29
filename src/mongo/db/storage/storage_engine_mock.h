@@ -136,7 +136,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void setLastMaterializedLsn(uint64_t lsn) final {}
+    void setLastMaterializedLsn(uint64_t lsn) final {
+        _lastSetMaterializedLsn = lsn;
+    }
 
     void setRecoveryCheckpointMetadata(StringData checkpointMetadata) final {}
 
@@ -297,6 +299,13 @@ public:
     bool hasOngoingLiveRestore() final {
         return false;
     }
+
+    uint64_t getLastSetMaterializedLsn() const {
+        return _lastSetMaterializedLsn;
+    }
+
+private:
+    uint64_t _lastSetMaterializedLsn;
 };
 
 }  // namespace mongo

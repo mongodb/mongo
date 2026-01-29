@@ -2,8 +2,8 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
 
 const INTERNAL_USER = "CN=internal,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const SERVER_USER = "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";

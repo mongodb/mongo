@@ -92,8 +92,15 @@ if (topology.type === Topology.kShardedCluster) {
             const shard = topology.shards[shardName];
 
             if (shard.type === Topology.kReplicaSet) {
+                // Use primary if available, otherwise fall back to the first node.
+                let rst;
+                if (shard.primary) {
+                    rst = new ReplSetTest(shard.primary);
+                } else {
+                    assert(shard.nodes[0], "Shard has no primary and no nodes");
+                    rst = new ReplSetTest(shard.nodes[0]);
+                }
                 // Await replication to ensure all of the shards are queryable.
-                const rst = new ReplSetTest(shard.primary);
                 rst.awaitReplication();
                 rst.nodes.forEach((node) => {
                     takeAction(node, operation);

@@ -4,6 +4,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
+ *   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
  * ]
  */
 const testDB = db.getSiblingDB("findAndModifyAPIVersion");

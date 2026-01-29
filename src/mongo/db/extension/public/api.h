@@ -633,6 +633,7 @@ typedef struct MongoExtensionNamespaceString {
 typedef struct MongoExtensionCatalogContext {
     const ::MongoExtensionNamespaceString namespaceString;
     const MongoExtensionByteView uuidString;
+    const uint8_t inRouter;
 } MongoExtensionCatalogContext;
 
 /**

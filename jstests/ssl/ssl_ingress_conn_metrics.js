@@ -19,8 +19,8 @@ let cipherSuite = "TLS_AES_256_GCM_SHA384";
 const mongodOptions = (connectionHealthLoggingOn) => {
     let options = {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         setParameter: {
             opensslCipherSuiteConfig: cipherSuite,
             enableDetailedConnectionHealthMetricLogLines: connectionHealthLoggingOn,
@@ -39,9 +39,9 @@ function testConn(mongod) {
         mongod.port,
         "--tls",
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--tlsCertificateKeyFile",
-        "jstests/libs/client.pem",
+        getX509Path("client.pem"),
         "--eval",
         ";",
     );

@@ -2440,11 +2440,10 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
-    testViewPolicyHelper(
-        _nss,
-        MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend,
-        ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
-        NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault()));
+    testViewPolicyHelper(_nss,
+                         MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend,
+                         ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
+                         viewNss.coll().data());
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
@@ -2452,11 +2451,10 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
 
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
-    testViewPolicyHelper(
-        _nss,
-        MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
-        ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
-        NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault()));
+    testViewPolicyHelper(_nss,
+                         MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
+                         ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
+                         viewNss.coll().data());
 }
 
 }  // namespace mongo::extension

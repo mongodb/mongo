@@ -6,8 +6,6 @@
  *
  * @tags: [
  *   requires_replication,
- *   # TODO SERVER-111867: Remove once primary-driven index builds support side writes.
- *   primary_driven_index_builds_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -115,11 +113,8 @@ fpSecondaryDrain.off();
 fpPrimarySetup.off();
 awaitCreateIndex();
 
-// TODO(SERVER-110846): Possibly re-enable this check.
-if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
-    // The skipped document is resolved, and causes the index to flip to multikey.
-    // "Index set to multi key ..."
-    checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
-}
+// The skipped document is resolved, and causes the index to flip to multikey.
+// "Index set to multi key ..."
+checkLog.containsJson(secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
 
 replTest.stopSet();

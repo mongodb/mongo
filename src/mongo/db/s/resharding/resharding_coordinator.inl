@@ -1264,6 +1264,9 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                            [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
                                std::map<ShardId, ShardVersion> donorShardVersions;
                                {
+                                   uassertStatusOK(routingInformationCache
+                                                       ->getCollectionPlacementInfoWithRefresh(
+                                                           opCtx, _coordinatorDoc.getSourceNss()));
                                    auto cri = uassertStatusOK(
                                        routingInformationCache->getCollectionRoutingInfoAt(
                                            opCtx,

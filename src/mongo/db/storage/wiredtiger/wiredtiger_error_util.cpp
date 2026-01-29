@@ -183,7 +183,7 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     auto s = generateContextStrStream(prefix, errContext.c_str(), retCode);
 
     if (retCode == WT_DUPLICATE_KEY) {
-        return Status(ErrorCodes::DuplicateKey, s);
+        return Status(ErrorCodes::KeyExists, s);
     }
     if (retCode == WT_NOTFOUND) {
         return Status(ErrorCodes::NoSuchKey, s);

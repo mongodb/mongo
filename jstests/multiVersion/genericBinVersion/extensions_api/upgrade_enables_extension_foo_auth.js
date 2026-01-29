@@ -13,16 +13,18 @@
  */
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {
-    assertFooStageAccepted,
-    assertFooStageRejected,
     setupCollection,
-} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/upgrade_enables_extension_foo_utils.js";
-import {
-    extensionNodeOptions,
-    generateMultiversionExtensionConfigs,
+    assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+    assertFooViewCreationAllowedAndExtensionVectorSearchUsed,
+    assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+    assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed,
+    assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed,
+    assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed,
+    generateUpgradeEnablesExtensionConfigs,
     deleteMultiversionExtensionConfigs,
     wrapOptionsWithStubParserFeatureFlag,
-} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
+    multipleExtensionNodeOptions,
+} from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_upgrade_downgrade_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
@@ -31,30 +33,39 @@ if (!isLinux()) {
     quit();
 }
 
-const extensionNames = generateMultiversionExtensionConfigs();
+const extensionNames = generateUpgradeEnablesExtensionConfigs();
+const ifrFlags = {
+    featureFlagVectorSearchExtension: true,
+};
 
 try {
-    const fooOptions = extensionNodeOptions(extensionNames[0]);
-    const upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(fooOptions);
+    const fooAndVectorSearchOptions = multipleExtensionNodeOptions([extensionNames[0], extensionNames[1]]);
+    const upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(fooAndVectorSearchOptions);
     testPerformUpgradeReplSet({
         upgradeNodeOptions,
+        ifrFlags,
         setupFn: setupCollection,
-        whenFullyDowngraded: assertFooStageRejected,
+        whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
         // TODO SERVER-115501 Add validation.
         whenSecondariesAreLatestBinary: () => {},
-        whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
-        whenFullyUpgraded: assertFooStageAccepted,
+        whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+        whenIfrFlagsAreToggled: assertFooViewCreationAllowedAndExtensionVectorSearchUsed,
+        whenFullyUpgraded: assertFooViewCreationAllowedAndExtensionVectorSearchUsed,
     });
 
     testPerformUpgradeSharded({
         upgradeNodeOptions,
+        ifrFlags,
         setupFn: setupCollection,
-        whenFullyDowngraded: assertFooStageRejected,
-        whenOnlyConfigIsLatestBinary: assertFooStageRejected,
-        whenSecondariesAndConfigAreLatestBinary: assertFooStageRejected,
-        whenMongosBinaryIsLastLTS: assertFooStageRejected,
-        whenBinariesAreLatestAndFCVIsLastLTS: assertFooStageAccepted,
-        whenFullyUpgraded: assertFooStageAccepted,
+        whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+        whenOnlyConfigIsLatestBinary: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+        whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+        whenMongosBinaryIsLastLTS: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+        whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+        whenOnlyRouterHasIFRFlag: assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed,
+        whenOnlyShardHasIFRFlag: assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed,
+        whenIfrFlagsAreToggled: assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed,
+        whenFullyUpgraded: assertFooViewCreationAllowedAndExtensionVectorSearchUsed,
     });
 } finally {
     deleteMultiversionExtensionConfigs(extensionNames);

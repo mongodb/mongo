@@ -174,7 +174,7 @@ std::vector<bool> makeFromMigrateForInserts(
 
     // Overriding the 'fromMigrate' flag makes sense only for requests coming from clients
     // directly connected to shards.
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
+    if (OperationShardingState::isVersioned(opCtx, nss)) {
         return fromMigrate;
     }
 

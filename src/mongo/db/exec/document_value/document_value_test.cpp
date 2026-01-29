@@ -636,6 +636,62 @@ TEST(DocumentMerge, SubDocumentsAreMergedRecursively) {
     ASSERT_EQ(4, mergedDoc["key"]["f"]["g"].getInt());
 }
 
+TEST(DocumentPeek, ValueFromPeekIsNotAffectedByMutableDocumentChanges) {
+    // Create a MutableDocument with initial fields
+    MutableDocument md;
+    md.addField("a", Value(1));
+    md.addField("b", Value("test"_sd));
+    md.addField("c", Value(3.14));
+
+    // Save Value created from peek()
+    Value peekedValue = Value(md.peek());
+
+    // Verify the initial state
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["a"], Value(1));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"_sd));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["c"], Value(3.14));
+    ASSERT_EQUALS(3ULL, peekedValue.getDocument().computeSize());
+
+    // Modify the MutableDocument
+    md.setField("a", Value(999));
+    md.setField("b", Value("modified"_sd));
+    md.addField("d", Value("new"_sd));
+    md.remove("c");
+
+    // Verify the peeked Value is unchanged
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["a"], Value(1));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["b"], Value("test"_sd));
+    ASSERT_VALUE_EQ(peekedValue.getDocument()["c"], Value(3.14));
+    ASSERT_EQUALS(3ULL, peekedValue.getDocument().computeSize());
+    ASSERT(peekedValue.getDocument()["d"].missing());
+
+    // Verify the MutableDocument itself has changed
+    ASSERT_VALUE_EQ(md.peek()["a"], Value(999));
+    ASSERT_VALUE_EQ(md.peek()["b"], Value("modified"_sd));
+    ASSERT_VALUE_EQ(md.peek()["d"], Value("new"_sd));
+    ASSERT(md.peek()["c"].missing());
+    ASSERT_EQUALS(3ULL, md.peek().computeSize());
+
+    // Test with nested documents
+    MutableDocument nestedMd;
+    nestedMd.addField("outer", Value(1));
+    nestedMd.addField("inner", Value(DOC("field" << 2)));
+
+    Value nestedPeekedValue = Value(nestedMd.peek());
+
+    // Modify nested field
+    nestedMd["inner"]["field"] = Value(999);
+    nestedMd["outer"] = Value(888);
+
+    // Verify peeked value is unchanged
+    ASSERT_VALUE_EQ(nestedPeekedValue.getDocument()["outer"], Value(1));
+    ASSERT_VALUE_EQ(nestedPeekedValue.getDocument()["inner"]["field"], Value(2));
+
+    // Verify MutableDocument has changed
+    ASSERT_VALUE_EQ(nestedMd.peek()["outer"], Value(888));
+    ASSERT_VALUE_EQ(nestedMd.peek()["inner"]["field"], Value(999));
+}
+
 /** Add Document fields. */
 class AddField {
 public:

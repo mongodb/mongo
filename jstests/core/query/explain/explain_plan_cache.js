@@ -26,6 +26,7 @@ import {
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
@@ -89,6 +90,8 @@ function predicateTest(explainMode) {
     coll.createIndex({a: -1, b: 1});
     coll.createIndex({b: -1, a: 1});
 
+    const topLevelOrUsesSubPlanning = getPlanRankerMode(db) === "automaticCE";
+
     // Nothing should be cached at first.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 1}}).explain(explainMode), false);
     assertWinningPlanCacheStatus(getAggPlannerExplain(explainMode, [{$match: {a: 1}}, {$unwind: "$d"}]), false);
@@ -114,7 +117,7 @@ function predicateTest(explainMode) {
     // isn't enabled. However when SBE is fully enabled, we cache the full plan.
     assertWinningPlanCacheStatus(
         coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode),
-        isUsingSbePlanCache,
+        isUsingSbePlanCache || topLevelOrUsesSubPlanning,
     );
 
     // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the

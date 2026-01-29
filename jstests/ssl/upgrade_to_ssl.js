@@ -16,7 +16,7 @@ let opts = {
     tlsCertificateKeyFile: SERVER_CERT,
     tlsAllowInvalidCertificates: "",
     tlsAllowConnectionsWithoutCertificates: "",
-    tlsCAFile: "jstests/libs/ca.pem",
+    tlsCAFile: getX509Path("ca.pem"),
 };
 let rst = new ReplSetTest({name: "tlsSet", nodes: 3, nodeOptions: opts});
 rst.startSet();

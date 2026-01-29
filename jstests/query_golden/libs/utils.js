@@ -185,7 +185,7 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
             `"errors": ${padNumber(totalErrors)}},`,
     );
 
-    const parameters = {
+    let parameters = {
         planRankerMode: null,
         samplingMarginOfError: null,
         samplingConfidenceInterval: null,
@@ -194,6 +194,12 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
     };
 
     for (const param in parameters) {
+        const result = db.adminCommand({getParameter: 1, [param]: 1});
+        parameters[param] = result[param];
+    }
+
+    if (parameters["planRankerMode"] === "automaticCE") {
+        const param = "automaticCEPlanRankingStrategy";
         const result = db.adminCommand({getParameter: 1, [param]: 1});
         parameters[param] = result[param];
     }

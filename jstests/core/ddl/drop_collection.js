@@ -13,9 +13,6 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// TODO SERVER-114640 Remove this line once aggregate won't report NamespaceNotFound if the db gets dropped.
-TestData.pinToSingleMongos = true;
-
 let _collCounter = 0;
 function getNewColl(db) {
     const collNamePrefix = jsTestName() + "_coll_";

@@ -7,6 +7,7 @@ readonly k_test_path="$1"
 return_code=1
 
 export PATH="$(dirname "$k_mongo"):$PATH"
+export INSTALL_DIR="$(dirname "$k_mongo")"
 
 function print_err() {
     echo "$@" >&2

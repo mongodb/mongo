@@ -4,6 +4,9 @@ import pathlib
 import subprocess
 from typing import List, Union
 
+from git import Repo
+from utils.evergreen_git import get_mongodb_remote
+
 from buildscripts.bazel_custom_formatter import (
     validate_bazel_groups,
     validate_clang_tidy_configs,
@@ -178,8 +181,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--origin-branch",
-        help="The branch to use as the fork point for changed files",
-        default="origin/master",
+        help="The branch to use as the fork point for changed files (example: origin/master)",
+        default="auto",
     )
     parser.add_argument(
         "--file",
@@ -192,15 +195,20 @@ def main() -> int:
 
     os.chdir(default_dir)
 
+    origin_branch = args.origin_branch
+    if origin_branch == "auto":
+        remote = get_mongodb_remote(Repo())
+        origin_branch = f"{remote.name}/master"
+
     files_to_format = "all"
     if args.file:
         files_to_format = [str(args.file)]
     elif not args.all:
         max_distance = 100
-        distance = _git_distance([f"{args.origin_branch}..HEAD"])
+        distance = _git_distance([f"{origin_branch}..HEAD"])
         if distance > max_distance:
             print(
-                f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
+                f"The number of commits between current branch and origin branch ({origin_branch}) is too large: {distance} commits (> {max_distance} commits)."
             )
             print("WARNING!!! Defaulting to formatting all files, this may take a while.")
             print(
@@ -208,7 +216,7 @@ def main() -> int:
             )
             args.all = True
         else:
-            files_to_format = _get_files_changed_since_fork_point(args.origin_branch)
+            files_to_format = _get_files_changed_since_fork_point(origin_branch)
 
     def files_to_format_contains_bazel_file(files: Union[List[str], str]) -> bool:
         if files == "all":

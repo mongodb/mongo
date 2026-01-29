@@ -1,7 +1,7 @@
 // Test X509 auth with custom OIDs.
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
 
 function testClient(conn, name) {
     let auth = {mechanism: "MONGODB-X509"};
@@ -15,7 +15,7 @@ function testClient(conn, name) {
         "--tls",
         "--tlsAllowInvalidHostnames",
         "--tlsCertificateKeyFile",
-        "jstests/libs/client-multivalue-rdn.pem",
+        getX509Path("client-multivalue-rdn.pem"),
         "--tlsCAFile",
         CA_CERT,
         "--port",

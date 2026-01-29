@@ -82,7 +82,8 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
     auto cappedTrialsConfig = trial_period::TrialPhaseConfig{
         .maxNumWorksPerPlan = internalQueryPlanEvaluationWorks.load() / solutionsSize,
-        .targetNumResults = trialsConfig.targetNumResults};
+        .targetNumResults = trialsConfig.targetNumResults,
+        .isCappedTrialPhase = true};
     auto mpTrialsStatus = _multiPlanner->runTrials(cappedTrialsConfig);
     if (!mpTrialsStatus.isOK()) {
         return mpTrialsStatus;

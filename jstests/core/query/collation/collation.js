@@ -1219,8 +1219,10 @@ var mapReduceOut = coll.mapReduce(
 assert.commandWorked(mapReduceOut);
 assert.eq(mapReduceOut.results.length, 0);
 
-// mapReduce should correctly combine results when no collation is specified and the collection has
-// a default collation.
+// mapReduce should fail when source and destination have mismatched collations.
+// TODO SERVER-117493 We temporarily accept both failure and success here, as
+// the sharded case still succeeds. We should make it fail in the sharded case
+// as well.
 coll = testDb.collation_mapreduce4;
 const outCollName = coll.getName() + "_outcoll";
 const outColl = testDb[outCollName];
@@ -1232,7 +1234,7 @@ assert.commandWorked(coll.insert({_id: 1, str: "foo", amt: 100}));
 assert.commandWorked(coll.insert({_id: 2, str: "FOO", amt: 200}));
 assert.commandWorked(coll.insert({_id: 3, str: "foo", amt: 300}));
 assert.commandWorked(coll.insert({_id: 4, str: "FOO", amt: 400}));
-assert.commandWorked(
+try {
     coll.mapReduce(
         function () {
             emit(this.str, this.amt);
@@ -1241,13 +1243,14 @@ assert.commandWorked(
             return Array.sum(values);
         },
         {out: {reduce: outCollName}},
-    ),
-);
-
-// Using the case insensitive collation should leave us with a single result.
-const mrResult = outColl.find().toArray();
-assert.eq(mrResult.length, 1, mrResult);
-assert.eq(mrResult[0].value, 1000, mrResult);
+    );
+    // Using the case insensitive collation should leave us with a single result.
+    const mrResult = outColl.find().toArray();
+    assert.eq(mrResult.length, 1, mrResult);
+    assert.eq(mrResult[0].value, 1000, mrResult);
+} catch (error) {
+    assert.commandFailedWithCode(error, 51183);
+}
 
 //
 // Collation tests for remove.

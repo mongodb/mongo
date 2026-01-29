@@ -289,6 +289,10 @@ public:
             true /* ignoreRemovedShards */);
     }
 
+    void disablePreciseTargetingFeatureFlag() {
+        _scopedFeatureFlagEnabled.reset();
+    }
+
 private:
     /**
     * Given the desired number of shards n, generates a vector of n ShardType objects (in BSON
@@ -319,6 +323,14 @@ private:
 
     std::unique_ptr<DDLCoordinatorServiceMock> _recoverable =
         std::make_unique<DDLCoordinatorServiceMock>();
+
+    // Calls to ShardingCatalogManager::getHistoricalPlacement() require the feature flag for V2
+    // change stream readers to be enabled.
+    // TODO (SERVER-98118): Delete this field once featureFlagChangeStreamPreciseShardTargeting
+    // reaches last-lts.
+    std::unique_ptr<RAIIServerParameterControllerForTest> _scopedFeatureFlagEnabled =
+        std::make_unique<RAIIServerParameterControllerForTest>(
+            "featureFlagChangeStreamPreciseShardTargeting", true);
 };
 
 TEST_F(GetHistoricalPlacementTestFixture, queriesOnShardedCollectionReturnExpectedPlacement) {
@@ -4785,6 +4797,43 @@ TEST_F(
                                                 : ChangeStreamReadMode::kStrict)
                 .value,
             historicalPlacement);
+    }
+}
+
+TEST_F(GetHistoricalPlacementTestFixture,
+       TargetingQueriesReturnNotAvailableResponseWhenFeatureFlagIsDisabled) {
+    auto opCtx = operationContext();
+
+    // Set up a consistent cluster representation in config.placementHistory
+    Timestamp placementHistoryTs(10, 0);
+    setupConfigPlacementHistory(opCtx,
+                                {{placementHistoryTs, "db", {"shard1"}},
+                                 {placementHistoryTs, "db.collection1", {"shard1", "shard2"}}});
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    setShardIdsInShardRegistry(opCtx, {"shard1", "shard2"});
+
+    disablePreciseTargetingFeatureFlag();
+
+    std::vector<boost::optional<NamespaceString>> queriableNamespaces{
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        NamespaceString::createNamespaceString_forTest("db"),
+        boost::none};
+
+    for (const auto& ns : queriableNamespaces) {
+        for (const auto ignoreRemovedShards : {true, false}) {
+            for (const auto checkIfPointInTimeIsInFuture : {true, false}) {
+                auto historicalPlacement =
+                    shardingCatalogManager().getHistoricalPlacement(opCtx,
+                                                                    ns,
+                                                                    placementHistoryTs,
+                                                                    checkIfPointInTimeIsInFuture,
+                                                                    ignoreRemovedShards);
+
+                ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
+                ASSERT(historicalPlacement.getShards().empty());
+            }
+        }
     }
 }
 

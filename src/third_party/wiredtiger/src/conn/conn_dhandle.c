@@ -288,8 +288,22 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
     bucket = __wt_hash_city64(uri, strlen(uri)) & (conn->dh_hash_size - 1);
     if (checkpoint == NULL) {
         TAILQ_FOREACH (dhandle, &conn->dhhash[bucket], hashq) {
-            if (F_ISSET(dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_OUTDATED))
+            if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
                 continue;
+            if (F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) {
+                /*
+                 * For read-only stable table checkpoints, they are really outdated when they are
+                 * not in use any more. The pinned shared history store checkpoints may be still
+                 * needed by the readers while the stable table checkpoints may still be needed by
+                 * the checkpoint tracking logic.
+                 */
+                if (WT_DHANDLE_BTREE(dhandle) &&
+                  F_ISSET((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
+                    if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0)
+                        continue;
+                } else
+                    continue;
+            }
             if (dhandle->checkpoint == NULL && strcmp(uri, dhandle->name) == 0) {
                 session->dhandle = dhandle;
                 return (0);

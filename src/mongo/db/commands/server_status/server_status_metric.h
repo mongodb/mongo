@@ -362,9 +362,9 @@ private:
     T _v;
 };
 
-template <>
-struct ServerStatusMetricPolicySelection<Counter64> {
-    using type = CounterMetricPolicy<Counter64>;
+template <std::derived_from<Counter64> CounterType>
+struct ServerStatusMetricPolicySelection<CounterType> {
+    using type = CounterMetricPolicy<CounterType>;
 };
 
 template <>

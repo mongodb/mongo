@@ -67,7 +67,10 @@ std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MakePipelineOptions opts) {
     LiteParsedPipeline liteParsedPipeline =
-        LiteParsedPipeline(expCtx->getNamespaceString(), rawPipeline);
+        LiteParsedPipeline(expCtx->getNamespaceString(),
+                           rawPipeline,
+                           false,
+                           LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
 
     if (opts.desugar) {
         LiteParsedDesugarer::desugar(&liteParsedPipeline);
@@ -125,7 +128,10 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
     }
 
     LiteParsedPipeline liteParsedPipeline =
-        LiteParsedPipeline(expCtx->getNamespaceString(), aggRequest.getPipeline());
+        LiteParsedPipeline(expCtx->getNamespaceString(),
+                           aggRequest.getPipeline(),
+                           false,
+                           LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
 
     if (opts.desugar) {
         LiteParsedDesugarer::desugar(&liteParsedPipeline);

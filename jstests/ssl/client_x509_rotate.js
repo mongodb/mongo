@@ -8,13 +8,13 @@ import {
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
-const OLD_CA = "jstests/libs/ca.pem";
-const OLD_CLIENT = "jstests/libs/client.pem";
-const OLD_SERVER = "jstests/libs/server.pem";
+const OLD_CA = getX509Path("ca.pem");
+const OLD_CLIENT = getX509Path("client.pem");
+const OLD_SERVER = getX509Path("server.pem");
 
-const NEW_CA = "jstests/libs/trusted-ca.pem";
-const NEW_CLIENT = "jstests/libs/trusted-client.pem";
-const NEW_SERVER = "jstests/libs/trusted-server.pem";
+const NEW_CA = getX509Path("trusted-ca.pem");
+const NEW_CLIENT = getX509Path("trusted-client.pem");
+const NEW_SERVER = getX509Path("trusted-server.pem");
 
 (function () {
     let mongos;
@@ -32,7 +32,7 @@ const NEW_SERVER = "jstests/libs/trusted-server.pem";
     // rotate, and make sure it can communicate with ONLY that shard after a rotate.
     const mongosOptions = {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
         tlsCAFile: dbPath + "/ca-test.pem",
         tlsClusterFile: dbPath + "/client-test.pem",
         tlsAllowInvalidHostnames: "",

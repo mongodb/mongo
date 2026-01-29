@@ -3,17 +3,17 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isMacOS} from "jstests/ssl/libs/ssl_helpers.js";
 
-const kServerAuthClientCert = "jstests/libs/client_with_serverAuth_eku.pem";
-const kBothEKUsClientCert = "jstests/libs/client_with_serverAuth_and_clientAuth_eku.pem";
-const kNoEKUsClientCert = "jstests/libs/client_without_eku.pem";
-const kClientAuthClientCert = "jstests/libs/client.pem";
+const kServerAuthClientCert = getX509Path("client_with_serverAuth_eku.pem");
+const kBothEKUsClientCert = getX509Path("client_with_serverAuth_and_clientAuth_eku.pem");
+const kNoEKUsClientCert = getX509Path("client_without_eku.pem");
+const kClientAuthClientCert = getX509Path("client.pem");
 
-const kClientAuthServerCert = "jstests/libs/server_with_clientAuth_eku.pem";
-const kBothEKUsServerCert = "jstests/libs/server.pem";
-const kNoEKUsServerCert = "jstests/libs/server_without_eku.pem";
-const kServerAuthServerCert = "jstests/libs/server_with_serverAuth_eku.pem";
+const kClientAuthServerCert = getX509Path("server_with_clientAuth_eku.pem");
+const kBothEKUsServerCert = getX509Path("server.pem");
+const kNoEKUsServerCert = getX509Path("server_without_eku.pem");
+const kServerAuthServerCert = getX509Path("server_with_serverAuth_eku.pem");
 
-const kCACert = "jstests/libs/ca.pem";
+const kCACert = getX509Path("ca.pem");
 
 function testClientAuthEKU(conn, clientCert, shouldFail) {
     clearRawMongoProgramOutput();
@@ -24,7 +24,7 @@ function testClientAuthEKU(conn, clientCert, shouldFail) {
         "--tlsCertificateKeyFile",
         clientCert,
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--port",
         conn.port,
         "--eval",
@@ -91,8 +91,8 @@ function testServerAuthEKU(serverCert, shouldFail) {
         auth: "",
         tlsMode: "requireTLS",
         // Server PEM file is server.pem to match the shell's ca.pem.
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
+        tlsCAFile: getX509Path("ca.pem"),
         tlsAllowInvalidCertificates: "",
     });
     testClientAuthEKU(mongod, kClientAuthClientCert, false /* shouldFail */);

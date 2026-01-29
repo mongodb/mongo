@@ -1046,8 +1046,6 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // require reparse from the modified LPP).
     // TODO SPM-4488: Once query shape can be generated from LiteParsed, a reparse will no
     // longer be required. Simplify the logic as such.
-    // TODO SERVER-117322 Increase the reparse granularity here so that we only reparse stages that
-    // have been modified by desugaring or view processing.
     auto desugaredLPP = aggExState.getOriginalLiteParsedPipeline().clone();
     const auto desugaredHere = LiteParsedDesugarer::desugar(&desugaredLPP);
     auto secondParseRequirement =
@@ -1148,7 +1146,7 @@ StatusWith<std::unique_ptr<Pipeline>> preparePipeline(
         aggExState.getRequest().getEncryptionInformation()->setCrudProcessed(true);
     }
 
-    if (search_helpers::isMongotPipeline(pipeline.get())) {
+    if (search_helpers::shouldPreValidateMetaDependencies(pipeline.get())) {
         // Before preparing the pipeline executor, we need to do dependency analysis to validate
         // the metadata dependencies.
         // TODO SERVER-40900 Consider performing $meta validation for all queries at this point

@@ -117,6 +117,7 @@ executor:
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
   fixture:
     class: ShardedClusterFixture
+    num_mongos: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1

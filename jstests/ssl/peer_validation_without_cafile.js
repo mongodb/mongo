@@ -18,7 +18,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
         const rs = new ReplSetTest(rsOpts);
         rs.startSet({
             env: {
-                SSL_CERT_FILE: "jstests/libs/ca.pem",
+                SSL_CERT_FILE: getX509Path("ca.pem"),
             },
         });
         if (succeed) {
@@ -55,15 +55,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // Sanity check that ca.pem can be used to properly authenticate.
     const options_manual_systemca = {
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsCertificateKeyFile: getX509Path("server.pem"),
     };
     testRS(options_manual_systemca, true);
 
     // Ensure that we can authenticate with system CA.
     const options_systemca = {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/server.pem",
+        tlsCertificateKeyFile: getX509Path("server.pem"),
         setParameter: {tlsUseSystemCA: true},
     };
     testRS(options_systemca, true);
@@ -71,15 +71,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // Sanity check that ca.pem can be used to properly fail to authenticate.
     const options_manual_systemca_nomatch = {
         tlsMode: "requireTLS",
-        tlsCAFile: "jstests/libs/ca.pem",
-        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
+        tlsCAFile: getX509Path("ca.pem"),
+        tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
     };
     testRS(options_manual_systemca_nomatch, false);
 
     // Ensure that we can properly fail to authenticate with system CA.
     const options_systemca_nomatch = {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
+        tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
         setParameter: {tlsUseSystemCA: true},
     };
 

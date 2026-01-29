@@ -75,5 +75,25 @@ TEST(StaleExceptionTest, StaleEpochInfoSerializationTest) {
     ASSERT_EQ(deserializedInfo->getVersionWanted(), ShardVersion::UNTRACKED());
 }
 
+TEST(StaleExceptionTest, StaleEpochInfoOptionalSerializationTest) {
+    StaleEpochInfo info(kNss);
+
+    // Serialize
+    BSONObjBuilder bob;
+    info.serialize(&bob);
+
+    // Deserialize
+    auto deserializedInfo =
+        std::static_pointer_cast<const StaleEpochInfo>(StaleEpochInfo::parse(bob.obj()));
+
+    // TODO SERVER-117117: After 9.0 becomes last LTS, remove the ShardVersion{} filling workaround
+    // and update this test to verify that versionReceived/versionWanted can be unset optionals.
+    ASSERT_EQ(deserializedInfo->getNss(), kNss);
+    ASSERT_TRUE(deserializedInfo->getVersionReceived().has_value());
+    ASSERT_TRUE(deserializedInfo->getVersionWanted().has_value());
+    ASSERT_EQ(deserializedInfo->getVersionReceived(), ShardVersion{});
+    ASSERT_EQ(deserializedInfo->getVersionWanted(), ShardVersion{});
+}
+
 }  // namespace
 }  // namespace mongo

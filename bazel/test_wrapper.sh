@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Golden tests are currently incompatible with Bazel Remote Execution
+unset GOLDEN_TEST_CONFIG_PATH
+
 is_ppc64le() {
     local -r arch="$(uname -m)"
     [[ "${arch}" == "ppc64le" || "${arch}" == "ppc64" || "${arch}" == "ppc" ]] && return 0 || return 1

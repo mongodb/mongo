@@ -4,13 +4,18 @@ buildvariants:
     # Don't run Coverity analysis as part of patch builds
     patchable: false
     allow_for_git_tag: false
-    # Run at 4 am UTC everyday
-    cron: "30 4 * * *"
+    # Don't run Coverity on commits, it will be run only as  part of nightly periodic build
+    activate: false
     run_on: ubuntu2404-xlarge
     modules:
       - devprod_coverity
     tasks:
       - name: run_coverity
+
+patch_aliases:
+  - alias: coverity_scan
+    variant: bv_coverity_analysis
+    task: run_coverity
 
 functions:
   f_generate_evergreen_bazelrc:

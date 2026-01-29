@@ -47,7 +47,7 @@
 
 namespace mongo::auth {
 
-class MONGO_MOD_PUBLIC AuthorizationBackendMock : public AuthorizationBackendLocal {
+class AuthorizationBackendMock : public AuthorizationBackendLocal {
 public:
     /**
      * Inserts the given user object into the "admin" database.

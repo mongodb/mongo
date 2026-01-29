@@ -53,11 +53,11 @@ assert.commandWorked(
 
 // Set the failCommand failpoint to make the next 'find' command fail once due to a failover.
 // Start a transaction & execute a find command.
-// It should succeed since the command will be retried.
-jsTest.log("Testing that mongos retries read commands with startTransaction=true on replication set failover.");
+// It should fail once due to the 'failCommand' failpoint and should not be retried.
+jsTest.log("Testing that mongos does not retry read commands with startTransaction=true on replication set failover.");
 assert.commandWorked(setCommandToFailOnce(primaryConnection, "find", kNs));
 
-assert.commandWorked(
+assert.commandFailedWithCode(
     mongosDB.runCommand({
         find: kCollName,
         filter: kDoc0,
@@ -66,6 +66,7 @@ assert.commandWorked(
         stmtId: NumberInt(0),
         autocommit: false,
     }),
+    ErrorCodes.doMongosRewrite(st.s0, ErrorCodes.HostUnreachable),
 );
 
 // Set the failCommand failpoint to make the next 'update' command fail once due to a failover.

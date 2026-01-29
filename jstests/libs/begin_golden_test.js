@@ -1,4 +1,4 @@
-import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerMode, getAutomaticCEPlanRankingStrategy} from "jstests/libs/query/cbr_utils.js";
 import {
     checkSbeStatus,
     checkJoinOptimizationStatus,
@@ -28,6 +28,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     // case, we need to pick the correct directory for the curent configuration.
     const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
     const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
+    const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(typeof db === "undefined" ? null : db);
     const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
     const sbeNonLeadingMatchEnabled = checkSbeNonLeadingMatchEnabled(typeof db === "undefined" ? null : db);
 
@@ -35,9 +36,13 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/featureFlagSbeNonLeadingMatch/" + outputName,
     );
     const sbeExpectedExists = fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
-    const planRankerModeExpectedExists = fileExists(
-        relativePathToExpectedOutput + "/" + planRankerMode + "/" + outputName,
-    );
+
+    const outputDirPlanRanking =
+        planRankerMode != "automaticCE"
+            ? relativePathToExpectedOutput + "/" + planRankerMode
+            : relativePathToExpectedOutput + "/" + planRankerMode + "/" + autoPlanRankingStrategy;
+    const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
+
     const joinOptimizationExpectedExists = fileExists(
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
@@ -54,7 +59,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     } else if (sbeExpectedExists) {
         relativePathToExpectedOutput += "/" + sbeStatus;
     } else if (planRankerModeExpectedExists) {
-        relativePathToExpectedOutput += "/" + planRankerMode;
+        relativePathToExpectedOutput = outputDirPlanRanking;
     }
 
     _openGoldenData(outputName, {relativePath: relativePathToExpectedOutput});

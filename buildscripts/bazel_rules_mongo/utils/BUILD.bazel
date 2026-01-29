@@ -1,1 +1,13 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
 exports_files(["evergreen_git.py"])
+
+py_library(
+    name = "evergreen_git",
+    srcs = ["evergreen_git.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency("pyyaml"),
+        dependency("gitpython"),
+    ],
+)

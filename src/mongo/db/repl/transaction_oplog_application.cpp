@@ -222,6 +222,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                               "'createIndexes' command");
                     return repl::applyCommand_inlock(
                         opCtx, ApplierOperation{&op}, oplogApplicationMode);
+                } else if (op.isContainerOpType()) {
+                    return applyContainerOperation_inlock(
+                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
                 }
                 return repl::applyOperation_inlock(opCtx,
                                                    coll,
@@ -723,10 +726,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             txnParticipant.prepareTransaction(opCtx, prepareOp.getOpTime());
 
             auto opObserver = opCtx->getServiceContext()->getOpObserver();
-            auto prepareOpTime = prepareOp.getOpTime();
             invariant(opObserver);
-            opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
-                opCtx, *prepareOp.getSessionId(), txnOps, prepareOpTime);
+            opObserver->onTransactionPrepareNonPrimary(
+                opCtx, *prepareOp.getSessionId(), txnOps, prepareOp.getOpTime());
 
             // Prepare transaction success.
             abortOnError.dismiss();
@@ -927,15 +929,10 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
         }
 
         // Reload transaction participant state based on the transaction record.
-        const auto lsid = txnRecord.getSessionId();
         txnParticipant.restorePreparedTxnFromPreciseCheckpoint(opCtx, std::move(txnRecord));
 
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        invariant(opObserver);
-        // Statements and prepareOpTime are not recoverable from a precise checkpoint, so we don't
-        // pass them to the op-observer.
-        opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
-            opCtx, lsid, boost::none /* statements */, boost::none /* prepareOpTime */);
+        // TODO SERVER-113740: Trigger the op observers for chunk migrations once they support
+        // not having the full operations list. e.g. onTransactionPrepareNonPrimary()
 
         // Stash the transaction so it yields its resources and can be resumed by future user
         // operations.

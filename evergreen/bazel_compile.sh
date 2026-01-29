@@ -117,8 +117,13 @@ LOCAL_ARG="$(bazel_evergreen_shutils::maybe_release_flag "$LOCAL_ARG")"
 # Ensure server is up and print PID
 bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
 
+MONGO_VERSION_ARG="--define=MONGO_VERSION=${version}"
+if [[ -n "${no_mongo_version}" ]]; then
+    MONGO_VERSION_ARG=""
+fi
+
 # Build flags line
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} --define=MONGO_VERSION=${version} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
 # Save the entire bazel build invocation to attach to the task for re-running locally

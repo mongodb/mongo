@@ -3,9 +3,9 @@
 
 import {clientSupportsTLS1_2, clientSupportsTLS1_3, determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-let SERVER_CERT = "jstests/libs/server.pem";
-let CLIENT_CERT = "jstests/libs/client.pem";
-let CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = getX509Path("server.pem");
+let CLIENT_CERT = getX509Path("client.pem");
+let CA_CERT = getX509Path("ca.pem");
 
 const supportsTLS1_2 = clientSupportsTLS1_2();
 const supportsTLS1_3 = clientSupportsTLS1_3();

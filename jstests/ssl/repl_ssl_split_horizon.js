@@ -78,7 +78,7 @@ let replTest = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
         tlsMode: "requireTLS",
-        tlsCertificateKeyFile: "jstests/libs/splithorizon-server.pem",
+        tlsCertificateKeyFile: getX509Path("splithorizon-server.pem"),
         setParameter: {tlsUseSystemCA: true},
     },
     host: "localhost",
@@ -87,7 +87,7 @@ let replTest = new ReplSetTest({
 
 replTest.startSet({
     env: {
-        SSL_CERT_FILE: "jstests/libs/ca.pem",
+        SSL_CERT_FILE: getX509Path("ca.pem"),
     },
 });
 
@@ -122,11 +122,11 @@ let checkExpectedHorizon = function (url, memberIndex, expectedHostname) {
     let argv = [
         "env",
         "HOSTALIASES=" + hostsFile,
-        "SSL_CERT_FILE=jstests/libs/ca.pem",
+        "SSL_CERT_FILE=" + getX509Path("ca.pem"),
         "mongo",
         "--tls",
         "--tlsCertificateKeyFile",
-        "jstests/libs/splithorizon-server.pem",
+        getX509Path("splithorizon-server.pem"),
         url,
         "--eval",
         assertion,

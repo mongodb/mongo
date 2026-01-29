@@ -15,7 +15,7 @@ fi
 TEMP_DIR=$(mktemp -d /tmp/librdkafka.XXXXXX)
 
 # Setup some directory variables
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/librdkafka
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/private/librdkafka
 DIST_DIR=$DEST_DIR/dist
 PLATFORM_DIR=$DIST_DIR/platform
 

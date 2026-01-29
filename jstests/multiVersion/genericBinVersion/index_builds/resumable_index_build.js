@@ -1,10 +1,9 @@
 /**
  * Tests that resumable index builds can resume after restart with a different bin version
  * @tags: [
- *   # Primary-driven index builds aren't resumable.
- *   primary_driven_index_builds_incompatible,
+ *   requires_index_build_resumability,
  *   requires_persistence,
- *   requires_replication
+ *   requires_replication,
  * ]
  */
 

@@ -16,16 +16,16 @@ function runTest(mongod) {
 
     const tls = net.tls;
     assert.eq(tls.mode, "requireTLS");
-    assert.eq(tls.CAFile, "jstests/libs/ca.pem");
-    assert.eq(tls.certificateKeyFile, "jstests/libs/server.pem");
+    assert.eq(tls.CAFile, getX509Path("ca.pem"));
+    assert.eq(tls.certificateKeyFile, getX509Path("server.pem"));
     assert.eq(tls.allowConnectionsWithoutCertificates, true);
     assert.eq(tls.allowInvalidHostnames, true);
 }
 
 const options = {
     sslMode: "requireSSL",
-    sslCAFile: "jstests/libs/ca.pem",
-    sslPEMKeyFile: "jstests/libs/server.pem",
+    sslCAFile: getX509Path("ca.pem"),
+    sslPEMKeyFile: getX509Path("server.pem"),
     sslAllowConnectionsWithoutCertificates: "",
     sslAllowInvalidHostnames: "",
 };

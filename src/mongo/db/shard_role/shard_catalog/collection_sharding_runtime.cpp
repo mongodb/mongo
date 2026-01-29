@@ -95,19 +95,6 @@ private:
 
 const auto kUntrackedCollection = std::make_shared<UntrackedCollection>();
 
-boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCtx,
-                                                          const NamespaceString& nss) {
-    // If there is a version attached to the OperationContext, use it as the received version.
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
-        return OperationShardingState::get(opCtx).getShardVersion(nss);
-    }
-
-    // There is no shard version information on the 'opCtx'. This means that the operation
-    // represented by 'opCtx' is unversioned, and the shard version is always OK for unversioned
-    // operations.
-    return boost::none;
-}
-
 // This shard version is used as the received version in StaleConfigInfo since we do not have
 // information about the received version of the operation.
 ShardVersion ShardVersionPlacementIgnored() {
@@ -163,7 +150,7 @@ void assertPlacementConflictTimePresentWhenRequired(
     bool isRoutedVersion = !isShardVersionIgnored && !isShardVersionUntracked;
 
     if (isRoutedVersion && opCtx->inMultiDocumentTransaction() &&
-        OperationShardingState::isComingFromRouter(opCtx) &&
+        OperationShardingState::isVersioned(opCtx, nss) &&
         repl::ReadConcernArgs::get(opCtx).getLevel() !=
             repl::ReadConcernLevel::kSnapshotReadConcern &&
         !nss.isNamespaceAlwaysUntracked()) {
@@ -263,7 +250,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OrphanCleanupPolicy orphanCleanupPolicy,
     bool supportNonVersionedOperations) const {
     const boost::optional<ShardVersion> optReceivedShardVersion =
-        getOperationReceivedVersion(opCtx, _nss);
+        OperationShardingState::get(opCtx).getShardVersion(_nss);
     if (!supportNonVersionedOperations) {
         // No operations should be calling getOwnershipFilter without a shard version
         tassert(7032300,
@@ -293,7 +280,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx) const {
-    const bool operationIsVersioned = OperationShardingState::isComingFromRouter(opCtx);
+    const bool operationIsVersioned = OperationShardingState::isVersioned(opCtx, _nss);
     return getCollectionDescription(opCtx, operationIsVersioned);
 }
 
@@ -334,7 +321,7 @@ boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadat
 }
 
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) const {
-    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+    const auto optReceivedShardVersion = OperationShardingState::get(opCtx).getShardVersion(_nss);
     if (optReceivedShardVersion) {
         checkShardVersionOrThrow(opCtx, *optReceivedShardVersion);
     }

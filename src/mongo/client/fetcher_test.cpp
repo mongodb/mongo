@@ -225,6 +225,17 @@ void doNothingCallback(const Fetcher::QueryResponseStatus& fetchResult,
                        Fetcher::NextAction* nextAction,
                        BSONObjBuilder* getMoreBob) {}
 
+void appendGetMoreRequest(const StatusWith<Fetcher::QueryResponse>& fetchResult,
+                          Fetcher::NextAction* nextAction,
+                          BSONObjBuilder* getMoreBob) {
+    if (!getMoreBob) {
+        return;
+    }
+    const auto& batchData = fetchResult.getValue();
+    getMoreBob->append("getMore", batchData.cursorId);
+    getMoreBob->append("collection", batchData.nss.coll());
+}
+
 TEST_F(FetcherTest, InvalidConstruction) {
     TaskExecutor& executor = getExecutor();
 
@@ -403,15 +414,18 @@ TEST_F(FetcherTest, NonFindCommand) {
 
 TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToConstructor) {
     auto metadataObj = BSON("x" << 1);
-    Milliseconds timeout(8000);
+    Milliseconds findTimeout(8000);
+    Milliseconds getMoreTimeout(6000);
+    callbackHook = appendGetMoreRequest;
 
     fetcher = std::make_unique<Fetcher>(&getExecutor(),
                                         source,
                                         DatabaseName::createDatabaseName_forTest(boost::none, "db"),
                                         findCmdObj,
-                                        doNothingCallback,
+                                        makeCallback(),
                                         metadataObj,
-                                        timeout);
+                                        findTimeout,
+                                        getMoreTimeout);
 
     ASSERT_EQUALS(source, fetcher->getSource());
     ASSERT_BSONOBJ_EQ(findCmdObj, fetcher->getCommandObject());
@@ -421,18 +435,49 @@ TEST_F(FetcherTest, RemoteCommandRequestShouldContainCommandParametersPassedToCo
 
     auto net = getNet();
     executor::RemoteCommandRequest request;
+    const BSONObj doc = BSON("_id" << 1);
+    const BSONObj findResponse = BSON("cursor" << BSON("id" << 1LL << "ns"
+                                                            << "db.coll"
+                                                            << "firstBatch" << BSON_ARRAY(doc))
+                                               << "ok" << 1);
+
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
         ASSERT_TRUE(net->hasReadyRequests());
-        auto noi = net->getNextReadyRequest();
+        auto noi = net->getFrontOfReadyQueue();
         request = noi->getRequest();
-        ASSERT_EQUALS(timeout, request.timeout);
     }
 
     ASSERT_EQUALS(source, request.target);
     ASSERT_BSONOBJ_EQ(findCmdObj, request.cmdObj);
     ASSERT_BSONOBJ_EQ(metadataObj, request.metadata);
-    ASSERT_EQUALS(timeout, request.timeout);
+    ASSERT_EQUALS(findTimeout, request.timeout);
+    ASSERT_EQUALS(ErrorCodes::MaxTimeMSExpired, request.timeoutCode);
+
+    processNetworkResponse(
+        findResponse, Milliseconds(100), ReadyQueueState::kHasReadyRequests, FetcherState::kActive);
+
+    ASSERT_OK(status);
+    ASSERT_EQUALS(1LL, cursorId);
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
+    ASSERT_EQUALS(1U, documents.size());
+    ASSERT_BSONOBJ_EQ(doc, documents.front());
+    ASSERT_EQUALS(elapsedMillis, Milliseconds(100));
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        request = noi->getRequest();
+    }
+
+    ASSERT_EQUALS(source, request.target);
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection" << "coll"), request.cmdObj);
+    ASSERT_BSONOBJ_EQ(metadataObj, request.metadata);
+    ASSERT_EQUALS(getMoreTimeout, request.timeout);
+    ASSERT_EQUALS(ErrorCodes::MaxTimeMSExpired, request.timeoutCode);
 }
 
 TEST_F(FetcherTest, GetDiagnosticString) {
@@ -790,17 +835,6 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
     ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
-}
-
-void appendGetMoreRequest(const StatusWith<Fetcher::QueryResponse>& fetchResult,
-                          Fetcher::NextAction* nextAction,
-                          BSONObjBuilder* getMoreBob) {
-    if (!getMoreBob) {
-        return;
-    }
-    const auto& batchData = fetchResult.getValue();
-    getMoreBob->append("getMore", batchData.cursorId);
-    getMoreBob->append("collection", batchData.nss.coll());
 }
 
 TEST_F(FetcherTest, FetchMultipleBatches) {

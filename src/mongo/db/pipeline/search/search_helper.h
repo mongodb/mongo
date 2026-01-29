@@ -139,6 +139,11 @@ bool isMongotStage(DocumentSource* stage);
  */
 bool isExtensionVectorSearchStage(std::string stageName);
 
+bool isExtensionVectorSearchPipeline(const Pipeline* pipeline);
+
+// TODO SERVER-40900 Can remove this when all meta validation is done in run_aggregate.
+bool shouldPreValidateMetaDependencies(const Pipeline* pipeline);
+
 /**
  * Asserts that $$SEARCH_META is accessed correctly; that is, it is set by a prior stage, and is
  * not accessed in a subpipline.

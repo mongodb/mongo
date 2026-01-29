@@ -414,11 +414,8 @@ public:
  *
  * LockRequest are owned by the Locker class and it controls their lifetime. They should not
  * be deleted while on the LockManager though (see the contract for the lock/unlock methods).
- *
- * TODO (SERVER-113920): Remove the only direct usage of the LockManager outside of the shard local
- * catalog module and make this class MONGO_MOD_PRIVATE
  */
-struct MONGO_MOD_NEEDS_REPLACEMENT LockRequest {
+struct MONGO_MOD_PRIVATE LockRequest {
     enum Status : uint8_t {
         STATUS_NEW,
         STATUS_GRANTED,

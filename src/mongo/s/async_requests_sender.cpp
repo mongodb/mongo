@@ -303,7 +303,11 @@ auto AsyncRequestsSender::RemoteData::scheduleRequest() -> SemiFuture<RemoteComm
         .thenRunOn(*_ars->_subBaton)
         .then([this](const auto& shard) -> SemiFuture<HostAndPort> {
             if (!_retryStrategy) {
-                _retryStrategy.emplace(shard, _ars->_retryPolicy);
+                Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+                    _cmdObj.getField("startTransaction").booleanSafe()
+                    ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+                    : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
+                _retryStrategy.emplace(shard, _ars->_retryPolicy, isStartTransaction);
             }
 
             if (!_designatedHostAndPort.empty()) {

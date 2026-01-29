@@ -12,8 +12,8 @@ executor:
       nodb: ""
       ssl: ""
       sslAllowInvalidCertificates: ""
-      sslCAFile: jstests/libs/ca.pem
-      sslPEMKeyFile: jstests/libs/client.pem
+      sslCAFile: ${x509ObjDir}/ca.pem
+      sslPEMKeyFile: ${x509ObjDir}/client.pem
       global_vars:
         TestData:
           setParameters:

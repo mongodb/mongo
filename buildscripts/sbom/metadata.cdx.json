@@ -398,63 +398,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/apache/avro@{{VERSION}}",
-      "supplier": {
-        "name": "The Apache Software Foundation",
-        "url": [
-          "https://www.apache.org/"
-        ]
-      },
-      "author": "Apache Avro Developers",
-      "group": "apache",
-      "name": "Apache Avro C++",
-      "version": "{{VERSION}}",
-      "description": "Apache Avro is a data serialization system. This is the C++ implementation.",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "copyright": "Copyright 2010-2024 The Apache Software Foundation",
-      "cpe": "cpe:2.3:a:apache:avro:{{VERSION}}:*:*:*:*:*:*:*",
-      "purl": "pkg:github/apache/avro@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/apache/avro.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/avro-cpp/scripts/import.sh"
-        },
-        {
-          "name": "generate_sbom:priority_version_source",
-          "value": "import_script"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/avro-cpp"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/arximboldi/immer@{{VERSION}}",
       "supplier": {
         "name": "sinusoidal engineering"
@@ -493,59 +436,6 @@
         "occurrences": [
           {
             "location": "src/third_party/immer"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
-      "supplier": {
-        "name": "Amazon Web Services",
-        "url": [
-          "https://amazon.com/aws"
-        ]
-      },
-      "author": "Amazon Web Services",
-      "group": "aws",
-      "name": "AWS SDK for C++",
-      "version": "{{VERSION}}",
-      "description": "AWS SDK for C++",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "copyright": "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.",
-      "cpe": "cpe:2.3:a:amazon:aws-sdk-cpp:{{VERSION}}:*:*:*:*:*:*:*",
-      "purl": "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/aws/aws-sdk-cpp.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Atlas Streams"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/aws-sdk/scripts/getsources.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/aws-sdk"
           }
         ]
       },
@@ -698,56 +588,6 @@
         "occurrences": [
           {
             "location": "src/third_party/asio"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/confluentinc/librdkafka@{{VERSION}}",
-      "supplier": {
-        "name": "Confluent Inc."
-      },
-      "author": "Magnus Edenhill",
-      "group": "confluentinc",
-      "name": "librdkafka - The Apache Kafka C/C++ library",
-      "version": "{{VERSION}}",
-      "description": "The Apache Kafka C/C++ library",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-2-Clause"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2012-2022, Magnus Edenhill; 2023, Confluent Inc.",
-      "cpe": "cpe:2.3:a:confluent:librdkafka:{{VERSION}}:*:*:*:*:*:*:*",
-      "purl": "pkg:github/confluentinc/librdkafka@{{VERSION}}",
-      "externalReferences": [
-        {
-          "url": "https://github.com/confluentinc/librdkafka.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Atlas Streams"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/librdkafka/scripts/librdkafka_get_sources.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/librdkafka"
           }
         ]
       },
@@ -2610,8 +2450,6 @@
         "pkg:github/abseil/abseil-cpp@{{VERSION}}",
         "pkg:github/arximboldi/immer@{{VERSION}}",
         "pkg:github/chriskohlhoff/asio@{{VERSION}}",
-        "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
-        "pkg:github/apache/avro@{{VERSION}}",
         "pkg:github/google/benchmark@{{VERSION}}",
         "pkg:github/boostorg/boost@boost-{{VERSION}}",
         "pkg:github/c-ares/c-ares@{{VERSION}}",
@@ -2631,7 +2469,6 @@
         "pkg:github/jbeder/yaml-cpp@{{VERSION}}",
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/mongodb/libmongocrypt@{{VERSION}}",
-        "pkg:github/confluentinc/librdkafka@{{VERSION}}",
         "pkg:github/libtom/libtomcrypt@{{VERSION}}",
         "pkg:github/libunwind/libunwind@{{VERSION}}",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
@@ -2688,15 +2525,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/apache/avro@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/arximboldi/immer@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/aws/aws-sdk-cpp@{{VERSION}}",
       "dependsOn": []
     },
     {
@@ -2709,10 +2538,6 @@
     },
     {
       "ref": "pkg:github/chriskohlhoff/asio@{{VERSION}}",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/confluentinc/librdkafka@{{VERSION}}",
       "dependsOn": []
     },
     {

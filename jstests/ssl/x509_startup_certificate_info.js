@@ -3,10 +3,10 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-const CA_CERT = "jstests/libs/ca.pem";
-const SERVER_CERT = "jstests/libs/server.pem";
-const CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
-const CRL_FILE = "jstests/libs/crl.pem";
+const CA_CERT = getX509Path("ca.pem");
+const SERVER_CERT = getX509Path("server.pem");
+const CLUSTER_CERT = getX509Path("cluster_cert.pem");
+const CRL_FILE = getX509Path("crl.pem");
 
 const SERVER_CERT_INFO = {
     "type": "Server",

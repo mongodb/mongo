@@ -151,6 +151,9 @@ filters:
   - "*user_write_block*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "shard_drain_chunk_size_behavior.js":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "set_fcv*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

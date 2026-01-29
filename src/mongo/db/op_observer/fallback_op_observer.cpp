@@ -79,6 +79,8 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
     }
 
     const auto& nss = coll->ns();
+    const bool inReplicatedBatchedWrite =
+        BatchedWriteContext::get(opCtx).writesAreBatched() && opCtx->writesAreReplicated();
 
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
@@ -105,13 +107,12 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
             CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
-        if (opAccumulator) {
-            auto& opTimeList = opAccumulator->batchOpTimes;
-            if (!opTimeList.empty() && !opTimeList.back().isNull()) {
-                for (auto it = first; it != last; it++) {
-                    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-                    mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, it->doc);
-                }
+        if (inReplicatedBatchedWrite ||
+            (opAccumulator && !opAccumulator->batchOpTimes.empty() &&
+             !opAccumulator->batchOpTimes.back().isNull())) {
+            for (auto it = first; it != last; it++) {
+                auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+                mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, it->doc);
             }
         }
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
@@ -143,13 +144,15 @@ void FallbackOpObserver::onUpdate(OperationContext* opCtx,
     }
 
     const auto& nss = args.coll->ns();
+    const bool inReplicatedBatchedWrite =
+        BatchedWriteContext::get(opCtx).writesAreBatched() && opCtx->writesAreReplicated();
 
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-               !opAccumulator->opTime.writeOpTime.isNull()) {
+               (inReplicatedBatchedWrite || !opAccumulator->opTime.writeOpTime.isNull())) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
                                                                      args.updateArgs->updatedDoc);
@@ -167,14 +170,15 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
                                   const OplogDeleteEntryArgs& args,
                                   OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    const bool inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
+    const bool inReplicatedBatchedWrite =
+        BatchedWriteContext::get(opCtx).writesAreBatched() && opCtx->writesAreReplicated();
 
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-               (inBatchedWrite || !opAccumulator->opTime.writeOpTime.isNull())) {
+               (inReplicatedBatchedWrite || !opAccumulator->opTime.writeOpTime.isNull())) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {

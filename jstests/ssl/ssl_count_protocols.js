@@ -5,9 +5,9 @@ import {
     sslProviderSupportsTLS1_1,
 } from "jstests/ssl/libs/ssl_helpers.js";
 
-let SERVER_CERT = "jstests/libs/server.pem";
-let CLIENT_CERT = "jstests/libs/client.pem";
-let CA_CERT = "jstests/libs/ca.pem";
+let SERVER_CERT = getX509Path("server.pem");
+let CLIENT_CERT = getX509Path("client.pem");
+let CA_CERT = getX509Path("ca.pem");
 
 const protocols = ["TLS1_0", "TLS1_1", "TLS1_2", "TLS1_3"];
 

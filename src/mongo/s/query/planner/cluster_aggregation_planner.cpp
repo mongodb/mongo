@@ -117,10 +117,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <list>
 #include <string>
 #include <vector>
 
+#include <absl/container/flat_hash_set.h>
 #include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -231,20 +233,22 @@ BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
 
 ShardId pickMergingShard(OperationContext* opCtx,
                          const boost::optional<ShardId>& pipelineMergeShardId,
-                         const std::vector<ShardId>& targetedShards) {
+                         const absl::flat_hash_set<ShardId>& targetedShards) {
     // If we cannot merge on mongoS, establish the merge cursor on a shard. Perform the merging
     // command on random shard, unless the pipeline dictates that it needs to be run on a specific
     // shard for the database.
-    return pipelineMergeShardId
-        ? *pipelineMergeShardId
-        : targetedShards[opCtx->getClient()->getPrng().nextInt32(targetedShards.size())];
+    if (pipelineMergeShardId) {
+        return *pipelineMergeShardId;
+    }
+    return *std::next(targetedShards.begin(),
+                      opCtx->getClient()->getPrng().nextInt32(targetedShards.size()));
 }
 
 BSONObj createCommandForMergingShard(Document serializedCommand,
                                      const boost::intrusive_ptr<ExpressionContext>& mergeCtx,
                                      const NamespaceString& nss,
                                      const ShardId& shardId,
-                                     const std::vector<ShardId>& targetedShards,
+                                     const absl::flat_hash_set<ShardId>& targetedShards,
                                      bool hasSpecificMergeShard,
                                      const boost::optional<CollectionRoutingInfo>& cri,
                                      bool mergingShardContributesData,
@@ -305,7 +309,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                 tassert(8596500,
                         "Contacting primary shard for collation in unexpected case",
                         targetedShards.size() == 1 &&
-                            targetedShards[0] == cri->getDbPrimaryShardId() &&
+                            *targetedShards.begin() == cri->getDbPrimaryShardId() &&
                             hasSpecificMergeShard);
 
                 if (auto untrackedDefaultCollation =
@@ -402,10 +406,10 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
             mergePipeline);
     auto* opCtx = expCtx->getOperationContext();
 
-    std::vector<ShardId> targetedShards;
+    absl::flat_hash_set<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
     for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
-        targetedShards.emplace_back(std::string{remoteCursor->getShardId()});
+        targetedShards.insert(ShardId{std::string(remoteCursor->getShardId())});
     }
 
     sharded_agg_helpers::partitionAndAddMergeCursorsSource(
@@ -430,9 +434,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
 
     const ShardId mergingShardId =
         pickMergingShard(opCtx, shardDispatchResults.mergeShardId, targetedShards);
-    const bool mergingShardContributesData =
-        std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
-        targetedShards.end();
+    const auto mergingShardContributesData = targetedShards.contains(mergingShardId);
 
     const auto& cri = routingCtx.hasNss(namespaces.executionNss)
         ? boost::optional<CollectionRoutingInfo>(

@@ -9,7 +9,6 @@
 #include "wt_internal.h"
 
 static int __ckpt_last(WT_SESSION_IMPL *, const char *, WT_CKPT *);
-static int __ckpt_last_name(WT_SESSION_IMPL *, const char *, const char **, int64_t *, uint64_t *);
 static int __ckpt_load(WT_SESSION_IMPL *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *, WT_CKPT *);
 static int __ckpt_named(WT_SESSION_IMPL *, const char *, const char *, WT_CKPT *);
 static int __ckpt_parse_time(WT_SESSION_IMPL *, WT_CONFIG_ITEM *, uint64_t *);
@@ -185,7 +184,7 @@ __wt_meta_checkpoint_last_name(
     WT_ERR(__ckpt_version_chk(session, fname, config));
 
     /* Retrieve the name of the last unnamed checkpoint. */
-    WT_ERR(__ckpt_last_name(session, config, namep, orderp, timep));
+    WT_ERR(__wt_ckpt_last_name(session, config, namep, orderp, timep));
 
 err:
     __wt_free(session, config);
@@ -401,15 +400,15 @@ __ckpt_last(WT_SESSION_IMPL *session, const char *config, WT_CKPT *ckpt)
 }
 
 /*
- * __ckpt_last_name --
+ * __wt_ckpt_last_name --
  *     Return the name associated with the file's last unnamed checkpoint. Except: in keeping with
  *     global snapshot/timestamp metadata being about the most recent checkpoint (named or unnamed),
  *     we return the most recent checkpoint (named or unnamed), since all callers need a checkpoint
  *     that matches the snapshot info they're using.
  */
-static int
-__ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **namep, int64_t *orderp,
-  uint64_t *timep)
+int
+__wt_ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **namep,
+  int64_t *orderp, uint64_t *timep)
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM a, k, v;

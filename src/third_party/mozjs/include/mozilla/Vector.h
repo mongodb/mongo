@@ -343,8 +343,8 @@ class MOZ_NON_PARAM MOZ_GSL_OWNER Vector final : private AllocPolicy {
   /* utilities */
   static constexpr bool kElemIsPod =
       std::is_trivial_v<T> && std::is_standard_layout_v<T>;
-  typedef detail::VectorImpl<T, MinInlineCapacity, AllocPolicy, kElemIsPod>
-      Impl;
+  using Impl =
+      detail::VectorImpl<T, MinInlineCapacity, AllocPolicy, kElemIsPod>;
   friend struct detail::VectorImpl<T, MinInlineCapacity, AllocPolicy,
                                    kElemIsPod>;
 
@@ -537,7 +537,7 @@ class MOZ_NON_PARAM MOZ_GSL_OWNER Vector final : private AllocPolicy {
  public:
   static const size_t sMaxInlineStorage = MinInlineCapacity;
 
-  typedef T ElementType;
+  using ElementType = T;
 
   explicit Vector(AllocPolicy);
   Vector() : Vector(AllocPolicy()) {}
@@ -582,25 +582,33 @@ class MOZ_NON_PARAM MOZ_GSL_OWNER Vector final : private AllocPolicy {
 
   T& operator[](size_t aIndex) {
     MOZ_ASSERT(!mEntered);
-    MOZ_ASSERT(aIndex < mLength);
+    if (MOZ_UNLIKELY(aIndex >= mLength)) {
+      mozilla::detail::InvalidArrayIndex_CRASH(aIndex, mLength);
+    }
     return begin()[aIndex];
   }
 
   const T& operator[](size_t aIndex) const {
     MOZ_ASSERT(!mEntered);
-    MOZ_ASSERT(aIndex < mLength);
+    if (MOZ_UNLIKELY(aIndex >= mLength)) {
+      mozilla::detail::InvalidArrayIndex_CRASH(aIndex, mLength);
+    }
     return begin()[aIndex];
   }
 
   T& back() {
     MOZ_ASSERT(!mEntered);
-    MOZ_ASSERT(!empty());
+    if (MOZ_UNLIKELY(empty())) {
+      mozilla::detail::InvalidArrayIndex_CRASH(0, 0);
+    }
     return *(end() - 1);
   }
 
   const T& back() const {
     MOZ_ASSERT(!mEntered);
-    MOZ_ASSERT(!empty());
+    if (MOZ_UNLIKELY(empty())) {
+      mozilla::detail::InvalidArrayIndex_CRASH(0, 0);
+    }
     return *(end() - 1);
   }
 
@@ -1519,7 +1527,9 @@ MOZ_ALWAYS_INLINE bool Vector<T, N, AP>::append(const U* aInsBegin,
 template <typename T, size_t N, class AP>
 MOZ_ALWAYS_INLINE void Vector<T, N, AP>::popBack() {
   MOZ_REENTRANCY_GUARD_ET_AL;
-  MOZ_ASSERT(!empty());
+  if (MOZ_UNLIKELY(empty())) {
+    mozilla::detail::InvalidArrayIndex_CRASH(0, 0);
+  }
   --mLength;
   endNoCheck()->~T();
 }

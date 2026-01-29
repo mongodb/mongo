@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <string>
 
 namespace mongo {
-namespace awsIam {
+namespace MONGO_MOD_PUBLIC awsIam {
 /**
  * SASL AWS Client parameters
  */
@@ -54,5 +56,5 @@ struct SASLAwsClientGlobalParams {
 };
 
 extern SASLAwsClientGlobalParams saslAwsClientGlobalParams;
-}  // namespace awsIam
+}  // namespace MONGO_MOD_PUBLIC awsIam
 }  // namespace mongo

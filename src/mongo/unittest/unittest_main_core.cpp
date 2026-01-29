@@ -42,6 +42,7 @@
 #include "mongo/unittest/unittest_details.h"
 #include "mongo/unittest/unittest_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debugger.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -50,6 +51,7 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
@@ -105,7 +107,19 @@ public:
 
 class ThrowListener : public testing::EmptyTestEventListener {
     void OnTestPartResult(const testing::TestPartResult& result) override {
-        if (result.type() != testing::TestPartResult::kFatalFailure)
+        if (result.type() == testing::TestPartResult::kSuccess ||
+            result.type() == testing::TestPartResult::kSkip)
+            return;
+
+        if (GTEST_FLAG_GET(break_on_failure)) {
+#if defined(_WIN32)
+            DebugBreak();
+#else
+            raise(SIGTRAP);
+#endif
+        }
+
+        if (result.type() == testing::TestPartResult::kNonFatalFailure)
             return;
 
         StringData msg = result.message();
@@ -271,6 +285,9 @@ std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection) 
 }
 
 void MainProgress::initialize() {
+    if (auto ec = _parseAndAcceptOptions())
+        quickExit(static_cast<int>(*ec));
+
     setDefaultMockBehavior(MockBehavior::nice);
     callInitGoogleTest(_argVec);
 
@@ -280,16 +297,32 @@ void MainProgress::initialize() {
         GTEST_FLAG_SET(color, "yes");
     }
 
-    if (isDeathTestChild()) {
-        initializeDeathTestChild();
-        return;
+    if (isDebuggerActive()) {
+        GTEST_FLAG_SET(break_on_failure, true);
     }
 
-    // Googletest takes ownership of the listener.
-    testing::UnitTest::GetInstance()->listeners().Append(new FCVEventListener{});
+    if (isDeathTestChild()) {
+        initializeDeathTestChild();
+    } else {
+        // Googletest takes ownership of the listener.
+        testing::UnitTest::GetInstance()->listeners().Append(new FCVEventListener{});
+    }
+
+    testing::UnitTest::GetInstance()->listeners().Append(new ThrowListener{});
+
+    clearSignalMask();
+    setupSynchronousSignalHandlers();
+
+    if (auto&& tp = TestingProctor::instance(); !tp.isInitialized())
+        tp.setEnabled(true);
+    setTestCommandsEnabled(true);
+
+    if (!_options.suppressGlobalInitializers) {
+        runGlobalInitializersOrDie(_argVec);
+    }
 }
 
-boost::optional<ExitCode> MainProgress::parseAndAcceptOptions() {
+boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
     auto uto = parseUnitTestOptions(args());
     if (uto.help) {
         std::cerr << getUnitTestOptionsHelpString(_argVec) << std::endl;
@@ -374,23 +407,6 @@ boost::optional<ExitCode> MainProgress::parseAndAcceptOptions() {
 }
 
 int MainProgress::test() {
-    clearSignalMask();
-    setupSynchronousSignalHandlers();
-
-    if (!TestingProctor::instance().isInitialized()) {
-        TestingProctor::instance().setEnabled(true);
-    }
-    setTestCommandsEnabled(true);
-
-    if (auto ec = parseAndAcceptOptions())
-        return static_cast<int>(*ec);
-
-    if (!_options.suppressGlobalInitializers) {
-        runGlobalInitializersOrDie(_argVec);
-    }
-
-    testing::UnitTest::GetInstance()->listeners().Append(new ThrowListener{});
-
     auto result = RUN_ALL_TESTS();
 
     if (!_options.suppressGlobalInitializers) {

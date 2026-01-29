@@ -5,6 +5,8 @@
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent

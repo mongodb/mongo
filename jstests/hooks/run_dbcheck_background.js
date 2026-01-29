@@ -133,6 +133,8 @@ const exceptionFilteredBackgroundDbCheck = function (newMongoWithRetry, hosts) {
             ErrorCodes.NamespaceNotFound,
             ErrorCodes.LockTimeout,
             ErrorCodes.Interrupted,
+            // TODO SERVER-117477 remove this error code once 9.0 becomes last LTS and all timeseries collection are viewless.
+            ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade,
             ErrorCodes.CommandNotSupportedOnView,
         ],
         onDrop,

@@ -130,6 +130,33 @@ assert.commandWorked(
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+
+if (!isMultiversion) {
+    // Test failpoint with errorMsg
+    assert.commandWorked(
+        adminDB.runCommand({
+            configureFailPoint: "failCommand",
+            mode: "alwaysOn",
+            data: {
+                errorCode: ErrorCodes.NotWritablePrimary,
+                failCommands: ["ping"],
+                threadName: threadName,
+                errorMsg: "Mock error",
+            },
+        }),
+    );
+
+    {
+        let result = testDB.runCommand({ping: 1});
+        assert(result.ok == 0);
+        assert(result.code == ErrorCodes.NotWritablePrimary);
+        assert(result.errmsg == "Mock error");
+    }
+    assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+}
+
 // Test failpoint for command aliases
 assert.commandWorked(
     adminDB.runCommand({

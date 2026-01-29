@@ -263,7 +263,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
      * statistic.
      */
     page_size = __wt_atomic_load_size_relaxed(&page->memory_footprint);
-    __wt_atomic_stats_max_uint64(&conn->evict->evict_max_page_size, page_size);
 
     /* Clean page */
     if (!is_dirty) {

@@ -225,12 +225,29 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     invariant(_state == kInitialized);
     if (cq()->getExplain().has_value()) {
+        bool isCountQuery = getRoot()->stageType() == STAGE_COUNT;
+        // This loop will not run if pure multiplanning is configured (planRankerMode:
+        // multiPlanning) since rejected solutions in that case live in the multiplanner itself.
         for (auto&& solutionWithPlanStage : _planExplainerData.rejectedPlansWithStages) {
             if (!solutionWithPlanStage.planStage) {
                 // If planStage is not already built, build it. This will be the case for CBR
                 // rejected plans that are not multi-planned.
                 auto execTree = buildExecutableTree(*solutionWithPlanStage.solution);
                 solutionWithPlanStage.planStage = std::move(execTree);
+            }
+            if (isCountQuery) {
+                tassert(11777400,
+                        "Expected rejected plan to not have CountStage as root",
+                        solutionWithPlanStage.planStage->stageType() != STAGE_COUNT);
+
+                // Wrap the rejected plan's root stage in a CountStage to reflect the actual
+                // execution.
+                solutionWithPlanStage.planStage =
+                    std::make_unique<CountStage>(cq()->getExpCtxRaw(),
+                                                 static_cast<CountStage*>(getRoot())->getLimit(),
+                                                 static_cast<CountStage*>(getRoot())->getSkip(),
+                                                 ws(),
+                                                 solutionWithPlanStage.planStage.release());
             }
         }
         for (auto& mapping : _planStageQsnMap) {

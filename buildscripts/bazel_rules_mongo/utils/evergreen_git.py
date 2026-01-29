@@ -21,6 +21,7 @@ def get_expansions(expansions_file: str) -> Dict[str, any]:
 def get_mongodb_remote(repo: Repo) -> Remote:
     remotes = repo.remotes
     picked_remote = None
+    possible_remotes = {}
     for remote in remotes:
         url = remote.url
         # local repository pointing to a local dir
@@ -37,15 +38,25 @@ def get_mongodb_remote(repo: Repo) -> Remote:
         owner = parts[-2].split(":")[-1]
 
         if owner in ("10gen", "mongodb", "evergreen-ci", "mongodb-ets", "realm", "mongodb-js"):
-            picked_remote = remote
-            print(f"Selected remote: {remote.url}")
+            possible_remotes[remote.name] = remote
+
+    # prefer "origin" then "upstream"
+    for name in ["origin", "upstream"]:
+        if name in possible_remotes:
+            picked_remote = possible_remotes[name]
             break
+
+    if picked_remote is None and possible_remotes:
+        # pick an arbitrary remote from the possible remotes
+        picked_remote = next(iter(possible_remotes.values()))
 
     if picked_remote is None:
         print(
             "Could not find remote from any mongodb github org, falling back to the first remote found"
         )
         picked_remote = next(repo.remotes)
+    else:
+        print(f"Picked remote '{picked_remote.name}' with url '{picked_remote.url}'")
 
     if picked_remote is None:
         raise RuntimeError("Could not find valid remote")

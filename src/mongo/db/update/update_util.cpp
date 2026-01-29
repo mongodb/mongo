@@ -403,7 +403,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
     FieldRefSet immutablePaths;
     if (isUserInitiatedWrite) {
         const auto& collDesc = collection.getShardingDescription();
-        if (collDesc.isSharded() && !OperationShardingState::isComingFromRouter(opCtx)) {
+        if (collDesc.isSharded() && !OperationShardingState::isVersioned(opCtx, collection.nss())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
         }
         immutablePaths.keepShortest(&idFieldRef);

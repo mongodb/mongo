@@ -32,6 +32,7 @@ global:
         - "mongo/db/auth/user_name.h"
         - "mongo/db/auth/role_name.h"
         - "mongo/db/auth/role_name_or_string.h"
+    mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"

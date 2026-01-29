@@ -15,7 +15,7 @@ from bson.objectid import ObjectId
 
 from buildscripts.resmokelib import config, core, errors, logging, utils
 from buildscripts.resmokelib.testing.testcases import interface
-from buildscripts.resmokelib.utils import registry
+from buildscripts.resmokelib.utils import certs, registry
 
 
 class _SingleJSTestCase(interface.ProcessTestCase):
@@ -125,6 +125,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(process_kwargs, self._id)
 
         self.shell_options["process_kwargs"] = process_kwargs
+        self.shell_options = certs.expand_x509_paths(self.shell_options)
 
     def _get_data_dir(self, global_vars: dict) -> str:
         """Return the value that mongo shell should set for the MongoRunner.dataDir property."""

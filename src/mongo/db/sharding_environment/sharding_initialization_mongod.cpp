@@ -427,9 +427,7 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
     }();
 
     bool isStandaloneOrPrimary = [&]() {
-        // This is only called in startup when there shouldn't be replication state changes, but to
-        // be safe we take the RSTL anyway.
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        // This is only called in startup when there shouldn't be replication state changes.
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         bool isReplSet = replCoord->getSettings().isReplSet();
         return !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);

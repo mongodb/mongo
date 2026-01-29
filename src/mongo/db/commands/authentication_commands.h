@@ -35,9 +35,12 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-void doSpeculativeAuthenticate(OperationContext* opCtx, BSONObj helloCmd, BSONObjBuilder* result);
+MONGO_MOD_PUBLIC void doSpeculativeAuthenticate(OperationContext* opCtx,
+                                                BSONObj helloCmd,
+                                                BSONObjBuilder* result);
 
 }  // namespace mongo

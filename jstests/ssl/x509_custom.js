@@ -12,9 +12,9 @@ function testClient(conn, name) {
         "--tls",
         "--tlsAllowInvalidHostnames",
         "--tlsCertificateKeyFile",
-        "jstests/libs/client-custom-oids.pem",
+        getX509Path("client-custom-oids.pem"),
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--port",
         conn.port,
         "--eval",
@@ -26,7 +26,7 @@ function testClient(conn, name) {
 
 function runTest(conn) {
     const NAME =
-        "1.2.3.45=Value\\,Rando,1.2.3.56=RandoValue,CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
+        "1.2.3.56=RandoValue,1.2.3.45=Value\\,Rando,CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
     const admin = conn.getDB("admin");
     admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     admin.auth("admin", "admin");
@@ -43,9 +43,9 @@ const mongod = MongoRunner.runMongod({
     auth: "",
     tlsMode: "requireTLS",
     // Server PEM file is server.pem to match the shell's ca.pem.
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    // Server CA file is non-expiring-ca.pem to match the shell's client-custom-oids.pem.
-    tlsCAFile: "jstests/libs/non-expiring-ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    // Server CA file is ca.pem to match the shell's client-custom-oids.pem.
+    tlsCAFile: getX509Path("ca.pem"),
     tlsAllowInvalidCertificates: "",
 });
 runTest(mongod);

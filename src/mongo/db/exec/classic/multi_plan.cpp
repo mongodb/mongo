@@ -337,7 +337,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         auto totalWorks = ix * _candidates.size();
         classicWorksHistogram.increment(totalWorks);
         classicWorksTotal.increment(totalWorks);
-        if (moreToDo) {
+        if (moreToDo && !trialConfig.isCappedTrialPhase) {
             multiPlannerHitWorksLimitTotal.incrementRelaxed();
         }
 

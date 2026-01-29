@@ -397,7 +397,7 @@ def run_smoke_tests(
                 BAZEL,
                 "test",
                 *bazel_args,
-                f"--test_tag_filters={test_tag},-wrapper_target,-intermediate_debug",
+                f"--test_tag_filters={test_tag},-intermediate_debug",
                 "--test_output=summary",
                 "--dev_stacktrace=False",
                 *test_build_target,

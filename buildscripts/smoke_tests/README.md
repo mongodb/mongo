@@ -14,7 +14,7 @@ Below is information about the smoke test suites available for each team and how
 Tests are tagged with `catalog-and-routing`. To run:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,catalog-and-routing //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,catalog-and-routing //...
 ```
 
 ## Server Integration
@@ -22,7 +22,7 @@ bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediat
 Tests are tagged with `server-integration-smoke`. To run:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-integration-smoke //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-integration-smoke //...
 ```
 
 ## Replication
@@ -36,13 +36,13 @@ bazel test --test_tag_filters=replication-smoke //...
 This should be run in conjunction with the unit tests, which can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug //src/mongo/db/repl/...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug //src/mongo/db/repl/...
 ```
 
 To run both combined:
 
 ```
-bazel test --test_output=summary --test_tag_filters=mongo_unittest,replication-smoke,-wrapper_target,-intermediate_debug //src/mongo/db/repl/... //buildscripts/smoke_tests/...
+bazel test --test_output=summary --test_tag_filters=mongo_unittest,replication-smoke,-intermediate_debug //src/mongo/db/repl/... //buildscripts/smoke_tests/...
 ```
 
 ## Server Programmability
@@ -50,7 +50,7 @@ bazel test --test_output=summary --test_tag_filters=mongo_unittest,replication-s
 Tests are tagged with `server-programmability`. To run:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-programmability //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-programmability //...
 ```
 
 ## Storage Execution
@@ -59,7 +59,7 @@ The smoke test suites for storage execution are divided up into components. The 
 for all of the components that storage execution owns can be run with the following:
 
 ```
-bazel test --test_output=summary  --test_tag_filters=-wrapper_target,-intermediate_debug,server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //...
+bazel test --test_output=summary  --test_tag_filters=-intermediate_debug,server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //...
 ```
 
 The individual components owned by storage execution are as follows:
@@ -69,7 +69,7 @@ The individual components owned by storage execution are as follows:
 The unit tests for the server-bsoncolumn component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-bsoncolumn //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-bsoncolumn //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -79,7 +79,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-collection-write-path component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-collection-write-path //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-collection-write-path //...
 ```
 
 ### Server-External-Sorter
@@ -87,7 +87,7 @@ bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediat
 The unit tests for the server-external-sorter component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-external-sorter //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-external-sorter //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -97,7 +97,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-index-builds component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-index-builds //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-index-builds //...
 ```
 
 ### Server-Key-String
@@ -105,7 +105,7 @@ bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediat
 The unit tests for the server-key-string component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-key-string //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-key-string //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -115,7 +115,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-storage-engine-integration component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-storage-engine-integration //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-storage-engine-integration //...
 ```
 
 ### Server-Timeseries-Bucket-Catalog
@@ -123,7 +123,7 @@ bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediat
 The unit tests for the server-timeseries-bucket-catalog component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-timeseries-bucket-catalog //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-timeseries-bucket-catalog //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -133,7 +133,7 @@ There are currently no smoke test integration tests for this component.
 The unit tests for the server-tracking-allocators component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-tracking-allocators //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-tracking-allocators //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -143,5 +143,5 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-ttl component can be run with the following:
 
 ```
-bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-ttl //...
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-ttl //...
 ```

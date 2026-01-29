@@ -30,11 +30,6 @@ const spillOverhead = numDocs * 16;
 let memAllocNum = Math.trunc((maxDataMemUsageMegabytes * 1024 * 1024 + memPoolMemoryUsage - 1) / memPoolMemoryUsage);
 let expectedSpilledRanges = Math.trunc((numDocs + memAllocNum - 1) / memAllocNum);
 
-const documentBsonSize = Object.bsonsize({
-    _id: 0,
-    a: "a".repeat(fieldSize),
-});
-
 const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}},

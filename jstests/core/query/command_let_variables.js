@@ -9,6 +9,8 @@
 //   # Explain will return different plan than expected when a collection becomes a time-series
 //   # collection. Also, query shape will be different.
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO (SERVER-116395): Re-enable this test with primary-driven index builds.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

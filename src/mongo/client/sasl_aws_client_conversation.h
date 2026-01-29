@@ -35,6 +35,7 @@
 #include "mongo/client/sasl_aws_protocol_common.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <string>

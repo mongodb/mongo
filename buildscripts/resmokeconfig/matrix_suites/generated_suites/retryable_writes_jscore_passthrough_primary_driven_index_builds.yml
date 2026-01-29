@@ -69,7 +69,10 @@ selector:
     - rolling_index_builds
     - requires_commit_quorum
     - requires_capped
+    - requires_rollbacks
+    - requires_index_build_resumability
     - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
+    - primary_driven_index_builds_incompatible_with_retryable_writes
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js

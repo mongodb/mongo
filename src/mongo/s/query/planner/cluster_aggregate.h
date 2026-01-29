@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -140,8 +141,10 @@ public:
         bool alreadyDesugared = false);
 
     /**
-     * Retries a command that was previously run on a view by resolving the view as an aggregation
-     * against the underlying collection.
+     * Retries a command that either
+     * 1) was previously run on a view, by resolving the view as an aggregation
+     * against the underlying collection,
+     * or 2) encountered an IFR retry kickback, by disabling the given IFR flag.
      *
      * 'privileges' contains the privileges that were required to run this aggregation, to be used
      * later for re-checking privileges for GetMore commands.
@@ -150,10 +153,10 @@ public:
      *
      * This function doesn't throw, it return a Status object instead.
      */
-    static Status retryOnViewError(
+    static Status retryOnViewOrIFRKickbackError(
         OperationContext* opCtx,
         const AggregateCommandRequest& request,
-        const ResolvedView& resolvedView,
+        const std::variant<ResolvedView, IFRFlagRetryInfo>& errInfo,
         const NamespaceString& requestedNss,
         const PrivilegeVector& privileges,
         boost::optional<ExplainOptions::Verbosity> verbosity,

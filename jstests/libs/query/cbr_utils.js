@@ -58,6 +58,23 @@ export function getPlanRankerMode(db) {
     }
 }
 
+export function getAutomaticCEPlanRankingStrategy(db) {
+    if (db !== null) {
+        const getParam = db.adminCommand({
+            getParameter: 1,
+            automaticCEPlanRankingStrategy: 1,
+        });
+
+        return getParam.hasOwnProperty("automaticCEPlanRankingStrategy")
+            ? getParam.automaticCEPlanRankingStrategy
+            : "HistogramCEWithHeuristicFallback";
+    } else {
+        return TestData.setParameters.automaticCEPlanRankingStrategy
+            ? TestData.setParameters.automaticCEPlanRankingStrategy
+            : "HistogramCEWithHeuristicFallback";
+    }
+}
+
 export function getMultiplanningBatchSize() {
     const result = db.adminCommand({
         getParameter: 1,

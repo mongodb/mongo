@@ -81,11 +81,15 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(
       session, stats, file_open, __wt_atomic_load_uint32_relaxed(&conn->open_file_count));
     WT_STATP_CONN_SET(
+      session, stats, btree_open, __wt_atomic_load_uint32_relaxed(&conn->open_btree_count));
+    WT_STATP_CONN_SET(
       session, stats, cursor_open_count, __wt_atomic_load_uint32_relaxed(&conn->open_cursor_count));
     WT_STATP_CONN_SET(
       session, stats, dh_conn_handle_count, __wt_atomic_load_uint64_relaxed(&conn->dhandle_count));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_btree_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_BTREE]));
+    WT_STATP_CONN_SET(session, stats, dh_conn_handle_layered_count,
+      __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_LAYERED]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_table_count,
       __wt_atomic_load_uint64_relaxed(&conn->dhandle_types_count[WT_DHANDLE_TYPE_TABLE]));
     WT_STATP_CONN_SET(session, stats, dh_conn_handle_tiered_count,

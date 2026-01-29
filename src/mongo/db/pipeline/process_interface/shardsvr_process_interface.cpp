@@ -109,10 +109,15 @@ void writeToLocalShard(OperationContext* opCtx,
     invariant(shState->enabled());
     auto shardId = shState->shardId();
     auto shardState = ShardSharedStateCache::get(opCtx).getShardState(shardId);
+    Shard::RetryStrategy::RequestStartTransactionState isStartTransaction =
+        cmdObj.getField("startTransaction").booleanSafe()
+        ? Shard::RetryStrategy::RequestStartTransactionState::kStartingTransaction
+        : Shard::RetryStrategy::RequestStartTransactionState::kNotStartingTransaction;
 
     Shard::RetryStrategy retryStrategy{ConnectionString::ConnectionType::kLocal,
                                        *shardState,
-                                       Shard::RetryPolicy::kStrictlyNotIdempotent};
+                                       Shard::RetryPolicy::kStrictlyNotIdempotent,
+                                       isStartTransaction};
 
     uassertStatusOK(runWithRetryStrategy(
         opCtx, retryStrategy, [&](const TargetingMetadata&) -> RetryStrategy::Result<BSONObj> {

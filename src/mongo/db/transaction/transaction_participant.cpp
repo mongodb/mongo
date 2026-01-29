@@ -2107,6 +2107,10 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
     invariant(p().needToWriteAbortEntry);
     invariant(p().autoCommit == boost::optional<bool>(false));
 
+    // TODO SERVER-113740: These will be unset and we need a way to ensure callers can handle that
+    // and won't introduce new dependencies on it.
+    // p().transactionOperations
+
     {
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).txnState.transitionTo(TransactionState::kPrepared);
@@ -2130,8 +2134,6 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
         // TODO SERVER-113731: Handle recovering history when we support retryable transactions.
         p().activeTxnCommittedStatements = {};
         o(lg).hasIncompleteHistory = true;
-
-        p().recoveredFromPreciseCheckpoint = true;
 
         // This should be called after checking out the session without refresh, which already sets
         // isValid.
@@ -2183,9 +2185,6 @@ TransactionOperations* TransactionParticipant::Participant::retrieveCompletedTra
     // or prepared.
     invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
               str::stream() << "Current state: " << o().txnState);
-
-    // Prepared transactions recovered from a precise checkpoint do not have transactionOperations.
-    invariant(!p().recoveredFromPreciseCheckpoint);
 
     return &(p().transactionOperations);
 }

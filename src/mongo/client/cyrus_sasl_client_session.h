@@ -31,6 +31,7 @@
 
 
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/util/modules.h"
 
 #include <sasl/sasl.h>
 

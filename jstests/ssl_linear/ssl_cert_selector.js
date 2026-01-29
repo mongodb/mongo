@@ -12,9 +12,9 @@ import {
     TRUSTED_SERVER_CERT,
 } from "jstests/ssl/libs/ssl_helpers.js";
 
-const clientThumbprint = cat("jstests/libs/trusted-client.pem.digest.sha1");
-const serverThumbprint = cat("jstests/libs/trusted-server.pem.digest.sha1");
-const clusterServerThumbprint = cat("jstests/libs/trusted-cluster-server.pem.digest.sha1");
+const clientThumbprint = cat(getX509Path("trusted-client.pem.digest.sha1"));
+const serverThumbprint = cat(getX509Path("trusted-server.pem.digest.sha1"));
+const clusterServerThumbprint = cat(getX509Path("trusted-cluster-server.pem.digest.sha1"));
 const CLIENT = "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const SERVER = "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
 const CLUSTER_SERVER = "CN=Trusted Kernel Test Cluster Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
@@ -142,19 +142,24 @@ requireSSLProvider("windows", function () {
         runProgram("certutil.exe", "-addstore", "-f", "Root", TRUSTED_CA_CERT);
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
-        const importPfx = function (pfxFile) {
+        const createAndImportPfx = function (basename) {
+            const pemFile = getX509Path(basename + ".pem");
+            const dbPath = MongoRunner.toRealPath("$dataDir\\ssl_cert_selector\\");
+            mkdir(dbPath);
+            const pfxFile = dbPath + basename + ".pfx";
+            runProgram("certutil.exe", "-mergepfx", "-f", "-p", "qwerty,qwerty", pemFile, pfxFile);
             return runProgram("certutil.exe", "-importpfx", "-f", "-p", "qwerty", pfxFile);
         };
-        assert.eq(0, importPfx("jstests\\libs\\trusted-client.pfx"));
-        assert.eq(0, importPfx("jstests\\libs\\trusted-server.pfx"));
-        assert.eq(0, importPfx("jstests\\libs\\trusted-cluster-server.pfx"));
+        assert.eq(0, createAndImportPfx("trusted-client"));
+        assert.eq(0, createAndImportPfx("trusted-server"));
+        assert.eq(0, createAndImportPfx("trusted-cluster-server"));
     }
 
     try {
         testCases.forEach((test) => testServerSelectorKeyUsage(test));
     } finally {
         if (_isWindows()) {
-            const trusted_ca_thumbprint = cat("jstests/libs/trusted-ca.pem.digest.sha1");
+            const trusted_ca_thumbprint = cat(getX509Path("trusted-ca.pem.digest.sha1"));
             runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
         }
     }

@@ -71,4 +71,10 @@ TEST(ListCollectionsFilterTest, AddViewFilterToEmptyInputFilter) {
     ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::addTypeViewFilter(filter));
 }
 
+TEST(ListCollectionsFilterTest, MakeExcludeViewsFilter) {
+    BSONObj expected = fromjson("{type: {$ne: 'view'}}");
+
+    ASSERT_BSONOBJ_EQ(expected, ListCollectionsFilter::makeExcludeViewsFilter());
+}
+
 }  // namespace

@@ -99,8 +99,6 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
 
     // If the change stream is opened without the 'rawData' flag, we must filter out events with
     // 'isTimeseries' set to true.
-    // While currently transactions cannot contain time-series writes, this filter is included for
-    // future-proofing, in case that changes.
     if (!isRawDataOperation(expCtx->getOperationContext())) {
         unwindFilter->add(buildNotViewlessTimeSeriesFilter(expCtx, userMatch, bsonObj));
     }

@@ -64,6 +64,9 @@ DBQuery.prototype.help = function () {
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
 };
 
+/**
+ * @returns {DBQuery}
+ */
 DBQuery.prototype.clone = function () {
     const cloneResult = new DBQuery(
         this._mongo,
@@ -85,10 +88,16 @@ DBQuery.prototype._checkModify = function () {
     if (this._cursor) throw Error("query already executed");
 };
 
+/**
+ * @returns {boolean}
+ */
 DBQuery.prototype._isExhaustCursor = function () {
     return (this._options & DBQuery.Option.exhaust) !== 0;
 };
 
+/**
+ * @returns {boolean}
+ */
 DBQuery.prototype._isTailableCursor = function () {
     return (this._options & DBQuery.Option.tailable) !== 0;
 };
@@ -284,11 +293,17 @@ DBQuery.prototype.readOnly = function () {
     return this;
 };
 
+/**
+ * @this {DBQuery}
+ */
 DBQuery.prototype.getId = function () {
     this._exec();
     return this._cursor.getId();
 };
 
+/**
+ * @this {DBQuery}
+ */
 DBQuery.prototype.toArray = function () {
     if (this._arr) return this._arr;
 
@@ -611,6 +626,9 @@ DBQuery.prototype.isExhausted = function () {
     return this._cursor.isClosed() && this._cursor.objsLeftInBatch() === 0;
 };
 
+/**
+ * @this {DBQuery}
+ */
 DBQuery.prototype.getClusterTime = function () {
     // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
     this._exec();
@@ -804,18 +822,31 @@ DBCommandCursor.prototype.next = function () {
 DBCommandCursor.prototype.objsLeftInBatch = function () {
     return this._batch.length;
 };
+/**
+ * @this {DBCommandCursor}
+ */
 DBCommandCursor.prototype.getId = function () {
     return this._cursorid;
 };
+
+/**
+ * @this {DBCommandCursor}
+ */
 DBCommandCursor.prototype.getResumeToken = function () {
     // Return the most recent recorded resume token, if such a token exists.
     return this._resumeToken;
 };
 
+/**
+ * @this {DBCommandCursor}
+ */
 DBCommandCursor.prototype.getChangeStreamVersion = function () {
     return this._changeStreamVersion;
 };
 
+/**
+ * @this {DBCommandCursor}
+ */
 DBCommandCursor.prototype.getClusterTime = function () {
     // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
     return this._atClusterTime;

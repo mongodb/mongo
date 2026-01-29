@@ -54,11 +54,13 @@ executor:
     # node.
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
   fixture:
     class: ShardedClusterFixture
+    num_mongos: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1

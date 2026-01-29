@@ -210,7 +210,7 @@ class MOZ_STACK_CLASS MOZ_NON_PARAM CallArgsBase {
 
   /* Returns the i-th zero-indexed argument. */
   MutableHandleValue operator[](unsigned i) const {
-    MOZ_ASSERT(i < argc_);
+    MOZ_RELEASE_ASSERT(i < argc_);
     return MutableHandleValue::fromMarkedLocation(&this->argv_[i]);
   }
 

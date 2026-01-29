@@ -17,9 +17,6 @@
  * ]
  */
 
-// TODO SERVER-114640 Remove this line once aggregate won't report NamespaceNotFound if the db gets dropped.
-TestData.pinToSingleMongos = true;
-
 import {withSkipRetryOnNetworkError} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";

@@ -32,10 +32,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::auth {
 
-class AuthorizationBackendInterface {
+class MONGO_MOD_PUBLIC AuthorizationBackendInterface {
 public:
     class CmdUMCPassthrough;
 

@@ -15,8 +15,8 @@ if (determineSSLProvider() !== "openssl") {
 
 const baseParams = {
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/ssl/x509/root-and-trusted-ca.pem",
+    tlsCertificateKeyFile: getX509Path("server.pem"),
+    tlsCAFile: getX509Path("root-and-trusted-ca.pem"),
     waitForConnect: false,
 };
 
@@ -29,9 +29,9 @@ function testConn() {
         mongod.port,
         "--tls",
         "--tlsCAFile",
-        "jstests/libs/ca.pem",
+        getX509Path("ca.pem"),
         "--tlsCertificateKeyFile",
-        "jstests/libs/trusted-client.pem",
+        getX509Path("trusted-client.pem"),
         "--eval",
         ";",
     );

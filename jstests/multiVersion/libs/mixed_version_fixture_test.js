@@ -29,10 +29,12 @@ export function testPerformReplSetRollingRestart({
     restartVersion = latestVersion,
     startingNodeOptions = {},
     restartNodeOptions = {},
+    ifrFlags = {},
     setupFn,
     beforeRestart,
     afterSecondariesHaveRestarted,
     afterPrimariesHaveRestarted,
+    afterIfrFlagToggle = null,
     afterFCVBump = null,
 }) {
     jsTest.log.info(
@@ -98,19 +100,50 @@ export function testPerformReplSetRollingRestart({
     jsTest.log.info("Calling the afterPrimariesHaveRestarted function");
     afterPrimariesHaveRestarted(primaryConnection);
 
-    if (afterFCVBump) {
-        const getAdminDB = () => primaryConnection.getDB("admin");
+    const getAdminDB = (conn) => conn.getDB("admin");
+    if (afterIfrFlagToggle) {
+        // Enable IFR flags on all nodes (primary and secondaries).
+        jsTest.log.info("Enabling IFR flags on all nodes");
 
+        // Enable flag on primary.
+        for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
+            assert.commandWorked(getAdminDB(primaryConnection).runCommand({setParameter: 1, [flagName]: flagValue}));
+        }
+
+        // Enable flag on all secondaries.
+        for (const node of rst.nodes) {
+            if (node !== primaryConnection) {
+                for (const [flagName, flagValue] of Object.entries(ifrFlags)) {
+                    assert.commandWorked(getAdminDB(node).runCommand({setParameter: 1, [flagName]: flagValue}));
+                }
+            }
+        }
+
+        jsTest.log.info("Calling the afterIfrFlagToggle function");
+        afterIfrFlagToggle(primaryConnection);
+    }
+
+    if (afterFCVBump) {
         // Upgrade the FCV.
         jsTest.log.info("Upgrading the FCV to " + tojsononeline(latestFCV));
-        assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(
+            getAdminDB(primaryConnection).adminCommand({
+                setFeatureCompatibilityVersion: latestFCV,
+                confirm: true,
+            }),
+        );
 
         jsTest.log.info("Calling the afterFCVBump function");
         afterFCVBump(primaryConnection);
 
         // Downgrade FCV without restarting.
         jsTest.log.info("Downgrading the FCV to " + tojsononeline(lastLTSFCV));
-        assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(
+            getAdminDB(primaryConnection).adminCommand({
+                setFeatureCompatibilityVersion: lastLTSFCV,
+                confirm: true,
+            }),
+        );
 
         jsTest.log.info("Calling the afterPrimariesHaveRestarted function");
         afterPrimariesHaveRestarted(primaryConnection);
@@ -127,10 +160,12 @@ export function testPerformReplSetRollingRestart({
 export function testPerformUpgradeReplSet({
     startingNodeOptions = {},
     upgradeNodeOptions = {},
+    ifrFlags = {},
     setupFn,
     whenFullyDowngraded,
     whenSecondariesAreLatestBinary,
     whenBinariesAreLatestAndFCVIsLastLTS,
+    whenIfrFlagsAreToggled,
     whenFullyUpgraded,
 }) {
     testPerformReplSetRollingRestart({
@@ -138,10 +173,12 @@ export function testPerformUpgradeReplSet({
         restartVersion: latestVersion,
         startingNodeOptions,
         restartNodeOptions: upgradeNodeOptions,
+        ifrFlags,
         setupFn,
         beforeRestart: whenFullyDowngraded,
         afterSecondariesHaveRestarted: whenSecondariesAreLatestBinary,
         afterPrimariesHaveRestarted: whenBinariesAreLatestAndFCVIsLastLTS,
+        afterIfrFlagToggle: whenIfrFlagsAreToggled,
         afterFCVBump: whenFullyUpgraded,
     });
 }

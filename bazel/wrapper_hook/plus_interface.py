@@ -124,6 +124,7 @@ def test_runner_interface(
     replacements = {}
     fileNameFilter = []
     bin_targets = []
+    catch_all_target = False
     source_targets = {}
 
     current_bazel_command = check_bazel_command_type(args)
@@ -154,10 +155,25 @@ def test_runner_interface(
                 clang_tidy = True
         if arg.startswith(plus_starts):
             skip_plus_interface = False
+        if arg.endswith("..."):
+            catch_all_target = True
 
     config_mode = swap_default_config(
         args, current_bazel_command, config_mode, compiledb_target, clang_tidy
     )
+
+    for arg in args:
+        if arg.startswith("--runs_per_test=") and catch_all_target:
+            try:
+                runs_per_test_value = int(arg.split("=")[1])
+                if runs_per_test_value > 10:
+                    print(
+                        f"WARNING: --runs_per_test={runs_per_test_value} is set above 10. "
+                        "This may cause excessive resource usage. Please only use this option when a single test is selected."
+                    )
+                    sys.exit(1)
+            except ValueError:
+                pass  # Non-integer value, let bazel handle the error
 
     if compiledb_target:
         generate_compiledb(args[0], persistent_compdb, enterprise, atlas)

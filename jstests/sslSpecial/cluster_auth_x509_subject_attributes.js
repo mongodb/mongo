@@ -22,29 +22,29 @@ const clusterMembershipOverrideDN =
  * tlsClusterAuthX509Attributes.
  */
 // Subject: CN=server, title=foo, C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel
-const serverTitleFooCert = "jstests/libs/server_title_foo.pem";
+const serverTitleFooCert = getX509Path("server_title_foo.pem");
 // Subject: CN=clusterTest, title=foo, C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel
-const clusterTitleFooCert = "jstests/libs/cluster_title_foo.pem";
+const clusterTitleFooCert = getX509Path("cluster_title_foo.pem");
 
 /**
  * Member certificates whose subjects do not include DC, OU, or O.
  */
 // Subject: CN=server, title=foo, C=US, ST=New York, L=New York City
-const serverTitleFooNoDefaultCert = "jstests/libs/server_title_foo_no_o_ou_dc.pem";
+const serverTitleFooNoDefaultCert = getX509Path("server_title_foo_no_o_ou_dc.pem");
 // Subject: CN=clusterTest, title=foo, C=US, ST=New York, L=New York City
-const clusterTitleFooNoDefaultCert = "jstests/libs/cluster_title_foo_no_o_ou_dc.pem";
+const clusterTitleFooNoDefaultCert = getX509Path("cluster_title_foo_no_o_ou_dc.pem");
 
 /**
  * Certificates that will not satisfy clusterMembershipAttributesDN.
  */
 // Subject: CN=server, title=bar, C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel
-const serverTitleBarCert = "jstests/libs/server_title_bar.pem";
+const serverTitleBarCert = getX509Path("server_title_bar.pem");
 // Subject: CN=server, C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel
-const serverDefaultOnlyCert = "jstests/libs/server.pem";
+const serverDefaultOnlyCert = getX509Path("server.pem");
 // Subject: CN=clusterTest, C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel
-const clusterDefaultOnlyCert = "jstests/libs/cluster_cert.pem";
+const clusterDefaultOnlyCert = getX509Path("cluster_cert.pem");
 
-const serverCAFile = "jstests/libs/ca.pem";
+const serverCAFile = getX509Path("ca.pem");
 
 function assertNoStart(opts, errmsg) {
     clearRawMongoProgramOutput();
@@ -200,11 +200,11 @@ runValidMongodTest(
     opts,
     {user: "__system", certificate: serverDefaultOnlyCert},
     {
-        user: "L=New York City,ST=New York,C=US,title=foo,CN=server",
+        user: "title=foo,CN=server,L=New York City,ST=New York,C=US",
         certificate: serverTitleFooNoDefaultCert,
     },
     {
-        user: "L=New York City,ST=New York,C=US,title=foo,CN=clustertest",
+        user: "title=foo,CN=clustertest,L=New York City,ST=New York,C=US",
         certificate: clusterTitleFooNoDefaultCert,
     },
 );

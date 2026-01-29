@@ -656,8 +656,6 @@ int main(int argc, char** argv) {
     mongo::unittest::MainProgress progress({.suppressGlobalInitializers = true},
                                            std::vector<std::string>(argv, argv + argc));
     progress.initialize();
-    if (auto ec = progress.parseAndAcceptOptions())
-        return static_cast<int>(*ec);
 
     if (auto ret = mongo::runGlobalInitializers(progress.args()); !ret.isOK()) {
         std::cerr << "Global initilization failed" << ret.toString();

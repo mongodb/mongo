@@ -3,14 +3,14 @@
  * different phases.
  *
  * @tags: [
- *   # Primary-driven index builds aren't resumable.
- *   primary_driven_index_builds_incompatible,
- *   requires_majority_read_concern,
- *   requires_persistence,
  *   # The rollback can be slow on certain build variants (such as macOS and code coverage), which
  *   # can cause the targeted log messages to fall off the log buffer before we search for them.
  *   incompatible_with_gcov,
+ *   requires_index_build_resumability,
+ *   requires_majority_read_concern,
  *   requires_mongobridge,
+ *   requires_persistence,
+ *   requires_rollbacks,
  * ]
  */
 import {RollbackResumableIndexBuildTest} from "jstests/replsets/libs/rollback_resumable_index_build.js";

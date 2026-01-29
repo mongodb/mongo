@@ -204,7 +204,7 @@ void RoutingContext::onStaleError(const Status& status,
             _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
         } else if (auto sei = status.extraInfo<StaleEpochInfo>()) {
             const auto& versionWanted = sei->getVersionWanted();
-            if (versionWanted == ShardVersion{}) {
+            if (!versionWanted.has_value() || versionWanted == ShardVersion{}) {
                 // The StaleEpochInfo does not always have a valid `wanted` version.
                 _catalogCache->onStaleCollectionVersion(sei->getNss(), boost::none);
             } else {

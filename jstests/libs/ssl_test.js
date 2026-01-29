@@ -12,8 +12,7 @@
  * {'cmdLineParam': 'value', ...}. For flag arguments, the empty string is used as the value.
  *
  * For serverOpts a few defaults are set if values are not provided: specifically 'tlsMode'
- * (preferTLS), tlsCertificateKeyFile ("jstests/libs/server.pem"), and tlsCAFile
- * "jstests/libs/ca.pem").
+ * (preferTLS), tlsCertificateKeyFile ("server.pem"), and tlsCAFile ("ca.pem").
  */
 export function TLSTest(serverOpts, clientOpts) {
     let canonicalServerOpts = function (userProvidedOpts) {
@@ -27,10 +26,10 @@ export function TLSTest(serverOpts, clientOpts) {
         }
 
         if (!canonical.hasOwnProperty("tlsCertificateKeyFile")) {
-            canonical.tlsCertificateKeyFile = "jstests/libs/server.pem";
+            canonical.tlsCertificateKeyFile = getX509Path("server.pem");
         }
         if (!canonical.hasOwnProperty("tlsCAFile")) {
-            canonical.tlsCAFile = "jstests/libs/ca.pem";
+            canonical.tlsCAFile = getX509Path("ca.pem");
         }
         return canonical;
     };
@@ -48,8 +47,8 @@ export function TLSTest(serverOpts, clientOpts) {
  */
 TLSTest.prototype.defaultTLSClientOptions = {
     "tls": "",
-    "tlsCertificateKeyFile": "jstests/libs/client.pem",
-    "tlsCAFile": "jstests/libs/ca.pem",
+    "tlsCertificateKeyFile": getX509Path("client.pem"),
+    "tlsCAFile": getX509Path("ca.pem"),
     "eval": ";", // prevent the shell from entering interactive mode
 };
 

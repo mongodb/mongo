@@ -5,11 +5,6 @@
  * and spill often to avoid exceeding any memory limits.
  *
  * @tags: [
- *  # TODO(SERVER-107050): Enable this test after making primary-driven index builds respect
- *  # maxIndexBuildMemoryUsageMegabytes. Primary-driven index builds don't respect
- *  # maxIndexBuildMemoryUsageMegabytes, so this test will lead to OOMs during primary-driven index
- *  # builds.
- *  primary_driven_index_builds_incompatible,
  *  requires_replication,
  * ]
  */

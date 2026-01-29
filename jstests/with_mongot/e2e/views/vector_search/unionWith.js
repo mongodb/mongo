@@ -7,9 +7,6 @@
  * 3. Outer collection and inner view.
  *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
- *
- * TODO SERVER-106939: Run $vectorSearch with and without storedSource.
- *
  */
 import {
     actionMoviesViewPipeline,

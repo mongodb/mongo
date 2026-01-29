@@ -579,15 +579,13 @@ public:
         }
     }
 
-    void onTransactionPrepareNonPrimaryForChunkMigration(
-        OperationContext* opCtx,
-        const LogicalSessionId& lsid,
-        boost::optional<const std::vector<repl::OplogEntry>&> statements,
-        boost::optional<const repl::OpTime&> prepareOpTime) override {
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const LogicalSessionId& lsid,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
-            observer->onTransactionPrepareNonPrimaryForChunkMigration(
-                opCtx, lsid, statements, prepareOpTime);
+            observer->onTransactionPrepareNonPrimary(opCtx, lsid, statements, prepareOpTime);
         }
     }
 

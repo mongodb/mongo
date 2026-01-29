@@ -1,8 +1,8 @@
 // Test that we can safely use entries in the user cache created by old connections.
 
-const SERVER_CERT = "jstests/libs/server.pem";
-const CA_CERT = "jstests/libs/ca.pem";
-const CLIENT_CERT = "jstests/libs/client_roles.pem";
+const SERVER_CERT = getX509Path("server.pem");
+const CA_CERT = getX509Path("ca.pem");
+const CLIENT_CERT = getX509Path("client_roles.pem");
 
 function runTest(port) {
     // Run given test function in a parallel shell.

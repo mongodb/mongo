@@ -5,6 +5,8 @@ overrides:
   - "kill_primary.sharding_reconfig_archive"
   - "kill_primary.sharding_shell_options"
   - "kill_primary.all_nodes_can_be_primary"
+  # TODO (SERVER-117693) - Remove this override once SERVER-114640 is backported to 8.2
+  - "multiversion.sharding_temporarily_enforce_1_mongos"
 
 extends:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"

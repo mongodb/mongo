@@ -464,6 +464,18 @@ buildvariants:
       - name: rollback_fuzzer_sanity_patch_gen
       - name: query_golden_cbr_automatic
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_cost_choice_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_cost_choice_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_automatic_cost_choice
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_no_multiplanning_results_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_no_multiplanning_results_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_automatic_no_multiplanning_results
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_jscore_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_aggregation_passthrough
@@ -554,6 +566,18 @@ buildvariants:
       - name: initial_sync_fuzzer_sanity_patch_gen
       - name: rollback_fuzzer_sanity_patch_gen
       - name: query_golden_cbr_automatic
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_cost_choice_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_cost_choice_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_automatic_cost_choice
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_no_multiplanning_results_jscore_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_cbr_automatic_no_multiplanning_results_aggregation_passthrough
+        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      - name: query_golden_cbr_automatic_no_multiplanning_results
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_jscore_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.

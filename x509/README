@@ -79,8 +79,6 @@ Certificate definition format:
       },
       # Optional, in addition to the .pem file, write just the certificate to a .crt file and just the signing key to a .key file
       "split_cert_and_key": True,
-      # Optional, don't write a header comment to this cert
-      "include_header": False,
       # Optional, X.509 extensions to include in the certificate
       "extensions": { # All extensions are optional.
         "basicConstraints": {},

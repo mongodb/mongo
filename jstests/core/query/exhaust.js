@@ -9,6 +9,8 @@
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 const coll = db.exhaustColl;
 coll.drop();
 
@@ -23,17 +25,30 @@ assert.eq(coll.find().batchSize(1).itcount(), docCount);
 // Now try to run the same query with exhaust
 assert.eq(coll.find().batchSize(1).addOption(DBQuery.Option.exhaust).itcount(), docCount);
 
-// 'internalQueryFindCommandBatchSize' can have a different value on a mongod and a mongos.
-// TestData.setParameters.internalQueryFindCommandBatchSize' takes on the mongod value,
-// while findCommandBatchSizeKnob takes on the value from mongos if we are in a sharded
-// environment. We take the min of these to values to find the correct batch size.
-const findCommandBatchSizeKnob = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
-)["internalQueryFindCommandBatchSize"];
+const findCommandBatchSize = (() => {
+    let batchSize = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}))[
+        "internalQueryFindCommandBatchSize"
+    ];
 
-const findCommandBatchSize = TestData.setParameters.internalQueryFindCommandBatchSize
-    ? Math.min(TestData.setParameters.internalQueryFindCommandBatchSize, findCommandBatchSizeKnob)
-    : findCommandBatchSizeKnob;
+    if (FixtureHelpers.isMongos(db)) {
+        // 'internalQueryFindCommandBatchSize' can have a different value on shard nodes and routers.
+        // getParameter command will return the value from a router. To find the correct batch size
+        // we take the mimimum of router and shard nodes values.
+        FixtureHelpers.mapOnEachShardNode({
+            db,
+            func: (nodeDB) => {
+                batchSize = Math.min(
+                    batchSize,
+                    assert.commandWorked(nodeDB.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}))[
+                        "internalQueryFindCommandBatchSize"
+                    ],
+                );
+            },
+        });
+    }
+
+    return batchSize;
+})();
 
 // Test a case where the amount of data requires a response to the initial find operation as
 // well as three getMore reply batches.

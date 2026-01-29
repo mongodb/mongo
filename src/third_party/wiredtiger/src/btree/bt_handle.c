@@ -142,8 +142,11 @@ __btree_pin_hs_dhandle_and_get_meta_checkpoint(WT_SESSION_IMPL *session, WT_BTRE
      */
     WT_ERR_NOTFOUND_OK(
       __wt_meta_checkpoint(session, dhandle_name, checkpoint, ckpt, lr_fh_meta), true);
-    if (ret == WT_NOTFOUND)
+    if (ret == WT_NOTFOUND) {
+        /* The history store dhandle is pinned. We must find it. */
+        WT_ASSERT(session, !WT_IS_URI_HS(dhandle_name));
         return (__wt_set_return(session, EBUSY));
+    }
     F_SET(btree, WT_BTREE_READONLY);
 
 err:

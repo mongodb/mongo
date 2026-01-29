@@ -153,7 +153,9 @@ void DocumentSourceInternalSearchIdLookUp::bindCatalogInfo(
 DocumentSourceContainer::iterator DocumentSourceInternalSearchIdLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     auto stageItr = std::next(itr);
-    _limit = getUserLimit(stageItr, container).value_or(_limit);
+    if (auto userLimit = getUserLimit(stageItr, container)) {
+        _limit = _limit ? std::min(*userLimit, _limit) : *userLimit;
+    }
     return stageItr;
 }
 

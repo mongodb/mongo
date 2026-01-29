@@ -34,8 +34,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ClusterUMCErrorWithWriteConcernErrorInfo final : public ErrorExtraInfo {
 public:
@@ -53,4 +54,4 @@ private:
     WriteConcernErrorDetail _wcError;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

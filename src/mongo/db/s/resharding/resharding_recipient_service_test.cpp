@@ -1364,14 +1364,14 @@ protected:
         std::vector<UUID> idsInserted;
         idsInserted.reserve(numInserts);
 
-        for (int i = 0; i <= numInserts; i++) {
+        for (int i = 0; i < numInserts; i++) {
             auto id = UUID::gen();
             auto doc = makeTestDocumentForInsert(i, id);
             client.insert(recipientDoc.getTempReshardingNss(), doc);
             idsInserted.emplace_back(id);
         }
 
-        for (int i = 0; i <= numUpdates; i++) {
+        for (int i = 0; i < numUpdates; i++) {
             client.update(recipientDoc.getTempReshardingNss(),
                           BSON("_id" << idsInserted[i].toBSON()),
                           makeTestDocumentUpdateStatement(),
@@ -1379,7 +1379,7 @@ protected:
                           false);
         }
 
-        for (int i = 0; i <= numDeletes; i++) {
+        for (int i = 0; i < numDeletes; i++) {
             client.remove(
                 recipientDoc.getTempReshardingNss(), BSON("_id" << idsInserted[i].toBSON()), false);
         }
@@ -2314,6 +2314,12 @@ TEST_F(ReshardingRecipientServiceTest, SkipBuildingIndexesPhase) {
         .noChunksToCopy = false,
     };
 
+    // Prevent the recipient from transitioning into the "strict-consistency" state since the mock
+    // writes to the temporary resharding collection in one of steps below must be performed while
+    // the recipient is in the "cloning" or "applying" state.
+    PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                      RecipientStateEnum::kStrictConsistency};
+
     auto doc = makeRecipientDocument(testOptions);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
@@ -2322,6 +2328,8 @@ TEST_F(ReshardingRecipientServiceTest, SkipBuildingIndexesPhase) {
     notifyToStartCloning(opCtx.get(), *recipient, doc);
     awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
     notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
     ASSERT_OK(recipient->awaitInStrictConsistencyOrError().getNoThrow());
 
     // Verify the operation completed successfully - the metrics will be set, but the actual

@@ -243,7 +243,7 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
         }
 
         // An unversioned request cannot update the shard key, so all shardKey paths are immutable.
-        if (!OperationShardingState::isComingFromRouter(opCtx())) {
+        if (!OperationShardingState::isVersioned(opCtx(), collectionAcquisition().nss())) {
             for (auto&& shardKeyPath : shardKeyPaths) {
                 immutablePaths.insert(shardKeyPath);
             }

@@ -12,7 +12,10 @@
 //    transitioning_replicaset_incompatible,
 //   ]
 
-import {kAllClusterParameters, testInvalidGetClusterParameter} from "jstests/libs/cluster_server_parameter_utils.js";
+import {
+    kTestOnlyClusterParameters,
+    testInvalidGetClusterParameter,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // name => name of cluster parameter to get
 // expectedValue => document that should be equal to document describing CP's value, excluding the
@@ -49,47 +52,18 @@ function runSetClusterParameter(conn, name, value) {
 
 let conn = db.getMongo();
 
-const currentFCVifMultiversion = TestData.multiversionBinVersion
-    ? MongoRunner.getBinVersionFor(TestData.multiversionBinVersion)
-    : null;
-
 // For each parameter, run setClusterParameter and verify that getClusterParameter
 // returns the updated value.
 
 // We need to use assert.soon because, when running against an embedded router,
 // we might not see updates right away.
-for (const [name, data] of Object.entries(kAllClusterParameters)) {
-    if (
-        currentFCVifMultiversion &&
-        data.hasOwnProperty("minFCV") &&
-        MongoRunner.compareBinVersions(data["minFCV"], currentFCVifMultiversion) > 0
-    ) {
-        // This parameter is not supported in the current FVC.
-        assert.commandFailedWithCode(
-            conn.getDB("admin").runCommand({setClusterParameter: {[name]: data.testValues[0]}}),
-            ErrorCodes.BadValue,
-        );
-
-        // Skip the rest of the checks for unsupported parameters.
+for (const [name, data] of Object.entries(kTestOnlyClusterParameters)) {
+    if (data.hasOwnProperty("featureFlag")) {
+        // Skip testing feature-flag-gated params for now.
+        // Difficult to reliably get and check FCV in passthroughs.
+        // Feature-flagged cluster parameters are covered in no-passthrough tests.
         continue;
     }
-
-    if (data.hasOwnProperty("isSetInternally") && data.isSetInternally) {
-        // Skip the parameters that are set internally to avoid altering the cluster services that use them.
-        continue;
-    }
-
-    // Test that setting an unknown field fails. Note that this is important to avoid silently
-    // ignoring misspelled fields. For more info see SERVER-117009.
-    if (typeof data.default === "object") {
-        assert.commandFailedWithCode(
-            conn
-                .getDB("admin")
-                .runCommand({setClusterParameter: {[name]: {"unknownField": "unknownValue", ...data.default}}}),
-            [ErrorCodes.IDLUnknownField, ErrorCodes.BadValue],
-        );
-    }
-
     // Parameters should always start at defaults.
     checkGetClusterParameterMatch(conn, name, data.default);
     runSetClusterParameter(conn, name, data.testValues[0]);

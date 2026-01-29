@@ -57,12 +57,18 @@ function doassert(msg, obj) {
 /**
  * Sort document object fields.
  *
- * @param doc
+ * @template {T}
+ * @param {T} doc
  *
  * @returns Sorted document object.
  */
 function sortDoc(doc) {
     // Helper to sort the elements of the array
+
+    /**
+     * @template {T}
+     * @param {T} arr
+     */
     const sortElementsOfArray = function (arr) {
         if (!arr || arr.constructor != Array) return arr;
         return arr.map((el) => sortDoc(el));
@@ -98,11 +104,14 @@ function sortDoc(doc) {
     return newDoc;
 }
 
-/*
+/**
  * This function transforms a given function, 'func', into a function 'safeFunc',
  * where 'safeFunc' matches the behavior of 'func', except that it returns false
  * in any instance where 'func' throws an exception. 'safeFunc' also prints
  * message 'excMsg' upon catching such a thrown exception.
+ *
+ * @param { Function } func
+ * @param { string } excMsg
  */
 function _convertExceptionToReturnStatus(func, excMsg) {
     const safeFunc = () => {
@@ -134,6 +143,11 @@ function formatErrorMsg(msg, attr = {}, serializeFn = tojson) {
     return msg;
 }
 
+/**
+ *
+ * @param {*} msg
+ * @returns {string}
+ */
 function _processMsg(msg) {
     if (typeof msg === "function") {
         msg = msg();
@@ -145,6 +159,12 @@ function _processMsg(msg) {
     return msg;
 }
 
+/**
+ *
+ * @param {string} msg
+ * @param {string} prefix
+ * @param {*} attr
+ */
 function _doassert(msg, prefix, attr) {
     if (TestData?.logFormat === "json") {
         if (attr?.res) {
@@ -161,6 +181,10 @@ function _doassert(msg, prefix, attr) {
     doassert(_buildAssertionMessage(msg, formatErrorMsg(prefix, attr, tojson)), attr?.res);
 }
 
+/**
+ * @param {string} msg
+ * @param {*} attr
+ */
 function _validateAssertionMessage(msg, attr) {
     if (msg) {
         if (typeof msg === "function") {
@@ -178,6 +202,12 @@ function _validateAssertionMessage(msg, attr) {
     }
 }
 
+/**
+ *
+ * @param {string} msg
+ * @param {string} prefix
+ * @returns
+ */
 function _buildAssertionMessage(msg, prefix) {
     let fullMessage = "";
 
@@ -435,7 +465,7 @@ assert.fuzzySameMembers = function (aArr, bArr, fuzzyFields, msg, places = 4, at
     function fuzzyCompare(docA, docB) {
         return _fieldsClose(docA, docB, fuzzyFields, msg, places);
     }
-    return assert.sameMembers(aArr, bArr, msg, fuzzyCompare, attr);
+    assert.sameMembers(aArr, bArr, msg, fuzzyCompare, attr);
 };
 
 /**
@@ -810,10 +840,9 @@ assert.retryNoExcept = function (func, msg, num_attempts, intervalMS, {runHangAn
  * assert.adminCommandWorkedAllowingNetworkError(replTest.getPrimary(), {replSetReconfig: config});
  */
 assert.adminCommandWorkedAllowingNetworkError = function (node, commandObj) {
-    let res;
     try {
-        res = node.adminCommand(commandObj);
-        assert.commandWorked(res);
+        let res = node.adminCommand(commandObj);
+        return assert.commandWorked(res);
     } catch (e) {
         // Ignore errors due to connection failures.
         if (!isNetworkError(e)) {
@@ -821,13 +850,13 @@ assert.adminCommandWorkedAllowingNetworkError = function (node, commandObj) {
         }
         print("Caught network error: " + tojson(e));
     }
-    return res;
 };
 
 /**
  * Assert that function execution completes within a specified timeout.
  *
- * @param {Function} f Function to be executed, or string to be `eval`ed.
+ * @template T
+ * @param {(() => T) | string} f Function to be executed, or string to be `eval`ed.
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
@@ -836,7 +865,7 @@ assert.adminCommandWorkedAllowingNetworkError = function (node, commandObj) {
  *     property.
  * @param {object} [attr] Additional attributes to be included in failure messages.
  *
- * @returns Result of the function evaluation/execution.
+ * @returns {T} Result of the function evaluation/execution.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -880,6 +909,11 @@ assert.time = function (f, msg, timeout = 30_000 /*ms*/, {runHangAnalyzer = true
     _doassert(msg, msgPrefix, {timeMS: diff, timeoutMS: timeout, function: f, diff, ...attr});
 };
 
+/**
+ *
+ * @param {Function} func
+ * @param {*} params
+ */
 function assertThrowsHelper(func, params) {
     if (typeof func !== "function") {
         _doassert("1st argument must be a function");
@@ -1012,14 +1046,15 @@ assert.throwsWithCode = function (func, expectedCode, params, msg, attr) {
  * This is typically used when the test wants to verify that a function executes safely,
  * but does not warrant any further verifications of its output or effects.
  *
- * @param {Function} func Function to be executed.
+ * @template T
+ * @param {(...args: any[]) => T} func Function to be executed.
  * @param {any[]} [params] Parameters to apply into the function execution.
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  * @param {object} [attr] Additional attributes to be included in failure messages.
  *
- * @returns The output of the function.
+ * @returns {T} The output of the function.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1164,6 +1199,14 @@ function _runHangAnalyzerForSpecificFailureTypes(res) {
     _runHangAnalyzerIfNonTransientLockTimeoutError(res);
 }
 
+/**
+ * @template T
+ *
+ * @param {T} res
+ * @param {*} msg
+ * @param {*} param2
+ * @returns {T}
+ */
 function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernErrors}) {
     _validateAssertionMessage(msg);
     _validateCommandResponse(res, "commandWorked");
@@ -1216,6 +1259,14 @@ function _assertCommandWorked(res, msg, {ignoreWriteErrors, ignoreWriteConcernEr
 
 assert._kAnyErrorCode = Object.create(null);
 
+/**
+ * @template T
+ *
+ * @param {T} res
+ * @param {*} expectedCode
+ * @param {*} msg
+ * @returns {T}
+ */
 function _assertCommandFailed(res, expectedCode, msg) {
     _validateAssertionMessage(msg);
     _validateCommandResponse(res, "commandFailed");
@@ -1323,7 +1374,8 @@ assert.commandWorkedOrFailedWithCode = function (res, errorCodeSet, msg) {
  *
  * This is an extension of {@link assert.commandWorked} and {@link assert.commandFailedWithCode}.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {number | number[]} [errorCodeSet] Code (or array of possible Codes) to match on failed
  *     results.
@@ -1331,7 +1383,7 @@ assert.commandWorkedOrFailedWithCode = function (res, errorCodeSet, msg) {
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1352,13 +1404,14 @@ assert.commandWorkedIgnoringWriteConcernErrorsOrFailedWithCode = function (res, 
 /**
  * Assert that a command worked by testing a result object.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1375,13 +1428,14 @@ assert.commandWorked = function (res, msg) {
  *
  * This is an extension of {@link assert.commandWorked}.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1396,13 +1450,14 @@ assert.commandWorkedIgnoringWriteErrors = function (res, msg) {
 /**
  * Assert that a command worked, ignoring write concern errors.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1417,13 +1472,14 @@ assert.commandWorkedIgnoringWriteConcernErrors = function (res, msg) {
 /**
  * Assert that a command worked, ignoring write errors and write concern errors.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1438,13 +1494,14 @@ assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors = function (res, ms
 /**
  * Assert that a command failed.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should be successful ("worked").
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1459,14 +1516,15 @@ assert.commandFailed = function (res, msg) {
 /**
  * Assert that a command failed with a specific code.
  *
- * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result that should have failed.
  * @param {number | number[]} expectedCode Code (or array of possible Codes) to match
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1481,14 +1539,15 @@ assert.commandFailedWithCode = function (res, expectedCode, msg) {
 /**
  * Assert that a command resulted in successful writes.
  *
- * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result object.
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  * @param {object} [attr] Additional attributes to be included in failure messages.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1531,13 +1590,14 @@ assert.writeOK = function (res, msg, {ignoreWriteConcernErrors} = {}) {
 /**
  * Assert that a command resulted in write errors.
  *
- * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} res
+ * @template {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result object.
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example
@@ -1554,14 +1614,15 @@ assert.writeError = function (res, msg) {
  *
  * This is a stricter check of {@link assert.writeError}.
  *
- * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError } res
+ * @template {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} T
+ * @param {T} res
  *     Result object.
  * @param {number | number[]} expectedCode Code (or array of possible Codes) to match
  * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
  *            If a function, it is invoked and its result is used as the failure message.
  *            If an object, its conversion to json is used as the failure message.
  *
- * @returns The result object to continue any chaining.
+ * @returns {T} The result object to continue any chaining.
  * @throws {Error} if assertion is not satisfied.
  *
  * @example

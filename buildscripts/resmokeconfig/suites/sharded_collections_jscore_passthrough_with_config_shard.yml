@@ -71,6 +71,7 @@ executor:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
@@ -78,6 +79,7 @@ executor:
     class: ShardedClusterFixture
     config_shard: "any"
     num_shards: 2
+    num_mongos: 3
     enable_balancer: false
     mongos_options:
       set_parameters:

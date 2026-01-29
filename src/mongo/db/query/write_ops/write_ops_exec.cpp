@@ -281,7 +281,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             if (!fcvSnapshot.isVersionInitialized() ||
                 !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
-                !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+                !OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
                 (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
                 allowCollectionCreation.emplace(opCtx, ns);
             }
@@ -495,7 +495,7 @@ bool handleError(OperationContext* opCtx,
         ex.code() == ErrorCodes::CannotImplicitlyCreateCollection) {
         // Fail the write for direct shard operations so that a RetryableWriteError label can be
         // returned and the write can be retried by the driver.
-        if (!OperationShardingState::isComingFromRouter(opCtx) &&
+        if (!OperationShardingState::isVersioned(opCtx, nss) &&
             ex.code() == ErrorCodes::StaleConfig && opCtx->isRetryableWrite()) {
             throw;
         }
@@ -802,7 +802,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (!fcvSnapshot.isVersionInitialized() ||
             !feature_flags::g80CollectionCreationPath.isEnabled(fcvSnapshot) ||
-            !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+            !OperationShardingState::get(opCtx).isShardingAware(opCtx) ||
             (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
             allowCollectionCreation.emplace(opCtx, nsString);
         }

@@ -340,14 +340,6 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     // "o.applyOps" stores the list of operations, so it must be an array.
     applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
 
-    // If the change stream is opened without the 'rawData' flag, we must filter out oplog entries
-    // with 'isTimeseries' set to true.
-    if (!isRawDataOperation(expCtx->getOperationContext())) {
-        auto isTimeseriesFieldPath =
-            fmt::format("o.applyOps.{}", repl::OplogEntry::kIsTimeseriesFieldName);
-        applyOpsBuilder.append(isTimeseriesFieldPath, BSON("$ne" << true));
-    }
-
     BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
 
     {

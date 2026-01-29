@@ -90,5 +90,4 @@ if __name__ == "__main__":
         for cipher, error in exception_ciphers.items():
             print(cipher + "\tError: " + error)
 
-    with open(args.outfile, "w+") as outfile:
-        json.dump(results, outfile)
+    print("Enumeration results:", json.dumps(results))

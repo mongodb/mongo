@@ -18,6 +18,7 @@ import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
     preImagesForOps,
+    assertValidChangeStreamPreImageDocument,
 } from "jstests/libs/query/change_stream_util.js";
 
 // Pre-images are only recorded in the replica set mode.
@@ -47,7 +48,7 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
 
     for (let idx = 0; idx < writtenPreImages.length; idx++) {
         assert.eq(writtenPreImages[idx].preImage, expectedPreImages[idx]);
-        assertValidChangeStreamPreImageDocument(writtenPreImages[idx]);
+        assertValidChangeStreamPreImageDocument(writtenPreImages[idx], localDB);
     }
 
     // Because the pre-images collection is implicitly replicated, validate that writes do not
@@ -58,22 +59,6 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
 // Validates that no pre-image is written while performing ops.
 function assertNoPreImageWrittenForOps(db, ops) {
     assertPreImagesWrittenForOps(db, ops, []);
-}
-
-// Validates the contents of the pre-image collection entry.
-function assertValidChangeStreamPreImageDocument(preImage) {
-    const oplogEntryCursor = localDB.oplog.rs.find({ts: preImage._id.ts});
-    assert(oplogEntryCursor.hasNext());
-    const oplogEntry = oplogEntryCursor.next();
-
-    // Pre-images documents are recorded only for update and delete commands.
-    assert.contains(oplogEntry.op, ["u", "d"], oplogEntry);
-    assert.eq(preImage._id.nsUUID, oplogEntry.ui);
-    assert.eq(preImage._id.applyOpsIndex, 0);
-    assert.eq(preImage.operationTime, oplogEntry.wall, oplogEntry);
-    if (oplogEntry.hasOwnProperty("o2")) {
-        assert.eq(preImage.preImage._id, oplogEntry.o2._id, oplogEntry);
-    }
 }
 
 // Tests the pre-images recording behavior in capped collections.

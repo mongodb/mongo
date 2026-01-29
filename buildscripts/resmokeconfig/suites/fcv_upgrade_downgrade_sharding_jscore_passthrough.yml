@@ -141,6 +141,8 @@ executor:
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
     - class: ValidateCollections
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN

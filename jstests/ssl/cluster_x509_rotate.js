@@ -6,9 +6,9 @@ import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");
 mkdir(dbPath);
 
-copyCertificateFile("jstests/libs/ca.pem", dbPath + "/ca-test.pem");
-copyCertificateFile("jstests/libs/client.pem", dbPath + "/client-test.pem");
-copyCertificateFile("jstests/libs/server.pem", dbPath + "/server-test.pem");
+copyCertificateFile(getX509Path("ca.pem"), dbPath + "/ca-test.pem");
+copyCertificateFile(getX509Path("client.pem"), dbPath + "/client-test.pem");
+copyCertificateFile(getX509Path("server.pem"), dbPath + "/server-test.pem");
 
 // Make replset with old certificates, rotate to new certificates, and try to add
 // a node with new certificates.
@@ -24,9 +24,9 @@ rst.startSet({
 rst.initiate();
 rst.awaitReplication();
 
-copyCertificateFile("jstests/libs/trusted-ca.pem", dbPath + "/ca-test.pem");
-copyCertificateFile("jstests/libs/trusted-client.pem", dbPath + "/client-test.pem");
-copyCertificateFile("jstests/libs/trusted-server.pem", dbPath + "/server-test.pem");
+copyCertificateFile(getX509Path("trusted-ca.pem"), dbPath + "/ca-test.pem");
+copyCertificateFile(getX509Path("trusted-client.pem"), dbPath + "/client-test.pem");
+copyCertificateFile(getX509Path("trusted-server.pem"), dbPath + "/server-test.pem");
 
 for (let node of rst.nodes) {
     assert.commandWorked(node.adminCommand({rotateCertificates: 1}));
@@ -34,9 +34,9 @@ for (let node of rst.nodes) {
 
 const newnode = rst.add({
     tlsMode: "requireTLS",
-    tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
-    tlsCAFile: "jstests/libs/trusted-ca.pem",
-    tlsClusterFile: "jstests/libs/trusted-client.pem",
+    tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
+    tlsCAFile: getX509Path("trusted-ca.pem"),
+    tlsClusterFile: getX509Path("trusted-client.pem"),
     tlsAllowInvalidHostnames: "",
     // IMPORTANT: shell will not be able to talk to the new node due to cert rotation
     // therefore we set "waitForConnect:false" to ensure shell does not try to acess it
@@ -50,8 +50,8 @@ assert.soon(() => {
     try {
         new Mongo(host, undefined, {
             tls: {
-                certificateKeyFile: "jstests/libs/trusted-client.pem",
-                CAFile: "jstests/libs/trusted-ca.pem",
+                certificateKeyFile: getX509Path("trusted-client.pem"),
+                CAFile: getX509Path("trusted-ca.pem"),
                 allowInvalidHostnames: true,
             },
         });
@@ -69,8 +69,8 @@ assert.soon(() => {
     try {
         const conn = new Mongo(host, undefined, {
             tls: {
-                certificateKeyFile: "jstests/libs/trusted-client.pem",
-                CAFile: "jstests/libs/trusted-ca.pem",
+                certificateKeyFile: getX509Path("trusted-client.pem"),
+                CAFile: getX509Path("trusted-ca.pem"),
                 allowInvalidHostnames: true,
             },
         });
@@ -99,8 +99,8 @@ for (let node of rst.nodeList()) {
             print(`Testing connectivity of ${node} to ${target}`);
             const conn = new Mongo(node, undefined, {
                 tls: {
-                    certificateKeyFile: "jstests/libs/trusted-client.pem",
-                    CAFile: "jstests/libs/trusted-ca.pem",
+                    certificateKeyFile: getX509Path("trusted-client.pem"),
+                    CAFile: getX509Path("trusted-ca.pem"),
                     allowInvalidHostnames: true,
                 },
             });

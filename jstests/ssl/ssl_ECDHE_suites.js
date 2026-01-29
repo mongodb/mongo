@@ -11,7 +11,7 @@ if (_isWindows()) {
 // Amazon linux does not currently support ECDHE
 const EXCLUDED_BUILDS = ["amazon", "amzn64"];
 
-const SERVER_CERT = "jstests/libs/server.pem";
+const SERVER_CERT = getX509Path("server.pem");
 const OUTFILE = "jstests/ssl/ciphers.json";
 
 const suites = ["sslv2", "sslv3", "tls1", "tls1_1", "tls1_2"];
@@ -43,19 +43,13 @@ const python_command =
     CLIENT_CERT +
     " --outfile=" +
     OUTFILE;
-assert.eq(runProgram("/bin/sh", "-c", python_command), 0);
 
-// Parse its output
-let cipherDict = {};
-try {
-    cipherDict = JSON.parse(cat(OUTFILE));
-} catch (e) {
-    jsTestLog("Failed to parse ciphers.json");
-    throw e;
-} finally {
-    const delete_command = "rm " + OUTFILE;
-    assert.eq(runProgram("/bin/sh", "-c", delete_command), 0);
-}
+clearRawMongoProgramOutput();
+assert.eq(runProgram("/bin/sh", "-c", python_command), 0);
+const resIndicator = "Enumeration results: ";
+const res = rawMongoProgramOutput(resIndicator);
+assert.gte(res.indexOf(resIndicator), 0, "Expected enumeration results in output");
+let cipherDict = JSON.parse(res.substring(res.indexOf(resIndicator) + resIndicator.length));
 
 // Checking that SSLv2, SSLv3 and TLS 1.0 are not accepted
 suites.slice(0, suites.indexOf("tls1")).forEach((tlsVersion) => assert(cipherDict[tlsVersion].length === 0));

@@ -40,6 +40,9 @@ filters:
   - "replica_sets_jscore_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
+  - "shard*":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "sharded_collections_pqs*":
     approvers:
       - 10gen/query-execution-query-settings
@@ -84,5 +87,8 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "replica_sets_reconfig*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_kill_stepdown*":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -49,7 +49,7 @@ const testCases = [
     },
 ];
 
-function runNullSemanticsTest(pipeline, assertResultsEqual, extraParams = {}) {
+function runNullSemanticsTest(pipeline, extraParams = {}) {
     subSection("No join opt");
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
 
@@ -73,7 +73,7 @@ function runNullSemanticsTest(pipeline, assertResultsEqual, extraParams = {}) {
             caseName += `${k} = ${v}`;
         }
         assert.commandWorked(db.adminCommand({setParameter: 1, ...params, ...extraParams}));
-        runJoinTestAndCompare(caseName, coll, pipeline, params, noJoinOptResults, assertResultsEqual);
+        runJoinTestAndCompare(caseName, coll, pipeline, params, noJoinOptResults);
     }
 }
 
@@ -104,39 +104,31 @@ joinTestWrapper(() => {
         {$unwind: "$lf"},
     ]);
 
-    // TODO SERVER-113276: fix.
     section("Correlated sub-pipeline");
-    runNullSemanticsTest(
-        [
-            {
-                $lookup: {
-                    from: otherColl.getName(),
-                    let: {k: "$key"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$k", "$key"]}}}],
-                    as: "cor",
-                },
+    runNullSemanticsTest([
+        {
+            $lookup: {
+                from: otherColl.getName(),
+                let: {k: "$key"},
+                pipeline: [{$match: {$expr: {$eq: ["$$k", "$key"]}}}],
+                as: "cor",
             },
-            {$unwind: "$cor"},
-        ],
-        false /* assertResultsEqual */,
-    );
+        },
+        {$unwind: "$cor"},
+    ]);
 
-    // TODO SERVER-113276: fix.
     section("Correlated sub-pipeline (nested field)");
-    runNullSemanticsTest(
-        [
-            {
-                $lookup: {
-                    from: otherColl.getName(),
-                    let: {f: "$key.foo"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
-                    as: "cor",
-                },
+    runNullSemanticsTest([
+        {
+            $lookup: {
+                from: otherColl.getName(),
+                let: {f: "$key.foo"},
+                pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
+                as: "cor",
             },
-            {$unwind: "$cor"},
-        ],
-        false /* assertResultsEqual */,
-    );
+        },
+        {$unwind: "$cor"},
+    ]);
 
     section("Implicit cycle (local-foreign)");
     runNullSemanticsTest([
@@ -160,88 +152,76 @@ joinTestWrapper(() => {
         {$unwind: "$lf2"},
     ]);
 
-    // TODO SERVER-113276: fix.
     section("Implicit cycle (mixed)");
-    runNullSemanticsTest(
-        [
-            {
-                $lookup: {
-                    from: otherColl.getName(),
-                    localField: "key",
-                    foreignField: "key",
-                    as: "lf",
-                },
+    runNullSemanticsTest([
+        {
+            $lookup: {
+                from: otherColl.getName(),
+                localField: "key",
+                foreignField: "key",
+                as: "lf",
             },
-            {$unwind: "$lf"},
-            {
-                $lookup: {
-                    from: thirdColl.getName(),
-                    let: {f: "$lf.key"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
-                    as: "cor",
-                },
+        },
+        {$unwind: "$lf"},
+        {
+            $lookup: {
+                from: thirdColl.getName(),
+                let: {f: "$lf.key"},
+                pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
+                as: "cor",
             },
-            {$unwind: "$cor"},
-        ],
-        false /* assertResultsEqual */,
-    );
+        },
+        {$unwind: "$cor"},
+    ]);
 
-    // TODO SERVER-113276: fix.
     section("Implicit cycle (correlated)");
-    runNullSemanticsTest(
-        [
-            {
-                $lookup: {
-                    from: thirdColl.getName(),
-                    let: {k: "$key"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$k", "$key"]}}}],
-                    as: "cor",
-                },
+    runNullSemanticsTest([
+        {
+            $lookup: {
+                from: thirdColl.getName(),
+                let: {k: "$key"},
+                pipeline: [{$match: {$expr: {$eq: ["$$k", "$key"]}}}],
+                as: "cor",
             },
-            {$unwind: "$cor"},
-            {
-                $lookup: {
-                    from: otherColl.getName(),
-                    let: {f: "$cor.foo"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
-                    as: "cor2",
-                },
+        },
+        {$unwind: "$cor"},
+        {
+            $lookup: {
+                from: otherColl.getName(),
+                let: {f: "$cor.foo"},
+                pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
+                as: "cor2",
             },
-            {$unwind: "$cor2"},
-        ],
-        false /* assertResultsEqual */,
-    );
+        },
+        {$unwind: "$cor2"},
+    ]);
 
     // Add some indexes.
     assert.commandWorked(otherColl.createIndex({key: 1}));
     assert.commandWorked(otherColl.createIndex({"key.foo": 1}));
     assert.commandWorked(thirdColl.createIndex({key: 1}));
 
-    // TODO SERVER-113276: fix.
     section("Implicit cycle (mixed) + indexes");
-    runNullSemanticsTest(
-        [
-            {
-                $lookup: {
-                    from: otherColl.getName(),
-                    localField: "key",
-                    foreignField: "key",
-                    as: "lf",
-                },
+    runNullSemanticsTest([
+        {
+            $lookup: {
+                from: otherColl.getName(),
+                localField: "key",
+                foreignField: "key",
+                as: "lf",
             },
-            {$unwind: "$lf"},
-            {
-                $lookup: {
-                    from: thirdColl.getName(),
-                    let: {f: "$lf.key"},
-                    pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
-                    as: "cor",
-                },
+        },
+        {$unwind: "$lf"},
+        {
+            $lookup: {
+                from: thirdColl.getName(),
+                let: {f: "$lf.key"},
+                pipeline: [{$match: {$expr: {$eq: ["$$f", "$key.foo"]}}}],
+                as: "cor",
             },
-            {$unwind: "$cor"},
-        ],
-        false /* assertResultsEqual */,
-    );
+        },
+        {$unwind: "$cor"},
+    ]);
 
     const fourthColl = db[jsTestName() + "_fourth"];
     fourthColl.drop();
@@ -251,7 +231,6 @@ joinTestWrapper(() => {
     fifthColl.drop();
     assert.commandWorked(fifthColl.insertMany(testDocs));
 
-    // TODO SERVER-113276: fix.
     section("Large implicit cycle (5 nodes)");
     /**
      * Graph: BASE <-> OTHER <-> THIRD <-> FOURTH <-> FIFTH
@@ -297,7 +276,6 @@ joinTestWrapper(() => {
             },
             {$unwind: "$c4"},
         ],
-        false /* assertResultsEqual */,
         {internalMaxNumberNodesConsideredForImplicitEdges: 5},
     );
 }); // joinTestWrapper();

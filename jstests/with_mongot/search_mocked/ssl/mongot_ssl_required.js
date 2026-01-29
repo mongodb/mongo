@@ -16,10 +16,10 @@ const mongotConn = mongotmock.getConnection();
 
 const conn = MongoRunner.runMongod({
     sslMode: "requireSSL",
-    sslPEMKeyFile: "jstests/libs/password_protected.pem",
+    sslPEMKeyFile: getX509Path("password_protected.pem"),
     sslPEMKeyPassword: "qwerty",
     setParameter: {mongotHost: mongotConn.host, searchTLSMode: "disabled"},
-    sslCAFile: "jstests/libs/ca.pem",
+    sslCAFile: getX509Path("ca.pem"),
 });
 
 const db = conn.getDB("test");

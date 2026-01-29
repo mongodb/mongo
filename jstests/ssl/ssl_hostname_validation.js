@@ -2,14 +2,14 @@
 // for client-server and server-server connections
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-let CA_CERT = "jstests/libs/ca.pem";
-let SERVER_CERT = "jstests/libs/server.pem";
-let CN_CERT = "jstests/libs/localhostnameCN.pem";
-let SAN_CERT = "jstests/libs/localhostnameSAN.pem";
-let CLIENT_CERT = "jstests/libs/client.pem";
-let BAD_SAN_CERT = "jstests/libs/badSAN.pem";
-let NOSUBJ_CERT = "jstests/libs/server_no_subject.pem";
-let NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
+let CA_CERT = getX509Path("ca.pem");
+let SERVER_CERT = getX509Path("server.pem");
+let CN_CERT = getX509Path("localhostnameCN.pem");
+let SAN_CERT = getX509Path("localhostnameSAN.pem");
+let CLIENT_CERT = getX509Path("client.pem");
+let BAD_SAN_CERT = getX509Path("badSAN.pem");
+let NOSUBJ_CERT = getX509Path("server_no_subject.pem");
+let NOSUBJ_NOSAN_CERT = getX509Path("server_no_subject_no_SAN.pem");
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     jsTestLog("Testing certificate: " + JSON.stringify(arguments));

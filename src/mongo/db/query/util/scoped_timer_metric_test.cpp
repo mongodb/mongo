@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/util/scoped_timer_metric.h"
 
+#include "mongo/db/stats/counters.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
@@ -36,161 +37,126 @@
 namespace mongo {
 namespace {
 
-/**
- * Simple mock counter class for testing ScopedTimerMetric.
- * Tracks the total count incremented and the number of increment calls.
- * The ScopedTimerMetric calls increment() with the raw count value (Duration::count()).
- */
-class MockCounter {
-public:
-    void increment(int64_t count) {
-        _totalCount += count;
-        _incrementCount++;
-    }
-
-    int64_t getTotalCount() const {
-        return _totalCount;
-    }
-
-    int getIncrementCount() const {
-        return _incrementCount;
-    }
-
-    void reset() {
-        _totalCount = 0;
-        _incrementCount = 0;
-    }
-
-private:
-    int64_t _totalCount{0};
-    int _incrementCount{0};
-};
 
 TEST(ScopedTimerMetricTest, IncrementCounterOnDestruction) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Milliseconds> counter;
 
     // Set the tick source to advance by 100ms each time getTicks() is called.
     // First call (in constructor) returns 0, second call (in destructor) returns 100.
     tickSource.setAdvanceOnRead(Milliseconds{100});
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 100);
-    ASSERT_EQ(counter.getIncrementCount(), 1);
+    ASSERT_EQ(counter.get(), 100);
 }
 
 TEST(ScopedTimerMetricTest, ZeroDurationWhenNoTimeElapsed) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Milliseconds> counter;
 
     // No advance on read - both getTicks() calls return the same value.
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 0);
-    ASSERT_EQ(counter.getIncrementCount(), 1);
+    ASSERT_EQ(counter.get(), 0);
 }
 
 TEST(ScopedTimerMetricTest, MultipleTimersAccumulate) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Milliseconds> counter;
 
     tickSource.setAdvanceOnRead(Milliseconds{50});
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer1(&tickSource, counter);
+        ScopedTimerMetric timer1(&tickSource, counter);
     }
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer2(&tickSource, counter);
+        ScopedTimerMetric timer2(&tickSource, counter);
     }
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer3(&tickSource, counter);
+        ScopedTimerMetric timer3(&tickSource, counter);
     }
 
     // Each timer should add 50ms (the advance on read amount).
-    ASSERT_EQ(counter.getTotalCount(), 150);
-    ASSERT_EQ(counter.getIncrementCount(), 3);
+    ASSERT_EQ(counter.get(), 150);
 }
 
 TEST(ScopedTimerMetricTest, WorksWithMicroseconds) {
     TickSourceMock<Microseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Microseconds> counter;
 
     tickSource.setAdvanceOnRead(Microseconds{500});
 
     {
-        ScopedTimerMetric<MockCounter, Microseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 500);
-    ASSERT_EQ(counter.getIncrementCount(), 1);
+    ASSERT_EQ(counter.get(), 500);
 }
 
 TEST(ScopedTimerMetricTest, DifferentDurationTypes) {
     // Use a tick source with a different duration base than the timer.
     TickSourceMock<Microseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Milliseconds> counter;
 
     tickSource.setAdvanceOnRead(Microseconds{5000});
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 5);
-    ASSERT_EQ(counter.getIncrementCount(), 1);
+    ASSERT_EQ(counter.get(), 5);
 }
 
 TEST(ScopedTimerMetricTest, ManualAdvanceSimulatesTimePassage) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Milliseconds> counter;
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
         // Manually advance the tick source to simulate 250ms passing.
         tickSource.advance(Milliseconds{250});
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 250);
-    ASSERT_EQ(counter.getIncrementCount(), 1);
+    ASSERT_EQ(counter.get(), 250);
 }
 
 TEST(ScopedTimerMetricTest, NestedTimersWorkIndependently) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter outerCounter;
-    MockCounter innerCounter;
+    DurationCounter64<Milliseconds> outerCounter;
+    DurationCounter64<Milliseconds> innerCounter;
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> outerTimer(&tickSource, outerCounter);
+        ScopedTimerMetric outerTimer(&tickSource, outerCounter);
         tickSource.advance(Milliseconds{100});
         {
-            ScopedTimerMetric<MockCounter, Milliseconds> innerTimer(&tickSource, innerCounter);
+            ScopedTimerMetric innerTimer(&tickSource, innerCounter);
             tickSource.advance(Milliseconds{50});
         }
         // Inner timer should have recorded 50ms.
-        ASSERT_EQ(innerCounter.getTotalCount(), 50);
+        ASSERT_EQ(innerCounter.get(), 50);
         tickSource.advance(Milliseconds{25});
     }
 
     // Outer timer should have recorded the total time: 100 + 50 + 25 = 175ms.
-    ASSERT_EQ(outerCounter.getTotalCount(), 175);
+    ASSERT_EQ(outerCounter.get(), 175);
 }
 
 TEST(ScopedTimerMetricTest, LargeDurations) {
     TickSourceMock<Milliseconds> tickSource;
-    MockCounter counter;
+    DurationCounter64<Microseconds> counter;
 
     {
-        ScopedTimerMetric<MockCounter, Milliseconds> timer(&tickSource, counter);
+        ScopedTimerMetric timer(&tickSource, counter);
         // Simulate a large amount of time passing.
         tickSource.advance(Seconds{10});
     }
 
-    ASSERT_EQ(counter.getTotalCount(), 10000);
+    ASSERT_EQ(counter.get(), 10000000);
 }
 
 }  // namespace

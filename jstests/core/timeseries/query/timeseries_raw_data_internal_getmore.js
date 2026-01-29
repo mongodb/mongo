@@ -20,9 +20,27 @@ const timeField = "t";
 const metaField = "m";
 const t = new Date("2002-05-29T00:00:00Z");
 
-const originalBatchSize = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
-)["internalQueryFindCommandBatchSize"];
+const originalBatchSize = (() => {
+    let resultBatchSize = undefined;
+    FixtureHelpers.mapOnEachShardNode({
+        db: db,
+        func: (nodeDB) => {
+            const batchSize = assert.commandWorked(
+                nodeDB.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
+            )["internalQueryFindCommandBatchSize"];
+            if (resultBatchSize === undefined) {
+                resultBatchSize = batchSize;
+            } else {
+                assert.eq(
+                    resultBatchSize,
+                    batchSize,
+                    "Expected all nodes to have the same internalQueryFindCommandBatchSize",
+                );
+            }
+        },
+    });
+    return resultBatchSize;
+})();
 
 const coll = db[jsTestName()];
 

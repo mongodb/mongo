@@ -1104,7 +1104,6 @@ certs_def = json.encode({
             },
             "Issuer": "self",
             "keyfile": "ocsp_ca_key.pem",
-            "include_header": False,
             "split_cert_and_key": True,
             "extensions": {
                 "basicConstraints": {
@@ -1124,7 +1123,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1159,7 +1157,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1190,7 +1187,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1224,7 +1220,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1259,7 +1254,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1295,7 +1289,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1326,7 +1319,6 @@ certs_def = json.encode({
             },
             "Issuer": "ca_ocsp.pem",
             "keyfile": "intermediate_ocsp_ca_key.pem",
-            "include_header": False,
             "split_cert_and_key": True,
             "extensions": {
                 "subjectKeyIdentifier": "hash",
@@ -1339,7 +1331,6 @@ certs_def = json.encode({
         {
             "name": "intermediate_ca_with_root_ocsp.pem",
             "description": "OCSP CA and OCSP Intermediate appended together",
-            "include_header": False,
             "append_cert": [
                 "intermediate_ca_only_ocsp.pem",
                 "ca_ocsp.pem",
@@ -1353,7 +1344,6 @@ certs_def = json.encode({
             },
             "Issuer": "intermediate_ca_only_ocsp.pem",
             "keyfile": "intermediate_ocsp_key.pem",
-            "include_header": False,
             "extensions": {
                 "basicConstraints": {
                     "CA": False,
@@ -1385,7 +1375,6 @@ certs_def = json.encode({
             },
             "Issuer": "intermediate_ca_only_ocsp.pem",
             "keyfile": "intermediate_ocsp_key.pem",
-            "include_header": False,
             "append_cert": "intermediate_ca_only_ocsp.pem",
             "extensions": {
                 "basicConstraints": {
@@ -1420,8 +1409,7 @@ certs_def = json.encode({
                 "L": "OCSP-3",
             },
             "Issuer": "ca_ocsp.pem",
-            "keyfile": "ocsp_key.pem",
-            "include_header": False,
+            "keyfile": "ocsp_responder_key.pem",
             "split_cert_and_key": True,
             "extensions": {
                 "basicConstraints": {
@@ -1642,6 +1630,7 @@ certs_def = json.encode({
             },
             "Issuer": "trusted-ca.pem",
             "keyfile": "trusted_key.pem",
+            "split_cert_and_key": True,
             "extensions": {
                 "extendedKeyUsage": [
                     "clientAuth",
@@ -1660,6 +1649,7 @@ certs_def = json.encode({
             },
             "Issuer": "trusted-ca.pem",
             "keyfile": "trusted_key.pem",
+            "split_cert_and_key": True,
             "extensions": {
                 "extendedKeyUsage": [
                     "serverAuth",
@@ -1678,6 +1668,7 @@ certs_def = json.encode({
             },
             "Issuer": "trusted-ca.pem",
             "keyfile": "trusted_key.pem",
+            "split_cert_and_key": True,
             "extensions": {
                 "extendedKeyUsage": [
                     "clientAuth",
@@ -1738,6 +1729,7 @@ certs_def = json.encode({
             "name": "ecdsa-client.pem",
             "description": "Client certificate for ECDSA tree.",
             "Subject": {
+                "OU": "KernelUser",
                 "CN": "client",
             },
             "Issuer": "ecdsa-ca.pem",
@@ -1868,7 +1860,7 @@ certs_def = json.encode({
             "name": "ecdsa-ocsp-responder.pem",
             "description": "ECDSA certificate and key for OCSP responder",
             "Issuer": "ecdsa-ca-ocsp.pem",
-            "keyfile": "pkcs8_encrypted_ec_ocsp_key.pem",
+            "keyfile": "pkcs8_encrypted_ec_ocsp_responder_key.pem",
             "Subject": {
                 "CN": "server",
             },

@@ -96,10 +96,8 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
 
     const auto checkStaleEpoch = [&](const ChunkManager& cm) {
         if (_targetEpoch) {
-            uassert(StaleEpochInfo(_nss, ShardVersion{}, ShardVersion{}),
-                    "Collection has been dropped",
-                    cm.hasRoutingTable());
-            uassert(StaleEpochInfo(_nss, ShardVersion{}, ShardVersion{}),
+            uassert(StaleEpochInfo(_nss), "Collection has been dropped", cm.hasRoutingTable());
+            uassert(StaleEpochInfo(_nss),
                     "Collection epoch has changed",
                     cm.getVersion().epoch() == *_targetEpoch);
         }

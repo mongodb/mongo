@@ -8,11 +8,11 @@ requireSSLProvider("openssl", function () {
     jsTest.log("Testing censorship of ssl options");
 
     const mongodConfig = {
-        tlsCertificateKeyFile: "jstests/libs/password_protected.pem",
+        tlsCertificateKeyFile: getX509Path("password_protected.pem"),
         tlsMode: "requireTLS",
         tlsCertificateKeyFilePassword: "qwerty",
         tlsClusterPassword: "qwerty",
-        tlsCAFile: "jstests/libs/ca.pem",
+        tlsCAFile: getX509Path("ca.pem"),
     };
     const mongodSource = MongoRunner.runMongod(mongodConfig);
 

@@ -1490,7 +1490,7 @@ public:
                                                      bool yaml) {
         std::vector<std::string> argv;
         if (!yaml) {
-            argv = {"binaryname", "--extensionsSignaturePublicKeyPath", extSigPubKeyPath};
+            argv = {"binaryname", "--extensionsSignaturePublicKeyPath", extSigPubKeyPath.string()};
         } else {
             argv = {"binaryname", "--config", "config.yaml"};
             parser.setConfig("config.yaml",
