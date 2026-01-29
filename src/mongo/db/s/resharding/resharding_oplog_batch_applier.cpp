@@ -140,10 +140,9 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                 "Operation-fatal error for resharding while applying oplog entry from donor shard",
                 "error"_attr = redact(status));
         })
-        .template until<Status>([chainCtx](const Status& status) {
-            return status.isOK() && chainCtx->nextToApply >= chainCtx->batch.size();
-        })
-        .on(std::move(executor), cancelToken)
+        .untilRunOn([chainCtx] { return chainCtx->nextToApply >= chainCtx->batch.size(); },
+                    std::move(executor),
+                    cancelToken)
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .on() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and

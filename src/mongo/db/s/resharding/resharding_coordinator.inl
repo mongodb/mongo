@@ -301,8 +301,7 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                   "participants to refresh",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getStepdownToken());
+        .runOn(**executor, _ctHolder->getStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
@@ -322,8 +321,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                   "Resharding coordinator encountered unrecoverable error while initializing",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getAbortToken())
+        .runOn(**executor, _ctHolder->getAbortToken())
         .onCompletion([this, executor](Status status) {
             if (_ctHolder->isSteppingOrShuttingDown()) {
                 return ExecutorFuture<void>(**executor, status);
@@ -381,16 +379,14 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
 ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilReadyToCommit(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
-    return resharding::WithAutomaticRetry([this,
-                                           executor,
-                                           telemetryCtx = telemetryCtx->clone()]() mutable {
+    return resharding::WithAutomaticRetry([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                return ExecutorFuture<void>(**executor)
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
                            telemetryCtx, "ReshardingCoordinator::_awaitAllDonorsReadyToDonate");
                        return _awaitAllDonorsReadyToDonate(executor);
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kCloning) {
                            auto span = _startSpan(
                                telemetryCtx, "ReshardingCoordinator::_awaitAllRecipientsCloning");
@@ -403,32 +399,32 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                            _tellAllDonorsToStartChangeStreamsMonitor(executor);
                        }
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
                            telemetryCtx,
                            "ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors");
                        return _fetchAndPersistNumDocumentsToCloneFromDonors(executor);
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span =
                            _startSpan(telemetryCtx,
                                       "ReshardingCoordinator::_awaitAllRecipientsFinishedCloning");
                        return _awaitAllRecipientsFinishedCloning(executor);
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kApplying) {
                            auto span = _startSpan(telemetryCtx,
                                                   "ReshardingCoordinator::_tellAllDonorsToRefresh");
                            _tellAllDonorsToRefresh(executor);
                        }
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span =
                            _startSpan(telemetryCtx,
                                       "ReshardingCoordinator::_awaitAllRecipientsFinishedApplying");
                        return _awaitAllRecipientsFinishedApplying(executor);
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kBlockingWrites) {
                            auto span = _startSpan(
                                telemetryCtx,
@@ -446,13 +442,13 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                            }
                        }
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
                            telemetryCtx,
                            "ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFromDonors");
                        return _fetchAndPersistNumDocumentsFinalFromDonors(executor);
                    })
-                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                   .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
                            telemetryCtx,
                            "ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency");
@@ -465,9 +461,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until<StatusWith<ReshardingCoordinatorDocument>>(
-            [](const StatusWith<ReshardingCoordinatorDocument>& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getAbortToken())
+        .runOn(**executor, _ctHolder->getAbortToken())
         .onCompletion([this](auto passthroughFuture) {
             _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
             return passthroughFuture;
@@ -537,8 +531,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                   "Resharding coordinator encountered unrecoverable error while committing",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getStepdownToken())
+        .runOn(**executor, _ctHolder->getStepdownToken())
         .onError([this, executor](Status status) {
             if (status == ErrorCodes::TransactionTooLargeForCache) {
                 return _onAbortCoordinatorAndParticipants(executor, status);
@@ -614,8 +607,7 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                           "committing",
                           "error"_attr = status);
                 })
-                .until<Status>([](const Status& status) { return status.isOK(); })
-                .on(**executor, _ctHolder->getStepdownToken())
+                .runOn(**executor, _ctHolder->getStepdownToken())
                 .onError([this, executor](Status status) {
                     {
                         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -849,8 +841,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
                   "Resharding coordinator encountered unrecoverable error while aborting",
                   "error"_attr = retryStatus);
         })
-        .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
-        .on(**executor, _ctHolder->getStepdownToken())
+        .runOn(**executor, _ctHolder->getStepdownToken())
         // Return back original status.
         .then([status] { return status; });
 }
@@ -906,8 +897,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
                   "participants",
                   "error"_attr = retryStatus);
         })
-        .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
-        .on(**executor, _ctHolder->getStepdownToken())
+        .runOn(**executor, _ctHolder->getStepdownToken())
         // Return back the original status.
         .then([status] { return status; });
 }
@@ -1020,8 +1010,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                   "Resharding coordinator encountered unrecoverable error refreshing routing info",
                   "error"_attr = status.getStatus());
         })
-        .until<StatusWith<bool>>([](const StatusWith<bool>& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getAbortToken())
+        .runOn(**executor, _ctHolder->getAbortToken())
         .onError(([this, executor](StatusWith<bool> status) {
             return ExecutorFuture<bool>(**executor, _getEffectiveStatus(status.getStatus()));
         }));
@@ -1331,8 +1320,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                   "documents to copy from donor shards",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getAbortToken())
+        .runOn(**executor, _ctHolder->getAbortToken())
         .then([this] {
             // Wait for the update to the coordinator doc to be majority committed before moving to
             // the next step.
@@ -1575,8 +1563,7 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFro
                   "number of documents from donor shards",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _ctHolder->getAbortToken())
+        .runOn(**executor, _ctHolder->getAbortToken())
         .then([this] {
             // Wait for the update to the coordinator doc to be majority committed before moving to
             // the next step.

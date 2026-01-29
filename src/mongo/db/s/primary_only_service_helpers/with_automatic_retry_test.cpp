@@ -30,6 +30,8 @@
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 
 #include "mongo/base/status.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -45,11 +47,13 @@ namespace primary_only_service_helpers {
 class WithAutomaticRetryTest : public unittest::Test {
 protected:
     void setUp() override {
-        _executor = std::make_shared<ThreadPool>([]() {
+        auto network = std::make_unique<executor::NetworkInterfaceMock>();
+        auto pool = std::make_unique<ThreadPool>([]() {
             ThreadPool::Options options;
             options.maxThreads = 2;
             return options;
         }());
+        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(network));
         _executor->startup();
     }
 
@@ -58,7 +62,7 @@ protected:
         _executor->join();
     }
 
-    std::shared_ptr<ThreadPool> getExecutor() const {
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() const {
         return _executor;
     }
 
@@ -74,7 +78,7 @@ protected:
     }
 
 private:
-    std::shared_ptr<ThreadPool> _executor;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 
 TEST_F(WithAutomaticRetryTest, WithAutomaticRetryRetriesOnPredicateTrue) {
@@ -94,8 +98,7 @@ TEST_F(WithAutomaticRetryTest, WithAutomaticRetryRetriesOnPredicateTrue) {
             [errorToRetryOn](const Status& status) { return status == errorToRetryOn; })
             .onTransientError([](const Status& retryStatus) {})
             .onUnrecoverableError([](const Status& retryStatus) {})
-            .until<Status>([](const Status& status) { return status.isOK(); })
-            .on(getExecutor(), CancellationToken::uncancelable());
+            .runOn(getExecutor(), CancellationToken::uncancelable());
 
     ASSERT_OK(future.getNoThrow());
     ASSERT_EQ(numAttempts, 3);
@@ -119,8 +122,7 @@ TEST_F(WithAutomaticRetryTest, WithAutomaticRetryDoesNotRetryOnPredicateFalse) {
             [errorToRetryOn](const Status& status) { return status == errorToRetryOn; })
             .onTransientError([](const Status& retryStatus) {})
             .onUnrecoverableError([](const Status& retryStatus) {})
-            .until<Status>([](const Status& status) { return status.isOK(); })
-            .on(getExecutor(), CancellationToken::uncancelable());
+            .runOn(getExecutor(), CancellationToken::uncancelable());
 
     ASSERT_NOT_OK(future.getNoThrow());
     ASSERT_EQ(numAttempts, 1);

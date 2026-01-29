@@ -385,8 +385,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "Donor _runUntilBlockingWritesOrErrored encountered unrecoverable error",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .onError([this, executor](Status status) {
             if (_cancelState->isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
@@ -429,8 +428,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                           "error while transitioning to state kError",
                           "error"_attr = status);
                 })
-                .until<Status>([](const Status& status) { return status.isOK(); })
-                .on(**executor, _cancelState->getAbortOrStepdownToken());
+                .runOn(**executor, _cancelState->getAbortOrStepdownToken());
         })
         .onCompletion([this, executor](Status status) {
             if (_cancelState->isAbortedOrSteppingDown()) {
@@ -473,8 +471,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
                   "Unrecoverable error while notifying the coordinator and awaiting decision",
                   "error"_attr = status);
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .then([this] {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
@@ -566,8 +563,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                   "error"_attr = status);
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getStepdownToken());
+        .runOn(**executor, _cancelState->getStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(

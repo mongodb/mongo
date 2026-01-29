@@ -371,6 +371,7 @@ mongo_cc_library(
         "//src/mongo/db/s/metrics:phase_duration.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:cancel_state.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:phase_transition_progress_gen",
+        "//src/mongo/db/s/primary_only_service_helpers:primary_only_service_retry_strategy.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:retry_until_majority_commit.cpp",
         "//src/mongo/db/s/primary_only_service_helpers:retry_until_success_or_cancel.cpp",
         "//src/mongo/db/s/resharding:document_source_resharding_add_resume_id.cpp",

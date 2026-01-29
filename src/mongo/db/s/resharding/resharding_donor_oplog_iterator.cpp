@@ -71,7 +71,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
-    return resharding::WithAutomaticRetry([this, executor, cancelToken, factory]() mutable {
+    return resharding::WithAutomaticRetry([this, executor, cancelToken, factory]() {
                return _getNextBatch(executor, cancelToken, factory);
            })
         .onTransientError([this](const Status& status) {
@@ -86,11 +86,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                   logAttrs(_oplogBufferNss),
                   "error"_attr = redact(status));
         })
-        .until<StatusWith<std::vector<repl::OplogEntry>>>(
-            [](const StatusWith<std::vector<repl::OplogEntry>>& retryStatus) {
-                return retryStatus.isOK();
-            })
-        .on(executor, cancelToken);
+        .runOn(executor, cancelToken);
 }
 
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::_getNextBatch(

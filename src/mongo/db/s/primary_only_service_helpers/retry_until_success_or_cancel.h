@@ -77,18 +77,13 @@ public:
             .onUnrecoverableError([this, operationName](const Status& status) {
                 logError("unrecoverable", operationName, status);
             })
-            .template until<StatusifiedResultType>(
-                [](const auto& statusLike) { return statusLike.isOK(); })
-            .withBackoffBetweenIterations(kBackoff)
-            .on(**_taskExecutor, _token);
+            .runOn(**_taskExecutor, _token);
     }
 
 private:
     void logError(StringData errorKind,
                   const std::string& operationName,
                   const Status& status) const;
-
-    const static Backoff kBackoff;
 
     const std::string _serviceName;
     std::shared_ptr<executor::ScopedTaskExecutor> _taskExecutor;

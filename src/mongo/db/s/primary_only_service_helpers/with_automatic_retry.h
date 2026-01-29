@@ -30,13 +30,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/s/primary_only_service_helpers/primary_only_service_retry_strategy.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/modules.h"
 
 namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
-
-using RetryabilityPredicate = std::function<bool(const Status&)>;
 
 const auto kDefaultRetryabilityPredicate = [](const Status& status) {
     // Always attempt to retry on any type of retryable error. Also retry on errors
@@ -67,7 +66,6 @@ const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& s
 const auto kAlwaysRetryPredicate = [](const Status& status) {
     return true;
 };
-
 /**
  * A fluent-style API for executing asynchronous, future-returning try-until loops, specialized
  * around typical retry logic for components within primary-only services.
@@ -95,62 +93,96 @@ const auto kAlwaysRetryPredicate = [](const Status& status) {
 template <typename BodyCallable>
 class [[nodiscard]] WithAutomaticRetry {
 public:
+    using ErrorHandler = std::function<void(const Status&)>;
+
     explicit WithAutomaticRetry(BodyCallable&& body,
                                 RetryabilityPredicate isRetryable = kDefaultRetryabilityPredicate)
-        : _isRetryable{std::move(isRetryable)}, _body{std::move(body)} {}
+        : _body{std::move(body)}, _retryFactory{std::move(isRetryable)} {}
 
-    decltype(auto) onTransientError(unique_function<void(const Status&)> onTransientError) && {
-        invariant(!_onTransientError, "Cannot call onTransientError() twice");
-        _onTransientError = std::move(onTransientError);
+    decltype(auto) onTransientError(ErrorHandler onTransientError) && {
+        _retryFactory.onTransientError(std::move(onTransientError));
         return std::move(*this);
     }
 
-    decltype(auto) onUnrecoverableError(
-        unique_function<void(const Status&)> onUnrecoverableError) && {
-        invariant(!_onUnrecoverableError, "Cannot call onUnrecoverableError() twice");
-        _onUnrecoverableError = std::move(onUnrecoverableError);
+    decltype(auto) onUnrecoverableError(ErrorHandler onUnrecoverableError) && {
+        _retryFactory.onUnrecoverableError(std::move(onUnrecoverableError));
         return std::move(*this);
     }
 
-    template <typename StatusType>
-    auto until(unique_function<bool(const StatusType&)> condition) && {
-        invariant(_onTransientError, "Must call onTransientError() first");
-        invariant(_onUnrecoverableError, "Must call onUnrecoverableError() first");
-
-        return AsyncTry<BodyCallable>(std::move(_body))
-            .until([onTransientError = std::move(_onTransientError),
-                    onUnrecoverableError = std::move(_onUnrecoverableError),
-                    condition = std::move(condition),
-                    isRetryable = _isRetryable](const StatusType& statusOrStatusWith) {
-                Status status = _getStatus(statusOrStatusWith);
-
-                if (!status.isOK()) {
-                    if (isRetryable(status)) {
-                        onTransientError(status);
-                    } else {
-                        onUnrecoverableError(status);
-                        return true;
-                    }
+    template <typename SleepableExecutor>
+    auto untilRunOn(unique_function<bool()> condition,
+                    SleepableExecutor executor,
+                    CancellationToken cancelToken) && {
+        auto body = std::make_shared<BodyCallable>(std::move(_body));
+        return AsyncTry{[body, retryFactory = _retryFactory, executor, cancelToken] {
+                   auto strategy = retryFactory.make();
+                   return AsyncTry{[body](const TargetingMetadata& metadata) {
+                              return (*body)();
+                          }}
+                       .withRetryStrategy(strategy)
+                       .on(executor, cancelToken);
+               }}
+            .until([condition = std::move(condition)](const auto& result) {
+                if (!result.isOK()) {
+                    return true;
                 }
+                return condition();
+            })
+            .on(executor, cancelToken);
+    }
 
-                return condition(statusOrStatusWith);
-            });
+    template <typename SleepableExecutor>
+    auto runOn(SleepableExecutor executor, CancellationToken cancelToken) && {
+        return WithAutomaticRetry{std::move(_body), _retryFactory.getRetryabilityPredicate()}.runOn(
+            std::move(executor), std::move(cancelToken), _retryFactory.make());
+    }
+
+    template <typename SleepableExecutor>
+    auto runOn(SleepableExecutor executor,
+               CancellationToken cancelToken,
+               std::shared_ptr<RetryStrategy> retryStrategy) && {
+        return AsyncTry{[body = std::move(_body)](const TargetingMetadata& metadata) {
+                   return body();
+               }}
+            .withRetryStrategy(std::move(retryStrategy))
+            .on(executor, cancelToken);
     }
 
 private:
-    static const Status& _getStatus(const Status& status) {
-        return status;
-    }
+    class RetryStrategyFactory {
+    public:
+        RetryStrategyFactory(RetryabilityPredicate isRetryable)
+            : _isRetryable{std::move(isRetryable)} {}
 
-    template <typename ValueType>
-    static const Status& _getStatus(const StatusWith<ValueType>& statusWith) {
-        return statusWith.getStatus();
-    }
-    RetryabilityPredicate _isRetryable;
+        std::shared_ptr<RetryStrategy> make() const {
+            invariant(_onTransientError, "Must call onTransientError() first");
+            invariant(_onUnrecoverableError, "Must call onUnrecoverableError() first");
+            return std::make_shared<PrimaryOnlyServiceRetryStrategy>(
+                _isRetryable, _onTransientError, _onUnrecoverableError);
+        }
+
+        void onTransientError(ErrorHandler onTransientError) {
+            invariant(!_onTransientError, "Cannot call onTransientError() twice");
+            _onTransientError = std::move(onTransientError);
+        }
+
+        void onUnrecoverableError(ErrorHandler onUnrecoverableError) {
+            invariant(!_onUnrecoverableError, "Cannot call onUnrecoverableError() twice");
+            _onUnrecoverableError = std::move(onUnrecoverableError);
+        }
+
+        const RetryabilityPredicate& getRetryabilityPredicate() const {
+            return _isRetryable;
+        }
+
+    private:
+        RetryabilityPredicate _isRetryable;
+        ErrorHandler _onTransientError;
+        ErrorHandler _onUnrecoverableError;
+    };
+
     BodyCallable _body;
-
-    unique_function<void(const Status&)> _onTransientError;
-    unique_function<void(const Status&)> _onUnrecoverableError;
+    RetryStrategyFactory _retryFactory;
 };
 
 }  // namespace primary_only_service_helpers

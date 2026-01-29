@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,37 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/primary_only_service_helpers/retry_until_success_or_cancel.h"
+#pragma once
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+#include "mongo/client/retry_strategy.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
 
-RetryUntilSuccessOrCancel::RetryUntilSuccessOrCancel(
-    StringData serviceName,
-    std::shared_ptr<executor::ScopedTaskExecutor> taskExecutor,
-    std::shared_ptr<ThreadPool> markKilledExecutor,
-    CancellationToken token,
-    BSONObj metadata,
-    RetryabilityPredicate isRetryable)
-    : _serviceName{serviceName},
-      _taskExecutor{std::move(taskExecutor)},
-      _token{token},
-      _retryFactory(token, markKilledExecutor, isRetryable),
-      _metadata{std::move(metadata)} {}
+using RetryabilityPredicate = std::function<bool(const Status&)>;
 
-void RetryUntilSuccessOrCancel::logError(StringData errorKind,
-                                         const std::string& operationName,
-                                         const Status& status) const {
-    LOGV2(8126400,
-          "Service encountered an error",
-          "service"_attr = _serviceName,
-          "errorKind"_attr = errorKind,
-          "operation"_attr = operationName,
-          "status"_attr = redact(status),
-          "metadata"_attr = _metadata);
-}
+class PrimaryOnlyServiceRetryStrategy final : public RetryStrategy {
+public:
+    using RetryCriteria = DefaultRetryStrategy::RetryCriteria;
+
+    PrimaryOnlyServiceRetryStrategy(RetryabilityPredicate retryabilityPredicate,
+                                    unique_function<void(const Status&)> onTransientError,
+                                    unique_function<void(const Status&)> onUnrecoverableError);
+    [[nodiscard]]
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& origin,
+                                             std::span<const std::string> errorLabels) override;
+    void recordSuccess(const boost::optional<HostAndPort>& origin) override;
+    Milliseconds getNextRetryDelay() const override;
+    const TargetingMetadata& getTargetingMetadata() const override;
+    void recordBackoff(Milliseconds backoff) override;
+
+private:
+    std::unique_ptr<RetryStrategy> _underlyingStrategy;
+    unique_function<void(const Status&)> _onTransientError;
+    unique_function<void(const Status&)> _onUnrecoverableError;
+};
 
 }  // namespace primary_only_service_helpers
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

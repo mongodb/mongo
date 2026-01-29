@@ -464,10 +464,9 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                         "readTimestamp"_attr = _atClusterTime,
                         "error"_attr = redact(status));
         })
-        .until<Status>([chainCtx, factory](const Status& status) {
-            return status.isOK() && !chainCtx->moreToCome;
-        })
-        .on(std::move(executor), cancelToken)
+        .untilRunOn([chainCtx, factory]() { return !chainCtx->moreToCome; },
+                    std::move(executor),
+                    cancelToken)
         .semi();
 }
 

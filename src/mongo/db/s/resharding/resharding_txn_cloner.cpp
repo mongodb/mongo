@@ -312,12 +312,19 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    chainCtx->donorRecord = boost::none;
                    return makeReadyFutureWith([] {}).semi();
                })
-        .onTransientError([this](const Status& status) {
+        .onTransientError([this, chainCtx, factory](const Status& status) {
             LOGV2(5461600,
                   "Transient error while cloning config.transactions collection",
                   "sourceId"_attr = _sourceId,
                   "readTimestamp"_attr = _fetchTimestamp,
                   "error"_attr = redact(status));
+            if (chainCtx->pipeline) {
+                auto opCtx = factory.makeOperationContext(&cc());
+                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
+                chainCtx->execPipeline->dispose();
+                chainCtx->pipeline.reset();
+                chainCtx->execPipeline.reset();
+            }
         })
         .onUnrecoverableError([this](const Status& status) {
             LOGV2_ERROR(
@@ -327,18 +334,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 "readTimestamp"_attr = _fetchTimestamp,
                 "error"_attr = redact(status));
         })
-        .until<Status>([chainCtx, factory](const Status& status) {
-            if (!status.isOK() && chainCtx->pipeline) {
-                auto opCtx = factory.makeOperationContext(&cc());
-                chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
-                chainCtx->execPipeline->dispose();
-                chainCtx->pipeline.reset();
-                chainCtx->execPipeline.reset();
-            }
-
-            return status.isOK() && !chainCtx->moreToCome;
-        })
-        .on(std::move(executor), cancelToken)
+        .untilRunOn(
+            [chainCtx, factory] { return !chainCtx->moreToCome; }, std::move(executor), cancelToken)
         .thenRunOn(std::move(cleanupExecutor))
         // It is unsafe to capture `this` once the task is running on the cleanupExecutor because
         // RecipientStateMachine, along with its ReshardingTxnCloner member, may have already been

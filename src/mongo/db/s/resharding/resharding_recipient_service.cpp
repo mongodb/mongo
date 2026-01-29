@@ -424,8 +424,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                   "Recipient _runUntilStrictConsistencyOrErrored encountered unrecoverable error",
                   "error"_attr = redact(status));
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .onError([this, executor](Status status) {
             if (_cancelState->isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
@@ -466,8 +465,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                           "error while transitioning to state kError",
                           "error"_attr = redact(status));
                 })
-                .until<Status>([](const Status& retryStatus) { return retryStatus.isOK(); })
-                .on(**executor, _cancelState->getAbortOrStepdownToken());
+                .runOn(**executor, _cancelState->getAbortOrStepdownToken());
         })
         .onCompletion([this, executor](Status status) {
             if (_cancelState->isAbortedOrSteppingDown()) {
@@ -512,8 +510,7 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                   "coordinator's decision",
                   "error"_attr = redact(status));
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
         .then([this] {
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
                                                  _cancelState->getAbortOrStepdownToken());
@@ -593,8 +590,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                   "error"_attr = redact(status));
         })
         .onUnrecoverableError([](const Status& status) {})
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getStepdownToken());
+        .runOn(**executor, _cancelState->getStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
@@ -1891,8 +1887,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restore
                   "Unrecoverable error while restoring metrics",
                   "error"_attr = redact(status));
         })
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, _cancelState->getAbortOrStepdownToken());
+        .runOn(**executor, _cancelState->getAbortOrStepdownToken());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
