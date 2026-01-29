@@ -2272,10 +2272,8 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         // Convert each index spec into a corresponding IndexBuildInfo instance.
         std::vector<IndexBuildInfo> indexes;
         indexes.reserve(build.indexSpecs.size());
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         for (const auto& spec : build.indexSpecs) {
             IndexBuildInfo indexBuildInfo(spec, boost::none);
-            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(opCtx));
             indexes.push_back(std::move(indexBuildInfo));
         }
 
