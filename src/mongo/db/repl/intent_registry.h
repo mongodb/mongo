@@ -192,6 +192,8 @@ public:
     void updateAndLogStateTransitionMetrics(IntentRegistry::InterruptionType interrupt,
                                             size_t numOpsKilled) const;
 
+    bool hasWriteIntentDeclared(const OperationContext* opCtx);
+
     /**
      * Marks the IntentRegistry enabled and resets the active and last interruption.
      */

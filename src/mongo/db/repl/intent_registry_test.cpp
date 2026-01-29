@@ -70,7 +70,19 @@ TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
             serviceContext->getService()->makeClient(std::to_string(client_i++));
         contexts.back().second = contexts.back().first->makeOperationContext();
         auto opCtx = contexts.back().second.get();
+        bool priorhasWriteIntentDeclared = _intentRegistry.hasWriteIntentDeclared(opCtx);
         auto registerResult = _intentRegistry.registerIntent(intent, opCtx);
+        if (intent == IntentRegistry::Intent::Write) {
+            // hasWriteIntentDeclared should change when registering write intent.
+            ASSERT_TRUE(_intentRegistry.hasWriteIntentDeclared(opCtx));
+            ASSERT_NOT_EQUALS(priorhasWriteIntentDeclared,
+                              _intentRegistry.hasWriteIntentDeclared(opCtx));
+        } else {
+            // hasWriteIntentDeclared should not change when registering a non-write intent.
+            ASSERT_FALSE(_intentRegistry.hasWriteIntentDeclared(opCtx));
+            ASSERT_EQUALS(priorhasWriteIntentDeclared,
+                          _intentRegistry.hasWriteIntentDeclared(opCtx));
+        }
         tokens.push_back(registerResult);
         ASSERT_TRUE(containsToken(registerResult));
 
@@ -78,12 +90,20 @@ TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
         ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
     };
     executePerIntent(createTokens, 10);
+    int count = 0;
     for (auto token : tokens) {
+        if (token.intent() == IntentRegistry::Intent::Write) {
+            ASSERT_TRUE(_intentRegistry.hasWriteIntentDeclared(contexts[count].second.get()));
+        } else {
+            ASSERT_FALSE(_intentRegistry.hasWriteIntentDeclared(contexts[count].second.get()));
+        }
         _intentRegistry.deregisterIntent(token);
+        ASSERT_FALSE(_intentRegistry.hasWriteIntentDeclared(contexts[count].second.get()));
         ASSERT_FALSE(containsToken(token));
 
         expectedIntentCounts[(size_t)token.intent()] -= 1;
         ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
+        count++;
     }
 }
 

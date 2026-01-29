@@ -566,8 +566,12 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         // Declaring Write intent ensures we are the primary node and this operation will be
         // interrupted by StepDown. Only a primary node should be able to allocate optimes for new
         // entries in the oplog.
+        // TODO SERVER-118511 make this function throw if write intent is not declared for this
+        // opCtx.
         boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
-        if (gFeatureFlagIntentRegistration.isEnabled()) {
+        if (gFeatureFlagIntentRegistration.isEnabled() &&
+            !rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                 .hasWriteIntentDeclared(opCtx)) {
             try {
                 writeGuard.emplace(opCtx);
             } catch (const DBException& ex) {

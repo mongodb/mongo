@@ -47,6 +47,7 @@ namespace consensus {
 namespace {
 
 auto registryDecoration = ServiceContext::declareDecoration<IntentRegistry>();
+const auto writeIntentCountOnOpCtx = OperationContext::declareDecoration<AtomicWord<int32_t>>();
 
 }  // namespace
 
@@ -100,8 +101,8 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                 // Mark opCtx as killed before uasserting.
                 auto serviceCtx = opCtx->getServiceContext();
                 auto client = opCtx->getClient();
-                ClientLock lock(client);
-                serviceCtx->killOperation(lock, opCtx, ErrorCodes::InterruptedAtShutdown);
+                ClientLock cl_lock(client);
+                serviceCtx->killOperation(cl_lock, opCtx, ErrorCodes::InterruptedAtShutdown);
             }
             uassert(
                 ErrorCodes::InterruptedAtShutdown,
@@ -143,6 +144,9 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                 "token"_attr = token.id(),
                 "intent"_attr = intentToString(intent),
                 "opCtx"_attr = opCtx->getOpID());
+    if (intent == Intent::Write || intent == Intent::BlockingWrite) {
+        writeIntentCountOnOpCtx(opCtx).fetchAndAdd(1);
+    }
     {
         stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
@@ -154,6 +158,9 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     auto& tokenMap = _tokenMaps[(size_t)token.intent()];
     stdx::lock_guard<stdx::mutex> lock(tokenMap.lock);
 
+    if (token.intent() == Intent::Write || token.intent() == Intent::BlockingWrite) {
+        writeIntentCountOnOpCtx(tokenMap.map[token.id()]).fetchAndSubtract(1);
+    }
     (void)tokenMap.map.erase(token.id());
     if (tokenMap.map.empty()) {
         tokenMap.cv.notify_all();
@@ -276,6 +283,10 @@ void IntentRegistry::updateAndLogStateTransitionMetrics(IntentRegistry::Interrup
     bob.appendNumber("totalOpsKilledByIntentRegistry", totalOpsKilledByIntentRegistry.get());
 
     LOGV2(10286300, "State transition ops metrics for intent registry", "metrics"_attr = bob.obj());
+}
+
+bool IntentRegistry::hasWriteIntentDeclared(const OperationContext* opCtx) {
+    return 0 != writeIntentCountOnOpCtx(opCtx).load();
 }
 
 void IntentRegistry::enable() {
