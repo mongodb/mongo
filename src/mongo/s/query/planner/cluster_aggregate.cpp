@@ -872,6 +872,15 @@ Status runAggregateImpl(OperationContext* opCtx,
             // Validate the pipeline post-optimization.
             const bool alreadyOptimized = true;
             pipeline->validateCommon(alreadyOptimized);
+        } else {
+            LOGV2_INFO(11800100,
+                       "Skipping optimization!",
+                       "routingTableIsAvailable"_attr = routingTableIsAvailable,
+                       "requiresCollation..."_attr = requiresCollationForParsingUnshardedAggregate,
+                       "hasChangeStream"_attr = hasChangeStream,
+                       "shouldDoFLERewrite"_attr = shouldDoFLERewrite,
+                       "collectionLess"_attr =
+                           pipelineCtx->getNamespaceString().isCollectionlessAggregateNS());
         }
 
         // TODO SERVER-89546: Ideally extractDocsNeededBounds should be called internally within
