@@ -159,6 +159,7 @@ executor:
     class: ShardedClusterFixture
     config_shard: "any"
     num_shards: 3
+    num_mongos: 3
     mongos_options:
       set_parameters:
         enableTestCommands: 1
