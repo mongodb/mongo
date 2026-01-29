@@ -32,11 +32,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <map>
 #include <string>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
