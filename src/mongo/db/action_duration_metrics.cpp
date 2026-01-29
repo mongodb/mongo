@@ -82,11 +82,16 @@ void ActionDurationMetrics::report(BSONObjBuilder* builder) const {
 }
 
 ActionDurationTimer::ActionDurationTimer(OperationContext* opCtx, std::string action)
-    : _opCtx(opCtx), _action(std::move(action)), _start(opCtx->fastClockSource().now()) {}
+    : ActionDurationTimer(opCtx->getServiceContext(), std::move(action)) {}
+
+ActionDurationTimer::ActionDurationTimer(ServiceContext* serviceContext, std::string action)
+    : _serviceContext(serviceContext),
+      _action(std::move(action)),
+      _start(serviceContext->getFastClockSource()->now()) {}
 
 ActionDurationTimer::~ActionDurationTimer() {
-    Milliseconds duration = _opCtx->fastClockSource().now() - _start;
-    getActionDurationMetrics(_opCtx->getServiceContext()).record(_action, duration);
+    Milliseconds duration = _serviceContext->getFastClockSource()->now() - _start;
+    getActionDurationMetrics(_serviceContext).record(_action, duration);
 }
 
 }  // namespace mongo

@@ -80,13 +80,14 @@ public:
     ActionDurationTimer(ActionDurationTimer&&) = delete;
     ActionDurationTimer& operator=(ActionDurationTimer&&) = delete;
 
-    // Caller is responsible for using the RAII within the OperationContext lifetime.
+    // Caller is responsible for using the RAII within the OperationContext/ServiceContext lifetime.
     ActionDurationTimer(OperationContext* opCtx, std::string action);
+    ActionDurationTimer(ServiceContext* serviceContext, std::string action);
 
     ~ActionDurationTimer();
 
 private:
-    OperationContext* _opCtx;
+    ServiceContext* _serviceContext;
     std::string _action;
     Date_t _start;
 };
