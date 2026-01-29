@@ -96,6 +96,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"

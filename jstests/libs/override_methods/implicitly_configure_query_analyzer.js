@@ -5,7 +5,14 @@
  * sharding.
  */
 
-import {denylistedNamespaces, ShardingOverrideCommon} from "jstests/libs/override_methods/shard_collection_util.js";
+import {
+    ImplicitlyShardAccessCollSettings,
+    denylistedNamespaces,
+    ShardingOverrideCommon,
+} from "jstests/libs/override_methods/shard_collection_util.js";
+
+// Expose settings for this override on `globalThis`
+globalThis.ImplicitlyShardAccessCollSettings = ImplicitlyShardAccessCollSettings;
 
 const kShardProbability = 0.5;
 const kSamplesPerSecond = 1000; // per second.

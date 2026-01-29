@@ -470,7 +470,7 @@ void checkRenamePreconditions(OperationContext* opCtx,
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, toNss));
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "Can't rename to target collection " << toNss.toStringForErrorMsg()
-                          << " because it must not have associated tags",
+                          << " because it must not have associated zones/tags",
             tags.empty());
 }
 

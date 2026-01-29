@@ -29,6 +29,7 @@ executor:
             retryOnNetworkErrors: true
             wrapCRUDinTransactions: true
           overrideRetryAttempts: 3
+          runningWithStepdowns: true
           sessionOptions:
             causalConsistency: true
             retryWrites: true

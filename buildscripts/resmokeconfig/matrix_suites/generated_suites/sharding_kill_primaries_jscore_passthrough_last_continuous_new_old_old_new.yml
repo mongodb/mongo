@@ -35,6 +35,7 @@ executor:
             retryOnNetworkErrors: true
           nonClusteredConfigTransactions: true
           overrideRetryAttempts: 3
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:

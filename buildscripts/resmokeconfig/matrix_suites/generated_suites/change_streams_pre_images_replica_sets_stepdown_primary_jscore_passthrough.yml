@@ -30,6 +30,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 6
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:
@@ -77,6 +78,7 @@ executor:
       shell_options:
         global_vars:
           TestData:
+            runningWithStepdowns: true
             skipEnforceFastCountOnValidate: true
     - class: CleanEveryN
       n: 20

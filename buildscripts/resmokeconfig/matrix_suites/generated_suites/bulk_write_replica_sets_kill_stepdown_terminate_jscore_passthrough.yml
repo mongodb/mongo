@@ -30,6 +30,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 3
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:

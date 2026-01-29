@@ -4,7 +4,6 @@
  * @tags: [
  *   # Cannot implicitly shard accessed collections because of collection existing when none
  *   # expected.
- *   assumes_no_implicit_collection_creation_after_drop,
  *   requires_getmore,
  *   requires_replication,
  *   uses_api_parameters,
@@ -24,6 +23,24 @@ const mydb = db.getSiblingDB("list_collections1");
 let cursor;
 let res;
 let collObj;
+
+// Detect if collections are implicitly sharded
+const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+
+// Disable implicit re-create on drop for sharded suites (which are those suites that implicitly shard collections on create)
+function dropCollection(coll) {
+    if (isImplicitlyShardedCollection) {
+        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        try {
+            TestData.implicitlyShardOnCreateCollectionOnly = true;
+            assert(coll.drop());
+        } finally {
+            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+        }
+    } else {
+        assert(coll.drop());
+    }
+}
 
 jsTest.log("Test basic command output");
 {
@@ -88,7 +105,7 @@ jsTest.log('Test basic usage of "filter" option');
     assert.eq(2, getListCollectionsCursor(mydb, {filter: {name: {$in: ["foo", "bar"]}}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^foo$/}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^bar$/}}).itcount());
-    mydb.foo.drop();
+    dropCollection(mydb.foo);
     assert.eq(
         1,
         cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function (c) {
@@ -98,7 +115,7 @@ jsTest.log('Test basic usage of "filter" option');
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: {$in: ["foo", "bar"]}}}).itcount());
     assert.eq(0, getListCollectionsCursor(mydb, {filter: {name: /^foo$/}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^bar$/}}).itcount());
-    mydb.bar.drop();
+    dropCollection(mydb.bar);
     assert.eq(
         0,
         cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function (c) {
@@ -305,7 +322,7 @@ jsTest.log("Test on empty database");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
-    mydb.foo.drop();
+    dropCollection(mydb.foo);
     cursor = getListCollectionsCursor(mydb);
     assert.eq(
         0,

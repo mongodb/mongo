@@ -35,6 +35,7 @@
                 # causal consistency should not be required to read your own writes on the new primary
                 # after the old one is killed.
                 maybeUseCausalConsistency: true
+              runningWithStepdowns: true
           # We specify nodb so the shell used by each test will attempt to connect after loading the
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
@@ -67,6 +68,7 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
+              runningWithStepdowns: true
           # We specify nodb so the shell used by each test will attempt to connect after loading the
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
@@ -107,6 +109,7 @@
                 # causal consistency should not be required to read your own writes on the new primary
                 # after the old one is killed.
                 maybeUseCausalConsistency: true
+              runningWithStepdowns: true
 
 ###
 # Fixture options.
@@ -341,6 +344,7 @@
                 # causal consistency should not be required to read your own writes on the new primary
                 # after the old one is killed.
                 maybeUseCausalConsistency: true
+              runningWithStepdowns: true
           # We specify nodb so the shell used by each test will attempt to connect after loading the
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""

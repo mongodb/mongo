@@ -30,6 +30,7 @@ executor:
             backgroundReconfigs: true
             retryOnNetworkErrors: true
           overrideRetryAttempts: 3
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:

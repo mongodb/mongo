@@ -16,6 +16,7 @@ executor:
       global_vars:
         TestData:
           ignoreCommandsIncompatibleWithRollback: true
+          runningWithStepdowns: true
   hooks:
     - class: ContinuousStepdown
     - class: FuzzerRestoreSettings

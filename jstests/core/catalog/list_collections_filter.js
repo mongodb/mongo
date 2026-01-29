@@ -4,8 +4,6 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: applyOps.
  *   not_allowed_with_signed_security_token,
- *   # applyOps is not supported on mongos
- *   assumes_against_mongod_not_mongos,
  *   # Requires no extra options present
  *   incompatible_with_preimages_by_default,
  * ]
@@ -14,6 +12,7 @@
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const mydb = db.getSiblingDB("list_collections_filter");
 assert.commandWorked(mydb.dropDatabase());
@@ -43,9 +42,12 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "RecordIdsReplicated")) {
 assert.commandWorked(mydb.createCollection("lists"));
 assert.commandWorked(mydb.createCollection("ordered_sets"));
 assert.commandWorked(mydb.createCollection("unordered_sets"));
-assert.commandWorked(
-    mydb.runCommand({applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]}),
-);
+
+if (!FixtureHelpers.isMongos(mydb)) {
+    assert.commandWorked(
+        mydb.runCommand({applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]}),
+    );
+}
 
 /**
  * Asserts that the names of the collections returned from running the listCollections
@@ -76,7 +78,11 @@ function testListCollections(filter, expectedNames) {
 }
 
 // No filter.
-testListCollections({}, ["lists", "ordered_sets", "unordered_sets", "arrays_temp"]);
+if (!FixtureHelpers.isMongos(mydb)) {
+    testListCollections({}, ["lists", "ordered_sets", "unordered_sets", "arrays_temp"]);
+} else {
+    testListCollections({}, ["lists", "ordered_sets", "unordered_sets"]);
+}
 
 // Filter without name.
 testListCollections(defaultCollectionOptionsFilter, ["lists", "ordered_sets", "unordered_sets"]);
@@ -102,7 +108,9 @@ testListCollections({name: {$in: ["lists", /.*_sets$/, "non-existent", "", 1234]
 testListCollections(Object.merge({name: "lists"}, defaultCollectionOptionsFilter), ["lists"]);
 testListCollections({name: "lists", "options.temp": true}, []);
 testListCollections({$and: [{name: "lists"}, {"options.temp": true}]}, []);
-testListCollections({name: "arrays_temp", "options.temp": true}, ["arrays_temp"]);
+if (!FixtureHelpers.isMongos(mydb)) {
+    testListCollections({name: "arrays_temp", "options.temp": true}, ["arrays_temp"]);
+}
 
 // Filter with $and and $in.
 testListCollections(Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter), [

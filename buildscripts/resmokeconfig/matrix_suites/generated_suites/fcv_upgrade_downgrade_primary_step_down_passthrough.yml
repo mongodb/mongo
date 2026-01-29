@@ -29,6 +29,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 3
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:
@@ -111,6 +112,7 @@ selector:
     - jstests/core/testing/mixed_version_replica_set.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/catalog/list_collections_correctness.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_getmore

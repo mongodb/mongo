@@ -1,11 +1,7 @@
 /**
  * Test nameOnly option of listCollections
- *
- * @tags: [
- *   # We expect the collection to exist when running listCollections
- *   does_not_support_stepdowns
- * ]
  */
+
 let mydb = db.getSiblingDB("list_collections_nameonly");
 let res;
 let collObj;

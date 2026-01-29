@@ -118,8 +118,10 @@ export var ShardingOverrideCommon = (function () {
 
         // Set the entire chunk range to a single zone, so balancer will be forced to move the
         // evenly distributed chunks to a shard (selected at random).
+        // Skipping this for timeseries collections since they don't support zones.
         if (
             res.ok === 1 &&
+            !timeseriesSpec &&
             ImplicitlyShardAccessCollSettings.getMode() ===
                 ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard
         ) {

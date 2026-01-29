@@ -26,6 +26,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 6
+          runningWithStepdowns: true
           sessionOptions:
             maybeUseCausalConsistency: true
             readConcern:
