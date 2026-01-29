@@ -1012,12 +1012,56 @@ std::vector<ConsistentCollection> CollectionCatalog::establishConsistentCollecti
     return result;
 }
 
-bool CollectionCatalog::_collectionHasPendingCommits(const NamespaceStringOrUUID& nssOrUUID) const {
+const std::shared_ptr<Collection>* CollectionCatalog::_findPendingCommitCollection(
+    const NamespaceStringOrUUID& nssOrUUID) const {
     if (nssOrUUID.isNamespaceString()) {
         return _pendingCommitNamespaces.find(nssOrUUID.nss());
     } else {
         return _pendingCommitUUIDs.find(nssOrUUID.uuid());
     }
+}
+
+bool CollectionCatalog::_hasPendingTimeseriesUpgradeDowngradeCommit(
+    const NamespaceStringOrUUID& nsOrUUID, const std::shared_ptr<Collection>& pending) const {
+    // Timeseries upgrade/downgrade is a rename across 'myts' <-> 'system.buckets.myts'.
+
+    // Find the pending commit instance of the collection after the rename.
+    Collection* pendingCommitColl = pending.get();
+    if (!pendingCommitColl && nsOrUUID.isNamespaceString()) {
+        // The namespace may be the "from" of the rename, so check the "to" instead.
+        auto otherNs = nsOrUUID.nss().isTimeseriesBucketsCollection()
+            ? nsOrUUID.nss().getTimeseriesViewNamespace()
+            : nsOrUUID.nss().makeTimeseriesBucketsNamespace();
+        auto found = _pendingCommitNamespaces.find(otherNs);
+        if (found) {
+            pendingCommitColl = found->get();
+        }
+    }
+
+    if (!pendingCommitColl) {
+        // This is a drop, so it isn't viewless timeseries upgrade/downgrade.
+        return false;
+    }
+    if (!pendingCommitColl->isTimeseriesCollection()) {
+        return false;
+    }
+
+    // Check if it is a rename across 'myts' <-> 'system.buckets.myts' by checking if the last
+    // committed instance we know about on the other timeseries NS has the same UUID.
+    const std::shared_ptr<Collection>* committedColl =
+        pendingCommitColl->ns().isTimeseriesBucketsCollection()
+        ? _collections.find(pendingCommitColl->ns().getTimeseriesViewNamespace())
+        : _collections.find(pendingCommitColl->ns().makeTimeseriesBucketsNamespace());
+    if (!committedColl || pendingCommitColl->uuid() != (*committedColl)->uuid()) {
+        return false;
+    }
+
+    tassert(11581101,
+            fmt::format("Found rename from {} to {} that is not timeseries upgrade/downgrade",
+                        (*committedColl)->ns().toStringForErrorMsg(),
+                        pendingCommitColl->ns().toStringForErrorMsg()),
+            (*committedColl)->isTimeseriesCollection());
+    return true;
 }
 
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
@@ -1033,7 +1077,8 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
         // Otherwise we only verify that the collection is valid for the given timestamp.
         return *readTimestamp < coll->getMinimumValidSnapshot();
     } else {
-        return _collectionHasPendingCommits(nsOrUUID);
+        auto pending = _findPendingCommitCollection(nsOrUUID);
+        return pending && !_hasPendingTimeseriesUpgradeDowngradeCommit(nsOrUUID, *pending);
     }
 }
 
@@ -1059,14 +1104,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // compare the collection instance in _pendingCommitNamespaces and the collection instance in
     // the in-memory catalog with the durable catalog entry to determine which instance to return.
     const auto& pendingCollection = [&]() -> std::shared_ptr<Collection> {
-        if (nssOrUUID.isNamespaceString()) {
-            const std::shared_ptr<Collection>* pending =
-                _pendingCommitNamespaces.find(nssOrUUID.nss());
-            invariant(pending);
-            return *pending;
-        }
-
-        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(nssOrUUID.uuid());
+        const std::shared_ptr<Collection>* pending = _findPendingCommitCollection(nssOrUUID);
         invariant(pending);
         return *pending;
     }();
@@ -1753,7 +1791,9 @@ boost::optional<NamespaceString> CollectionCatalog::_lookupNSSByUUID(OperationCo
     }
 
     if (withCommitPending) {
-        if (const auto collPtr = _pendingCommitUUIDs.find(uuid); collPtr && *collPtr) {
+        if (const auto collPtr = _pendingCommitUUIDs.find(uuid); collPtr && *collPtr &&
+            !_hasPendingTimeseriesUpgradeDowngradeCommit({(*collPtr)->ns().dbName(), uuid},
+                                                         *collPtr)) {
             auto coll = *collPtr;
             return coll->ns();
         }

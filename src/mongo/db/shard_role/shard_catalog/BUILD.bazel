@@ -484,6 +484,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/lock_manager:exception_util",
         "//src/mongo/db/timeseries:timeseries_collmod",
         "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/validate:collection_validation",
         "//src/mongo/db/validate:validate_idl",
         "//src/mongo/db/validate:validate_state",
