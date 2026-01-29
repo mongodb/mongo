@@ -1198,6 +1198,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/genericSetFCVUsage/index_builds/OWNERS.yml
 /jstests/multiVersion/genericSetFCVUsage/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/multiVersion/genericSetFCVUsage/query-optimization/OWNERS.yml
+/jstests/multiVersion/genericSetFCVUsage/query-optimization/**/* @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/multiVersion/genericSetFCVUsage/shard_catalog/OWNERS.yml
 /jstests/multiVersion/genericSetFCVUsage/shard_catalog/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 
