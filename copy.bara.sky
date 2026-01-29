@@ -20,7 +20,7 @@ core.workflow(
         push = "v8.2",
     ),
     # Change path to the folder you want to publish publicly
-    origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**"]),
+    origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**", "src/third_party/private/**"]),
     authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
     mode = "ITERATIVE",
     transformations = [

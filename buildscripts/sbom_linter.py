@@ -303,6 +303,8 @@ def main() -> int:
     )
     # the only files in this dir that are not third party libs
     third_party_libs.remove("scripts")
+    # Nothing in this directory is included in Community/EA
+    third_party_libs.remove("private")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
     error_manager.print_errors()
 
