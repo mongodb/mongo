@@ -12,6 +12,11 @@
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// The 'serverStatus' command is unreliable in test suites with multiple mongos processes given that
+// each node has its own metrics. The assertions here would not hold up if run against multiple
+// mongos.
+TestData.pinToSingleMongos = true;
+
 /**
  * Helper to get the extension getNext time metric from a single node's serverStatus.
  */

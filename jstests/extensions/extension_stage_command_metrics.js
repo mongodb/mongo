@@ -29,7 +29,7 @@ import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = jsTestName();
 
-// The 'serverStatus' command is unreliable in test suites with multiple mongos processesgiven that
+// The 'serverStatus' command is unreliable in test suites with multiple mongos processes given that
 // each node has its own metrics. The assertions here would not hold up if run against multiple
 // mongos.
 TestData.pinToSingleMongos = true;
