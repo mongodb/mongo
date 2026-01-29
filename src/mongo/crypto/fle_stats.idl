@@ -34,6 +34,7 @@ imports:
 
 structs:
     ECOCStats:
+        mod_visibility: public
         description: "Stats about records in ECOC compact touched"
         fields:
             read:
@@ -44,6 +45,7 @@ structs:
                 default: 0
 
     ECStats:
+        mod_visibility: public
         description: "Stats about records in ESC compact touched"
         fields:
             read:
@@ -60,18 +62,21 @@ structs:
                 default: 0
 
     CompactStats:
+        mod_visibility: public
         description: "Stats about records in ECOC, and ESC compact touched"
         fields:
             ecoc: ECOCStats
             esc: ECStats
 
     CleanupStats:
+        mod_visibility: public
         description: "Stats about records in ECOC, and ESC cleanup touched"
         fields:
             ecoc: ECOCStats
             esc: ECStats
 
     FLEIndexTypeStats:
+        mod_visibility: private
         description: "Counters for each FLE2 index type, including unindexed"
         fields:
             unindexed:
