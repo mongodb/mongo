@@ -61,10 +61,13 @@ try {
     const fooV1Options = extensionNodeOptions(extensionNames[0]);
     const fooV2Options = extensionNodeOptions(extensionNames[1]);
 
+    const fooV1WithStubParserFlag = wrapOptionsWithStubParserFeatureFlag(fooV1Options);
+    const fooV2WithStubParserFlag = wrapOptionsWithStubParserFeatureFlag(fooV2Options);
+
     // Test upgrading foo extension in a replica set.
     testPerformReplSetRollingRestart({
-        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
-        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
+        startingNodeOptions: fooV1WithStubParserFlag,
+        restartNodeOptions: fooV2WithStubParserFlag,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1Only,
         // TODO SERVER-115501 Add fine-grained validation.
@@ -74,8 +77,8 @@ try {
 
     // Test upgrading foo extension in a sharded cluster.
     testPerformShardedClusterRollingRestart({
-        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
-        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
+        startingNodeOptions: fooV1WithStubParserFlag,
+        restartNodeOptions: fooV2WithStubParserFlag,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1Only,
         afterConfigHasRestarted: assertFooStageAcceptedV1Only,
@@ -86,8 +89,8 @@ try {
 
     // Test downgrading foo extension in a replica set.
     testPerformReplSetRollingRestart({
-        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
-        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
+        startingNodeOptions: fooV2WithStubParserFlag,
+        restartNodeOptions: fooV1WithStubParserFlag,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1AndV2,
         // TODO SERVER-115501 Add fine-grained validation.
@@ -97,8 +100,8 @@ try {
 
     // Test downgrading foo extension in a sharded cluster.
     testPerformShardedClusterRollingRestart({
-        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
-        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
+        startingNodeOptions: fooV2WithStubParserFlag,
+        restartNodeOptions: fooV1WithStubParserFlag,
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1AndV2,
         afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,

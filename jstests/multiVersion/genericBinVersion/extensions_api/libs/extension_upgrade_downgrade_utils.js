@@ -5,6 +5,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
 
 const fooStageUnrecognizedErrCode = 40324;
@@ -58,6 +59,16 @@ export function wrapOptionsWithStubParserFeatureFlag(baseOptions) {
         setParameter: {
             ...baseOptions.setParameter,
             featureFlagExtensionStubParsers: true,
+        },
+    };
+}
+
+export function wrapOptionsWithViewsAndUnionWithFeatureFlag(baseOptions) {
+    return {
+        ...baseOptions,
+        setParameter: {
+            ...baseOptions.setParameter,
+            featureFlagExtensionViewsAndUnionWith: true,
         },
     };
 }
@@ -144,6 +155,14 @@ export function assertExtensionVectorSearchInUnionWithUsed(primaryConn) {
     assertArrayEq({actual: coll.aggregate(vectorSearchInUnionWithPipeline).toArray(), expected: expectedDocs});
 }
 
+export function assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn) {
+    if (FeatureFlagUtil.isPresentAndEnabled(primaryConn, "ExtensionViewsAndUnionWith")) {
+        assertExtensionVectorSearchInUnionWithUsed(primaryConn);
+    } else {
+        assertLegacyVectorSearchInUnionWithUsed(primaryConn);
+    }
+}
+
 export function assertFooViewCreationRejectedAndLegacyVectorSearchUsed(primaryConn) {
     assertFooViewCreationRejected(primaryConn);
     assertLegacyVectorSearchUsed(primaryConn);
@@ -159,7 +178,7 @@ export function assertFooViewAllowedAndLegacyVectorSearchUsed(primaryConn) {
 export function assertFooViewAndExtensionVectorSearchUsed(primaryConn) {
     assertFooStageAccepted(primaryConn);
     assertExtensionVectorSearchUsed(primaryConn);
-    assertExtensionVectorSearchInUnionWithUsed(primaryConn);
+    assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn);
 }
 
 export function assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed(primaryConn) {
@@ -287,7 +306,7 @@ export function assertFooViewCreationAllowedAndLegacyVectorSearchUsed(primaryCon
 export function assertFooViewCreationAllowedAndExtensionVectorSearchUsed(primaryConn) {
     assertFooStageAccepted(primaryConn);
     assertExtensionVectorSearchUsed(primaryConn);
-    assertExtensionVectorSearchInUnionWithUsed(primaryConn);
+    assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn);
 }
 
 export function assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade(primaryConn) {
@@ -310,7 +329,7 @@ export function assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade(
 export function assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed(primaryConn, shardingTest) {
     // Router propagates flag to shards, so extension behavior should be used
     assertExtensionVectorSearchUsed(primaryConn);
-    assertExtensionVectorSearchInUnionWithUsed(primaryConn);
+    assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn);
 }
 
 /**
@@ -333,5 +352,5 @@ export function assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed(primaryConn, 
 export function assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed(primaryConn, shardingTest) {
     // All nodes have flag, so extension behavior should be used
     assertExtensionVectorSearchUsed(primaryConn);
-    assertExtensionVectorSearchInUnionWithUsed(primaryConn);
+    assertVectorSearchInUnionWithBasedOnFeatureFlag(primaryConn);
 }

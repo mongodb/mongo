@@ -40,6 +40,7 @@ import {
     deleteMultiversionExtensionConfigs,
     wrapOptionsWithStubParserFeatureFlag,
     multipleExtensionNodeOptions,
+    wrapOptionsWithViewsAndUnionWithFeatureFlag,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_upgrade_downgrade_utils.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -55,34 +56,39 @@ const ifrFlags = {
 };
 
 try {
-    const baseUpgradeOptions = multipleExtensionNodeOptions([extensionNames[0], extensionNames[1]]);
-    const upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(baseUpgradeOptions);
-    testPerformUpgradeReplSet({
-        upgradeNodeOptions,
-        ifrFlags,
-        setupFn: setupCollection,
-        whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
-        // TODO SERVER-115501 Add validation.
-        whenSecondariesAreLatestBinary: () => {},
-        whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
-        whenIfrFlagsAreToggled: assertFooViewAndExtensionVectorSearchUsed,
-        whenFullyUpgraded: assertFooViewAndExtensionVectorSearchUsed,
-    });
+    for (var extensionUnionWithFeatureFlagValue of [true, false]) {
+        const baseUpgradeOptions = multipleExtensionNodeOptions([extensionNames[0], extensionNames[1]]);
+        var upgradeNodeOptions = wrapOptionsWithStubParserFeatureFlag(baseUpgradeOptions);
+        if (extensionUnionWithFeatureFlagValue) {
+            upgradeNodeOptions = wrapOptionsWithViewsAndUnionWithFeatureFlag(upgradeNodeOptions);
+        }
+        testPerformUpgradeReplSet({
+            upgradeNodeOptions,
+            ifrFlags,
+            setupFn: setupCollection,
+            whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+            // TODO SERVER-115501 Add validation.
+            whenSecondariesAreLatestBinary: () => {},
+            whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+            whenIfrFlagsAreToggled: assertFooViewAndExtensionVectorSearchUsed,
+            whenFullyUpgraded: assertFooViewAndExtensionVectorSearchUsed,
+        });
 
-    testPerformUpgradeSharded({
-        upgradeNodeOptions,
-        ifrFlags,
-        setupFn: setupCollection,
-        whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
-        whenOnlyConfigIsLatestBinary: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
-        whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
-        whenMongosBinaryIsLastLTS: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
-        whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
-        whenOnlyRouterHasIFRFlag: assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed,
-        whenOnlyShardHasIFRFlag: assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed,
-        whenIfrFlagsAreToggled: assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed,
-        whenFullyUpgraded: assertFooViewAndExtensionVectorSearchUsed,
-    });
+        testPerformUpgradeSharded({
+            upgradeNodeOptions,
+            ifrFlags,
+            setupFn: setupCollection,
+            whenFullyDowngraded: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+            whenOnlyConfigIsLatestBinary: assertFooViewCreationRejectedAndLegacyVectorSearchUsed,
+            whenSecondariesAndConfigAreLatestBinary: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
+            whenMongosBinaryIsLastLTS: assertFooViewCreationOnlyAllowedAndLegacyVectorSearchUsed,
+            whenBinariesAreLatestAndFCVIsLastLTS: assertFooViewCreationAndVectorSearchBehaviorAfterPrimaryUpgrade,
+            whenOnlyRouterHasIFRFlag: assertOnlyRouterHasIFRFlagAndExtensionVectorSearchUsed,
+            whenOnlyShardHasIFRFlag: assertOnlyShardHasIFRFlagAndLegacyVectorSearchUsed,
+            whenIfrFlagsAreToggled: assertAllNodesHaveIFRFlagAndExtensionVectorSearchUsed,
+            whenFullyUpgraded: assertFooViewAndExtensionVectorSearchUsed,
+        });
+    }
 } finally {
     deleteMultiversionExtensionConfigs(extensionNames);
 }
