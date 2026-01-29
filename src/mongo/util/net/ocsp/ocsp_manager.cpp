@@ -72,6 +72,7 @@ void OCSPManager::shutdown(ServiceContext* service) {
     auto* ocspManager = get(service);
     if (ocspManager) {
         ocspManager->_pool->shutdown();
+        ocspManager->_pool->join();
     }
 }
 
