@@ -1,0 +1,7 @@
+description: Runs mongot e2e tests with the $vectorSearch extension loaded and enabled via the featureFlagVectorSearchExtension IFR flag.
+
+base_suite: mongot_community_e2e_single_node
+overrides:
+  - vector_search_extension.exclude_incompatible_tests
+  - vector_search_extension.load_extension
+  - vector_search_extension.extension_enabled

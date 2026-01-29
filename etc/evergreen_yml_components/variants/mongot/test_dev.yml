@@ -283,4 +283,4 @@ buildvariants:
       - name: compile_and_archive_dist_test_TG
         distros:
           - rhel8.8-large
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.experimental

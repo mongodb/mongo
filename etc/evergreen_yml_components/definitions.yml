@@ -561,6 +561,15 @@ functions:
         args:
           - "./src/evergreen/functions/get_mongot_version.sh"
 
+  "setup mongot-extension":
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "setup mongot-extension"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/functions/setup_mongot_extension.sh"
+
   "run diskstats": &run_diskstats
     command: subprocess.exec
     display_name: "run diskstats"

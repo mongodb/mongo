@@ -54,3 +54,6 @@ filters:
   - "generated_suites/sharding_kill_stepdown*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "generated_suites/vector_search_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api

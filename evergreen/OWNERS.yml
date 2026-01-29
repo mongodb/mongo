@@ -54,3 +54,6 @@ filters:
   - "verify_extension_visibility_test.sh":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "functions/setup_mongot_extension.sh":
+    approvers:
+      - 10gen/query-integration-extensions-api

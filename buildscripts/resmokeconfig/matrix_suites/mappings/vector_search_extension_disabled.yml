@@ -1,0 +1,6 @@
+description: Runs mongot e2e tests with the $vectorSearch extension loaded but disabled via the featureFlagVectorSearchExtension IFR flag. Because the extension is loaded but disabled, we expect legacy $vectorSearch to be used and identical results as mongot_community_e2e_single_node.
+
+base_suite: mongot_community_e2e_single_node
+overrides:
+  - vector_search_extension.load_extension
+  - vector_search_extension.extension_disabled
