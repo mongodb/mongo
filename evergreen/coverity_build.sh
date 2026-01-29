@@ -21,7 +21,7 @@ bazel_jobs=$(bc <<<"$(grep -c '^processor' /proc/cpuinfo) * .85 / 1")
 cov_jobs=$(bc <<<"$(grep -c '^processor' /proc/cpuinfo) * .40 / 1")
 
 build_config="--config=local --jobs=$bazel_jobs --build_atlas=True --compiler_type=gcc --opt=off --dbg=False --allocator=system --define=MONGO_VERSION=${version}"
-bazel_query='mnemonic("CppCompile|LinkCompile", filter(//src/mongo, deps(//:install-core)) except //src/mongo/db/modules/enterprise/src/streams/third_party/...)'
+bazel_query='mnemonic("CppCompile|LinkCompile", filter(//src/mongo, deps(//:install-core)))'
 bazel_cache="--output_user_root=$workdir/bazel_cache"
 
 python bazel/coverity/generate_coverity_targets.py --bazel_executable="bazel" --bazel_cache=$bazel_cache --bazel_query="$bazel_query" $build_config --noinclude_artifacts
