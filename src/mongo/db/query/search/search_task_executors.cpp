@@ -107,22 +107,22 @@ struct State {
             std::move(searchIndexThreadPool), std::move(searchIdxNetworkInterface));
     }
 
-    std::atomic<std::shared_ptr<TaskExecutor>> mongotExecutor;           // NOLINT
-    std::atomic<std::shared_ptr<TaskExecutor>> searchIndexMgmtExecutor;  // NOLINT
+    std::shared_ptr<TaskExecutor> mongotExecutor;
+    std::shared_ptr<TaskExecutor> searchIndexMgmtExecutor;
 };
 
 const auto getExecutorHolder = ServiceContext::declareDecoration<State>();
 
 Rarely _shutdownLogSampler;
 
-void destroyTaskExecutor(std::atomic<std::shared_ptr<TaskExecutor>>& executor) {
+void destroyTaskExecutor(std::shared_ptr<TaskExecutor>& executor) {
     // We want to make sure that the TaskExecutor gets destructed here so that it frees all its
     // resources (e.g. GRPC clients) before continuing. However, any in progress search operations
     // also keep a shared_ptr reference to the object, so resetting the global pointer isn't enough
     // to guarantee that it is destructed. We create a weak pointer here and wait for it to be
     // expired so that we know that all references are gone.
-    std::weak_ptr<executor::TaskExecutor> weakReference(executor.load());
-    executor.store(nullptr);
+    std::weak_ptr<executor::TaskExecutor> weakReference = executor;
+    executor.reset();
 
     // Tick the log sampler in advance to avoid logging immediately - only log if it's a long wait.
     _shutdownLogSampler.tick();
@@ -138,7 +138,7 @@ void destroyTaskExecutor(std::atomic<std::shared_ptr<TaskExecutor>>& executor) {
 }  // namespace
 
 StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(ServiceContext* svc) {
-    if (auto mongotExec = getExecutorHolder(svc).mongotExecutor.load()) {
+    if (auto mongotExec = getExecutorHolder(svc).mongotExecutor) {
         return mongotExec;
     }
     return {ErrorCodes::ShutdownInProgress, "mongot task executor is shutting down"};
@@ -146,7 +146,7 @@ StatusWith<std::shared_ptr<TaskExecutor>> getMongotTaskExecutor(ServiceContext* 
 
 StatusWith<std::shared_ptr<TaskExecutor>> getSearchIndexManagementTaskExecutor(
     ServiceContext* svc) {
-    if (auto indexMgmtExec = getExecutorHolder(svc).searchIndexMgmtExecutor.load()) {
+    if (auto indexMgmtExec = getExecutorHolder(svc).searchIndexMgmtExecutor) {
         return indexMgmtExec;
     }
     return {ErrorCodes::ShutdownInProgress,
@@ -157,12 +157,12 @@ void startupSearchExecutorsIfNeeded(ServiceContext* svc) {
     auto& holder = getExecutorHolder(svc);
     if (!globalMongotParams.host.empty()) {
         LOGV2_INFO(8267400, "Starting up mongot task executor.");
-        holder.mongotExecutor.load()->startup();
+        holder.mongotExecutor->startup();
     }
 
     if (!globalSearchIndexParams.host.empty()) {
         LOGV2_INFO(8267401, "Starting up search index management task executor.");
-        holder.searchIndexMgmtExecutor.load()->startup();
+        holder.searchIndexMgmtExecutor->startup();
     }
 }
 
@@ -170,28 +170,25 @@ void shutdownSearchExecutorsIfNeeded(ServiceContext* svc) {
     auto& state = getExecutorHolder(svc);
     if (!globalMongotParams.host.empty()) {
         LOGV2_INFO(10026102, "Shutting down mongot task executor.");
-        {
-            auto mongotExecutor = state.mongotExecutor.load();
-            // The underlying mongot TaskExecutor must outlive any PinnedConnectionTaskExecutor that
-            // uses it, so we must drain PCTEs first and then shut down the mongot executor.
-            shutdownPinnedExecutors(svc, mongotExecutor);
-            mongotExecutor->shutdown();
-            mongotExecutor->join();
-        }
-        destroyTaskExecutor(state.mongotExecutor);
+        auto& mongotExecutor = state.mongotExecutor;
+        // The underlying mongot TaskExecutor must outlive any PinnedConnectionTaskExecutor that
+        // uses it, so we must drain PCTEs first and then shut down the mongot executor.
+        shutdownPinnedExecutors(svc, mongotExecutor);
+        mongotExecutor->shutdown();
+        mongotExecutor->join();
+
+        destroyTaskExecutor(mongotExecutor);
         LOGV2_INFO(11323801, "Finished shutting down mongot task executor.");
     }
 
     if (!globalSearchIndexParams.host.empty()) {
         LOGV2_INFO(10026103, "Shutting down search index management task executor.");
-        {
-            auto searchIndexMgmtExecutor = state.searchIndexMgmtExecutor.load();
-            shutdownPinnedExecutors(svc, searchIndexMgmtExecutor);
-            searchIndexMgmtExecutor->shutdown();
-            searchIndexMgmtExecutor->join();
-        }
+        auto& searchIndexMgmtExecutor = state.searchIndexMgmtExecutor;
+        shutdownPinnedExecutors(svc, searchIndexMgmtExecutor);
+        searchIndexMgmtExecutor->shutdown();
+        searchIndexMgmtExecutor->join();
 
-        destroyTaskExecutor(state.searchIndexMgmtExecutor);
+        destroyTaskExecutor(searchIndexMgmtExecutor);
         LOGV2_INFO(11323802, "Finished shutting down search index management task executor.");
     }
 }
