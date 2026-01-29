@@ -72,95 +72,118 @@ function arrayEqWithIgnoredFields(union, regular, ignoredFields) {
     return arrayEq(union, regular, false /* verbose */, null /* valueComparator */, ignoredFields);
 }
 
-function assertExplainEq(union, regular) {
+function assertExplainEq(getUnion, getRegular) {
     if (FixtureHelpers.isMongos(testDB)) {
-        assert(
-            anyEqWithIgnoredFields(union.splitPipeline, regular.splitPipeline, mongosIgnoredFields),
-            buildErrorString(union, regular, "splitPipeline"),
+        let lastUnion, lastRegular, failedCheck;
+        // Accepting to eventually get the expected results since in a scenario where we have more than 1 mongos, the
+        // one in charge may have stale routing information and we're ok to wait for it to refresh.
+        assert.soon(
+            () => {
+                lastUnion = getUnion();
+                lastRegular = getRegular();
+                if (!anyEqWithIgnoredFields(lastUnion.splitPipeline, lastRegular.splitPipeline, mongosIgnoredFields)) {
+                    failedCheck = "splitPipeline";
+                    return false;
+                }
+                if (lastUnion.mergeType !== lastRegular.mergeType) {
+                    failedCheck = "mergeType";
+                    return false;
+                }
+                if (!documentEqWithIgnoredFields(lastUnion.shards, lastRegular.shards, mongosIgnoredFields)) {
+                    failedCheck = "shards";
+                    return false;
+                }
+                return true;
+            },
+            () => buildErrorString(lastUnion, lastRegular, failedCheck),
         );
+    } else {
+        const union = getUnion();
+        const regular = getRegular();
+        if ("executionStats" in regular) {
+            const unionStats = union[0].$cursor.executionStats;
+            const regularStats = regular.executionStats;
 
-        assert.eq(union.mergeType, regular.mergeType, buildErrorString(union, regular, "mergeType"));
-
-        assert(
-            documentEqWithIgnoredFields(union.shards, regular.shards, mongosIgnoredFields),
-            buildErrorString(union, regular, "shards"),
-        );
-    } else if ("executionStats" in regular) {
-        const unionStats = union[0].$cursor.executionStats;
-        const regularStats = regular.executionStats;
-
-        assert(
-            documentEqWithIgnoredFields(
-                unionStats.executionStages,
-                regularStats.executionStages,
-                executionStatsIngoredFields,
-            ),
-            buildErrorString(unionStats, regularStats, "executionStages"),
-        );
-    } else if ("stages" in regular) {
-        // For explains run with the runCommand({explain: ...}) format.
-        if (
-            regular.stages.length > 1 &&
-            "$cursor" in regular.stages[0] &&
-            "executionStats" in regular.stages[0]["$cursor"]
-        ) {
             assert(
-                arrayEqWithIgnoredFields(union, regular.stages, [
-                    ...stagesIgnoredFields,
-                    ...executionStatsIngoredFields,
-                ]),
-                buildErrorString(union, regular, "stages with executionStats"),
+                documentEqWithIgnoredFields(
+                    unionStats.executionStages,
+                    regularStats.executionStages,
+                    executionStatsIngoredFields,
+                ),
+                buildErrorString(unionStats, regularStats, "executionStages"),
+            );
+        } else if ("stages" in regular) {
+            // For explains run with the runCommand({explain: ...}) format.
+            if (
+                regular.stages.length > 1 &&
+                "$cursor" in regular.stages[0] &&
+                "executionStats" in regular.stages[0]["$cursor"]
+            ) {
+                assert(
+                    arrayEqWithIgnoredFields(union, regular.stages, [
+                        ...stagesIgnoredFields,
+                        ...executionStatsIngoredFields,
+                    ]),
+                    buildErrorString(union, regular, "stages with executionStats"),
+                );
+            } else {
+                assert(
+                    arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
+                    buildErrorString(union, regular, "stages"),
+                );
+            }
+        } else if ("queryPlanner" in regular) {
+            assert.eq(union.length, 1, "Expected single union stage");
+            const unionCursor = union[0].$cursor;
+            assert(
+                documentEqWithIgnoredFields(regular.queryPlanner, unionCursor.queryPlanner, queryPlannerIgnoredFields),
+                buildErrorString(unionCursor, regular, "queryPlanner"),
             );
         } else {
             assert(
-                arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
-                buildErrorString(union, regular, "stages"),
+                false,
+                "Don't know how to compare following explains.\n" +
+                    "regular: " +
+                    tojson(regular) +
+                    "\n" +
+                    "union: " +
+                    tojson(union) +
+                    "\n",
             );
         }
-    } else if ("queryPlanner" in regular) {
-        assert.eq(union.length, 1, "Expected single union stage");
-        const unionCursor = union[0].$cursor;
-        assert(
-            documentEqWithIgnoredFields(regular.queryPlanner, unionCursor.queryPlanner, queryPlannerIgnoredFields),
-            buildErrorString(unionCursor, regular, "queryPlanner"),
-        );
-    } else {
-        assert(
-            false,
-            "Don't know how to compare following explains.\n" +
-                "regular: " +
-                tojson(regular) +
-                "\n" +
-                "union: " +
-                tojson(union) +
-                "\n",
-        );
     }
 }
 
-function assertExplainMatch(unionExplain, regularExplain) {
-    const unionStage = getUnionWithStage(unionExplain);
-    assert(unionStage, unionExplain);
-    const unionSubExplain = unionStage.$unionWith.pipeline;
-    assertExplainEq(unionSubExplain, regularExplain);
+function assertExplainMatch(getUnionExplain, getRegularExplain) {
+    // Create lambdas that extract the union subexplain from the full explain.
+    const getUnionSubExplain = () => {
+        const unionExplain = getUnionExplain();
+        const unionStage = getUnionWithStage(unionExplain);
+        assert(unionStage, "Failed to find $unionWith stage in: " + tojson(unionExplain));
+        return unionStage.$unionWith.pipeline;
+    };
+    assertExplainEq(getUnionSubExplain, getRegularExplain);
 }
 
 function testPipeline(pipeline) {
-    let unionResult = collA.aggregate([{$unionWith: {coll: collB.getName(), pipeline: pipeline}}], {explain: true});
-    let queryResult = collB.aggregate(pipeline, {explain: true});
-    assertExplainMatch(unionResult, queryResult);
+    const getUnionResult = () =>
+        collA.aggregate([{$unionWith: {coll: collB.getName(), pipeline: pipeline}}], {explain: true});
+    const getRegularResult = () => collB.aggregate(pipeline, {explain: true});
+    assertExplainMatch(getUnionResult, getRegularResult);
 
     // Alternative explain invocation. This is a regression test for SERVER-89344.
     if (!FixtureHelpers.isMongos(db)) {
-        unionResult = db.runCommand({
-            explain: {
-                "aggregate": collA.getName(),
-                "pipeline": [{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
-                "cursor": {},
-            },
-        });
-        queryResult = db.runCommand({explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
-        assertExplainMatch(unionResult, queryResult);
+        const getUnionResult2 = () =>
+            db.runCommand({
+                explain: {
+                    "aggregate": collA.getName(),
+                    "pipeline": [{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
+                    "cursor": {},
+                },
+            });
+        const getRegularResult2 = () =>
+            db.runCommand({explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
+        assertExplainMatch(getUnionResult2, getRegularResult2);
     }
 }
 
@@ -279,7 +302,10 @@ result = collA
     .explain("executionStats")
     .aggregate([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 2}}}]}}]);
 expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
-assertExplainMatch(result, expectedResult);
+assertExplainMatch(
+    () => result,
+    () => expectedResult,
+);
 
 // Test a nested $unionWith which itself should perform an index scan.
 testPipeline([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 0}}}]}}]);
@@ -293,7 +319,10 @@ if (!res["failpoint.disablePipelineOptimization"].mode) {
         .explain("executionStats")
         .aggregate([{$unionWith: indexedColl.getName()}, {$match: {val: {$gt: 2}}}]);
     expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
-    assertExplainMatch(result, expectedResult);
+    assertExplainMatch(
+        () => result,
+        () => expectedResult,
+    );
 }
 
 // Test that $unionWith that has uses variables runs correctly.
