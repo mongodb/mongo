@@ -945,6 +945,197 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
     return attemptCollectionScan(query, isTailable, params);
 }
 
+/**
+ * Extends the candidate plan set with additional plans that the main PlanEnumerator doesn't
+ * generate. This includes index-provided sort plans, covered projection plans, covered distinct
+ * scan plans, and $search solutions. The potential extra plans are added to 'out'.
+ */
+void extendCandidatePlans(const CanonicalQuery& query,
+                          const QueryPlannerParams& params,
+                          const std::vector<IndexEntry>& fullIndexList,
+                          const std::vector<IndexEntry>& relevantIndices,
+                          bool hasHint,
+                          boost::optional<StringSet&> relevantIndexOutput,
+                          std::vector<std::unique_ptr<QuerySolution>>& out) {
+    const bool isDistinctMultiplanningEnabled =
+        query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
+    const auto& sortPattern = query.getSortPattern();
+    const auto& sortRequirementForDistinct =
+        query.getDistinct() ? query.getDistinct()->getSortRequirement() : boost::none;
+
+    // If a sort order is requested, there may be an index that provides it, even if that
+    // index is not over any predicates in the query. When planning a distinct scan query, a
+    // sort might be required even when the query doesn't have an actual sort.
+    if ((sortPattern || sortRequirementForDistinct) &&
+        !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
+                                     MatchExpression::GEO_NEAR) &&
+        !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::TEXT)) {
+        // See if we have a sort provided from an index already.
+        // This is implied by the presence of a non-blocking solution.
+        bool usingIndexToSort = false;
+        for (size_t i = 0; i < out.size(); ++i) {
+            auto soln = out[i].get();
+            if (!soln->hasBlockingStage) {
+                usingIndexToSort = true;
+                break;
+            }
+        }
+
+        if (!usingIndexToSort || !sortPattern) {
+            for (size_t i = 0; i < fullIndexList.size(); ++i) {
+                const IndexEntry& index = fullIndexList[i];
+                // Only a regular index or the non-hashed prefix of a compound hashed index can
+                // be used to provide a sort. In addition, the index needs to be a non-sparse
+                // index.
+                //
+                // TODO: Sparse indexes can't normally provide a sort, because non-indexed
+                // documents could potentially be missing from the result set.  However, if the
+                // query predicate can be used to guarantee that all documents to be returned
+                // are indexed, then the index should be able to provide the sort.
+                //
+                // For example:
+                // - Sparse index {a: 1, b: 1} should be able to provide a sort for
+                //   find({b: 1}).sort({a: 1}).  SERVER-13908.
+                // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
+                //   2dsphereIndexVersion=2) should be able to provide a sort for
+                //   find({b: GEO}).sort({a:1}).  SERVER-10801.
+                if (index.type != INDEX_BTREE && index.type != INDEX_HASHED) {
+                    continue;
+                }
+                if (index.sparse) {
+                    continue;
+                }
+
+                // If the index collation differs from the query collation, the index should not
+                // be used to provide a sort, because strings will be ordered incorrectly.
+                if (!CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
+                    continue;
+                }
+
+                // Partial indexes can only be used to provide a sort only if the query
+                // predicate is compatible.
+                if (index.filterExpr &&
+                    !expression::isSubsetOf(query.getPrimaryMatchExpression(), index.filterExpr)) {
+                    continue;
+                }
+
+                auto addPlansWithIndexProvidedSort = [&](const BSONObj& kp, const int direction) {
+                    const bool providesSort =
+                        sortPattern && QueryPlannerCommon::providesSort(query, kp);
+                    if (!providesSort &&
+                        !QueryPlannerCommon::providesSortRequirementForDistinct(query.getDistinct(),
+                                                                                kp)) {
+                        return;
+                    }
+
+                    LOGV2_DEBUG(
+                        20981, 5, "Planner: outputting soln that uses index to provide sort");
+                    auto index = fullIndexList[i];
+                    auto soln = buildWholeIXSoln(index, query, params, direction);
+                    // If the solution was created to satisfy a sort requirement for distinct scan,
+                    // ensure we have a distinct scan plan.
+                    if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
+                        if (relevantIndexOutput) {
+                            // We generated a plan that used an index that was not over any of the
+                            // predicates in the query and thus not in the list of relevantIndices.
+                            // As a result, we need to add the fields of this index to the
+                            // relevantIndexOutput set.
+                            cost_based_ranker::addFieldsToRelevantIndexOutput(
+                                index.keyPattern, relevantIndexOutput.get());
+                        }
+                        PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+                        indexTree->setIndexEntry(fullIndexList[i]);
+                        SolutionCacheData* scd = new SolutionCacheData();
+                        scd->tree.reset(indexTree);
+                        scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
+                        scd->wholeIXSolnDir = direction;
+
+                        soln->cacheData.reset(scd);
+                        out.push_back(std::move(soln));
+                    }
+                };
+
+                const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
+                addPlansWithIndexProvidedSort(kp, 1);
+                addPlansWithIndexProvidedSort(QueryPlannerCommon::reverseSortObj(kp), -1);
+            }
+        }
+    }
+
+    // If a projection exists, there may be an index that allows for a covered plan, even if
+    // none were considered earlier.
+    const auto projection = query.getProj();
+    if (params.mainCollectionInfo.options & QueryPlannerParams::GENERATE_COVERED_IXSCANS &&
+        out.size() == 0 && query.getQueryObj().isEmpty() && projection &&
+        !projection->requiresDocument()) {
+
+        const auto* indicesToConsider = hasHint ? &relevantIndices : &fullIndexList;
+        for (auto&& index : *indicesToConsider) {
+            if (index.type != INDEX_BTREE || index.multikey || index.sparse || index.filterExpr ||
+                !CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
+                continue;
+            }
+
+            auto soln = buildWholeIXSoln(
+                index,
+                query,
+                // TODO SERVER-87683 Investigate why empty parameters are used instead of 'params'.
+                QueryPlannerParams{
+                    QueryPlannerParams::ArgsForTest{},
+                });
+            if (soln && !soln->root()->fetched()) {
+                LOGV2_DEBUG(
+                    20983, 5, "Planner: outputting soln that uses index to provide projection");
+                if (relevantIndexOutput) {
+                    // We generated a plan that used an index that was not over any of the
+                    // predicates in the query and thus not in the list of relevantIndices used.
+                    // As a result, we need to add the fields of this index to the
+                    // relevantIndexOutput set.
+                    cost_based_ranker::addFieldsToRelevantIndexOutput(index.keyPattern,
+                                                                      relevantIndexOutput.get());
+                }
+                PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+                indexTree->setIndexEntry(index);
+
+                SolutionCacheData* scd = new SolutionCacheData();
+                scd->tree.reset(indexTree);
+                scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
+                scd->wholeIXSolnDir = 1;
+                soln->cacheData.reset(scd);
+
+                out.push_back(std::move(soln));
+                break;
+            }
+        }
+    }
+
+    // Distinct queries can benefit from an index even without a sort or filter present. Without
+    // these, the previous steps don't consider any indexed plans, so we try to generate a covered
+    // distinct scan here. The direction of the index doesn't matter in this case.
+    if (isDistinctMultiplanningEnabled && query.getDistinct() &&
+        query.getFindCommandRequest().getFilter().isEmpty() && !sortPattern &&
+        !sortRequirementForDistinct) {
+
+        auto soln = constructCoveredDistinctScan(query, params, *query.getDistinct());
+        if (soln) {
+            out.push_back(std::move(soln));
+        }
+    }
+
+    // Create a $search QuerySolution if we are performing a $search.
+    if (out.empty()) {
+        auto statusWithSoln = tryToBuildSearchQuerySolution(params, query);
+        if (statusWithSoln.isOK()) {
+            out.emplace_back(std::move(statusWithSoln.getValue()));
+        } else {
+            LOGV2_DEBUG(7816302,
+                        4,
+                        "Not pushing down $search into SBE",
+                        "reason"_attr = statusWithSoln.getStatus());
+        }
+    }
+}
+
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
@@ -1411,177 +1602,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                       "Failed to build whole-index solution for $hint");
     }
 
-    // If a sort order is requested, there may be an index that provides it, even if that
-    // index is not over any predicates in the query. When planning a distinct scan query, a
-    // sort might be required even when the query doesn't have an actual sort.
-    if ((sortPattern || sortRequirementForDistinct) &&
-        !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
-                                     MatchExpression::GEO_NEAR) &&
-        !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::TEXT)) {
-        // See if we have a sort provided from an index already.
-        // This is implied by the presence of a non-blocking solution.
-        bool usingIndexToSort = false;
-        for (size_t i = 0; i < out.size(); ++i) {
-            auto soln = out[i].get();
-            if (!soln->hasBlockingStage) {
-                usingIndexToSort = true;
-                break;
-            }
-        }
-
-        if (!usingIndexToSort || !sortPattern) {
-            for (size_t i = 0; i < fullIndexList.size(); ++i) {
-                const IndexEntry& index = fullIndexList[i];
-                // Only a regular index or the non-hashed prefix of a compound hashed index can
-                // be used to provide a sort. In addition, the index needs to be a non-sparse
-                // index.
-                //
-                // TODO: Sparse indexes can't normally provide a sort, because non-indexed
-                // documents could potentially be missing from the result set.  However, if the
-                // query predicate can be used to guarantee that all documents to be returned
-                // are indexed, then the index should be able to provide the sort.
-                //
-                // For example:
-                // - Sparse index {a: 1, b: 1} should be able to provide a sort for
-                //   find({b: 1}).sort({a: 1}).  SERVER-13908.
-                // - Index {a: 1, b: "2dsphere"} (which is "geo-sparse", if
-                //   2dsphereIndexVersion=2) should be able to provide a sort for
-                //   find({b: GEO}).sort({a:1}).  SERVER-10801.
-                if (index.type != INDEX_BTREE && index.type != INDEX_HASHED) {
-                    continue;
-                }
-                if (index.sparse) {
-                    continue;
-                }
-
-                // If the index collation differs from the query collation, the index should not
-                // be used to provide a sort, because strings will be ordered incorrectly.
-                if (!CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
-                    continue;
-                }
-
-                // Partial indexes can only be used to provide a sort only if the query
-                // predicate is compatible.
-                if (index.filterExpr &&
-                    !expression::isSubsetOf(query.getPrimaryMatchExpression(), index.filterExpr)) {
-                    continue;
-                }
-
-                auto addPlansWithIndexProvidedSort = [&](const BSONObj& kp, const int direction) {
-                    const bool providesSort =
-                        sortPattern && QueryPlannerCommon::providesSort(query, kp);
-                    if (!providesSort &&
-                        !QueryPlannerCommon::providesSortRequirementForDistinct(query.getDistinct(),
-                                                                                kp)) {
-                        return;
-                    }
-
-                    LOGV2_DEBUG(
-                        20981, 5, "Planner: outputting soln that uses index to provide sort");
-                    auto index = fullIndexList[i];
-                    auto soln = buildWholeIXSoln(index, query, params, direction);
-                    // If the solution was created to satisfy a sort requirement for distinct scan,
-                    // ensure we have a distinct scan plan.
-                    if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
-                        if (relevantIndexOutput) {
-                            // We generated a plan that used an index that was not over any of the
-                            // predicates in the query and thus not in the list of relevantIndices.
-                            // As a result, we need to add the fields of this index to the
-                            // relevantIndexOutput set.
-                            cost_based_ranker::addFieldsToRelevantIndexOutput(
-                                index.keyPattern, relevantIndexOutput.get());
-                        }
-                        PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
-                        indexTree->setIndexEntry(fullIndexList[i]);
-                        SolutionCacheData* scd = new SolutionCacheData();
-                        scd->tree.reset(indexTree);
-                        scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
-                        scd->wholeIXSolnDir = direction;
-
-                        soln->cacheData.reset(scd);
-                        out.push_back(std::move(soln));
-                    }
-                };
-
-                const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
-                addPlansWithIndexProvidedSort(kp, 1);
-                addPlansWithIndexProvidedSort(QueryPlannerCommon::reverseSortObj(kp), -1);
-            }
-        }
-    }
-
-    // If a projection exists, there may be an index that allows for a covered plan, even if
-    // none were considered earlier.
-    const auto projection = query.getProj();
-    if (params.mainCollectionInfo.options & QueryPlannerParams::GENERATE_COVERED_IXSCANS &&
-        out.size() == 0 && query.getQueryObj().isEmpty() && projection &&
-        !projection->requiresDocument()) {
-
-        const auto* indicesToConsider = hintedIndexBson ? &relevantIndices : &fullIndexList;
-        for (auto&& index : *indicesToConsider) {
-            if (index.type != INDEX_BTREE || index.multikey || index.sparse || index.filterExpr ||
-                !CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
-                continue;
-            }
-
-            auto soln = buildWholeIXSoln(
-                index,
-                query,
-                // TODO SERVER-87683 Investigate why empty parameters are used instead of 'params'.
-                QueryPlannerParams{
-                    QueryPlannerParams::ArgsForTest{},
-                });
-            if (soln && !soln->root()->fetched()) {
-                LOGV2_DEBUG(
-                    20983, 5, "Planner: outputting soln that uses index to provide projection");
-                if (relevantIndexOutput) {
-                    // We generated a plan that used an index that was not over any of the
-                    // predicates in the query and thus not in the list of relevantIndices used.
-                    // As a result, we need to add the fields of this index to the
-                    // relevantIndexOutput set.
-                    cost_based_ranker::addFieldsToRelevantIndexOutput(index.keyPattern,
-                                                                      relevantIndexOutput.get());
-                }
-                PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
-                indexTree->setIndexEntry(index);
-
-                SolutionCacheData* scd = new SolutionCacheData();
-                scd->tree.reset(indexTree);
-                scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
-                scd->wholeIXSolnDir = 1;
-                soln->cacheData.reset(scd);
-
-                out.push_back(std::move(soln));
-                break;
-            }
-        }
-    }
-
-    // Distinct queries can benefit from an index even without a sort or filter present. Without
-    // these, the previous steps don't consider any indexed plans, so we try to generate a covered
-    // distinct scan here. The direction of the index doesn't matter in this case.
-    if (isDistinctMultiplanningEnabled && query.getDistinct() &&
-        query.getFindCommandRequest().getFilter().isEmpty() && !sortPattern &&
-        !sortRequirementForDistinct) {
-
-        auto soln = constructCoveredDistinctScan(query, params, *query.getDistinct());
-        if (soln) {
-            out.push_back(std::move(soln));
-        }
-    }
-
-    // Create a $search QuerySolution if we are performing a $search.
-    if (out.empty()) {
-        auto statusWithSoln = tryToBuildSearchQuerySolution(params, query);
-        if (statusWithSoln.isOK()) {
-            out.emplace_back(std::move(statusWithSoln.getValue()));
-        } else {
-            LOGV2_DEBUG(7816302,
-                        4,
-                        "Not pushing down $search into SBE",
-                        "reason"_attr = statusWithSoln.getStatus());
-        }
-    }
+    extendCandidatePlans(query,
+                         params,
+                         fullIndexList,
+                         relevantIndices,
+                         hintedIndexBson.has_value(),
+                         relevantIndexOutput,
+                         out);
 
     // The caller can explicitly ask for a collscan.
     bool collscanRequested =
