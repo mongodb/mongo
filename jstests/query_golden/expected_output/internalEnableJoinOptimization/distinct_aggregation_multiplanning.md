@@ -2456,9 +2456,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
@@ -4393,9 +4391,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}
@@ -4441,9 +4437,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_aggregation_multiplanning_md",
 			"stage" : "COLLSCAN"
 		}

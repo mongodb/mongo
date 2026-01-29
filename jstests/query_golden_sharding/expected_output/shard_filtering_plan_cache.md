@@ -49,9 +49,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -61,12 +59,8 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
-		"sort" : {
-			
-		}
+		"query" : { },
+		"sort" : { }
 	},
 	"isActive" : false,
 	"planCacheKey" : "FB6EE5E8",
@@ -104,9 +98,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -116,12 +108,8 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
-		"sort" : {
-			
-		}
+		"query" : { },
+		"sort" : { }
 	},
 	"isActive" : false,
 	"planCacheKey" : "FB6EE5E8",
@@ -179,9 +167,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -191,12 +177,8 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
-		"sort" : {
-			
-		}
+		"query" : { },
+		"sort" : { }
 	},
 	"isActive" : true,
 	"planCacheKey" : "FB6EE5E8",
@@ -234,9 +216,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -246,12 +226,8 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
-		"sort" : {
-			
-		}
+		"query" : { },
+		"sort" : { }
 	},
 	"isActive" : true,
 	"planCacheKey" : "FB6EE5E8",
@@ -310,9 +286,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -322,9 +296,7 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
+		"query" : { },
 		"sort" : {
 			"shardKey" : -1
 		}
@@ -365,9 +337,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -377,9 +347,7 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
+		"query" : { },
 		"sort" : {
 			"shardKey" : -1
 		}
@@ -440,9 +408,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -452,9 +418,7 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
+		"query" : { },
 		"sort" : {
 			"shardKey" : -1
 		}
@@ -495,9 +459,7 @@
 			"stage" : "SORT_KEY_GENERATOR"
 		},
 		"stage" : "PROJECTION_COVERED",
-		"transformBy" : {
-			
-		}
+		"transformBy" : { }
 	},
 	"createdFromQuery" : {
 		"distinct" : {
@@ -507,9 +469,7 @@
 			"_id" : 0,
 			"shardKey" : 1
 		},
-		"query" : {
-			
-		},
+		"query" : { },
 		"sort" : {
 			"shardKey" : -1
 		}
@@ -585,9 +545,7 @@
 		"distinct" : {
 			"key" : "shardKey"
 		},
-		"projection" : {
-			
-		},
+		"projection" : { },
 		"query" : {
 			"shardKey" : {
 				"$gt" : "chunk1_s0"
@@ -641,9 +599,7 @@
 		"distinct" : {
 			"key" : "shardKey"
 		},
-		"projection" : {
-			
-		},
+		"projection" : { },
 		"query" : {
 			"shardKey" : {
 				"$gt" : "chunk1_s0"
@@ -725,9 +681,7 @@
 		"distinct" : {
 			"key" : "shardKey"
 		},
-		"projection" : {
-			
-		},
+		"projection" : { },
 		"query" : {
 			"shardKey" : {
 				"$gt" : "chunk1_s0"
@@ -781,9 +735,7 @@
 		"distinct" : {
 			"key" : "shardKey"
 		},
-		"projection" : {
-			
-		},
+		"projection" : { },
 		"query" : {
 			"shardKey" : {
 				"$gt" : "chunk1_s0"

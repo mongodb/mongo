@@ -697,11 +697,6 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
     }
 
     if (fieldStrings.length === 0) {
-        if (!nolint) {
-            // The following is a hack to match old behavior to avoid lots of multi-line whitespace churn in golden tests
-            // Remove with SERVER-117304
-            return "{" + "\n" + indent + "\t".repeat(depth) + "\n" + leadingPad + "}";
-        }
         return "{ }";
     }
 

@@ -1829,9 +1829,7 @@
 		"$group" : {
 			"_id" : "$avg",
 			"num" : {
-				"$count" : {
-					
-				}
+				"$count" : { }
 			}
 		}
 	}
@@ -4172,9 +4170,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 	{
 		"$addFields" : {
 			"complex" : {
-				"$rand" : {
-					
-				}
+				"$rand" : { }
 			}
 		}
 	},
@@ -4241,9 +4237,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 		{
 			"$addFields" : {
 				"complex" : {
-					"$rand" : {
-						
-					}
+					"$rand" : { }
 				}
 			}
 		},
@@ -4297,9 +4291,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 		{
 			"$addFields" : {
 				"complex" : {
-					"$rand" : {
-						
-					}
+					"$rand" : { }
 				}
 			}
 		},
@@ -4343,9 +4335,7 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 		{
 			"$addFields" : {
 				"complex" : {
-					"$rand" : {
-						
-					}
+					"$rand" : { }
 				}
 			}
 		},

@@ -34,26 +34,20 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 3
 				},
 				"y" : 5
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "C86CC07A"
@@ -96,26 +90,20 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 3
 				},
 				"y" : 5
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "C86CC07A"
@@ -158,17 +146,13 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 12
@@ -177,9 +161,7 @@
 					"$lt" : 200
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "1C3825BE"
@@ -221,17 +203,13 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 12
@@ -240,9 +218,7 @@
 					"$lt" : 250
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "1C3825BE"
@@ -294,9 +270,7 @@
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : -1
@@ -305,9 +279,7 @@
 					"$lt" : 105
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "62DB0FF3"
@@ -358,9 +330,7 @@
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : -1
@@ -369,9 +339,7 @@
 					"$lt" : 105
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "62DB0FF3"
@@ -433,9 +401,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -446,9 +412,7 @@
 				"a" : 1,
 				"b" : 1
 			},
-			"query" : {
-				
-			},
+			"query" : { },
 			"sort" : {
 				"a" : 1,
 				"b" : 1
@@ -513,9 +477,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -526,9 +488,7 @@
 				"a" : 1,
 				"b" : 1
 			},
-			"query" : {
-				
-			},
+			"query" : { },
 			"sort" : {
 				"a" : 1,
 				"b" : 1
@@ -598,9 +558,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -612,12 +570,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "99D32B85"
@@ -683,9 +637,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -697,12 +649,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "99D32B85"
@@ -769,9 +717,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -783,12 +729,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "3F05097B"
@@ -854,9 +796,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -868,12 +808,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "3F05097B"
@@ -939,9 +875,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -953,12 +887,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "99D32B85"
@@ -1024,9 +954,7 @@
 				"stage" : "DISTINCT_SCAN"
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			}
+			"transformBy" : { }
 		},
 		"createdFromQuery" : {
 			"distinct" : {
@@ -1038,12 +966,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "99D32B85"

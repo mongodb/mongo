@@ -43,9 +43,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_scan_md",
 			"stage" : "COLLSCAN"
 		}

@@ -678,9 +678,7 @@ Execution Engine: classic
 				"as" : "z",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_base",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "y.base",
 				"pipeline" : [
 					{
@@ -1162,9 +1160,7 @@ Execution Engine: classic
 				"as" : "aaa",
 				"foreignField" : "a",
 				"from" : "base_coll_reorder_md_a",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1188,9 +1184,7 @@ Execution Engine: classic
 				"as" : "bbb",
 				"foreignField" : "b",
 				"from" : "base_coll_reorder_md_b",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1211,9 +1205,7 @@ Execution Engine: classic
 				"as" : "ccc",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_base",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "aaa.base",
 				"pipeline" : [
 					{
@@ -1234,9 +1226,7 @@ Execution Engine: classic
 				"as" : "ddd",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_b",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "base",
 				"pipeline" : [
 					{

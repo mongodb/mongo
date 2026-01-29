@@ -193,9 +193,7 @@ ABC"bar"
                 `\
 {
 	"x" : [ ],
-	"y" : {
-		
-	}
+	"y" : { }
 }`,
             );
 
@@ -674,21 +672,9 @@ ABC"y" : null
 
 describe("tojsonObject", () => {
     it("empty object", () => {
-        assert.eq(
-            tojsonObject({}, "", false),
-            `\
-{
-	
-}`,
-        );
+        assert.eq(tojsonObject({}, "", false), "{ }");
         assert.eq(tojsonObject({}, "", true), "{ }");
-        assert.eq(
-            tojsonObject({}, "\t\t", false),
-            `\
-{
-		
-}`,
-        );
+        assert.eq(tojsonObject({}, "\t\t", false), "{ }");
     });
 
     it("single field", () => {

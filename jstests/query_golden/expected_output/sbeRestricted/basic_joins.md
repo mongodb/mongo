@@ -727,9 +727,7 @@ Execution Engine: classic
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -750,9 +748,7 @@ Execution Engine: classic
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1130,9 +1126,7 @@ Execution Engine: classic
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1153,9 +1147,7 @@ Execution Engine: classic
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1508,9 +1500,7 @@ Execution Engine: classic
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1531,9 +1521,7 @@ Execution Engine: classic
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1930,9 +1918,7 @@ Execution Engine: classic
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1953,9 +1939,7 @@ Execution Engine: classic
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{

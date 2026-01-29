@@ -60,9 +60,7 @@ Execution Engine: sbe
 			"foreignField" : "a",
 			"inputStage" : {
 				"direction" : "forward",
-				"filter" : {
-					
-				},
+				"filter" : { },
 				"nss" : "test.basic_joins_md",
 				"stage" : "COLLSCAN"
 			},
@@ -347,9 +345,7 @@ Execution Engine: sbe
 					"inputStage" : {
 						"inputStage" : {
 							"direction" : "forward",
-							"filter" : {
-								
-							},
+							"filter" : { },
 							"nss" : "test.basic_joins_md",
 							"stage" : "COLLSCAN"
 						},
@@ -689,9 +685,7 @@ Execution Engine: sbe
 				"winningPlan" : {
 					"inputStage" : {
 						"direction" : "forward",
-						"filter" : {
-							
-						},
+						"filter" : { },
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
@@ -709,9 +703,7 @@ Execution Engine: sbe
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -732,9 +724,7 @@ Execution Engine: sbe
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1102,9 +1092,7 @@ Execution Engine: sbe
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -1115,9 +1103,7 @@ Execution Engine: sbe
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1138,9 +1124,7 @@ Execution Engine: sbe
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1493,9 +1477,7 @@ Execution Engine: sbe
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1516,9 +1498,7 @@ Execution Engine: sbe
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1915,9 +1895,7 @@ Execution Engine: sbe
 				"as" : "x",
 				"foreignField" : "a",
 				"from" : "basic_joins_md_foreign1",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1938,9 +1916,7 @@ Execution Engine: sbe
 				"as" : "y",
 				"foreignField" : "b",
 				"from" : "basic_joins_md_foreign2",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -2263,9 +2239,7 @@ Execution Engine: sbe
 			"foreignField" : "a",
 			"inputStage" : {
 				"direction" : "forward",
-				"filter" : {
-					
-				},
+				"filter" : { },
 				"nss" : "test.basic_joins_md",
 				"stage" : "COLLSCAN"
 			},
@@ -2556,9 +2530,7 @@ Execution Engine: sbe
 				"foreignField" : "a",
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				},
@@ -2920,9 +2892,7 @@ Execution Engine: sbe
 				"foreignField" : "a",
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				},
@@ -3272,9 +3242,7 @@ Execution Engine: sbe
 			"inputStage" : {
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				},
@@ -3598,9 +3566,7 @@ Execution Engine: sbe
 			"inputStage" : {
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				},
@@ -3910,9 +3876,7 @@ Execution Engine: sbe
 			"inputStage" : {
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				},
@@ -4734,9 +4698,7 @@ Execution Engine: sbe
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}

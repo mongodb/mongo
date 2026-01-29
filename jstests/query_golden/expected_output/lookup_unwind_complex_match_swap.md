@@ -13,9 +13,7 @@
 		"_id" : 2,
 		"b" : 4,
 		"my_id" : 101,
-		"m" : {
-			
-		}
+		"m" : { }
 	},
 	{
 		"_id" : 3,
@@ -188,9 +186,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -211,9 +207,7 @@
 			"as" : "C_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -261,9 +255,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -284,9 +276,7 @@
 			"as" : "C_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -376,9 +366,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -490,9 +478,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -513,9 +499,7 @@
 			"as" : "C_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -565,9 +549,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -588,9 +570,7 @@
 			"as" : "C_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -684,9 +664,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {
@@ -797,9 +775,7 @@
 			"as" : "B_data",
 			"localField" : "b",
 			"foreignField" : "b",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$match" : {

@@ -17,9 +17,7 @@
 		"h" : {
 			"i" : 12
 		},
-		"b" : {
-			
-		}
+		"b" : { }
 	},
 	{
 		"_id" : 3,
@@ -621,9 +619,7 @@
 		"$lookup" : {
 			"from" : "complex_match_swap",
 			"as" : "arr",
-			"let" : {
-				
-			},
+			"let" : { },
 			"pipeline" : [
 				{
 					"$group" : {
@@ -639,9 +635,7 @@
 	{
 		"$match" : {
 			"arr.b" : {
-				"$eq" : {
-					
-				}
+				"$eq" : { }
 			}
 		}
 	},

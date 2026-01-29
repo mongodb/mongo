@@ -1319,9 +1319,7 @@ Summarized explain
 				"$expr" : {
 					"$in" : [
 						{
-							"$const" : {
-								
-							}
+							"$const" : { }
 						},
 						"$m"
 					]
@@ -1362,9 +1360,7 @@ Summarized explain
 				"$expr" : {
 					"$in" : [
 						{
-							"$const" : {
-								
-							}
+							"$const" : { }
 						},
 						"$m"
 					]
@@ -1435,9 +1431,7 @@ Summarized explain
 					"$in" : [
 						{
 							"$const" : [
-								{
-									
-								}
+								{ }
 							]
 						},
 						"$m"
@@ -1480,9 +1474,7 @@ Summarized explain
 					{
 						"m" : {
 							"$eq" : [
-								{
-									
-								}
+								{ }
 							]
 						}
 					},
@@ -1491,9 +1483,7 @@ Summarized explain
 							"$in" : [
 								{
 									"$const" : [
-										{
-											
-										}
+										{ }
 									]
 								},
 								"$m"
@@ -1933,9 +1923,7 @@ Summarized explain
 					"$in" : [
 						{
 							"$const" : [
-								{
-									
-								}
+								{ }
 							]
 						},
 						"$m"
@@ -1978,9 +1966,7 @@ Summarized explain
 					{
 						"m" : {
 							"$eq" : [
-								{
-									
-								}
+								{ }
 							]
 						}
 					},
@@ -1989,9 +1975,7 @@ Summarized explain
 							"$in" : [
 								{
 									"$const" : [
-										{
-											
-										}
+										{ }
 									]
 								},
 								"$m"
@@ -4586,9 +4570,7 @@ Summarized explain
 				"$expr" : {
 					"$in" : [
 						{
-							"$const" : {
-								
-							}
+							"$const" : { }
 						},
 						"$m.a"
 					]
@@ -4629,9 +4611,7 @@ Summarized explain
 				"$expr" : {
 					"$in" : [
 						{
-							"$const" : {
-								
-							}
+							"$const" : { }
 						},
 						"$m.a"
 					]
@@ -4703,9 +4683,7 @@ Summarized explain
 					"$in" : [
 						{
 							"$const" : [
-								{
-									
-								}
+								{ }
 							]
 						},
 						"$m.a"
@@ -4748,9 +4726,7 @@ Summarized explain
 					{
 						"m.a" : {
 							"$eq" : [
-								{
-									
-								}
+								{ }
 							]
 						}
 					},
@@ -4759,9 +4735,7 @@ Summarized explain
 							"$in" : [
 								{
 									"$const" : [
-										{
-											
-										}
+										{ }
 									]
 								},
 								"$m.a"

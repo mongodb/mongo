@@ -189,9 +189,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
@@ -348,9 +346,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
@@ -388,9 +384,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
@@ -445,9 +439,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}
@@ -731,9 +723,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_index_eligibility_md",
 			"stage" : "COLLSCAN"
 		}

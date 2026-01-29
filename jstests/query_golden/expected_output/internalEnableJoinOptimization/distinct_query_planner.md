@@ -210,9 +210,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_query_planner_md",
 			"stage" : "COLLSCAN"
 		}
@@ -380,9 +378,7 @@ Execution Engine: sbe
 		},
 		{
 			"direction" : "forward",
-			"filter" : {
-				
-			},
+			"filter" : { },
 			"nss" : "test.distinct_query_planner_md",
 			"stage" : "COLLSCAN"
 		}

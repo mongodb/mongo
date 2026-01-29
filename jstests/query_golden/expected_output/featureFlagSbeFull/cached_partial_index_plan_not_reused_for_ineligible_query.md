@@ -207,9 +207,7 @@ Verifying that the plan cache contains an entry with the partial index
 			"stage" : "FETCH"
 		},
 		"createdFromQuery" : {
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"$or" : [
 					{
@@ -225,9 +223,7 @@ Verifying that the plan cache contains an entry with the partial index
 					"$lte" : 5
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "7D81D3A7"
@@ -508,9 +504,7 @@ Verifying that the plan cache contains an entry with the partial index
 			"type" : "simple"
 		},
 		"createdFromQuery" : {
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"$or" : [
 					{

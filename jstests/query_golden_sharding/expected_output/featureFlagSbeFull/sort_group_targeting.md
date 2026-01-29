@@ -829,9 +829,7 @@
 					},
 					{
 						"direction" : "forward",
-						"filter" : {
-							
-						},
+						"filter" : { },
 						"nss" : "test.sort_group_targeting",
 						"stage" : "COLLSCAN"
 					}
@@ -863,9 +861,7 @@
 					},
 					{
 						"direction" : "forward",
-						"filter" : {
-							
-						},
+						"filter" : { },
 						"nss" : "test.sort_group_targeting",
 						"stage" : "COLLSCAN"
 					}

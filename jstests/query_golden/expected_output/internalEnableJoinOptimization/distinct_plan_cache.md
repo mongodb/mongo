@@ -35,27 +35,21 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 3
 				},
 				"y" : 5
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "B303875C"
@@ -99,27 +93,21 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 3
 				},
 				"y" : 5
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "B303875C"
@@ -163,18 +151,14 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 12
@@ -183,9 +167,7 @@
 					"$lt" : 200
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "49BCC9BF"
@@ -228,18 +210,14 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : 12
@@ -248,9 +226,7 @@
 					"$lt" : 250
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "49BCC9BF"
@@ -304,9 +280,7 @@
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : -1
@@ -315,9 +289,7 @@
 					"$lt" : 105
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "07AE4E3B"
@@ -370,9 +342,7 @@
 			"distinct" : {
 				"key" : "x"
 			},
-			"projection" : {
-				
-			},
+			"projection" : { },
 			"query" : {
 				"x" : {
 					"$gt" : -1
@@ -381,9 +351,7 @@
 					"$lt" : 105
 				}
 			},
-			"sort" : {
-				
-			}
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "07AE4E3B"
@@ -446,9 +414,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -460,9 +426,7 @@
 				"a" : 1,
 				"b" : 1
 			},
-			"query" : {
-				
-			},
+			"query" : { },
 			"sort" : {
 				"a" : 1,
 				"b" : 1
@@ -528,9 +492,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -542,9 +504,7 @@
 				"a" : 1,
 				"b" : 1
 			},
-			"query" : {
-				
-			},
+			"query" : { },
 			"sort" : {
 				"a" : 1,
 				"b" : 1
@@ -615,9 +575,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -630,12 +588,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "99D32B85"
@@ -702,9 +656,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -717,12 +669,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "99D32B85"
@@ -790,9 +738,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -805,12 +751,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "3F05097B"
@@ -877,9 +819,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -892,12 +832,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "3F05097B"
@@ -964,9 +900,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -979,12 +913,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : false,
 		"planCacheKey" : "99D32B85"
@@ -1051,9 +981,7 @@
 				"usedJoinOptimization" : false
 			},
 			"stage" : "PROJECTION_COVERED",
-			"transformBy" : {
-				
-			},
+			"transformBy" : { },
 			"usedJoinOptimization" : false
 		},
 		"createdFromQuery" : {
@@ -1066,12 +994,8 @@
 				"b" : 1,
 				"c" : 1
 			},
-			"query" : {
-				
-			},
-			"sort" : {
-				
-			}
+			"query" : { },
+			"sort" : { }
 		},
 		"isActive" : true,
 		"planCacheKey" : "99D32B85"

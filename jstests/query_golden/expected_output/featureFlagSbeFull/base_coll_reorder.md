@@ -60,9 +60,7 @@ Execution Engine: sbe
 				"foreignField" : "a",
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
@@ -231,9 +229,7 @@ Execution Engine: sbe
 				"foreignField" : "a",
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
@@ -397,9 +393,7 @@ Execution Engine: sbe
 				"foreignField" : "base",
 				"inputStage" : {
 					"direction" : "forward",
-					"filter" : {
-						
-					},
+					"filter" : { },
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				},
@@ -656,9 +650,7 @@ Execution Engine: sbe
 				"as" : "z",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_base",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "y.base",
 				"pipeline" : [
 					{
@@ -1140,9 +1132,7 @@ Execution Engine: sbe
 				"as" : "aaa",
 				"foreignField" : "a",
 				"from" : "base_coll_reorder_md_a",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "a",
 				"pipeline" : [
 					{
@@ -1166,9 +1156,7 @@ Execution Engine: sbe
 				"as" : "bbb",
 				"foreignField" : "b",
 				"from" : "base_coll_reorder_md_b",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "b",
 				"pipeline" : [
 					{
@@ -1189,9 +1177,7 @@ Execution Engine: sbe
 				"as" : "ccc",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_base",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "aaa.base",
 				"pipeline" : [
 					{
@@ -1212,9 +1198,7 @@ Execution Engine: sbe
 				"as" : "ddd",
 				"foreignField" : "base",
 				"from" : "base_coll_reorder_md_b",
-				"let" : {
-					
-				},
+				"let" : { },
 				"localField" : "base",
 				"pipeline" : [
 					{
