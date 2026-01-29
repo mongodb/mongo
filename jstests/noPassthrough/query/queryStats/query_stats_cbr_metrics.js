@@ -10,6 +10,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {getQueryPlannerMetrics, getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
@@ -57,6 +58,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
         let testDB;
         let coll;
         let automaticCEColl;
+        let isSbeEnabled;
 
         before(function () {
             const setupRes = setupFn();
@@ -65,6 +67,9 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             testDB = setupRes.testDB;
             coll = testDB[collName];
             coll.drop();
+
+            // TODO SERVER-117707 Remove once CBR enabled with SBE.
+            isSbeEnabled = checkSbeFullyEnabled(testDB);
 
             // Insert documents and create indexes for multiplanning scenarios.
             for (let i = 0; i < 100; i++) {
@@ -268,22 +273,20 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 );
                 const cbrSection = queryPlannerSection.costBasedRanker;
 
-                assert.eq(cbrSection.cardinalityEstimationMethods, {
-                    Histogram: NumberLong(0),
-                    Sampling: NumberLong(1),
-                    Heuristics: NumberLong(0),
-                    Mixed: NumberLong(0),
-                    Metadata: NumberLong(0),
-                    Code: NumberLong(0),
-                });
-
-                const expectedSampleSize = Math.round(zScore ** 2 / ((2 * samplingMarginOfError) / 100.0) ** 2);
-                const nDocsSampled = Number(cbrSection.nDocsSampled.sum);
-                assert.eq(
-                    nDocsSampled,
-                    expectedSampleSize,
-                    `Expected nDocsSampled == ${expectedSampleSize} (CI=${confidenceInterval}%, MoE=${samplingMarginOfError}%) but got ${tojson(cbrSection)}`,
-                );
+                // TODO SERVER-117707 Remove branch.
+                if (isSbeEnabled) {
+                    assert.eq(cbrSection.nDocsSampled.sum, 0);
+                } else {
+                    const expectedSampleSize = Math.round(zScore ** 2 / ((2 * samplingMarginOfError) / 100.0) ** 2);
+                    const nDocsSampled = Number(cbrSection.nDocsSampled.sum);
+                    assert.eq(
+                        nDocsSampled,
+                        expectedSampleSize,
+                        `Expected nDocsSampled == ${expectedSampleSize} (CI=${
+                            confidenceInterval
+                        }%, MoE=${samplingMarginOfError}%) but got ${tojson(cbrSection)}`,
+                    );
+                }
             } finally {
                 // Reset knobs to defaults on all nodes.
                 FixtureHelpers.mapOnEachShardNode({
@@ -337,19 +340,26 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 );
                 const cbrSection = queryPlannerSection.costBasedRanker;
 
-                assert.eq(cbrSection.cardinalityEstimationMethods, {
-                    Histogram: NumberLong(0),
-                    Sampling: NumberLong(1),
-                    Heuristics: NumberLong(0),
-                    Mixed: NumberLong(0),
-                    Metadata: NumberLong(0),
-                    Code: NumberLong(0),
-                });
-                assert.gt(
-                    cbrSection.nDocsSampled.sum,
-                    0,
-                    `nDocsSampled should be positive when samplingCE is used: ${tojson(cbrSection)}`,
-                );
+                // TODO SERVER-117707 Remove branch.
+                if (isSbeEnabled) {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(0),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                } else {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(1),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                }
             } finally {
                 // Reset knobs to defaults on all nodes.
                 FixtureHelpers.mapOnEachShardNode({
@@ -463,19 +473,33 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                     `costBasedRanker section should be present when CBR is used: ${tojson(queryPlannerSection)}`,
                 );
                 const cbrSection = queryPlannerSection.costBasedRanker;
-                assert.eq(cbrSection.cardinalityEstimationMethods, {
-                    Histogram: NumberLong(0),
-                    Sampling: NumberLong(1),
-                    Heuristics: NumberLong(0),
-                    Mixed: NumberLong(0),
-                    Metadata: NumberLong(0),
-                    Code: NumberLong(0),
-                });
-                assert.gt(
-                    cbrSection.nDocsSampled.sum,
-                    0,
-                    `nDocsSampled should be positive when CBR is used: ${tojson(cbrSection)}`,
-                );
+
+                // TODO SERVER-117707 Remove branch.
+                if (isSbeEnabled) {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(0),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                    assert.eq(cbrSection.nDocsSampled.sum, 0);
+                } else {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(1),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                    assert.gt(
+                        cbrSection.nDocsSampled.sum,
+                        0,
+                        `nDocsSampled should be positive when CBR is used: ${tojson(cbrSection)}`,
+                    );
+                }
             } finally {
                 // Reset knobs to defaults on all nodes.
                 FixtureHelpers.mapOnEachShardNode({
