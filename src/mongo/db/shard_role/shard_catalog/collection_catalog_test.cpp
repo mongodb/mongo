@@ -60,6 +60,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_yield_restore.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -941,8 +943,6 @@ public:
                           const NamespaceString& from,
                           const NamespaceString& to,
                           Timestamp timestamp) {
-        invariant(from == to);
-
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
         _renameCollection(opCtx, from, to, timestamp);
@@ -1189,6 +1189,77 @@ public:
 protected:
     ServiceContext::UniqueOperationContext opCtx;
 
+    /**
+     * RAII class that runs a DDL operation on a background thread, with the ability to hang
+     * before or after durable commit.
+     */
+    class ConcurrentDDL {
+    public:
+        template <typename Callable>
+        ConcurrentDDL(ServiceContext* svcCtx, Timestamp timestamp, Callable&& ddlOperation) {
+            _thread = stdx::thread(
+                [this, svcCtx, timestamp, ddlOperation = std::forward<Callable>(ddlOperation)]() {
+                    ThreadClient client(svcCtx->getService());
+                    auto opCtx = client->makeOperationContext();
+                    shard_role_details::getRecoveryUnit(opCtx.get())->setCommitTimestamp(timestamp);
+
+                    WriteUnitOfWork wuow(opCtx.get());
+
+                    // The onCommit handler must be registered prior to the DDL operation so it's
+                    // executed before any onCommit handlers set up in the operation.
+                    class ChangeForCatalogVisibility : public RecoveryUnit::Change {
+                    public:
+                        ChangeForCatalogVisibility(ConcurrentDDL* op) : _op(op) {}
+                        void commit(OperationContext*, boost::optional<Timestamp>) noexcept final {
+                            _op->_reachedCommit.emplaceValue();
+                            _op->_unhangCommit.getFuture().get();
+                        }
+                        void rollback(OperationContext*) noexcept final {}
+                        ConcurrentDDL* _op;
+                    };
+                    shard_role_details::getRecoveryUnit(opCtx.get())
+                        ->registerChangeForCatalogVisibility(
+                            std::make_unique<ChangeForCatalogVisibility>(this));
+
+                    ddlOperation(opCtx.get());
+
+                    // The preCommit handler must be registered after the DDL operation so it's
+                    // executed after any preCommit hooks set up in the operation.
+                    shard_role_details::getRecoveryUnit(opCtx.get())
+                        ->registerPreCommitHook([this](OperationContext*) {
+                            _reachedPreCommit.emplaceValue();
+                            _unhangPreCommit.getFuture().get();
+                        });
+
+                    wuow.commit();
+                });
+        }
+
+        void hangAfterPreCommit() {
+            _reachedPreCommit.getFuture().get();
+        }
+
+        void hangAfterCommit() {
+            _unhangPreCommit.emplaceValue();
+            _reachedCommit.getFuture().get();
+        }
+
+        ~ConcurrentDDL() {
+            if (!_unhangPreCommit.getFuture().isReady()) {
+                _unhangPreCommit.emplaceValue();
+            }
+            _unhangCommit.emplaceValue();
+            _thread.join();
+        }
+
+    private:
+        SharedPromise<void> _reachedPreCommit;
+        SharedPromise<void> _unhangPreCommit;
+        SharedPromise<void> _reachedCommit;
+        SharedPromise<void> _unhangCommit;
+        stdx::thread _thread;
+    };
+
 private:
     void _setupDDLOperation(OperationContext* opCtx, Timestamp timestamp) {
         RecoveryUnit* recoveryUnit = shard_role_details::getRecoveryUnit(opCtx);
@@ -1279,6 +1350,8 @@ private:
                            const NamespaceString& from,
                            const NamespaceString& to,
                            Timestamp timestamp) {
+        invariant(from != to);
+
         Lock::DBLock dbLk(opCtx, from.dbName(), MODE_IX);
         Lock::CollectionLock fromLk(opCtx, from, MODE_X);
         Lock::CollectionLock toLk(opCtx, to, MODE_X);
@@ -1333,68 +1406,9 @@ private:
         Timestamp timestamp,
         Callable&& ddlOperation,
         std::function<void(OperationContext* opCtx)> catalogOperations) {
-        stdx::mutex mutex;
-        stdx::condition_variable cv;
-        int numCalls = 0;
-
-        stdx::thread t([&, svcCtx = getServiceContext()] {
-            ThreadClient client(svcCtx->getService());
-            auto newOpCtx = client->makeOperationContext();
-            _setupDDLOperation(newOpCtx.get(), timestamp);
-
-            WriteUnitOfWork wuow(newOpCtx.get());
-
-            // Register a hook either preCommit or onCommit that will block until the
-            // main thread has finished its openCollection lookup.
-            auto commitHandler = [&]() {
-                stdx::unique_lock lock(mutex);
-
-                // Let the main thread know we have committed to the storage engine.
-                numCalls = 1;
-                cv.notify_all();
-
-                // Wait until the main thread has finished its openCollection lookup.
-                cv.wait(lock, [&numCalls]() { return numCalls == 2; });
-            };
-
-            class ChangeForCatalogVisibility : public RecoveryUnit::Change {
-            public:
-                ChangeForCatalogVisibility(std::function<void()> commitHandler)
-                    : callback(std::move(commitHandler)) {}
-
-                void commit(OperationContext* opCtx, boost::optional<Timestamp>) noexcept final {
-                    callback();
-                }
-
-                void rollback(OperationContext* opCtx) noexcept final {}
-
-                std::function<void()> callback;
-            };
-
-            shard_role_details::getRecoveryUnit(newOpCtx.get())
-                ->registerChangeForCatalogVisibility(
-                    std::make_unique<ChangeForCatalogVisibility>(commitHandler));
-
-            ddlOperation(newOpCtx.get());
-
-            wuow.commit();
-        });
-
-        // Wait for the thread above to start its commit of the DDL operation.
-        {
-            stdx::unique_lock lock(mutex);
-            cv.wait(lock, [&numCalls]() { return numCalls == 1; });
-        }
-
+        ConcurrentDDL ddl(getServiceContext(), timestamp, std::forward<Callable>(ddlOperation));
+        ddl.hangAfterCommit();
         catalogOperations(opCtx);
-
-        // Notify the thread that our openCollection lookup is done.
-        {
-            stdx::unique_lock lock(mutex);
-            numCalls = 2;
-            cv.notify_all();
-        }
-        t.join();
     }
 
     /**
@@ -1416,72 +1430,13 @@ private:
         bool expectedExistence,
         int expectedNumIndexes,
         std::function<void()> verifyStateCallback = {}) {
-        stdx::mutex mutex;
-        stdx::condition_variable cv;
-        int numCalls = 0;
+        boost::optional<ConcurrentDDL> ddl;
+        ddl.emplace(getServiceContext(), timestamp, std::forward<Callable>(ddlOperation));
 
-        stdx::thread t([&, svcCtx = getServiceContext()] {
-            ThreadClient client(svcCtx->getService());
-            auto newOpCtx = client->makeOperationContext();
-            _setupDDLOperation(newOpCtx.get(), timestamp);
-
-            WriteUnitOfWork wuow(newOpCtx.get());
-
-            // Register a hook either preCommit or onCommit that will block until the
-            // main thread has finished its openCollection lookup.
-            auto commitHandler = [&]() {
-                stdx::unique_lock lock(mutex);
-
-                // Let the main thread know we have committed to the storage engine.
-                numCalls = 1;
-                cv.notify_all();
-
-                // Wait until the main thread has finished its openCollection lookup.
-                cv.wait(lock, [&numCalls]() { return numCalls == 2; });
-            };
-
-            // The onCommit handler must be registered prior to the DDL operation so it's executed
-            // before any onCommit handlers set up in the operation.
-            if (!openSnapshotBeforeCommit) {
-                // Need to use 'registerChangeForCatalogVisibility' so it can happen after storage
-                // engine commit but before the changes become visible in the catalog.
-                class ChangeForCatalogVisibility : public RecoveryUnit::Change {
-                public:
-                    ChangeForCatalogVisibility(std::function<void()> commitHandler)
-                        : callback(std::move(commitHandler)) {}
-
-                    void commit(OperationContext* opCtx,
-                                boost::optional<Timestamp>) noexcept final {
-                        callback();
-                    }
-
-                    void rollback(OperationContext* opCtx) noexcept final {}
-
-                    std::function<void()> callback;
-                };
-
-                shard_role_details::getRecoveryUnit(newOpCtx.get())
-                    ->registerChangeForCatalogVisibility(
-                        std::make_unique<ChangeForCatalogVisibility>(commitHandler));
-            }
-
-            ddlOperation(newOpCtx.get());
-
-            // The preCommit handler must be registered after the DDL operation so it's executed
-            // after any preCommit hooks set up in the operation.
-            if (openSnapshotBeforeCommit) {
-                shard_role_details::getRecoveryUnit(newOpCtx.get())
-                    ->registerPreCommitHook(
-                        [&commitHandler](OperationContext* opCtx) { commitHandler(); });
-            }
-
-            wuow.commit();
-        });
-
-        // Wait for the thread above to start its commit of the DDL operation.
-        {
-            stdx::unique_lock lock(mutex);
-            cv.wait(lock, [&numCalls]() { return numCalls == 1; });
+        if (openSnapshotBeforeCommit) {
+            ddl->hangAfterPreCommit();
+        } else {
+            ddl->hangAfterCommit();
         }
 
         // Perform the openCollection lookup.
@@ -1493,14 +1448,7 @@ private:
         auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
             opCtx, nssOrUUID, boost::none);
 
-        // Notify the thread that our openCollection lookup is done.
-        {
-            stdx::unique_lock lock(mutex);
-            numCalls = 2;
-            cv.notify_all();
-        }
-        t.join();
-
+        ddl.reset();
 
         auto catalog = CollectionCatalog::get(opCtx);
         auto mdbCatalog = MDBCatalog::get(opCtx);
@@ -2233,6 +2181,103 @@ TEST_F(CollectionCatalogTimestampTest, DropCollectionAndCreateViewOnSameNSS) {
     hangCommit->setMode(FailPoint::off);
     t.join();
     assertCatalogChangesVisiblity(true);
+}
+
+// TODO(SERVER-114573): Remove this which is only needed for viewless timeseries downgrade.
+class CollectionCatalogTimeseriesUpgradeDowngradeTest : public CollectionCatalogTimestampTest {
+public:
+    void setUp() override {
+        CollectionCatalogTimestampTest::setUp();
+
+        // Ensure that we are primary.
+        auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    }
+
+    /**
+     * Validates that during viewless timeseries upgrade/downgrade, the rename from 'coll' to
+     * 'system.buckets.coll' or viceversa is only visible in establishConsistentCollection after
+     * updating the in-memory catalog, rather than when it is committed to durable storage.
+     * See the documentation of `_hasPendingTimeseriesUpgradeDowngradeCommit` for why this is done.
+     */
+    void testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(bool isUpgrade) {
+        const Timestamp upgradeDowngradeTs = Timestamp(20, 20);
+        const auto mainNs = NamespaceString::createNamespaceString_forTest("a.b");
+        const auto bucketsNs = mainNs.makeTimeseriesBucketsNamespace();
+
+        // Create viewful timeseries (for upgrade) or viewless timeseries (for downgrade).
+        {
+            RAIIServerParameterControllerForTest featureFlagController(
+                "featureFlagCreateViewlessTimeseriesCollections", !isUpgrade);
+            CreateCommand cmd = CreateCommand(mainNs);
+            cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("t"));
+            ASSERT_OK(mongo::createCollection(opCtx.get(), cmd));
+
+            // Pre-create system.views to avoid downgrade trying to create it on a separate WUOW.
+            AutoGetDb autoDb(opCtx.get(), mainNs.dbName(), MODE_X);
+            autoDb.ensureDbExists(opCtx.get())->createSystemDotViewsIfNecessary(opCtx.get());
+        }
+
+        // Viewless: collection at mainNs, no view.
+        // Viewful: view at mainNs, collection at bucketsNs.
+        auto assertCatalogState = [&](bool expectViewless) {
+            auto newClient =
+                getServiceContext()->getService()->makeClient("AssertCatalogStateClient");
+            auto newOpCtx = newClient->makeOperationContext();
+            auto catalog = CollectionCatalog::get(newOpCtx.get());
+            if (expectViewless) {
+                ASSERT(catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
+                ASSERT(!catalog->lookupView(newOpCtx.get(), mainNs));
+                ASSERT(catalog->establishConsistentCollection(
+                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                ASSERT(!catalog->establishConsistentCollection(
+                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+            } else {
+                ASSERT(!catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
+                ASSERT(catalog->lookupView(newOpCtx.get(), mainNs));
+                ASSERT(!catalog->establishConsistentCollection(
+                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                ASSERT(catalog->establishConsistentCollection(
+                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+            }
+        };
+
+        {
+            ConcurrentDDL ddl(
+                getServiceContext(), upgradeDowngradeTs, [&](OperationContext* opCtx) {
+                    RAIIServerParameterControllerForTest featureFlagController(
+                        "featureFlagCreateViewlessTimeseriesCollections", isUpgrade);
+                    if (isUpgrade) {
+                        timeseries::upgradeToViewlessTimeseries(opCtx, mainNs);
+                    } else {
+                        timeseries::downgradeFromViewlessTimeseries(opCtx, mainNs);
+                    }
+                });
+
+            // Before durable commit: no changes visible.
+            ddl.hangAfterPreCommit();
+            assertCatalogState(!isUpgrade /* expectViewless */);
+
+            // After durable commit, before catalog update: no changes visible, neither in the
+            // collection nor the view (this is special behavior for timeseries upgrade/downgrade:
+            // normally the collection would become visible after durable commit).
+            ddl.hangAfterCommit();
+            assertCatalogState(!isUpgrade /* expectViewless */);
+        }
+
+        // After in-memory state updated: all changes visible.
+        assertCatalogState(isUpgrade /* expectViewless */);
+    }
+};
+
+TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
+       ConcurrentTimeseriesDowngradeAndOpenCollection) {
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(false /* isUpgrade */);
+}
+
+TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
+       ConcurrentTimeseriesUpgradeAndOpenCollection) {
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(true /* isUpgrade */);
 }
 
 using CollectionCatalogTimestampTestDeathTest = CollectionCatalogTimestampTest;
