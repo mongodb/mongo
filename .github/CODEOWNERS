@@ -2313,6 +2313,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/fle/**/* @10gen/query-integration-features @10gen/server-security @svc-auto-approve-bot
+/src/mongo/db/modules/enterprise/jstests/fle/**/fle_logpath* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fle2/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/fle2/**/* @10gen/query-integration-features @10gen/server-security @svc-auto-approve-bot

@@ -69,6 +69,10 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
+#ifdef _WIN32
+#include "mongo/logv2/log_util.h"
+#endif
+
 namespace mongo::logv2 {
 namespace {
 
@@ -78,12 +82,21 @@ using stream_t = Win32SharedAccessOfstream;
 using stream_t = std::ofstream;
 #endif
 
+bool checkLogFileExists(const std::string& filename) {
+#ifdef _WIN32
+    if (isLogPathWindowsNul(filename)) {
+        return true;
+    }
+#endif
+    return boost::filesystem::exists(filename);
+}
+
 StatusWith<boost::shared_ptr<stream_t>> openFile(const std::string& filename, bool append) {
     std::ios_base::openmode mode = std::ios_base::out;
     bool exists = false;
     if (append) {
         mode |= std::ios_base::app;
-        exists = boost::filesystem::exists(filename);
+        exists = checkLogFileExists(filename);
     } else
         mode |= std::ios_base::trunc;
     auto file = boost::make_shared<stream_t>(filename, mode);

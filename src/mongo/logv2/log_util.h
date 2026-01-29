@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <functional>
 
@@ -43,6 +44,10 @@ namespace MONGO_MOD_PUBLIC logv2 {
 
 constexpr auto kServerLogTag = "server"_sd;
 constexpr auto kAuditLogTag = "audit"_sd;
+
+#ifdef _WIN32
+constexpr auto kWindowsNUL = "nul"_sd;
+#endif
 
 using LogRotateCallback = std::function<Status(bool, StringData, std::function<void(Status)>)>;
 using ShouldEmitLogServiceFn = std::function<bool()>;
@@ -117,6 +122,16 @@ bool shouldEmitLogService();
  * be emitted.
  */
 void setShouldEmitLogService(ShouldEmitLogServiceFn fn);
+
+#ifdef _WIN32
+/**
+ * Checks for the Windows NUL file. Although it's a valid file, boost::filesystem::exists() throws
+ * an exception when checking it so we use this function as a special case.
+ */
+inline bool isLogPathWindowsNul(const std::string& path) {
+    return str::equalCaseInsensitive(path, kWindowsNUL);
+}
+#endif
 
 }  // namespace MONGO_MOD_PUBLIC logv2
 }  // namespace mongo
