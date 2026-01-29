@@ -101,7 +101,10 @@ mongo_cc_library(
         "//src/mongo/s:common_s",
         "//src/mongo/util:processinfo",
     ] + select({
-        "@platforms//os:linux": ["//src/mongo/util:procparser"],
+        "@platforms//os:linux": [
+            "//src/mongo/util:procparser",
+            "//src/mongo/util:procparser_parameters",
+        ],
         "@platforms//os:windows": ["//src/mongo/util:perfctr_collect"],
         "//conditions:default": [],
     }),

@@ -129,6 +129,14 @@ Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuild
  */
 Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
 
+/**
+ * Procfs files such as the files parsed by this component should be just a small to moderate amount
+ * of text. To protect us from abnormally huge or even corrupted procfs files, we enforce a max size
+ * on them. The ability to adjust this limit is allowed as a safety measure for the safety measure.
+ */
+void setProcFileSizeLimit(size_t limit);
+size_t getProcFileSizeLimit();
+
 //
 // The rest of this file is implementation details that are only in the header to support testing.
 //

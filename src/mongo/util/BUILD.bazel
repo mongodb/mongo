@@ -469,6 +469,28 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "procparser_parameters_gen",
+    src = "procparser_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "procparser_parameters",
+    srcs = [
+        "procparser_parameters.cpp",
+        ":procparser_parameters_gen",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":procparser",
+        "//src/mongo:base",
+        "//src/mongo/db:server_parameter",
+    ],
+)
+
 mongo_cc_library(
     name = "processinfo",
     srcs = ["processinfo.cpp"],
