@@ -599,7 +599,7 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
 
     // Handle case where previous execution stashed a result.
     if (!_stash.empty()) {
-        objOut = includeMetadata ? _stash.front().toBson() : _stash.front().toBsonWithMetaData();
+        objOut = _stash.front().toBson();
         _stash.pop_front();
         if (hasAppendFn) {
             append(objOut, getPostBatchResumeToken(), numResults);
