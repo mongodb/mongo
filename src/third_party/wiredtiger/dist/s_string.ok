@@ -170,6 +170,7 @@ GF
 GIDs
 GLIBC
 Geoff
+GetDiskFreeSpaceExA
 GetEnvironmentVariableA
 GetFileAttributesEx
 GetFileSizeEx
@@ -813,6 +814,7 @@ foward
 fprintf
 fread
 free'd
+freep
 freopen
 fs
 fscanf
@@ -1295,6 +1297,7 @@ srch
 ss
 ssize
 statlog
+statvfs
 stb
 stdbool
 stderr

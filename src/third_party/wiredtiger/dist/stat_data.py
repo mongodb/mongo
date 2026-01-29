@@ -1313,6 +1313,7 @@ conn_dsrc_stats = [
     # Disaggregated block manager statistics
     ##########################################
     BlockDisaggStat('disagg_block_get', 'Disaggregated block manager get'),
+    BlockDisaggStat('disagg_block_get_cold', 'Disaggregated block manager get cold page'),
     BlockDisaggStat('disagg_block_hs_byte_read', 'Bytes read from the shared history store in SLS', 'size'),
     BlockDisaggStat('disagg_block_hs_byte_write', 'Bytes written to the shared history store in SLS', 'size'),
     BlockDisaggStat('disagg_block_hs_get', 'Disaggregated block manager get from the shared history store in SLS'),

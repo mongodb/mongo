@@ -569,6 +569,34 @@ err:
 }
 
 /*
+ * __win_fs_free_space --
+ *     Return the free space disk available in a windows file system containing the file.
+ */
+static int
+__win_fs_free_space(
+  WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *path, wt_off_t *freep)
+{
+    DWORD windows_error;
+    ULARGE_INTEGER free_bytes_to_caller, total_bytes, total_free_bytes;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(file_system);
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    /* This function only works with directory paths. */
+    if (!GetDiskFreeSpaceExA(path, &free_bytes_to_caller, &total_bytes, &total_free_bytes)) {
+        windows_error = __wt_getlasterror();
+        ret = __wt_map_windows_error(windows_error);
+        WT_RET_MSG(session, ret, "%s: free-disk-space: GetDiskFreeSpaceExA: %s", path,
+          __wt_formatmessage(session, windows_error));
+    }
+
+    *freep = (wt_off_t)free_bytes_to_caller.QuadPart;
+    return (0);
+}
+
+/*
  * __win_terminate --
  *     Discard a Windows configuration.
  */
@@ -606,6 +634,7 @@ __wt_os_win(WT_SESSION_IMPL *session)
     file_system->fs_remove = __win_fs_remove;
     file_system->fs_rename = __win_fs_rename;
     file_system->fs_size = __wti_win_fs_size;
+    file_system->fs_free_space = __win_fs_free_space;
     file_system->terminate = __win_terminate;
 
     /* Switch it into place. */

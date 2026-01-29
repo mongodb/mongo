@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <sys/statvfs.h>
+
 /* Some systems don't configure 64-bit MIN/MAX by default. */
 #ifndef ULLONG_MAX
 #define ULLONG_MAX 0xffffffffffffffffULL

@@ -98,7 +98,8 @@ class test_layered52(wttest.WiredTigerTestCase):
                 self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         cursor.close()
 
-    nitems = 1000
+    # Use more items so we reliably get a deeper tree and enough internal keys.
+    nitems = 5000
 
     def test_internal_page_delta_delete_leaf(self):
 
@@ -116,32 +117,67 @@ class test_layered52(wttest.WiredTigerTestCase):
 
         expected_keys = set(str(i) for i in range(1, self.nitems + 1))
 
-        # To reliably delete an entire leaf page, we need to delete a contiguous range of keys.
-        # A range of 100 keys should be enough to span at least one or more full leaf pages.
-        delete_start = 200
-        keys_to_delete = [str(k) for k in range(delete_start, delete_start + 100) if str(k) in expected_keys]
+        #
+        # Drive multiple substantial changes into the internal tree so that
+        # reconciliation has more than one opportunity to write internal
+        # page deltas with deleted children.
+        #
 
-        # Delete the selected keys.
-        delete_ts = initial_ts + 10
-        self.delete_keys(keys_to_delete, delete_ts)
+        # First delete range: a contiguous block of keys somewhere in the
+        # middle of the key space. Use a range large enough to span several
+        # leaf pages given the small page sizes.
+        delete_start1 = 200
+        delete_len1 = 200
+        keys_to_delete1 = [
+            str(k)
+            for k in range(delete_start1, delete_start1 + delete_len1)
+            if str(k) in expected_keys
+        ]
+
+        delete_ts1 = initial_ts + 10
+        self.delete_keys(keys_to_delete1, delete_ts1)
 
         self.conn.set_timestamp('oldest_timestamp={},stable_timestamp={}'.format(
-            self.timestamp_str(delete_ts), self.timestamp_str(delete_ts)))
+            self.timestamp_str(delete_ts1), self.timestamp_str(delete_ts1)))
 
-        # Perform a checkpoint to write out a delta.
+        # First checkpoint after the first delete range.
+        self.session.checkpoint()
+        expected_keys.difference_update(keys_to_delete1)
+
+        # Second delete range: a separate block of keys further along the key
+        # space to affect different leaves and internal children.
+        delete_start2 = 3000
+        delete_len2 = 200
+        keys_to_delete2 = [
+            str(k)
+            for k in range(delete_start2, delete_start2 + delete_len2)
+            if str(k) in expected_keys
+        ]
+
+        delete_ts2 = delete_ts1 + 10
+        self.delete_keys(keys_to_delete2, delete_ts2)
+
+        self.conn.set_timestamp('oldest_timestamp={},stable_timestamp={}'.format(
+            self.timestamp_str(delete_ts2), self.timestamp_str(delete_ts2)))
+
+        # Second checkpoint after the second delete range. Between the two
+        # checkpoints, internal reconciliation should see multiple children
+        # becoming deletable and is more likely to write internal deltas
+        # that include deleted keys.
         self.session.checkpoint()
 
-        # Remove the deleted keys from our set of expected keys.
-        expected_keys.difference_update(keys_to_delete)
+        expected_keys.difference_update(keys_to_delete2)
 
-        # FIXME-WT-16316: Fix this test to generate internal delta again.
-        # self.verify_stat()
+        # After two delete+checkpoint sequences on disjoint ranges, we should
+        # now have internal page deltas that include deleted keys.
+        self.verify_stat()
 
-        # Verify that only the expected keys are present.
-        self.verify(expected_keys, delete_ts)
+        # Verify that only the expected keys are present at the latest
+        # stable timestamp.
+        self.verify(expected_keys, delete_ts2)
 
         # Re-open the connection to clear contents out of memory.
         self.reopen_disagg_conn(self.conn_config())
 
         # Verify the updated values in the table.
-        self.verify(expected_keys, delete_ts)
+        self.verify(expected_keys, delete_ts2)

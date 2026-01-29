@@ -8,6 +8,7 @@
 
 #include "wt_internal.h"
 
+static void __fs_free_space_dump(WT_SESSION_IMPL *session, WT_BLOCK *block);
 /*
  * __wt_bm_read --
  *     Map or read address cookie referenced block into a buffer.
@@ -330,6 +331,9 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
          */
         WT_IGNORE_RET(__wt_bm_corrupt_dump(session, buf, objectid, offset, size, checksum));
 
+        /* Dump the free disk space. */
+        __fs_free_space_dump(session, block);
+
         /*
          * Attempt to detect single-bit flips in the data. This can help diagnose memory corruption
          * issues.
@@ -357,6 +361,60 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     __wti_block_extlist_dump_all(session, block);
 
     WT_RET_PANIC(session, WT_ERROR, "%s: fatal read error", block->name);
+}
+
+/*
+ * __fs_free_space_dump --
+ *     Dump the free disk space on the main database directory and on the journal directory for both
+ *     full or partial checksum mismatch.
+ */
+static void
+__fs_free_space_dump(WT_SESSION_IMPL *session, WT_BLOCK *block)
+{
+    WT_DECL_RET;
+    WT_FILE_SYSTEM *fs;
+    WT_LOG_MANAGER *log_mgr;
+    wt_off_t db_dir_free_space, journal_dir_free_space;
+    const char *db_dir, *journal_dir;
+
+    db_dir_free_space = journal_dir_free_space = 0;
+    db_dir = S2C(session)->home;
+    journal_dir = NULL;
+    log_mgr = &S2C(session)->log_mgr;
+    fs = __wt_fs_file_system(session);
+
+    if (log_mgr->log_path != NULL && strlen(log_mgr->log_path) > 0)
+        /*
+         * If the journal directory is not the same as the main database directory path, set it.
+         */
+        journal_dir = !WT_STREQ(db_dir, log_mgr->log_path) ? log_mgr->log_path : NULL;
+
+    /* Log free space on the main database directory, and the journal directory if different. */
+    ret = fs->fs_free_space(fs, (WT_SESSION *)session, db_dir, &db_dir_free_space);
+    /*
+     * Using __wt_errx here is intentional: we're already in a corruption path (checksum mismatch).
+     * We're being consistent with other corruption logs so free-space details are always recorded.
+     */
+    if (ret == 0) {
+        __wt_errx(session,
+          "%s: free disk space on main database directory (%s) is %" PRIdMAX " bytes", block->name,
+          db_dir, (intmax_t)db_dir_free_space);
+    } else
+        __wt_err(session, ret,
+          "%s: unable to determine free disk space on main database directory (%s)", block->name,
+          db_dir);
+
+    if (journal_dir != NULL) {
+        ret = fs->fs_free_space(fs, (WT_SESSION *)session, journal_dir, &journal_dir_free_space);
+        if (ret == 0) {
+            __wt_errx(session,
+              "%s: free disk space on journal directory (%s) is %" PRIdMAX " bytes", block->name,
+              journal_dir, (intmax_t)journal_dir_free_space);
+        } else
+            __wt_err(session, ret,
+              "%s: unable to determine free disk space on journal directory (%s)", block->name,
+              journal_dir);
+    }
 }
 
 #ifdef HAVE_UNITTEST

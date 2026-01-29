@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import errno, inspect, os, wiredtiger, wttest
+import wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, gen_disagg_storages
-from wtscenario import make_scenarios
 from wiredtiger import stat
 
 # test_disagg04.py
@@ -41,6 +40,7 @@ class test_disagg04(wttest.WiredTigerTestCase, DisaggConfigMixin):
     disagg_storages = gen_disagg_storages('test_disagg04', disagg_only = True)
 
     uri = "layered:test_disagg04_%02d"
+    cold_table_config = 'key_format=S,value_format=S,disaggregated=(storage_tier=cold),'
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):
@@ -94,7 +94,7 @@ class test_disagg04(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Test valid storage_tier configuration value (cold)
         self.validate_config(
             self.uri%3,
-            'key_format=S,value_format=S,disaggregated=(storage_tier=cold),',
+            self.cold_table_config,
             lambda v: self.assertTrue(v.find('storage_tier=cold') != -1)
         )
 
@@ -112,10 +112,26 @@ class test_disagg04(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
         uri = self.uri%5
 
-        self.session.create(uri, 'key_format=S,value_format=S,disaggregated=(storage_tier=cold),')
+        self.session.create(uri, self.cold_table_config)
 
         self.assertEqual(self.get_stat(stat.conn.disagg_block_put_cold), 0)
 
         self.add_data(uri, 1000)
 
         self.assertGreater(self.get_stat(stat.conn.disagg_block_put_cold), 0)
+
+    def test_cold_read(self):
+        self.conn.reconfigure('disaggregated=(role=leader)')
+
+        uri = self.uri%6
+
+        self.session.create(uri, self.cold_table_config)
+
+        self.add_data(uri, 1000)
+
+        self.assertEqual(self.get_stat(stat.conn.disagg_block_get_cold), 0)
+
+        # Verify the table to read all pages.
+        self.verifyUntilSuccess(uri=uri)
+
+        self.assertGreater(self.get_stat(stat.conn.disagg_block_get_cold), 0)

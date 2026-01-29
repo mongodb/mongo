@@ -893,10 +893,10 @@ err:
     if (ret == 0)
         __clayered_deleted_decode(&cursor->value);
     else {
-        __clayered_reset_cursors(clayered, false);
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+        if (ret != WT_PREPARE_CONFLICT)
+            __clayered_reset_cursors(clayered, false);
     }
-
     return (ret);
 }
 
@@ -1323,9 +1323,8 @@ err:
 
         if (value == &cursor->value)
             F_SET(cursor, WT_CURSTD_VALUE_INT);
-    } else {
+    } else if (ret != WT_PREPARE_CONFLICT)
         WT_TRET(__clayered_reset_cursors(clayered, false));
-    }
 
     return (ret);
 }
@@ -1507,11 +1506,13 @@ err:
     if (closest != NULL)
         WT_TRET(closest->reset(closest));
 
-    F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     if (ret == 0) {
+        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-    } else
+    } else if (ret != WT_PREPARE_CONFLICT) {
+        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         clayered->current_cursor = NULL;
+    }
 
     API_END_RET(session, ret);
 }

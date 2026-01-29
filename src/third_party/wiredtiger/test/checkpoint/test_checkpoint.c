@@ -278,7 +278,7 @@ main(int argc, char *argv[])
               stderr, "disaggregated storage feature doesn't supports named checkpoints (-c)");
             return (EXIT_FAILURE);
         }
-        /* FIXME-WT-15051 Disagg is not support prepared operations yet. */
+        /* FIXME-WT-15795 Disagg is not support prepared operations yet. */
         if (g.prepare == true) {
             fprintf(
               stderr, "disaggregated storage feature doesn't supports prepare operations (-p)");

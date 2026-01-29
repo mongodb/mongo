@@ -44,7 +44,7 @@ class test_prepare_discover07(wttest.WiredTigerTestCase):
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
-        # FIXME-WT-15051 handle searching for committed prepared tombstone on standby
+        # FIXME-WT-16530 handle searching for committed prepared tombstone on standby
         # ('commit', dict(commit=True)),
         ('rollback', dict(commit=False)),
     ]

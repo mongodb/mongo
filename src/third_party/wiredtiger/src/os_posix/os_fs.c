@@ -992,6 +992,29 @@ err:
 }
 
 /*
+ * __posix_fs_free_space --
+ *     Return the free space disk available in the file system containing the file.
+ */
+static int
+__posix_fs_free_space(
+  WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *path, wt_off_t *freep)
+{
+    struct statvfs stats;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(file_system);
+    session = (WT_SESSION_IMPL *)wt_session;
+
+    WT_SYSCALL(statvfs(path, &stats), ret);
+    if (ret != 0)
+        WT_RET_MSG(session, ret, "%s: free-disk-space: statvfs", path);
+
+    *freep = (wt_off_t)((uint64_t)stats.f_bavail * (uint64_t)stats.f_frsize);
+    return (0);
+}
+
+/*
  * __posix_terminate --
  *     Terminate a POSIX configuration.
  */
@@ -1026,6 +1049,7 @@ __wt_os_posix(WT_SESSION_IMPL *session, WT_FILE_SYSTEM **fsp)
     file_system->fs_remove = __posix_fs_remove;
     file_system->fs_rename = __posix_fs_rename;
     file_system->fs_size = __posix_fs_size;
+    file_system->fs_free_space = __posix_fs_free_space;
     file_system->terminate = __posix_terminate;
 
     /* Return the file system. */
