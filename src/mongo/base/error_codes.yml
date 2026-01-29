@@ -1161,5 +1161,12 @@ error_codes:
       categories: [Interruption, RetriableError],
     }
 
+  # Stream processor Kafka throttle error - allows mongohouse to retry indefinitely
+  - {
+      code: 486,
+      name: StreamProcessorKafkaThrottled,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
