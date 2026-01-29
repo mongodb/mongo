@@ -682,45 +682,9 @@ private:
     class PublishCatalogUpdates;
 
     /**
-     * If the NSS or UUID is pending commit, returns the instance of the collection pending commit.
-     * Otherwise, returns nullptr.
+     * Returns whether the collection has pending commits.
      */
-    const std::shared_ptr<Collection>* _findPendingCommitCollection(
-        const NamespaceStringOrUUID& nssOrUUID) const;
-
-    /**
-     * Given a collection that is pending commit, returns whether the pending commit is because
-     * of a viewless timeseries upgrade/downgrade. This resolves the following problem:
-     *
-     * When downgrading a timeseries collection from viewful to viewless format, we atomically:
-     * - Rename the timeseries collection on 'myts' to 'system.buckets.myts'.
-     * - Create the timeseries view on 'myts'.
-     *
-     * After this has been committed to durable storage, but before the changes are published
-     * to the in-memory catalog, catalog queries combining establishConsistentCollection with
-     * lookupView (as it's done for example by the Shard Role API) return an inconsistent state:
-     * - establishConsistentCollection returns the durable state, i.e. no collection on 'myts'.
-     * - lookupView returns the in-memory state, i.e. no view on 'myts'.
-     * So from the point of view of catalog users, it looks a non-existing namespace.
-     *
-     * Similarly, right after the commit of an upgrade to durable storage, establishConsistentColl.
-     * returns 'myts' as a collection, but lookupView still returns 'myts' as a view based on its
-     * (stale) in-memory state, so 'myts' appears as both a collection and a view in the catalog.
-     *
-     * We resolve this by removing viewless timeseries upgrade/downgrade from the two-phase
-     * commit protocol; that is, like views, we always resolve them from the in-memory state.
-     * This, in effect, delays the visibility of the collection changes until the changes to both
-     * the collection and the view are (atomically) published to the in-memory catalog.
-     *
-     * This works because the viewless timeseries upgrade/downgrade is just a metadata change:
-     * - It preserves the identity of the collection: NSS (modulo system.buckets), UUID and idents.
-     * - For users, commands over them have the same result before and after the upgrade.
-     * So operations can work with a stale version of the collection metadata.
-     *
-     * TODO(SERVER-114573): Remove once 9.0 is last LTS
-     */
-    bool _hasPendingTimeseriesUpgradeDowngradeCommit(
-        const NamespaceStringOrUUID& nsOrUUID, const std::shared_ptr<Collection>& pending) const;
+    bool _collectionHasPendingCommits(const NamespaceStringOrUUID& nssOrUUID) const;
 
     /**
      * Gets Collections by UUID/Namespace.
