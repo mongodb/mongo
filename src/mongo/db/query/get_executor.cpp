@@ -1704,8 +1704,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     });
 
     if (!collectionPtr) {
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-
         // Treat collections that do not exist as empty collections. Return a PlanExecutor which
         // contains an EOF stage.
         LOGV2_DEBUG(20927,
@@ -1716,7 +1714,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
         return plan_executor_factory::make(
             expCtx,
-            std::move(ws),
+            std::make_unique<WorkingSet>(),
             std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
             coll,
             parsedDelete->yieldPolicy(),
@@ -1769,7 +1767,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // This is the regular path for when we have a CanonicalQuery.
     std::unique_ptr<CanonicalQuery> cq(parsedDelete->releaseParsedQuery());
 
-    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     const auto policy = parsedDelete->yieldPolicy();
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
@@ -1817,8 +1814,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             .collections = collections,
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collections, std::move(ws), cq.get(), policy, std::move(plannerParams)};
+    ClassicPrepareExecutionHelper helper{opCtx,
+                                         collections,
+                                         std::make_unique<WorkingSet>(),
+                                         cq.get(),
+                                         policy,
+                                         std::move(plannerParams)};
 
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams",
@@ -1893,7 +1894,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
     // is true, we expect the caller to have created the collection already.
     if (!coll.exists()) {
-        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
@@ -1902,7 +1902,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
         return plan_executor_factory::make(
             expCtx,
-            std::move(ws),
+            std::make_unique<WorkingSet>(),
             std::make_unique<EOFStage>(expCtx.get(), eof_node::EOFType::NonExistentNamespace),
             boost::none,
             policy,
@@ -1958,7 +1958,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // This is the regular path for when we have a CanonicalQuery.
     UpdateStageParams updateStageParams(request, driver, opDebug, std::move(documentCounter));
-    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<CanonicalQuery> cq(canonicalUpdate->releaseParsedQuery());
 
     std::unique_ptr<projection_ast::Projection> projection;
@@ -1987,7 +1986,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     ClassicPrepareExecutionHelper helper{
         opCtx,
         collections,
-        std::move(ws),
+        std::make_unique<WorkingSet>(),
         cq.get(),
         policy,
         std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
@@ -2020,8 +2019,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     std::unique_ptr<ParsedFindCommand> parsedFind,
     const CountCommandRequest& count) {
     OperationContext* opCtx = expCtx->getOperationContext();
-    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-
     auto statusWithCQ = CanonicalQuery::make(
         {.expCtx = expCtx, .parsedFind = std::move(parsedFind), .isCountLike = true});
     if (!statusWithCQ.isOK()) {
@@ -2040,6 +2037,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     });
 
     if (!coll.exists()) {
+        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         // Treat collections that do not exist as empty collections. Note that the explain reporting
         // machinery always assumes that the root stage for a count operation is a CountStage, so in
         // this case we put a CountStage on top of an EOFStage.
@@ -2082,7 +2080,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             std::make_unique<RecordStoreFastCountStage>(expCtx.get(), coll, skip, limit);
 
         return plan_executor_factory::make(expCtx,
-                                           std::move(ws),
+                                           std::make_unique<WorkingSet>(),
                                            std::move(root),
                                            boost::none,
                                            yieldPolicy,
@@ -2104,8 +2102,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             .plannerOptions = plannerOptions,
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collections, std::move(ws), cq.get(), yieldPolicy, std::move(plannerParams)};
+    ClassicPrepareExecutionHelper helper{opCtx,
+                                         collections,
+                                         std::make_unique<WorkingSet>(),
+                                         cq.get(),
+                                         yieldPolicy,
+                                         std::move(plannerParams)};
 
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams",
