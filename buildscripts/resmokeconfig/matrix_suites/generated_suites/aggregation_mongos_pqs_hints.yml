@@ -32,6 +32,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+    num_mongos: 3
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
