@@ -362,4 +362,6 @@ testQuerySettingsParameterized({
         );
         return true;
     });
+
+    qsutils.removeAllQuerySettings();
 }
