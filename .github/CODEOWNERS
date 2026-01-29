@@ -3421,6 +3421,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/third_party/private/arrow/dist/arrow/flight/transport/grpc/OWNERS.yml
 /src/third_party/private/arrow/dist/arrow/flight/transport/grpc/**/* @10gen/streams-engine @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/third_party/private/mongocxx/OWNERS.yml
+/src/third_party/private/mongocxx/ @10gen/streams-engine @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/third_party/scripts/OWNERS.yml
 /src/third_party/scripts/**/gen_thirdpartyreadme.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 /src/third_party/scripts/**/README.third_party.md.template @10gen/code-review-team-ssdlc @svc-auto-approve-bot
