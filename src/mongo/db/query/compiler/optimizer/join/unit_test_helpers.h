@@ -228,6 +228,20 @@ public:
               std::move(collCards)) {
         _subsetCardinalities = std::move(subsetCards);
     }
+
+    /**
+     * This constuctor initializes base node subsets and generates estimates for composite subsets.
+     */
+    FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx,
+                                 SubsetCardinalities subsetCards,
+                                 EdgeSelectivities edgeSels,
+                                 NodeCardinalities collCards)
+        : JoinCardinalityEstimator(jCtx,
+                                   EdgeSelectivities(std::move(edgeSels)),
+                                   NodeCardinalities(collCards),
+                                   collCards) {
+        _subsetCardinalities = std::move(subsetCards);
+    }
 };
 
 

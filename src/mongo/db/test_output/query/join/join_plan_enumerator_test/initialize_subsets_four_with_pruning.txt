@@ -10,17 +10,17 @@ Level 3:
 1111
 
 Output plans (best plan 0):
-0.(0)[1111] HJ
+0.(0)[1111] NLJ
  -> left:
     (0)[0111] HJ
      -> left:
         (0)[0011] HJ
          -> left:
-            (0.0001)[0001][test.nss0] COLLSCAN
+            (0.0148174)[0001][test.nss0] COLLSCAN
          -> right:
-            (1.48174)[0010][test.nss1] COLLSCAN
+            (1.49656)[0010][test.nss1] COLLSCAN
      -> right:
-        (2.76358)[0100][test.nss2] COLLSCAN
+        (2.97829)[0100][test.nss2] COLLSCAN
  -> right:
-    (4.24521)[1000][test.nss3] COLLSCAN
+    (4.46003)[1000][test.nss3] COLLSCAN
 

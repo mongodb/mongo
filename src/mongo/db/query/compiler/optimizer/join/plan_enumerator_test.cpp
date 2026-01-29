@@ -96,8 +96,8 @@ public:
             auto filterBSON = bsonStorage.emplace_back(BSON(fieldName << BSON("$gt" << 0)));
 
             // Pick some cardinalities.
-            collCards.push_back(makeCard(i * 1000.0));
-            subsetCards.emplace(makeNodeSet((NodeId)i), makeCard((i % 2) * 999.0 + 1.0));
+            collCards.push_back(makeCard(i * 1000.0 + 10.0));
+            subsetCards.emplace(makeNodeSet((NodeId)i), collCards[i]);
             catStats.collStats[nss] =
                 CollectionStats{.allocatedDataPageBytes = collCards[i].toDouble() * 420.0};
 
@@ -116,7 +116,13 @@ public:
     }
 
     std::unique_ptr<JoinCardinalityEstimator> makeFakeEstimator(const JoinReorderingContext& jCtx) {
-        return std::make_unique<FakeJoinCardinalityEstimator>(jCtx, subsetCards, collCards);
+        return std::make_unique<FakeJoinCardinalityEstimator>(
+            jCtx,
+            subsetCards,
+            // Just assume all edges are 10% selective.
+            EdgeSelectivities(jCtx.joinGraph.numEdges(),
+                              {SelectivityType{0.1}, EstimationSource::Code}),
+            collCards);
     }
 
     auto makeCoster(const JoinReorderingContext& jCtx, JoinCardinalityEstimator& ce) {
