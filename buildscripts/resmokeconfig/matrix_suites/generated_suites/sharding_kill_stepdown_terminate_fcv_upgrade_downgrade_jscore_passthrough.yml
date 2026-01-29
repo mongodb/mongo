@@ -144,9 +144,6 @@ selector:
     - featureFlagRankFusion
     - featureFlagMongotIndexedViews
     - uses_transactions
-    - requires_fcv_71
-    - requires_fcv_72
-    - requires_fcv_73
     - requires_fcv_80
     - requires_fcv_81
     - requires_fcv_82
