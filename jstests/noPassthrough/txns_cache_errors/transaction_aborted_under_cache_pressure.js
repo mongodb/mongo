@@ -1,8 +1,7 @@
 /**
  * Validate we are aborting multi-document transactions when we are under cache pressure.
  *
- * @tags: [requires_persistence, requires_wiredtiger, featureFlagStorageEngineInterruptibility,
- * requires_fcv_83]
+ * @tags: [requires_persistence, requires_wiredtiger, requires_fcv_83]
  */
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";

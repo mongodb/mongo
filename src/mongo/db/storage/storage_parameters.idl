@@ -282,11 +282,6 @@ feature_flags:
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged
         default: false
         fcv_gated: true
-    featureFlagStorageEngineInterruptibility:
-        description: "Enable support for interrupting user operations in storage engines and rolling back transactions immediately that are targeted by the storage engine."
-        cpp_varname: feature_flags::gStorageEngineInterruptibility
-        default: true
-        fcv_gated: false
     featureFlagReplicateLocalCatalogIdentifiers:
         description: >-
             Enable replication of local catalog identifiers across replica set nodes, ensuring the

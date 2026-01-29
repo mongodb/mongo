@@ -977,38 +977,28 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
 // cache eviction. While there is gating in place, ensure that the gating fully disables the
 // feature
 TEST_F(WiredTigerRecoveryUnitTestFixture, OptionalEvictionCanBeInterrupted) {
-    for (bool enableFeature : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlag{"featureFlagStorageEngineInterruptibility",
-                                                         enableFeature};
-        auto clientAndCtx =
-            makeClientAndOpCtx(harnessHelper.get(), "test" + std::to_string(enableFeature));
-        OperationContext* opCtx = clientAndCtx.second.get();
-        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
+    auto clientAndCtx = makeClientAndOpCtx(harnessHelper.get(), "test");
+    OperationContext* opCtx = clientAndCtx.second.get();
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
 
-        WiredTigerEventHandler eventHandler;
-        WT_SESSION* session = ru->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });
-        ASSERT_EQ(0,
-                  eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
-                                                                   ru->getConnection()->conn(),
-                                                                   session,
-                                                                   WT_EVENT_EVICTION,
-                                                                   nullptr));
+    WiredTigerEventHandler eventHandler;
+    WT_SESSION* session = ru->getSessionNoTxn()->with([](WT_SESSION* arg) { return arg; });
+    ASSERT_EQ(0,
+              eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                               ru->getConnection()->conn(),
+                                                               session,
+                                                               WT_EVENT_EVICTION,
+                                                               nullptr));
 
-        opCtx->markKilled(ErrorCodes::Interrupted);
-        ASSERT_EQ(
-            enableFeature,
-            (bool)eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
-                                                                   ru->getConnection()->conn(),
-                                                                   session,
-                                                                   WT_EVENT_EVICTION,
-                                                                   nullptr));
+    opCtx->markKilled(ErrorCodes::Interrupted);
+    ASSERT_TRUE(
+        (bool)eventHandler.getWtEventHandler()->handle_general(eventHandler.getWtEventHandler(),
+                                                               ru->getConnection()->conn(),
+                                                               session,
+                                                               WT_EVENT_EVICTION,
+                                                               nullptr));
 
-        if (enableFeature) {
-            ASSERT_EQ(WiredTigerUtil::getCancelledCacheMetric_forTest(), 1);
-        } else {
-            ASSERT_EQ(WiredTigerUtil::getCancelledCacheMetric_forTest(), 0);
-        }
-    }
+    ASSERT_EQ(WiredTigerUtil::getCancelledCacheMetric_forTest(), 1);
 }
 
 class SnapshotTestDecoration {
@@ -1072,9 +1062,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, AbortSnapshotChange) {
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, PreparedTransactionSkipsOptionalEviction) {
-    RAIIServerParameterControllerForTest truncateFeatureFlag{
-        "featureFlagStorageEngineInterruptibility", true};
-
     // A snapshot is already open from when the RU was constructed.
     ASSERT(ru1->getSession());
     ASSERT(!ru1->getNoEvictionAfterCommitOrRollback());

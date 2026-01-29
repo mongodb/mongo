@@ -1472,8 +1472,7 @@ int WiredTigerUtil::handleWtEvictionEvent(WT_SESSION* session) {
     }
     auto opCtx = reinterpret_cast<OperationContext*>(session->app_private);
 
-    if (feature_flags::gStorageEngineInterruptibility.isEnabled() &&
-        !opCtx->checkForInterruptNoAssert().isOK()) {
+    if (!opCtx->checkForInterruptNoAssert().isOK()) {
         auto& metrics = StorageExecutionContext::get(opCtx)->getStorageMetrics();
         // Check killTime as it can be 0 for a short window when interrupted during shutdown.
         auto killTime = opCtx->getKillTime();

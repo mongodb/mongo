@@ -213,14 +213,13 @@ void WiredTigerRecoveryUnit::prepareUnitOfWork() {
 
     // Prepare the transaction.
     invariantWTOK(session->prepare_transaction(confStr.c_str()), *session);
-    if (feature_flags::gStorageEngineInterruptibility.isEnabled()) {
-        // Avoids a situation where committing or rolling back a prepared transaction hangs with
-        // concurrent operations trying to read documents modified by the prepared transaction. This
-        // avoids the prepared transaction from being opted into optional eviction to avoid the
-        // situation where it's unable to evict anything due to pages being pinned by the concurrent
-        // operations hitting a prepare conflict.
-        setNoEvictionAfterCommitOrRollback();
-    }
+
+    // Avoids a situation where committing or rolling back a prepared transaction hangs with
+    // concurrent operations trying to read documents modified by the prepared transaction. This
+    // avoids the prepared transaction from being opted into optional eviction to avoid the
+    // situation where it's unable to evict anything due to pages being pinned by the concurrent
+    // operations hitting a prepare conflict.
+    setNoEvictionAfterCommitOrRollback();
 }
 
 void WiredTigerRecoveryUnit::doCommitUnitOfWork() {

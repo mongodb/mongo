@@ -118,9 +118,6 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
     PeriodicRunner::PeriodicJob job(
         "rollbackUnderCachePressure",
         [](Client* client) {
-            if (!feature_flags::gStorageEngineInterruptibility.isEnabled()) {
-                return;
-            }
             try {
                 // The opCtx destructor handles unsetting itself from the Client. (The
                 // PeriodicRunner's Client must be reset before returning.)
