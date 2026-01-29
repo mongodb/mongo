@@ -28,6 +28,7 @@
  */
 #include "mongo/db/extension/shared/extension_status.h"
 
+#include "mongo/base/init.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -36,6 +37,60 @@
 
 namespace mongo::extension {
 namespace {
+
+class TestObservabilityContext : public mongo::extension::ObservabilityContext {
+public:
+    ~TestObservabilityContext() override {}
+
+    void extensionSuccess() const noexcept override {
+        ++_sExtensionSuccessCounter;
+    }
+
+    void extensionError() const noexcept override {
+        ++_sExtensionFailureCounter;
+    }
+
+    void hostSuccess() const noexcept override {
+        ++_sHostSuccessCounter;
+    }
+
+    void hostError() const noexcept override {
+        ++_sHostFailureCounter;
+    }
+
+    static size_t getExtensionSuccessCounter() {
+        return _sExtensionSuccessCounter;
+    }
+
+    static size_t getExtensionFailureCounter() {
+        return _sExtensionFailureCounter;
+    }
+
+    static size_t getHostSuccessCounter() {
+        return _sHostSuccessCounter;
+    }
+
+    static size_t getHostFailureCounter() {
+        return _sHostFailureCounter;
+    }
+
+    static void resetCounters() {
+        _sExtensionSuccessCounter = 0;
+        _sExtensionFailureCounter = 0;
+        _sHostSuccessCounter = 0;
+        _sHostFailureCounter = 0;
+    }
+
+private:
+    static inline size_t _sExtensionSuccessCounter = 0;
+    static inline size_t _sExtensionFailureCounter = 0;
+    static inline size_t _sHostSuccessCounter = 0;
+    static inline size_t _sHostFailureCounter = 0;
+};
+
+MONGO_INITIALIZER(InitializeTestObservabilityContext)(InitializerContext*) {
+    mongo::extension::setGlobalObservabilityContext(std::make_unique<TestObservabilityContext>());
+};
 
 TEST(ExtensionStatusTest, extensionStatusOKTest) {
     // StatusHandle going out of scope should call destroy, but not destroy our singleton.
@@ -99,9 +154,17 @@ TEST(ExtensionStatusTest, ExtensionStatusExceptionCloneTest) {
 // Test that a std::exception correctly returns MONGO_EXTENSION_STATUS_RUNTIME_ERROR when called via
 // wrapCXXAndConvertExceptionToStatus.
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdException) {
+    TestObservabilityContext::resetCounters();
+    const auto* obsCtx = mongo::extension::getGlobalObservabilityContext();
+    const auto* cast = dynamic_cast<const TestObservabilityContext*>(obsCtx);
+    ASSERT(cast != nullptr);
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
     ASSERT_TRUE(status->getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
 }
 
 // Test that a std::exception can be rethrown when it crosses from a C++ context through the C API
@@ -109,20 +172,30 @@ TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdE
 TEST(
     ExtensionStatusTest,
     extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_stdException) {
+    TestObservabilityContext::resetCounters();
     ASSERT_THROWS(invokeCAndConvertStatusToException([&]() {
                       return wrapCXXAndConvertExceptionToStatus([&]() {
                           throw std::runtime_error("Runtime exception in $noOpExtension parse.");
                       });
                   }),
                   std::exception);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
 }
 
 // Test that wrapCXXAndConvertExceptionToStatus correctly wraps a DBException (uassert) and returns
 // the correct code when a call is made at the C API boundary.
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_AssertionException) {
+    TestObservabilityContext::resetCounters();
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
     ASSERT_TRUE(status->getCode() == 10596408);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
 }
 
 // Test that a DBException (uassert) can be rethrown when it crosses from a C++ context through the
@@ -130,6 +203,7 @@ TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_Asse
 TEST(
     ExtensionStatusTest,
     extensionStatusWrapCXXAndConvertExceptionToStatus_invokeCAndConvertStatusToException_rethrow_AssertionException) {
+    TestObservabilityContext::resetCounters();
     ASSERT_THROWS_CODE(invokeCAndConvertStatusToException([&]() {
                            return wrapCXXAndConvertExceptionToStatus([&]() {
                                uasserted(10596409, "Failed with uassert in $noOpExtension parse.");
@@ -137,6 +211,10 @@ TEST(
                        }),
                        AssertionException,
                        10596409);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
 }
 
 /*
@@ -154,6 +232,7 @@ TEST(
     auto extensionStatusPtr =
         std::make_unique<ExtensionStatusException>(nullptr, 10596412, kErrorString);
     const auto* extensionStatusOriginalPtr = extensionStatusPtr.get();
+    TestObservabilityContext::resetCounters();
 
     StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
         invokeCAndConvertStatusToException([&]() { return extensionStatusPtr.release(); });
@@ -163,17 +242,81 @@ TEST(
     // wrapCXXAndConvertExceptionToStatus(invokeCAndConvertStatusToException(..)) is the same one we
     // originally allocated.
     ASSERT_TRUE(propagatedStatus.get() == extensionStatusOriginalPtr);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
+}
+
+TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_ExtensionStatusOK) {
+    TestObservabilityContext::resetCounters();
+    invokeCAndConvertStatusToException([&]() { return &ExtensionStatusOK::getInstance(); });
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
+}
+
+TEST(ExtensionStatusTest,
+     extensionStatusInvokeCAndConvertStatusToException_wrapCXXAndConvertExceptionToStatus_Success) {
+    TestObservabilityContext::resetCounters();
+
+    StatusHandle status(wrapCXXAndConvertExceptionToStatus([&]() { return true; }));
+    ASSERT_TRUE(status->getCode() == MONGO_EXTENSION_STATUS_OK);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 1u);
 }
 
 TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_ExtensionDBException) {
     const std::string& kErrorString =
         "Failed with an error which was not an ExtensionStatusException.";
+    TestObservabilityContext::resetCounters();
+
     ASSERT_THROWS_CODE_AND_WHAT(
         invokeCAndConvertStatusToException(
             [&]() { return new ExtensionStatusException(nullptr, 10596412, kErrorString); }),
         ExtensionDBException,
         10596412,
         kErrorString);
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 1u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
+}
+
+/*
+ * Verify that an ExtensionDBException, propagates the underlying extension::ExtensionStatus
+ * when it crosses the API boundary. An ExtensionDBException is typically thrown when we receive an
+ * extension::ExtensionStatus that was not from the host's C++ context. In this case, there is
+ * no underlying exception that can be rethrown. Instead, we throw a ExtensionDBException that wraps
+ * the underlying MongoExtensionStatus.
+ */
+TEST(
+    ExtensionStatusTest,
+    extensionStatusInvokeCAndConvertStatusToException_wrapCXXAndConvertExceptionToStatus_MultipleRoundTrips) {
+    TestObservabilityContext::resetCounters();
+    // wrapCXX catches the rethrown exception, which is not an ExtensionDBException, so it
+    // bumps the count again
+    StatusHandle propagatedStatus(wrapCXXAndConvertExceptionToStatus([&]() {
+        invokeCAndConvertStatusToException([&]() {
+            // wrapCXX catches the rethrown exception, which is not an ExtensionDBException, so it
+            // bumps the count again
+            return wrapCXXAndConvertExceptionToStatus([&]() {
+                invokeCAndConvertStatusToException([&]() {
+                    // wrapCXX increases failure count to 1. allocates ExtensionStatusException
+                    return wrapCXXAndConvertExceptionToStatus(
+                        []() { uasserted(11569604, "Dummy error."); });
+                });
+            });
+        });
+    }));
+
+    ASSERT_EQ(TestObservabilityContext::getExtensionFailureCounter(), 2u);
+    ASSERT_EQ(TestObservabilityContext::getExtensionSuccessCounter(), 0u);
+    ASSERT_EQ(TestObservabilityContext::getHostFailureCounter(), 3u);
+    ASSERT_EQ(TestObservabilityContext::getHostSuccessCounter(), 0u);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {

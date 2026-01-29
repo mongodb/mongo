@@ -30,6 +30,8 @@
 #include "mongo/db/extension/shared/extension_status.h"
 
 #include "mongo/db/extension/shared/byte_buf.h"
+#include "mongo/util/testing_proctor.h"
+
 
 namespace mongo::extension {
 
@@ -66,6 +68,41 @@ const ::MongoExtensionStatusVTable extension::ExtensionGenericStatus::VTABLE = {
     .clone = &ExtensionGenericStatus::_extClone,
 };
 
+namespace {
+// Note, this function should only be called from this file. It's used to ensure the singleton is
+// initialized only once (function scope static, one copy per DSO).
+std::unique_ptr<ObservabilityContext>& _getGlobalObservabilityContext() noexcept {
+    static std::unique_ptr<ObservabilityContext> obsCtx{nullptr};
+    return obsCtx;
+}
+}  // namespace
+
+const ObservabilityContext* getGlobalObservabilityContext() noexcept {
+    return _getGlobalObservabilityContext().get();
+}
+
+std::unique_ptr<ObservabilityContext> releaseGlobalObservabilityContext() {
+    tassert(11569605,
+            "Attempted to releaseGlobalObservabilityContext from non-unit test context!",
+            mongo::TestingProctor::instance().isInitialized() &&
+                mongo::TestingProctor::instance().isEnabled());
+    auto& currObsCtx = _getGlobalObservabilityContext();
+    std::unique_ptr<ObservabilityContext> tmp{nullptr};
+    currObsCtx.swap(tmp);
+    return tmp;
+}
+
+void setGlobalObservabilityContext(std::unique_ptr<ObservabilityContext> obsCtx) {
+    auto& currObsCtx = _getGlobalObservabilityContext();
+    tassert(11569601,
+            "Attempted to call setGlobalObservabilityContext more than once!",
+            currObsCtx.get() == nullptr);
+    tassert(11569603,
+            "Attempted to call setGlobalObservabilityContext with invalid context!",
+            obsCtx.get() != nullptr);
+    currObsCtx = std::move(obsCtx);
+}
+
 void convertStatusToException(StatusHandle status) {
     /**
      * If we can extract an exception pointer from the received status from the C API call, it means
@@ -97,5 +134,4 @@ StatusHandle StatusAPI::clone() const {
     invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &cloneTarget); });
     return StatusHandle(cloneTarget);
 }
-
 }  // namespace mongo::extension

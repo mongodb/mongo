@@ -228,8 +228,8 @@ private:
     static const ::MongoExtensionStatusVTable VTABLE;
 
     /**
-     * _code may be MONGO_EXTENSION_STATUS_RUNTIME_ERROR if there was no error code associated with
-     *  the exception.
+     * _code may be MONGO_EXTENSION_STATUS_RUNTIME_ERROR if there was no error code associated
+     * with the exception.
      */
     int32_t _code;
     std::string _reason;
@@ -248,9 +248,9 @@ using StatusHandle = OwnedHandle<::MongoExtensionStatus>;
 /**
  * StatusAPI is a wrapper around a MongoExtensionStatus.
  *
- * Typically this is a handle around a MongoExtensionStatus allocated by the host whose ownership
- * has been transferred to the extension. Note that this includes assertion exceptions that are
- * allocated by the host but were triggered/conceptually thrown by the extension.
+ * Typically this is a handle around a MongoExtensionStatus allocated by the host whose
+ * ownership has been transferred to the extension. Note that this includes assertion exceptions
+ * that are allocated by the host but were triggered/conceptually thrown by the extension.
  */
 class StatusAPI : public VTableAPI<::MongoExtensionStatus> {
 public:
@@ -291,13 +291,14 @@ public:
  * invoked using invokeCAndConvertStatusToException, which throws a non-OK MongoExtensionStatus as
  * an ExtensionDBException wrapping the original returned status.
  *
- * We hold on to the original status handle in order to facilitate propagating the status across the
- * API boundary multiple times if necessary without needing to re-allocate a MongoExtensionStatus.
+ * We hold on to the original status handle in order to facilitate propagating the status across
+ * the API boundary multiple times if necessary without needing to re-allocate a
+ * MongoExtensionStatus.
  *
  * Exceptions are generally thrown by value, and are either moved or copied depending on the
- * platform. Recent Visual Studio versions mandate all exceptions have a copy constructor, while our
- * supported linux compilers both take advantage of the move semantics. In both these scenarios, it
- * should be safe to extract the status handle from inside a catch block.
+ * platform. Recent Visual Studio versions mandate all exceptions have a copy constructor, while
+ * our supported linux compilers both take advantage of the move semantics. In both these
+ * scenarios, it should be safe to extract the status handle from inside a catch block.
  *
  */
 class ExtensionDBException final : public DBException {
@@ -337,33 +338,150 @@ private:
 };
 
 /**
+ * ObservabilityContext provides callbacks for success and error cases when invoking
+ * C API functions.
+ */
+class ObservabilityContext {
+public:
+    virtual ~ObservabilityContext() {};
+
+    virtual void extensionSuccess() const noexcept = 0;
+    virtual void extensionError() const noexcept = 0;
+    virtual void hostSuccess() const noexcept = 0;
+    virtual void hostError() const noexcept = 0;
+};
+
+/**
+ * getGlobalObservabilityContext returns a pointer to a function scoped static variable. Once
+ * this value is set by setObservabilityContext(), it is never expected to change.
+ */
+const ObservabilityContext* getGlobalObservabilityContext() noexcept;
+
+/**
+ * setGlobalObservabilityContext was introduced to accomodate the global ObservabilityContext
+ * which is required to provide metrics on the Host. The ObservabilityContext is used as
+ * necessary within the wrapCXXAndConvertExceptionToStatus & invokeCAndConvertStatusToException
+ * helpers. While the ObservabilityContext has no use on the extension side of the API boundary,
+ * it is introduced here because both the Host and the Extension share this file to reduce our
+ * maintenance burden.
+ *
+ * IMPORTANT NOTE: This function must only be called by the Host, and should never be called by
+ * extensions.
+ * Furthermore, it should never be called from a multi-threaded context, and should only be
+ * called once. We could implement a locking mechanism, but given the intended use of the
+ * ObsCtx, it was deemed unecessary.
+ */
+void setGlobalObservabilityContext(std::unique_ptr<ObservabilityContext> obsCtx);
+
+/**
+ *
+ * Note: This function is only used to allow a workaround for unit tests. It should only be called
+ * from a unit test context. Any other use is strictly forbidden and not supported.
+ *
+ * When extensions are built as part of a unit test, or for a unit test (i.e
+ * load_extension_test.cpp), they are not yet statically linked. Ideally, we want to prevent the
+ * ObservabilityContext from being set twice. However, due to the linking limitation in unit testing
+ * scenarios, we need to provide a workaround for us to manually set the ObservabilityContext to
+ * null temporarily when using the $assert extension stage (i.e extension_errors.cpp).
+ *
+ * This is because the $assert extension performs a sanity check at parse time which checks that
+ * the ObservabilityContext is always null. This sanity check is valuable for us when running
+ * integration tests directly on the mongod/mongos binaries, but problematic in unit test
+ * scenarios.
+ *
+ * As a workaround, in the $assert extension, we conditionally skip the sanity check if a
+ * TestingProctor is initialized and enabled as this indicates the test extension was built into
+ * a unit test. This does not work for load_extension_test.cpp, because in that case, the
+ * $assert extension does not see the same TestingProctor::instance as the unit test executable,
+ * and incorrectly assumes it is not running in a unit test. This is due to the the visibility
+ * of the symbols exported by the extension.
+ *
+ * For this reason, we provide this function to conditionally allow releasing the global
+ * ObservabilityContext within the context of a unit test. This works in the case of
+ * load_extension_test.cpp because the calls to the TestingProctor within the unit test
+ * executable's libraries - with the exception of the extensions - resolve to the same symbol.
+ *
+ * TODO SERVER-117648: Once we statically link extensions even when they are part of unit tests,
+ * remove releaseGlobalObservabilityContext() and all its references.
+ */
+std::unique_ptr<ObservabilityContext> releaseGlobalObservabilityContext();
+
+enum class MetricsGuardMode : int { kHostSide = 0, kExtensionSide = 1 };
+
+template <MetricsGuardMode GuardMode>
+class MetricsGuard {
+    static_assert(GuardMode == MetricsGuardMode::kHostSide ||
+                  GuardMode == MetricsGuardMode::kExtensionSide);
+
+public:
+    MetricsGuard(const ObservabilityContext* obsCtx) noexcept : _obsCtx(obsCtx) {}
+    MetricsGuard() noexcept {}
+    MetricsGuard(const MetricsGuard&) = delete;
+    MetricsGuard& operator=(const MetricsGuard&) = delete;
+    MetricsGuard(MetricsGuard&& other) = delete;
+    MetricsGuard& operator=(MetricsGuard&& other) = delete;
+
+    ~MetricsGuard() noexcept {
+        if (!_obsCtx) {
+            return;
+        }
+
+        if constexpr (GuardMode == MetricsGuardMode::kHostSide) {
+            _success ? _obsCtx->hostSuccess() : _obsCtx->hostError();
+        } else if constexpr (GuardMode == MetricsGuardMode::kExtensionSide) {
+            _success ? _obsCtx->extensionSuccess() : _obsCtx->extensionError();
+        }
+    }
+
+    void setContext(const ObservabilityContext* obsCtx) {
+        _obsCtx = obsCtx;
+    }
+
+    void markSuccess() {
+        _success = true;
+    }
+
+private:
+    const ObservabilityContext* _obsCtx{nullptr};
+    bool _success{false};
+};
+
+/**
  * wrapCXXAndConvertExceptionToStatus is a template helper that allows functions that will be
  * invoked across the C API boundary to return control to the caller safely.
  *
- * In other words: Since exceptions are not allowed to cross the API boundary, this helper is used
- * in the **implementation of Extension API functionality** (or, "adapters") to ensure that
- * exceptions are caught and translated into a MongoExtensionStatus*, which can be safely returned
- * to the caller. Once the caller receives the status, they may use the helper
- * invokeCAndConvertStatusToException to translate the status back into a C++ exception (assuming
- * the caller is in C++).
+ * In other words: Since exceptions are not allowed to cross the API boundary, this helper is
+ * used in the **implementation of Extension API functionality** (or, "adapters") to ensure that
+ * exceptions are caught and translated into a MongoExtensionStatus*, which can be safely
+ * returned to the caller. Once the caller receives the status, they may use the helper
+ * invokeCAndConvertStatusToException to translate the status back into a C++ exception
+ * (assuming the caller is in C++).
+ *
+ * NOTE: ObservabilityContext is only expected to be non-null when this code is running on the host
+ * side of the API, not on the extension. In this function, we update the
+ * hostSuccesses/hostFailures metrics, because wrapCXXAndConvertExceptionToStatus, when used by the
+ * Host, is used when a call from the extension re-enters the Host side of the API boundary.
  */
 template <typename Fn>
 ::MongoExtensionStatus* wrapCXXAndConvertExceptionToStatus(Fn&& fn) {
+    MetricsGuard<MetricsGuardMode::kHostSide> metricsGuard;
     try {
+        metricsGuard.setContext(getGlobalObservabilityContext());
         fn();
+        metricsGuard.markSuccess();
         return &ExtensionStatusOK::getInstance();
     } catch (ExtensionDBException& e) {
         /**
-         * If we caught an ExtensionDBException, we can propagate the underlying extension status.
-         * Note that we catch here by non-const reference, because we must mutate the exception
-         * object to extract the underlying extension status.
+         * If we caught an ExtensionDBException, we can propagate the underlying extension
+         * status. Note that we catch here by non-const reference, because we must mutate the
+         * exception object to extract the underlying extension status.
          */
         return e.extractStatus().release();
     } catch (const DBException& e) {
         /**
          * If we caught any other type of exception, we capture the current C++ exception in our
-         * custom ExtensionStatusException type. If we ever re-enter into our C++ execution context,
-         * we can rethrow the captured exception.
+         * custom ExtensionStatusException type. If we ever re-enter into our C++ execution
+         * context, we can rethrow the captured exception.
          */
         return new ExtensionStatusException(std::current_exception(), e.code());
     } catch (...) {
@@ -375,17 +493,24 @@ template <typename Fn>
 void convertStatusToException(StatusHandle status);
 
 /**
- * invokeCAndConvertStatusToException is a template helper that wraps a function that **calls into
- * the C API** and returns a MongoExtensionStatus* (likely within some extension "handle" class).
- * The provided functor must return a MongoExtensionStatus*, which this helper will translate into a
- * C++ exception.
+ * invokeCAndConvertStatusToException is a template helper that wraps a function that **calls
+ * into the C API** and returns a MongoExtensionStatus* (likely within some extension "handle"
+ * class). The provided functor must return a MongoExtensionStatus*, which this helper will
+ * translate into a C++ exception.
+ *
+ * NOTE: ObservabilityContext is only expected to be non-null when this code is running on the host
+ * side of the API, not on the extension. In this function, we update the
+ * extensionSuccesses/extensionFailures metrics, because invokeCAndConvertStatusToException, when
+ * used by the Host, is used when the host calls into the extension.
  */
 template <typename Fn>
 void invokeCAndConvertStatusToException(Fn&& fn) {
+    MetricsGuard<MetricsGuardMode::kExtensionSide> metricsGuard(getGlobalObservabilityContext());
     StatusHandle status(fn());
     if (auto code = status->getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
         return convertStatusToException(std::move(status));
     }
+    metricsGuard.markSuccess();
 }
 
 inline ::MongoExtensionStatus* ExtensionGenericStatus::_extSetReason(

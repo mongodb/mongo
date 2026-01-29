@@ -13,6 +13,22 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "extension_host_utils",
+    srcs = [
+        "extension_host_utils.cpp",
+    ],
+    hdrs = [
+        "extension_host_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_metric",
+        "//src/mongo/db/extension/shared",
+        "//src/mongo/db/extension/shared/handle",
+    ],
+)
+
 # Note that this is a standalone library such that it doesn't need to have any server dependencies like the rest of the extension_host target does.
 mongo_cc_library(
     name = "extension_operation_metrics_registry",
@@ -23,6 +39,7 @@ mongo_cc_library(
         "operation_metrics_registry.h",
     ],
     deps = [
+        ":extension_host_utils",
         "//src/mongo:base",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
     ],
@@ -52,6 +69,7 @@ mongo_cc_library(
         "extension_stage.cpp",
     ],
     deps = [
+        ":extension_host_utils",
         ":extension_operation_metrics_registry",
         ":extension_vector_search_server_status",
         "//src/mongo:base",
