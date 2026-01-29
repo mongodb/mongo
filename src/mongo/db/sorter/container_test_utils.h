@@ -57,7 +57,28 @@ public:
         boost::optional<std::span<const char>> find(int64_t key) override {
             for (auto&& [entryKey, entryValue] : _entries) {
                 if (entryKey == key) {
+                    _position = entryKey;
                     return {{entryValue.data(), entryValue.size()}};
+                }
+            }
+            return boost::none;
+        }
+
+        boost::optional<std::pair<int64_t, std::span<const char>>> next() override {
+            if (!_position) {
+                _position = _entries.begin()->first;
+                return {{_entries.begin()->first,
+                         {_entries.begin()->second.data(), _entries.begin()->second.size()}}};
+            }
+
+            for (auto it = _entries.begin(); it != _entries.end(); ++it) {
+                if (it->first == _position) {
+                    ++it;
+                    if (it == _entries.end()) {
+                        return boost::none;
+                    }
+                    _position = it->first;
+                    return {{it->first, {it->second.data(), it->second.size()}}};
                 }
             }
             return boost::none;
@@ -65,6 +86,7 @@ public:
 
     private:
         const std::vector<ViewableIntegerKeyedContainer::Entry>& _entries;
+        boost::optional<int64_t> _position;
     };
 
     ViewableIntegerKeyedContainer() = default;

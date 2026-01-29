@@ -65,8 +65,11 @@ public:
 
         boost::optional<std::span<const char>> find(int64_t key) final;
 
+        boost::optional<std::pair<int64_t, std::span<const char>>> next() final;
+
     private:
         WiredTigerCursor _cursor;
+        bool _done = false;
     };
 
     WiredTigerIntegerKeyedContainer(std::shared_ptr<Ident> ident,
@@ -97,8 +100,11 @@ public:
 
         boost::optional<std::span<const char>> find(std::span<const char> key) final;
 
+        boost::optional<std::pair<std::span<const char>, std::span<const char>>> next() final;
+
     private:
         WiredTigerCursor _cursor;
+        bool _done = false;
     };
 
     WiredTigerStringKeyedContainer(std::shared_ptr<Ident> ident, std::string uri, uint64_t tableId);

@@ -37,17 +37,28 @@
 namespace mongo {
 namespace {
 
+boost::optional<std::span<const char>> _get(WiredTigerCursor& cursor) {
+    WT_ITEM value;
+    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
+    return std::span<const char>{static_cast<const char*>(value.data), value.size};
+}
+
 boost::optional<std::span<const char>> _find(WiredTigerCursor& cursor) {
     auto ret = cursor->search(cursor.get());
     if (ret == WT_NOTFOUND) {
         return boost::none;
     }
     invariantWTOK(ret, cursor->session);
+    return _get(cursor);
+}
 
-    WT_ITEM value;
-    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
-
-    return std::span<const char>{static_cast<const char*>(value.data), value.size};
+boost::optional<std::span<const char>> _next(WiredTigerCursor& cursor) {
+    auto ret = cursor->next(cursor.get());
+    if (ret == WT_NOTFOUND) {
+        return boost::none;
+    }
+    invariantWTOK(ret, cursor->session);
+    return _get(cursor);
 }
 
 }  // namespace
@@ -114,6 +125,24 @@ boost::optional<std::span<const char>> WiredTigerIntegerKeyedContainer::Cursor::
     return _find(_cursor);
 }
 
+boost::optional<std::pair<int64_t, std::span<const char>>>
+WiredTigerIntegerKeyedContainer::Cursor::next() {
+    if (_done) {
+        return boost::none;
+    }
+
+    auto value = _next(_cursor);
+    if (!value) {
+        _done = true;
+        return boost::none;
+    }
+
+    int64_t key;
+    invariantWTOK(_cursor->get_key(_cursor.get(), &key), _cursor->session);
+
+    return {{key, *value}};
+}
+
 WiredTigerStringKeyedContainer::WiredTigerStringKeyedContainer(std::shared_ptr<Ident> ident,
                                                                std::string uri,
                                                                uint64_t tableId)
@@ -172,6 +201,24 @@ boost::optional<std::span<const char>> WiredTigerStringKeyedContainer::Cursor::f
     std::span<const char> key) {
     _cursor->set_key(_cursor.get(), WiredTigerItem{key}.get());
     return _find(_cursor);
+}
+
+boost::optional<std::pair<std::span<const char>, std::span<const char>>>
+WiredTigerStringKeyedContainer::Cursor::next() {
+    if (_done) {
+        return boost::none;
+    }
+
+    auto value = _next(_cursor);
+    if (!value) {
+        _done = true;
+        return boost::none;
+    }
+
+    WiredTigerItem key;
+    invariantWTOK(_cursor->get_key(_cursor.get(), &key), _cursor->session);
+
+    return {{{key.data(), key.size()}, *value}};
 }
 
 }  // namespace mongo

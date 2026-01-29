@@ -39,6 +39,18 @@
 namespace mongo {
 namespace {
 
+template <typename Key>
+void expectKeyEq(Key actual, Key expected) {
+    if constexpr (std::is_same_v<Key, int64_t>) {
+        EXPECT_EQ(actual, expected);
+    } else if constexpr (std::is_same_v<Key, std::span<const char>>) {
+        EXPECT_EQ(std::string(actual.data(), actual.size()),
+                  std::string(expected.data(), expected.size()));
+    } else {
+        FAIL("Unexpected key type");
+    }
+}
+
 template <typename Container, typename Key>
 void runContainerTest(KeyFormat keyFormat, Key key1, Key key2) {
     auto harnessHelper = newRecordStoreHarnessHelper();
@@ -78,6 +90,35 @@ void runContainerTest(KeyFormat keyFormat, Key key1, Key key2) {
         ASSERT_EQ(std::string(found2->data(), found2->size()), value2);
     }
     {
+        auto cursor = container.getCursor(ru);
+        auto next = cursor->next();
+        ASSERT_TRUE(next);
+        expectKeyEq(next->first, key1);
+        EXPECT_EQ(std::string(next->second.data(), next->second.size()), value1);
+        next = cursor->next();
+        ASSERT_TRUE(next);
+        expectKeyEq(next->first, key2);
+        EXPECT_EQ(std::string(next->second.data(), next->second.size()), value2);
+        next = cursor->next();
+        EXPECT_FALSE(next);
+        next = cursor->next();
+        EXPECT_FALSE(next);
+    }
+    {
+        auto cursor = container.getCursor(ru);
+        auto found = cursor->find(key1);
+        ASSERT_TRUE(found);
+        EXPECT_EQ(std::string(found->data(), found->size()), value1);
+        auto next = cursor->next();
+        ASSERT_TRUE(next);
+        expectKeyEq(next->first, key2);
+        EXPECT_EQ(std::string(next->second.data(), next->second.size()), value2);
+        next = cursor->next();
+        EXPECT_FALSE(next);
+        next = cursor->next();
+        EXPECT_FALSE(next);
+    }
+    {
         StorageWriteTransaction txn(ru);
         ASSERT_OK(container.remove(ru, key1));
         txn.commit();
@@ -96,7 +137,7 @@ TEST(ContainerTest, IntegerKeyedContainer) {
 }
 
 TEST(ContainerTest, StringKeyedContainer) {
-    runContainerTest<StringKeyedContainer, std::string>(KeyFormat::String, "k1", "k2");
+    runContainerTest<StringKeyedContainer, std::span<const char>>(KeyFormat::String, "k1", "k2");
 }
 
 }  // namespace

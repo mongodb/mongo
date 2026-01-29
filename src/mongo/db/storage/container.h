@@ -54,6 +54,11 @@ public:
          * Returns the value in the container at the given key, or none if it is not present.
          */
         virtual boost::optional<std::span<const char>> find(int64_t key) = 0;
+
+        /**
+         * Returns the next key/value in the container, or none if the cursor has reached the end.
+         */
+        virtual boost::optional<std::pair<int64_t, std::span<const char>>> next() = 0;
     };
 
     virtual ~IntegerKeyedContainer() {}
@@ -105,6 +110,11 @@ public:
          * Returns the value in the container at the given key, or none if it is not present.
          */
         virtual boost::optional<std::span<const char>> find(std::span<const char> key) = 0;
+
+        /**
+         * Returns the next key/value in the container, or none if the cursor has reached the end.
+         */
+        virtual boost::optional<std::pair<std::span<const char>, std::span<const char>>> next() = 0;
     };
 
     virtual ~StringKeyedContainer() {}
