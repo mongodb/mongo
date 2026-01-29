@@ -93,6 +93,8 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
+    std::mt19937 _random{kSeed};
+
 private:
     void SetUp(benchmark::State& state) final {
         QueryFCVEnvironmentForTest::setUp();
@@ -114,34 +116,48 @@ private:
     std::unique_ptr<QueryTestScopedGlobalServiceContext> _scopedGlobalServiceContext;
 };
 
-template <typename Generator>
-BSONArray generateArray(int64_t from, int64_t to, int64_t step, Generator generator) {
-    BSONArrayBuilder arr;
-    for (int64_t i = from; i < to; i += step) {
-        arr.append(generator(i));
+template <typename T>
+BSONArray toBsonArray(std::vector<T> array) {
+    BSONArrayBuilder builder;
+    for (auto& v : array) {
+        builder.append(std::move(v));
     }
-    return arr.arr();
+    return builder.arr();
 }
 
-BSONArray generateNumberArray(int64_t from, int64_t to, int64_t step = 1) {
-    return generateArray(from, to, step, [](auto i) { return i; });
+template <typename Generator>
+BSONArray generateArray(
+    std::mt19937& random, int64_t from, int64_t to, int64_t step, Generator generator) {
+    std::vector<std::invoke_result_t<Generator, int64_t>> array;
+    for (int64_t i = from; i < to; i += step) {
+        array.push_back(generator(i));
+    }
+    std::shuffle(array.begin(), array.end(), random);
+    return toBsonArray(std::move(array));
+}
+
+BSONArray generateNumberArray(std::mt19937& random, int64_t from, int64_t to, int64_t step = 1) {
+    return generateArray(random, from, to, step, [](auto i) { return i; });
 }
 
 BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, AddToSetNumbers)(benchmark::State& state) {
     int64_t inputSize = state.range(0);
     int64_t updateSize = state.range(1);
-    BSONObj inputDoc = BSON("a" << generateNumberArray(0, inputSize));
+    BSONObj inputDoc = BSON("a" << generateNumberArray(_random, 0, inputSize));
     // Create array with step 2 to have some overlap between input and update
     BSONObj addToSetSpec =
         BSON("a" << BSON("$each" << generateNumberArray(
-                             inputSize - updateSize, inputSize + updateSize, 2)));
+                             _random, inputSize - updateSize, inputSize + updateSize, 2)));
     benchmarkAddToSet(inputDoc, addToSetSpec, nullptr /*collator*/, state);
 }
 
-BSONArray generateObjectWithStringArray(int64_t from, int64_t to, int64_t step = 1) {
+BSONArray generateObjectWithStringArray(std::mt19937& random,
+                                        int64_t from,
+                                        int64_t to,
+                                        int64_t step = 1) {
     static constexpr size_t kStringPrefixSize = 64;
     std::string prefix{kStringPrefixSize, '0'};
-    return generateArray(from, to, step, [&](int64_t index) {
+    return generateArray(random, from, to, step, [&](int64_t index) {
         BSONObjBuilder builder;
         std::stringstream payload;
         payload << prefix << std::hex << index;
@@ -154,11 +170,11 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
                    AddToSetObjectWithStrings)(benchmark::State& state) {
     int64_t inputSize = state.range(0);
     int64_t updateSize = state.range(1);
-    BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(0, inputSize));
+    BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(_random, 0, inputSize));
     // Create array with step 2 to have some overlap between input and update
     BSONObj addToSetSpec =
         BSON("a" << BSON("$each" << generateObjectWithStringArray(
-                             inputSize - updateSize, inputSize + updateSize, 2)));
+                             _random, inputSize - updateSize, inputSize + updateSize, 2)));
     benchmarkAddToSet(inputDoc, addToSetSpec, nullptr /*collator*/, state);
 }
 
@@ -166,11 +182,11 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
                    AddToSetObjectWithStringsCollator)(benchmark::State& state) {
     int64_t inputSize = state.range(0);
     int64_t updateSize = state.range(1);
-    BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(0, inputSize));
+    BSONObj inputDoc = BSON("a" << generateObjectWithStringArray(_random, 0, inputSize));
     // Create array with step 2 to have some overlap between input and update
     BSONObj addToSetSpec =
         BSON("a" << BSON("$each" << generateObjectWithStringArray(
-                             inputSize - updateSize, inputSize + updateSize, 2)));
+                             _random, inputSize - updateSize, inputSize + updateSize, 2)));
 
     CollatorFactoryICU _collatorFactory;
     auto statusWithCollator =
@@ -180,9 +196,8 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
 }
 
 static void configureAddToSetBenchmark(benchmark::internal::Benchmark* bm) {
-    static constexpr int64_t kSmallArray = 10;
-    static constexpr int64_t kLargeArray = 1000;
-    bm->ArgsProduct({{kSmallArray, kLargeArray}, {kSmallArray, kLargeArray}});
+    static const std::vector<int64_t> kSizes = {10, 1000};
+    bm->ArgsProduct({kSizes, kSizes});
 }
 
 BENCHMARK_REGISTER_F(UpdateTreeExecutorBenchmark, AddToSetNumbers)

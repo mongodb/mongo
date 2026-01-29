@@ -421,9 +421,7 @@ TEST_F(AddToSetNodeTest, ApplyRespectsCollationFromSetCollator) {
     ASSERT_EQUALS(getModifiedPaths(), "{fieldName}");
 }
 
-DEATH_TEST_REGEX(AddToSetNodeDeathTest,
-                 CannotSetCollatorIfCollatorIsNonNull,
-                 "Invariant failure.*!_collator") {
+TEST_F(AddToSetNodeTest, CannotSetCollatorIfCollatorIsNonNull) {
     auto update = fromjson("{$addToSet: {fieldName: 1}}");
     auto caseInsensitiveCollator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
@@ -431,10 +429,14 @@ DEATH_TEST_REGEX(AddToSetNodeDeathTest,
     expCtx->setCollator(std::move(caseInsensitiveCollator));
     AddToSetNode node;
     ASSERT_OK(node.init(update["$addToSet"]["fieldName"], expCtx));
-    node.setCollator(expCtx->getCollator());
+    ASSERT_THROWS_WITH_CHECK(
+        node.setCollator(expCtx->getCollator()), DBException, [](const DBException& ex) {
+            ASSERT_EQUALS(ex.code(), 11739500);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
 }
 
-DEATH_TEST_REGEX(AddToSetNodeDeathTest, CannotSetCollatorTwice, "Invariant failure.*!_collator") {
+TEST_F(AddToSetNodeTest, CannotSetCollatorTwice) {
     auto update = fromjson("{$addToSet: {fieldName: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     AddToSetNode node;
@@ -443,7 +445,11 @@ DEATH_TEST_REGEX(AddToSetNodeDeathTest, CannotSetCollatorTwice, "Invariant failu
     const CollatorInterfaceMock caseInsensitiveCollator(
         CollatorInterfaceMock::MockType::kToLowerString);
     node.setCollator(&caseInsensitiveCollator);
-    node.setCollator(&caseInsensitiveCollator);
+    ASSERT_THROWS_WITH_CHECK(
+        node.setCollator(&caseInsensitiveCollator), DBException, [](const DBException& ex) {
+            ASSERT_EQUALS(ex.code(), 11739500);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
 }
 
 TEST_F(AddToSetNodeTest, ApplyNestedArray) {

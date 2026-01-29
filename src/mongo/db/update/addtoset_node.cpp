@@ -30,8 +30,8 @@
 #include "mongo/db/update/addtoset_node.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
@@ -42,32 +42,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-
-namespace {
-
-/**
- * Deduplicates 'elements' using 'collator' for comparisons.
- */
-void deduplicate(std::vector<BSONElement>& elements, const CollatorInterface* collator) {
-
-    // Copy 'elements' into a new vector.
-    std::vector<BSONElement> elementsCopy = elements;
-    elements.clear();
-
-    // Keep track of which elements were already added.
-    BSONElementSet added(collator);
-
-    // Copy all non-duplicate elements back into 'elements'. Ensure that the original order of
-    // elements is preserved.
-    for (auto&& elem : elementsCopy) {
-        if (added.find(elem) == added.end()) {
-            elements.push_back(elem);
-        }
-        added.insert(elem);
-    }
-}
-
-}  // namespace
 
 Status AddToSetNode::init(BSONElement modExpr,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -106,9 +80,45 @@ Status AddToSetNode::init(BSONElement modExpr,
 }
 
 void AddToSetNode::setCollator(const CollatorInterface* collator) {
-    invariant(!_collator);
-    _collator = collator;
-    deduplicate(_elements, _collator);
+    tassert(11739500,
+            "Trying to set collator when it is already set",
+            !_elementsSet.key_comp().collator());
+    _elementsSet = absl::btree_set<BSONElementAndIndex, BSONElementAndIndexComparator>(
+        BSONElementAndIndexComparator{collator});
+
+    _deduplicateElements();
+}
+
+void AddToSetNode::_deduplicateElements() {
+    _elementsSet.clear();
+    std::vector<BSONElement> deduplicatedElements;
+    for (size_t i = 0; i < _elements.size(); ++i) {
+        if (_elementsSet.emplace(_elements[i], i).second) {
+            deduplicatedElements.push_back(_elements[i]);
+        }
+    }
+    _elements = deduplicatedElements;
+}
+
+std::vector<AddToSetNode::BSONElementAndIndex> AddToSetNode::_getElementsToAdd(
+    mutablebson::Element* element) const {
+    // Find the set of elements that do not already exist in the array 'element'.
+    auto elementsToAdd = _elementsSet;
+    for (auto existingElem = element->leftChild(); existingElem.ok();
+         existingElem = existingElem.rightSibling()) {
+        elementsToAdd.erase(existingElem);
+        if (elementsToAdd.size() == 0) {
+            break;
+        }
+    }
+
+    // Sort elements by original index to preserve the order.
+    std::vector<BSONElementAndIndex> elementsToAddVector{elementsToAdd.begin(),
+                                                         elementsToAdd.end()};
+    std::sort(elementsToAddVector.begin(),
+              elementsToAddVector.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.index < rhs.index; });
+    return elementsToAddVector;
 }
 
 ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Element* element,
@@ -119,27 +129,11 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Elem
                           << typeName(element->getType()),
             element->getType() == BSONType::array);
 
-    // Find the set of elements that do not already exist in the array 'element'.
-    std::vector<BSONElement> elementsToAdd;
-    for (auto&& elem : _elements) {
-        auto shouldAdd = true;
-        for (auto existingElem = element->leftChild(); existingElem.ok();
-             existingElem = existingElem.rightSibling()) {
-            if (existingElem.compareWithBSONElement(elem, _collator, false) == 0) {
-                shouldAdd = false;
-                break;
-            }
-        }
-        if (shouldAdd) {
-            elementsToAdd.push_back(elem);
-        }
-    }
-
+    auto elementsToAdd = _getElementsToAdd(element);
     if (elementsToAdd.empty()) {
         return ModifyResult::kNoOp;
     }
-
-    for (auto&& elem : elementsToAdd) {
+    for (auto&& [elem, _] : elementsToAdd) {
         auto toAdd = element->getDocument().makeElement(elem);
         invariant(element->pushBack(toAdd));
     }
@@ -157,7 +151,6 @@ void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
         invariant(element->pushBack(toAdd));
     }
 }
-
 
 void AddToSetNode::logUpdate(LogBuilderInterface* logBuilder,
                              const RuntimeUpdatePath& pathTaken,
