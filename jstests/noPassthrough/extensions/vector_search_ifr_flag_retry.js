@@ -1,327 +1,34 @@
 /**
- * This test ensures that $vectorSearch works against views and only uses legacy vector search.
- * The desired behavior is that queries pass and have predictable results, and the IFR flag kickback retry
- * gets invoked.
+ * This test ensures that $vectorSearch works against views, within $unionWith on collections,
+ * and within $unionWith on views, and that the IFR flag kickback retry is invoked to fall back
+ * to legacy vector search when featureFlagExtensionViewsAndUnionWith is disabled.
  *
- * TODO SERVER-116994 Update these values when vector search as an extension is supported against views.
- * We will most likely just remove these tests.
  * @tags: [ featureFlagExtensionsAPI ]
  */
-import {getParameter, setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {getParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mongotCommandForVectorSearchQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {setUpMongotReturnExplainAndCursor} from "jstests/with_mongot/mongotmock/lib/utils.js";
 import {
     checkPlatformCompatibleWithExtensions,
     withExtensionsAndMongot,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
-
-const kNumShards = 2;
+import {
+    createTestViewAndIndex,
+    getExtensionVectorSearchUsedCount,
+    getInUnionWithKickbackRetryCount,
+    getLegacyVectorSearchUsedCount,
+    getOnViewKickbackRetryCount,
+    kNumShards,
+    kTestCollName,
+    kTestDbName,
+    kTestViewName,
+    kTestViewPipeline,
+    runQueriesAndVerifyMetrics,
+    setFeatureFlags,
+    setUpMongotMockForVectorSearch,
+    vectorSearchQuery,
+} from "jstests/noPassthrough/extensions/vector_search_ifr_flag_retry_utils.js";
 
 checkPlatformCompatibleWithExtensions();
-
-/**
- * Sets the featureFlagVectorSearchExtension parameter on all non-config nodes in the cluster.
- *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
- * @param {boolean} featureFlagValue - The value to set for the feature flag.
- */
-function setFeatureFlags(conn, featureFlagValue) {
-    setParameterOnAllNonConfigNodes(conn, "featureFlagVectorSearchExtension", featureFlagValue);
-}
-
-/**
- * Gets the admin database from a connection object.
- * Works with both mongos and mongod connections.
- *
- * @param {Mongo|Object} connection - The connection object (can be a Mongo instance or connection object).
- * @returns {DB} The admin database instance.
- */
-function getAdminDB(connection) {
-    let adminDB;
-    if (typeof connection.getDB === "function") {
-        adminDB = connection.getDB("admin");
-    } else {
-        assert(typeof connection.getSiblingDB === "function", `Cannot get Admin DB from ${tojson(connection)}`);
-        adminDB = connection.getSiblingDB("admin");
-    }
-    return adminDB;
-}
-
-/**
- * Extracts a vector search metric value from a serverStatus response.
- *
- * @param {Object} serverStatus - The serverStatus command response object.
- * @param {string} metricName - The name of the metric to extract from extension.vectorSearch section.
- * @returns {number} The metric value if found, otherwise 0.
- */
-function extractVectorSearchMetric(serverStatus, metricName) {
-    return serverStatus.metrics.extension.vectorSearch[metricName];
-}
-
-/**
- * Retrieves a vector search metric from a specific connection by running serverStatus.
- *
- * @param {Mongo|Object} conn - The connection to query (can be mongos or mongod).
- * @param {string} metricName - The name of the metric to retrieve from extension.vectorSearch section.
- * @returns {number} The metric value from the connection's serverStatus.
- */
-function getVectorSearchMetricFromConnection(conn, metricName) {
-    const serverStatus = getAdminDB(conn).runCommand({serverStatus: 1});
-    assert.commandWorked(serverStatus);
-    return extractVectorSearchMetric(serverStatus, metricName);
-}
-
-/**
- * Gets the total count of a vector search metric across the entire cluster.
- * Aggregates the metric from mongos and all shards.
- *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
- * @param {string} metricName - The name of the metric to retrieve from extension.vectorSearch section.
- * @returns {number} The sum of the metric value across all nodes in the cluster.
- */
-function getVectorSearchMetric(conn, metricName) {
-    // Get value from mongos or mongod (if standalone).
-    let totalCount = getVectorSearchMetricFromConnection(conn, metricName);
-
-    // If connected to mongos, get metrics from all shard primaries.
-    // For standalone mongod, we're done (no shards to query).
-    const db = conn.getDB ? conn.getDB("admin") : conn.getSiblingDB("admin");
-    if (FixtureHelpers.isMongos(db)) {
-        const shardPrimaries = FixtureHelpers.getPrimaries(db);
-        for (const shardPrimary of shardPrimaries) {
-            totalCount += getVectorSearchMetricFromConnection(shardPrimary, metricName);
-        }
-    }
-
-    return totalCount;
-}
-
-function getInUnionWithKickbackRetryCount(conn) {
-    return getVectorSearchMetric(conn, "inUnionWithKickbackRetries");
-}
-
-function getOnViewKickbackRetryCount(conn) {
-    return getVectorSearchMetric(conn, "onViewKickbackRetries");
-}
-
-function getLegacyVectorSearchUsedCount(conn) {
-    return getVectorSearchMetric(conn, "legacyVectorSearchUsed");
-}
-
-function getExtensionVectorSearchUsedCount(conn) {
-    return getVectorSearchMetric(conn, "extensionVectorSearchUsed");
-}
-
-const kTestDbName = jsTestName();
-const kTestCollName = "testColl";
-const kTestViewName = "testView";
-const kTestIndexName = "vector_index";
-const kTestViewPipeline = [{$addFields: {enriched: {$concat: ["$title", " - ", {$toString: "$_id"}]}}}];
-const kTestData = [
-    {_id: 1, title: "Doc1", embedding: [1.0, 0.0, 0.0]},
-    {_id: 2, title: "Doc2", embedding: [0.0, 1.0, 0.0]},
-    {_id: 3, title: "Doc3", embedding: [0.0, 0.0, 1.0]},
-];
-const testVectorSearchIndexSpec = {
-    name: kTestIndexName,
-    type: "vectorSearch",
-    definition: {
-        fields: [
-            {
-                type: "vector",
-                numDimensions: 3,
-                path: "embedding",
-                similarity: "euclidean",
-            },
-        ],
-    },
-};
-
-/**
- * Creates a simple collection, view, and vector search index using the provided connection.
- *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
- * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
- * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
- * @returns {Collection} The view collection.
- */
-function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
-    const testDb = conn.getDB(kTestDbName);
-    const coll = testDb[kTestCollName];
-    coll.drop();
-    assert.commandWorked(coll.insertMany(kTestData));
-
-    // Shard the collection if running in a sharded topology.
-    if (shardingTest) {
-        shardingTest.shardColl(
-            coll.getName(),
-            {_id: 1}, // shard key
-            {_id: 2}, // split at
-            {_id: 2}, // move chunk containing this value
-            kTestDbName,
-            true, // waitForDelete
-        );
-    }
-
-    // Check if the view exists using collection metadata.
-    const viewExists = testDb.getCollectionInfos({name: kTestViewName, type: "view"}).length > 0;
-    if (!viewExists) {
-        // Create the view if it doesn't exist.
-        assert.commandWorked(testDb.createView(kTestViewName, coll.getName(), kTestViewPipeline));
-    }
-    const view = testDb[kTestViewName];
-
-    // Create the vector search index.
-    const createIndexResponse = {
-        ok: 1,
-        indexesCreated: [{id: "index-Id", name: kTestIndexName}],
-    };
-    mongotMock.setMockSearchIndexCommandResponse(createIndexResponse);
-    assert.commandWorked(
-        testDb.runCommand({
-            createSearchIndexes: kTestViewName,
-            indexes: [testVectorSearchIndexSpec],
-        }),
-    );
-
-    return view;
-}
-
-const vectorSearchQuery = {
-    queryVector: [0.5, 0.5, 0.5],
-    path: "embedding",
-    numCandidates: 10,
-    limit: 5,
-    index: kTestIndexName,
-};
-
-/**
- * Sets up MongotMock for vector search queries (explain or aggregate).
- *
- * @param {MongotMock} mongotMock - The mongot mock instance.
- * @param {string} vectorSearchQuery - Parameters for the vector search query.
- * @param {ShardingTest|null} shardingTest - ShardingTest instance or null.
- * @param {number} startingCursorId - Starting cursor ID.
- * @param {Collection} db - Database object.
- * @param {Collection} coll - Collection object.
- * @param {string} [verbosity] - Explain verbosity.
- * @param {number} [numPipelineExecutionsPerNode=1] - Number of times the pipeline is expected to execute per node.
- * @param {string|null} [viewName=null] - View name (if querying a view).
- * @param {Array|null} [viewPipeline=null] - View pipeline (if querying a view).
- * @returns {number} The next cursor ID to use.
- */
-function setUpMongotMockForVectorSearch(
-    mongotMock,
-    {
-        vectorSearchQuery,
-        testDb,
-        shardingTest,
-        startingCursorId,
-        coll,
-        verbosity = null,
-        numPipelineExecutionsPerNode = 1,
-        viewName = null,
-        viewPipeline = null,
-    },
-) {
-    const collectionUUID = getUUIDFromListCollections(testDb, coll.getName());
-
-    const baseCmdParams = {
-        ...vectorSearchQuery,
-        collName: coll.getName(),
-        dbName: testDb.getName(),
-        collectionUUID,
-    };
-
-    if (verbosity) {
-        baseCmdParams.explain = {verbosity};
-    }
-
-    const searchCmd = mongotCommandForVectorSearchQuery(baseCmdParams);
-
-    if (viewName && viewPipeline) {
-        searchCmd.viewName = viewName;
-        searchCmd.view = {
-            name: viewName,
-            effectivePipeline: viewPipeline,
-        };
-    }
-
-    let cursorId = startingCursorId;
-    const numShards = shardingTest ? kNumShards : 1;
-    for (let i = 0; i < numShards; i++) {
-        const iterations = numPipelineExecutionsPerNode;
-        for (let j = 0; j < iterations; j++) {
-            setUpMongotReturnExplainAndCursor({
-                mongotMock,
-                coll,
-                searchCmd,
-                nextBatch: [],
-                cursorId: cursorId++,
-            });
-        }
-    }
-    return cursorId;
-}
-
-/**
- * Runs queries and verifies metrics.
- *
- * @param {Mongo|Object} conn - The connection to use.
- * @param {function} getRetryCountFn - Function to get retry count metric.
- * @param {string} retryMetricName - Name of retry metric for error messages.
- * @param {number} expectedRetryDelta - Expected retry count delta.
- * @param {number} expectedLegacyDelta - Expected legacy vector search delta.
- * @param {function} runExplainQuery - Function to run the explain query.
- * @param {function} runAggregateQuery - Function to run the aggregate query.
- */
-function runQueriesAndVerifyMetrics({
-    conn,
-    getRetryCountFn,
-    retryMetricName,
-    expectedRetryDelta,
-    expectedLegacyDelta,
-    runExplainQuery,
-    runAggregateQuery,
-}) {
-    // Get initial server status to check metrics before running queries.
-    const initialRetryCount = getRetryCountFn(conn);
-    const initialLegacyCount = getLegacyVectorSearchUsedCount(conn);
-    const initialExtensionCount = getExtensionVectorSearchUsedCount(conn);
-
-    runExplainQuery();
-    runAggregateQuery();
-
-    // Check server status after the queries and verify metrics were incremented correctly.
-    const finalRetryCount = getRetryCountFn(conn);
-    const finalLegacyCount = getLegacyVectorSearchUsedCount(conn);
-    const finalExtensionCount = getExtensionVectorSearchUsedCount(conn);
-
-    const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-
-    assert.eq(
-        finalRetryCount,
-        initialRetryCount + expectedRetryDelta,
-        `${retryMetricName} should have increased from ${initialRetryCount} to 
-            ${initialRetryCount + expectedRetryDelta} when feature flag is ${expectRetry}`,
-    );
-
-    assert.eq(
-        finalLegacyCount,
-        initialLegacyCount + expectedLegacyDelta,
-        `legacyVectorSearchUsed should have increased from ${initialLegacyCount} to
-            ${initialLegacyCount + expectedLegacyDelta} (both explain and regular query use legacy)`,
-    );
-
-    assert.eq(
-        finalExtensionCount,
-        initialExtensionCount,
-        `extensionVectorSearchUsed should remain at ${initialExtensionCount}
-            (views always use legacy vector search, never extension)`,
-    );
-}
 
 /**
  * Runs the vector search tests against views.
@@ -338,7 +45,6 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
 
     const testDb = conn.getDB(kTestDbName);
     const coll = testDb[kTestCollName];
-    const viewName = kTestViewName;
 
     // Set up MongotMock cursor for explain query, using a cursorId of 123.
     let cursorId = setUpMongotMockForVectorSearch(mongotMock, {
@@ -348,7 +54,7 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
         startingCursorId: 123,
         coll,
         testDb,
-        viewName,
+        viewName: kTestViewName,
         viewPipeline: kTestViewPipeline,
     });
 
@@ -359,7 +65,7 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
         startingCursorId: cursorId,
         coll,
         testDb,
-        viewName,
+        viewName: kTestViewName,
         viewPipeline: kTestViewPipeline,
     });
 
@@ -436,8 +142,9 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
 
     // Get the current feature flag value to determine if we expect retries.
     const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-    // We expect 2 retries - one for the explain and one for the aggregate.
-    const expectedUnionWithKickbackRetryDelta = expectRetry ? 2 : 0;
+    // We expect 1 retry per query per shard - one for the explain and one for the aggregate.
+    // In sharded mode, the kickback retry happens on each shard.
+    const expectedUnionWithKickbackRetryDelta = expectRetry ? 2 * numNodes : 0;
 
     // Set up MongotMock cursor for aggregate query.
     setUpMongotMockForVectorSearch(mongotMock, {
@@ -456,7 +163,7 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
         conn,
         testDb,
         getRetryCountFn: getInUnionWithKickbackRetryCount,
-        retryMetricName: "onInUnionWithKickbackRetries",
+        retryMetricName: "inUnionWithKickbackRetries",
         expectedRetryDelta: expectedUnionWithKickbackRetryDelta,
         expectedLegacyDelta,
         runExplainQuery: () => {
@@ -487,6 +194,8 @@ function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue,
     const coll = testDb[kTestCollName];
     const viewName = kTestViewName;
 
+    const numNodes = shardingTest ? kNumShards : 1;
+
     const unionWithStage = {
         $unionWith: {
             coll: viewName,
@@ -496,8 +205,8 @@ function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue,
 
     // Get the current feature flag value to determine if we expect retries.
     const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-    // We expect 1 retry for the aggregate.
-    const expectedUnionWithOnViewKickbackRetryDelta = expectRetry ? 1 : 0;
+    // We expect 1 retry per shard for the aggregate (no explain query is run in this test).
+    const expectedUnionWithOnViewKickbackRetryDelta = expectRetry ? numNodes : 0;
 
     // Set up MongotMock cursor for aggregate query.
     setUpMongotMockForVectorSearch(mongotMock, {

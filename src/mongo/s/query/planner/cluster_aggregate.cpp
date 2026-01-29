@@ -41,6 +41,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -1390,25 +1391,26 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     };
 
     RetryOnViewOrIFRKickbackState retryState;
-    visit(OverloadedVisitor{[&](const ResolvedView& resolvedView) {
-                                // Note that we initialize the IFR flags to disable with the vector
-                                // search extension feature
-                                // flag. This is because we know that the extension is not allowed
-                                // to run on views, so we might as well pre-disable it regardless of
-                                // the feature flag value to prevent unnecessary retries. This is
-                                // purely an optimization - the retry logic would work with or
-                                // without this initialization.
-                                // TODO SERVER-116994 Initialize this as an empty set.
-                                retryState.ifrFlagsToDisableOnRetries.insert(
-                                    &feature_flags::gFeatureFlagVectorSearchExtension);
-                                retryState.resolvedView = resolvedView;
-                            },
-                            [&](const IFRFlagRetryInfo& ifrRetryInfo) {
-                                retryState.ifrFlagsToDisableOnRetries.insert(
-                                    IncrementalRolloutFeatureFlag::findByName(
-                                        ifrRetryInfo.getDisabledFlagName()));
-                            }},
-          errInfo);
+    visit(
+        OverloadedVisitor{
+            [&](const ResolvedView& resolvedView) {
+                // If it's possible this is a $vectorSearch-extension-on-a-view query but extension
+                // views is disabled, we optimistically disable the vector search extension flag on
+                // view retry. This is an optimization to avoid one extra retry (we could wait to
+                // trigger the main view retry logic when we apply the view).
+                if (ifrContext->getSavedFlagValue(
+                        feature_flags::gFeatureFlagVectorSearchExtension) &&
+                    !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+                    retryState.ifrFlagsToDisableOnRetries.insert(
+                        &feature_flags::gFeatureFlagVectorSearchExtension);
+                }
+                retryState.resolvedView = resolvedView;
+            },
+            [&](const IFRFlagRetryInfo& ifrRetryInfo) {
+                retryState.ifrFlagsToDisableOnRetries.insert(
+                    IncrementalRolloutFeatureFlag::findByName(ifrRetryInfo.getDisabledFlagName()));
+            }},
+        errInfo);
 
     return retryOnWithState(
         "ClusterAggregate::retryOnViewOrIFRKickbackError",

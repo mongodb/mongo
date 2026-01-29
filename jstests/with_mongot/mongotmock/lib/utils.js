@@ -141,9 +141,10 @@ export function setUpMongotReturnExplain({
     searchCmd,
     cursorId = NumberLong(123),
     explainContents = defaultLastExplainContents,
+    maybeUnused = false,
 }) {
     {
-        const history = [{expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}}];
+        const history = [{expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}, maybeUnused}];
         mongotMock.setMockResponses(history, cursorId);
     }
 }
@@ -168,6 +169,7 @@ export function setUpMongotReturnExplainAndCursor({
     cursorId = NumberLong(123),
     vars = null,
     explainContents = defaultLastExplainContents,
+    maybeUnused = false,
 }) {
     {
         const history = [
@@ -181,6 +183,7 @@ export function setUpMongotReturnExplainAndCursor({
                     explainContents,
                     vars,
                 ),
+                maybeUnused,
             },
         ];
         mongotMock.setMockResponses(history, cursorId);
