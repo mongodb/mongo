@@ -184,4 +184,11 @@ export var ClusteredCollectionUtil = class {
         assert.eq(1, coll.find({[clusterKey]: NumberLong("42")}).itcount());
         coll.drop();
     }
+
+    static isCollectionClustered(collection) {
+        const db = collection.getDB();
+        const name = collection.getName();
+        const info = db.getCollectionInfos({name: name})[0];
+        return !!(info.options && info.options.clusteredIndex);
+    }
 };
