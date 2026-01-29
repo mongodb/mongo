@@ -9,7 +9,7 @@
 #  - https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-amazon2023-aarch64.tgz
 #
 #    base_url: https://mongot-extension.s3.amazonaws.com/release/
-#    name: mongot_extension
+#    name: mongot-extension
 #    version: 0.0.0
 #    variants:
 #      amazon2-x86_64: amazon2-x86_64
@@ -20,7 +20,7 @@
 extensions:
   mongot_extension:
     base_url: https://mongot-extension.s3.amazonaws.com/release/
-    name: mongot_extension
+    name: mongot-extension
     version: 0.0.0
     variants:
       amazon2-x86_64: amazon2-x86_64
@@ -29,7 +29,7 @@ extensions:
       amazon2023-aarch64: amazon2023-aarch64
   rerank_extension:
     base_url: https://mongot-extension.s3.amazonaws.com/release/
-    name: rerank_extension
+    name: rerank-extension
     version: 0.0.0
     variants:
       amazon2-x86_64: amazon2-x86_64
