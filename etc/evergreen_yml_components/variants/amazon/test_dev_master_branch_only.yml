@@ -406,6 +406,25 @@ buildvariants:
     tasks:
       - name: .benchmarks_sep
 
+  - name: &al2023-arm64-benchmarks al2023-arm64-benchmarks
+    display_name: "* AL2023 arm64 (Benchmarks)"
+    tags: ["suggested"]
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - amazon2023.3-arm64-m6g-4xlarge
+    expansions:
+      bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --dbg_level=1
+        --separate_debug=False
+      evergreen_remote_exec: on
+      compile_variant: *al2023-arm64-benchmarks
+    tasks:
+      - name: compile_upload_benchmarks_TG
+        distros:
+          - amazon2023.3-arm64-m6g-4xlarge
+      - name: .benchmarks
+
   ### Query Patch-Specific Build Variants ###
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
