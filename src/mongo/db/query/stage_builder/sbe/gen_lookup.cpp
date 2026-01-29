@@ -1849,7 +1849,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     auto [leftStage, leftOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs = PlanStageReqs{}.setResultObj().set(std::move(rightRequests));
+    PlanStageReqs rightChildReqs =
+        PlanStageReqs{}
+            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
+            .set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(nestedLoopJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -1860,10 +1863,15 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
     SbSlotVector outerProjects;
     sbe::value::SlotSet
         outerProjectsSet;  // Used to avoid duplicates in the 'outerProjections' list.
+    // Include the special Nothing slot, so that we avoid referencing it in the projection list.
+    if (auto nothingSlot = _state.env->getSlotIfExists(kNothingEnvSlotName); nothingSlot) {
+        outerProjectsSet.insert(*nothingSlot);
+    }
     if (leftOutputs.has(kResult)) {
         auto resultObj = leftOutputs.get(kResult);
-        outerProjects.emplace_back(resultObj);
-        outerProjectsSet.insert(resultObj.getId());
+        if (outerProjectsSet.insert(resultObj.getId()).second) {
+            outerProjects.emplace_back(resultObj);
+        }
     }
 
     // ensure that requested fields coming from the left side are propagated (the right side is
@@ -1975,7 +1983,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
             .set(std::move(leftRequests));
     auto [leftStage, leftOutputs] = build(hashJoinEmbeddingNode->children[0].get(), leftChildReqs);
 
-    PlanStageReqs rightChildReqs = PlanStageReqs{}.setResultObj().set(std::move(rightRequests));
+    PlanStageReqs rightChildReqs =
+        PlanStageReqs{}
+            .setResultInfo(FieldSet::makeOpenSet(std::vector<std::string>{}), FieldEffects())
+            .set(std::move(rightRequests));
     auto [rightStage, rightOutputs] =
         build(hashJoinEmbeddingNode->children[1].get(), rightChildReqs);
 
@@ -2005,6 +2016,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
     // Propagate all the slots created by the children.
     SbSlotVector leftProjectSlots, rightProjectSlots;
     sbe::value::SlotSet dedupSlotId;  // Used to avoid duplicates in the projection list.
+    // Include the special Nothing slot, so that we avoid referencing it in the projection list.
+    if (auto nothingSlot = _state.env->getSlotIfExists(kNothingEnvSlotName); nothingSlot) {
+        dedupSlotId.insert(*nothingSlot);
+    }
     for (auto& produce : leftOutputs.getAllSlotsInOrder()) {
         if (dedupSlotId.insert(produce.getId()).second) {
             leftProjectSlots.emplace_back(produce);
@@ -2214,6 +2229,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
 
     SbSlotVector projectedSlots;
     sbe::value::SlotSet dedupSlotId;  // Used to avoid duplicates in the projection list.
+    // Include the special Nothing slot, so that we avoid referencing it in the projection list.
+    if (auto nothingSlot = _state.env->getSlotIfExists(kNothingEnvSlotName); nothingSlot) {
+        dedupSlotId.insert(*nothingSlot);
+    }
     for (auto& produce : leftOutputs.getAllSlotsInOrder()) {
         if (dedupSlotId.insert(produce.getId()).second) {
             projectedSlots.emplace_back(produce);

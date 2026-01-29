@@ -925,7 +925,7 @@ public:
     };
 
 protected:
-    void instatiateMainCollection(const std::vector<BSONObj>& documents) {
+    void instantiateMainCollection(const std::vector<BSONObj>& documents) {
         ASSERT_OK(
             storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
 
@@ -1048,7 +1048,7 @@ protected:
             return collectionScan;
         }();
 
-        // Of the involved collections (inluding the left-most), exactly one should have no
+        // Of the involved collections (including the left-most), exactly one should have no
         // embedding, and we consider that one to be the "main" collection.
         auto mainCollectionName = !leftEmbeddingPath.has_value()
             ? boost::make_optional<NamespaceString>(NamespaceString(leftMostCollectionName))
@@ -1235,7 +1235,7 @@ std::string toString(BinaryJoinStageBuilderTest::JoinAlgorithm algorithm) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
@@ -1334,7 +1334,7 @@ TEST_F(BinaryJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
@@ -1372,7 +1372,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicateEmbeddingLeftInRight) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
@@ -1408,7 +1408,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicateEmbeddingLeftInRight) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathPredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, a: {b: 1}}"),
         fromjson("{_id: 1, a: {b: 2}}"),
         fromjson("{_id: 2, no_a: -1}"),
@@ -1471,7 +1471,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbedding) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, a: {b: {c: 1, x: 1}, y: 1}, lkey: 0}"),
         fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
         fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
@@ -1512,7 +1512,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithArrayPredicate) {
     // the optimizer should use multi-key information to ensure all of a predicate's paths reference
     // a single value. However, if execution encounters an array while evaluating a predicate, it
     // should at least run without crashing, even if the results don't make sense.
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: [1]}"),
         fromjson("{_id: 1, lkey: [0, 1]}"),
         fromjson("{_id: 2, lkey: []}"),
@@ -1538,7 +1538,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithArrayPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, NLJWithCompoundPredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey1: 0, lkey2: 0}"),
         fromjson("{_id: 1, lkey1: 1, lkey2: 0}"),
         fromjson("{_id: 2, lkey1: 2, lkey2: 3}"),
@@ -1567,7 +1567,7 @@ TEST_F(BinaryJoinStageBuilderTest, NLJWithCompoundPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
@@ -1605,7 +1605,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicateEmbeddingLeftInRight) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
@@ -1641,7 +1641,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicateEmbeddingLeftInRig
 }
 
 TEST_F(BinaryJoinStageBuilderTest, HashJoinWithDottedPathPredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, a: {b: 1}}"),
         fromjson("{_id: 1, a: {b: 2}}"),
         fromjson("{_id: 2, no_a: -1}"),
@@ -1704,7 +1704,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithDottedPathPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, a: {b: {c: 1, x: 1}, y: 1}, lkey: 0}"),
         fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
         fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
@@ -1745,7 +1745,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithArrayPredicate) {
     // the optimizer should use multi-key information to ensure all of a predicate's paths reference
     // a single value. However, if execution encounters an array while evaluating a predicate, it
     // should at least run without crashing, even if the results don't make sense.
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: [1]}"),
         fromjson("{_id: 1, lkey: [0, 1]}"),
         fromjson("{_id: 2, lkey: []}"),
@@ -1774,7 +1774,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithArrayPredicate) {
 // collection. The optimizer will never generate a plan that does this, because there is no way to
 // represent it syntactically, but it makes sense to support nonetheless.
 TEST_F(BinaryJoinStageBuilderTest, JoinWithInvertedEmbedding) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 0}"),
         fromjson("{_id: 1, lkey: 1}"),
     });
@@ -1800,7 +1800,7 @@ TEST_F(BinaryJoinStageBuilderTest, JoinWithInvertedEmbedding) {
 //   db.A.aggregate([$lookup: {from: B, ...}, {$unwind: ...}])
 // if the optimizer decided to swap the outer and inner sides.
 TEST_F(BinaryJoinStageBuilderTest, ReverseOrderJoin) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 0}"),
         fromjson("{_id: 1, lkey: 1}"),
     });
@@ -1833,7 +1833,7 @@ TEST_F(BinaryJoinStageBuilderTest, ReverseOrderJoin) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, HashJoinWithCompoundPredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey1: 0, lkey2: 0}"),
         fromjson("{_id: 1, lkey1: 1, lkey2: 0}"),
         fromjson("{_id: 2, lkey1: 2, lkey2: 3}"),
@@ -1863,7 +1863,7 @@ TEST_F(BinaryJoinStageBuilderTest, HashJoinWithCompoundPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoin) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 0}"),
         fromjson("{_id: 1, lkey: 1}"),
     });
@@ -1915,7 +1915,7 @@ TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoin) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicate) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, l1key: 0}"),
         fromjson("{_id: 1, l1key: 1}"),
     });
@@ -1967,7 +1967,7 @@ TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicate) {
 }
 
 TEST_F(BinaryJoinStageBuilderTest, ThreeWayNestedLoopJoinWithNestedPathEmbeddings) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, lkey: 0}"),
         fromjson("{_id: 1, lkey: 1}"),
     });
@@ -2019,7 +2019,7 @@ TEST_F(BinaryJoinStageBuilderTest, ThreeWayNestedLoopJoinWithNestedPathEmbedding
 }
 
 TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicatesAndEmbeddings) {
-    instatiateMainCollection({
+    instantiateMainCollection({
         fromjson("{_id: 0, l1key: 0}"),
         fromjson("{_id: 1, l1key: 1}"),
     });
@@ -2071,5 +2071,64 @@ TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicatesAndEmbedd
         }
     }
 }
+
+TEST_F(BinaryJoinStageBuilderTest, RightDeepCollscanBaseLeftmost) {
+    instantiateMainCollection({
+        fromjson("{_id: 0, l1key: 0}"),
+        fromjson("{_id: 1, l1key: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0, l2key: 10}"),
+                                       fromjson("{_id: 11, f1key: 1, l2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 10}"),
+                                       fromjson("{_id: 21, f2key: 11}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, l1key: 0, x: {_id: 10, f1key: 0, l2key: 10}, z: {_id: 20, f2key: 10}}"),
+        fromjson("{_id: 1, l1key: 1, x: {_id: 11, f1key: 1, l2key: 11}, z: {_id: 21, f2key: 11}}"),
+    };
+
+    auto cs1 = std::make_unique<CollectionScanNode>();
+    cs1->nss = foreignCollectionName1;
+
+    auto cs2 = std::make_unique<CollectionScanNode>();
+    cs2->nss = foreignCollectionName2;
+
+    auto cs3 = std::make_unique<CollectionScanNode>();
+    cs3->nss = _nss;
+
+    auto hj = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs1),
+        std::move(cs2),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq, .leftField = "l2key", .rightField = "f2key"}},
+        FieldPath{"x"},
+        FieldPath{"z"});
+    auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs3),
+        std::move(hj),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = "l1key",
+                                                       .rightField = "x.f1key"}},
+        boost::none,
+        boost::none));
+    auto execPlan = makeExecutablePlan(_nss,
+                                       {foreignCollectionName1, foreignCollectionName2},
+                                       std::move(solution),
+                                       new ExpressionContextForTest(operationContext(), _nss));
+    execPlan.expectReturnedDocuments(expected);
+}
+
 }  // namespace
 }  // namespace mongo::sbe
