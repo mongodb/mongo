@@ -6,8 +6,6 @@
  *  # We need persistence as we temporarily restart nodes as standalones.
  *   requires_persistence,
  *   requires_fcv_80,
- *   # TODO (SERVER-117561): Decide what to do with this test.
- *   featureFlagRecordIdsReplicated_incompatible
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -33,7 +31,12 @@ const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: 2,
     nodeOptions: {
-        setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+        setParameter: {
+            logComponentVerbosity: tojson({command: 3}),
+            dbCheckHealthLogEveryNBatches: 1,
+            //TODO (SERVER-117561): Refactor this test to work with replicated record Ids.
+            "failpoint.overrideRecordIdsReplicatedFalse": {mode: "alwaysOn"},
+        },
     },
 });
 replSet.startSet();
