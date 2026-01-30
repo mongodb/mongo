@@ -17,14 +17,15 @@ export function getEqLookupArb(from) {
         });
 }
 
-export function getEqLookupUnwindArb(from) {
+export function getEqLookupUnwindArb(fromArb) {
     return fc
         .record({
+            from: fromArb,
             localField: fieldArb,
             foreignField: fieldArb,
             as: assignableFieldArb,
         })
-        .map(({localField, foreignField, as}) => {
+        .map(({from, localField, foreignField, as}) => {
             // The foreign side matches may appear out-of-order between control and experiment, so $unwind them as a workaround for result set comparison.
             return [{$lookup: {from, localField, foreignField, as}}, {$unwind: {path: "$" + as}}];
         });

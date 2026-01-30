@@ -84,26 +84,53 @@ const okIndexCreationErrorCodes = [
  * there are.
  */
 function runProperty(propertyFn, namespaces, workload, sortArrays) {
-    let {collSpec, queries, extraParams} = workload;
-    const {controlColl, experimentColl} = namespaces;
+    let {collSpec, foreignCollSpec, queries, extraParams} = workload;
+    const {controlColl, experimentColl, foreignControlColl, foreignExperimentColl} = namespaces;
 
-    // Setup the control/experiment collections, define the helper functions, then run the property.
-    if (controlColl) {
-        assertDropCollection(controlColl.getDB(), controlColl.getName());
-        createColl(controlColl.getDB(), controlColl);
-        assert.commandWorked(controlColl.insert(collSpec.docs));
+    function setUpCollection({collection, docs, isTS = false, indexes = []}) {
+        assertDropCollection(collection.getDB(), collection.getName());
+        createColl(collection.getDB(), collection, isTS);
+        assert.commandWorked(collection.insert(docs));
+        const createIndex = (indexSpec, num) =>
+            assert.commandWorkedOrFailedWithCode(
+                collection.createIndex(indexSpec.def, {name: `index_${num}`, ...indexSpec.options}),
+                okIndexCreationErrorCodes,
+            );
+        indexes.forEach(createIndex);
     }
 
-    assertDropCollection(experimentColl.getDB(), experimentColl.getName());
-    createColl(experimentColl.getDB(), experimentColl, collSpec.isTS);
-    assert.commandWorked(experimentColl.insert(collSpec.docs));
-    collSpec.indexes.forEach((indexSpec, num) => {
-        const name = "index_" + num;
-        assert.commandWorkedOrFailedWithCode(
-            experimentColl.createIndex(indexSpec.def, Object.assign({}, indexSpec.options, {name})),
-            okIndexCreationErrorCodes,
-        );
+    // Setup the control/experiment collections, define the helper functions, then run the property.
+    assert(experimentColl, "experimentColl must be defined");
+    setUpCollection({
+        collection: experimentColl,
+        docs: collSpec.docs,
+        isTS: collSpec.isTS,
+        indexes: collSpec.indexes,
     });
+
+    if (controlColl) {
+        setUpCollection({
+            collection: controlColl,
+            docs: collSpec.docs,
+        });
+    }
+
+    if (foreignExperimentColl) {
+        assert(foreignCollSpec);
+        setUpCollection({
+            collection: foreignExperimentColl,
+            docs: foreignCollSpec.docs,
+            isTS: foreignCollSpec.isTS,
+            indexes: foreignCollSpec.indexes,
+        });
+    }
+
+    if (foreignControlColl) {
+        setUpCollection({
+            collection: foreignControlColl,
+            docs: foreignCollSpec.docs,
+        });
+    }
 
     const testHelpers = {
         comp: sortArrays === true ? _resultSetsEqualUnorderedWithUnorderedArrays : _resultSetsEqualUnordered,
@@ -151,8 +178,20 @@ function reporter(propertyFn, namespaces) {
  */
 export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, sortArrays) {
     assert.eq(typeof propertyFn, "function");
-    assert(Object.keys(namespaces).every((collName) => collName === "controlColl" || collName === "experimentColl"));
     assert.eq(typeof numRuns, "number");
+
+    const isValidNamespaceKey = (collName) => {
+        switch (collName) {
+            case "controlColl":
+            case "experimentColl":
+            case "foreignControlColl":
+            case "foreignExperimentColl":
+                return true;
+            default:
+                return false;
+        }
+    };
+    assert(Object.keys(namespaces).every(isValidNamespaceKey));
 
     const seed = 4;
     jsTest.log.info("Running property `" + propertyFn.name + "` from test file `" + jsTestName() + "`, seed = " + seed);

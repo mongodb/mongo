@@ -57,7 +57,7 @@ function statsCollectorFn(explain) {
         numPlansUsedIndex++;
     }
 }
-const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn);
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {statsCollectorFn});
 
 /*
  * Generate a random $sort, aggregation pipelines, and collection. Using the $sort, create an

@@ -156,7 +156,7 @@ export function getTrySbeEnginePushdownEligibleAggPipelineArb(
         addFieldsVarArb,
         getSortArb(),
         groupArb,
-        getEqLookupArb(foreignCollName),
+        getEqLookupArb(fc.constantFrom(foreignCollName)),
         getEqLookupUnwindArb(foreignCollName),
     );
     // eqLookupUnwind returns a javascript array; flatten that here.
@@ -174,6 +174,33 @@ export function getSbeFullPushdownEligibleAggPipelineArb(
         allowedStages,
         isTS,
     });
+}
+
+export function getEqLookupUnwindAggPipelineArb(
+    foreignCollNameArb,
+    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
+) {
+    if (allowedStages.length === 0) {
+        allowedStages.push(...getAllowedStages(allowOrs, deterministicBag, isTS));
+    }
+    const lookupUnwindPairArb = getEqLookupUnwindArb(foreignCollNameArb);
+
+    // Manually piece together the pipeline by generating a sparse array of lookup/unwind pairs to insert into a base pipeline.
+    return fc
+        .record({
+            // Generate [1,3] non-lookup/unwind stages.
+            pipeline: fc.array(oneof(...allowedStages), {minLength: 1, maxLength: 3}),
+            // Generate in between 1 and 3 lookup/unwind pairs to insert into the pipeline at the specified positions.
+            lookupUnwindPositionPairs: fc.array(fc.tuple(fc.nat(), lookupUnwindPairArb), {minLength: 1, maxLength: 3}),
+        })
+        .map(({pipeline, lookupUnwindPositionPairs}) => {
+            // Insert the lookup/unwind pairs at the specified positions.
+            for (const [pos, lookupPair] of lookupUnwindPositionPairs) {
+                // Ensure the position is not out of bounds by taking modulo with pipeline length.
+                pipeline.splice(pos % pipeline.length, 0, ...lookupPair);
+            }
+            return pipeline;
+        });
 }
 
 /*

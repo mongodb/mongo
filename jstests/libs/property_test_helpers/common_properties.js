@@ -40,7 +40,11 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
  * The `statsCollectorFn`, if provided, is run on the explain of each query on the experiment
  * collection.
  */
-export function createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn, jsTestLogExplain = false) {
+export function createCorrectnessProperty(
+    controlColl,
+    experimentColl,
+    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn} = {},
+) {
     return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
@@ -49,24 +53,24 @@ export function createCorrectnessProperty(controlColl, experimentColl, statsColl
 
         for (let i = 0; i < queries.length; i++) {
             const query = queries[i];
+            assert.eq(typeof query, "object");
             const controlResults = resultMap[i];
 
-            let experimentResults = [];
-            assert.eq(typeof query, "object");
-            experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
+            const {pipeline, options} = modifyExperimentQueryFn ? modifyExperimentQueryFn(query) : query;
+            const experimentResults = experimentColl.aggregate(pipeline, options).toArray();
             if (jsTestLogExplain) {
-                jsTest.log(experimentColl.explain().aggregate(query.pipeline, query.options));
+                jsTest.log.info(experimentColl.explain().aggregate(pipeline, options));
             }
             if (statsCollectorFn) {
-                statsCollectorFn(experimentColl.explain().aggregate(query.pipeline, query.options));
+                statsCollectorFn(experimentColl.explain().aggregate(pipeline, options));
             }
 
             if (!testHelpers.comp(controlResults, experimentResults)) {
                 return {
                     passed: false,
                     message: "Query results from experiment collection did not match plain collection using collscan.",
-                    query,
-                    explain: experimentColl.explain().aggregate(query.pipeline, query.options),
+                    query: {pipeline, options},
+                    explain: experimentColl.explain().aggregate(pipeline, options),
                     controlResults,
                     experimentResults,
                 };

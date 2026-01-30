@@ -33,18 +33,31 @@ function typeCheckManyAggsModel(aggsModel) {
  *    - `aggsModel` which generates multiple aggregation pipelines at a time or
  *    - `aggModel` and `numQueriesPerRun` which will be used to create an `aggsModel`
  */
-export function makeWorkloadModel({collModel, aggModel, aggsModel, numQueriesPerRun, extraParamsModel} = {}) {
-    assert(!aggsModel || !aggModel, "Cannot  specify both `aggsModel` and `aggModel`");
-    assert(
-        !aggsModel || !numQueriesPerRun,
-        "Cannot specify `aggsModel` and `numQueriesPerRun`, since `numQueriesPerRun` is only used when provided `aggModel`.",
-    );
-    if (aggModel) {
-        aggsModel = fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun, size: "+2"});
+export function makeWorkloadModel({
+    collModel,
+    includeForeignCollection,
+    aggModel,
+    aggsModel,
+    numQueriesPerRun,
+    extraParamsModel,
+} = {}) {
+    let workload = {};
+    workload.collSpec = collModel;
+    workload.extraParams = extraParamsModel || fc.constant({});
+    if (includeForeignCollection) {
+        workload.foreignCollSpec = collModel;
     }
-    typeCheckManyAggsModel(aggsModel);
-    if (!extraParamsModel) {
-        extraParamsModel = fc.constant({});
-    }
-    return fc.record({collSpec: collModel, queries: aggsModel, extraParams: extraParamsModel});
+    workload.queries = (function () {
+        assert(!aggsModel || !aggModel, "Cannot  specify both `aggsModel` and `aggModel`");
+        assert(
+            !aggsModel || !numQueriesPerRun,
+            "Cannot specify `aggsModel` and `numQueriesPerRun`, since `numQueriesPerRun` is only used when provided `aggModel`.",
+        );
+        if (aggsModel) {
+            return aggsModel;
+        }
+        return fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun, size: "+2"});
+    })();
+    typeCheckManyAggsModel(workload.queries);
+    return fc.record(workload);
 }

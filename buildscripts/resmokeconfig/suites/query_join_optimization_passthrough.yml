@@ -46,6 +46,8 @@ selector:
     # TODO SERVER-113718 Do not use join optimizer path if join predicates/fields operate over arrays
     - jstests/core/query/release_memory/hash_lookup_unwind.js
     - jstests/aggregation/sources/match/sbe_non_leading_match_pbt.js
+    # TODO SERVER-118416 Fix join reordering tripwire assertions for lookup+unwind pipelines and re-enable lookup_unwind_pbt PBT
+    - jstests/aggregation/sources/lookup/lookup_unwind_pbt.js
 executor:
   config:
     shell_options:

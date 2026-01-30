@@ -39,12 +39,7 @@ const experimentName = "match_pbt_experiment";
 const controlColl = db[controlName];
 const experimentColl = db[experimentName];
 
-const correctnessProperty = createCorrectnessProperty(
-    controlColl,
-    experimentColl,
-    undefined /*statsCollectorFn*/,
-    jsTestLogExplain,
-);
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, {jsTestLogExplain});
 
 // The inner side of the lookup may be out-of-order between control and experiment. There are
 // $unwind's sprinkled in as a workaround. This blocks SBE pushdown for some suffix of the
