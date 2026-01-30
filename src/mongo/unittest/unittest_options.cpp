@@ -120,7 +120,6 @@ public:
                     break;
                 }
                 if (!a.empty()) {  // not a match
-                    ++ai;
                     continue;
                 }
 
