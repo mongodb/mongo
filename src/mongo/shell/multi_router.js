@@ -610,14 +610,6 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
                 return target.getDB("test", proxy);
             }
 
-            // TODO (SERVER-115564) Investigate how the key-vault should interact with the multi-router.
-            if (prop === "getKeyVault") {
-                return function () {
-                    let kv = target.primaryMongo.getKeyVault();
-                    return kv;
-                };
-            }
-
             if (prop === "getDB") {
                 return function (name) {
                     return target.getDB(name, proxy);
