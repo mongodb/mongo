@@ -29,6 +29,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig, reconnect} from "jstests/replsets/rslib.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 export class ContinuousStepdown {
     /**
@@ -332,6 +333,44 @@ function makeShardingTestWithContinuousPrimaryStepdown(stepdownOptions, verbosit
 
             if (stepdownOptions.shardStepdown && this._rs.some((rst) => !rst)) {
                 throw new Error("Continuous shard primary step down only available with replica set shards");
+            }
+        }
+
+        /**
+         * Set server parameters to prevent test timeouts due to config stepdowns.
+         */
+        setServerParameters() {
+            if (isSlowBuild(this.configRS.getPrimary())) {
+                // Sets a large defaultFindReplicaSetHostTimeoutMS on mongos to avoid timeouts in
+                // the ReplicaSetMonitor due to config stepdowns.
+                this._mongos.forEach((mongos) => {
+                    try {
+                        const conn = new Mongo(mongos.host);
+                        assert.commandWorked(
+                            conn.adminCommand({setParameter: 1, defaultFindReplicaSetHostTimeoutMS: 2 * 60 * 1000}),
+                        );
+                    } catch (e) {
+                        if (isNetworkError(e)) {
+                            jsTest.log(
+                                "Got a network error when setting server parameter on mongos: " +
+                                    tojson({host: mongos.host, error: e}),
+                            );
+                            // The network error is only expected if the test misconfigured the
+                            // mongoses.
+                            assert(TestData.misconfigureMongoses);
+                            return;
+                        }
+                        throw e;
+                    }
+                });
+
+                // Set a large fassertOnLockTimeoutForStepUpDown on config server nodes to avoid
+                // fasserts due to slow stepdowns.
+                this.configRS.nodes.forEach((node) => {
+                    assert.commandWorked(
+                        node.adminCommand({setParameter: 1, fassertOnLockTimeoutForStepUpDown: 3 * 60}),
+                    );
+                });
             }
         }
 

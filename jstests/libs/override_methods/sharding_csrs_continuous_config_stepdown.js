@@ -3,17 +3,7 @@ import "jstests/libs/override_methods/implicitly_retry_on_config_stepdowns.js";
 import {kOverrideConstructor as kOverrideConstructorForRST, ReplSetTest} from "jstests/libs/replsettest.js";
 import {kOverrideConstructor as kOverrideConstructorForST, ShardingTest} from "jstests/libs/shardingtest.js";
 
-function isSlowBuildFromTestOptions() {
-    const testOptions = jsTestOptions();
-    return (
-        testOptions.isAddressSanitizerActive ||
-        testOptions.isThreadSanitizerActive ||
-        testOptions.isDebug ||
-        _isWindows()
-    );
-}
-
-const stepdownIntervalMS = isSlowBuildFromTestOptions() ? 15 * 1000 : 8 * 1000;
+const stepdownIntervalMS = 8 * 1000;
 
 const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrimaryStepdown} =
     ContinuousStepdown.configure(
@@ -42,6 +32,7 @@ ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailov
         // Set the feature on the test configuration; this will allow js tests to selectively
         // skip/alter test cases.
         TestData.runningWithConfigStepdowns = true;
+        this.setServerParameters();
         // Automatically start the continuous stepdown thread on the config server replica set.
         this.startContinuousFailover();
     }
