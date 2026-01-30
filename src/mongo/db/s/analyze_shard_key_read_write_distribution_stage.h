@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::exec::agg {
 

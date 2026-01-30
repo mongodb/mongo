@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/document_source_analyze_shard_key_read_write_distribution_gen.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>

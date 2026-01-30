@@ -48,6 +48,7 @@
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

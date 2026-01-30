@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace analyze_shard_key {

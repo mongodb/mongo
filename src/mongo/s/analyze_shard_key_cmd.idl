@@ -27,6 +27,7 @@
 #
 
 global:
+    mod_visibility: public
     cpp_namespace: "mongo::analyze_shard_key"
     cpp_includes:
         - "mongo/client/read_preference.h"
