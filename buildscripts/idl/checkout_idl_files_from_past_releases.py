@@ -112,7 +112,7 @@ def _show_with_retry(tag: str, path: str):
 
 @retry(tries=3, delay=5)
 def _fetch_with_retry(tags: List[str]):
-    return check_output(["git", "fetch", "--depth=1", "origin", *tags])
+    return check_output(["git", "fetch", "origin", *tags])
 
 
 def make_idl_directories(tags: List[str], destination: str) -> None:
