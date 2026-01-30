@@ -2,8 +2,8 @@ base_suite: sharding_jscore_passthrough
 
 overrides:
   - "kill_primary.sharding_override_fixture"
-  - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_stepdown_kill_and_fcv_hooks"
-  - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_shell_options_fcv"
+  - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_stepdown_and_fcv_hooks"
+  - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_stepdown_and_fcv_shell_options"
 
 extends:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"

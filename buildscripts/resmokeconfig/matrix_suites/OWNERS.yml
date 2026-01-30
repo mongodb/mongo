@@ -51,7 +51,7 @@ filters:
   - "generated_suites/replica_sets_reconfig*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "generated_suites/sharding_kill_stepdown*":
+  - "generated_suites/sharding*stepdown*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "generated_suites/vector_search_extension*":

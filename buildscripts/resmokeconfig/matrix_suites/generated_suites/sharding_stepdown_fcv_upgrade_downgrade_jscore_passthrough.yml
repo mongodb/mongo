@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_kill_stepdown_terminate_fcv_upgrade_downgrade_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
@@ -30,7 +30,6 @@ executor:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: majority
           isRunningFCVUpgradeDowngradeSuite: true
-          killShards: true
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
@@ -71,7 +70,6 @@ executor:
           catchUpTimeoutMillis: 0
   hooks:
     - class: ContinuousStepdown
-      randomize_kill: true
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections

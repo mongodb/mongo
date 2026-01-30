@@ -1894,7 +1894,7 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: sharding_kill_stepdown_terminate_fcv_upgrade_downgrade_jscore_passthrough_gen
+    name: sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",

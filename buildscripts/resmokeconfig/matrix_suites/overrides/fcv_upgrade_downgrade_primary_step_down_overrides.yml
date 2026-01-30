@@ -40,7 +40,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: sharding_stepdown_kill_and_fcv_hooks
+- name: sharding_stepdown_and_fcv_hooks
   value:
     executor:
       archive:
@@ -54,7 +54,6 @@
           - CleanEveryN
       hooks:
         - class: ContinuousStepdown
-          randomize_kill: true
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections
@@ -67,7 +66,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: sharding_shell_options_fcv
+- name: sharding_stepdown_and_fcv_shell_options
   value:
     executor:
       config:
@@ -103,7 +102,6 @@
               # Inform the tests that we are running with stepdown hook
               runningWithConfigStepdowns: true
               runningWithShardStepdowns: true
-              killShards: true
           # We specify nodb so the shell used by each test will attempt to connect after loading the
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""

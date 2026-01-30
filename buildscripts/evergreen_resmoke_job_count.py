@@ -48,7 +48,7 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
         "task": r"sharding_jscore_passthrough.*",
         "factor": 0.25,
     },
-    {"task": r"sharding_kill_stepdown_terminate_*jscore_passthrough", "factor": 0.125},
+    {"task": r"sharding*stepdown*jscore_passthrough", "factor": 0.125},
 ]
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
