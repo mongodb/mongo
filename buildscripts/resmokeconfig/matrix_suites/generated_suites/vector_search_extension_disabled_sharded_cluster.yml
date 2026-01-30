@@ -1,0 +1,67 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/vector_search_extension_disabled_sharded_cluster.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+config_variables:
+  - jstests/with_mongot/keyfile_for_testing
+  - Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &id001
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+    username: __system
+description:
+  Runs mongot e2e sharded cluster tests (sharding_no_passthrough) with
+  the $vectorSearch extension loaded but disabled via the featureFlagVectorSearchExtension
+  IFR flag. Because the extension is loaded but disabled, we expect legacy $vectorSearch
+  to be used and identical results as mongot_e2e_sharded_cluster.
+executor:
+  config:
+    shell_options:
+      authenticationDatabase: admin
+      authenticationMechanism: SCRAM-SHA-256
+      eval: jsTest.authenticate(db.getMongo());
+      global_vars:
+        TestData:
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: jstests/with_mongot/keyfile_for_testing
+          keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+          roleGraphInvalidationIsFatal: true
+      password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+      username: __system
+  fixture:
+    auth_options: *id001
+    class: ShardedClusterFixture
+    launch_mongot: true
+    mongod_options:
+      keyFile: jstests/with_mongot/keyfile_for_testing
+      loadExtensions: mongot-extension
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagEgressGrpcForSearch: true
+        featureFlagExtensionViewsAndUnionWith: false
+        featureFlagExtensionsAPI: true
+        featureFlagVectorSearchExtension: false
+        skipAuthenticationToMongot: true
+        useGrpcForSearch: 1
+    mongos_options:
+      keyFile: jstests/with_mongot/keyfile_for_testing
+      set_parameters:
+        featureFlagEgressGrpcForSearch: true
+        featureFlagExtensionViewsAndUnionWith: false
+        featureFlagExtensionsAPI: true
+        featureFlagVectorSearchExtension: false
+        skipAuthenticationToMongot: true
+        useGrpcForSearch: 1
+    num_mongos: 3
+    num_shards: 2
+matrix_suite: true
+selector:
+  roots:
+    - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
+test_kind: js_test
