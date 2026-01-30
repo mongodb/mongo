@@ -1,6 +1,6 @@
 /**
  * This test ensures that $vectorSearch works against views, within $unionWith on collections,
- * and within $unionWith on views, and that the IFR flag kickback retry is invoked to fall back
+ * within $unionWith on views, and inside $rankFusion/$scoreFusion subpipelines, and that the IFR flag kickback retry is invoked to fall back
  * to legacy vector search when featureFlagExtensionViewsAndUnionWith is disabled.
  *
  * @tags: [ featureFlagExtensionsAPI ]
@@ -12,16 +12,16 @@ import {
     withExtensionsAndMongot,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 import {
+    createTestCollectionAndIndex,
     createTestViewAndIndex,
-    getExtensionVectorSearchUsedCount,
     getInUnionWithKickbackRetryCount,
-    getLegacyVectorSearchUsedCount,
     getOnViewKickbackRetryCount,
     kNumShards,
     kTestCollName,
     kTestDbName,
     kTestViewName,
     kTestViewPipeline,
+    runHybridSearchTests,
     runQueriesAndVerifyMetrics,
     setFeatureFlags,
     setUpMongotMockForVectorSearch,
@@ -107,7 +107,8 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
  */
 function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
     setFeatureFlags(conn, featureFlagValue);
-    createTestViewAndIndex(conn, mongotMock, shardingTest);
+    // Create collection with search index on the collection namespace (not the view).
+    createTestCollectionAndIndex(conn, mongotMock, shardingTest);
 
     const testDb = conn.getDB(kTestDbName);
     const coll = testDb[kTestCollName];
@@ -254,12 +255,18 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runViewVectorSearchTests(conn, mongotMock, true, shardingTest);
     runUnionWithVectorSearchTests(conn, mongotMock, true, shardingTest);
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, true, shardingTest);
+
     // Run with the feature flag set to false.
     // No IFR retry kickback logic should be triggered. This is because the shards get the feature flag value from
     // the IFR context passed from the router, and the router already has the feature flag disabled.
     runViewVectorSearchTests(conn, mongotMock, false, shardingTest);
     runUnionWithVectorSearchTests(conn, mongotMock, false, shardingTest);
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, false, shardingTest);
+
+    // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
+    // These always trigger the IFR kickback retry regardless of featureFlagExtensionViewsAndUnionWith.
+    runHybridSearchTests(conn, mongotMock, true, shardingTest);
+    runHybridSearchTests(conn, mongotMock, false, shardingTest);
 }
 
 withExtensionsAndMongot(

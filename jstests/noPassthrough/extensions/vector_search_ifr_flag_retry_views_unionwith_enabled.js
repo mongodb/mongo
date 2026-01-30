@@ -3,6 +3,10 @@
  * featureFlagExtensionViewsAndUnionWith is enabled. It tests views, $unionWith on collections,
  * and $unionWith on views.
  *
+ * It also tests that $rankFusion and $scoreFusion with $vectorSearch subpipelines always use
+ * legacy vector search via the IFR kickback retry mechanism, regardless of the
+ * featureFlagExtensionViewsAndUnionWith setting.
+ *
  * @tags: [ featureFlagExtensionsAPI, featureFlagExtensionViewsAndUnionWith ]
  */
 import {getParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -11,6 +15,7 @@ import {
     withExtensionsAndMongot,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 import {
+    createTestCollectionAndIndex,
     createTestViewAndIndex,
     getInUnionWithKickbackRetryCount,
     getOnViewKickbackRetryCount,
@@ -20,9 +25,10 @@ import {
     kTestViewName,
     kTestViewPipeline,
     runQueriesAndVerifyMetrics,
+    runHybridSearchTests,
     setFeatureFlags,
     setUpMongotMockForVectorSearch,
-    setupMockVectorSearchResponses,
+    setupMockVectorSearchResponsesForView,
     vectorSearchQuery,
 } from "jstests/noPassthrough/extensions/vector_search_ifr_flag_retry_utils.js";
 
@@ -40,7 +46,7 @@ checkPlatformCompatibleWithExtensions();
 function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
     setFeatureFlags(conn, featureFlagValue);
     const view = createTestViewAndIndex(conn, mongotMock, shardingTest);
-    const {vectorSearchQuery, testDb} = setupMockVectorSearchResponses(conn, mongotMock, shardingTest);
+    const {vectorSearchQuery, testDb} = setupMockVectorSearchResponsesForView(conn, mongotMock, shardingTest);
 
     const numNodes = shardingTest ? kNumShards : 1;
 
@@ -84,7 +90,8 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
  */
 function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
     setFeatureFlags(conn, featureFlagValue);
-    createTestViewAndIndex(conn, mongotMock, shardingTest);
+    // Create collection with search index on the collection namespace (not the view).
+    createTestCollectionAndIndex(conn, mongotMock, shardingTest);
 
     const testDb = conn.getDB(kTestDbName);
     const coll = testDb[kTestCollName];
@@ -213,6 +220,11 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runViewVectorSearchTests(conn, mongotMock, false, shardingTest);
     runUnionWithVectorSearchTests(conn, mongotMock, false, shardingTest);
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, false, shardingTest);
+
+    // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
+    // These always trigger the IFR kickback retry regardless of featureFlagExtensionViewsAndUnionWith.
+    runHybridSearchTests(conn, mongotMock, true, shardingTest);
+    runHybridSearchTests(conn, mongotMock, false, shardingTest);
 }
 
 // We don't have to manually enable featureFlagExtensionViewsAndUnionWith since the test will only run if it's enabled.

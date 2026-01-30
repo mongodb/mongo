@@ -47,7 +47,7 @@ export const vectorSearchQuery = {
 /**
  * Sets the featureFlagVectorSearchExtension parameter on all non-config nodes in the cluster.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @param {boolean} featureFlagValue - The value to set for the feature flag.
  */
 export function setFeatureFlags(conn, featureFlagValue) {
@@ -57,7 +57,7 @@ export function setFeatureFlags(conn, featureFlagValue) {
 /**
  * Retrieves a vector search metric from a specific connection by running serverStatus.
  *
- * @param {Mongo|Object} conn - The connection to query (can be mongos or mongod).
+ * @param {Mongo} conn - The connection to query (can be mongos or mongod).
  * @param {string} metricName - The name of the metric to retrieve from extension.vectorSearch section.
  * @returns {number} The metric value from the connection's serverStatus.
  */
@@ -71,7 +71,7 @@ function getVectorSearchMetricFromConnection(conn, metricName) {
  * Gets the total count of a vector search metric across the entire cluster.
  * Aggregates the metric from mongos and all shards.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @param {string} metricName - The name of the metric to retrieve from extension.vectorSearch section.
  * @returns {number} The sum of the metric value across all nodes in the cluster.
  */
@@ -94,7 +94,7 @@ export function getVectorSearchMetric(conn, metricName) {
 /**
  * Gets the count of onViewKickbackRetries metric across the cluster.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @returns {number} The total count of view kickback retries.
  */
 export function getOnViewKickbackRetryCount(conn) {
@@ -104,7 +104,7 @@ export function getOnViewKickbackRetryCount(conn) {
 /**
  * Gets the count of legacyVectorSearchUsed metric across the cluster.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @returns {number} The total count of legacy vector search usage.
  */
 export function getLegacyVectorSearchUsedCount(conn) {
@@ -114,7 +114,7 @@ export function getLegacyVectorSearchUsedCount(conn) {
 /**
  * Gets the count of extensionVectorSearchUsed metric across the cluster.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @returns {number} The total count of extension vector search usage.
  */
 export function getExtensionVectorSearchUsedCount(conn) {
@@ -124,7 +124,7 @@ export function getExtensionVectorSearchUsedCount(conn) {
 /**
  * Gets the count of inUnionWithKickbackRetries metric across the cluster.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @returns {number} The total count of $unionWith kickback retries.
  */
 export function getInUnionWithKickbackRetryCount(conn) {
@@ -132,14 +132,26 @@ export function getInUnionWithKickbackRetryCount(conn) {
 }
 
 /**
- * Creates a simple collection, view, and vector search index using the provided connection.
+ * Gets the count of inHybridSearchKickbackRetries metric across the cluster.
+ * This metric tracks retries triggered when $vectorSearch is used inside
+ * $rankFusion or $scoreFusion subpipelines.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
- * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
- * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
- * @returns {Collection} The view collection.
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @returns {number} The total count of hybrid search kickback retries.
  */
-export function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
+export function getInHybridSearchKickbackRetryCount(conn) {
+    return getVectorSearchMetric(conn, "inHybridSearchKickbackRetries");
+}
+
+/**
+ * Sets up the test collection with data and optional sharding.
+ * This is a shared helper used by both collection and view index setup functions.
+ *
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ * @returns {Object} An object containing { testDb, coll } for use in tests.
+ */
+function setupTestCollection(conn, shardingTest = null) {
     const testDb = conn.getDB(kTestDbName);
     const coll = testDb[kTestCollName];
     coll.drop();
@@ -157,6 +169,57 @@ export function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
         );
     }
 
+    return {testDb, coll};
+}
+
+/**
+ * Creates a vector search index on the specified namespace.
+ *
+ * @param {DB} testDb - The database to create the index in.
+ * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
+ * @param {string} namespace - The collection or view name to create the index on.
+ */
+function createSearchIndex(testDb, mongotMock, namespace) {
+    const createIndexResponse = {
+        ok: 1,
+        indexesCreated: [{id: "index-Id", name: kTestIndexName}],
+    };
+    mongotMock.setMockSearchIndexCommandResponse(createIndexResponse);
+    assert.commandWorked(
+        testDb.runCommand({
+            createSearchIndexes: namespace,
+            indexes: [testVectorSearchIndexSpec],
+        }),
+    );
+}
+
+/**
+ * Creates a test collection with a vector search index on the collection namespace.
+ * Use this for tests that query the collection directly (e.g., $unionWith, hybrid search).
+ *
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
+ * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ * @returns {Collection} The test collection.
+ */
+export function createTestCollectionAndIndex(conn, mongotMock, shardingTest = null) {
+    const {testDb, coll} = setupTestCollection(conn, shardingTest);
+    createSearchIndex(testDb, mongotMock, kTestCollName);
+    return coll;
+}
+
+/**
+ * Creates a test collection, view, and vector search index on the view namespace.
+ * Use this for tests that query the view (e.g., view vector search tests).
+ *
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
+ * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ * @returns {Collection} The view collection.
+ */
+export function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
+    const {testDb, coll} = setupTestCollection(conn, shardingTest);
+
     // Check if the view exists using collection metadata.
     const viewExists = testDb.getCollectionInfos({name: kTestViewName, type: "view"}).length > 0;
     if (!viewExists) {
@@ -165,18 +228,7 @@ export function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
     }
     const view = testDb[kTestViewName];
 
-    // Create the vector search index.
-    const createIndexResponse = {
-        ok: 1,
-        indexesCreated: [{id: "index-Id", name: kTestIndexName}],
-    };
-    mongotMock.setMockSearchIndexCommandResponse(createIndexResponse);
-    assert.commandWorked(
-        testDb.runCommand({
-            createSearchIndexes: kTestViewName,
-            indexes: [testVectorSearchIndexSpec],
-        }),
-    );
+    createSearchIndex(testDb, mongotMock, kTestViewName);
 
     return view;
 }
@@ -186,12 +238,12 @@ export function createTestViewAndIndex(conn, mongotMock, shardingTest = null) {
  * This configures the mock to return appropriate responses for both the explain command and
  * the regular aggregate command.
  *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
  * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
  * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
  * @returns {Object} An object containing { vectorSearchQuery, testDb } for use in tests.
  */
-export function setupMockVectorSearchResponses(conn, mongotMock, shardingTest = null) {
+export function setupMockVectorSearchResponsesForView(conn, mongotMock, shardingTest = null) {
     const queryVector = [0.5, 0.5, 0.5];
     const path = "embedding";
     const numCandidates = 10;
@@ -345,7 +397,7 @@ export function setUpMongotMockForVectorSearch(
  * retry and legacy/extension usage metrics are incremented correctly.
  *
  * @param {Object} options - Configuration options.
- * @param {Mongo|Object} options.conn - The connection to use.
+ * @param {Mongo} options.conn - The connection to use.
  * @param {DB} options.testDb - The test database.
  * @param {function} options.getRetryCountFn - Function to get retry count metric.
  * @param {string} options.retryMetricName - Name of retry metric for error messages.
@@ -403,4 +455,147 @@ export function runQueriesAndVerifyMetrics({
         `extensionVectorSearchUsed should have changed from ${initialExtensionCount} to ` +
             `${initialExtensionCount + expectedExtensionDelta} when feature flag is ${featureFlagValue}`,
     );
+}
+
+/**
+ * Sets up MongotMock responses for vector search queries used in hybrid search ($rankFusion/$scoreFusion).
+ * Unlike setupMockVectorSearchResponses which sets up mocks for views, this sets up mocks for
+ * regular $vectorSearch commands on the base collection.
+ *
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
+ * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ * @returns {Object} An object containing { vectorSearchQuery, testDb } for use in tests.
+ */
+export function setupMockVectorSearchResponsesForHybridSearch(conn, mongotMock, shardingTest = null) {
+    const queryVector = [0.5, 0.5, 0.5];
+    const path = "embedding";
+    const numCandidates = 10;
+    const limit = 5;
+    const index = kTestIndexName;
+    const vectorSearchQuery = {
+        $vectorSearch: {
+            queryVector,
+            path,
+            numCandidates,
+            limit,
+            index,
+        },
+    };
+
+    const testDb = conn.getDB(kTestDbName);
+    const collectionUUID = getUUIDFromListCollections(testDb, kTestCollName);
+
+    const dbName = testDb.getName();
+    const collName = kTestCollName;
+    const numNodes = shardingTest ? kNumShards : 1;
+
+    // Set up MongotMock cursor for regular (non-explain, non-view) $vectorSearch commands.
+    // These are used when $vectorSearch runs inside $rankFusion/$scoreFusion subpipelines.
+    const vectorSearchCmd = mongotCommandForVectorSearchQuery({
+        queryVector,
+        path,
+        numCandidates,
+        limit,
+        index,
+        collName,
+        dbName,
+        collectionUUID,
+    });
+
+    // We need 2 mocks per node: one for $rankFusion and one for $scoreFusion.
+    let startingCursorId = 200;
+    for (let i = 0; i < 2 * numNodes; i++) {
+        setUpMongotReturnExplainAndCursor({
+            mongotMock,
+            coll: testDb[collName],
+            searchCmd: vectorSearchCmd,
+            nextBatch: [],
+            cursorId: startingCursorId++,
+            maybeUnused: true,
+        });
+    }
+
+    return {vectorSearchQuery, testDb};
+}
+
+/**
+ * Runs tests for $rankFusion and $scoreFusion with $vectorSearch in subpipelines.
+ * These hybrid search stages always trigger the IFR kickback retry to use legacy $vectorSearch,
+ * regardless of the featureFlagExtensionViewsAndUnionWith setting.
+ *
+ * Unlike the view kickback, this triggers on both router and shards.
+ *
+ * @param {Mongo} conn - The connection to use (mongos or mongod).
+ * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
+ * @param {boolean} featureFlagValue - The value to set for the feature flag.
+ * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ */
+export function runHybridSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
+    setFeatureFlags(conn, featureFlagValue);
+    // Reuse the index setup to get a consistent test environment (creates collection and index).
+    createTestCollectionAndIndex(conn, mongotMock, shardingTest);
+    // Set up mock responses for hybrid search (regular $vectorSearch on base collection, not views).
+    const {vectorSearchQuery, testDb} = setupMockVectorSearchResponsesForHybridSearch(conn, mongotMock, shardingTest);
+
+    // Get the current feature flag value to determine if we expect retries.
+    const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
+    // Hybrid search stages always trigger the kickback when the extension flag is enabled.
+    // Unlike the view kickback, this triggers on both router and shards.
+    // TODO SERVER-117797 Fix double counting of kickback on mongos.
+    const temporaryDoubler = shardingTest ? 2 : 1;
+    const expectedHybridKickbackRetryDelta = temporaryDoubler * (expectRetry ? 2 : 0);
+
+    const numNodes = shardingTest ? kNumShards : 1;
+
+    // Build $rankFusion and $scoreFusion pipelines with $vectorSearch subpipelines.
+    const rankFusionPipeline = [
+        {
+            $rankFusion: {
+                input: {
+                    pipelines: {
+                        vectorPipeline: [vectorSearchQuery],
+                    },
+                },
+            },
+        },
+    ];
+
+    const scoreFusionPipeline = [
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        vectorPipeline: [vectorSearchQuery],
+                    },
+                    normalization: "none",
+                },
+            },
+        },
+    ];
+
+    // We expect one legacy $vectorSearch per hybrid search query per shard (rankFusion + scoreFusion).
+    const expectedLegacyDelta = 2 * numNodes;
+
+    runQueriesAndVerifyMetrics({
+        conn,
+        testDb,
+        getRetryCountFn: getInHybridSearchKickbackRetryCount,
+        retryMetricName: "inHybridSearchKickbackRetries",
+        expectedRetryDelta: expectedHybridKickbackRetryDelta,
+        expectedLegacyDelta,
+        runExplainQuery: () => {
+            // Run $rankFusion aggregate.
+            assert.commandWorked(
+                testDb.runCommand({aggregate: kTestCollName, pipeline: rankFusionPipeline, cursor: {}}),
+            );
+        },
+        runAggregateQuery: () => {
+            // Run $scoreFusion aggregate.
+            assert.commandWorked(
+                testDb.runCommand({aggregate: kTestCollName, pipeline: scoreFusionPipeline, cursor: {}}),
+            );
+        },
+        shardingTest,
+    });
 }

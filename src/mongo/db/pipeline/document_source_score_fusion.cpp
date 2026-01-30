@@ -31,6 +31,8 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_score_fusion_gen.h"
@@ -130,8 +132,26 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
         // Ensure that all pipelines are valid scored selection pipelines.
         scoreFusionBsonPipelineValidator(bsonPipeline, pExpCtx);
 
-        auto pipeline = pipeline_factory::makePipeline(
-            bsonPipeline, pExpCtx, pipeline_factory::kOptionsMinimal);
+        LiteParsedPipeline liteParsedPipeline =
+            LiteParsedPipeline(pExpCtx->getNamespaceString(),
+                               bsonPipeline,
+                               false,
+                               LiteParserOptions{.ifrContext = pExpCtx->getIfrContext()});
+
+        if (liteParsedPipeline.hasExtensionVectorSearchStage()) {
+            // If any input pipeline has an extension $vectorSearch stage, we perform the IFR flag
+            // retry kickback to use legacy $vectorSearch instead.
+            // TODO SERVER-117661: Implement support for extension $vectorSearch stages in
+            // scoreFusion pipelines.
+            vector_search_metrics::inHybridSearchKickbackRetryCount.increment();
+            uassertStatusOK(
+                Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
+                       "$vectorSearch-as-an-extension is not allowed against in a $scoreFusion "
+                       "pipeline."));
+        }
+
+        auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, pExpCtx);
+
         tassert(
             10535800,
             "The metadata dependency tracker determined $scoreFusion input pipeline does not "
