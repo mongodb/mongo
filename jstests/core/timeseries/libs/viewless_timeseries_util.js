@@ -4,14 +4,17 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {isFCVlt} from "jstests/libs/feature_compatibility_version.js";
+import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 export function areViewlessTimeseriesEnabled(db) {
-    if (TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (
+        !isStableFCVSuite() &&
+        FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
+    ) {
         jsTest.log(
-            "Skipping test because it is unsafe to call areViewlessTimeseriesEnabled in a suite performing FCV transitions",
+            "Skipping test execution because it is calling areViewlessTimeseriesEnabled() in a suite with unstable FCV, where timeseries collections are constantly converted between viewless (new) and viewfull (legacy)",
         );
         quit();
     }
