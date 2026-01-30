@@ -219,3 +219,13 @@ server_parameters:
         on_update: "TicketingSystem::updateBackgroundTasksDeprioritization"
         default: true
         redact: false
+
+    executionControlApplicationDeprioritizationExemptions:
+        description: >-
+            A document containing a list of application names exempted from deprioritization. These
+            applications remain at kNormal priority and are not downgraded to kLow.
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "ExecutionControlDeprioritizationExemptions"
+            override_set: true
+        redact: false

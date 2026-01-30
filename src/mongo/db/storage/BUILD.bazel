@@ -36,6 +36,7 @@ mongo_cc_library(
     deps = [
         ":storage_options",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/shard_role/lock_manager",
     ],
 )
 
@@ -706,7 +707,6 @@ mongo_cc_benchmark(
     deps = [
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/shard_role/lock_manager",
     ],
 )
 

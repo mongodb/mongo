@@ -1622,7 +1622,6 @@ mongo_cc_library(
     deps = [
         "multi_key_path_tracker",
         "server_base",
-        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/util:clock_sources",
@@ -2265,6 +2264,7 @@ mongo_cc_library(
         "validate_api_parameters",
         "//src/mongo:base",
         "//src/mongo/db:commands",
+        "//src/mongo/db/admission:app_name_exemption_matcher",
         "//src/mongo/db/admission:ingress_admission_control",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/auth",
@@ -2279,6 +2279,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:replica_set_messages",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/stats:api_version_metrics",
         "//src/mongo/db/stats:counters",
         "//src/mongo/db/stats:read_preference_metrics",

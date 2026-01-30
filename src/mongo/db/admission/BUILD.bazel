@@ -10,6 +10,44 @@ exports_files(
 )
 
 idl_generator(
+    name = "app_name_exemption_gen",
+    src = "app_name_exemption.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "app_name_exemption_matcher",
+    srcs = [
+        "app_name_exemption_matcher.cpp",
+        ":app_name_exemption_gen",
+    ],
+    hdrs = [
+        "app_name_exemption_matcher.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/rpc:client_metadata",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "app_name_exemption_matcher_test",
+    srcs = [
+        "app_name_exemption_matcher_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":app_name_exemption_matcher",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/unittest",
+    ],
+)
+
+idl_generator(
     name = "ingress_request_rate_limiter_gen",
     src = "ingress_request_rate_limiter.idl",
     deps = [
@@ -24,6 +62,7 @@ mongo_cc_library(
         ":ingress_request_rate_limiter_gen",
     ],
     deps = [
+        ":app_name_exemption_matcher",
         ":rate_limiter",
         "//src/mongo:base",
         "//src/mongo/db:server_feature_flags",
@@ -124,6 +163,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:flow_control_ticketholder",
         "//src/mongo/util:background_job",
     ],

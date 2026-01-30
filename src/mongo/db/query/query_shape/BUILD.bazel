@@ -25,6 +25,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db:common",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/pipeline:field_path",
     ],

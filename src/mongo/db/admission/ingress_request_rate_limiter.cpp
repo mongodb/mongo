@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/admission/app_name_exemption_matcher.h"
 #include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"
@@ -69,7 +70,7 @@ private:
 
     bool _areSnapshotsCurrent() const {
         return ingressRequestRateLimiterIPExemptions.isCurrent(_ipExemptions) &&
-            ingressRequestRateLimiterAppExemptions.isCurrent(_appExemptions);
+            _appNameExemptionMatcher.isExemptionListSnapshotCurrent();
     }
 
     bool _isAuthorizationExempt(Client* client) {
@@ -88,27 +89,7 @@ private:
     }
 
     bool _isApplicationExempt(Client* client) {
-        const auto clientMetadata = ClientMetadata::get(client);
-        if (!clientMetadata) {
-            return false;
-        }
-
-        // Don't refresh the client's snapshot of app exemptions until we've seen the client
-        // metadata, to ensure that we don't cache an outdated exempted status based on non-existent
-        // client metadata.
-        ingressRequestRateLimiterAppExemptions.refreshSnapshot(_appExemptions);
-        if (!_appExemptions) {
-            return false;
-        }
-
-        const auto& driverName = clientMetadata->getDriverName();
-        const auto& applicationName = clientMetadata->getApplicationName();
-        for (auto& appExemption : *_appExemptions) {
-            if (driverName.starts_with(appExemption) || applicationName.starts_with(appExemption)) {
-                return true;
-            }
-        }
-        return false;
+        return _appNameExemptionMatcher.isExempted(client);
     }
 
     bool _isExempted(Client* client) {
@@ -126,7 +107,8 @@ private:
     }
 
     Snapshot<CIDRList> _ipExemptions;
-    Snapshot<std::vector<std::string>> _appExemptions;
+    admission::AppNameExemptionMatcher _appNameExemptionMatcher{
+        ingressRequestRateLimiterAppExemptions};
     boost::optional<bool> _exempted;
 };
 
@@ -134,18 +116,6 @@ const auto getAdmissionControlState = Client::declareDecoration<ClientAdmissionC
 
 bool ClientAdmissionControlState::isExempted(Client* client) {
     return getAdmissionControlState(client)._isExempted(client);
-}
-
-std::shared_ptr<std::vector<std::string>> parseApplicationExemptionList(const BSONObj& b) {
-    IDLParserContext ctx("ApplicationExemptionListParameters");
-    const auto params = ApplicationExemptionListParameters::parse(b, ctx);
-
-    auto apps = std::make_shared<std::vector<std::string>>();
-    for (const auto& app : params.getAppNames()) {
-        apps->emplace_back(std::string{app});
-    }
-
-    return apps;
 }
 
 }  // namespace
@@ -174,28 +144,21 @@ void IngressRequestRateLimiterAppExemptions::append(OperationContext*,
                                                     BSONObjBuilder* bob,
                                                     StringData name,
                                                     const boost::optional<TenantId>&) {
-    auto snapshot = ingressRequestRateLimiterAppExemptions.makeSnapshot();
-
-    if (snapshot) {
-        BSONObjBuilder subObj(bob->subobjStart(name));
-        BSONArrayBuilder bb(bob->subarrayStart("appNames"));
-        for (const auto& appName : *snapshot) {
-            bb << appName;
-        }
-    } else {
-        *bob << name << BSONNULL;
-    }
+    admission::appendAppNameExemptionList(
+        ingressRequestRateLimiterAppExemptions.makeSnapshot(), bob, name);
 }
 
 Status IngressRequestRateLimiterAppExemptions::set(const BSONElement& value,
                                                    const boost::optional<TenantId>&) {
-    ingressRequestRateLimiterAppExemptions.update(parseApplicationExemptionList(value.Obj()));
+    ingressRequestRateLimiterAppExemptions.update(
+        admission::parseAppNameExemptionList(value.Obj()));
     return Status::OK();
 }
 
 Status IngressRequestRateLimiterAppExemptions::setFromString(StringData str,
                                                              const boost::optional<TenantId>&) {
-    ingressRequestRateLimiterAppExemptions.update(parseApplicationExemptionList(fromjson(str)));
+    ingressRequestRateLimiterAppExemptions.update(
+        admission::parseAppNameExemptionList(fromjson(str)));
     return Status::OK();
 }
 

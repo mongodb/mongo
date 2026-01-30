@@ -164,6 +164,7 @@ The following server parameters control the ticketing system:
 - `executionControlHeuristicDeprioritization`: Enables automatic deprioritization of long-running operations. Requires `executionControlDeprioritizationGate` to be `true`.
 - `executionControlHeuristicNumAdmissionsDeprioritizeThreshold`: Number of admissions an operation must perform before being deprioritized.
 - `executionControlBackgroundTasksDeprioritization`: Controls deprioritization for background task operations (index builds, TTL deletions, range deletions). When `true` (default), background tasks always run at low priority. When `false`, background tasks run at normal priority and are immune to heuristic deprioritization.
+- `executionControlApplicationDeprioritizationExemptions`: A document containing a list of application names exempted from deprioritization. Operations from clients whose application name or driver name starts with any of the exempted names will not be deprioritized. Format: `{appNames: ["App1", "App2"]}`.
 
 #### Throughput Probing Configuration
 

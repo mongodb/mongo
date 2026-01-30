@@ -83,6 +83,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/util:secure_compare_memory",
     ],
 )
 

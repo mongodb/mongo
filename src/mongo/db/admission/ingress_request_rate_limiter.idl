@@ -36,15 +36,6 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
-structs:
-    ApplicationExemptionListParameters:
-        description: "A parameter value containing a list of exempted application names"
-        strict: true
-        fields:
-            appNames:
-                description: "An array of exempted application names"
-                type: array<string>
-
 server_parameters:
     ingressRequestRateLimiterEnabled:
         description: Controls whether ingress request rate limiter mechanism is enabled.

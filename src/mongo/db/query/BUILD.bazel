@@ -300,6 +300,7 @@ mongo_cc_library(
     deps = [
         ":on_parameter_change_updaters",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
     ],
 )

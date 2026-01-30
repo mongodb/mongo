@@ -120,6 +120,7 @@ mongo_cc_benchmark(
     deps = [
         ":lock_manager",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:app_name_exemption_matcher",
     ],
 )
 

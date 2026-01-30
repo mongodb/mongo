@@ -48,6 +48,7 @@ mongo_cc_library(
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/admission:app_name_exemption_matcher",
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:ticketholder",

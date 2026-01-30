@@ -113,6 +113,13 @@ export function getTotalDeprioritizationCount(node) {
     return node.adminCommand({serverStatus: 1}).queues.execution.totalDeprioritizations;
 }
 
+export function getNormalPriorityFinishedCount(node) {
+    const stats = getExecutionControlStats(node);
+    return (
+        (stats.read?.normalPriority?.finishedProcessing || 0) + (stats.write?.normalPriority?.finishedProcessing || 0)
+    );
+}
+
 /**
  * Sets execution control ticket limits for normal and low priority pools.
  */
@@ -175,4 +182,20 @@ export function insertTestDocuments(coll, documentCount, options = {}) {
     }
 
     return assert.commandWorked(bulk.execute());
+}
+
+export function setExecutionControlDeprioritizationExemptions(node, appNames) {
+    assert.commandWorked(
+        node.adminCommand({
+            setParameter: 1,
+            executionControlApplicationDeprioritizationExemptions: {appNames: appNames},
+        }),
+    );
+}
+
+export function getExecutionControlDeprioritizationExemptions(node) {
+    const result = assert.commandWorked(
+        node.adminCommand({getParameter: 1, executionControlApplicationDeprioritizationExemptions: 1}),
+    );
+    return result.executionControlApplicationDeprioritizationExemptions;
 }
