@@ -63,6 +63,8 @@ std::unique_ptr<write_op_helpers::BatchCommandSizeEstimatorBase> getSizeEstimato
 template <bool Ordered>
 class SimpleBatchBuilderBase {
 public:
+    using DbVersionMap = absl::flat_hash_map<DatabaseName, boost::optional<DatabaseVersion>>;
+
     SimpleBatchBuilderBase(OperationContext* opCtx,
                            WriteOpBatcher& batcher,
                            const WriteCommandRef& cmdRef)
@@ -139,14 +141,16 @@ public:
      * sizeEstimator, this is done when the op is actually added into the batch in 'addOp'.
      */
     bool wouldFitInBatch(WriteOpId opIdx, Analysis analysis) {
-        for (const auto& shard : analysis.shardsAffected) {
-            auto it = _batch->requestByShardId.find(shard.shardName);
+        for (const auto& endpoint : analysis.shardsAffected) {
+            const auto& shardName = endpoint.shardName;
+
+            auto it = _batch->requestByShardId.find(shardName);
             if (it == _batch->requestByShardId.end()) {
                 // If this is the first item in the batch, it can't be too big.
                 continue;
             }
 
-            int estSizeBytesForWrite = _sizeEstimator->getOpSizeEstimate(opIdx, shard.shardName);
+            int estSizeBytesForWrite = _sizeEstimator->getOpSizeEstimate(opIdx, shardName);
             tassert(10414701, "Expected a non-zero write operation size", estSizeBytesForWrite > 0);
 
             if (it->second.ops.size() >= write_ops::kMaxWriteBatchSize ||
@@ -179,24 +183,44 @@ public:
                 "Expected op's type to be compatible with batch",
                 opIsRetryableWriteWithId == _batch->isRetryableWriteWithId);
 
-        for (const auto& shard : analysis.shardsAffected) {
+        for (const auto& endpoint : analysis.shardsAffected) {
             auto nss = writeOp.getNss();
+            const auto& shardName = endpoint.shardName;
             int estSizeBytesForWrite =
-                _sizeEstimator->getOpSizeEstimate(getWriteOpId(writeOp), shard.shardName);
+                _sizeEstimator->getOpSizeEstimate(getWriteOpId(writeOp), shardName);
 
-            auto it = _batch->requestByShardId.find(shard.shardName);
-            if (it != _batch->requestByShardId.end()) {
-                SimpleWriteBatch::ShardRequest& request = it->second;
+            const bool isTracked =
+                endpoint.shardVersion && *endpoint.shardVersion != ShardVersion::UNTRACKED();
+
+            // Assert the shardVersion is compatible with the batch's shardVersion for 'nss'.
+            auto requestIt = _batch->requestByShardId.find(shardName);
+            if (requestIt != _batch->requestByShardId.end()) {
+                const auto& versionByNss = requestIt->second.versionByNss;
+                if (auto versionIt = versionByNss.find(nss); versionIt != versionByNss.end()) {
+                    tassert(10387001,
+                            "Shard version for the same namespace must be the same",
+                            versionIt->second == endpoint);
+                }
+            }
+
+            if (!isTracked) {
+                auto& dvMap = _dvMaps[shardName];
+                if (auto dvIt = dvMap.find(nss.dbName()); dvIt != dvMap.end()) {
+                    // Assert the dbVersion is compatible with what is recorded in 'dvMap'.
+                    tassert(11841902,
+                            "Database version for the same database must be the same",
+                            dvIt->second == endpoint.databaseVersion);
+                } else {
+                    // Record the dbVersion in 'dvMap'.
+                    dvMap.emplace(nss.dbName(), endpoint.databaseVersion);
+                }
+            }
+
+            if (requestIt != _batch->requestByShardId.end()) {
+                SimpleWriteBatch::ShardRequest& request = requestIt->second;
                 request.ops.push_back(writeOp);
 
-                auto versionFound = request.versionByNss.find(nss);
-                if (versionFound != request.versionByNss.end()) {
-                    tassert(10387001,
-                            "Shard version for the same namespace need to be the same",
-                            versionFound->second == shard);
-                }
-
-                request.versionByNss.emplace_hint(versionFound, nss, shard);
+                request.versionByNss.emplace(nss, endpoint);
 
                 if (analysis.isViewfulTimeseries) {
                     request.nssIsViewfulTimeseries.emplace(nss);
@@ -209,9 +233,9 @@ public:
                     nssIsViewfulTimeseries.emplace(nss);
                 }
                 _batch->requestByShardId.emplace(
-                    shard.shardName,
+                    shardName,
                     SimpleWriteBatch::ShardRequest{
-                        std::map<NamespaceString, ShardEndpoint>{{nss, shard}},
+                        absl::flat_hash_map<NamespaceString, ShardEndpoint>{{nss, endpoint}},
                         std::move(nssIsViewfulTimeseries),
                         std::vector<WriteOp>{writeOp},
                         std::map<WriteOpId, UUID>{},
@@ -219,8 +243,8 @@ public:
             }
 
             const auto& targetedSampleId = analysis.targetedSampleId;
-            if (targetedSampleId && targetedSampleId->isFor(shard.shardName)) {
-                auto& request = _batch->requestByShardId[shard.shardName];
+            if (targetedSampleId && targetedSampleId->isFor(shardName)) {
+                auto& request = _batch->requestByShardId[shardName];
                 request.sampleIds.emplace(getWriteOpId(writeOp), targetedSampleId->getId());
             }
         }
@@ -275,14 +299,18 @@ protected:
             return false;
         }
 
-        for (const auto& shard : analysis.shardsAffected) {
-            auto it = _batch->requestByShardId.find(shard.shardName);
-            if (it != _batch->requestByShardId.end()) {
-                auto versionFound = it->second.versionByNss.find(nss);
-                // If the namespace is already in the batch, the shard version must be the same.
-                // If it's not, we need a new batch.
-                if (versionFound != it->second.versionByNss.end() &&
-                    versionFound->second != shard) {
+        for (const auto& endpoint : analysis.shardsAffected) {
+            const bool isTracked =
+                endpoint.shardVersion && *endpoint.shardVersion != ShardVersion::UNTRACKED();
+            const auto& shardName = endpoint.shardName;
+            auto requestIt = _batch->requestByShardId.find(shardName);
+            auto dvMapIt = _dvMaps.find(shardName);
+
+            // If there are conflicting ShardVersions for 'nss', return true.
+            if (requestIt != _batch->requestByShardId.end()) {
+                const auto& versionByNss = requestIt->second.versionByNss;
+                auto versionIt = versionByNss.find(nss);
+                if (versionIt != versionByNss.end() && versionIt->second != endpoint) {
                     LOGV2_DEBUG(10387002,
                                 4,
                                 "Cannot add op to batch because namespace was already targeted "
@@ -292,6 +320,22 @@ protected:
                     return true;
                 }
             }
+
+            // If there are conflicting DatabaseVersions for 'nss.dbName()', return true.
+            if (!isTracked && dvMapIt != _dvMaps.end()) {
+                const auto& dvMap = dvMapIt->second;
+                if (auto dvIt = dvMap.find(nss.dbName()); dvIt != dvMap.end()) {
+                    if (dvIt->second != endpoint.databaseVersion) {
+                        LOGV2_DEBUG(11841903,
+                                    4,
+                                    "Cannot add op to batch because database was already targeted "
+                                    "with a different database version",
+                                    "dbName"_attr = nss.dbName());
+
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;
@@ -299,6 +343,7 @@ protected:
 
     WriteOpBatcher& _batcher;
     boost::optional<SimpleWriteBatch> _batch;
+    absl::flat_hash_map<ShardId, DbVersionMap> _dvMaps;
     std::unique_ptr<write_op_helpers::BatchCommandSizeEstimatorBase> _sizeEstimator;
 };
 

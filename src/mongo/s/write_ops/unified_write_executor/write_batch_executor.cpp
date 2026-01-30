@@ -341,7 +341,7 @@ WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
 BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
-    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -482,7 +482,7 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
 BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
-    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> errorsOnly,
@@ -629,7 +629,7 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequestObj(
 write_ops::FindAndModifyCommandRequest WriteBatchExecutor::buildFindAndModifyRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
-    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -730,7 +730,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequestObj(
 CommandRequestVariant WriteBatchExecutor::buildRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
-    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> errorsOnly,

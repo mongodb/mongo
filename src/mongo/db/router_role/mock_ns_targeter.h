@@ -157,7 +157,7 @@ public:
 
     bool isTargetedCollectionSharded() const override {
         // No-op
-        return false;
+        return true;
     }
 
     bool isTrackedTimeSeriesBucketsNamespace() const override {

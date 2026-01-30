@@ -76,6 +76,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
 
     const CollectionRoutingInfo& cri = routingCtx.getCollectionRoutingInfo(nss);
+    const bool isSharded = cri.isSharded();
     const bool isTimeseriesCollection =
         cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
     invariant(!cri.hasRoutingTable() || cri.getChunkManager().getNss() == nss);
@@ -139,43 +140,51 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         return tr.endpoints.size() > 1 ? AnalysisType::kMultiShard : AnalysisType::kSingleShard;
     }();
 
-    if (type == AnalysisType::kRetryableWriteWithId) {
-        // For kRetryableWriteWithId batches, we need to target all shards.
-        //
-        // TODO SERVER-101167: For kRetryableWriteWithId batches, we should only target the shards
-        // that are needed (instead of targeting all shards).
-        tr.endpoints = targetAllShards(opCtx, cri);
-    }
+    if (isSharded && !inTxn) {
+        if (type == AnalysisType::kRetryableWriteWithId) {
+            // For kRetryableWriteWithId batches, we need to target all shards.
+            //
+            // TODO SERVER-101167: For kRetryableWriteWithId batches, we should only target the
+            // shards that are needed (instead of targeting all shards).
+            tr.endpoints = targetAllShards(opCtx, cri);
+        }
 
-    if (type == AnalysisType::kMultiShard && !inTxn && !isTargetDataOwningShardsOnlyMultiWrite) {
-        // For kMultiShard batches, if 'isTargetDataOwningShardsOnlyMultiWrite' is false and we're
-        // not running in a transaction, then we need to target all shards -AND- we need to set
-        // 'shardVersion' to IGNORED on all endpoints.
-        //
-        // (When 'isTargetDataOwningShardsOnlyMultiWrite' is true, StaleConfig errors with partially
-        // applied writes will cause the write command to fail with a non-retryable QueryPlanKilled
-        // error, and the user may choose to manually re-run the command if desired.)
-        //
-        // Currently there are two cases where this block of code is reached:
-        //   1) multi:true updates/upserts/deletes outside of transaction (where
-        //      'isTimeseriesRetryableUpdateOp' and 'enableMultiWriteBlockingMigrations' and
-        //      'isTargetDataOwningShardsOnlyMultiWrite' are all false)
-        //   2) non-retryable or sessionless multi:false non-upsert updates/deletes
-        //      that have an _id equality outside of a transaction (where
-        //      'isTimeseriesRetryableUpdateOp' is false)
-        //
-        // TODO SPM-1153: Implement a new approach for multi:true updates/upserts/deletes that
-        // does not need set 'shardVersion' to IGNORED and that can target only the relevant
-        // shards when 'type' is kMultiShard (instead of targeting all shards).
-        //
-        // TODO SPM-3673: For non-retryable/sessionless multi:false non-upsert updates/deletes
-        // that have an _id equality, implement a different approach that doesn't need to set
-        // 'shardVersion' to IGNORED and that can target only the relevant shards when
-        // 'type' is kMultiShard (instead of targeting all shards).
-        tr.endpoints = targetAllShards(opCtx, cri);
+        if (type == AnalysisType::kMultiShard && !isTargetDataOwningShardsOnlyMultiWrite) {
+            // For kMultiShard batches, if 'isTargetDataOwningShardsOnlyMultiWrite' is false and
+            // we're not running in a transaction, then we need to target all shards -AND- we need
+            // to set 'shardVersion' to IGNORED on all endpoints.
+            //
+            // (When 'isTargetDataOwningShardsOnlyMultiWrite' is true, StaleConfig errors with
+            // partially applied writes will cause the write command to fail with a non-retryable
+            // QueryPlanKilled error, and the user may choose to manually re-run the command if
+            // desired.)
+            //
+            // Currently there are two cases where this block of code is reached:
+            //   1) multi:true updates/upserts/deletes outside of transaction (where
+            //      'isTimeseriesRetryableUpdateOp' and 'enableMultiWriteBlockingMigrations' and
+            //      'isTargetDataOwningShardsOnlyMultiWrite' are all false)
+            //   2) non-retryable or sessionless multi:false non-upsert updates/deletes
+            //      that have an _id equality outside of a transaction (where
+            //      'isTimeseriesRetryableUpdateOp' is false)
+            //
+            // TODO SPM-1153: Implement a new approach for multi:true updates/upserts/deletes that
+            // does not need set 'shardVersion' to IGNORED and that can target only the relevant
+            // shards when 'type' is kMultiShard (instead of targeting all shards).
+            //
+            // TODO SPM-3673: For non-retryable/sessionless multi:false non-upsert updates/deletes
+            // that have an _id equality, implement a different approach that doesn't need to set
+            // 'shardVersion' to IGNORED and that can target only the relevant shards when
+            // 'type' is kMultiShard (instead of targeting all shards).
+            tr.endpoints = targetAllShards(opCtx, cri);
 
-        for (auto& endpoint : tr.endpoints) {
-            endpoint.shardVersion->setPlacementVersionIgnored();
+            for (auto& endpoint : tr.endpoints) {
+                auto& shardVersion = endpoint.shardVersion;
+                tassert(11841901,
+                        "Expected collection be sharded",
+                        shardVersion && *shardVersion != ShardVersion::UNTRACKED());
+
+                shardVersion->setPlacementVersionIgnored();
+            }
         }
     }
 

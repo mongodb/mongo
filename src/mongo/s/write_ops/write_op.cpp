@@ -150,7 +150,9 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
     const bool isInsert = opType == BatchedCommandRequest::BatchType_Insert;
     const bool isUpdate = opType == BatchedCommandRequest::BatchType_Update;
     const bool isDelete = opType == BatchedCommandRequest::BatchType_Delete;
+    const bool isMultiWrite = _itemRef.getMulti();
     const bool inTransaction = bool(TransactionRouter::get(opCtx));
+    const bool isSharded = targeter.isTargetedCollectionSharded();
 
     std::vector<ShardEndpoint> endpoints;
     bool useTwoPhaseWriteProtocol = false;
@@ -170,8 +172,6 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
     }
 
     const bool multipleEndpoints = endpoints.size() > 1u;
-
-    const bool isMultiWrite = _itemRef.getMulti();
 
     // Check if an update or delete requires using a non ordinary writeType. An updateOne
     // or deleteOne necessitates using the two phase write in the case where the query does
@@ -204,7 +204,7 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
     // op is not multi:true or the "onlyTargetDataOwningShardsForMultiWrites" cluster param is
     // not enabled, then we must target all endpoints (since partial results cannot be retried)
     // and for Ordinary writes we must also set 'shardVersion' to IGNORED on all endpoints.
-    if ((isUpdate || isDelete) && multipleEndpoints && !inTransaction &&
+    if (isSharded && (isUpdate || isDelete) && multipleEndpoints && !inTransaction &&
         (writeType == WriteType::Ordinary || writeType == WriteType::WithoutShardKeyWithId)) {
         // We only need to target all shards (and set 'shardVersion' to IGNORED on all endpoints
         // for Ordinary writes when 'onlyTargetDataOwningShardsForMultiWrites' is false or when
@@ -258,7 +258,12 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
             endpoints = targeter.targetAllShards(opCtx);
 
             for (auto& endpoint : endpoints) {
-                endpoint.shardVersion->setPlacementVersionIgnored();
+                auto& shardVersion = endpoint.shardVersion;
+                tassert(11841904,
+                        "Expected collection be sharded",
+                        shardVersion && *shardVersion != ShardVersion::UNTRACKED());
+
+                shardVersion->setPlacementVersionIgnored();
             }
         }
     }

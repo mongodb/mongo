@@ -328,7 +328,7 @@ private:
     BatchedCommandRequest buildBatchWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
-        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -347,7 +347,7 @@ private:
     BulkWriteCommandRequest buildBulkWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
-        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> errorsOnly,
@@ -363,7 +363,7 @@ private:
     write_ops::FindAndModifyCommandRequest buildFindAndModifyRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
-        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
@@ -378,7 +378,7 @@ private:
     CommandRequestVariant buildRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
-        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const absl::flat_hash_map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> errorsOnly,

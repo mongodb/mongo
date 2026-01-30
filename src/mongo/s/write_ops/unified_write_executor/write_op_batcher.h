@@ -55,7 +55,7 @@ struct SimpleWriteBatch {
     // Given that a write command can target multiple collections, we store one shard version per
     // namespace to support batching ops which target different namespaces on the same shard.
     struct ShardRequest {
-        std::map<NamespaceString, ShardEndpoint> versionByNss;
+        absl::flat_hash_map<NamespaceString, ShardEndpoint> versionByNss;
         std::set<NamespaceString> nssIsViewfulTimeseries;
         std::vector<WriteOp> ops;
         std::map<WriteOpId, UUID> sampleIds;

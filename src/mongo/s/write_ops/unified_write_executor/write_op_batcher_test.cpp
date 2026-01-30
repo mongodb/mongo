@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
@@ -81,6 +82,12 @@ public:
     const ShardEndpoint nss0Shard1 = ShardEndpoint(shardId1, shardVersionNss0Shard1, boost::none);
     const ShardEndpoint nss1Shard0 = ShardEndpoint(shardId0, shardVersionNss1Shard0, boost::none);
     const ShardEndpoint nss1Shard1 = ShardEndpoint(shardId1, shardVersionNss1Shard1, boost::none);
+    const DatabaseVersion dbVersion1 = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const DatabaseVersion dbVersion2 = DatabaseVersion(UUID::gen(), Timestamp(2, 1));
+    const ShardEndpoint unshardedEndpointVer1 =
+        ShardEndpoint(shardId0, ShardVersion::UNTRACKED(), dbVersion1);
+    const ShardEndpoint unshardedEndpointVer2 =
+        ShardEndpoint(shardId0, ShardVersion::UNTRACKED(), dbVersion2);
     const bool nss0IsViewfulTimeseries = false;
     const bool nss1IsViewfulTimeseries = true;
     const std::set<NamespaceString> nssIsViewfulTimeseries{nss1};
@@ -1792,6 +1799,70 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherAttachesSampleI
 
     auto result4 = batcher.getNextBatch(getOperationContext(), *routingCtx);
     ASSERT_TRUE(result4.batch.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, TwoUnshardedCollectionsSameDbVersion) {
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(1, BSON("_id" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+
+    WriteOpProducer producer(request);
+
+    WriteOpAnalyzerMock analyzer(
+        {{0, Analysis{kSingleShard, {unshardedEndpointVer1}, /*isViewfulTimeseries*/ false}},
+         {1, Analysis{kSingleShard, {unshardedEndpointVer1}, /*isViewfulTimeseries*/ false}}});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // Output batches: [0, 1]
+    auto shardRequest = SimpleWriteBatch::ShardRequest{
+        {{nss0, unshardedEndpointVer1}, {nss1, unshardedEndpointVer1}},
+        /*nssIsViewfulTimeseries*/ {},
+        {WriteOp(request, 0), WriteOp(request, 1)}};
+
+    SimpleWriteBatch expectedBatch{{{shardId0, shardRequest}}};
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result1.batch, expectedBatch);
+
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result2.batch.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, TwoUnshardedCollectionsDifferentDbVersions) {
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("_id" << 1)), BulkWriteInsertOp(1, BSON("_id" << 1))},
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+
+    WriteOpProducer producer(request);
+
+    WriteOpAnalyzerMock analyzer(
+        {{0, Analysis{kSingleShard, {unshardedEndpointVer1}, /*isViewfulTimeseries*/ false}},
+         {1, Analysis{kSingleShard, {unshardedEndpointVer2}, /*isViewfulTimeseries*/ false}}});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // Output batches: [0], [1]
+    auto shardRequest = SimpleWriteBatch::ShardRequest{
+        {{nss0, unshardedEndpointVer1}}, /*nssIsViewfulTimeseries*/ {}, {WriteOp(request, 0)}};
+
+    SimpleWriteBatch expectedBatch{{{shardId0, shardRequest}}};
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result1.batch, expectedBatch);
+
+    shardRequest = SimpleWriteBatch::ShardRequest{
+        {{nss1, unshardedEndpointVer2}}, /*nssIsViewfulTimeseries*/ {}, {WriteOp(request, 1)}};
+
+    SimpleWriteBatch expectedBatch2{{{shardId0, shardRequest}}};
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result2.batch, expectedBatch2);
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
 }
 
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
