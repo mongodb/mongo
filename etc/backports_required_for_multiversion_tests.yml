@@ -127,6 +127,8 @@ last-continuous:
       ticket: SERVER-116528
     - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
       ticket: SERVER-117623
+    - test_file: jstests/sharding/index_not_cloned_on_non_owner_shards.js
+      ticket: SERVER-102165
   suites: null
 last-lts:
   all:
@@ -754,4 +756,6 @@ last-lts:
       ticket: SERVER-116089
     - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
       ticket: SERVER-116528
+    - test_file: jstests/sharding/index_not_cloned_on_non_owner_shards.js
+      ticket: SERVER-102165
   suites: null

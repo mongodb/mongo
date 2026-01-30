@@ -7,12 +7,11 @@
  * but verifies that custom (non-shard-key) indexes are not built, saving resources.
  *
  * @tags: [
- *   requires_fcv_80,
+ *   requires_fcv_83,
  *   featureFlagReshardingImprovements,
  *   featureFlagMoveCollection,
  *   featureFlagUnshardCollection,
  *   assumes_balancer_off,
- *   featureFlagReshardingSkipBuildingIndexesIfApplicable,
  * ]
  */
 
@@ -22,11 +21,6 @@ import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 const st = new ShardingTest({
     mongos: 1,
     shards: 3,
-    other: {
-        setParameter: {
-            featureFlagReshardingSkipCloningAndApplyingIfApplicable: true,
-        },
-    },
 });
 
 const dbName = "testDB";

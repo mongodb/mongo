@@ -95,7 +95,8 @@ feature_flags:
             the collection after resharding skip building indexes for the
             collection."
         cpp_varname: gFeatureFlagReshardingSkipBuildingIndexesIfApplicable
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         mod_visibility: public
