@@ -370,6 +370,7 @@ GraphLookupCounters graphLookupCounters;
 TextOrCounters textOrCounters;
 BucketAutoCounters bucketAutoCounters;
 GeoNearCounters geoNearCounters;
+HashJoinCounters hashJoinCounters;
 TimeseriesCounters timeseriesCounters;
 OrCounters orCounters;
 SortMergeCounters sortMergeCounters;

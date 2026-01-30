@@ -589,6 +589,13 @@ public:
 };
 extern GeoNearCounters geoNearCounters;
 
+/** Counters tracking HashJoin stats */
+class HashJoinCounters : public SpillingCounters {
+public:
+    HashJoinCounters() : SpillingCounters("hashJoin") {}
+};
+extern HashJoinCounters hashJoinCounters;
+
 class RecordIdDeduplicationCounters {
 public:
     RecordIdDeduplicationCounters(std::string stageName)
