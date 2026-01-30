@@ -401,7 +401,8 @@ TEST_F(PlanExplainerTest, ClassicPipelinePlanExplainDiagnostics) {
     ASSERT_STRING_CONTAINS(explainDiagnostics, "executionStats': {");
     ASSERT_STRING_CONTAINS(explainDiagnostics, "isEOF: 0");
     ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
-    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: 1");
+    ASSERT_STRING_CONTAINS(explainDiagnostics, "nReturned: ");
+    ASSERT_STRING_OMITS(explainDiagnostics, "nReturned: 0");
 }
 
 TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
