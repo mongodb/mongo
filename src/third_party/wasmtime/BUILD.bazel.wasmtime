@@ -1,0 +1,40 @@
+# This file is injected into the crate BUILD file - to reference build with @crates//:wasmtime_c
+load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+expand_template(
+    name = "gen_conf",
+    out = "include/wasmtime/conf.h",
+    substitutions = {
+        "#cmakedefine WASMTIME_FEATURE_PROFILING": "#define WASMTIME_FEATURE_PROFILING",
+        "#cmakedefine WASMTIME_FEATURE_WAT": "#define WASMTIME_FEATURE_WAT",
+        "#cmakedefine WASMTIME_FEATURE_CACHE": "#define WASMTIME_FEATURE_CACHE",
+        "#cmakedefine WASMTIME_FEATURE_PARALLEL_COMPILATION": "#define WASMTIME_FEATURE_PARALLEL_COMPILATION",
+        "#cmakedefine WASMTIME_FEATURE_WASI": "#define WASMTIME_FEATURE_WASI",
+        "#cmakedefine WASMTIME_FEATURE_LOGGING": "#define WASMTIME_FEATURE_LOGGING",
+        "#cmakedefine WASMTIME_FEATURE_DISABLE_LOGGING": "/* #undef WASMTIME_FEATURE_DISABLE_LOGGING */",
+        "#cmakedefine WASMTIME_FEATURE_COREDUMP": "#define WASMTIME_FEATURE_COREDUMP",
+        "#cmakedefine WASMTIME_FEATURE_ADDR2LINE": "#define WASMTIME_FEATURE_ADDR2LINE",
+        "#cmakedefine WASMTIME_FEATURE_DEMANGLE": "#define WASMTIME_FEATURE_DEMANGLE",
+        "#cmakedefine WASMTIME_FEATURE_THREADS": "#define WASMTIME_FEATURE_THREADS",
+        "#cmakedefine WASMTIME_FEATURE_GC": "#define WASMTIME_FEATURE_GC",
+        "#cmakedefine WASMTIME_FEATURE_GC_DRC": "#define WASMTIME_FEATURE_GC_DRC",
+        "#cmakedefine WASMTIME_FEATURE_GC_NULL": "#define WASMTIME_FEATURE_GC_NULL",
+        "#cmakedefine WASMTIME_FEATURE_ASYNC": "#define WASMTIME_FEATURE_ASYNC",
+        "#cmakedefine WASMTIME_FEATURE_CRANELIFT": "#define WASMTIME_FEATURE_CRANELIFT",
+        "#cmakedefine WASMTIME_FEATURE_WINCH": "#define WASMTIME_FEATURE_WINCH",
+        "#cmakedefine WASMTIME_FEATURE_DEBUG_BUILTINS": "#define WASMTIME_FEATURE_DEBUG_BUILTINS",
+        "#cmakedefine WASMTIME_FEATURE_POOLING_ALLOCATOR": "#define WASMTIME_FEATURE_POOLING_ALLOCATOR",
+        "#cmakedefine WASMTIME_FEATURE_COMPONENT_MODEL": "#define WASMTIME_FEATURE_COMPONENT_MODEL",
+        "#cmakedefine WASMTIME_FEATURE_PULLEY": "#define WASMTIME_FEATURE_PULLEY",
+        "#cmakedefine WASMTIME_FEATURE_ALL_ARCH": "/* #undef WASMTIME_FEATURE_ALL_ARCH */",
+    },
+    template = "include/wasmtime/conf.h.in",
+)
+
+cc_library(
+    name = "wasmtime_c",
+    hdrs = glob(["include/**"]) + [":gen_conf"],
+    strip_include_prefix = "include",
+    deps = [":wasmtime_c_api"],
+)

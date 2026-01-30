@@ -136,6 +136,9 @@ filters:
   - "valgrind":
     approvers:
       - 10gen/devprod-build
+  - "wasmtime":
+    approvers:
+      - 10gen/query-integration-features
   - "wiredtiger":
     approvers:
       - 10gen/storage-engines

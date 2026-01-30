@@ -587,6 +587,9 @@ common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
 common:public-release --stamp
 
+common --@rules_rust//rust/toolchain/channel=nightly
+common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true
+
 --config=fission
 common:fission --fission=yes
 common:fission --remote_download_regex=.*\.dwo$

@@ -82,10 +82,10 @@ http_file(
 )
 
 bazel_dep(name = "rules_cc", version = "0.2.10")
-bazel_dep(name = "platforms", version = "0.0.9")
+bazel_dep(name = "platforms", version = "0.0.11")
 single_version_override(
     module_name = "platforms",
-    version = "0.0.9",
+    version = "0.0.11",
 )
 
 # TODO move over from WORKSPACE
@@ -282,3 +282,63 @@ setup_mongo_windows_toolchains_extension = use_extension("//bazel/toolchains/cc/
 use_repo(setup_mongo_windows_toolchains_extension, "mongo_windows_toolchain")
 
 register_toolchains("@mongo_windows_toolchain//...")
+
+###################### RUST DEPS ######################
+bazel_dep(name = "rules_rust", version = "0.68.1")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["nightly/2025-12-11"],
+)
+
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.spec(
+    package = "wasmtime",
+    version = "40.0.2",
+)
+crate.spec(
+    features = [
+        "cranelift",
+        "component-model",
+        "async",
+        "wasi",
+    ],
+    package = "wasmtime-c-api-impl",
+    version = "40.0.2",
+)
+
+# We partially custom build wasmtime_c because otherwise it tries to use cmake
+# to create generate conf.h
+crate.annotation(
+    additive_build_file = "//src/third_party/wasmtime:BUILD.bazel.wasmtime",
+    crate = "wasmtime-c-api-impl",
+    extra_aliased_targets = {"wasmtime_c": "wasmtime_c"},
+    gen_build_script = "off",
+)
+crate.spec(
+    package = "zstd-sys",
+    version = "2.0.16+zstd.1.5.7",
+)
+
+# Bindgen uses libclang to parse code so it needs to know the path to libclang
+crate.annotation_select(
+    build_script_data = [
+        "@@mongo_toolchain_v5//:libclang",
+    ],
+    build_script_env = {
+        "LIBCLANG_PATH": "$(execpath @@mongo_toolchain_v5//:libclang)",
+        "BINDGEN_EXTRA_CLANG_ARGS": "-isystem$${pwd}/external/mongo_toolchain_v5/stow/llvm-v5/lib/clang/19/include",
+    },
+    crate = "zstd-sys",
+    repositories = ["crates"],
+    triples = [
+        "aarch64-unknown-linux-gnu",
+        "x86_64-unknown-linux-gnu",
+        "powerpc-unknown-linux-gnu",
+        "s390x-unknown-linux-gnu",
+    ],
+)
+crate.from_specs()
+use_repo(crate, "crates")
+#################### END RUST DEPS ####################

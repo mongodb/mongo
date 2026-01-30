@@ -322,8 +322,11 @@ def _impl(ctx):
             flag_set(
                 actions = all_compile_actions,
                 flag_groups = [flag_group(flags = [
-                    "-isystem{}".format(include)
+                    # -isystem and the include path need to be separate strings in the array
+                    # as things like rules_rust parse each flag individually
+                    final_include
                     for include in ctx.attr.includes
+                    for final_include in ["-isystem", include]
                 ])],
             ),
         ] if ctx.attr.includes != None and len(ctx.attr.includes) > 0 else [],
@@ -336,8 +339,11 @@ def _impl(ctx):
             flag_set(
                 actions = all_compile_actions + all_link_actions + lto_index_actions,
                 flag_groups = [flag_group(flags = [
-                    "-B{}".format(bin_dir)
+                    # -B and the bin dirs need to be separate strings in the array
+                    # as things like rules_rust parse each flag individually
+                    final_bin_dir
                     for bin_dir in ctx.attr.bin_dirs
+                    for final_bin_dir in ["-B", bin_dir]
                 ])],
             ),
         ] if ctx.attr.bin_dirs != None and len(ctx.attr.bin_dirs) > 0 else [],
@@ -468,7 +474,10 @@ def _impl(ctx):
                 flag_groups = [flag_group(flags = ["-fPIE"])],
             ),
             flag_set(
-                actions = all_link_actions + lto_index_actions,
+                actions = [
+                    ACTION_NAMES.cpp_link_executable,
+                    ACTION_NAMES.lto_index_for_executable,
+                ],
                 flag_groups = [flag_group(flags = ["-pie"])],
             ),
         ],
@@ -1158,6 +1167,11 @@ def _impl(ctx):
                         ],
                     ),
                 ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
+                    ),
+                ],
             ),
             flag_set(
                 actions = [
@@ -1194,6 +1208,11 @@ def _impl(ctx):
                             "-Wno-coverage-mismatch",
                             "-fprofile-dir=" + ctx.attr.pgo_profile_use[DefaultInfo].files.to_list()[0].dirname if ctx.attr.pgo_profile_use != None else "",
                         ],
+                    ),
+                ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
                     ),
                 ],
             ),
@@ -1456,8 +1475,22 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-fsanitize=address",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
                             "-fsanitize-blacklist=" + ctx.attr.asan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.asan_denylist != None else "",
                         ],
+                    ),
+                ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
                     ),
                 ],
             ),
@@ -1521,8 +1554,22 @@ def _impl(ctx):
                         flags = [
                             "-fsanitize=memory",
                             "-fsanitize-memory-track-origins",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
                             "-fsanitize-blacklist=" + ctx.attr.msan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.msan_denylist != None else "",
                         ],
+                    ),
+                ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
                     ),
                 ],
             ),
@@ -1549,8 +1596,22 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-fsanitize=thread",
+                        ],
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
                             "-fsanitize-blacklist=" + ctx.attr.tsan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.tsan_denylist != None else "",
                         ],
+                    ),
+                ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
                     ),
                 ],
             ),
@@ -1595,8 +1656,22 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-fsanitize=undefined",
-                            "-fsanitize-blacklist=" + ctx.attr.ubsan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.ubsan_denylist != None else "",
                         ] + ubsan_compile_flags,
+                    ),
+                ],
+            ),
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-fsanitize-blacklist=" + ctx.attr.ubsan_denylist[DefaultInfo].files.to_list()[0].path if ctx.attr.ubsan_denylist != None else "",
+                        ],
+                    ),
+                ],
+                with_features = [
+                    with_feature_set(
+                        features = ["rules_rust_unsupported_feature"],
                     ),
                 ],
             ),
@@ -1841,6 +1916,14 @@ def _impl(ctx):
         ],
     )
 
+    # This feature is disabled during rust crate execution
+    # This means that any feature that depends on this feature being
+    # enabled will be disabled during crate compilation/linking.
+    rules_rust_unsupported_feature = feature(
+        name = "rules_rust_unsupported_feature",
+        enabled = True,
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -1929,6 +2012,7 @@ def _impl(ctx):
         first_party_gcc_warnings_feature,
         trivial_auto_var_init_pattern_feature,
         glibcxx_assertions_feature,
+        rules_rust_unsupported_feature,
     ] + get_common_features(ctx) + [
         # These flags are at the bottom so they get applied after anything else.
         # These are things like the flags people apply directly on cc_library through copts/linkopts
