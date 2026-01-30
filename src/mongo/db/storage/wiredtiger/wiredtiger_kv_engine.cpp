@@ -1808,7 +1808,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                 return WiredTigerUtil::useTableLogging(
                     provider, nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
             }
-            fassert(8423353, ident.starts_with("internal-"));
+            fassert(8423353, ident::isInternalIdent(ident));
             return !_isReplSet && !_shouldRecoverFromOplogAsStandalone;
         }();
         WiredTigerRecordStore::Params params{

@@ -41,10 +41,12 @@ let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, primaryColl.getFul
 awaitIndexBuild();
 
 const indexIdent = getUriForIndex(primaryColl, "a_1");
-const sorterIdent = "internal-sorter-" + indexIdent;
-const sideWritesIdent = "internal-sideWrites-" + indexIdent;
-const skippedRecordsTrackerIdent = "internal-skippedRecordsTracker-" + indexIdent;
-const constraintViolationsIdent = "internal-constraintViolations-" + indexIdent;
+// Index idents take the form "index-<UUID>".
+const uniqueTag = indexIdent.substring(indexIdent.indexOf("-") + 1);
+const sorterIdent = "internal-sorter-" + uniqueTag;
+const sideWritesIdent = "internal-sideWrites-" + uniqueTag;
+const skippedRecordsTrackerIdent = "internal-skippedRecordsTracker-" + uniqueTag;
+const constraintViolationsIdent = "internal-constraintViolations-" + uniqueTag;
 
 checkLog.containsRelaxedJson(primary, 20384, {
     "indexBuildInfo": {
