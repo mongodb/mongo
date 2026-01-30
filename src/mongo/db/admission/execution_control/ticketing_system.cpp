@@ -414,13 +414,13 @@ bool TicketingSystem::_wasOperationDowngradedToLowPriority(
         return false;
     }
 
+    const auto priority = admCtx->getPriority();
+
     // Background tasks are always downgraded to low priority, if its deprioritization is enabled.
     // Otherwise, they are treated as normal priority bypassing the heuristic deprioritization.
-    if (admCtx->isBackgroundTask()) {
+    if (admCtx->isBackgroundTask() && priority != AdmissionContext::Priority::kExempt) {
         return _state.loadRelaxed().deprioritization.backgroundTasks;
     }
-
-    const auto priority = admCtx->getPriority();
 
     // Check for all conditions that prevent a downgrade:
     //      1. The heuristic must be enabled via its server parameter.
