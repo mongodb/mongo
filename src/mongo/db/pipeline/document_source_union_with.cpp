@@ -470,10 +470,9 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                     std::move(recoveredPipeline),
                     _userNss);
             } else {
-                pipeline_factory::MakePipelineOptions opts = pipeline_factory::kOptionsMinimal;
-                opts.desugar = true;
-                pipeCopy = pipeline_factory::makePipeline(
-                    recoveredPipeline, _sharedState->_pipeline->getContext(), opts);
+                pipeCopy = pipeline_factory::makePipeline(recoveredPipeline,
+                                                          _sharedState->_pipeline->getContext(),
+                                                          pipeline_factory::kDesugarOnly);
             }
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
@@ -671,12 +670,9 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
                     src->constraints().isAllowedInUnionPipeline());
         }
     };
-    pipeline_factory::MakePipelineOptions opts;
-    opts.attachCursorSource = false;
     // We will call optimize() when finalizing the pipeline in 'doGetNext()'.
-    opts.optimize = false;
+    auto opts = pipeline_factory::kDesugarOnly;
     opts.validator = validatorCallback;
-    opts.desugar = true;
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);

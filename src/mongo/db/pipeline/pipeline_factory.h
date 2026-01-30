@@ -58,6 +58,9 @@ struct MakePipelineOptions {
 static const MakePipelineOptions kOptionsMinimal{
     .optimize = false, .alreadyOptimized = false, .attachCursorSource = false, .desugar = false};
 
+static const MakePipelineOptions kDesugarOnly{
+    .optimize = false, .alreadyOptimized = false, .attachCursorSource = false, .desugar = true};
+
 /**
  * Factory functions for creating Pipeline objects from various input formats.
  *

@@ -1,6 +1,6 @@
 /**
- * Test that $graphLookup can run on a view containing a $unionWith stage with an extension stage
- * in its subpipeline.
+ * Test that $graphLookup can run on views containing extension stages, either directly in the
+ * view definition or within a $unionWith subpipeline.
  *
  * @tags: [featureFlagExtensionsAPI]
  */
@@ -33,8 +33,8 @@ const numUsers = users.length;
 const expectedUsersInView = numUsers - 1;
 coll.insertMany(users);
 
-function runGraphLookup(fromViewName, fromViewPipeline) {
-    assert.commandWorked(db.createView(fromViewName, collName, fromViewPipeline));
+function runGraphLookup(fromViewName, fromViewPipeline, source = collName) {
+    assert.commandWorked(db.createView(fromViewName, source, fromViewPipeline));
 
     // Sanity check to make sure the view returns what we expect.
     const view = db[fromViewName];
@@ -65,6 +65,25 @@ function runGraphLookup(fromViewName, fromViewPipeline) {
 
     assert.commandWorked(coll.getDB().runCommand({drop: fromViewName}));
 }
+
+describe("$graphLookup with extension stages in view definition", function () {
+    it("should run $graphLookup on a view with a desugar/source stage in definition", function () {
+        runGraphLookup(collName + "_read_n_docs_view", [{$readNDocuments: {numDocs: expectedUsersInView}}]);
+    });
+
+    it("should run $graphLookup on a view with a 'transform' stage in definition", function () {
+        runGraphLookup(collName + "_extension_limit_view", [{$sort: {_id: 1}}, {$extensionLimit: expectedUsersInView}]);
+    });
+
+    it("should run $graphLookup on a nested view with extension stage in inner view definition", function () {
+        const nestedViewName = collName + "_nested_extension_view";
+        assert.commandWorked(
+            db.createView(nestedViewName, collName, [{$readNDocuments: {numDocs: expectedUsersInView}}]),
+        );
+        runGraphLookup(collName + "_nested_view", [], nestedViewName);
+        assert.commandWorked(coll.getDB().runCommand({drop: nestedViewName}));
+    });
+});
 
 describe("$graphLookup with $unionWith and extension stages", function () {
     it("should run $graphLookup on a view with a desugar/source stage in subpipeline", function () {
@@ -109,5 +128,6 @@ describe("$graphLookup with $unionWith and extension stages", function () {
                 },
             },
         ]);
+        assert.commandWorked(coll.getDB().runCommand({drop: nestedViewName}));
     });
 });

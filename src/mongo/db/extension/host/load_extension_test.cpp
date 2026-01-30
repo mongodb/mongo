@@ -286,12 +286,8 @@ TEST_F(LoadExtensionsTest, LoadMatchTopNDesugarExtensionSucceeds) {
 
     // Full Parse expansion
     {
-        auto parsedPipeline = pipeline_factory::makePipeline(pipeline,
-                                                             expCtx,
-                                                             {.optimize = false,
-                                                              .alreadyOptimized = false,
-                                                              .attachCursorSource = false,
-                                                              .desugar = true});
+        auto parsedPipeline =
+            pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kDesugarOnly);
         ASSERT_EQ(parsedPipeline->size(), 4U);
 
         auto it = parsedPipeline->getSources().begin();

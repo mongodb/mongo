@@ -549,7 +549,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
     _fromExpCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
     std::unique_ptr<mongo::Pipeline> pipeline = mongo::pipeline_factory::makePipeline(
-        _fromPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal);
+        _fromPipeline, _fromExpCtx, pipeline_factory::kDesugarOnly);
     try {
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,
@@ -596,7 +596,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
 
         // We can now safely optimize and reattempt attaching the cursor source.
         pipeline = mongo::pipeline_factory::makePipeline(
-            _fromPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal);
+            _fromPipeline, _fromExpCtx, pipeline_factory::kDesugarOnly);
 
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,

@@ -486,8 +486,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone(
 void DocumentSourceGraphLookUp::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_fromExpCtx->getNamespaceString());
-    auto introspectionPipeline = pipeline_factory::makePipeline(
-        _fromPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal);
+    auto introspectionPipeline =
+        pipeline_factory::makePipeline(_fromPipeline, _fromExpCtx, pipeline_factory::kDesugarOnly);
     for (auto&& stage : introspectionPipeline->getSources()) {
         stage->addInvolvedCollections(collectionNames);
     }
