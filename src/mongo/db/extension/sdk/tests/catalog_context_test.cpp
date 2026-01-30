@@ -53,6 +53,7 @@ TEST(CatalogContextTest, CatalogContextWithValidFields) {
 
     expCtx->setUUID(expectedUUID);
     expCtx->setInRouter(true);
+    expCtx->setExplain(ExplainOptions::Verbosity::kExecAllPlans);
 
     const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
     const auto& extensionCatalogContext = catalogContext.getAsBoundaryType();
@@ -69,6 +70,8 @@ TEST(CatalogContextTest, CatalogContextWithValidFields) {
     ASSERT_EQUALS(expectedUUID, statusWithUUID.getValue());
 
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 1);
+    ASSERT_EQUALS(extensionCatalogContext.verbosity,
+                  ::MongoExtensionExplainVerbosity::kExecAllPlans);
 }
 
 TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
@@ -89,6 +92,7 @@ TEST(CatalogContextTest, CatalogContextWithEmptyFields) {
     ASSERT_EQUALS(extensionNamespaceString.collectionName.len, 0);
     ASSERT_EQUALS(extensionCatalogContext.uuidString.len, 0);
     ASSERT_EQUALS(extensionCatalogContext.inRouter, 0);
+    ASSERT_EQUALS(extensionCatalogContext.verbosity, ::MongoExtensionExplainVerbosity::kNotExplain);
 }
 }  // namespace
 }  // namespace mongo::extension

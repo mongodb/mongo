@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
+#include "mongo/db/extension/shared/explain_utils.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/util/database_name_util.h"
@@ -52,10 +53,12 @@ public:
           _collName(expCtx.getNamespaceString().coll()),
           _uuid(expCtx.getUUID().has_value() ? expCtx.getUUID()->toString() : ""),
           _inRouter(expCtx.getInRouter()),
+          _verbosity(expCtx.getExplain()),
           _api(::MongoExtensionNamespaceString(stringDataAsByteView(StringData(_dbName)),
                                                stringDataAsByteView(StringData(_collName))),
                stringDataAsByteView(StringData(_uuid)),
-               _inRouter) {}
+               _inRouter,
+               convertHostVerbosityToExtVerbosity(_verbosity)) {}
 
     ~CatalogContext() = default;
 
@@ -68,6 +71,7 @@ private:
     const std::string _collName;
     const std::string _uuid;
     const bool _inRouter;
+    const boost::optional<ExplainOptions::Verbosity> _verbosity;
     const ::MongoExtensionCatalogContext _api;
 };
 };  // namespace mongo::extension::host

@@ -297,18 +297,22 @@ typedef struct MongoExtensionHostQueryShapeOptsVTable {
  */
 typedef enum MongoExtensionExplainVerbosity : uint32_t {
     /**
+     * Command does not have explain enabled.
+     */
+    kNotExplain = 0,
+    /**
      * Display basic information about the pipeline that would run.
      */
-    kQueryPlanner = 0,
+    kQueryPlanner = 1,
     /**
      * In addition reporting basic information about the pipeline, runs the pipeline and reports
      * execution-related stats.
      */
-    kExecStats = 1,
+    kExecStats = 2,
     /**
      * Generates kExecStats output for all possible query plans.
      */
-    kExecAllPlans = 2,
+    kExecAllPlans = 3,
 } MongoExtensionExplainVerbosity;
 
 /**
@@ -634,6 +638,7 @@ typedef struct MongoExtensionCatalogContext {
     const ::MongoExtensionNamespaceString namespaceString;
     const MongoExtensionByteView uuidString;
     const uint8_t inRouter;
+    const MongoExtensionExplainVerbosity verbosity;
 } MongoExtensionCatalogContext;
 
 /**

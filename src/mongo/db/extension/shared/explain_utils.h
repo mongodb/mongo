@@ -35,8 +35,11 @@
 namespace mongo::extension {
 
 inline ::MongoExtensionExplainVerbosity convertHostVerbosityToExtVerbosity(
-    mongo::ExplainOptions::Verbosity hostVerbosity) {
-    switch (hostVerbosity) {
+    boost::optional<mongo::ExplainOptions::Verbosity> hostVerbosity) {
+    if (!hostVerbosity.has_value()) {
+        return ::MongoExtensionExplainVerbosity::kNotExplain;
+    }
+    switch (hostVerbosity.value()) {
         case mongo::ExplainOptions::Verbosity::kQueryPlanner:
             return ::MongoExtensionExplainVerbosity::kQueryPlanner;
         case mongo::ExplainOptions::Verbosity::kExecStats:
