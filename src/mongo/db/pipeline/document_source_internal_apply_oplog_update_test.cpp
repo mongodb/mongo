@@ -260,5 +260,43 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, RedactsCorrectly) {
         redact(*docSource));
 }
 
+TEST_F(DocumentSourceInternalApplyOplogUpdateTest, SerializesRepresentativeValueCorrectly) {
+    auto spec = fromjson(R"({
+        $_internalApplyOplogUpdate: {
+            oplogUpdate: {
+                $v: 1,
+                diff: { u: { b: 3 } }
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx());
+
+    // Serialize with representative query shape options.
+    std::vector<Value> serialization;
+    docSource->serializeToArray(serialization,
+                                SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalApplyOplogUpdate": {
+                "oplogUpdate": {}
+            }
+        })",
+        serialization[0].getDocument().toBson());
+
+    // Verify the representative value can be reparsed into a new stage.
+    auto serializedBSON = serialization[0].getDocument().toBson();
+    auto roundTripped = DocumentSourceInternalApplyOplogUpdate::createFromBson(
+        serializedBSON.firstElement(), getExpCtx());
+
+    std::vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
 }  // namespace
 }  // namespace mongo

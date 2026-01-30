@@ -73,8 +73,9 @@ DocumentSourceInternalApplyOplogUpdate::DocumentSourceInternalApplyOplogUpdate(
     : DocumentSource(kStageName, pExpCtx), _oplogUpdate(oplogUpdate) {}
 
 Value DocumentSourceInternalApplyOplogUpdate::serialize(const SerializationOptions& opts) const {
-    return Value(Document{
-        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteral(_oplogUpdate)}}}});
+    return Value(Document{{kStageName,
+                           Document{{kOplogUpdateFieldName,
+                                     opts.serializeLiteral(_oplogUpdate, Value(Document{}))}}}});
 }
 
 }  // namespace mongo
