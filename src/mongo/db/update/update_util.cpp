@@ -399,7 +399,6 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                    ? mutablebson::Document::kInPlaceEnabled
                    : mutablebson::Document::kInPlaceDisabled));
 
-
     FieldRefSet immutablePaths;
     if (isUserInitiatedWrite) {
         const auto& collDesc = collection.getShardingDescription();
@@ -491,8 +490,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
 
     args.retryableWrite = write_stage_common::isRetryableWrite(opCtx);
 
-    BSONObj newObj = doc.getObject();
-
+    BSONObj newObj;
     bool indexesAffected = false;
     if (inPlace) {
         if (!request->getIsExplain()) {
@@ -525,6 +523,8 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                     oldObj.snapshotId() ==
                         shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
             wunit.commit();
+        } else {
+            newObj = oldObjValue;
         }
     } else {
         // The updates were not in place. Apply them through the file manager.
