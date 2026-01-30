@@ -36,14 +36,20 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
+#include "mongo/transport/message_compressor_snappy.h"
+#include "mongo/transport/message_compressor_zlib.h"
+#include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 
 struct CompressionInfrastructure {
     CompressionInfrastructure() : manager(&registry) {
-        registry.setSupportedCompressors({"noop"});
+        registry.setSupportedCompressors({"noop", "snappy", "zlib", "zstd"});
         registry.registerImplementation(std::make_unique<NoopMessageCompressor>());
+        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        registry.registerImplementation(std::make_unique<ZlibMessageCompressor>());
+        registry.registerImplementation(std::make_unique<ZstdMessageCompressor>());
         uassertStatusOK(registry.finalizeSupportedCompressors());
     }
 
@@ -70,7 +76,6 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
         static CompressionInfrastructure compression = {};
         msg = uassertStatusOK(compression.manager.decompressMessage(msg));
     }
-
 
     switch (msg.operation()) {
         case dbMsg: {
