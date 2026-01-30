@@ -1431,6 +1431,7 @@ mongo_cc_library(
         "shardsvr_move_range_command.cpp",
         "shardsvr_notify_sharding_event_command.cpp",
         "shardsvr_participant_block_command.cpp",
+        "shardsvr_recreate_range_deletion_tasks_command.cpp",
         "shardsvr_refine_collection_shard_key_command.cpp",
         "shardsvr_rename_collection_command.cpp",
         "shardsvr_rename_collection_participant_command.cpp",

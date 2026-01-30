@@ -16,6 +16,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "releaseMemory",
     "replicateSearchIndexCommand",
     "getTrafficRecordingStatus",
+    "recreateRangeDeletionTasks",
     "startTrafficRecording",
     "stopTrafficRecording",
     "startShardDraining",

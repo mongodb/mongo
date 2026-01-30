@@ -189,6 +189,8 @@ let testCases = {
             "does not accept read or write concern (accepts writeConcern, but only explicitly and when _secondaryThrottle is true)"
     },
     _shardsvrNotifyShardingEvent: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasks: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "internal command"},
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
@@ -665,6 +667,7 @@ let testCases = {
     recipientForgetMigration: {skip: "does not accept read or write concern"},
     recipientSyncData: {skip: "does not accept read or write concern"},
     recipientVoteImportedFiles: {skip: "does not accept read or write concern"},
+    recreateRangeDeletionTasks: {skip: "accepts only majority"},
     refineCollectionShardKey: {skip: "does not accept read or write concern"},
     refreshLogicalSessionCacheNow: {skip: "does not accept read or write concern"},
     refreshSessions: {skip: "does not accept read or write concern"},

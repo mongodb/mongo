@@ -182,6 +182,8 @@ const wcCommandsTests = {
     _shardsvrMovePrimaryExitCriticalSection: {skip: "internal command"},
     _shardsvrMoveRange: {skip: "internal command"},
     _shardsvrNotifyShardingEvent: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasks: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "internal command"},
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
@@ -2075,6 +2077,7 @@ const wcCommandsTests = {
     profile: {skip: "does not accept write concern"},
     reIndex: {skip: "does not accept write concern"},
     reapLogicalSessionCacheNow: {skip: "does not accept write concern"},
+    recreateRangeDeletionTasks: {skip: "does not accept write concern"},
     refineCollectionShardKey: {
         noop: {
             // Refine to same shard key
@@ -3284,6 +3287,8 @@ const wcTimeseriesViewsCommandsTests = {
     _shardsvrMovePrimaryExitCriticalSection: {skip: "internal command"},
     _shardsvrMoveRange: {skip: "internal command"},
     _shardsvrNotifyShardingEvent: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasks: {skip: "internal command"},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "internal command"},
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
@@ -4139,6 +4144,7 @@ const wcTimeseriesViewsCommandsTests = {
     profile: {skip: "does not accept write concern"},
     reIndex: {skip: "does not accept write concern"},
     reapLogicalSessionCacheNow: {skip: "does not accept write concern"},
+    recreateRangeDeletionTasks: {skip: "does not accept write concern"},
     refineCollectionShardKey: {
 
         noop: {

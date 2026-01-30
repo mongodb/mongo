@@ -29,6 +29,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "recreate_range_deletion_tasks_gen",
+    src = "recreate_range_deletion_tasks.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "refine_collection_shard_key_gen",
     src = "refine_collection_shard_key.idl",
     deps = [
@@ -156,6 +165,7 @@ mongo_cc_library(
         "cluster_oplog_note_cmd.cpp",
         "cluster_query_settings_cmds.cpp",
         "cluster_query_without_shard_key_cmd.cpp",
+        "cluster_recreate_range_deletion_tasks_command.cpp",
         "cluster_refine_collection_shard_key_cmd.cpp",
         "cluster_rename_collection_cmd.cpp",
         "cluster_repair_sharded_collection_chunks_history_cmd.cpp",
@@ -181,6 +191,7 @@ mongo_cc_library(
         "s_read_write_concern_defaults_server_status.cpp",
         ":cluster_commands_gen",
         ":cluster_fsync_unlock_cmd_gen",
+        ":recreate_range_deletion_tasks_gen",
         ":refine_collection_shard_key_gen",
         ":shard_collection_gen",
         "//src/mongo/s/commands/commit_quorum:cluster_set_index_commit_quorum_cmd.cpp",

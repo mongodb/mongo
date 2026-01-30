@@ -26,5 +26,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "releaseMemory",
     "_configsvrStartShardDraining",
     "_configsvrShardDrainingStatus",
+    "_shardsvrRecreateRangeDeletionTasks",
+    "_shardsvrRecreateRangeDeletionTasksParticipant",
     "testCommandFeatureFlaggedOnLatestFCV82",
 ];

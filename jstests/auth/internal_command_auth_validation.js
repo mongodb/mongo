@@ -644,6 +644,18 @@ const internalCommandsMap = {
         command:
             {_shardsvrNotifyShardingEvent: "test", eventType: "collectionResharded", details: {}},
     },
+    _shardsvrRecreateRangeDeletionTasks: {
+        testname: "_shardsvrRecreateRangeDeletionTasks",
+        command: {_shardsvrRecreateRangeDeletionTasks: "collection", skipEmptyRanges: true},
+    },
+    _shardsvrRecreateRangeDeletionTasksParticipant: {
+        testname: "_shardsvrRecreateRangeDeletionTasksParticipant",
+        command: {
+            _shardsvrRecreateRangeDeletionTasksParticipant: "collection",
+            skipEmptyRanges: true,
+            uuid: UUID()
+        },
+    },
     _shardsvrRenameCollection: {
         testname: "_shardsvrRenameCollection",
         command: {_shardsvrRenameCollection: "test.collection", to: "db.collection_renamed"},
