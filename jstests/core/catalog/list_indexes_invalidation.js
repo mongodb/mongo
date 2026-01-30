@@ -1,10 +1,13 @@
 // Cannot implicitly shard accessed collections because renameCollection command not supported
 // on sharded collections.
 // @tags: [
-//   assumes_unsharded_collection,
 //   requires_non_retryable_commands,
 //   requires_fastcount,
-//   requires_getmore
+//   requires_getmore,
+//   # listIndexes command is not running all its getMore commands sequentially, causing
+//   # network_error_and_txn_override.js to fail since getMore may be executed as the first command
+//   # in a transaction.
+//   does_not_support_transactions,
 // ]
 
 let collName = "system_indexes_invalidations";
@@ -12,9 +15,27 @@ let collNameRenamed = "renamed_collection";
 let coll = db[collName];
 let collRenamed = db[collNameRenamed];
 
+// Detect if collections are implicitly sharded
+const isImplicitlyShardedCollection = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+
+function dropCollectionWithoutImplicitRecreate(coll) {
+    if (isImplicitlyShardedCollection) {
+        const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
+        try {
+            TestData.implicitlyShardOnCreateCollectionOnly = true;
+            assert(coll.drop());
+        } finally {
+            TestData.implicitlyShardOnCreateCollectionOnly = originalImplicitlyShardOnCreateCollectionOnly;
+        }
+    } else {
+        assert(coll.drop());
+    }
+}
+
 function testIndexInvalidation(isRename) {
+    dropCollectionWithoutImplicitRecreate(collRenamed);
+
     coll.drop();
-    collRenamed.drop();
     assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}]));
 
     // Get the first two indexes.
