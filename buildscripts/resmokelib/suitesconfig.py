@@ -5,6 +5,7 @@ import copy
 import itertools
 import os
 import pathlib
+import subprocess
 from threading import Lock
 from typing import Any, Optional
 
@@ -223,6 +224,16 @@ def _get_suite_config(suite_name_or_path):
 
 def generate():
     MatrixSuiteConfig.generate_all_matrix_suite_files()
+
+    print("\nRunning 'bazel run format' to format generated files...")
+    print("Note: This may take a while to complete.")
+    try:
+        subprocess.run(["bazel", "run", "format"], check=True)
+        print("Formatting completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: 'bazel run format' failed with exit code {e.returncode}")
+    except FileNotFoundError:
+        print("Warning: 'bazel' command not found. Skipping formatting.")
 
 
 class SuiteConfigInterface:
@@ -729,7 +740,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             "# AND REGENERATE THE MATRIX SUITES.",
             "#",
             f"# matrix suite mapping file: {mapping_path.as_posix()}",
-            "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format",
+            "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites",
             "##########################################################",
         ]
 

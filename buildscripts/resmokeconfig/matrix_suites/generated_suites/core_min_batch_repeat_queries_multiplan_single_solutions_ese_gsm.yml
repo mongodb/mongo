@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 description:
   This suite is a combination of core_ese_gcm, core_repeat_queries, core_multiplan_single_solutions,

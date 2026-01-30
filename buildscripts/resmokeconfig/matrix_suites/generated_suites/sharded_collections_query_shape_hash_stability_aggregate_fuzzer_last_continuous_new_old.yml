@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_query_shape_hash_stability_aggregate_fuzzer_last_continuous_new_old.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 description:
   This suite runs through all fuzzer generated tests and ensures that the
