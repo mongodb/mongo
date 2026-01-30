@@ -917,11 +917,6 @@ inline bool operator<(const EDCIndexedFields& left, const EDCIndexedFields& righ
     return left.fieldPathName < right.fieldPathName;
 }
 
-struct FLEDeleteToken {
-    ECOCToken ecocToken;
-    ServerDataEncryptionLevel1Token serverEncryptionToken;
-};
-
 /**
  * Manipulates the EDC collection.
  *
