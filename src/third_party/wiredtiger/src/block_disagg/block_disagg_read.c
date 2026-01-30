@@ -110,7 +110,7 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
     uint64_t time_start, time_stop;
     uint32_t retry, tmp_count;
     int32_t last, result;
-    uint8_t compatible_version, expected_magic;
+    uint8_t expected_magic;
     bool is_delta;
 
     time_start = __wt_clock(session);
@@ -201,14 +201,12 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
                       swap.magic, expected_magic);
                     goto corrupt;
                 }
-                /* TODO: workaround MacOS build failure when passing macro to a string format. */
-                compatible_version = WT_BLOCK_DISAGG_COMPATIBLE_VERSION;
-                if (swap.compatible_version > compatible_version) {
+                if (swap.compatible_version > WT_BLOCK_DISAGG_COMPATIBLE_VERSION) {
                     __block_disagg_read_err(session, block_disagg->name, size, page_id, lsn,
                       is_delta, result,
                       "compatible version error, version %" PRIu8
                       " is greater than compatible version of %" PRIu8,
-                      swap.compatible_version, compatible_version);
+                      swap.compatible_version, WT_BLOCK_DISAGG_COMPATIBLE_VERSION);
                     goto corrupt;
                 }
 

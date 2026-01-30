@@ -981,11 +981,11 @@ err:
 }
 
 /*
- * __wt_page_inmem_update --
+ * __page_inmem_update --
  *     Create the actual update.
  */
-int
-__wt_page_inmem_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack,
+static int
+__page_inmem_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack,
   WT_UPDATE **updp, size_t *sizep)
 {
     if (WT_TIME_WINDOW_HAS_PREPARE(&unpack->tw))
@@ -1003,7 +1003,7 @@ static int
 __page_inmem_update_col(WT_SESSION_IMPL *session, WT_REF *ref, WT_CURSOR_BTREE *cbt, uint64_t recno,
   WT_ITEM *value, WT_CELL_UNPACK_KV *unpack, WT_UPDATE **updp, size_t *sizep)
 {
-    WT_RET(__wt_page_inmem_update(session, value, unpack, updp, sizep));
+    WT_RET(__page_inmem_update(session, value, unpack, updp, sizep));
 
     /* Search the page and apply the modification. */
     WT_RET(__wt_col_search(cbt, recno, ref, true, NULL));
@@ -1099,7 +1099,7 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
             WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
               "Should never read an overflow removed value for a prepared update");
 
-            WT_ERR(__wt_page_inmem_update(session, value, &unpack, &upd, &size));
+            WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));
             total_size += size;
 
             /* Search the page and apply the modification. */

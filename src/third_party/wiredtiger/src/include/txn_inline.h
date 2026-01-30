@@ -913,7 +913,7 @@ __wt_txn_pinned_stable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinne
      */
     checkpoint_ts = __wt_tsan_suppress_load_uint64(&txn_global->checkpoint_timestamp);
 
-    if (checkpoint_ts != 0 && checkpoint_ts < pinned_stable_ts)
+    if (checkpoint_ts != WT_TS_NONE && checkpoint_ts < pinned_stable_ts)
         *pinned_stable_tsp = checkpoint_ts;
     else
         *pinned_stable_tsp = pinned_stable_ts;

@@ -83,14 +83,8 @@ struct __wt_evict {
     struct timespec evict_tune_last_time;        /* Time of last check */
     uint64_t evict_tune_progress_last;           /* Progress counter */
     uint64_t evict_tune_progress_rate_max;       /* Max progress rate */
-    bool evict_tune_stable;                      /* Are we stable? */
     uint32_t evict_tune_workers_best;            /* Best performing value */
     uint32_t evict_tune_num_points;              /* Number of values tried */
-
-    /*
-     * Pass interrupt counter.
-     */
-    wt_shared volatile uint32_t pass_intr; /* Interrupt eviction pass. */
 
     /*
      * LRU eviction list information.
@@ -110,7 +104,12 @@ struct __wt_evict {
                                             before it switches. */
     WTI_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
     WTI_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
-    uint32_t evict_slots;                 /* LRU list eviction slots */
+
+    /*
+     * Pass interrupt counter.
+     */
+    wt_shared volatile uint32_t pass_intr; /* Interrupt eviction pass. */
+    uint32_t evict_slots;                  /* LRU list eviction slots */
 
 #define WT_EVICT_PRESSURE_THRESHOLD 0.95
 #define WT_EVICT_SCORE_BUMP 10
@@ -148,6 +147,7 @@ struct __wt_evict {
 #define WT_EVICT_CACHE_HARD \
     (WT_EVICT_CACHE_CLEAN_HARD | WT_EVICT_CACHE_DIRTY_HARD | WT_EVICT_CACHE_UPDATES_HARD)
     uint32_t flags;
+    bool evict_tune_stable; /* Are we stable? */
     bool use_npos_in_pass; /* Cached value of conn->evict_use_npos for the run of eviction server */
 };
 

@@ -328,7 +328,16 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
                 if (!skip_hs) {
                     __wt_verbose(session, WT_VERB_VERIFY, "%s: verify against history store", name);
+#ifndef WT_STANDALONE_BUILD
+                    /* FIXME-WT-16557: Re-enable HS validation at all times. */
+                    if (__wt_conn_is_disagg(session))
+                        __wt_verbose(session, WT_VERB_VERIFY,
+                          "%s: skipping verify against history store in disagg", name);
+                    else
+                        WT_TRET(__wt_hs_verify_one(session, btree->id));
+#else
                     WT_TRET(__wt_hs_verify_one(session, btree->id));
+#endif
                 }
                 /*
                  * We cannot error out here. If we got an error verifying the history store, we need

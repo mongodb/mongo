@@ -39,6 +39,47 @@ __wt_prepared_discover_find_item(
 }
 
 /*
+ * __prepare_discover_alloc_upd --
+ *     Create the actual update for a pending prepared value.
+ */
+static int
+__prepare_discover_alloc_upd(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack,
+  WT_UPDATE **updp, size_t *sizep)
+{
+    WT_UPDATE *upd;
+
+    *sizep = 0;
+    upd = NULL;
+    if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&(unpack->tw))) {
+        /*
+         * Usually we would allocate a tombstone update when seeing a stop timestamp. However in
+         * this code flow, we're restoring the update into ingest table with no tombstone allowed,
+         * create a standard update with a special tombstone value instead of a tombstone. In the
+         * case where the update has both start and stop prepared, no need to restore the start
+         * prepared.
+         */
+        WT_RET(__wt_upd_alloc(session, &__wt_tombstone, WT_UPDATE_STANDARD, &upd, sizep));
+        upd->txnid = unpack->tw.stop_txn;
+        upd->prepared_id = unpack->tw.stop_prepared_id;
+        upd->prepare_ts = unpack->tw.stop_prepare_ts;
+        upd->upd_durable_ts = WT_TS_NONE;
+        upd->upd_start_ts = unpack->tw.stop_prepare_ts;
+        upd->prepare_state = WT_PREPARE_INPROGRESS;
+    } else {
+        WT_ASSERT(session, WT_TIME_WINDOW_HAS_START_PREPARE(&(unpack->tw)));
+        WT_RET(__wt_upd_alloc(session, value, WT_UPDATE_STANDARD, &upd, sizep));
+        upd->txnid = unpack->tw.start_txn;
+        upd->prepared_id = unpack->tw.start_prepared_id;
+        upd->prepare_ts = unpack->tw.start_prepare_ts;
+        upd->upd_durable_ts = WT_TS_NONE;
+        upd->upd_start_ts = unpack->tw.start_prepare_ts;
+        upd->prepare_state = WT_PREPARE_INPROGRESS;
+    }
+    *updp = upd;
+    return (0);
+}
+
+/*
  * __pending_prepare_items_init --
  *     Initialize pending prepared txn hash map.
  */
@@ -196,7 +237,7 @@ __wti_prepared_discover_restore_and_add_artifact_upd(WT_SESSION_IMPL *session,
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     size_t size;
-    WT_ERR(__wt_page_inmem_update(session, value, unpack, &upd, &size));
+    WT_ERR(__prepare_discover_alloc_upd(session, value, unpack, &upd, &size));
 
     /* Search the page and apply the modification. */
     WT_WITH_PAGE_INDEX(session, ret = __wt_row_search(cbt, key, true, NULL, false, NULL));

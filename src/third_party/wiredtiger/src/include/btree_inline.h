@@ -875,13 +875,21 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
     WT_ASSERT(session, !F_ISSET(session->dhandle, WT_DHANDLE_DEAD));
 
     WT_ASSERT_ALWAYS(session, !F_ISSET(page->modify, WT_PAGE_MODIFY_EXCLUSIVE),
       "Illegal attempt to modify a page that is being exclusively reconciled");
 
-    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+    if (F_ISSET(btree, WT_BTREE_READONLY))
         return;
+
+    WT_ASSERT(session,
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
+
     /*
      * This is a relatively complex dance of operations so pay attention prior to modifying the code
      * further. Firstly, the atomic increment on page state to mark the page as dirty is effectively
@@ -941,8 +949,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
          */
         (void)__wt_atomic_add_uint64_relaxed(
           &S2C(session)->cache->bytes_dirty_total, page_memory_footprint);
-        (void)__wt_atomic_add_uint64_relaxed(
-          &S2BT(session)->bytes_dirty_total, page_memory_footprint);
+        (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_dirty_total, page_memory_footprint);
         /*
          * The bytes dirty count for a page is decreased later when the page is marked clean, so
          * there's no need to decrease it within this function. As a result, it also doesn't need to
@@ -983,8 +990,17 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_tree_modify_set(WT_SESSION_IMPL *session)
 {
-    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+    WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
+
+    btree = S2BT(session);
+    conn = S2C(session);
+
+    if (F_ISSET(btree, WT_BTREE_READONLY))
         return;
+
+    WT_ASSERT(
+      session, !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || conn->layered_table_manager.leader);
 
     /*
      * Test before setting the dirty flag, it's a hot cache line.
@@ -994,7 +1010,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
      * the pages clean, it might result in an extra checkpoint that doesn't do any work but it
      * shouldn't cause problems; regardless, let's play it safe.)
      */
-    if (!S2BT(session)->modified) {
+    if (!btree->modified) {
         /* Assert we never dirty a checkpoint handle. */
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
@@ -1006,15 +1022,15 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
          */
         if (WT_SESSION_BTREE_SYNC(session) && !WT_IS_METADATA(session->dhandle) &&
           !WT_IS_DISAGG_META(session->dhandle) &&
-          !FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) {
+          !FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE)) {
             WT_ASSERT_ALWAYS(session, !F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE), "%s",
               "A btree is marked dirty during RTS");
             WT_ASSERT_ALWAYS(session,
-              !F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
-                !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING_CHECKPOINT),
+              !F_ISSET(conn, WT_CONN_RECOVERING) &&
+                !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT),
               "%s", "A btree is marked dirty during recovery or shutdown");
         }
-        S2BT(session)->modified = true;
+        btree->modified = true;
         WT_FULL_BARRIER();
 
         /*
@@ -1029,8 +1045,8 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
      * The btree may already be marked dirty while the connection is still clean; mark the
      * connection dirty outside the test of the btree state.
      */
-    if (!S2C(session)->modified)
-        S2C(session)->modified = true;
+    if (!conn->modified)
+        conn->modified = true;
 }
 
 /*
@@ -1073,12 +1089,19 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
     /*
      * Prepared records in the datastore require page updates, even for read-only handles, don't
      * mark the tree or page dirty.
      */
-    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+    if (F_ISSET(btree, WT_BTREE_READONLY))
         return;
+
+    WT_ASSERT(session,
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
 
     /*
      * Mark the tree dirty (even if the page is already marked dirty), newly created pages to
@@ -1109,10 +1132,16 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static WT_INLINE int
 __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_only)
 {
+    WT_BTREE *btree;
     WT_PAGE *parent;
 
-    if (F_ISSET(S2BT(session), WT_BTREE_READONLY))
+    btree = S2BT(session);
+
+    if (F_ISSET(btree, WT_BTREE_READONLY))
         return (0);
+
+    WT_ASSERT(session,
+      !F_ISSET(btree, WT_BTREE_DISAGGREGATED) || S2C(session)->layered_table_manager.leader);
 
     /*
      * This function exists as a place to stash this comment. There are a few places where we need
@@ -2137,11 +2166,11 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_materialization_check --
- *     Check if the page can be evicted given the current materialization frontier.
+ * __wt_materialization_check --
+ *     Check if the record LSN max is behind the materialization frontier.
  */
 static WT_INLINE bool
-__wt_page_materialization_check(WT_SESSION_IMPL *session, uint64_t rec_lsn_max)
+__wt_materialization_check(WT_SESSION_IMPL *session, uint64_t rec_lsn_max)
 {
     WT_DISAGGREGATED_STORAGE *disagg;
     uint64_t last_materialized_lsn;
@@ -2158,7 +2187,39 @@ __wt_page_materialization_check(WT_SESSION_IMPL *session, uint64_t rec_lsn_max)
     if (last_materialized_lsn == WT_DISAGG_LSN_NONE)
         return (true);
 
-    return (rec_lsn_max <= last_materialized_lsn);
+    if (rec_lsn_max > last_materialized_lsn) {
+        __wt_verbose_debug1(session, WT_VERB_EVICTION,
+          "The max lsn (%" PRIu64 ") is ahead of the last materialized lsn (%" PRIu64 ")",
+          rec_lsn_max, last_materialized_lsn);
+        return (false);
+    }
+
+    return (true);
+}
+
+/*
+ * __wt_btree_can_discard --
+ *     Check if a btree can be discarded based on the materialization frontier.
+ */
+static WT_INLINE bool
+__wt_btree_can_discard(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
+    uint64_t rec_lsn_max;
+
+    btree = S2BT(session);
+    conn = S2C(session);
+
+    if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+        return (true);
+
+    if (!conn->layered_table_manager.leader)
+        return (true);
+
+    rec_lsn_max = __wt_atomic_load_uint64_relaxed(&btree->rec_lsn_max);
+
+    return (__wt_materialization_check(session, rec_lsn_max));
 }
 
 /*
@@ -2205,7 +2266,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     if (mod == NULL) {
         if (page->disagg_info == NULL)
             return (true);
-        else if (__wt_page_materialization_check(session, page->disagg_info->rec_lsn_max))
+        else if (__wt_materialization_check(session, page->disagg_info->rec_lsn_max))
             return (true);
         else {
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_materialization);
@@ -2263,7 +2324,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * They would not go through reconciliation, but just be discarded which isn't OK.
      */
     if (!modified && page->disagg_info != NULL &&
-      !__wt_page_materialization_check(session, page->disagg_info->rec_lsn_max)) {
+      !__wt_materialization_check(session, page->disagg_info->rec_lsn_max)) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_materialization);
         return (false);
     }

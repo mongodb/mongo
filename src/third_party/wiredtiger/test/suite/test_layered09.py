@@ -48,32 +48,25 @@ class test_layered09(wttest.WiredTigerTestCase):
         ('snappy', dict(block_compress='snappy')),
     ]
 
-    uris = [
-        ('layered', dict(uri='layered:test_layered09')),
-        ('btree', dict(uri='file:test_layered09')),
-    ]
-
     ts = [
         ('ts', dict(ts=True)),
         ('non-ts', dict(ts=False)),
     ]
 
+    # The delta percentage of 100 is an arbitrary large value, intended to produce
+    # deltas a lot of the time.
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(delta_pct=100),,'
     disagg_storages = gen_disagg_storages('test_layered09', disagg_only = True)
+    uri='layered:test_layered09'
 
     # Make scenarios for different cloud service providers
-    scenarios = make_scenarios(encrypt, compress, disagg_storages, uris, ts)
+    scenarios = make_scenarios(encrypt, compress, disagg_storages, ts)
 
     nitems = 100
 
     def session_create_config(self):
-        # The delta percentage of 100 is an arbitrary large value, intended to produce
-        # deltas a lot of the time.
-        cfg = 'key_format=S,value_format=S,block_compressor={}'.format(self.block_compress)
-        if self.uri.startswith('file'):
-            cfg += ',block_manager=disagg'
-        return cfg
+        return 'key_format=S,value_format=S,block_compressor={}'.format(self.block_compress)
 
     def conn_config(self):
         enc_conf = 'encryption=(name={0},{1})'.format(self.encryptor, self.encrypt_args)

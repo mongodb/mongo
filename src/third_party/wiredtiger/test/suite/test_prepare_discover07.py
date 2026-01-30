@@ -44,8 +44,7 @@ class test_prepare_discover07(wttest.WiredTigerTestCase):
     uri = 'layered:' + tablename
 
     resolve_scenarios = [
-        # FIXME-WT-16530 handle searching for committed prepared tombstone on standby
-        # ('commit', dict(commit=True)),
+        ('commit', dict(commit=True)),
         ('rollback', dict(commit=False)),
     ]
     # Use disaggregated storage scenarios

@@ -295,6 +295,8 @@ struct __wt_btree {
 
     /* The next page ID available for allocation in disaggregated storage for this tree. */
     wt_shared uint64_t next_page_id;
+    /* Maximum LSN of the pages assigned to the tree during reconciliation. */
+    wt_shared uint64_t rec_lsn_max;
     WT_BTREE_STORAGE_TIER storage_tier; /* Disaggregated storage tier type */
 
 /*

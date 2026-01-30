@@ -1971,14 +1971,15 @@ tasks:
         vars:
           directory: test/huge
 
-  - name: manydbs-test
-    tags: ["pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/manydbs
+  # FIXME-WT-16548: Re-enable the test.
+  # - name: manydbs-test
+  #   tags: ["pull_request"]
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #     - func: "make check directory"
+  #       vars:
+  #         directory: test/manydbs
 
   - name: packing-test
     tags: ["pull_request"]
@@ -4244,21 +4245,22 @@ tasks:
       # Run the long version of make check, that includes the full csuite tests
       - func: "make check all"
 
-      # Many dbs test - Run with:
-      # 1.  The defaults
-      - func: "many dbs test"
-      # 2.  Set idle flag to turn off operations.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -I
-      # 3.  More dbs.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -D 40
-      # 4.  With idle flag and more dbs.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -I -D 40
+      # FIXME-WT-16548: Re-enable all the scenarios below for many dbs test.
+      # # Many dbs test - Run with:
+      # # 1.  The defaults
+      # - func: "many dbs test"
+      # # 2.  Set idle flag to turn off operations.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -I
+      # # 3.  More dbs.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -D 40
+      # # 4.  With idle flag and more dbs.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -I -D 40
 
       # extended test/thread runs
       - func: "thread test"

@@ -185,9 +185,9 @@ __sync_obsolete_inmem_evict_or_mark_dirty(WT_SESSION_IMPL *session, WT_REF *ref)
          */
         if (__wt_atomic_load_uint32_relaxed(&btree->eviction_obsolete_tw_pages) == 0 &&
           __wt_atomic_load_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages) == 0)
-            __wt_atomic_add_uint32_v(&conn->heuristic_controls.obsolete_tw_btree_count, 1);
+            __wt_atomic_add_uint32_relaxed(&conn->heuristic_controls.obsolete_tw_btree_count, 1);
 
-        __wt_atomic_add_uint32_v(&btree->checkpoint_cleanup_obsolete_tw_pages, 1);
+        __wt_atomic_add_uint32_relaxed(&btree->checkpoint_cleanup_obsolete_tw_pages, 1);
         WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_obsolete_tw);
     }
 

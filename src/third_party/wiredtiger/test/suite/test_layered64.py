@@ -79,9 +79,12 @@ class test_layered64(wttest.WiredTigerTestCase):
         self.restart_without_local_files(pickup_checkpoint=False)
 
         # Ensure that we can pick up the checkpoint without a checksum.
+        # FIXME-WT-16000: Make the checksum parameter in "checkpoint_meta" required
         checkpoint_meta_no_checksum = re.sub(r',metadata_checksum=[0-9a-fA-F]+', '', checkpoint_meta)
         self.pr(f'Checkpoint metadata without a checksum: {checkpoint_meta_no_checksum}')
         self.conn.reconfigure(f'disaggregated=(checkpoint_meta="{checkpoint_meta_no_checksum}")')
+        self.captureout.checkAdditionalPattern(self,
+            'Missing metadata_checksum from metadata: ')
 
         # Check that all the data is present.
         cursor = self.session.open_cursor(self.uri, None, None)
