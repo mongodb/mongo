@@ -360,13 +360,25 @@ sh.waitForPingChange = function (activePings, timeout, interval) {
     return remainingPings;
 };
 
+sh.isSlowBuild = function () {
+    const buildInfo = db.getServerBuildInfo();
+    return (
+        buildInfo.isDebug() ||
+        !buildInfo.isOptimizationsEnabled() ||
+        buildInfo.isAddressSanitizerActive() ||
+        buildInfo.isLeakSanitizerActive() ||
+        buildInfo.isThreadSanitizerActive() ||
+        buildInfo.isUndefinedBehaviorSanitizerActive() ||
+        _isSpiderMonkeyDebugEnabled()
+    );
+};
+
 /**
  * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
  * round. If no round has been executed, throws an error.
  */
 sh.awaitBalancerRound = function (timeout, interval) {
-    timeout ||= 60000;
-
+    timeout ||= sh.isSlowBuild() ? 120000 : 60000;
     let initialStatus = sh._getBalancerStatus();
     let currentStatus;
     assert.soon(
@@ -388,7 +400,7 @@ sh.awaitBalancerRound = function (timeout, interval) {
             );
             return currentStatus.numBalancerRounds > initialStatus.numBalancerRounds;
         },
-        "Latest balancer status: " + tojson(currentStatus),
+        () => "Latest balancer status: " + tojson(currentStatus),
         timeout,
         interval,
     );
