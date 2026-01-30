@@ -1781,6 +1781,22 @@ auto getPrefixAndPath(const FieldPath& path) {
 
 Value ExpressionFieldPath::serialize(const SerializationOptions& options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
+
+    // When generating query shapes on a shard, if this is a system variable with
+    // a constant value, serialize the value instead of the variable reference. This ensures
+    // consistent query shapes between classic (which constant-folds system variables during
+    // optimization) and SBE (which does not constant-fold system variables to avoid plan cache
+    // issues). On mongos (where the query originated), system variables should remain as variable
+    // references.
+    if (!options.isKeepingLiteralsUnchanged() && getExpressionContext()->getFromRouter() &&
+        Variables::isBuiltin(_variable) &&
+        getExpressionContext()->variables.hasConstantValue(_variable)) {
+        return ExpressionConstant::serializeConstant(
+            options,
+            evaluate(Document(), &(getExpressionContext()->variables)),
+            true /* wrapRepresentativeValue */);
+    }
+
     // First handles special cases for redaction of system variables. User variables will fall
     // through to the default full redaction case.
     if (options.transformIdentifiers && prefix.length() == 2) {
