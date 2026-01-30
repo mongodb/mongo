@@ -66,9 +66,6 @@ using namespace mongo;
 namespace {
 
 ConnectionString fixtureConnectionString{};
-std::string testFilter;
-std::string fileNameFilter;
-std::vector<std::string> testSuites{};
 bool useEgressGRPC;
 
 }  // namespace
@@ -95,13 +92,7 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 }  // namespace
 
 int main(int argc, char** argv) {
-    unittest::MainProgress progress(
-        {
-            .testSuites = testSuites,
-            .testFilter = testFilter,
-            .fileNameFilter = fileNameFilter,
-        },
-        std::vector<std::string>(argv, argv + argc));
+    unittest::MainProgress progress({}, std::vector<std::string>(argv, argv + argc));
     progress.initialize();
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));

@@ -371,12 +371,16 @@ public:
 };
 
 // Sort in descreasing order with limit applied
-template <int LIMIT>
 class QueryStageSortDecWithLimit : public QueryStageSortDec {
 public:
+    explicit QueryStageSortDecWithLimit(int limit) : _limit(limit) {}
+
     int limit() const override {
-        return LIMIT;
+        return _limit;
     }
+
+private:
+    int _limit;
 };
 
 // Sort a big bunch of objects.
@@ -608,13 +612,16 @@ public:
 // Limit size of working set within sort stage to a small number
 // Sort stage implementation should not try to invalidate RecordIds that
 // are no longer in the working set.
-
-template <int LIMIT>
 class QueryStageSortDeletionInvalidationWithLimit : public QueryStageSortDeletionInvalidation {
 public:
+    explicit QueryStageSortDeletionInvalidationWithLimit(int limit) : _limit{limit} {}
+
     int limit() const override {
-        return LIMIT;
+        return _limit;
     }
+
+private:
+    int _limit;
 };
 
 // Should error out if we sort with parallel arrays.
@@ -690,14 +697,14 @@ public:
         add<QueryStageSortInc>();
         add<QueryStageSortDec>();
         // Sort with limit has a general limiting strategy for limit > 1
-        add<QueryStageSortDecWithLimit<10>>();
+        add<QueryStageSortDecWithLimit>(10);
         // and a special case for limit == 1
-        add<QueryStageSortDecWithLimit<1>>();
+        add<QueryStageSortDecWithLimit>(1);
         add<QueryStageSortExt>();
         add<QueryStageSortMutationInvalidation>();
         add<QueryStageSortDeletionInvalidation>();
-        add<QueryStageSortDeletionInvalidationWithLimit<10>>();
-        add<QueryStageSortDeletionInvalidationWithLimit<1>>();
+        add<QueryStageSortDeletionInvalidationWithLimit>(10);
+        add<QueryStageSortDeletionInvalidationWithLimit>(1);
         add<QueryStageSortParallelArrays>();
     }
 };

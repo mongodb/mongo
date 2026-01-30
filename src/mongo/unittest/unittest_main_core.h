@@ -47,16 +47,19 @@ struct SelectedTest {
 };
 std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection);
 
+struct FilterOptions {
+    std::vector<std::string> suites;
+    std::string filter;
+    std::string fileNameFilter;
+};
+
 /** Config for `testMain`. */
 struct MONGO_MOD_PUBLIC MainOptions {
     bool startSignalProcessingThread = true;
     bool suppressGlobalInitializers = false;
 
     /** Overrides if engaged */
-    boost::optional<std::vector<std::string>> testSuites;
-    boost::optional<std::string> testFilter;
-    boost::optional<std::string> fileNameFilter;
-    boost::optional<int> runsPerTest;
+    boost::optional<FilterOptions> filter;
 };
 
 /**
@@ -82,6 +85,10 @@ public:
      * Call `initialize` before calling this.
      */
     int test();
+
+    MainOptions& options() {
+        return _options;
+    }
 
     std::vector<std::string>& args() {
         return _argVec;

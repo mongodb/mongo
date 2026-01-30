@@ -157,10 +157,15 @@ void sleepalittle() {
 
 int once;
 
-/* This test is to see how long it takes to get a lock after there has been contention -- the OS
-   will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin
-   locks. Experimenting with different # of threads would be a good idea.
-*/
+/**
+ * Slack is a test to see how long it takes for another thread to pick up
+ * and begin work after another relinquishes the lock.  e.g. a spin lock
+ * would have very little slack.
+ *
+ * This test is to see how long it takes to get a lock after there has been contention -- the OS
+ * will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin
+ * locks. Experimenting with different # of threads would be a good idea.
+ */
 template <class whichmutex, class scoped>
 class Slack : public ThreadedTest<17> {
 public:
@@ -226,19 +231,18 @@ private:
     }
 };
 
+class StdxMutexSlackTest : public Slack<stdx::mutex, stdx::lock_guard<stdx::mutex>> {};
+class UIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned>> {};
+class ULLIsAtomicWordAtomicTest : public IsAtomicWordAtomic<AtomicWord<unsigned long long>> {};
 
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("threading") {}
 
     void setupTests() override {
-        // Slack is a test to see how long it takes for another thread to pick up
-        // and begin work after another relinquishes the lock.  e.g. a spin lock
-        // would have very little slack.
-        add<Slack<stdx::mutex, stdx::lock_guard<stdx::mutex>>>();
-
-        add<IsAtomicWordAtomic<AtomicWord<unsigned>>>();
-        add<IsAtomicWordAtomic<AtomicWord<unsigned long long>>>();
+        add<StdxMutexSlackTest>();
+        add<UIsAtomicWordAtomicTest>();
+        add<ULLIsAtomicWordAtomicTest>();
         add<ThreadPoolTest>();
     }
 };

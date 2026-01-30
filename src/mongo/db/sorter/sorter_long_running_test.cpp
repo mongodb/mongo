@@ -39,6 +39,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::sorter {
+namespace {
 
 class SortedFileWriterAndFileIteratorTests {
 public:
@@ -426,11 +427,16 @@ class Limit : public Basic {
     }
 };
 
-template <uint64_t Limit>
 class LimitExtreme : public Basic {
+public:
+    explicit LimitExtreme(uint64_t limit) : _limit{limit} {}
+
     SortOptions adjustSortOptions(SortOptions opts) override {
-        return opts.Limit(Limit);
+        return opts.Limit(_limit);
     }
+
+private:
+    uint64_t _limit;
 };
 
 class PauseAndResumeLimit : public Limit {
@@ -548,15 +554,14 @@ class Dupes : public Basic {
     }
 };
 
-template <bool Random = true>
 class LotsOfDataLittleMemory : public Basic {
 public:
-    LotsOfDataLittleMemory() : _array(new int[NUM_ITEMS]), _random(int64_t(time(nullptr))) {
-        for (int i = 0; i < NUM_ITEMS; i++)
-            _array[i] = i;
-
-        if (Random)
-            std::shuffle(_array.get(), _array.get() + NUM_ITEMS, _random.urbg());
+    explicit LotsOfDataLittleMemory(bool shuffle) {
+        std::iota(_array.begin(), _array.end(), 0);
+        if (shuffle) {
+            std::shuffle(
+                _array.begin(), _array.end(), PseudoRandom{SecureRandom{}.nextUInt64()}.urbg());
+        }
     }
 
     SortOptions adjustSortOptions(SortOptions opts) override {
@@ -575,8 +580,8 @@ public:
     }
 
     void addData(IWSorter* sorter) override {
-        for (int i = 0; i < NUM_ITEMS; i++)
-            sorter->add(_array[i], -_array[i]);
+        for (int val : _array)
+            sorter->add(val, -val);
     }
 
     size_t numAdded() const override {
@@ -621,19 +626,19 @@ public:
         return spillsDone;
     }
 
-    enum Constants {
-        NUM_ITEMS = 800 * 1000,
-        MEM_LIMIT = 128 * 1024,  // The total memory limit.
-        // The memory limit after subtracting the memory reserved for the file iterators.
-        DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
-    };
-    std::unique_ptr<int[]> _array;
-    PseudoRandom _random;
+    static constexpr size_t NUM_ITEMS = 800 * 1000;
+    static constexpr size_t MEM_LIMIT = 128 * 1024;  // The total memory limit.
+    // The memory limit after subtracting the memory reserved for the file iterators.
+    static constexpr size_t DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10);
+
+    std::array<int, NUM_ITEMS> _array;
 };
 
-template <long long Limit, bool Random = true>
-class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
-    typedef LotsOfDataLittleMemory<Random> Parent;
+class LotsOfDataWithLimit : public LotsOfDataLittleMemory {
+public:
+    typedef LotsOfDataLittleMemory Parent;
+    LotsOfDataWithLimit(long long limit, bool shuffle) : Parent{shuffle}, _limit{limit} {}
+
     SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure our tests will spill or not as desired
         MONGO_STATIC_ASSERT(DATA_MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
@@ -644,13 +649,13 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
         MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT > 100);
         MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT < 500);
 
-        return opts.MaxMemoryUsageBytes(MEM_LIMIT).Limit(Limit);
+        return opts.MaxMemoryUsageBytes(MEM_LIMIT).Limit(_limit);
     }
     std::shared_ptr<IWIterator> correct() override {
-        return std::make_shared<LimitIterator>(Limit, Parent::correct());
+        return std::make_shared<LimitIterator>(_limit, Parent::correct());
     }
     std::shared_ptr<IWIterator> correctReverse() override {
-        return std::make_shared<LimitIterator>(Limit, Parent::correctReverse());
+        return std::make_shared<LimitIterator>(_limit, Parent::correctReverse());
     }
     size_t correctNumRanges() const override {
         // For the TopKSorter, the number of ranges depends on the specific composition of the data
@@ -658,16 +663,19 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
         return 0;
     }
 
-    enum {
-        MEM_LIMIT = 32 * 1024,  // The total memory limit.
-        // The memory limit after subtracting the memory reserved for the file iterators.
-        DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10),
-    };
+    constexpr static size_t MEM_LIMIT = 32 * 1024;  // The total memory limit.
+    // The memory limit after subtracting the memory reserved for the file iterators.
+    constexpr static size_t DATA_MEM_LIMIT = MEM_LIMIT - static_cast<int>(MEM_LIMIT / 10);
+
+private:
+    long long _limit;
 };
 
-template <bool Random = true>
-class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
-    typedef LotsOfDataLittleMemory<Random> Parent;
+class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory {
+public:
+    typedef LotsOfDataLittleMemory Parent;
+    using Parent::Parent;
+
     SortOptions adjustSortOptions(SortOptions opts) override {
         // Make sure we create a lot of spills
         MONGO_STATIC_ASSERT(
@@ -724,11 +732,9 @@ class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
 class ManualSpills : public Basic {
 public:
     // Using constant seed for tests to be determenistic
-    ManualSpills() : _random(1) {
-        for (size_t i = 0; i < kElementCount; i++) {
-            _array[i] = i;
-        }
-        std::shuffle(_array.begin(), _array.end(), _random.urbg());
+    ManualSpills() {
+        std::iota(_array.begin(), _array.end(), 0);
+        std::shuffle(_array.begin(), _array.end(), PseudoRandom{1}.urbg());
     }
 
     void addData(IWSorter* sorter) override {
@@ -764,7 +770,6 @@ protected:
     static constexpr size_t kSpillEveryN = 10;
 
     std::array<int, kElementCount> _array;
-    PseudoRandom _random;
 };
 
 class ManualSpillsWithLimit : public ManualSpills {
@@ -799,32 +804,32 @@ public:
         add<SorterTests::Basic>();
         add<SorterTests::Limit>();
         add<SorterTests::Dupes>();
-        add<SorterTests::LotsOfDataLittleMemory</*random=*/false>>();
-        add<SorterTests::LotsOfDataLittleMemory</*random=*/true>>();
-        add<SorterTests::LotsOfSpillsLittleMemory</*random=*/false>>();
-        add<SorterTests::LotsOfSpillsLittleMemory</*random=*/true>>();
-        add<SorterTests::LotsOfDataWithLimit<1, /*random=*/false>>();     // limit=1 is special case
-        add<SorterTests::LotsOfDataWithLimit<1, /*random=*/true>>();      // limit=1 is special case
-        add<SorterTests::LotsOfDataWithLimit<100, /*random=*/false>>();   // fits in mem
-        add<SorterTests::LotsOfDataWithLimit<100, /*random=*/true>>();    // fits in mem
-        add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/false>>();  // spills
-        add<SorterTests::LotsOfDataWithLimit<5000, /*random=*/true>>();   // spills
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t>>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> - 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint32_t> / 8 + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t>>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> - 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int32_t> / 8 + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t>>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t> - 1>>();
-        add<SorterTests::LimitExtreme<0>>();  // kMaxAsU64<uint64_t> + 1
-        add<SorterTests::LimitExtreme<kMaxAsU64<uint64_t> / 8 + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t>>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> - 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> + 1>>();
-        add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> / 8 + 1>>();
+        add<SorterTests::LotsOfDataLittleMemory>(false);
+        add<SorterTests::LotsOfDataLittleMemory>(true);
+        add<SorterTests::LotsOfSpillsLittleMemory>(false);
+        add<SorterTests::LotsOfSpillsLittleMemory>(true);
+        add<SorterTests::LotsOfDataWithLimit>(1, false);     // limit=1 is special case
+        add<SorterTests::LotsOfDataWithLimit>(1, true);      // limit=1 is special case
+        add<SorterTests::LotsOfDataWithLimit>(100, false);   // fits in mem
+        add<SorterTests::LotsOfDataWithLimit>(100, true);    // fits in mem
+        add<SorterTests::LotsOfDataWithLimit>(5000, false);  // spills
+        add<SorterTests::LotsOfDataWithLimit>(5000, true);   // spills
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint32_t>);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint32_t> - 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint32_t> + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint32_t> / 8 + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int32_t>);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int32_t> - 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int32_t> + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int32_t> / 8 + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint64_t>);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint64_t> - 1);
+        add<SorterTests::LimitExtreme>(0);  // kMaxAsU64<uint64_t> + 1
+        add<SorterTests::LimitExtreme>(kMaxAsU64<uint64_t> / 8 + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int64_t>);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int64_t> - 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int64_t> + 1);
+        add<SorterTests::LimitExtreme>(kMaxAsU64<int64_t> / 8 + 1);
         add<SorterTests::PauseAndResume>();
         add<SorterTests::PauseAndResumeLimit>();
         add<SorterTests::PauseAndResumeLimitOne>();
@@ -834,4 +839,5 @@ public:
 };
 
 unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
+}  // namespace
 }  // namespace mongo::sorter

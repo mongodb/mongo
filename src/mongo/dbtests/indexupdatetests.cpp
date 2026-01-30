@@ -149,7 +149,6 @@ protected:
 };
 
 /** Index creation ignores unique constraints when told to. */
-template <bool background>
 class InsertBuildIgnoreUnique : public IndexBuildBase {
 public:
     void run() {
@@ -190,7 +189,6 @@ public:
 };
 
 /** Index creation enforces unique constraints unless told not to. */
-template <bool background>
 class InsertBuildEnforceUnique : public IndexBuildBase {
 public:
     void run() {
@@ -651,10 +649,8 @@ public:
         // These tests check that index creation ignores the unique constraint when told to.
         // The mobile storage engine does not support duplicate keys in unique indexes so these
         // tests are disabled.
-        add<InsertBuildIgnoreUnique<true>>();
-        add<InsertBuildIgnoreUnique<false>>();
-        add<InsertBuildEnforceUnique<true>>();
-        add<InsertBuildEnforceUnique<false>>();
+        add<InsertBuildIgnoreUnique>();
+        add<InsertBuildEnforceUnique>();
 
         add<InsertBuildIndexInterrupt>();
         add<InsertBuildIdIndexInterrupt>();

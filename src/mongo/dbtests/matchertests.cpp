@@ -69,7 +69,8 @@ public:
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
-template <typename M>
+using M = Matcher;
+
 class Basic {
 public:
     void run() {
@@ -80,7 +81,6 @@ public:
     }
 };
 
-template <typename M>
 class DoubleEqual {
 public:
     void run() {
@@ -91,7 +91,6 @@ public:
     }
 };
 
-template <typename M>
 class MixedNumericEqual {
 public:
     void run() {
@@ -103,7 +102,6 @@ public:
     }
 };
 
-template <typename M>
 class MixedNumericGt {
 public:
     void run() {
@@ -116,7 +114,6 @@ public:
     }
 };
 
-template <typename M>
 class MixedNumericIN {
 public:
     void run() {
@@ -149,7 +146,6 @@ public:
     }
 };
 
-template <typename M>
 class MixedNumericEmbedded {
 public:
     void run() {
@@ -160,7 +156,6 @@ public:
     }
 };
 
-template <typename M>
 class Size {
 public:
     void run() {
@@ -173,7 +168,6 @@ public:
     }
 };
 
-template <typename M>
 class WithinBox {
 public:
     void run() {
@@ -187,7 +181,6 @@ public:
     }
 };
 
-template <typename M>
 class WithinPolygon {
 public:
     void run() {
@@ -201,7 +194,6 @@ public:
     }
 };
 
-template <typename M>
 class WithinCenter {
 public:
     void run() {
@@ -218,7 +210,6 @@ public:
 };
 
 /** Test that MatchDetails::elemMatchKey() is set correctly after a match. */
-template <typename M>
 class ElemMatchKey {
 public:
     void run() {
@@ -234,7 +225,6 @@ public:
     }
 };
 
-template <typename M>
 class WhereSimple1 {
 public:
     void run() {
@@ -252,7 +242,6 @@ public:
     }
 };
 
-template <typename M>
 class TimingBase {
 public:
     long dotime(const BSONObj& patt, const BSONObj& obj) {
@@ -268,14 +257,12 @@ public:
     }
 };
 
-template <typename M>
-class AllTiming : public TimingBase<M> {
+class AllTiming : public TimingBase {
 public:
     void run() {
-        long normal = TimingBase<M>::dotime(BSON("x" << 5), BSON("x" << 5));
+        long normal = TimingBase::dotime(BSON("x" << 5), BSON("x" << 5));
 
-        long all =
-            TimingBase<M>::dotime(BSON("x" << BSON("$all" << BSON_ARRAY(5))), BSON("x" << 5));
+        long all = TimingBase::dotime(BSON("x" << BSON("$all" << BSON_ARRAY(5))), BSON("x" << 5));
 
         std::cout << "AllTiming " << demangleName(typeid(M)) << " normal: " << normal
                   << " all: " << all << std::endl;
@@ -283,7 +270,6 @@ public:
 };
 
 /** Test that 'collator' is passed to MatchExpressionParser::parse(). */
-template <typename M>
 class NullCollator {
 public:
     void run() {
@@ -294,7 +280,6 @@ public:
 };
 
 /** Test that 'collator' is passed to MatchExpressionParser::parse(). */
-template <typename M>
 class Collator {
 public:
     void run() {
@@ -311,24 +296,22 @@ class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("matcher") {}
 
-#define ADD_BOTH(TEST) add<TEST<Matcher>>();
-
     void setupTests() override {
-        ADD_BOTH(Basic);
-        ADD_BOTH(DoubleEqual);
-        ADD_BOTH(MixedNumericEqual);
-        ADD_BOTH(MixedNumericGt);
-        ADD_BOTH(MixedNumericIN);
-        ADD_BOTH(Size);
-        ADD_BOTH(MixedNumericEmbedded);
-        ADD_BOTH(ElemMatchKey);
-        ADD_BOTH(WhereSimple1);
-        ADD_BOTH(AllTiming);
-        ADD_BOTH(WithinBox);
-        ADD_BOTH(WithinCenter);
-        ADD_BOTH(WithinPolygon);
-        ADD_BOTH(NullCollator);
-        ADD_BOTH(Collator);
+        add<Basic>();
+        add<DoubleEqual>();
+        add<MixedNumericEqual>();
+        add<MixedNumericGt>();
+        add<MixedNumericIN>();
+        add<Size>();
+        add<MixedNumericEmbedded>();
+        add<ElemMatchKey>();
+        add<WhereSimple1>();
+        add<AllTiming>();
+        add<WithinBox>();
+        add<WithinCenter>();
+        add<WithinPolygon>();
+        add<NullCollator>();
+        add<Collator>();
     }
 };
 

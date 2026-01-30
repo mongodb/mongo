@@ -392,10 +392,9 @@ protected:
     std::unique_ptr<WriteUnitOfWork> _wuow;
 };
 
-template <bool full, bool background>
 class ValidateIdIndexCount : public ValidateBase {
 public:
-    ValidateIdIndexCount() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
@@ -448,10 +447,10 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateSecondaryIndexCount : public ValidateBase {
 public:
-    ValidateSecondaryIndexCount() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
+
     void run() {
         // Create a new collection, insert two documents.
         lockDb(MODE_X);
@@ -507,10 +506,10 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateSecondaryIndex : public ValidateBase {
 public:
-    ValidateSecondaryIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
+
     void run() {
         // Create a new collection, insert three records.
         lockDb(MODE_X);
@@ -556,10 +555,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateIdIndex : public ValidateBase {
 public:
-    ValidateIdIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
@@ -636,10 +634,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateMultiKeyIndex : public ValidateBase {
 public:
-    ValidateMultiKeyIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert three records and check it's valid.
@@ -716,10 +713,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateSparseIndex : public ValidateBase {
 public:
-    ValidateSparseIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert three records and check it's valid.
@@ -767,10 +763,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidatePartialIndex : public ValidateBase {
 public:
-    ValidatePartialIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert three records and check it's valid.
@@ -821,10 +816,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidatePartialIndexOnCollectionWithNonIndexableFields : public ValidateBase {
 public:
-    ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection and insert a record that has a non-indexable value on the indexed
@@ -857,10 +851,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateCompoundIndex : public ValidateBase {
 public:
-    ValidateCompoundIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection, insert five records and check it's valid.
@@ -916,10 +909,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateIndexEntry : public ValidateBase {
 public:
-    ValidateIndexEntry() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
@@ -1027,10 +1019,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateWildCardIndex : public ValidateBase {
 public:
-    ValidateWildCardIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection.
@@ -1128,10 +1119,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateWildCardIndexWithProjection : public ValidateBase {
 public:
-    ValidateWildCardIndexWithProjection() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection.
@@ -1197,10 +1187,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateMissingAndExtraIndexEntryResults : public ValidateBase {
 public:
-    ValidateMissingAndExtraIndexEntryResults() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection.
@@ -1279,10 +1268,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateMissingIndexEntryResults : public ValidateBase {
 public:
-    ValidateMissingIndexEntryResults() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
@@ -1389,10 +1377,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateExtraIndexEntryResults : public ValidateBase {
 public:
-    ValidateExtraIndexEntryResults() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection.
@@ -3196,10 +3183,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateDuplicateKeysUniqueIndex : public ValidateBase {
 public:
-    ValidateDuplicateKeysUniqueIndex() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
@@ -3398,10 +3384,9 @@ public:
     }
 };
 
-template <bool full, bool background>
 class ValidateInvalidBSONResults : public ValidateBase {
 public:
-    ValidateInvalidBSONResults() : ValidateBase(full, background) {}
+    using ValidateBase::ValidateBase;
 
     void run() {
         // Create a new collection.
@@ -4245,10 +4230,9 @@ public:
     }
 };
 
-template <bool background>
 class ValidateInvalidBSONOnClusteredCollection : public ValidateBase {
 public:
-    ValidateInvalidBSONOnClusteredCollection()
+    explicit ValidateInvalidBSONOnClusteredCollection(bool background)
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
@@ -4314,10 +4298,9 @@ public:
     }
 };
 
-template <bool background>
 class ValidateReportInfoOnClusteredCollection : public ValidateBase {
 public:
-    ValidateReportInfoOnClusteredCollection()
+    explicit ValidateReportInfoOnClusteredCollection(bool background)
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
@@ -4449,11 +4432,11 @@ public:
  * Buffer for keystring2: 10000
  * This can lead to a false positive uniqueness violation.
  */
-template <bool falsePositiveCase>
 class ValidateDuplicateKeyOnClusteredCollection : public ValidateBase {
 public:
-    ValidateDuplicateKeyOnClusteredCollection()
-        : ValidateBase(/*full=*/true, /*background=*/false, /*clustered=*/true) {}
+    explicit ValidateDuplicateKeyOnClusteredCollection(bool falsePositiveCase)
+        : ValidateBase(/*full=*/true, /*background=*/false, /*clustered=*/true),
+          falsePositiveCase(falsePositiveCase) {}
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
@@ -4596,6 +4579,8 @@ public:
 
         dumpOnErrorGuard.dismiss();
     }
+
+    bool falsePositiveCase;
 };
 
 class ValidateRepairOnClusteredCollection : public ValidateBase {
@@ -4739,11 +4724,10 @@ public:
  * Covered scenarios: a document with missing _id and a Record whose
  * RecordId doesn't match the document _id.
  */
-template <bool background>
 class ValidateInvalidRecordIdOnClusteredCollection : public ValidateBase {
 public:
-    ValidateInvalidRecordIdOnClusteredCollection(bool withSecondaryIndex)
-        : ValidateBase(/*full=*/true, /*background=*/background, /*clustered=*/true),
+    ValidateInvalidRecordIdOnClusteredCollection(bool background, bool withSecondaryIndex)
+        : ValidateBase(/*full=*/true, background, /*clustered=*/true),
           _withSecondaryIndex(withSecondaryIndex) {}
 
     void run() {
@@ -4847,47 +4831,47 @@ public:
     ValidateTests() : OldStyleSuiteSpecification("validate_tests") {}
 
     void setupTests() override {
-        add<ValidateDuplicateKeyOnClusteredCollection<true /*falsePositiveCase*/>>();
-        add<ValidateDuplicateKeyOnClusteredCollection<false /*falsePositiveCase*/>>();
+        add<ValidateDuplicateKeyOnClusteredCollection>(true);
+        add<ValidateDuplicateKeyOnClusteredCollection>(false);
 
         // Add tests for both full validate and non-full validate.
-        add<ValidateIdIndexCount<true, false>>();
-        add<ValidateIdIndexCount<false, false>>();
-        add<ValidateIdIndexCount<false, true>>();
-        add<ValidateSecondaryIndexCount<true, false>>();
-        add<ValidateSecondaryIndexCount<false, false>>();
-        add<ValidateSecondaryIndexCount<false, true>>();
+        add<ValidateIdIndexCount>(true, false);
+        add<ValidateIdIndexCount>(false, false);
+        add<ValidateIdIndexCount>(false, true);
+        add<ValidateSecondaryIndexCount>(true, false);
+        add<ValidateSecondaryIndexCount>(false, false);
+        add<ValidateSecondaryIndexCount>(false, true);
 
         // These tests are only needed for non-full validate.
-        add<ValidateIdIndex<false, false>>();
-        add<ValidateIdIndex<false, true>>();
-        add<ValidateSecondaryIndex<false, false>>();
-        add<ValidateSecondaryIndex<false, true>>();
-        add<ValidateMultiKeyIndex<false, false>>();
-        add<ValidateMultiKeyIndex<false, true>>();
-        add<ValidateSparseIndex<false, false>>();
-        add<ValidateSparseIndex<false, true>>();
-        add<ValidateCompoundIndex<false, false>>();
-        add<ValidateCompoundIndex<false, true>>();
-        add<ValidatePartialIndex<false, false>>();
-        add<ValidatePartialIndex<false, true>>();
-        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, false>>();
-        add<ValidatePartialIndexOnCollectionWithNonIndexableFields<false, true>>();
-        add<ValidateWildCardIndex<false, false>>();
-        add<ValidateWildCardIndex<false, true>>();
-        add<ValidateWildCardIndexWithProjection<false, false>>();
-        add<ValidateWildCardIndexWithProjection<false, true>>();
+        add<ValidateIdIndex>(false, false);
+        add<ValidateIdIndex>(false, true);
+        add<ValidateSecondaryIndex>(false, false);
+        add<ValidateSecondaryIndex>(false, true);
+        add<ValidateMultiKeyIndex>(false, false);
+        add<ValidateMultiKeyIndex>(false, true);
+        add<ValidateSparseIndex>(false, false);
+        add<ValidateSparseIndex>(false, true);
+        add<ValidateCompoundIndex>(false, false);
+        add<ValidateCompoundIndex>(false, true);
+        add<ValidatePartialIndex>(false, false);
+        add<ValidatePartialIndex>(false, true);
+        add<ValidatePartialIndexOnCollectionWithNonIndexableFields>(false, false);
+        add<ValidatePartialIndexOnCollectionWithNonIndexableFields>(false, true);
+        add<ValidateWildCardIndex>(false, false);
+        add<ValidateWildCardIndex>(false, true);
+        add<ValidateWildCardIndexWithProjection>(false, false);
+        add<ValidateWildCardIndexWithProjection>(false, true);
 
         // Tests for index validation.
-        add<ValidateIndexEntry<false, false>>();
-        add<ValidateIndexEntry<false, true>>();
+        add<ValidateIndexEntry>(false, false);
+        add<ValidateIndexEntry>(false, true);
         add<ValidateIndexMetadata>();
 
         // Tests that the 'missingIndexEntries' and 'extraIndexEntries' field are populated
         // correctly.
-        add<ValidateMissingAndExtraIndexEntryResults<false, false>>();
-        add<ValidateMissingIndexEntryResults<false, false>>();
-        add<ValidateExtraIndexEntryResults<false, false>>();
+        add<ValidateMissingAndExtraIndexEntryResults>(false, false);
+        add<ValidateMissingIndexEntryResults>(false, false);
+        add<ValidateExtraIndexEntryResults>(false, false);
 
         add<ValidateMissingAndExtraIndexEntryRepair>();
         add<ValidateMissingIndexEntryRepair>();
@@ -4899,11 +4883,11 @@ public:
 
         add<ValidateDuplicateDocumentIndexKeySet>();
 
-        add<ValidateDuplicateKeysUniqueIndex<false, false>>();
-        add<ValidateDuplicateKeysUniqueIndex<false, true>>();
+        add<ValidateDuplicateKeysUniqueIndex>(false, false);
+        add<ValidateDuplicateKeysUniqueIndex>(false, true);
 
-        add<ValidateInvalidBSONResults<false, false>>();
-        add<ValidateInvalidBSONResults<false, true>>();
+        add<ValidateInvalidBSONResults>(false, false);
+        add<ValidateInvalidBSONResults>(false, true);
         add<ValidateInvalidBSONRepair>();
 
         add<ValidateIndexWithMultikeyDocRepair>();
@@ -4912,16 +4896,16 @@ public:
         add<ValidateAddNewMultikeyPaths>();
 
         // Tests that validation works on clustered collections.
-        add<ValidateInvalidBSONOnClusteredCollection<false>>();
-        add<ValidateInvalidBSONOnClusteredCollection<true>>();
-        add<ValidateReportInfoOnClusteredCollection<false>>();
-        add<ValidateReportInfoOnClusteredCollection<true>>();
+        add<ValidateInvalidBSONOnClusteredCollection>(false);
+        add<ValidateInvalidBSONOnClusteredCollection>(true);
+        add<ValidateReportInfoOnClusteredCollection>(false);
+        add<ValidateReportInfoOnClusteredCollection>(true);
         add<ValidateRepairOnClusteredCollection>();
 
-        add<ValidateInvalidRecordIdOnClusteredCollection<false>>(false /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<false>>(true /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection>(false, false /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection>(false, true /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection>(true, false /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection>(true, true /*withSecondaryIndex*/);
     }
 };
 

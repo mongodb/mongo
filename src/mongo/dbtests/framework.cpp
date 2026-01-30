@@ -74,13 +74,17 @@ namespace mongo {
 namespace dbtests {
 
 unittest::MainProgress initializeDbTests(std::vector<std::string> argVec) {
-    unittest::MainProgress progress(
-        {
-            .testSuites = frameworkGlobalParams.suites,
-            .runsPerTest = frameworkGlobalParams.runsPerTest,
-        },
-        std::move(argVec));
+    unittest::MainProgress progress({}, std::move(argVec));
     progress.initialize();
+
+    if (!frameworkGlobalParams.suites.empty()) {
+        auto& o = progress.options().filter;
+        if (!o)
+            o.emplace();
+        LOGV2(11723900, "Dbtest overriding suites.", "suites"_attr = frameworkGlobalParams.suites);
+        o->suites = frameworkGlobalParams.suites;
+    }
+
     return progress;
 }
 

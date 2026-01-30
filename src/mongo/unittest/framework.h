@@ -67,6 +67,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
@@ -78,6 +79,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::unittest {
 
@@ -146,6 +148,14 @@ public:
     void add(auto a0, auto a1, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
         _add<T>(loc, a0, a1);
     }
+    template <typename T>
+    void add(auto a0, auto a1, auto a2, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+        _add<T>(loc, a0, a1, a2);
+    }
+    template <typename T>
+    void add(auto a0, auto a1, auto a2, auto a3, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
+        _add<T>(loc, a0, a1, a2, a3);
+    }
 
 private:
     /** A Gtest that runs an old style test as its `TestBody`. */
@@ -163,12 +173,33 @@ private:
     };
 
     template <typename T, typename... As>
+    std::string _genCaseName(const As&... args) {
+        std::string name = demangleName(typeid(T));
+
+        // Remove redundant common prefix between this suite's typename and the
+        // typename of the test case being added to it.
+        std::string suite = demangleName(typeid(*this));
+        auto cut = std::mismatch(suite.begin(), suite.end(), name.begin(), name.end()).second;
+        // Don't chop in the middle of an identifier.
+        for (auto prev = cut; cut != name.begin(); cut = prev) {
+            prev = std::prev(prev);
+            if (!ctype::isAlnum(*prev) && *prev != '_')
+                break;
+        }
+        name.erase(name.begin(), cut);
+        for (size_t pos; (pos = name.find("::")) != std::string::npos;)
+            name.replace(pos, 2, ".");
+        (name.append(fmt::format("/{}", args)), ...);
+        return name;
+    }
+
+    template <typename T, typename... As>
     void _add(SourceLocation loc, As... args) {
         // Gtest requires that a suite's tests all have the same base class,
         // so they're all registered as `Test*`, since we have nothing more
         // specific to use.
         testing::RegisterTest(_name.c_str(),
-                              demangleName(typeid(T)).c_str(),
+                              _genCaseName<T>(args...).c_str(),
                               nullptr,
                               nullptr,
                               loc.file_name(),

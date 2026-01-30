@@ -202,9 +202,11 @@ void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::s
 
 }  // namespace
 
-template <bool rollback, bool defaultIndexes, bool capped>
 class CreateCollection {
 public:
+    CreateCollection(bool rollback, bool defaultIndexes, bool capped)
+        : rollback{rollback}, defaultIndexes{defaultIndexes}, capped{capped} {}
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -230,17 +232,19 @@ public:
                 uow.commit();
             }
         }
-        if (rollback) {
-            ASSERT(!collectionExists(&opCtx, ns));
-        } else {
-            ASSERT(collectionExists(&opCtx, ns));
-        }
+        ASSERT_EQ(collectionExists(&opCtx, ns), !rollback);
     }
+
+    bool rollback;
+    bool defaultIndexes;
+    bool capped;
 };
 
-template <bool rollback, bool defaultIndexes, bool capped>
 class DropCollection {
 public:
+    DropCollection(bool rollback, bool defaultIndexes, bool capped)
+        : rollback{rollback}, defaultIndexes{defaultIndexes}, capped{capped} {}
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -285,11 +289,17 @@ public:
             ASSERT(!collectionExists(&opCtx, ns));
         }
     }
+
+    bool rollback;
+    bool defaultIndexes;
+    bool capped;
 };
 
-template <bool rollback, bool defaultIndexes, bool capped>
 class RenameCollection {
 public:
+    RenameCollection(bool rollback, bool defaultIndexes, bool capped)
+        : rollback{rollback}, defaultIndexes{defaultIndexes}, capped{capped} {}
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -341,11 +351,17 @@ public:
             ASSERT(collectionExists(&opCtx, target.ns_forTest()));
         }
     }
+
+    bool rollback;
+    bool defaultIndexes;
+    bool capped;
 };
 
-template <bool rollback, bool defaultIndexes, bool capped>
 class RenameDropTargetCollection {
 public:
+    RenameDropTargetCollection(bool rollback, bool defaultIndexes, bool capped)
+        : rollback{rollback}, defaultIndexes{defaultIndexes}, capped{capped} {}
+
     void run() {
         // Skip the test if the storage engine doesn't support capped collections.
         if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
@@ -415,11 +431,17 @@ public:
             assertOnlyRecord(&opCtx, target, sourceDoc);
         }
     }
+
+    bool rollback;
+    bool defaultIndexes;
+    bool capped;
 };
 
-template <bool rollback, bool defaultIndexes>
 class ReplaceCollection {
 public:
+    ReplaceCollection(bool rollback, bool defaultIndexes)
+        : rollback{rollback}, defaultIndexes{defaultIndexes} {}
+
     void run() {
         NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittests.rollback_replace_collection");
@@ -473,11 +495,16 @@ public:
             assertOnlyRecord(&opCtx, nss, newDoc);
         }
     }
+
+    bool rollback;
+    bool defaultIndexes;
 };
 
-template <bool rollback, bool defaultIndexes>
 class TruncateCollection {
 public:
+    TruncateCollection(bool rollback, bool defaultIndexes)
+        : rollback{rollback}, defaultIndexes{defaultIndexes} {}
+
     void run() {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
             "unittests.rollback_truncate_collection");
@@ -524,11 +551,15 @@ public:
             assertEmpty(&opCtx, nss);
         }
     }
+
+    bool rollback;
+    bool defaultIndexes;
 };
 
-template <bool rollback>
 class CreateIndex {
 public:
+    explicit CreateIndex(bool rollback) : rollback{rollback} {}
+
     void run() {
         std::string ns = "unittests.rollback_create_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -566,11 +597,14 @@ public:
             ASSERT(indexReady(&opCtx, nss, idxName));
         }
     }
+
+    bool rollback;
 };
 
-template <bool rollback>
 class DropIndex {
 public:
+    explicit DropIndex(bool rollback) : rollback{rollback} {}
+
     void run() {
         std::string ns = "unittests.rollback_drop_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -620,11 +654,14 @@ public:
             ASSERT(!indexExists(&opCtx, nss, idxName));
         }
     }
+
+    bool rollback;
 };
 
-template <bool rollback>
 class CreateDropIndex {
 public:
+    explicit CreateDropIndex(bool rollback) : rollback{rollback} {}
+
     void run() {
         std::string ns = "unittests.rollback_create_drop_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -664,11 +701,14 @@ public:
 
         ASSERT(!indexExists(&opCtx, nss, idxName));
     }
+
+    bool rollback;
 };
 
-template <bool rollback>
 class CreateCollectionAndIndexes {
 public:
+    explicit CreateCollectionAndIndexes(bool rollback) : rollback{rollback} {}
+
     void run() {
         std::string ns = "unittests.rollback_create_collection_and_indexes";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
@@ -719,35 +759,24 @@ public:
             ASSERT(indexReady(&opCtx, nss, idxNameC));
         }
     }
+
+    bool rollback;
 };
 
 class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("rollback") {}
 
-    template <template <bool> class T>
+    template <typename T>
     void addAll() {
-        add<T<false>>();
-        add<T<true>>();
-    }
-
-    template <template <bool, bool> class T>
-    void addAll() {
-        add<T<false, false>>();
-        add<T<false, true>>();
-        add<T<true, false>>();
-        add<T<true, true>>();
-    }
-    template <template <bool, bool, bool> class T>
-    void addAll() {
-        add<T<false, false, false>>();
-        add<T<false, false, true>>();
-        add<T<false, true, false>>();
-        add<T<false, true, true>>();
-        add<T<true, false, false>>();
-        add<T<true, false, true>>();
-        add<T<true, true, false>>();
-        add<T<true, true, true>>();
+        auto impl = [&]<typename... Bs>(auto self, std::tuple<Bs...> boolPack) {
+            if constexpr (std::is_constructible_v<T, Bs...>)
+                std::apply([&](auto&&... as) { add<T>(as...); }, boolPack);
+            else
+                for (auto b : {false, true})
+                    self(self, tuple_cat(boolPack, std::tuple(b)));
+        };
+        impl(impl, std::tuple{});
     }
 
     void setupTests() override {
