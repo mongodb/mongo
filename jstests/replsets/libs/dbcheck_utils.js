@@ -3,6 +3,8 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
+import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 
 export const defaultSnapshotSize = 1000;
 const infoBatchQuery = {
@@ -355,7 +357,7 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
         function () {
             queryCount = healthlog.find(query).count();
             if (queryCount != numExpected) {
-                jsTestLog(
+                jsTest.log.info(
                     "health log query returned " +
                         queryCount +
                         " entries, expected " +
@@ -420,23 +422,19 @@ export const injectInconsistencyOnSecondary = (
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
     let failMsg = "'listCollections' command failed";
-    // Some tests adds an invalid view, resulting in a failure of the 'listCollections' operation
-    // with an 'InvalidViewDefinition' error.
-    let res = assert.commandWorkedOrFailedWithCode(
-        database.runCommand("listCollections"),
-        ErrorCodes.InvalidViewDefinition,
-        failMsg,
-    );
-    if (res.ok) {
-        return res.cursor.firstBatch.filter((c) => c.type == "collection");
-    }
-    return [];
+    let res = assert.commandWorked(database.runCommand("listCollections", {filter: {type: {$ne: "view"}}}), failMsg);
+    return new DBCommandCursor(database, res).toArray();
 }
 
 // Returns a list of names of all indexes.
 function getIndexNames(db, collName, allowedErrorCodes) {
     let failMsg = "'listIndexes' command failed";
-    let res = assert.commandWorkedOrFailedWithCode(db[collName].runCommand("listIndexes"), allowedErrorCodes, failMsg);
+    const rawOpSpec = getRawOperationSpec(db);
+    let res = assert.commandWorkedOrFailedWithCode(
+        db[collName].runCommand({listIndexes: collName, ...rawOpSpec}),
+        allowedErrorCodes,
+        failMsg,
+    );
     if (res.ok) {
         return new DBCommandCursor(db, res).toArray().map((spec) => spec.name);
     }
@@ -486,7 +484,7 @@ export const runDbCheckForDatabase = (
         .map((c) => c.name)
         .forEach((collName) => {
             if (collNamesIgnoredFromDBCheck.includes(collName)) {
-                jsTestLog(
+                jsTest.log.info(
                     "dbCheck (" +
                         tojson(collDbCheckParameters) +
                         ") is skipped on ns: " +
@@ -499,7 +497,23 @@ export const runDbCheckForDatabase = (
                 return;
             }
 
-            jsTestLog(
+            // Ignore system.buckets.* collections when FCV >= 8.3
+            if (isFCVgte(replSet.getPrimary(), "8.3") && collName.startsWith("system.buckets")) {
+                jsTest.log.info(
+                    "dbCheck (" +
+                        tojson(collDbCheckParameters) +
+                        ") is skipped on ns: " +
+                        db.getName() +
+                        "." +
+                        collName +
+                        " for RS: " +
+                        replSet.getURL() +
+                        " (system.buckets collection)",
+                );
+                return;
+            }
+
+            jsTest.log.info(
                 "dbCheck (" +
                     tojson(collDbCheckParameters) +
                     ") is starting on ns: " +
@@ -518,7 +532,7 @@ export const runDbCheckForDatabase = (
                 false /* waitForHealthLogDbCheckStop */,
                 allowedErrorCodes,
             );
-            jsTestLog(
+            jsTest.log.info(
                 "dbCheck (" +
                     tojson(collDbCheckParameters) +
                     ") is done on ns: " +
@@ -539,7 +553,7 @@ export const runDbCheckForDatabase = (
                     validateMode: "extraIndexKeysCheck",
                     secondaryIndex: indexName,
                 };
-                jsTestLog(
+                jsTest.log.info(
                     "dbCheck (" +
                         tojson(extraIndexDbCheckParameters) +
                         ") is starting on ns: " +
@@ -558,7 +572,7 @@ export const runDbCheckForDatabase = (
                     false /* waitForHealthLogDbCheckStop */,
                     allowedErrorCodes,
                 );
-                jsTestLog(
+                jsTest.log.info(
                     "dbCheck (" +
                         tojson(extraIndexDbCheckParameters) +
                         ") is done on ns: " +
@@ -602,14 +616,14 @@ export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWa
                 let errs = healthlog.find({"severity": {$in: severityValues}, "data.error": regexString});
                 if (errs.hasNext()) {
                     const errMsg = "dbCheck found inconsistency on " + node.host;
-                    jsTestLog(errMsg + ". Errors/Warnings: ");
+                    jsTest.log.info(errMsg + ". Errors/Warnings: ");
                     let err;
                     for (let count = 0; errs.hasNext() && count < 20; count++) {
                         err = errs.next();
                         errorsFound.push(err);
-                        jsTestLog(tojson(err));
+                        jsTest.log.info(tojson(err));
                     }
-                    jsTestLog("Full HealthLog: " + tojson(healthlog.find().toArray()));
+                    jsTest.log.info("Full HealthLog: " + tojson(healthlog.find().toArray()));
                     assert(false, errMsg);
                 }
                 return true;
@@ -617,7 +631,7 @@ export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWa
                 if (e.code !== ErrorCodes.CappedPositionLost) {
                     throw e;
                 }
-                jsTestLog(`Retrying on CappedPositionLost error: ${tojson(e)}`);
+                jsTest.log.info(`Retrying on CappedPositionLost error: ${tojson(e)}`);
                 return false;
             }
         },
@@ -625,7 +639,7 @@ export const assertForDbCheckErrors = (node, assertForErrors = true, assertForWa
         60000,
     );
 
-    jsTestLog("Checked health log for on " + node.host);
+    jsTest.log.info("Checked health log for on " + node.host);
 };
 
 // Check for dbcheck errors for all nodes in a replica set and ignoring arbiters.
@@ -681,7 +695,7 @@ export function assertCompleteCoverage(healthlog, nDocs, indexName, docSuffix, s
 
     const truncateDocSuffix = (batchBoundary, docSuffix) => {
         const index = batchBoundary.indexOf(docSuffix);
-        jsTestLog("Index : " + index);
+        jsTest.log.info("Index : " + index);
         if (index < 1) {
             return batchBoundary;
         }
