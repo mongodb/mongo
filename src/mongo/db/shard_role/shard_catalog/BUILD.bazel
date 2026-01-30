@@ -341,6 +341,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl/dbcheck:health_log_interface",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_manager",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/stats:top",

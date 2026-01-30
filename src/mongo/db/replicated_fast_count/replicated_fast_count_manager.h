@@ -34,8 +34,10 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/replicated_size_and_count_metadata_manager/size_and_count.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_size_and_info.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -49,9 +51,22 @@
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC ReplicatedSizeAndCountMetadataManager {
+class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
 public:
-    static ReplicatedSizeAndCountMetadataManager& get(ServiceContext* svcCtx);
+    ReplicatedFastCountManager() {
+        initializeFastCountCommitFn();
+    }
+
+    /**
+     * Registers the fast count commit function that will be called on commit to apply the changes
+     * to the in-memory metadata. This function is initialized in this way to avoid introducing a
+     * circular dependency by having the UncommittedFastCountChange class depend directly on
+     * ReplicatedFastCountManager, since the former is depended on by the collection write path and
+     * the latter depends on the collection write path.
+     */
+    void initializeFastCountCommitFn();
+
+    static ReplicatedFastCountManager& get(ServiceContext* svcCtx);
 
     inline static StringData kCountKey = "c"_sd;
     inline static StringData kSizeKey = "s"_sd;
@@ -59,18 +74,23 @@ public:
     /**
      * Signals fastcount thread to start.
      */
-    void startup(OperationContext* opCtx) {
-        uasserted(ErrorCodes::NotImplemented,
-                  "ReplicatedSizeAndCountMetadataManager::startup not yet implemented");
-    }
+    void startup(OperationContext* opCtx);
+
     /**
      * Signals fastcount thread to stop.
      */
     void shutdown();
 
+    /**
+     * Records committed changes to the size and count for the collections in 'changes'.
+     */
     void commit(const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
                 boost::optional<Timestamp> commitTime);
 
+    /**
+     * Given a collection UUID, returns the last committed value of size and count for that
+     * collection.
+     */
     CollectionSizeCount find(const UUID& uuid) const;
 
 private:
@@ -81,12 +101,10 @@ private:
     void _createMetadataCollection(OperationContext* opCtx);
 
     void _writeMetadata(OperationContext* opCtx,
+                        const CollectionPtr& coll,
                         const UUID& uuid,
                         const CollectionSizeCount& sizeCount,
-                        RecordId recordId) {
-        uasserted(ErrorCodes::NotImplemented,
-                  "ReplicatedSizeAndCountMetadataManager::_writeMetadata not yet implemented");
-    }
+                        RecordId recordId);
 
     void _updateMetadata(OperationContext* opCtx,
                          const CollectionPtr& coll,
@@ -96,32 +114,17 @@ private:
     void _insertMetadata(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const UUID& uuid,
-                         const CollectionSizeCount& sizeCount) {
-        uasserted(ErrorCodes::NotImplemented,
-                  "ReplicatedSizeAndCountMetadataManager::_insertMetadata not yet implemented");
-    }
+                         const CollectionSizeCount& sizeCount);
 
     /**
      * Formats and returns the document to write to the metadata collection.
      */
     BSONObj _getDocForWrite(const UUID& uuid, const CollectionSizeCount& sizeCount);
 
-    // Acquire or create if missing, the kSystemReplicatedSizeAndCountMetadataStore collection.
-    // TODO SERVER-117575: Change return type to CollectionOrViewAcquisition
-    // boost::optional<CollectionOrViewAcquisition> _acquireMetadataCollection(
-    boost::optional<int> _acquireMetadataCollection(OperationContext* opCtx) {
-        uasserted(ErrorCodes::NotImplemented,
-                  "ReplicatedSizeAndCountMetadataManager::_acquireMetadataCollection not yet "
-                  "implemented");
-        return boost::none;
-    }
+    // Acquire or create if missing, the kSystemReplicatedFastCountStore collection.
+    CollectionOrViewAcquisition _acquireFastCountCollection(OperationContext* opCtx);
 
-    // void _fetch(OperationContext* opCtx, UUID uuid);
-    RecordId _keyForUUID(const UUID& uuid) {
-        uasserted(ErrorCodes::NotImplemented,
-                  "ReplicatedSizeAndCountMetadataManager::_keyForUUID not yet implemented");
-        return RecordId();
-    }
+    RecordId _keyForUUID(const UUID& uuid);
     UUID _UUIDForKey(RecordId key);
 
     AtomicWord<bool> _inShutdown = false;
@@ -133,6 +136,8 @@ private:
         bool dirty{false};  // indicate if write is needed
         // boost::optional<Timestamp> lastUpdated;
     };
+
+    // Map of collection UUID to the last committed size and count.
     absl::flat_hash_map<UUID, StoredSizeCount> _metadata;
 
     stdx::thread _backgroundThread;

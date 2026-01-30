@@ -1,0 +1,59 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "replicated_fast_count_manager",
+    srcs = [
+        "replicated_fast_count_manager.cpp",
+    ],
+    deps = [
+        "replicated_fast_count_committer",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/update:update_common",
+        "//src/mongo/db/update:update_document_diff",
+    ],
+)
+
+# This intentionally does not depend on the replicated_fast_count_manager library, since this
+# library is depended on by the collection write path whereas the replicated_fast_count_manager
+# library depends on the collection write path.
+mongo_cc_library(
+    name = "replicated_fast_count_uncommitted_changes",
+    srcs = [
+        "replicated_fast_count_uncommitted_changes.cpp",
+    ],
+    deps = [
+        "replicated_fast_count_committer",
+    ],
+)
+
+mongo_cc_library(
+    name = "replicated_fast_count_committer",
+    srcs = [
+        "replicated_fast_count_committer.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "replicated_fast_count_init",
+    srcs = [
+        "replicated_fast_count_init.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+    ],
+)

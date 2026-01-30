@@ -27,29 +27,20 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/replicated_size_and_count_metadata_manager/size_and_count.h"
-#include "mongo/util/uuid.h"
-
-#include <boost/container/flat_map.hpp>
-
+#include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
 
 namespace mongo {
 
-class MONGO_MOD_PUBLIC UncommittedMetaChange {
-public:
-    static const UncommittedMetaChange& read(OperationContext* opCtx);
-    static UncommittedMetaChange& write(OperationContext* opCtx);
+namespace {
+// Function to be registered as a callback for committing fast count changes.
+FastCountCommitFn gFastCountCommitFn;
+}  // namespace
 
-    CollectionSizeCount find(UUID uuid) const;
-    void record(UUID uuid, int64_t numDelta, int64_t sizeDelta);
+void setFastCountCommitFn(FastCountCommitFn fn) {
+    gFastCountCommitFn = std::move(fn);
+}
 
-private:
-    boost::container::flat_map<UUID, CollectionSizeCount> _trackedChanges;
-};
-
+FastCountCommitFn& getFastCountCommitFn() {
+    return gFastCountCommitFn;
+}
 }  // namespace mongo
-
-

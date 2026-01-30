@@ -130,7 +130,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
 Status ValidateState::_getReplicatedFastCountCollection(OperationContext* opCtx) const {
     // try {
     //     auto fastCountNss = NamespaceString::makeGlobalConfigCollection(
-    //         NamespaceString::kSystemReplicatedSizeAndCountMetadataStore);
+    //         NamespaceString::kSystemReplicatedFastCountStore);
     //     boost::optional<CollectionOrViewAcquisition> acquisition =
     //         acquireCollectionOrViewMaybeLockFree(
     //             opCtx,

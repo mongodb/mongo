@@ -231,9 +231,9 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
-    featureFlagReplicatedSizeAndCount:
+    featureFlagReplicatedFastCount:
         description: "Track collection size and count in replicated internal collections"
-        cpp_varname: gFeatureFlagReplicatedSizeAndCount
+        cpp_varname: gFeatureFlagReplicatedFastCount
         default: false
         fcv_gated: true
     featureFlagOtelMetrics:

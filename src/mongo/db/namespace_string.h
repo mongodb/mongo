@@ -84,9 +84,8 @@ public:
     static constexpr StringData kSystemDotProfileCollectionName = "system.profile"_sd;
 
     // Name for fastcount - replicated collection size and count - collections.
-    static constexpr StringData kSystemReplicatedSizeAndCountMetadataStore =
-        "fast_count_metadata_store"_sd;
-    static constexpr StringData kSystemReplicatedSizeAndCountMetadataStoreTimestamps =
+    static constexpr StringData kSystemReplicatedFastCountStore = "fast_count_metadata_store"_sd;
+    static constexpr StringData kSystemReplicatedFastCountStoreTimestamps =
         "fast_count_metadata_store_timestamps"_sd;
 
     // Names of privilege document collections

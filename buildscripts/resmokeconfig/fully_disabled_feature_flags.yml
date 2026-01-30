@@ -26,6 +26,6 @@
 # TODO SERVER-104494 SERVER-104258: Turn this back on once the issues are fixed.
 - featureFlagReshardingCloneNoRefresh
 # TODO SERVER-117454: Enable the feature flag in the all-feature-flags variant.
-- featureFlagReplicatedSizeAndCount
+- featureFlagReplicatedFastCount
 # TODO (SERVER-117324): Remove featureFlagDisallowFindAndModifyImageCollection
 - featureFlagDisallowFindAndModifyImageCollection

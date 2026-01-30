@@ -45,7 +45,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/replicated_size_and_count_metadata_manager/uncommitted_changes.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -400,10 +400,10 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             recordIds,
             /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
-        if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+        if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
                 VersionContext::getDecoration(opCtx),
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            UncommittedMetaChange::write(opCtx).record(
+            UncommittedFastCountChange::getForWrite(opCtx).record(
                 collection->uuid(),
                 records.size(),
                 std::accumulate(records.begin(), records.end(), 0LL, [](auto acc, const Record& r) {
@@ -772,10 +772,10 @@ void updateDocument(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
-    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        UncommittedMetaChange::write(opCtx).record(
+        UncommittedFastCountChange::getForWrite(opCtx).record(
             collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
     }
 }
@@ -870,10 +870,10 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     }
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
-    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        UncommittedMetaChange::write(opCtx).record(
+        UncommittedFastCountChange::getForWrite(opCtx).record(
             collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
     }
     return newDoc;
@@ -964,10 +964,11 @@ void deleteDocument(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onDelete(
         opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
-    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        UncommittedMetaChange::write(opCtx).record(collection->uuid(), -1, -doc.value().objsize());
+        UncommittedFastCountChange::getForWrite(opCtx).record(
+            collection->uuid(), -1, -doc.value().objsize());
     }
 
     if (opDebug) {
@@ -1020,10 +1021,11 @@ repl::OpTime truncateRange(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
-    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        UncommittedMetaChange::write(opCtx).record(collection->uuid(), -docsDeleted, -bytesDeleted);
+        UncommittedFastCountChange::getForWrite(opCtx).record(
+            collection->uuid(), -docsDeleted, -bytesDeleted);
     }
     return opTime;
 }

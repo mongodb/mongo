@@ -767,7 +767,7 @@ collection_write_path: # authoritative: @10gen/server-collection-write-path
   files:
     - src/mongo/db/collection_crud
     - src/mongo/db/commands/collection_to_capped*
-    - src/mongo/db/replicated_size_and_count_metadata_manager
+    - src/mongo/db/replicated_fast_count
 
 bsoncolumn: # authoritative: @10gen/server-bsoncolumn
   meta:

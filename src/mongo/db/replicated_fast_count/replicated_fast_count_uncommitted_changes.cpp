@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/replicated_size_and_count_metadata_manager/uncommitted_changes.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 
-#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -38,41 +38,44 @@
 
 namespace mongo {
 namespace {
-const OperationContext::Decoration<std::shared_ptr<UncommittedMetaChange>>
-    getUncommittedMetaChange =
-        OperationContext::declareDecoration<std::shared_ptr<UncommittedMetaChange>>();
-const ServiceContext::Decoration<ReplicatedSizeAndCountMetadataManager> getMetadataManager =
-    ServiceContext::declareDecoration<ReplicatedSizeAndCountMetadataManager>();
+const OperationContext::Decoration<std::shared_ptr<UncommittedFastCountChange>>
+    getUncommittedFastCountChange =
+        OperationContext::declareDecoration<std::shared_ptr<UncommittedFastCountChange>>();
 }  // namespace
 
-const UncommittedMetaChange& UncommittedMetaChange::read(OperationContext* opCtx) {
-    std::shared_ptr<UncommittedMetaChange>& ptr = getUncommittedMetaChange(opCtx);
+const UncommittedFastCountChange& UncommittedFastCountChange::getForRead(OperationContext* opCtx) {
+    std::shared_ptr<UncommittedFastCountChange>& ptr = getUncommittedFastCountChange(opCtx);
     if (ptr) {
         return *ptr;
     }
 
-    static UncommittedMetaChange empty;
+    static UncommittedFastCountChange empty;
     return empty;
 }
 
 
-UncommittedMetaChange& UncommittedMetaChange::write(OperationContext* opCtx) {
-    std::shared_ptr<UncommittedMetaChange>& ptr = getUncommittedMetaChange(opCtx);
+UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationContext* opCtx) {
+    std::shared_ptr<UncommittedFastCountChange>& ptr = getUncommittedFastCountChange(opCtx);
     if (ptr) {
         return *ptr;
     }
 
-    auto metaChange = std::make_shared<UncommittedMetaChange>();
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [metaChange](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-            getMetadataManager(opCtx->getServiceContext())
-                .commit(metaChange->_trackedChanges, commitTime);
-        });
+    auto metaChange = std::make_shared<UncommittedFastCountChange>();
+
     ptr = std::move(metaChange);
+
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
+            auto& fn = getFastCountCommitFn();
+
+            invariant(fn, "FastCountCommitFn is not set");
+
+            fn(opCtx, getUncommittedFastCountChange(opCtx)->_trackedChanges, commitTime);
+        });
     return *ptr;
 }
 
-CollectionSizeCount UncommittedMetaChange::find(UUID uuid) const {
+CollectionSizeCount UncommittedFastCountChange::find(const UUID& uuid) const {
     auto it = _trackedChanges.find(uuid);
     if (it != _trackedChanges.end()) {
         return it->second;
@@ -80,7 +83,7 @@ CollectionSizeCount UncommittedMetaChange::find(UUID uuid) const {
     return {};
 }
 
-void UncommittedMetaChange::record(UUID uuid, int64_t numDelta, int64_t sizeDelta) {
+void UncommittedFastCountChange::record(const UUID& uuid, int64_t numDelta, int64_t sizeDelta) {
     auto& collChanges = _trackedChanges[uuid];
     collChanges.count += numDelta;
     collChanges.size += sizeDelta;

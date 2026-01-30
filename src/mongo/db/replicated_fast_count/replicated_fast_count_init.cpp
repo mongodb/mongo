@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -44,23 +44,25 @@ Status createFastcountCollection(OperationContext* opCtx) {
         LOGV2(11718601,
               "Creating internal fastcount collection.",
               "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                              NamespaceString::kSystemReplicatedSizeAndCountMetadataStore)
+                              NamespaceString::kSystemReplicatedFastCountStore)
                               .toStringForErrorMsg());
 
         WriteUnitOfWork wuow(opCtx);
         Status createCollectionStatus = createCollection(
             opCtx,
             NamespaceString::makeGlobalConfigCollection(
-                NamespaceString::kSystemReplicatedSizeAndCountMetadataStore),
+                NamespaceString::kSystemReplicatedFastCountStore),
             CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()},
             BSONObj{});
-        uassert(createCollectionStatus.code(),
-                str::stream() << "Failed to create the metadata store collection: "
+        uassert(11757500,
+                str::stream() << "Failed to create the replicated fast count collection: "
                               << NamespaceString::makeGlobalConfigCollection(
-                                     NamespaceString::kSystemReplicatedSizeAndCountMetadataStore)
+                                     NamespaceString::kSystemReplicatedFastCountStore)
                                      .toStringForErrorMsg()
-                              << causedBy(createCollectionStatus.reason()),
-                createCollectionStatus.isOK());
+                              << causedBy(createCollectionStatus.reason()) << "code"
+                              << createCollectionStatus.code(),
+                createCollectionStatus.isOK() ||
+                    createCollectionStatus.code() == ErrorCodes::NamespaceExists);
         wuow.commit();
 
     } catch (const DBException& ex) {

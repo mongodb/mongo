@@ -135,7 +135,8 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -1127,6 +1128,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
     }
 
+    // TODO SERVER-118440: Revisit initializing this in ASC
+    if (!rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup() &&
+        gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(startupOpCtx.get()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassertStatusOK(createFastcountCollection(startupOpCtx.get()));
+        ReplicatedFastCountManager::get(serviceContext).startup(startupOpCtx.get());
+    }
+
     if (MONGO_unlikely(hangBeforeFinishingInitAndListen.shouldFail())) {
         // If something unexpectedly takes the GlobalLock and doesn't release
         // it, then we can livelock here because reconstructing prepared
@@ -1872,10 +1882,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     // Shut down the thread managing fast size and count information.
-    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        ReplicatedSizeAndCountMetadataManager::get(serviceContext).shutdown();
+        ReplicatedFastCountManager::get(serviceContext).shutdown();
     }
 
     // Depending on the underlying implementation, there may be some state that needs to be shut

@@ -2854,8 +2854,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/repl/split_horizon/OWNERS.yml
 /src/mongo/db/repl/split_horizon/**/* @10gen/server-split-horizon @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/replicated_size_and_count_metadata_manager/OWNERS.yml
-/src/mongo/db/replicated_size_and_count_metadata_manager/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
+# The following patterns are parsed from ./src/mongo/db/replicated_fast_count/OWNERS.yml
+/src/mongo/db/replicated_fast_count/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/router_role/OWNERS.yml
 /src/mongo/db/router_role/**/* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
