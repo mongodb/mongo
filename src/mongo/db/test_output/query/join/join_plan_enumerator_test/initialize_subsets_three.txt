@@ -8,9 +8,9 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.(0)[111] HJ
+0.(25.2957)[111] HJ
  -> left:
-    (0)[011] HJ
+    (1.71437)[011] HJ
      -> left:
         (0.0148174)[001][test.nss0] COLLSCAN
      -> right:
@@ -28,11 +28,11 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.(0)[111] HJ
+0.(25.2957)[111] HJ
  -> left:
     (2.97829)[100][test.nss2] COLLSCAN
  -> right:
-    (0)[011] HJ
+    (1.71437)[011] HJ
      -> left:
         (0.0148174)[001][test.nss0] COLLSCAN
      -> right:

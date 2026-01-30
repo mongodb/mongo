@@ -39,10 +39,6 @@
 namespace mongo::join_ordering {
 namespace {
 static constexpr size_t kBaseLevel = 0;
-// TODO SERVER-117480: remove this/ replace with actual calls to the costing module.
-JoinCostEstimate getZeroCE() {
-    return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
-}
 }  // namespace
 
 const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
@@ -93,6 +89,16 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
     return true;
 }
 
+void PlanEnumeratorContext::updateBestJoinPlanForSubset(JoinMethod method,
+                                                        JoinPlanNodeId left,
+                                                        JoinPlanNodeId right,
+                                                        JoinCostEstimate cost,
+                                                        JoinSubset& subset) {
+    subset.bestPlanIndex = subset.plans.size();
+    subset.plans.push_back(
+        _registry.registerJoinNode(subset, method, left, right, std::move(cost)));
+}
+
 void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
                                         JoinMethod method,
                                         const JoinSubset& left,
@@ -103,9 +109,12 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
         return;
     }
 
+    const auto leftPlan = _registry.get(left.bestPlan());
+
     if (method == JoinMethod::INLJ) {
         tassert(11371701, "Expected at least one edge", edges.size() >= 1);
         auto edge = edges[0];
+        // TODO SERVER-117583: Pick index in a cost-based manner.
         auto ie = bestIndexSatisfyingJoinPredicates(
             _ctx, (NodeId)*begin(right.subset), _ctx.joinGraph.getEdge(edge));
         if (!ie) {
@@ -113,30 +122,32 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
             return;
         }
 
-        const auto nodeId = right.getNodeId();
-        const auto& nss = _ctx.joinGraph.accessPathAt(nodeId)->nss();
-
-        // TODO SERVER-117480: actually get cost.
-        auto joinCost = getZeroCE();
-        if (subset.hasPlans() && joinCost >= _registry.getCost(subset.bestPlan())) {
+        const auto rightNodeId = right.getNodeId();
+        auto inljCost = _coster->costINLJFragment(leftPlan, rightNodeId, ie);
+        if (subset.hasPlans() && inljCost >= _registry.getCost(subset.bestPlan())) {
             // Only build this plan if it is better than what we already have.
             return;
         }
 
-        auto rhs = _registry.registerINLJRHSNode(nodeId, ie, nss);
-        subset.plans.push_back(
-            _registry.registerJoinNode(subset, method, left.bestPlan(), rhs, std::move(joinCost)));
+        const auto& nss = _ctx.joinGraph.accessPathAt(rightNodeId)->nss();
+        auto rhs = _registry.registerINLJRHSNode(rightNodeId, ie, nss);
+        updateBestJoinPlanForSubset(method, left.bestPlan(), rhs, std::move(inljCost), subset);
 
     } else {
-        // TODO SERVER-117480: actually get cost.
-        auto joinCost = getZeroCE();
+        const auto rightPlan = _registry.get(right.bestPlan());
+        JoinCostEstimate joinCost = [this, leftPlan, rightPlan, method]() {
+            if (method == JoinMethod::NLJ) {
+                return _coster->costNLJFragment(leftPlan, rightPlan);
+            }
+            tassert(1748000, "Expected HJ", method == JoinMethod::HJ);
+            return _coster->costHashJoinFragment(leftPlan, rightPlan);
+        }();
         if (subset.hasPlans() && joinCost >= _registry.getCost(subset.bestPlan())) {
             // Only build this plan if it is better than what we already have.
             return;
         }
-
-        subset.plans.push_back(_registry.registerJoinNode(
-            subset, method, left.bestPlan(), right.bestPlan(), std::move(joinCost)));
+        updateBestJoinPlanForSubset(
+            method, left.bestPlan(), right.bestPlan(), std::move(joinCost), subset);
     }
 
     LOGV2_DEBUG(11336912,

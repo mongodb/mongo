@@ -6,7 +6,7 @@ Level 1:
 11
 
 Output plans (best plan 0):
-0.(0)[11] HJ
+0.(1.71437)[11] HJ
  -> left:
     (0.0148174)[01][test.nss0] COLLSCAN
  -> right:
@@ -21,7 +21,7 @@ Level 1:
 11
 
 Output plans (best plan 0):
-0.(0)[11] HJ
+0.(1.71437)[11] HJ
  -> left:
     (0.0148174)[01][test.nss0] COLLSCAN
  -> right:

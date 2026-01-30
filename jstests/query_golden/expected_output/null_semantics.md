@@ -522,20 +522,12 @@ rightEmbeddingField: "cor"
   |  COLLSCAN [test.null_semantics_md_third]
   |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [key = key]
+  HASH_JOIN_EMBEDDING [key = key]
   leftEmbeddingField: "none"
   rightEmbeddingField: "lf"
   |  |
-  |  FETCH [test.null_semantics_md_other]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.null_semantics_md_other]
-  |  keyPattern: { "key" : 1 }
-  |  indexName: "key_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.null_semantics_md_other]
+  |  direction: "forward"
   |
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
@@ -627,35 +619,19 @@ rightEmbeddingField: "c4"
   |  COLLSCAN [test.null_semantics_md_fourth]
   |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [c1.key $= key,key = key]
+  HASH_JOIN_EMBEDDING [c1.key $= key,key = key]
   leftEmbeddingField: "none"
   rightEmbeddingField: "c2"
   |  |
-  |  FETCH [test.null_semantics_md_third]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.null_semantics_md_third]
-  |  keyPattern: { "key" : 1 }
-  |  indexName: "key_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.null_semantics_md_third]
+  |  direction: "forward"
   |
-  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [key $= key]
+  HASH_JOIN_EMBEDDING [key $= key]
   leftEmbeddingField: "none"
   rightEmbeddingField: "c1"
   |  |
-  |  FETCH [test.null_semantics_md_other]
-  |  
-  |  |
-  |  INDEX_PROBE_NODE [test.null_semantics_md_other]
-  |  keyPattern: { "key" : 1 }
-  |  indexName: "key_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.null_semantics_md_other]
+  |  direction: "forward"
   |
   COLLSCAN [test.null_semantics_md]
   direction: "forward"

@@ -78,8 +78,11 @@ double JoinCostEstimatorImpl::estimateDocSize(NodeSet subset) const {
     for (auto nodeId : iterable(subset)) {
         auto& collStats =
             _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
-        auto avgDocSize = collStats.allocatedDataPageBytes /
-            _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
+        auto collSize = _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
+        if (collSize == 0) {
+            continue;
+        }
+        auto avgDocSize = collStats.allocatedDataPageBytes / collSize;
         result += avgDocSize;
     }
     return result;

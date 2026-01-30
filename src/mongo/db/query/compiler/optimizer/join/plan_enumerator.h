@@ -131,6 +131,12 @@ private:
                              const JoinSubset& right,
                              const JoinSubset& subset);
 
+    void updateBestJoinPlanForSubset(JoinMethod method,
+                                     JoinPlanNodeId left,
+                                     JoinPlanNodeId right,
+                                     JoinCostEstimate cost,
+                                     JoinSubset& subset);
+
     const JoinReorderingContext& _ctx;
     std::unique_ptr<JoinCardinalityEstimator> _estimator;
     std::unique_ptr<JoinCostEstimator> _coster;
