@@ -196,6 +196,12 @@ std::string pruneGoogleFilter(const std::string& googleFilter) {
 void applyTestFilters(const std::vector<std::string>& suites,
                       const std::string& filter,
                       const std::string& fileNameFilter) {
+    LOGV2_DEBUG(11861900,
+                3,
+                "Applying test filters",
+                "suites"_attr = suites,
+                "filter"_attr = filter,
+                "fileNameFilter"_attr = fileNameFilter);
     boost::optional<pcre::Regex> filterRe;
     boost::optional<pcre::Regex> fileNameFilterRe;
     if (!filter.empty())
@@ -358,7 +364,7 @@ boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
         GTEST_FLAG_SET(repeat, *uto.repeat);
 
     // We allow options from the unit test's caller (i.e. main) to override the filter flags.
-    auto ensureFilter = [&]() -> decltype(auto) {
+    auto ensureFilter = [&]() -> auto& {
         if (!_options.filter)
             _options.filter.emplace();
         return _options.filter;
