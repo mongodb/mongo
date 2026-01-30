@@ -16,7 +16,6 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 let replSet = new ReplSetTest({name: "testSet", nodes: 3});
-let nodes = replSet.nodeList();
 replSet.startSet();
 let conf = replSet.getReplSetConfig();
 conf.members[2].priority = 0;

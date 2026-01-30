@@ -529,7 +529,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
             &opCtx, AdmissionContext::Priority::kExempt);
 
         // For pausing replication in tests.
-        if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
+        if (MONGO_unlikely(!useOplogWriter && rsSyncApplyStop.shouldFail())) {
             LOGV2(21229,
                   "Oplog Applier - rsSyncApplyStop fail point enabled. Blocking until fail "
                   "point is disabled");
@@ -544,7 +544,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
                 // Shut down and exit oplog application loop.
                 return;
             }
-            if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
+            if (MONGO_unlikely(!useOplogWriter && rsSyncApplyStop.shouldFail())) {
                 continue;
             }
             if (ops.termWhenExhausted()) {

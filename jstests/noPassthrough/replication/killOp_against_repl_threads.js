@@ -63,16 +63,7 @@ primaryAdminDB.adminCommand({
     logComponentVerbosity: {command: {verbosity: 3}},
 });
 
-let primaryOplogWriterFP = configureFailPoint(primary, "rsSyncApplyStop");
-try {
-    primaryOplogWriterFP.wait();
-    // Ensure Oplog Applier is stopped on the FP.
-    assert.soon(
-        () => rawMongoProgramOutput("21229.*Oplog Applier - rsSyncApplyStop fail point enabled."),
-        "mongod did not log that OplogApplier stopped at FP",
-        10 * 1000, // 10sec
-    );
-
+{
     const currentOpResults = primaryAdminDB.currentOp({"$all": true});
 
     const oplogWriterOp = currentOpResults.inprog.filter(function (op) {
@@ -80,22 +71,7 @@ try {
     });
     assert.gte(oplogWriterOp.length, 1, "Did not find any NoopWriter operation: " + tojson(currentOpResults));
 
-    const oplogApplierOp = currentOpResults.inprog.filter(function (op) {
-        return op.desc && op.desc == "OplogApplier-0";
-    });
-    assert.gte(oplogApplierOp.length, 1, "Did not find any OplogApplier operation: " + tojson(currentOpResults));
-
     assert.commandWorked(primaryAdminDB.killOp(oplogWriterOp[0].opid));
-    assert.commandWorked(primaryAdminDB.killOp(oplogApplierOp[0].opid));
-
-    assert.soon(
-        () => rawMongoProgramOutput("11227300.*Not killing exempt op").match('.*"opId":' + oplogApplierOp[0].opid),
-        "mongod did not log that it ignored killOp attempt on OplogApplier with opId=" + oplogApplierOp[0].opid,
-        10 * 1000, // 10sec
-    );
-} finally {
-    // Ensure the failpoint is turned off so the server cannot hang on shutdown.
-    primaryOplogWriterFP.off();
 }
 
 // Make sure both nodes are still alive
@@ -115,16 +91,11 @@ secondaryAdminDB.adminCommand({
 
 let secondaryOplogWriterFP = configureFailPoint(secondary, "rsSyncApplyStop");
 try {
+    // Ensure Oplog Writer is stopped on the FP.
     secondaryOplogWriterFP.wait();
-    // Ensure Oplog Writer and Applier are stopped on the FP.
     assert.soon(
         () => rawMongoProgramOutput("8543102.*Oplog Writer - rsSyncApplyStop fail point enabled."),
         "mongod did not log that OplogWriter stopped at FP",
-        10 * 1000, // 10sec
-    );
-    assert.soon(
-        () => rawMongoProgramOutput("21229.*Oplog Applier - rsSyncApplyStop fail point enabled."),
-        "mongod did not log that OplogApplier stopped at FP",
         10 * 1000, // 10sec
     );
 
@@ -137,22 +108,11 @@ try {
     });
     assert.gte(oplogWriterOp.length, 1, "Did not find any OplogWriter operation: " + tojson(currentOpResults));
 
-    const oplogApplierOp = currentOpResults.inprog.filter(function (op) {
-        return op.desc && op.desc == "OplogApplier-0";
-    });
-    assert.gte(oplogApplierOp.length, 1, "Did not find any OplogApplier operation: " + tojson(currentOpResults));
-
     assert.commandWorked(secondaryAdminDB.killOp(oplogWriterOp[0].opid));
-    assert.commandWorked(secondaryAdminDB.killOp(oplogApplierOp[0].opid));
 
     assert.soon(
         () => rawMongoProgramOutput("11227300.*Not killing exempt op").match('.*"opId":' + oplogWriterOp[0].opid),
         "mongod did not log that it ignored killOp attempt on OplogWriter with opId=" + oplogWriterOp[0].opid,
-        10 * 1000, // 10sec
-    );
-    assert.soon(
-        () => rawMongoProgramOutput("11227300.*Not killing exempt op").match('.*"opId":' + oplogApplierOp[0].opid),
-        "mongod did not log that it ignored killOp attempt on OplogApplier with opId=" + oplogApplierOp[0].opid,
         10 * 1000, // 10sec
     );
 } finally {
