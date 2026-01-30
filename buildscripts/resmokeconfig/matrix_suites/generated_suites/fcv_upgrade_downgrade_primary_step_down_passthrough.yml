@@ -9,8 +9,10 @@
 executor:
   archive:
     hooks:
-      - CheckReplDBHash
+      - FCVUpgradeDowngradeInBackground
+      - ContinuousStepdown
       - CheckReplOplogs
+      - CheckReplDBHash
       - ValidateCollections
     tests: true
   config:
@@ -25,6 +27,7 @@ executor:
         TestData:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: majority
+          isRunningFCVUpgradeDowngradeSuite: true
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true

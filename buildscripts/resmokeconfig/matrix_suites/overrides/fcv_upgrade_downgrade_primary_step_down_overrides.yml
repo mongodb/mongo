@@ -1,6 +1,13 @@
 - name: stepdown_and_fcv_hooks
   value:
     executor:
+      archive:
+        hooks:
+          - FCVUpgradeDowngradeInBackground
+          - ContinuousStepdown
+          - CheckReplOplogs
+          - CheckReplDBHash
+          - ValidateCollections
       hooks:
         - class: FCVUpgradeDowngradeInBackground
           shell_options:

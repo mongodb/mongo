@@ -36,6 +36,9 @@ filters:
   - "ingress_request_rate_limiter.yml":
     approvers:
       - 10gen/server-workload-resilience
+  - "fcv_upgrade_downgrade.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "fcv_upgrade_downgrade_primary_step_down_overrides.yml":
     approvers:
       - 10gen/server-replication-reviewers

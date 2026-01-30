@@ -1,0 +1,12 @@
+- name: overrides_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            globalThis.testingReplication = true;
+            await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+            await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");
+          global_vars:
+            TestData:
+              isRunningFCVUpgradeDowngradeSuite: true
