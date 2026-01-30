@@ -183,6 +183,16 @@ public:
         // ViewPolicy.
         bool isExtensionVectorSearchStage() const override;
 
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            return this->onlyReadConcernLocalSupported(
+                this->getParseTimeName(), level, isImplicitDefault);
+        }
+
+        void assertSupportsMultiDocumentTransaction() const override {
+            this->transactionNotSupported(this->getParseTimeName());
+        }
+
         // Define how to desugar a LiteParsedExpandable.
         static LiteParsedDesugarer::StageExpander stageExpander;
 
@@ -297,6 +307,16 @@ public:
         bool isExtensionVectorSearchStage() const override;
 
         ViewPolicy getViewPolicy() const override;
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            return this->onlyReadConcernLocalSupported(
+                this->getParseTimeName(), level, isImplicitDefault);
+        }
+
+        void assertSupportsMultiDocumentTransaction() const override {
+            this->transactionNotSupported(this->getParseTimeName());
+        }
 
     private:
         const AggStageAstNodeHandle _astNode;
