@@ -79,6 +79,10 @@ bool AttachedPersistenceProvider::shouldUseReplicatedTruncates() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::shouldUseReplicatedFastCount() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::shouldUseOplogWritesForFlowControlSampling() const {
     return true;
 }

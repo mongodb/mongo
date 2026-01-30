@@ -78,6 +78,11 @@ public:
     bool shouldUseReplicatedTruncates() const override;
 
     /**
+     * Attached storage uses unreplicated fastcounts.
+     */
+    bool shouldUseReplicatedFastCount() const override;
+
+    /**
      * Flow control is based on the rate of generation of oplog data and the ability of the
      * secondaries to keep the majority commit point relatively up-to-date.
      */

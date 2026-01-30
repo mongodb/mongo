@@ -104,6 +104,11 @@ public:
     virtual bool shouldUseReplicatedTruncates() const = 0;
 
     /**
+     * If true, fastcounts (collection size and count) will be managed with replicated writes.
+     */
+    virtual bool shouldUseReplicatedFastCount() const = 0;
+
+    /**
      * If true, writes to the oplog should be used as the unit of progress for flow control
      * sampling.
      */
