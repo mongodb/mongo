@@ -103,7 +103,7 @@ TEST(ContainerIteratorTest, Iterate) {
     ASSERT_OK(container.insert(
         ru, containerKey5, {containerValue5.buf(), static_cast<size_t>(containerValue5.len())}));
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        containerKey1,
                                                        containerKey5 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
@@ -136,7 +136,7 @@ TEST(ContainerIteratorTest, Iterate) {
     EXPECT_FALSE(iterator.more());
 }
 
-TEST(ContainerIteratorTest, SharedCursor) {
+TEST(ContainerIteratorTest, MultipleCursors) {
     RecoveryUnitNoop ru;
     ViewableIntegerKeyedContainer container;
 
@@ -179,16 +179,15 @@ TEST(ContainerIteratorTest, SharedCursor) {
     ASSERT_OK(container.insert(
         ru, containerKey4, {containerValue4.buf(), static_cast<size_t>(containerValue4.len())}));
 
-    auto cursor = container.getSharedCursor(ru);
     ContainerIterator<IntWrapper, IntWrapper> iterator1{
-        cursor,
+        container.getCursor(ru),
         containerKey1,
         containerKey2 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
         /*_checksumCalculator=*/71873048,
         SorterChecksumVersion::v2};
     ContainerIterator<IntWrapper, IntWrapper> iterator2{
-        cursor,
+        container.getCursor(ru),
         containerKey3,
         containerKey4 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
@@ -227,11 +226,11 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
     key1.serializeForSorter(containerValue1);
     value1.serializeForSorter(containerValue1);
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*_checksumCalculator=*/4104690164,
                                                        SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator.more());
@@ -243,7 +242,7 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
     EXPECT_EQ(iterator.nextWithDeferredValue(), key1);
 
     ASSERT_OK(container.remove(ru, containerKey1));
-    EXPECT_THROW(iterator.getDeferredValue(), DBException);
+    EXPECT_EQ(iterator.getDeferredValue(), value1);
 }
 
 TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
@@ -262,11 +261,11 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
     ASSERT_OK(container.insert(
         ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*_checksumCalculator=*/4104690164,
                                                        SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator.more());
@@ -292,8 +291,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV1Fails, "116059
     ASSERT_OK(container.insert(
         ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
 
-    auto cursor = container.getSharedCursor(ru);
-    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
@@ -320,8 +318,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
     ASSERT_OK(container.insert(
         ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
 
-    auto cursor = container.getSharedCursor(ru);
-    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
@@ -342,8 +339,7 @@ TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
     RecoveryUnitNoop ru;
     ViewableIntegerKeyedContainer container;
 
-    auto cursor = container.getSharedCursor(ru);
-    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getCursor(ru),
                                                        /*start=*/0,
                                                        /*end=*/1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},

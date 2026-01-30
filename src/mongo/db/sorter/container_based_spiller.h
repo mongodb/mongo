@@ -59,32 +59,28 @@ public:
      * Constructs an iterator using the given cursor, from `start` (inclusive) up to `end`
      * (exclusive).
      */
-    ContainerIterator(std::shared_ptr<IntegerKeyedContainer::Cursor> cursor,
+    ContainerIterator(std::unique_ptr<IntegerKeyedContainer::Cursor> cursor,
                       int64_t start,
                       int64_t end,
                       Iterator<Key, Value>::Settings settings,
                       const size_t checksum,
                       const SorterChecksumVersion checksumVersion)
         : _cursor(std::move(cursor)),
-          _position(start),
+          _start(start),
+          _position(_unpositioned),
           _end(end),
           _settings(std::move(settings)),
           _checksumCalculator(checksumVersion),
           _originalChecksum(checksum) {}
 
     bool more() override {
-        return _position < _end;
+        return _position < _end - 1;
     }
 
     std::pair<Key, Value> next() override {
-        auto result = _cursor->find(_position);
-        uassert(10896300,
-                fmt::format("Sorter container unexpectedly missing key {}", _position),
-                result);
-        ++_position;
-
-        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
-        _checksumCalculator.addData(result->data(), result->size());
+        auto result = _next();
+        BufReader reader{result.data(), static_cast<unsigned>(result.size())};
+        _checksumCalculator.addData(result.data(), result.size());
         _compareChecksums();
 
         return {Key::deserializeForSorter(reader, _settings.first),
@@ -92,34 +88,26 @@ public:
     }
 
     Key nextWithDeferredValue() override {
-        uassert(10896301, "Must follow nextWithDeferredValue with getDeferredValue", !_keySize);
+        uassert(
+            10896301, "Must follow nextWithDeferredValue with getDeferredValue", !_deferredValue);
 
-        auto result = _cursor->find(_position);
-        uassert(10896302,
-                fmt::format("Sorter container unexpectedly missing key {}", _position),
-                result);
-
-        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
-        _checksumCalculator.addData(result->data(), result->size());
+        auto result = _next();
+        BufReader reader{result.data(), static_cast<unsigned>(result.size())};
+        _checksumCalculator.addData(result.data(), result.size());
         _compareChecksums();
 
         auto key = Key::deserializeForSorter(reader, _settings.first);
-        _keySize = reader.offset();
+        _deferredValue.emplace(result.data() + reader.offset(), result.size() - reader.offset());
 
         return std::move(key);
     }
 
     Value getDeferredValue() override {
-        uassert(10896303, "Must precede getDeferredValue with nextWithDeferredValue", _keySize);
+        uassert(
+            10896303, "Must precede getDeferredValue with nextWithDeferredValue", _deferredValue);
 
-        auto result = _cursor->find(_position);
-        uassert(10896304,
-                fmt::format("Sorter container unexpectedly missing key {}", _position),
-                result);
-        ++_position;
-
-        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
-        reader.skip(*std::exchange(_keySize, boost::none));
+        BufReader reader{_deferredValue->data(), static_cast<unsigned>(_deferredValue->size())};
+        _deferredValue = boost::none;
 
         return Value::deserializeForSorter(reader, _settings.second);
     }
@@ -129,7 +117,7 @@ public:
     }
 
     SorterRange getRange() const override {
-        return {_position, _end, static_cast<int64_t>(_originalChecksum)};
+        return {_start, _end, static_cast<int64_t>(_originalChecksum)};
     }
 
     bool spillable() const override {
@@ -142,8 +130,32 @@ public:
     }
 
 private:
+    static constexpr int64_t _unpositioned = -1;
+
+    std::span<const char> _next() {
+        if (_position == _unpositioned) {
+            auto result = _cursor->find(_start);
+            uassert(10896300,
+                    fmt::format("Sorter container unexpectedly missing key {}", _position),
+                    result);
+            _position = _start;
+            return *result;
+        }
+
+        auto result = _cursor->next();
+        uassert(11786000,
+                fmt::format("Sorter container unexpectedly reached end before key {}", _position),
+                result);
+        uassert(11786001,
+                fmt::format("Sorter container unexpectedly got key {} instead of {}",
+                            result->first,
+                            _position),
+                result->first == ++_position);
+        return result->second;
+    }
+
     void _compareChecksums() {
-        if (_position >= _end && _originalChecksum != _checksumCalculator.checksum()) {
+        if (!more() && _originalChecksum != _checksumCalculator.checksum()) {
             fassert(11605900,
                     Status(ErrorCodes::Error::ChecksumMismatch,
                            "Data read from container does not match what was written to container. "
@@ -151,11 +163,12 @@ private:
         }
     }
 
-    std::shared_ptr<IntegerKeyedContainer::Cursor> _cursor;
+    std::unique_ptr<IntegerKeyedContainer::Cursor> _cursor;
+    int64_t _start;
     int64_t _position;
     int64_t _end;
     Iterator<Key, Value>::Settings _settings;
-    boost::optional<size_t> _keySize;
+    boost::optional<std::span<const char>> _deferredValue;
 
     // Checksum value that is updated with each read of a data object from a container. We can
     // compare this value with _originalChecksum to check for data corruption if and only if the
@@ -220,7 +233,7 @@ public:
     }
 
     std::shared_ptr<Iterator> done() override {
-        return std::make_shared<ContainerIterator<Key, Value>>(_container.getSharedCursor(_ru),
+        return std::make_shared<ContainerIterator<Key, Value>>(_container.getCursor(_ru),
                                                                _rangeStartKey,
                                                                _nextKey,
                                                                this->_settings,
@@ -228,7 +241,7 @@ public:
                                                                this->_checksumCalculator.version());
     }
     std::unique_ptr<Iterator> doneUnique() override {
-        return std::make_unique<ContainerIterator<Key, Value>>(_container.getSharedCursor(_ru),
+        return std::make_unique<ContainerIterator<Key, Value>>(_container.getCursor(_ru),
                                                                _rangeStartKey,
                                                                _nextKey,
                                                                this->_settings,
