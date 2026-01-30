@@ -61,13 +61,13 @@ void DynamicLimitController::addHost(PoolId id, const HostAndPort& host) {
                           host));
 }
 
-DynamicLimitController::HostGroupState DynamicLimitController::updateHost(PoolId id,
-                                                                          const HostState& stats) {
+DynamicLimitController::HostGroupState DynamicLimitController::updateHost(
+    PoolId id, const PoolMetrics& stats) {
     stdx::lock_guard lk(_mutex);
     auto& data = getOrInvariant(_poolData, id);
     data.target =
         std::clamp(stats.requests + stats.active + stats.leased, _minLoader(), _maxLoader());
-    return {{data.host}, stats.health == ConnectionPool::HostHealth::kExpired};
+    return {{data.host}, stats.state == ConnectionPoolState::kExpired};
 }
 
 void DynamicLimitController::removeHost(PoolId id) {

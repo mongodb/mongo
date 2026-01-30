@@ -47,6 +47,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -640,7 +641,8 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
                                                    0,
                                                    Milliseconds{0},
                                                    0,
-                                                   0};
+                                                   0,
+                                                   executor::ConnectionPoolState::kHealthy};
             hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
             stats->updateStatsForHost("global", host, hostStats);
         }

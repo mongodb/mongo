@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
@@ -79,7 +80,8 @@ struct ConnectionStatsPer {
                        size_t nWasUsedOnce,
                        Milliseconds nConnUsageTime,
                        size_t nRejectedConnectionsCount,
-                       size_t nPendingRequestsCount);
+                       size_t nPendingRequestsCount,
+                       ConnectionPoolState nPoolState);
 
     ConnectionStatsPer();
 
@@ -99,6 +101,7 @@ struct ConnectionStatsPer {
     size_t rejectedRequests = 0u;
     size_t pendingRequests = 0u;
     ConnectionWaitTimeHistogram acquisitionWaitTimes{};
+    ConnectionPoolState poolState{ConnectionPoolState::kHealthy};
 };
 
 /**

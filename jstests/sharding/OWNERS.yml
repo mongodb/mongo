@@ -3,6 +3,9 @@ filters:
   - "auto_split_vector_basic.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "conn_pool*":
+    approvers:
+      - 10gen/server-networking-and-observability
   - "drop_indexes_participant*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

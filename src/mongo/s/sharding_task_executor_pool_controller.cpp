@@ -234,7 +234,7 @@ void ShardingTaskExecutorPoolController::addHost(PoolId id, const HostAndPort& h
     // Add this PoolData to the set
     emplaceOrInvariant(_poolDatas, id, std::move(poolData));
 }
-auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& stats)
+auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const PoolMetrics& stats)
     -> HostGroupState {
     stdx::lock_guard lk(_mutex);
 
@@ -270,7 +270,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
         poolData.target = maxConns;
     }
 
-    poolData.isAbleToShutdown = (stats.health == ConnectionPool::HostHealth::kExpired);
+    poolData.isAbleToShutdown = (stats.state == executor::ConnectionPoolState::kExpired);
 
     // If the pool isn't in a groupData, we can return now
     auto groupData = poolData.groupData.lock();

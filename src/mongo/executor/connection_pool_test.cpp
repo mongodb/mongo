@@ -3051,6 +3051,87 @@ TEST_F(ConnectionPoolTest, WhenARefreshFailsNewConnectionsAreSpawnedOnNewConnect
     doneWith(conn1->getValue());
 }
 
+TEST_F(ConnectionPoolTest, HealthyPoolReportsHealthyState) {
+    auto pool = makePool();
+
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(
+        HostAndPort(),
+        Milliseconds(5000),
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { doneWith(swConn.getValue()); });
+
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kHealthy));
+}
+
+TEST_F(ConnectionPoolTest, FailedPoolReportsFailedState) {
+    auto pool = makePool();
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(HostAndPort(),
+                      Milliseconds(5000),
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          doneWithError(swConn.getValue(), {ErrorCodes::HostUnreachable, "error"});
+                      });
+
+    auto stats = getStats(pool);
+    auto hostStats = stats.statsByHost.at(HostAndPort());
+    ASSERT_EQ(static_cast<int>(hostStats.poolState),
+              static_cast<int>(ConnectionPoolState::kFailed));
+}
+
+TEST_F(ConnectionPoolTest, ThrottledPoolReportsThrottleState) {
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> connToTriggerSetup;
+
+    const auto refreshTimeout = Seconds(2);
+    const auto startTimePoint = Date_t::now();
+    PoolImpl::setNow(startTimePoint);
+
+    auto [pool, inUseConnections] = setupConnectionPool(
+        1,
+        1,
+        1,
+        [&](ConnectionPool::Options& options) {
+            options.refreshTimeout = refreshTimeout;
+            options.refreshRequirement = Seconds(100);
+        },
+        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            connToTriggerSetup = std::move(swConn);
+        });
+
+    ON_BLOCK_EXIT([&]() {
+        for (auto& conn : inUseConnections) {
+            doneWith(conn);
+        }
+
+        if (connToTriggerSetup && connToTriggerSetup->isOK()) {
+            doneWith(connToTriggerSetup->getValue());
+        }
+    });
+
+    {
+        auto stats = getStats(pool);
+        auto hostStats = stats.statsByHost.at(HostAndPort());
+        ASSERT_EQ(static_cast<int>(hostStats.poolState),
+                  static_cast<int>(ConnectionPoolState::kHealthy));
+    }
+
+    const auto setupFailureTimePoint = startTimePoint + refreshTimeout;
+    PoolImpl::setNow(setupFailureTimePoint);
+
+    {
+        auto stats = getStats(pool);
+        auto hostStats = stats.statsByHost.at(HostAndPort());
+        ASSERT_EQ(static_cast<int>(hostStats.poolState),
+                  static_cast<int>(ConnectionPoolState::kThrottle));
+    }
+}
+
 }  // namespace connection_pool_test_details
 }  // namespace executor
 }  // namespace mongo

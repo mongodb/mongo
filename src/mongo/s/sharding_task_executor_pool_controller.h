@@ -157,7 +157,7 @@ public:
     void init(ConnectionPool* parent) override;
 
     void addHost(PoolId id, const HostAndPort& host) override;
-    HostGroupState updateHost(PoolId id, const HostState& stats) override;
+    HostGroupState updateHost(PoolId id, const PoolMetrics& stats) override;
     void removeHost(PoolId id) override;
 
     ConnectionControls getControls(PoolId id) override;

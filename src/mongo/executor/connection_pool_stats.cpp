@@ -60,7 +60,8 @@ ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
                                        size_t nWasUsedOnce,
                                        Milliseconds nConnUsageTime,
                                        size_t nRejectedConnectionsCount,
-                                       size_t nPendingRequestsCount)
+                                       size_t nPendingRequestsCount,
+                                       ConnectionPoolState nPoolState)
     : inUse(nInUse),
       available(nAvailable),
       leased(nLeased),
@@ -71,7 +72,8 @@ ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
       wasUsedOnce(nWasUsedOnce),
       connUsageTime(nConnUsageTime),
       rejectedRequests(nRejectedConnectionsCount),
-      pendingRequests(nPendingRequestsCount) {}
+      pendingRequests(nPendingRequestsCount),
+      poolState(nPoolState) {}
 
 ConnectionStatsPer::ConnectionStatsPer() = default;
 
@@ -88,6 +90,7 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
     rejectedRequests += other.rejectedRequests;
     acquisitionWaitTimes += other.acquisitionWaitTimes;
     pendingRequests += other.pendingRequests;
+    poolState = other.poolState;
 
     return *this;
 }
@@ -192,6 +195,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 hostInfo.appendNumber("pendingRequests",
                                       static_cast<long long>(stats.pendingRequests));
                 appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
+                hostInfo.appendNumber("poolState", static_cast<int>(stats.poolState));
             }
         }
     }
@@ -212,6 +216,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                                   static_cast<long long>(stats.rejectedRequests));
             hostInfo.appendNumber("pendingRequests", static_cast<long long>(stats.pendingRequests));
             appendHistogram(hostInfo, stats.acquisitionWaitTimes, kAcquisitionWaitTimesKey);
+            hostInfo.appendNumber("poolState", static_cast<int>(stats.poolState));
         }
     }
 }

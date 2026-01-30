@@ -5,7 +5,7 @@
  * don't account for background activity on a config server.
  * @tags: [
  *   config_shard_incompatible,
- *   requires_fcv_63,
+ *   requires_fcv_83,
  * ]
  */
 import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
@@ -40,6 +40,16 @@ assert.lte(
 assert("totalRefreshed" in stats);
 
 assert("acquisitionWaitTimes" in stats);
+
+for (const hostName in stats["hosts"]) {
+    assert(
+        "poolState" in stats["hosts"][hostName],
+        "Expected poolState in host stats for " +
+            hostName +
+            ", host stats object is " +
+            tojson(stats["hosts"][hostName]),
+    );
+}
 
 // Check that connection wait time histograms are consistent.
 function assertHistogramIsSumOfChildren(parentStats, childrenStats) {

@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
@@ -210,51 +211,12 @@ public:
     };
 
     /**
-     * A set of states describing the health of a host pool:
-     */
-    enum class HostHealth {
-        /**
-         * The pool is healthy and will spawn new connections to reach the specified target.
-         */
-        kHealthy,
-        /**
-         * The pool is expired and can be shutdown by updateController.
-         * It is set when there have been no connection requests or in use connections for
-         * ControllerInterface::hostTimeout().
-         *
-         * The host health will go back to `kHealthy` as soon as a connection is requested.
-         */
-        kExpired,
-        /**
-         * The pool has processed a failure and will not spawn new connections until requested.
-         * It is set by processFailure() unless a shutdown has been triggered.
-         *
-         * As a further note, this prevents us from spamming a failed host with connection attempts.
-         * If an external user believes a host should be available, they can request again.
-         *
-         * The host health will go back to `kHealthy` as soon as a connection is requested.
-         */
-        kFailed,
-        /**
-         * The pool is shutdown and will never be called by the ConnectionPool again.
-         * It is set by triggerShutdown() or updateController(). It is never unset.
-         */
-        kShutdown,
-        /**
-         * The pool has received an overload failure during a connection setup.
-         * New connection spawns will happen with a backoff-with-jitter delay until the next
-         * returned connection gets refreshed or a setup succeeds.
-         */
-        kThrottle,
-    };
-
-    /**
      * The state of connection pooling for a single host
      *
      * This should only be constructed by the SpecificPool.
      */
-    struct HostState {
-        HostHealth health = HostHealth::kHealthy;
+    struct PoolMetrics {
+        ConnectionPoolState state = ConnectionPoolState::kHealthy;
         size_t requests = 0;
         size_t pending = 0;
         size_t ready = 0;
@@ -558,14 +520,15 @@ private:
 /**
  * An implementation of ControllerInterface directs the behavior of a SpecificPool
  *
- * Generally speaking, a Controller will be given HostState via updateState and then return Controls
- * via getControls. A Controller is expected to not directly mutate its SpecificPool, including via
- * its ConnectionPool pointer. A Controller is expected to be given to only one ConnectionPool.
+ * Generally speaking, a Controller will be given PoolMetrics via updateState and then return
+ * Controls via getControls. A Controller is expected to not directly mutate its SpecificPool,
+ * including via its ConnectionPool pointer. A Controller is expected to be given to only one
+ * ConnectionPool.
  */
 class ConnectionPool::ControllerInterface {
 public:
     using SpecificPool = typename ConnectionPool::SpecificPool;
-    using HostState = typename ConnectionPool::HostState;
+    using PoolMetrics = typename ConnectionPool::PoolMetrics;
     using ConnectionControls = typename ConnectionPool::ConnectionControls;
     using HostGroupState = typename ConnectionPool::HostGroupState;
     using PoolId = typename ConnectionPool::PoolId;
@@ -589,7 +552,7 @@ public:
      *
      * This function returns the state of the group of hosts to which this host belongs.
      */
-    virtual HostGroupState updateHost(PoolId id, const HostState& stats) = 0;
+    virtual HostGroupState updateHost(PoolId id, const PoolMetrics& stats) = 0;
 
     /**
      * Inform this Controller that a pool is no longer tracked
