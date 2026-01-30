@@ -35,6 +35,13 @@ if [ "$PATCH" ]; then
     TAG_SUFFIX="$TAG_SUFFIX-$revision_order_id"
 fi
 
+for arg in "$@"; do
+    if [ "$arg" == "--break-glass" ]; then
+        TAG_SUFFIX="${TAG_SUFFIX}_break_glass"
+        break
+    fi
+done
+
 attempts=0
 max_attempts=4
 

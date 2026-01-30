@@ -29,6 +29,13 @@ if [ "$PATCH" ]; then
     DISTRO_SUFFIX="$DISTRO_SUFFIX-$revision_order_id"
 fi
 
+for arg in "$@"; do
+    if [ "$arg" == "--break-glass" ]; then
+        DISTRO_SUFFIX="${DISTRO_SUFFIX}_break_glass"
+        break
+    fi
+done
+
 # Creating the manifest.
 docker manifest create $IMAGE:$GITSHA$DISTRO_SUFFIX \
     $IMAGE:$GITSHA-arm64$DISTRO_SUFFIX \

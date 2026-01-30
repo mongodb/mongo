@@ -427,6 +427,9 @@ tasks:
         omit_generated_tasks: true
     commands:
       - func: "streams build"
+        vars:
+          streams_output_file: streams_build_only.json
+          streams_s3_path: streams_build_only
 
   - name: streams_build_and_push_gen
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
@@ -436,14 +439,14 @@ tasks:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      # Update with all gen tasks to depend on here and the display name in evergreen_gen_streams_build_and_push_task.py
-      - name: streams_gen
-      - name: streams_kafka_gen
     commands:
-      - func: "streams build and push"
+      - func: "streams build"
+        vars:
+          streams_output_file: streams_build_and_push.json
+          streams_s3_path: streams_build_and_push
+          push_arg: "--push=true"
 
-  # This task is intended for use when building QA builds.
-  - name: streams_skip_tests_build_and_push_gen
+  - name: streams_build_and_push_break_glass_gen
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
     depends_on:
       - name: version_gen
@@ -452,7 +455,12 @@ tasks:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     commands:
-      - func: "streams skip tests build and push"
+      - func: "streams build"
+        vars:
+          streams_output_file: streams_build_and_push.json
+          streams_s3_path: streams_build_and_push
+          push_arg: "--push=true"
+          break_glass_arg: "--break-glass=true"
 
   - name: bazel_result_tasks_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

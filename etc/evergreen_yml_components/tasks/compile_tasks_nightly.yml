@@ -773,3 +773,21 @@ tasks:
         variant: enterprise-amazon2023-streams-arm64
     commands:
       - func: "streams publish manifest"
+
+  # Break glass version - publishes manifest without waiting for tests
+  - name: streams_publish_manifest_al2023_break_glass_gen
+    tags: ["assigned_to_jira_team_streams", "auxiliary"]
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      - name: streams_build_and_push_break_glass_gen
+        variant: enterprise-amazon2023-streams
+      - name: streams_build_and_push_break_glass_gen
+        variant: enterprise-amazon2023-streams-arm64
+    commands:
+      - func: "streams publish manifest"
+        vars:
+          break_glass_arg: "--break-glass=true"

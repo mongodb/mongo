@@ -61,8 +61,8 @@ buildvariants:
       - name: streams_aspio_iceberg_4
       - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
-      - name: streams_skip_tests_build_and_push_gen
-        activate: false # Only run on manual patches for now
+      - name: streams_build_and_push_break_glass_gen
+        activate: false # Only run on manual patches
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: enterprise-amazon2023-streams-arm64
@@ -118,8 +118,10 @@ buildvariants:
       - name: streams_aspio_iceberg_4
       - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
-      - name: streams_skip_tests_build_and_push_gen
-        activate: false # Only run on manual patches for now
+      - name: streams_build_and_push_break_glass_gen
+        activate: false # Only run on manual patches
       # Only needed once to generate the streams manifest for both x86 and arm
       - name: streams_publish_manifest_al2023_gen
+      - name: streams_publish_manifest_al2023_break_glass_gen
+        activate: false # Only run on manual patches
       - name: generate_buildid_to_debug_symbols_mapping

@@ -17,7 +17,35 @@ from buildscripts.util.read_config import read_config_file
 # The docker manifest is used in order for the different architecture images to be pulled correctly without needing the particular architecture tag.
 
 
-def make_task(compile_variant: str) -> Task:
+def make_testing_gate_task(compile_variant: str) -> Task:
+    dependencies = {
+        TaskDependency("aggregation", compile_variant.replace("-arm64", "")),
+        TaskDependency("aggregation", compile_variant),
+        TaskDependency(".streams_release_test", compile_variant.replace("-arm64", "")),
+        TaskDependency(".streams_release_test", compile_variant),
+    }
+
+    return Task(f"streams_testing_gate_{compile_variant}", [], dependencies)
+
+
+def make_task(compile_variant: str, break_glass: str) -> Task:
+    task_name = "streams_publish_manifest_"
+    dep_task_prefix = "streams_build_and_push_"
+    script_args = ["./src/evergreen/streams_docker_manifest.sh"]
+
+    dependencies = set()
+
+    if break_glass == "true":
+        task_name += "break_glass_"
+        dep_task_prefix += "break_glass_"
+        script_args.append("--break-glass")
+    else:
+        dependencies.add(TaskDependency("aggregation", compile_variant.replace("-arm64", "")))
+        dependencies.add(TaskDependency("aggregation", compile_variant))
+        dependencies.add(TaskDependency(".streams_release_test"))
+    dependencies.add(TaskDependency(f"{dep_task_prefix}{compile_variant.replace('-arm64', '')}"))
+    dependencies.add(TaskDependency(f"{dep_task_prefix}{compile_variant}"))
+
     commands = [
         BuiltInCommand("manifest.load", {}),
         FunctionCall("git get project and add git tag"),
@@ -35,20 +63,18 @@ def make_task(compile_variant: str) -> Task:
             {
                 "add_expansions_to_env": True,
                 "binary": "bash",
-                "args": ["./src/evergreen/streams_docker_manifest.sh"],
+                "args": script_args,
             },
         ),
     ]
-    dependencies = {
-        TaskDependency(f"streams_build_and_push_{compile_variant.replace('-arm64', '')}"),
-        TaskDependency(f"streams_build_and_push_{compile_variant}"),
-    }
-    return Task(f"streams_publish_manifest_{compile_variant}", commands, dependencies)
+
+    return Task(f"{task_name}{compile_variant}", commands, dependencies)
 
 
 def main(
     expansions_file: Annotated[str, typer.Argument()] = "expansions.yml",
     output_file: Annotated[str, typer.Option("--output-file")] = "streams_publish_manifest.json",
+    break_glass: Annotated[str, typer.Option("--break-glass")] = "false",
 ):
     expansions = read_config_file(expansions_file)
     distro = expansions.get("distro_id")
@@ -62,7 +88,10 @@ def main(
     build_variant = BuildVariant(name=build_variant_name)
     build_variant.display_task(
         current_task_name.replace("_gen", ""),
-        [make_task(compile_variant_name)],
+        [
+            make_task(compile_variant_name, break_glass=break_glass),
+            make_testing_gate_task(compile_variant_name),
+        ],
         distros=[distro],
     )
     shrub_project = ShrubProject.empty()
