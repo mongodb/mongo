@@ -1368,6 +1368,7 @@ mongo_cc_unit_test(
         ":document_source_mock",
         ":document_sources_idl",
         ":field_path",
+        ":graph_lookup_mock_mongo_interface",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
@@ -1467,6 +1468,18 @@ mongo_cc_library(
     deps = [
         ":expression_context_for_test",
         ":pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "graph_lookup_mock_mongo_interface",
+    srcs = ["graph_lookup_mock_mongo_interface.cpp"],
+    deps = [
+        ":document_source_mock",
+        ":expression_context_for_test",
+        ":pipeline",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
     ],
 )
 
