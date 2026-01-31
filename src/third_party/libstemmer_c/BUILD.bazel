@@ -37,6 +37,8 @@ mongo_cc_library(
         "dist/src_c/stem_UTF_8_romanian.h",
         "dist/src_c/stem_UTF_8_russian.c",
         "dist/src_c/stem_UTF_8_russian.h",
+        "dist/src_c/stem_UTF_8_serbian.c",
+        "dist/src_c/stem_UTF_8_serbian.h",
         "dist/src_c/stem_UTF_8_spanish.c",
         "dist/src_c/stem_UTF_8_spanish.h",
         "dist/src_c/stem_UTF_8_swedish.c",
