@@ -237,7 +237,8 @@ class LintRunner:
             if len(parts) > 2:
                 # Check if srcs contains .cpp files
                 srcs_str = " ".join(parts[2:])
-                if srcs_str != "(missing)" and ".cpp" in srcs_str:
+                cpp_extensions = [".cpp", ".cc", ".cxx", ".c++", ".c"]
+                if srcs_str != "(missing)" and any(ext in srcs_str for ext in cpp_extensions):
                     has_cpp_sources = True
 
             if has_cpp_sources:
