@@ -445,13 +445,7 @@ __wti_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WTI_UPDATE_SELECT
     if (!WT_TIME_WINDOW_HAS_START(tw))
         return;
 
-    /*
-     * In memory database don't need to avoid writing values to the cell. If we remove this check we
-     * create an extra update on the end of the chain later in reconciliation as we'll re-append the
-     * disk image value to the update chain.
-     */
-    if (!WT_TIME_WINDOW_HAS_PREPARE(tw) && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
-      !F_ISSET(btree, WT_BTREE_IN_MEMORY)) {
+    if (!WT_TIME_WINDOW_HAS_PREPARE(tw)) {
         /*
          * Check if the start of the time window is globally visible, and if so remove unnecessary
          * values.

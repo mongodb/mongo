@@ -43,7 +43,6 @@ __wt_crypt_header_byteswap(WT_CRYPT_HEADER *hdr)
 #ifdef WORDS_BIGENDIAN
     hdr->signature = __wt_bswap32(hdr->signature);
     hdr->crypt_size = __wt_bswap32(hdr->crypt_size);
-    hdr->checksum = __wt_bswap32(hdr->checksum);
 #else
     WT_UNUSED(hdr);
 #endif

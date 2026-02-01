@@ -138,7 +138,12 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor.close()
 
         # Ensure that the handle has been closed after the drop.
-        self.assertEqual(close2, 1)
+        if self.runningHook('disagg') and self.tabletype == 'row':
+            # In disaggregated mode, both the stable and ingest files are dropped,
+            # so two handles are closed.
+            self.assertEqual(close2, 2)
+        else:
+            self.assertEqual(close2, 1)
         # Ensure that any space was reclaimed from cache.
         self.assertLess(cache2, cache1)
 
