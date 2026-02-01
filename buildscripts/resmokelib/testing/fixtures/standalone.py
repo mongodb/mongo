@@ -13,6 +13,7 @@ import yaml
 
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.extensions import (
+    add_extensions_signature_pub_key_path,
     delete_extension_configs,
     find_and_generate_extension_configs,
 )
@@ -71,6 +72,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 logger=self.logger,
                 mongod_options=self.mongod_options,
             )
+            add_extensions_signature_pub_key_path(self.mongod_options)
 
         if "set_parameters" not in self.mongod_options:
             self.mongod_options["set_parameters"] = {}
