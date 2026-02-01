@@ -160,4 +160,8 @@ const char* AttachedPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() co
     return "10m";  // 10MB
 }
 
+bool AttachedPersistenceProvider::supportsCompaction() const {
+    return true;
+}
+
 }  // namespace mongo::rss

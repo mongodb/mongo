@@ -154,7 +154,7 @@ public:
         return {};
     }
 
-    bool compactSupported() const override {
+    bool compactSupported(OperationContext*) const override {
         return false;
     }
 

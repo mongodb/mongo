@@ -74,7 +74,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     auto collectionNss = collection->ns();
     auto recordStore = collection->getRecordStore();
 
-    if (!recordStore->compactSupported())
+    if (!recordStore->compactSupported(opCtx))
         return Status(ErrorCodes::CommandNotSupported,
                       str::stream() << "cannot compact collection with record store: "
                                     << recordStore->name());

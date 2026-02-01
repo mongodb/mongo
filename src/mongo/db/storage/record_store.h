@@ -585,7 +585,7 @@ public:
      *
      * If you return true, you must provide implementations of all compact methods.
      */
-    virtual bool compactSupported() const = 0;
+    virtual bool compactSupported(OperationContext*) const = 0;
 
     /**
      * Attempt to reduce the storage space used by this RecordStore.

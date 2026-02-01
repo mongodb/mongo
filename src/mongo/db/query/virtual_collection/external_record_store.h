@@ -202,7 +202,7 @@ public:
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }
 
-    bool compactSupported() const final {
+    bool compactSupported(OperationContext*) const final {
         return false;
     }
 

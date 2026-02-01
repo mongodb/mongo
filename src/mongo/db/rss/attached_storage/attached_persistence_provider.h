@@ -165,6 +165,11 @@ public:
      * The default memory_page_max value to set on WT for the oplog in string format.
      */
     const char* getWTMemoryPageMaxForOplogStrValue() const override;
+
+    /**
+     * We can support compaction.
+     */
+    bool supportsCompaction() const override;
 };
 
 }  // namespace mongo::rss

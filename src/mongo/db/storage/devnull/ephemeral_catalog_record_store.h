@@ -119,7 +119,7 @@ public:
                           int64_t hintDataSizeDiff,
                           int64_t hintNumRecordsDiff) override;
 
-    bool compactSupported() const override;
+    bool compactSupported(OperationContext*) const override;
 
     StatusWith<int64_t> _compact(OperationContext*, RecoveryUnit&, const CompactOptions&) override;
 

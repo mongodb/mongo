@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/damage_vector.h"
@@ -201,8 +202,9 @@ public:
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx,
                                                   RecoveryUnit& ru) const override;
 
-    bool compactSupported() const override {
-        return !_inMemory;
+    bool compactSupported(OperationContext* opCtx) const override {
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        return (!_inMemory) && provider.supportsCompaction();
     }
 
     void validate(RecoveryUnit& ru,

@@ -501,7 +501,7 @@ Status EphemeralForTestRecordStore::_rangeTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-bool EphemeralForTestRecordStore::compactSupported() const {
+bool EphemeralForTestRecordStore::compactSupported(OperationContext*) const {
     return false;
 }
 
