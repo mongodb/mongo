@@ -137,7 +137,8 @@ struct OplogInsertBatch {
  * Packs the oplog entries in 'aggregateBatch' into insert batches based on the configured maximum
  * insert batch count and bytes while preserving the original oplog order. If there is an oplog
  * entry whose size exceeds the max batch bytes, packs it into its own batch instead of throwing.
- * Sets the wall clock time of each oplog entry to the current wall clock time.
+ * Sets the wall clock time of each oplog entry to the current wall clock time. In addition, strips
+ * the 'rid' field to avoid donor-local replicated recordIds from leaking to recipients.
  */
 std::vector<OplogInsertBatch> getOplogInsertBatches(OperationContext* opCtx,
                                                     const std::vector<BSONObj>& aggregateBatch) {
@@ -170,6 +171,8 @@ std::vector<OplogInsertBatch> getOplogInsertBatches(OperationContext* opCtx,
             auto currentMutableOplogEntry =
                 uassertStatusOK(repl::MutableOplogEntry::parse(currentDoc));
             currentMutableOplogEntry.setWallClockTime(opCtx->fastClockSource().now());
+            // Don't leak donor shard-local replicated recordIds to the recipient.
+            currentMutableOplogEntry.clearRecordId();
             auto currentMutableOplogBson = currentMutableOplogEntry.toBSON();
 
             insertBatch.statements.emplace_back(currentMutableOplogBson);

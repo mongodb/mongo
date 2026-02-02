@@ -380,6 +380,10 @@ public:
         getDurableReplOperation().setRecordId(std::move(rid));
     }
 
+    void clearRecordId() & {
+        getDurableReplOperation().setRecordId(boost::none);
+    }
+
     void setUpsert(boost::optional<bool> value) & {
         getDurableReplOperation().setUpsert(std::move(value));
     }

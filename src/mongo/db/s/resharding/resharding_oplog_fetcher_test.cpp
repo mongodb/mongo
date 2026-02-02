@@ -332,6 +332,35 @@ public:
         return ret;
     }
 
+    // Asserts that every document in the specified output collection for the resharding oplog
+    // fetcher does not contain a 'rid' (RecordId) field. This ensures donor-local record IDs are
+    // not leaked to resharding recipients.
+    void assertRidsStrippedFromEntries(NamespaceString fetcherOutputNss) {
+        OneOffRead oof(_opCtx, Timestamp::min(), false);
+
+        DBDirectClient client(_opCtx);
+        FindCommandRequest findRequest{fetcherOutputNss};
+        auto cursor = client.find(std::move(findRequest));
+        while (cursor->more()) {
+            auto res = cursor->next();
+            repl::OplogEntry entry{res};
+            const auto& entryRid = entry.getDurableReplOperation().getRecordId();
+            ASSERT_FALSE(entryRid.has_value());
+        }
+    }
+
+    void assertCollUsesReplicatedRecordIds(const NamespaceString& nss) {
+        const auto coll = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest{nss,
+                                         PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kRead},
+            MODE_IS);
+        ASSERT(coll.exists());
+        ASSERT_TRUE(coll.getCollectionPtr()->getCollectionOptions().recordIdsReplicated);
+    }
+
     void create(NamespaceString nss) {
         writeConflictRetry(_opCtx, "create", nss, [&] {
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
@@ -667,6 +696,83 @@ protected:
             outputCollectionNss, usedApplyOpsToBatch, expectedNumApplyOpsOplogEntries);
     }
 
+    void testBasicSingleApplyOps(const NamespaceString& dataCollectionNss,
+                                 const NamespaceString& outputCollectionNss,
+                                 bool storeProgress) {
+        auto numInsertOplogEntries = 5;
+        auto initialAggregateBatchSize = 2;
+        // Add 1 to account for the sentinel final noop oplog entry.
+        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
+        // The oplog entries come in 2 separate aggregate batches, each requires an applyOps oplog
+        // entry.
+        auto numApplyOpsOplogEntries = 2;
+
+        setupBasic(
+            outputCollectionNss, dataCollectionNss, _destinationShard, numInsertOplogEntries);
+        testFetcherBasic(outputCollectionNss,
+                         dataCollectionNss,
+                         storeProgress,
+                         initialAggregateBatchSize,
+                         numFetchedOplogEntries,
+                         numApplyOpsOplogEntries);
+    }
+
+    void testBasicMultiApplyAndBatchLimitOperations(const NamespaceString& dataCollectionNss,
+                                                    const NamespaceString& outputCollectionNss,
+                                                    bool storeProgress) {
+        auto batchLimitOperations = 5;
+        RAIIServerParameterControllerForTest featureFlagController(
+            "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
+        auto numInsertOplogEntries = 8;
+        auto initialAggregateBatchSize = boost::none;
+        // Add 1 to account for the sentinel final noop oplog entry.
+        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
+        // The oplog entries come in one aggregate batch. However, each applyOps oplog entry can
+        // only have 'batchLimitOperations' oplog entries.
+        auto numApplyOpsOplogEntries =
+            std::ceil((double)numFetchedOplogEntries / batchLimitOperations);
+
+        setupBasic(
+            outputCollectionNss, dataCollectionNss, _destinationShard, numInsertOplogEntries);
+        testFetcherBasic(outputCollectionNss,
+                         dataCollectionNss,
+                         storeProgress,
+                         initialAggregateBatchSize,
+                         numFetchedOplogEntries,
+                         numApplyOpsOplogEntries);
+    }
+
+    void testBasicMultipleApplyOpsSingleOplogEntryExceedsBatchLimits(
+        const NamespaceString& dataCollectionNss,
+        const NamespaceString& outputCollectionNss,
+        bool storeProgress) {
+        auto batchLimitBytes = 1 * 1024;
+        RAIIServerParameterControllerForTest featureFlagController(
+            "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
+        auto numInsertOplogEntries = 2;
+        auto approxInsertOplogEntrySizeBytes = 3 * 1024;
+        auto initialAggregateBatchSize = boost::none;
+        // Add 1 to account for the sentinel final noop oplog entry.
+        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
+        // The oplog entries come in one aggregate batch. However, the size of each insert oplog
+        // entry exceeds the 'batchLimitBytes'. They should still get inserted successfully but each
+        // should require a separate applyOps oplog entry.
+        auto numApplyOpsOplogEntries = numFetchedOplogEntries;
+
+        setupBasic(outputCollectionNss,
+                   dataCollectionNss,
+                   _destinationShard,
+                   numInsertOplogEntries,
+                   approxInsertOplogEntrySizeBytes);
+        testFetcherBasic(outputCollectionNss,
+                         dataCollectionNss,
+                         storeProgress,
+                         initialAggregateBatchSize,
+                         numFetchedOplogEntries,
+                         numApplyOpsOplogEntries,
+                         true /*singleInsertExceedsBatchLimits=*/);
+    }
+
     void assertAggregateReadPreference(const executor::RemoteCommandRequest& request,
                                        const ReadPreferenceSetting& expectedReadPref) {
         auto parsedRequest = AggregateCommandRequest::parse(
@@ -721,23 +827,31 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicSingleApplyOps) {
         const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
             "dbtests.runFetchIteration" + std::to_string(storeProgress));
 
-        auto numInsertOplogEntries = 5;
-        auto initialAggregateBatchSize = 2;
-        // Add 1 to account for the sentinel final noop oplog entry.
-        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
-        // The oplog entries come in 2 separate aggregate batches, each requires an applyOps oplog
-        // entry.
-        auto numApplyOpsOplogEntries = 2;
+        testBasicSingleApplyOps(dataCollectionNss, outputCollectionNss, storeProgress);
+        resetResharding();
+    }
+}
 
-        setupBasic(
-            outputCollectionNss, dataCollectionNss, _destinationShard, numInsertOplogEntries);
-        testFetcherBasic(outputCollectionNss,
-                         dataCollectionNss,
-                         storeProgress,
-                         initialAggregateBatchSize,
-                         numFetchedOplogEntries,
-                         numApplyOpsOplogEntries);
+// Tests that recordIds replicated for the donor's data collection aren't leaked in the output
+// collection for the resharding fetcher.
+TEST_F(ReshardingOplogFetcherTest, TestBasicSingleApplyOpsStripsRids) {
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
+    for (bool storeProgress : {false, true}) {
+        LOGV2(8919200, "Running case", "storeProgress"_attr = storeProgress);
 
+        const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.outputCollection" + std::to_string(storeProgress));
+        const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.runFetchIteration" + std::to_string(storeProgress));
+        testBasicSingleApplyOps(dataCollectionNss, outputCollectionNss, storeProgress);
+
+        // Verify CRUD operations utilized replicated recordIds for the collection.
+        assertCollUsesReplicatedRecordIds(dataCollectionNss);
+
+        // Confirm that replicated recordIds specific to the donor aren't leaked in the fetcher's
+        // output collection.
+        assertRidsStrippedFromEntries(outputCollectionNss);
         resetResharding();
     }
 }
@@ -750,28 +864,31 @@ TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOps_BatchLimitOperation
             "dbtests.outputCollection" + std::to_string(storeProgress));
         const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
             "dbtests.runFetchIteration" + std::to_string(storeProgress));
+        testBasicMultiApplyAndBatchLimitOperations(
+            dataCollectionNss, outputCollectionNss, storeProgress);
+        resetResharding();
+    }
+}
 
-        auto batchLimitOperations = 5;
-        RAIIServerParameterControllerForTest featureFlagController(
-            "reshardingOplogFetcherInsertBatchLimitOperations", batchLimitOperations);
-        auto numInsertOplogEntries = 8;
-        auto initialAggregateBatchSize = boost::none;
-        // Add 1 to account for the sentinel final noop oplog entry.
-        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
-        // The oplog entries come in one aggregate batch. However, each applyOps oplog entry can
-        // only have 'batchLimitOperations' oplog entries.
-        auto numApplyOpsOplogEntries =
-            std::ceil((double)numFetchedOplogEntries / batchLimitOperations);
+TEST_F(ReshardingOplogFetcherTest, TestBasicMultipleApplyOpsStripsRids) {
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
+    for (bool storeProgress : {false, true}) {
+        LOGV2(8919201, "Running case", "storeProgress"_attr = storeProgress);
 
-        setupBasic(
-            outputCollectionNss, dataCollectionNss, _destinationShard, numInsertOplogEntries);
-        testFetcherBasic(outputCollectionNss,
-                         dataCollectionNss,
-                         storeProgress,
-                         initialAggregateBatchSize,
-                         numFetchedOplogEntries,
-                         numApplyOpsOplogEntries);
+        const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.outputCollection" + std::to_string(storeProgress));
+        const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.runFetchIteration" + std::to_string(storeProgress));
+        testBasicMultiApplyAndBatchLimitOperations(
+            dataCollectionNss, outputCollectionNss, storeProgress);
 
+        // Verify CRUD operations utilized replicated recordIds for the collection.
+        assertCollUsesReplicatedRecordIds(dataCollectionNss);
+
+        // Confirm that replicated recordIds specific to the donor aren't leaked in the fetcher's
+        // output collection.
+        assertRidsStrippedFromEntries(outputCollectionNss);
         resetResharding();
     }
 }
@@ -823,33 +940,34 @@ TEST_F(ReshardingOplogFetcherTest,
             "dbtests.outputCollection" + std::to_string(storeProgress));
         const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
             "dbtests.runFetchIteration" + std::to_string(storeProgress));
+        testBasicMultipleApplyOpsSingleOplogEntryExceedsBatchLimits(
+            dataCollectionNss, outputCollectionNss, storeProgress);
 
-        auto batchLimitBytes = 1 * 1024;
-        RAIIServerParameterControllerForTest featureFlagController(
-            "reshardingOplogFetcherInsertBatchLimitBytes", batchLimitBytes);
-        auto numInsertOplogEntries = 2;
-        auto approxInsertOplogEntrySizeBytes = 3 * 1024;
-        auto initialAggregateBatchSize = boost::none;
-        // Add 1 to account for the sentinel final noop oplog entry.
-        auto numFetchedOplogEntries = numInsertOplogEntries + 1;
-        // The oplog entries come in one aggregate batch. However, the size of each insert oplog
-        // entry exceeds the 'batchLimitBytes'. They should still get inserted successfully but each
-        // should require a separate applyOps oplog entry.
-        auto numApplyOpsOplogEntries = numFetchedOplogEntries;
+        resetResharding();
+    }
+}
 
-        setupBasic(outputCollectionNss,
-                   dataCollectionNss,
-                   _destinationShard,
-                   numInsertOplogEntries,
-                   approxInsertOplogEntrySizeBytes);
-        testFetcherBasic(outputCollectionNss,
-                         dataCollectionNss,
-                         storeProgress,
-                         initialAggregateBatchSize,
-                         numFetchedOplogEntries,
-                         numApplyOpsOplogEntries,
-                         true /*singleInsertExceedsBatchLimits=*/);
+TEST_F(ReshardingOplogFetcherTest,
+       TestBasicMultipleApplyOpsStripsRids_SingleOplogEntrySizeExceedsBatchLimitBytes) {
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
 
+    for (bool storeProgress : {false, true}) {
+        LOGV2(8919202, "Running case", "storeProgress"_attr = storeProgress);
+
+        const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.outputCollection" + std::to_string(storeProgress));
+        const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.runFetchIteration" + std::to_string(storeProgress));
+        testBasicMultipleApplyOpsSingleOplogEntryExceedsBatchLimits(
+            dataCollectionNss, outputCollectionNss, storeProgress);
+
+        // Verify CRUD operations utilized replicated recordIds for the collection.
+        assertCollUsesReplicatedRecordIds(dataCollectionNss);
+
+        // Confirm that replicated recordIds specific to the donor aren't leaked in the fetcher's
+        // output collection.
+        assertRidsStrippedFromEntries(outputCollectionNss);
         resetResharding();
     }
 }
