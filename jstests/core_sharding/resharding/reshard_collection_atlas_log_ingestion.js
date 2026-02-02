@@ -24,6 +24,66 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
+const TestMode = {
+    kSuccess: "success",
+    kFailInAwaitingFetchTimestamp: "awaiting-fetch-timestamp",
+    kFailInCreatingCollection: "creating-collection",
+    kFailInCloning: "cloning",
+    kFailInBuildingIndex: "building-index",
+    kFailInApplying: "applying",
+    kFailInStrictConsistency: "strict-consistency",
+};
+
+const TestModeOrdinal = {
+    [TestMode.kFailInAwaitingFetchTimestamp]: 1,
+    [TestMode.kFailInCreatingCollection]: 2,
+    [TestMode.kFailInCloning]: 3,
+    [TestMode.kFailInBuildingIndex]: 4,
+    [TestMode.kFailInApplying]: 5,
+    [TestMode.kFailInStrictConsistency]: 6,
+    [TestMode.kSuccess]: 7,
+};
+
+function happensBefore(a, b) {
+    return TestModeOrdinal[a] < TestModeOrdinal[b];
+}
+
+const MetricAvailability = {
+    recipientTotalBytes: TestMode.kFailInCloning,
+    recipientTotalDocs: TestMode.kFailInCloning,
+    recipientTotalFetched: TestMode.kFailInCloning,
+    copyDurationMs: TestMode.kFailInCloning,
+    totalBytesCloned: TestMode.kFailInCloning,
+    totalDocumentsCloned: TestMode.kFailInCloning,
+    totalOplogsFetched: TestMode.kFailInCloning,
+    maxRecipientIndexes: TestMode.kFailInCloning,
+    numberOfIndexesDelta: TestMode.kFailInCloning,
+    recipientTotalApplied: TestMode.kSuccess,
+    applyDurationMs: TestMode.kSuccess,
+    criticalSectionDurationMs: TestMode.kSuccess,
+    totalOplogsApplied: TestMode.kSuccess,
+};
+
+function metricAvailable(metric, mode) {
+    const availableAt = MetricAvailability[metric];
+    if (availableAt === undefined) {
+        return true;
+    }
+    return !happensBefore(mode, availableAt);
+}
+
+function assertMetricGtZero(metric, source, mode) {
+    if (metricAvailable(metric, mode)) {
+        assert.gt(source[metric], 0, metric);
+    }
+}
+
+function assertMetricEq(metric, source, expected, mode) {
+    if (metricAvailable(metric, mode)) {
+        assert.eq(source[metric], expected, metric);
+    }
+}
+
 const dbName = db.getName();
 const oldShardKey = {
     oldKey: 1,
@@ -35,26 +95,24 @@ const newShardKey = {
 main();
 
 function main() {
-    {
-        // Success case.
-        const collName = `${jsTestName()}-success`;
-        initializeCollection(collName);
-        const uuid = UUID();
-        assert.commandWorked(runResharding(collName, uuid));
-        const logs = getCompletionLogs(uuid);
-        verifyCompletionLogs(collName, logs, "success");
-    }
+    const testCases = [TestMode.kSuccess, TestMode.kFailInCloning, TestMode.kFailInAwaitingFetchTimestamp];
 
-    {
-        // Failure case.
-        const collName = `${jsTestName()}-failed`;
+    for (const mode of testCases) {
+        const isSuccess = mode === TestMode.kSuccess;
+        jsTest.log.info(`Testing ${isSuccess ? "success" : `failure during ${mode} phase`}`);
+        const collName = `${jsTestName()}-${mode}`;
         initializeCollection(collName);
         const uuid = UUID();
-        const failpoints = setFailInPhase("cloning");
-        assert.commandFailed(runResharding(collName, uuid));
+        const failpoints = isSuccess ? [] : setFailInPhase(mode);
+        const result = runResharding(collName, uuid);
+        if (isSuccess) {
+            assert.commandWorked(result);
+        } else {
+            assert.commandFailed(result);
+        }
         unsetFailpoints(failpoints);
         const logs = getCompletionLogs(uuid);
-        verifyCompletionLogs(collName, logs, "failed");
+        verifyCompletionLogs(collName, logs, mode);
     }
 }
 
@@ -73,7 +131,7 @@ function initializeCollection(collName) {
 }
 
 function runResharding(collName, uuid) {
-    jsTestLog(`Running resharding with user supplied UUID: ${tojson(uuid)}`);
+    jsTest.log.info(`Running resharding with user supplied UUID: ${tojson(uuid)}`);
     return db.adminCommand({reshardCollection: `${dbName}.${collName}`, key: newShardKey, reshardingUUID: uuid});
 }
 
@@ -118,7 +176,7 @@ function getLogs(connection) {
                 logs = assert.commandWorked(connection.adminCommand({getLog: "global"})).log;
                 return true;
             } catch (e) {
-                jsTestLog(`Failed to fetch logs: ${tojson(e)}`);
+                jsTest.log.error(`Failed to fetch logs: ${tojson(e)}`);
                 return false;
             }
         });
@@ -140,18 +198,19 @@ function getCompletionLogs(uuid) {
         });
 }
 
-function verifyCompletionLogs(collName, logs, expectedStatus) {
+function verifyCompletionLogs(collName, logs, mode) {
     // There could be multiple completion logs if deleting the coordinator state document is rolled
     // back.
     assert.gt(logs.length, 0, "No log lines with id 7763800 emitted on config server following resharding.");
     const completionLog = JSON.parse(logs.pop());
-    jsTestLog(`Completion log found: ${tojson(completionLog)}`);
+    jsTest.log.info(`Completion log found: ${tojson(completionLog)}`);
     const info = completionLog.attr.info;
     const stats = info.statistics;
-    assert.eq(info.status, expectedStatus);
-    const success = info.status == "success";
+    const isSuccess = mode === TestMode.kSuccess;
+    const expectedStatus = isSuccess ? "success" : "failed";
+    assert.eq(info.status, expectedStatus, "status");
     assert(info.hasOwnProperty("userSuppliedUUID"), "Missing userSuppliedUUID");
-    if (!success) {
+    if (!isSuccess) {
         assert(info.hasOwnProperty("failureReason"), "Missing failureReason");
     }
     assert.eq(stats.ns, `${dbName}.${collName}`, "namespace");
@@ -159,22 +218,23 @@ function verifyCompletionLogs(collName, logs, expectedStatus) {
     assert.eq(stats.provenance, "reshardCollection");
     assert.gt(stats.numberOfSourceShards, 0, "numberOfSourceShards");
     assert.gt(stats.numberOfDestinationShards, 0, "numberOfDestinationShards");
-    verifyDonorMetrics(stats, success);
-    verifyRecipientMetrics(stats, success);
-    verifyTotals(stats, success);
-    verifyCriticalSection(stats, success);
+    verifyDonorMetrics(stats, mode);
+    verifyRecipientMetrics(stats, mode);
+    verifyTotals(stats, mode);
+    verifyCriticalSection(stats, mode);
 }
 
-function verifyDonorMetrics(stats, success) {
+function verifyDonorMetrics(stats, mode) {
     assert(stats.hasOwnProperty("donors"), "Missing donors");
     assert.gt(Object.keys(stats.donors).length, 0, "No donors reported");
+    const isSuccess = mode === TestMode.kSuccess;
     for (const donor of Object.values(stats.donors)) {
         assert(donor.hasOwnProperty("shardName"), "Missing donor shardName");
         assert.gt(donor.bytesToClone, 0, "bytesToClone");
         assert.gt(donor.documentsToClone, 0, "documentsToClone");
         assert.gt(donor.indexCount, 0, "donor indexCount");
         assert(donor.hasOwnProperty("writesDuringCriticalSection"), "Missing writesDuringCriticalSection");
-        if (success) {
+        if (isSuccess) {
             assert(donor.hasOwnProperty("phaseDurations"), "Missing donor phaseDurations");
             assert.gte(donor.phaseDurations.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
             assert(donor.hasOwnProperty("criticalSectionInterval"));
@@ -185,24 +245,27 @@ function verifyDonorMetrics(stats, success) {
     }
 }
 
-function verifyRecipientMetrics(stats, success) {
+function verifyRecipientMetrics(stats, mode) {
     assert(stats.hasOwnProperty("recipients"), "Missing recipients");
     assert.gt(Object.keys(stats.recipients).length, 0, "No recipients reported");
-    let recipientTotalBytes = 0;
-    let recipientTotalDocs = 0;
-    let recipientTotalFetched = 0;
-    let recipientTotalApplied = 0;
+    const isSuccess = mode === TestMode.kSuccess;
+    const recipientTotals = {
+        recipientTotalBytes: 0,
+        recipientTotalDocs: 0,
+        recipientTotalFetched: 0,
+        recipientTotalApplied: 0,
+    };
     for (const recipient of Object.values(stats.recipients)) {
         assert(recipient.hasOwnProperty("shardName"), "Missing recipient shardName");
-        recipientTotalBytes += recipient.bytesCloned;
-        recipientTotalDocs += recipient.documentsCloned;
-        recipientTotalFetched += recipient.oplogsFetched;
-        recipientTotalApplied += recipient.oplogsApplied;
+        recipientTotals.recipientTotalBytes += recipient.bytesCloned;
+        recipientTotals.recipientTotalDocs += recipient.documentsCloned;
+        recipientTotals.recipientTotalFetched += recipient.oplogsFetched;
+        recipientTotals.recipientTotalApplied += recipient.oplogsApplied;
         assert(recipient.hasOwnProperty("phaseDurations"), "Missing recipient phaseDurations");
-        for (const [phase, duration] of Object.entries(recipient.phaseDurations)) {
-            assert.gt(duration, 0, `Phase ${phase} had no duration`);
+        for (const [phaseName, duration] of Object.entries(recipient.phaseDurations)) {
+            assert.gt(duration, 0, `Phase ${phaseName} had no duration`);
         }
-        if (success) {
+        if (isSuccess) {
             for (const expected of ["copyDurationMs", "applyDurationMs", "buildingIndexDurationMs"]) {
                 assert(
                     recipient.phaseDurations.hasOwnProperty(expected),
@@ -212,42 +275,38 @@ function verifyRecipientMetrics(stats, success) {
             assert.gt(recipient.indexCount, 0, "recipient indexCount");
         }
     }
-    assert.gt(recipientTotalBytes, 0, "recipientTotalBytes");
-    assert.gt(recipientTotalDocs, 0, "recipientTotalDocs");
-    assert.gt(recipientTotalFetched, 0, "recipientTotalFetched");
-    if (success) {
-        assert.gt(recipientTotalApplied, 0, "recipientTotalApplied");
-    }
+    assertMetricGtZero("recipientTotalBytes", recipientTotals, mode);
+    assertMetricGtZero("recipientTotalDocs", recipientTotals, mode);
+    assertMetricGtZero("recipientTotalFetched", recipientTotals, mode);
+    assertMetricGtZero("recipientTotalApplied", recipientTotals, mode);
 }
 
-function verifyTotals(stats, success) {
+function verifyTotals(stats, mode) {
     assert(stats.hasOwnProperty("totals"), "Missing totals");
-    let totals = stats.totals;
-    assert.gt(totals.copyDurationMs, 0, "copyDurationMs");
-    if (success) {
-        assert.gt(totals.applyDurationMs, 0, "applyDurationMs");
-        assert.gt(totals.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
-    }
+    const totals = stats.totals;
+
+    assertMetricGtZero("copyDurationMs", totals, mode);
+    assertMetricGtZero("applyDurationMs", totals, mode);
+    assertMetricGtZero("criticalSectionDurationMs", totals, mode);
 
     assert.gt(totals.totalBytesToClone, 0, "totalBytesToClone");
     assert.gt(totals.totalDocumentsToClone, 0, "totalDocumentsToClone");
     assert.gt(totals.averageDocSize, 0, "averageDocSize");
 
-    assert.gt(totals.totalBytesCloned, 0, "totalBytesCloned");
-    assert.gt(totals.totalDocumentsCloned, 0, "totalDocumentsCloned");
-    assert.gt(totals.totalOplogsFetched, 0, "totalOplogsFetched");
-    if (success) {
-        assert.gt(totals.totalOplogsApplied, 0, "totalOplogsApplied");
-    }
-    assert.gt(totals.maxDonorIndexes, 0, "maxDonorIndexes");
-    assert.gt(totals.maxRecipientIndexes, 0, "maxRecipientIndexes");
+    assertMetricGtZero("totalBytesCloned", totals, mode);
+    assertMetricGtZero("totalDocumentsCloned", totals, mode);
+    assertMetricGtZero("totalOplogsFetched", totals, mode);
+    assertMetricGtZero("totalOplogsApplied", totals, mode);
 
-    assert.eq(totals.numberOfIndexesDelta, totals.maxRecipientIndexes - totals.maxDonorIndexes);
+    assert.gt(totals.maxDonorIndexes, 0, "maxDonorIndexes");
+    assertMetricGtZero("maxRecipientIndexes", totals, mode);
+    assertMetricEq("numberOfIndexesDelta", totals, totals.maxRecipientIndexes - totals.maxDonorIndexes, mode);
 }
 
-function verifyCriticalSection(stats, success) {
-    assert(stats.hasOwnProperty("criticalSection") === success, "Incorrect critical section presence");
-    if (!success) {
+function verifyCriticalSection(stats, mode) {
+    const isSuccess = mode === TestMode.kSuccess;
+    assert(stats.hasOwnProperty("criticalSection") === isSuccess, "Incorrect critical section presence");
+    if (!isSuccess) {
         return;
     }
     const criticalSection = stats.criticalSection;
