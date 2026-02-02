@@ -56,6 +56,24 @@ config_fuzzer_params = {
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
+        "ingressRequestRateLimiterEnabled": {
+            "choices": [True, False],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressRequestAdmissionRatePerSec": {
+            "min": 25_000,
+            "max": 1_000_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressRequestAdmissionBurstCapacitySecs": {
+            "min": 0.1,
+            "max": 100_000,
+            "isUniform": True,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "indexBuildMinAvailableDiskSpaceMB": {
             "min": 250,
             "max": 750,
@@ -644,6 +662,24 @@ config_fuzzer_params = {
         "ingressConnectionEstablishmentMaxQueueDepth": {
             "min": 100,
             "max": 100_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressRequestRateLimiterEnabled": {
+            "choices": [True, False],
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressRequestAdmissionRatePerSec": {
+            "min": 25_000,
+            "max": 1_000_000,
+            "period": 60,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "ingressRequestAdmissionBurstCapacitySecs": {
+            "min": 0.1,
+            "max": 100_000,
+            "isUniform": True,
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
