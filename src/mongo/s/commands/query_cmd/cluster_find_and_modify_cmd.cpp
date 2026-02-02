@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
@@ -828,6 +829,10 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
         auto request = write_ops::FindAndModifyCommandRequest::parse(
             cmdObjForShard, IDLParserContext("ClusterFindAndModify"));
+
+        // Perform common command request validation. Uasserts on invalid requests.
+        FindAndModifyOp::validateCommandRequest(request);
+
         request.setNamespace(originalNss);
 
         auto response = unified_write_executor::findAndModify(opCtx, request, originalCmdObj);

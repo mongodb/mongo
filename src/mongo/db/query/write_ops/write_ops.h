@@ -76,6 +76,13 @@ public:
 class FindAndModifyOp {
 public:
     static write_ops::FindAndModifyCommandReply parseResponse(const BSONObj& obj);
+
+    /**
+     * Validates a findAndModify command request for obvious errors and uasserts if the request is
+     * invalid. The validation performed here is in addition to the basic field validation done by
+     * the IDL parser.
+     */
+    static void validateCommandRequest(const write_ops::FindAndModifyCommandRequest& request);
 };
 
 namespace write_ops {

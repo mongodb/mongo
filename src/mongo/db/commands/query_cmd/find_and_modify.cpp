@@ -64,6 +64,7 @@
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -127,36 +128,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failAllFindAndModify);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
-
-void validate(const write_ops::FindAndModifyCommandRequest& request) {
-    uassert(ErrorCodes::FailedToParse,
-            "Either an update or remove=true must be specified",
-            request.getRemove().value_or(false) || request.getUpdate());
-    if (request.getRemove().value_or(false)) {
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify both an update and remove=true",
-                !request.getUpdate());
-
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify both upsert=true and remove=true ",
-                !request.getUpsert() || !*request.getUpsert());
-
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify both new=true and remove=true; 'remove' always returns the deleted "
-                "document",
-                !request.getNew() || !*request.getNew());
-
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify arrayFilters and remove=true",
-                !request.getArrayFilters());
-    }
-
-    if (request.getUpdate() &&
-        request.getUpdate()->type() == write_ops::UpdateModification::Type::kPipeline &&
-        request.getArrayFilters()) {
-        uasserted(ErrorCodes::FailedToParse, "Cannot specify arrayFilters and a pipeline update");
-    }
-}
 
 void makeDeleteRequest(OperationContext* opCtx,
                        const write_ops::FindAndModifyCommandRequest& request,
@@ -360,7 +331,9 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
 void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                                            ExplainOptions::Verbosity verbosity,
                                            rpc::ReplyBuilderInterface* result) {
-    validate(request());
+    // Perform common command request validation. Uasserts on invalid requests.
+    FindAndModifyOp::validateCommandRequest(request());
+
     const BSONObj& cmdObj = request().toBSON();
 
     // Start the query planning timer right after parsing.
@@ -503,7 +476,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& req = request();
 
-    validate(req);
+    // Perform common command request validation. Uasserts on invalid requests.
+    FindAndModifyOp::validateCommandRequest(req);
 
     // Start the query planning timer right after parsing.
     auto& curOp = *CurOp::get(opCtx);

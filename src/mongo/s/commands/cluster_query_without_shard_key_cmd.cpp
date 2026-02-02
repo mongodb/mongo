@@ -178,37 +178,6 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
     return allShardsContainingChunksForNs;
 }
 
-void validateFindAndModifyCommand(const write_ops::FindAndModifyCommandRequest& request) {
-    uassert(ErrorCodes::FailedToParse,
-            "Either an update or remove=true must be specified",
-            request.getRemove().value_or(false) || request.getUpdate());
-    if (request.getRemove().value_or(false)) {
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify both an 'update' and 'remove'=true",
-                !request.getUpdate());
-
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify both 'upsert'=true and 'remove'=true ",
-                !request.getUpsert() || !*request.getUpsert());
-
-        uassert(
-            ErrorCodes::FailedToParse,
-            "Cannot specify both 'new'=true and 'remove'=true; 'remove' always returns the deleted "
-            "document",
-            !request.getNew() || !*request.getNew());
-
-        uassert(ErrorCodes::FailedToParse,
-                "Cannot specify 'arrayFilters' and 'remove'=true",
-                !request.getArrayFilters());
-    }
-
-    if (request.getUpdate() &&
-        request.getUpdate()->type() == write_ops::UpdateModification::Type::kPipeline &&
-        request.getArrayFilters()) {
-        uasserted(ErrorCodes::FailedToParse, "Cannot specify 'arrayFilters' and a pipeline update");
-    }
-}
-
 BSONObj createAggregateCmdObj(
     OperationContext* opCtx,
     const ParsedCommandInfo& parsedInfo,
@@ -364,7 +333,9 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             writeCmdObj, IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"));
-        validateFindAndModifyCommand(findAndModifyRequest);
+
+        // Perform common command request validation. Uasserts on invalid requests.
+        FindAndModifyOp::validateCommandRequest(findAndModifyRequest);
 
         parsedInfo.query = findAndModifyRequest.getQuery();
         parsedInfo.stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
