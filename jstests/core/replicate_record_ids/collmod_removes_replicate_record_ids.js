@@ -10,6 +10,9 @@
  *   expects_explicit_underscore_id_index,
  *   requires_non_retryable_commands, # common tag in collMod tests.
  *   featureFlagRecordIdsReplicated,
+ *   # TODO (SERVER-118693): Check if this tag can be removed.
+ *   # Unsetting 'recordIdsReplicated' option with the collMod command can create a test-only race condition during initial sync.
+ *   incompatible_with_initial_sync,
  * ]
  */
 
