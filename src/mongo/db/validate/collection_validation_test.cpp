@@ -800,10 +800,8 @@ public:
         })BSON");
     }
 
-    static std::vector<BSONObj> getAllSampleDocs() {
-        return std::vector<BSONObj>{getSampleDoc(),
-                                    // version 3 control block
-                                    ::mongo::fromjson(R"BSON(
+    static BSONObj getVersion3ControlSampleDoc() {
+        return ::mongo::fromjson(R"BSON(
         {
             "_id": {"$oid": "69690e4c8bee049fcc1c4d87"},
             "control": {
@@ -825,9 +823,11 @@ public:
                 "date": {"$binary": {"base64": "CQDpOGDCmwEAAICLLuFtJFWCTwA=", "subType": "07"}},
                 "_id": {"$binary": {"base64": "BwBpaQ5kKmiNEQMoTQyAK2AAEPwXANQA", "subType": "07"}}
             }
-        })BSON"),
-                                    // pre-epoch timestamps
-                                    ::mongo::fromjson(R"BSON(
+        })BSON");
+    }
+
+    static BSONObj getExtendedTimeRangeSampleDoc() {
+        return ::mongo::fromjson(R"BSON(
         {
             "_id": {"$oid":"e980f6cc8bee049fcc1c4d88"},
             "control": {
@@ -849,15 +849,19 @@ public:
                 "date": {"$binary": {"base64": "CQAofsQfqP///wA=", "subType": "07"}},
                 "_id": {"$binary": {"base64": "BwBpaTQMKmiNEQMoTREA", "subType": "07"}}
             }
-        })BSON")};
+        })BSON");
     }
+
+    static std::vector<BSONObj> getAllSampleDocs() {
+        return {getSampleDoc(), getVersion3ControlSampleDoc(), getExtendedTimeRangeSampleDoc()};
+    };
 
     static constexpr auto replacementIncorrectTimeField = "t"_sd;
 
     void insertDoc(BSONObj doc, ErrorCodes::Error expected = ErrorCodes::OK) {
         ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
         WriteUnitOfWork wuow(_opCtx);
-        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
         EXPECT_EQ(expected, Helpers::insert(_opCtx, *coll, doc));
         wuow.commit();
@@ -915,6 +919,7 @@ TEST_P(TimeseriesCollectionValidationValidBucketsTest, TimeseriesValidationGoodD
     {
         WriteUnitOfWork wuow(_opCtx);
         AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        coll->setRequiresTimeseriesExtendedRangeSupport(_opCtx);
         ASSERT_TRUE(coll->isTimeseriesCollection());
         ASSERT_OK(Helpers::insert(_opCtx, *coll, bson));
         wuow.commit();
@@ -1281,6 +1286,18 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest,
                            {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
                            {CollectionValidation::ValidateMode::kForegroundFullCheckBSON});
     }
+}
+
+
+TEST_F(TimeseriesCollectionValidationTest, ReportErrorsInExtendedRangeBookkeeping) {
+    const auto doc = getExtendedTimeRangeSampleDoc();
+    insertDoc(doc);
+    {
+        AutoGetCollection coll(_opCtx, _nss, MODE_IS);
+        EXPECT_FALSE(coll->getRequiresTimeseriesExtendedRangeSupport());
+    }
+    foregroundValidate(
+        _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0});
 }
 
 }  // namespace

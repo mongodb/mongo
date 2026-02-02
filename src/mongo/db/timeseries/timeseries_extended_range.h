@@ -58,6 +58,11 @@ bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
                                          std::vector<InsertStatement>::const_iterator last);
 
 /**
+ * Checks the OID for an extended range time component.
+ */
+bool oidHasExtendedRangeTime(const OID& oid);
+
+/**
  * Uses a heuristic to determine whether a given time-series collection may contain measurements
  * with dates that fall outside the standard range.
  */

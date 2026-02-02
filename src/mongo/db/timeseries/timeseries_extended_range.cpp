@@ -91,6 +91,11 @@ bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
     });
 }
 
+bool oidHasExtendedRangeTime(const OID& oid) {
+    const uint8_t highDateBits = oid.view().read<uint8_t>(0);
+    return highDateBits & 0x80;
+}
+
 bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
                                               const Collection& collection) {
     bool requiresExtendedRangeSupport = false;
@@ -108,12 +113,8 @@ bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
         rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), /* forward */ false);
     if (auto record = cursor->next()) {
         const auto& obj = record->data.toBson();
-        OID id = obj.getField(kBucketIdFieldName).OID();
-
-        uint8_t highDateBits = id.view().read<uint8_t>(0);
-        if (highDateBits & 0x80) {
-            requiresExtendedRangeSupport = true;
-        }
+        requiresExtendedRangeSupport =
+            oidHasExtendedRangeTime(obj.getField(kBucketIdFieldName).OID());
     }
 
     return requiresExtendedRangeSupport;
