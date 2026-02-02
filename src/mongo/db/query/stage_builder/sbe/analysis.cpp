@@ -648,6 +648,7 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
             // Use the postimage allowed set and postimage present set from qsNode's child.
             const auto& childQsnInfo = getQsnInfo(qsNode->children[0]);
             qsnInfo.setPostimageAllowedFields(childQsnInfo.postimageAllowedFields);
+            qsnInfo.effects = childQsnInfo.effects;
             return;
         }
         case STAGE_HASH_JOIN_EMBEDDING_NODE:

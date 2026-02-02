@@ -2130,5 +2130,73 @@ TEST_F(BinaryJoinStageBuilderTest, RightDeepCollscanBaseLeftmost) {
     execPlan.expectReturnedDocuments(expected);
 }
 
+// Apply a filter on an intermediate join, to apply non-equijoin predicates as soon as the data
+// sources have been fetched.
+TEST_F(BinaryJoinStageBuilderTest, JoinFilterBase) {
+    instantiateMainCollection({
+        fromjson("{_id: 0, l1key: 0}"),
+        fromjson("{_id: 1, l1key: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0, l2key: 10}"),
+                                       fromjson("{_id: 11, f1key: 1, l2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 10}"),
+                                       fromjson("{_id: 21, f2key: 11}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, l1key: 0, x: {_id: 10, f1key: 0, l2key: 10}, z: {_id: 20, f2key: 10}}"),
+    };
+
+    auto cs1 = std::make_unique<CollectionScanNode>();
+    cs1->nss = foreignCollectionName1;
+
+    auto cs2 = std::make_unique<CollectionScanNode>();
+    cs2->nss = foreignCollectionName2;
+
+    auto cs3 = std::make_unique<CollectionScanNode>();
+    cs3->nss = _nss;
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+        new ExpressionContextForTest(operationContext(), _nss));
+
+    auto hj = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs1),
+        std::move(cs2),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq, .leftField = "l2key", .rightField = "f2key"}},
+        FieldPath{"x"},
+        FieldPath{"z"});
+
+    // The filter is very simple and could have been applied directly on the cs1 collection, but the
+    // point is testing whether an intermediate MatchNode is supported by anti-materialization.
+    auto filter = std::make_unique<MatchNode>(
+        std::move(hj), std::make_unique<EqualityMatchExpression>("x.l2key"_sd, mongo::Value(10)));
+
+    auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
+        std::move(filter),
+        std::move(cs3),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = "x.f1key",
+                                                       .rightField = "l1key"}},
+        boost::none,
+        boost::none));
+
+    std::cout << solution->toString() << std::endl;
+    auto execPlan = makeExecutablePlan(
+        _nss, {foreignCollectionName1, foreignCollectionName2}, std::move(solution), expCtx);
+    execPlan.expectReturnedDocuments(expected);
+}
+
 }  // namespace
 }  // namespace mongo::sbe
