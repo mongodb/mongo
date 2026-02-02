@@ -361,7 +361,7 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
            << static_cast<size_t>(gWiredTigerCheckpointCleanupPeriodSeconds) << "),";
 
     ss << "config_base=false,";
-    ss << "statistics=(fast),";
+    ss << "statistics=(" << wtConfig.statisticsSetting << "),";
 
     if (wtConfig.inMemory) {
         invariant(!wtConfig.logEnabled);
@@ -3071,6 +3071,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions()
     wtConfig.liveRestoreThreadsMax = wiredTigerGlobalOptions.liveRestoreThreads;
     wtConfig.liveRestoreReadSizeMB = wiredTigerGlobalOptions.liveRestoreReadSizeMB;
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
+    wtConfig.statisticsSetting = wiredTigerGlobalOptions.statisticsSetting;
 
     wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
     if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {

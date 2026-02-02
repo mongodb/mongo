@@ -157,6 +157,21 @@ Status validateNoNullCharacter(StringData str) {
     return Status::OK();
 }
 
+Status WiredTigerGlobalOptions::validateStatisticsSetting(const std::string& setting) {
+    if (!(str::equalCaseInsensitive(setting, "all"_sd) ||
+          str::equalCaseInsensitive(setting, "cache_walk"_sd) ||
+          str::equalCaseInsensitive(setting, "fast"_sd) ||
+          str::equalCaseInsensitive(setting, "none"_sd) ||
+          str::equalCaseInsensitive(setting, "clear"_sd) ||
+          str::equalCaseInsensitive(setting, "tree_walk"_sd))) {
+        return {ErrorCodes::BadValue,
+                "storage.wiredTiger.engineConfig.statistics expects one of 'all', 'cache_walk', "
+                "'fast', 'none', 'clear', or 'tree_walk'"};
+    }
+
+    return Status::OK();
+}
+
 template <typename T>
 Status setFromStringImpl(T& data, StringData str) {
     invariant(data.second);
