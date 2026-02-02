@@ -1,5 +1,7 @@
 /**
  * Sharding tests for using "explain" with the $vectorSearch aggregation stage.
+ *
+ * TODO SERVER-118445 Delete this test.
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

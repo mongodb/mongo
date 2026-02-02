@@ -1,5 +1,8 @@
 /**
  * Test the use of "explain" with the "$vectorSearch" aggregation stage.
+ *
+ * TODO SERVER-118445 Delete this test.
+ *
  * @tags: [
  *  requires_fcv_71,
  * ]

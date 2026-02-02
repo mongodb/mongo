@@ -12,9 +12,10 @@ config_variables:
 
 test_kind: js_test
 description: |
-  This suite spins up a two node sharded cluster with atlas search enabled, consisting of a
-  mongos, two mongods and two mongots. Unlike the mongot_e2e_sharded_collections suite,
-  collections are not implicitly sharded by test infrastructure.
+  This suite spins up a sharded cluster with atlas search enabled, consisting of 3 mongos
+  instances, 2 shards with 2 replica set nodes each (1 primary + 1 secondary), and mongot
+  instances for each mongod. Unlike the mongot_e2e_sharded_collections suite, collections
+  are not implicitly sharded by test infrastructure.
 
 selector:
   # IMPORTANT: THIS SUITE IS OPT-IN ONLY.
@@ -42,6 +43,7 @@ executor:
     auth_options: *authOptions
     launch_mongot: true
     num_shards: 2
+    num_rs_nodes_per_shard: 2
     num_mongos: 3
     mongod_options:
       keyFile: *keyFile
