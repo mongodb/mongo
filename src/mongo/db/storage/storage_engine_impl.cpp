@@ -94,6 +94,8 @@ MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 
 namespace {
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
+// TODO SERVER-118539 make this configurable
+const auto kStandbyReaperDelayHours = 24;
 
 // Returns true if the ident refers to a resumable index build table.
 bool isResumableIndexBuildIdent(StringData ident) {
@@ -808,6 +810,18 @@ void StorageEngineImpl::setRecoveryCheckpointMetadata(StringData checkpointMetad
 
 void StorageEngineImpl::promoteToLeader() {
     _engine->promoteToLeader();
+    _dropPendingIdentReaper.configureDelay(Seconds(0));
+    // TODO SERVER-117466 catch up on buffered drops
+}
+
+void StorageEngineImpl::demoteFromLeader() {
+    // The engine itself doesn't need to do anything here yet.
+
+    // The contract with drops is that the primary must always see at least one table drop. To
+    // handle cases where a secondary sees a drop before the primary, and then the primary crashes,
+    // we have a 24-hour delay when dropping tables. This keeps the table data around long enough to
+    // drop it again on step-up -- see SERVER-117458.
+    _dropPendingIdentReaper.configureDelay(Seconds(kStandbyReaperDelayHours * 60 * 60));
 }
 
 void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force) {

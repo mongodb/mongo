@@ -154,6 +154,12 @@ public:
      */
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
+    /**
+     * Wait some fixed amount of additional time before dropping an ident. This gets added to the
+     * timestamp of each ident getting dropped. Incompatible with checkpoint-style drop times.
+     */
+    void configureDelay(Seconds delay);
+
 private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
@@ -235,6 +241,10 @@ private:
 
     // Ident to drop timestamp map. Used for efficient lookups into _timestampOrderedIdents.
     StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
+
+    // How long to extend the timeout on all requested drops with a timestamp. Has no effect
+    // on checkpoints.
+    Seconds _delay;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

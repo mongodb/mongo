@@ -76,7 +76,13 @@ bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine,
               dropTime);
 }
 
-KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
+KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine)
+    : _engine(engine), _delay(Seconds(0)) {}
+
+void KVDropPendingIdentReaper::configureDelay(Seconds delay) {
+    stdx::lock_guard lock(_mutex);
+    _delay = delay;
+}
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
                                                    std::shared_ptr<Ident> ident,
@@ -96,6 +102,13 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
     info->dropToken = ident;
     info->dropTime = dropTime;
     info->onDrop = onDrop;
+
+    if (_delay != Seconds::zero()) {
+        // For disagg, we're guaranteed to have a timestamp.
+        invariant(std::holds_alternative<Timestamp>(dropTime));
+        info->dropTime = std::get<Timestamp>(dropTime) + _delay.count();
+    }
+
     _timestampOrderedIdents.insert(info);
     _dropPendingIdents.insert(std::make_pair(ident->getIdent(), info));
 }
@@ -127,6 +140,11 @@ void KVDropPendingIdentReaper::dropUnknownIdent(const Timestamp& stableTimestamp
     info->identName = std::string(ident);
     info->dropTime = stableTimestamp;
     info->dropTimeIsExact = false;
+
+    if (_delay != Seconds::zero()) {
+        info->dropTime = stableTimestamp + _delay.count();
+    }
+
     _timestampOrderedIdents.insert(info);
     _dropPendingIdents.emplace(ident, std::move(info));
 }

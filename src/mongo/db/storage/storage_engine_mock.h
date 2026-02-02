@@ -144,6 +144,8 @@ public:
 
     void promoteToLeader() final {}
 
+    void demoteFromLeader() final {}
+
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override {}
     Timestamp getStableTimestamp() const override {
         return Timestamp();

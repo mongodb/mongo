@@ -740,5 +740,78 @@ TEST_F(KVDropPendingIdentReaperTest, HasExpiredChecksForCheckpointIteration) {
     ASSERT_TRUE(reaper.hasExpiredIdents(Timestamp::min()));
 }
 
+DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
+             AddCheckpointStyleIdentWithConfiguredDelay,
+             "invariant") {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    reaper.configureDelay(Seconds(1));
+    reaper.addDropPendingIdent(engine->checkpointIteration, std::make_shared<Ident>("ident"));
+}
+
+TEST_F(KVDropPendingIdentReaperTest, RemovingDelayReallowsCheckpointDropTimes) {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    reaper.configureDelay(Seconds(1));
+    reaper.configureDelay(Seconds(0));
+    reaper.addDropPendingIdent(engine->checkpointIteration, std::make_shared<Ident>("ident"));
+}
+
+TEST_F(KVDropPendingIdentReaperTest, IdentWithDelayDroppedAtCorrectTime) {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    reaper.configureDelay(Seconds(5));
+
+    Timestamp dropTimestamp{Seconds(10), 0};
+    std::string identName = "ident";
+
+    {
+        // The reaper must have the only references to the ident before it will drop it.
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
+    }
+
+    // This should have no effect.
+    auto opCtx = makeOpCtx();
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    ASSERT_EQUALS(0U, engine->droppedIdents.size());
+
+    // After adding the delay, the ident should finally be dropped.
+    Timestamp extendedDropTimestamp{Seconds(15), 0};
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(extendedDropTimestamp));
+    ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, IdentWithDelayStillNotDroppedAfterRemovingDelay) {
+    // TODO SERVER-117466 this test asserts incorrect behaviour that should go away
+    // after this ticket is done.
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    reaper.configureDelay(Seconds(5));
+
+    Timestamp dropTimestamp{Seconds(10), 0};
+    std::string identName = "ident";
+
+    {
+        // The reaper must have the only references to the ident before it will drop it.
+        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
+    }
+
+    reaper.configureDelay(Seconds(0));
+
+    // This should have no effect.
+    auto opCtx = makeOpCtx();
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+    ASSERT_EQUALS(0U, engine->droppedIdents.size());
+
+    // After adding the delay, the ident should finally be dropped.
+    Timestamp extendedDropTimestamp{Seconds(15), 0};
+    reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(extendedDropTimestamp));
+    ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front());
+}
+
 }  // namespace
 }  // namespace mongo

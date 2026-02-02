@@ -782,6 +782,12 @@ public:
     virtual void promoteToLeader() = 0;
 
     /**
+     * Configures the storage engine as a standby. Inverse of promoteToLeader(). Must be safe to
+     * call even if we're already not a leader.
+     */
+    virtual void demoteFromLeader() = 0;
+
+    /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
      * timestamp must not decrease unless force=true is set, in which case we force the stable
      * timestamp, the oldest timestamp, and the commit timestamp backward.
