@@ -119,6 +119,10 @@ public:
         return parseNode.vtable == &VTABLE;
     }
 
+    static ::MongoExtensionAggStageParseNodeVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     const AggStageParseNode& getImpl() const noexcept {
         return *_parseNode;

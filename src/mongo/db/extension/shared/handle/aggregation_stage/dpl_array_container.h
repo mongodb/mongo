@@ -52,7 +52,7 @@ public:
         : VTableAPI<::MongoExtensionDPLArrayContainer>(container) {}
 
     size_t size() const {
-        return vtable().size(get());
+        return _vtable().size(get());
     }
 
     /**
@@ -79,7 +79,7 @@ protected:
      * Callers of this function must have already verified isValid().
      */
     void _transferInternal(::MongoExtensionDPLArray& arr) {
-        invokeCAndConvertStatusToException([&]() { return vtable().transfer(get(), &arr); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().transfer(get(), &arr); });
     }
 };
 

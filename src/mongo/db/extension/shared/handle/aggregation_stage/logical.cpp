@@ -38,13 +38,13 @@
 namespace mongo::extension {
 
 StringData LogicalAggStageAPI::getName() const {
-    auto stringView = byteViewAsStringView(vtable().get_name(get()));
+    auto stringView = byteViewAsStringView(_vtable().get_name(get()));
     return StringData{stringView.data(), stringView.size()};
 }
 
 BSONObj LogicalAggStageAPI::serialize() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().serialize(get(), &buf); });
 
     tassert(11173700,
             "Extension implementation of `serialize` encountered nullptr inside the output buffer.",
@@ -59,7 +59,7 @@ BSONObj LogicalAggStageAPI::serialize() const {
 BSONObj LogicalAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() {
-        return vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        return _vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
     tassert(11239400, "buffer returned from explain must not be null", buf);
@@ -72,7 +72,7 @@ BSONObj LogicalAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) 
 
 ExecAggStageHandle LogicalAggStageAPI::compile() const {
     ::MongoExtensionExecAggStage* execAggStage{nullptr};
-    invokeCAndConvertStatusToException([&]() { return vtable().compile(get(), &execAggStage); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().compile(get(), &execAggStage); });
 
     return ExecAggStageHandle(execAggStage);
 }
@@ -80,14 +80,14 @@ ExecAggStageHandle LogicalAggStageAPI::compile() const {
 DistributedPlanLogicHandle LogicalAggStageAPI::getDistributedPlanLogic() const {
     ::MongoExtensionDistributedPlanLogic* dpl{nullptr};
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_distributed_plan_logic(get(), &dpl); });
+        [&]() { return _vtable().get_distributed_plan_logic(get(), &dpl); });
 
     return DistributedPlanLogicHandle(dpl);
 }
 
 LogicalAggStageHandle LogicalAggStageAPI::clone() const {
     ::MongoExtensionLogicalAggStage* logicalAggStage{nullptr};
-    invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &logicalAggStage); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &logicalAggStage); });
 
     return LogicalAggStageHandle(logicalAggStage);
 }
@@ -95,8 +95,8 @@ LogicalAggStageHandle LogicalAggStageAPI::clone() const {
 bool LogicalAggStageAPI::isSortedByVectorSearchScore() const {
     bool outIsSortedByVectorSearchScore{false};
     invokeCAndConvertStatusToException([&]() {
-        return vtable().is_stage_sorted_by_vector_search_score(get(),
-                                                               &outIsSortedByVectorSearchScore);
+        return _vtable().is_stage_sorted_by_vector_search_score(get(),
+                                                                &outIsSortedByVectorSearchScore);
     });
 
     return outIsSortedByVectorSearchScore;
@@ -105,10 +105,10 @@ bool LogicalAggStageAPI::isSortedByVectorSearchScore() const {
 void LogicalAggStageAPI::setExtractedLimitVal(boost::optional<long long> extractedLimitVal) {
     invokeCAndConvertStatusToException([&]() {
         if (extractedLimitVal.has_value()) {
-            return vtable().set_vector_search_limit_for_optimization(get(),
-                                                                     &extractedLimitVal.get());
+            return _vtable().set_vector_search_limit_for_optimization(get(),
+                                                                      &extractedLimitVal.get());
         } else {
-            return vtable().set_vector_search_limit_for_optimization(get(), nullptr);
+            return _vtable().set_vector_search_limit_for_optimization(get(), nullptr);
         }
     });
 }

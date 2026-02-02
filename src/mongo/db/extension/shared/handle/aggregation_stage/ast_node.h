@@ -60,7 +60,7 @@ public:
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
-        auto stringView = byteViewAsStringView(vtable().get_name(get()));
+        auto stringView = byteViewAsStringView(_vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
 

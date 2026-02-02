@@ -94,7 +94,7 @@ public:
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
-        auto stringView = byteViewAsStringView(vtable().get_name(get()));
+        auto stringView = byteViewAsStringView(_vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
 
@@ -142,7 +142,7 @@ private:
      * by the host to size the ExpandedArray.
      */
     size_t getExpandedSize() const {
-        return vtable().get_expanded_size(get());
+        return _vtable().get_expanded_size(get());
     }
 };
 

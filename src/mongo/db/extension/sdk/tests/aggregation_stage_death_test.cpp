@@ -199,121 +199,73 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, DescriptorAndParseNodeNameMismatchFa
 }
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
-    auto transformParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
-    auto handle = AggStageParseNodeHandle{transformParseNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageParseNode::getVTable();
     vtable.get_name = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
-    auto transformParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
-    auto handle = AggStageParseNodeHandle{transformParseNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageParseNode::getVTable();
     vtable.get_query_shape = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto transformParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
-    auto handle = AggStageParseNodeHandle{transformParseNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageParseNode::getVTable();
     vtable.get_expanded_size = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
-    auto transformParseNode =
-        new ExtensionAggStageParseNode(shared_test_stages::TransformAggStageParseNode::make());
-    auto handle = AggStageParseNodeHandle{transformParseNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageParseNode::getVTable();
     vtable.expand = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "11217601") {
-    auto transformAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
-    auto handle = AggStageAstNodeHandle{transformAstNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageAstNode::getVTable();
     vtable.get_name = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableBind, "11113700") {
-    auto transformAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
-    auto handle = AggStageAstNodeHandle{transformAstNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageAstNode::getVTable();
     vtable.bind = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "11347800") {
-    auto transformAstNode =
-        new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
-    auto handle = AggStageAstNodeHandle{transformAstNode};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionAggStageAstNode::getVTable();
     vtable.get_properties = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext, "10956800") {
-    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::TransformExecAggStage::make());
-    auto handle = ExecAggStageHandle{transformExecAggStage};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionExecAggStage::getVTable();
     vtable.get_next = nullptr;
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSource, "10957202") {
-    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::TransformExecAggStage::make());
-    auto handle = ExecAggStageHandle{transformExecAggStage};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionExecAggStage::getVTable();
     vtable.set_source = nullptr;
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "11216705") {
-    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::TransformExecAggStage::make());
-    auto handle = ExecAggStageHandle{transformExecAggStage};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionExecAggStage::getVTable();
     vtable.open = nullptr;
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, "11216706") {
-    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::TransformExecAggStage::make());
-    auto handle = ExecAggStageHandle{transformExecAggStage};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionExecAggStage::getVTable();
     vtable.reopen = nullptr;
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "11216707") {
-    auto transformExecAggStage = new extension::sdk::ExtensionExecAggStage(
-        shared_test_stages::TransformExecAggStage::make());
-    auto handle = ExecAggStageHandle{transformExecAggStage};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionExecAggStage::getVTable();
     vtable.close = nullptr;
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
@@ -442,10 +394,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 };
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsSize, "11368301") {
-    auto handle = DPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
-        sdk::DPLArrayContainer(std::vector<VariantDPLHandle>{}))};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.size = nullptr;
     DPLArrayContainerAPI::assertVTableConstraints(vtable);
 };
@@ -453,10 +402,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsS
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
              InvalidDPLArrayContainerVTableFailsTransfer,
              "11368302") {
-    auto handle = DPLArrayContainerHandle{new sdk::ExtensionDPLArrayContainerAdapter(
-        sdk::DPLArrayContainer(std::vector<VariantDPLHandle>{}))};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.transfer = nullptr;
     DPLArrayContainerAPI::assertVTableConstraints(vtable);
 };
@@ -498,31 +444,19 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 }
 
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "11027300") {
-    auto distributedPlanLogic =
-        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
-    auto handle = DistributedPlanLogicHandle{distributedPlanLogic};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.extract_shards_pipeline = nullptr;
     DistributedPlanLogicAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "11027301") {
-    auto distributedPlanLogic =
-        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
-    auto handle = DistributedPlanLogicHandle{distributedPlanLogic};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.extract_merging_pipeline = nullptr;
     DistributedPlanLogicAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "11027302") {
-    auto distributedPlanLogic =
-        new sdk::ExtensionDistributedPlanLogicAdapter(sdk::DistributedPlanLogic{});
-    auto handle = DistributedPlanLogicHandle{distributedPlanLogic};
-
-    auto vtable = handle->vtable();
+    auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.get_sort_pattern = nullptr;
     DistributedPlanLogicAPI::assertVTableConstraints(vtable);
 };

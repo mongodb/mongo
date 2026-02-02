@@ -69,6 +69,10 @@ public:
 
     static size_t getInstanceCount();
 
+    static ::MongoExtensionStatusVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     ExtensionStatusOK() : ::MongoExtensionStatus{&VTABLE} {
         sInstanceCount++;
@@ -260,14 +264,14 @@ public:
      * Return a non-zero code associated with `error`.
      */
     int getCode() const {
-        return vtable().get_code(get());
+        return _vtable().get_code(get());
     }
 
     /**
      * Return a utf-8 string associated with `MongoExtensionStatus`. May be empty.
      */
     std::string_view getReason() const {
-        return byteViewAsStringView(vtable().get_reason(get()));
+        return byteViewAsStringView(_vtable().get_reason(get()));
     }
 
     void setCode(int code);

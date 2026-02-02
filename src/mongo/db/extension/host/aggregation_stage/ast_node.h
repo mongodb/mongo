@@ -122,6 +122,10 @@ public:
         return astNode.vtable == &VTABLE;
     }
 
+    static ::MongoExtensionAggStageAstNodeVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     const AggStageAstNode& getImpl() const noexcept {
         return *_astNode;

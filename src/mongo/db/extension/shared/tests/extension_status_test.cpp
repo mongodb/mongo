@@ -320,36 +320,31 @@ TEST(
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
-    StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status->vtable();
+    auto vtable = ExtensionStatusOK::getVTable();
     vtable.get_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
-    StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status->vtable();
+    auto vtable = ExtensionStatusOK::getVTable();
     vtable.get_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
-    StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status->vtable();
+    auto vtable = ExtensionStatusOK::getVTable();
     vtable.set_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
-    StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status->vtable();
+    auto vtable = ExtensionStatusOK::getVTable();
     vtable.set_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
-    StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status->vtable();
+    auto vtable = ExtensionStatusOK::getVTable();
     vtable.clone = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }

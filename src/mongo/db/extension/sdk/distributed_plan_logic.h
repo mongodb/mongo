@@ -87,6 +87,10 @@ public:
     ExtensionDistributedPlanLogicAdapter& operator=(ExtensionDistributedPlanLogicAdapter&&) =
         delete;
 
+    static ::MongoExtensionDistributedPlanLogicVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     const DistributedPlanLogic& getImpl() const noexcept {
         return _dpl;

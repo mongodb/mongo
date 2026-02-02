@@ -88,12 +88,12 @@ public:
         : VTableAPI<::MongoExtensionHostServices>(services) {}
 
     ::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage) const {
-        return vtable().user_asserted(structuredErrorMessage);
+        return _vtable().user_asserted(structuredErrorMessage);
     }
 
     ::MongoExtensionStatus* tripwireAsserted(
         ::MongoExtensionByteView structuredErrorMessage) const {
-        return vtable().tripwire_asserted(structuredErrorMessage);
+        return _vtable().tripwire_asserted(structuredErrorMessage);
     }
 
     static UnownedHandle<const ::MongoExtensionHostServices>& getInstance() {
@@ -103,7 +103,7 @@ public:
     IdleThreadBlockHandle markIdleThread(const char* location) const {
         ::MongoExtensionIdleThreadBlock* idleThreadBlock = nullptr;
         invokeCAndConvertStatusToException(
-            [&] { return vtable().mark_idle_thread_block(&idleThreadBlock, location); });
+            [&] { return _vtable().mark_idle_thread_block(&idleThreadBlock, location); });
 
         return IdleThreadBlockHandle{idleThreadBlock};
     }
@@ -119,7 +119,7 @@ public:
     AggStageParseNodeHandle createHostAggStageParseNode(BSONObj spec) const {
         ::MongoExtensionAggStageParseNode* result = nullptr;
         invokeCAndConvertStatusToException([&] {
-            return vtable().create_host_agg_stage_parse_node(objAsByteView(spec), &result);
+            return _vtable().create_host_agg_stage_parse_node(objAsByteView(spec), &result);
         });
         return AggStageParseNodeHandle{result};
     }
@@ -127,12 +127,12 @@ public:
     AggStageAstNodeHandle createIdLookup(BSONObj spec) const {
         ::MongoExtensionAggStageAstNode* result = nullptr;
         invokeCAndConvertStatusToException(
-            [&] { return vtable().create_id_lookup(objAsByteView(spec), &result); });
+            [&] { return _vtable().create_id_lookup(objAsByteView(spec), &result); });
         return AggStageAstNodeHandle{result};
     }
 
     LoggerHandle getLogger() const {
-        return LoggerHandle(vtable().get_logger());
+        return LoggerHandle(_vtable().get_logger());
     }
 
     static void assertVTableConstraints(const VTable_t& vtable);

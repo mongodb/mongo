@@ -100,14 +100,6 @@ public:
         return _ptr;
     }
 
-    // TODO SERVER-115914: Make vtable protected. Update all tests that use vtable() to reflect
-    // this.
-    const VTable_t& vtable() const {
-        assertValid();
-        tassert(10596404, "Invalid vtable ptr!", _ptr->vtable != nullptr);
-        return *(_ptr->vtable);
-    }
-
     // Specializations of this class must implement this function to confirm the vtable is valid on
     // the API.
     static void assertVTableConstraints(const VTable_t& vtable) = delete;
@@ -117,9 +109,15 @@ public:
     }
 
 protected:
+    VTable_t& _vtable() const {
+        assertValid();
+        tassert(10596404, "Invalid vtable ptr!", _ptr->vtable != nullptr);
+        return *(_ptr->vtable);
+    }
+
     void _assertValidVTable() const {
         if (_ptr) {
-            API::assertVTableConstraints(vtable());
+            API::assertVTableConstraints(_vtable());
         }
     }
 

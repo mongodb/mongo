@@ -121,17 +121,17 @@ void convertStatusToException(StatusHandle status) {
 }
 
 void StatusAPI::setCode(int code) {
-    vtable().set_code(get(), code);
+    _vtable().set_code(get(), code);
 }
 
 void StatusAPI::setReason(std::string_view reason) {
     auto byteView = stringViewAsByteView(reason);
-    invokeCAndConvertStatusToException([&]() { return vtable().set_reason(get(), byteView); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().set_reason(get(), byteView); });
 }
 
 StatusHandle StatusAPI::clone() const {
     ::MongoExtensionStatus* cloneTarget{nullptr};
-    invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &cloneTarget); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &cloneTarget); });
     return StatusHandle(cloneTarget);
 }
 }  // namespace mongo::extension

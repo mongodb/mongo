@@ -84,6 +84,10 @@ public:
     ExtensionDPLArrayContainerAdapter(ExtensionDPLArrayContainerAdapter&&) = delete;
     ExtensionDPLArrayContainerAdapter& operator=(ExtensionDPLArrayContainerAdapter&&) = delete;
 
+    static ::MongoExtensionDPLArrayContainerVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     const DPLArrayContainer& getImpl() const noexcept {
         return _container;

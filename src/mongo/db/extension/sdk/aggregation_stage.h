@@ -306,6 +306,10 @@ public:
     ExtensionAggStageAstNode(ExtensionAggStageAstNode&&) = delete;
     ExtensionAggStageAstNode& operator=(ExtensionAggStageAstNode&&) = delete;
 
+    static ::MongoExtensionAggStageAstNodeVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     const AggStageAstNode& getImpl() const noexcept {
         return *_astNode;
@@ -447,6 +451,10 @@ public:
     ExtensionAggStageParseNode& operator=(const ExtensionAggStageParseNode&) = delete;
     ExtensionAggStageParseNode(ExtensionAggStageParseNode&&) = delete;
     ExtensionAggStageParseNode& operator=(ExtensionAggStageParseNode&&) = delete;
+
+    static ::MongoExtensionAggStageParseNodeVTable getVTable() {
+        return VTABLE;
+    }
 
 private:
     const AggStageParseNode& getImpl() const noexcept {
@@ -713,6 +721,10 @@ public:
     ExtensionExecAggStage& operator=(const ExtensionExecAggStage&) = delete;
     ExtensionExecAggStage(ExtensionExecAggStage&&) = delete;
     ExtensionExecAggStage& operator=(ExtensionExecAggStage&&) = delete;
+
+    static ::MongoExtensionExecAggStageVTable getVTable() {
+        return VTABLE;
+    }
 
 private:
     const ExecAggStageBase& getImpl() const noexcept {

@@ -57,14 +57,14 @@ public:
      * Get a read-only byte view of the contents of ByteBuf.
      */
     MongoExtensionByteView getByteView() const {
-        return vtable().get_view(get());
+        return _vtable().get_view(get());
     }
 
     /**
      * Get a read-only string view of the contents of ByteBuf.
      */
     std::string_view getStringView() const {
-        return byteViewAsStringView(vtable().get_view(get()));
+        return byteViewAsStringView(_vtable().get_view(get()));
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {

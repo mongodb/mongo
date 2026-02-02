@@ -99,10 +99,7 @@ DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
 DEATH_TEST(ExtensionByteBufVTableTestDeathTest,
            InvalidExtensionByteBufVTableFailsGetView,
            "10806301") {
-    auto buf = new ByteBuf();
-    auto handle = ExtensionByteBufHandle{buf};
-
-    auto vtable = handle->vtable();
+    auto vtable = ByteBuf::getVTable();
     vtable.get_view = nullptr;
     ExtensionByteBufAPI::assertVTableConstraints(vtable);
 };

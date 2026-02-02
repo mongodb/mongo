@@ -36,7 +36,7 @@ namespace mongo::extension {
 
 MongoExtensionStaticProperties AggStageAstNodeAPI::getProperties() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() { return vtable().get_properties(get(), &buf); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_properties(get(), &buf); });
 
     tassert(
         11347802,
@@ -54,7 +54,7 @@ LogicalAggStageHandle AggStageAstNodeAPI::bind(
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().bind(get(), &catalogContext, &logicalStagePtr); });
+        [&]() { return _vtable().bind(get(), &catalogContext, &logicalStagePtr); });
 
     return LogicalAggStageHandle(logicalStagePtr);
 }
@@ -64,7 +64,7 @@ AggStageAstNodeHandle AggStageAstNodeAPI::clone() const {
     ::MongoExtensionAggStageAstNode* astNodePtr{nullptr};
 
     // The API's contract mandates that astNodePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &astNodePtr); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().clone(get(), &astNodePtr); });
 
     return AggStageAstNodeHandle(astNodePtr);
 }
@@ -74,12 +74,12 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
     MongoExtensionFirstStageViewApplicationPolicy policy =
         MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_first_stage_view_application_policy(get(), &policy); });
+        [&]() { return _vtable().get_first_stage_view_application_policy(get(), &policy); });
     return policy;
 }
 
 void AggStageAstNodeAPI::bindViewInfo(std::string_view viewName) const {
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().bind_view_info(get(), stringViewAsByteView(viewName)); });
+        [&]() { return _vtable().bind_view_info(get(), stringViewAsByteView(viewName)); });
 }
 }  // namespace mongo::extension

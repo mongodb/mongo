@@ -36,7 +36,7 @@ ExtensionGenericStatus QueryExecutionContextAPI::checkForInterrupt() const {
     // interrupt was detected.
     ExtensionGenericStatus queryStatus;
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().check_for_interrupt(get(), &queryStatus); });
+        [&]() { return _vtable().check_for_interrupt(get(), &queryStatus); });
     return queryStatus;
 }
 
@@ -45,7 +45,7 @@ UnownedOperationMetricsHandle QueryExecutionContextAPI::getMetrics(
 
     MongoExtensionOperationMetrics* metrics = nullptr;
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_metrics(get(), execStage, &metrics); });
+        [&]() { return _vtable().get_metrics(get(), execStage, &metrics); });
 
     return UnownedOperationMetricsHandle(metrics);
 }

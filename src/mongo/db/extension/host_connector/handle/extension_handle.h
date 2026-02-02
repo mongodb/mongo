@@ -66,7 +66,7 @@ public:
     void initialize(const MongoExtensionHostPortal* portal,
                     const MongoExtensionHostServices* hostServices) const {
         invokeCAndConvertStatusToException(
-            [&] { return vtable().initialize(get(), portal, hostServices); });
+            [&] { return _vtable().initialize(get(), portal, hostServices); });
     }
 
     ::MongoExtensionAPIVersion getVersion() const {

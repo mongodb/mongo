@@ -67,7 +67,7 @@ std::string QueryShapeOptsAPI::serializeIdentifier(const std::string& identifier
     };
 
     return serializeUsingOptsHelper<std::string>(
-        byteView, vtable().serialize_identifier, transformViewToReturn);
+        byteView, _vtable().serialize_identifier, transformViewToReturn);
 }
 
 std::string QueryShapeOptsAPI::serializeFieldPath(const std::string& fieldPath) const {
@@ -78,7 +78,7 @@ std::string QueryShapeOptsAPI::serializeFieldPath(const std::string& fieldPath) 
     };
 
     return serializeUsingOptsHelper<std::string>(
-        byteView, vtable().serialize_field_path, transformViewToReturn);
+        byteView, _vtable().serialize_field_path, transformViewToReturn);
 }
 
 void QueryShapeOptsAPI::appendLiteral(BSONObjBuilder& builder,
@@ -97,7 +97,7 @@ void QueryShapeOptsAPI::appendLiteral(BSONObjBuilder& builder,
         return true;
     };
 
-    serializeUsingOptsHelper<bool>(byteView, vtable().serialize_literal, transformViewToReturn);
+    serializeUsingOptsHelper<bool>(byteView, _vtable().serialize_literal, transformViewToReturn);
 }
 
 }  // namespace mongo::extension::sdk

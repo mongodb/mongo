@@ -65,7 +65,7 @@ public:
 
     void registerStageDescriptor(const ExtensionAggStageDescriptor* stageDesc) const {
         invokeCAndConvertStatusToException([&] {
-            return vtable().register_stage_descriptor(
+            return _vtable().register_stage_descriptor(
                 get(), reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(stageDesc));
         });
     }
@@ -81,7 +81,8 @@ public:
     }
 
     YAML::Node getExtensionOptions() const {
-        return YAML::Load(std::string(byteViewAsStringView(vtable().get_extension_options(get()))));
+        return YAML::Load(
+            std::string(byteViewAsStringView(_vtable().get_extension_options(get()))));
     }
 
     static void assertVTableConstraints(const VTable_t& vtable) {

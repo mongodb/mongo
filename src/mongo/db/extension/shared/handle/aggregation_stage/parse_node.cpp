@@ -43,7 +43,7 @@ BSONObj AggStageParseNodeAPI::getQueryShape(const ::MongoExtensionHostQueryShape
     ::MongoExtensionByteBuf* buf{nullptr};
 
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_query_shape(get(), &opts, &buf); });
+        [&]() { return _vtable().get_query_shape(get(), &opts, &buf); });
 
     tassert(11188203, "buffer returned from get_query_shape must not be null", buf != nullptr);
 
@@ -92,7 +92,7 @@ std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     tassert(11113803, "AggStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
     std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
     ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
-    invokeCAndConvertStatusToException([&] { return vtable().expand(get(), &expandedArray); });
+    invokeCAndConvertStatusToException([&] { return _vtable().expand(get(), &expandedArray); });
     return abiArrayToRaiiVector(expandedArray);
 }
 
@@ -101,7 +101,7 @@ AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {
     ::MongoExtensionAggStageParseNode* parseNodePtr{nullptr};
 
     // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException([&] { return vtable().clone(get(), &parseNodePtr); });
+    invokeCAndConvertStatusToException([&] { return _vtable().clone(get(), &parseNodePtr); });
 
     return AggStageParseNodeHandle(parseNodePtr);
 }

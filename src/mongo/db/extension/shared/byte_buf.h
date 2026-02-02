@@ -40,8 +40,6 @@ namespace mongo::extension {
 
 class ByteBuf final : public ::MongoExtensionByteBuf {
 public:
-    static const ::MongoExtensionByteBufVTable VTABLE;
-
     ByteBuf();
     ByteBuf(const uint8_t* data, size_t len);
     /**
@@ -56,10 +54,15 @@ public:
      */
     void assign(const uint8_t* data, size_t len);
 
+    static ::MongoExtensionByteBufVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     static void _extDestroy(::MongoExtensionByteBuf* buf) noexcept;
     static MongoExtensionByteView _extGetView(const ::MongoExtensionByteBuf* byteBufPtr) noexcept;
 
+    static const ::MongoExtensionByteBufVTable VTABLE;
     std::vector<uint8_t> _buffer;
 };
 }  // namespace mongo::extension

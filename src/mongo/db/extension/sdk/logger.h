@@ -113,7 +113,7 @@ public:
         }
 
         auto logMessage = createLogMessageStruct(message, code, severity, attrs);
-        invokeCAndConvertStatusToException([&]() { return vtable().log(logMessage.get()); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().log(logMessage.get()); });
     }
 
     void logDebug(const std::string& message,
@@ -127,14 +127,14 @@ public:
         }
 
         auto logMessage = createDebugLogMessageStruct(message, code, level, attrs);
-        invokeCAndConvertStatusToException([&]() { return vtable().log(logMessage.get()); });
+        invokeCAndConvertStatusToException([&]() { return _vtable().log(logMessage.get()); });
     }
 
     bool shouldLog(::MongoExtensionLogSeverity levelOrSeverity,
                    ::MongoExtensionLogType logType) const {
         bool out = false;
         invokeCAndConvertStatusToException(
-            [&]() { return vtable().should_log(levelOrSeverity, logType, &out); });
+            [&]() { return _vtable().should_log(levelOrSeverity, logType, &out); });
         return out;
     }
 

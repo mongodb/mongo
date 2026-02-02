@@ -34,24 +34,24 @@
 namespace mongo::extension {
 
 void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {
-    invokeCAndConvertStatusToException([&]() { return vtable().set_source(get(), input.get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().set_source(get(), input.get()); });
 }
 
 ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionContext* execCtxPtr) {
     ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext();
     invokeCAndConvertStatusToException(
-        [&]() { return vtable().get_next(get(), execCtxPtr, &result); });
+        [&]() { return _vtable().get_next(get(), execCtxPtr, &result); });
 
     return ExtensionGetNextResult::makeFromApiResult(result);
 }
 
 std::string_view ExecAggStageAPI::getName() const {
-    return byteViewAsStringView(vtable().get_name(get()));
+    return byteViewAsStringView(_vtable().get_name(get()));
 }
 
 OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
     MongoExtensionOperationMetrics* metrics = nullptr;
-    invokeCAndConvertStatusToException([&]() { return vtable().create_metrics(get(), &metrics); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().create_metrics(get(), &metrics); });
 
     tassert(11213505, "Result of `create_metrics` was nullptr", metrics != nullptr);
 
@@ -60,21 +60,21 @@ OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
 }
 
 void ExecAggStageAPI::open() {
-    invokeCAndConvertStatusToException([&]() { return vtable().open(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().open(get()); });
 }
 
 void ExecAggStageAPI::reopen() {
-    invokeCAndConvertStatusToException([&]() { return vtable().reopen(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().reopen(get()); });
 }
 
 void ExecAggStageAPI::close() {
-    invokeCAndConvertStatusToException([&]() { return vtable().close(get()); });
+    invokeCAndConvertStatusToException([&]() { return _vtable().close(get()); });
 }
 
 BSONObj ExecAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() {
-        return vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+        return _vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
     });
 
     tassert(11239500, "buffer returned from explain must not be null", buf);
