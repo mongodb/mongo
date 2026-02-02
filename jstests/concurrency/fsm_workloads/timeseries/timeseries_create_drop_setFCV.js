@@ -11,6 +11,7 @@
  *   assumes_balancer_off,
  *   # Runs setFCV, which can interfere with other tests.
  *   incompatible_with_concurrency_simultaneous,
+ *   runs_set_fcv,
  * ]
  */
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";

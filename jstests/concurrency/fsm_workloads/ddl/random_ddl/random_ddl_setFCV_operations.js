@@ -8,6 +8,7 @@
  *   multiversion_incompatible,
  *   # TODO (SERVER-104171) Remove the 'assumes_balancer_off' tag
  *   assumes_balancer_off,
+ *   runs_set_fcv,
  *  ]
  */
 

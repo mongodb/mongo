@@ -6,6 +6,7 @@
  * collection, or an index is dropped.
  *
  * @tags: [
+ *   creates_background_indexes,
  *   uses_curop_agg_stage,
  *   state_functions_share_cursor,
  *   assumes_balancer_off,

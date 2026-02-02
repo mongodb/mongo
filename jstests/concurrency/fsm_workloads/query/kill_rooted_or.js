@@ -7,6 +7,7 @@
  *
  * This workload was designed to reproduce SERVER-24761.
  * @tags: [
+ *   creates_background_indexes,
  *   requires_getmore
  * ]
  */

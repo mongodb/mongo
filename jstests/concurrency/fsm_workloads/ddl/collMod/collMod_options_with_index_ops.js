@@ -2,6 +2,7 @@
  * Repeatedly run collMod on the collection options along with creating and dropping indexes of a collection.
  *
  * @tags: [
+ *   creates_background_indexes,
  *   requires_sharding,
  * ]
  */

@@ -8,7 +8,12 @@
  * collection, or an index is dropped concurrently.
  *
  * The parent test, invalidated_cursors.js, uses $currentOp.
- * @tags: [uses_curop_agg_stage, state_functions_share_cursor, assumes_balancer_off]
+ * @tags: [
+ *  creates_background_indexes,
+ *  uses_curop_agg_stage,
+ *  state_functions_share_cursor,
+ *  assumes_balancer_off,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/invalidated_cursors.js";

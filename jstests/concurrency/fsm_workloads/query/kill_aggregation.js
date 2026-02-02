@@ -7,6 +7,7 @@
  *
  * This workload was designed to reproduce SERVER-25039.
  * @tags: [
+ *   creates_background_indexes,
  *   requires_getmore
  * ]
  */

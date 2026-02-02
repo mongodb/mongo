@@ -5,6 +5,7 @@
  *   requires_timeseries,
  *   # TODO SERVER-105509 enable test in config shard suites
  *   config_shard_incompatible,
+ *   creates_background_indexes,
  * ]
  */
 

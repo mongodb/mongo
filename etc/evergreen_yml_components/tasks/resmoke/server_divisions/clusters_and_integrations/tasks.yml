@@ -3134,6 +3134,30 @@ tasks:
           use_large_distro: "true"
           resmoke_jobs_max: 10
 
+  - <<: *gen_task_template
+    name: disagg_concurrency_sharded_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_concurrency_sharded_replication
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
 ################################################
 #                 Task Groups                  #
 ################################################

@@ -18,6 +18,7 @@
  *  # This test performs FCV upgrade/downgrade, and config fuzzer
  *  # may set cluster/server parameters incompatible with the current/target FCV
  *  does_not_support_config_fuzzer,
+ *  runs_set_fcv,
  * ]
  */
 

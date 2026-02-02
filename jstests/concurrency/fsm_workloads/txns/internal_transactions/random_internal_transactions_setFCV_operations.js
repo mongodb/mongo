@@ -10,6 +10,7 @@
  *  multiversion_incompatible,
  *  # TODO (SERVER-104171) Re-enable this test once downgrade works with chunk migrations.
  *  __TEMPORARILY_DISABLED__,
+ *  runs_set_fcv,
  * ]
  */
 

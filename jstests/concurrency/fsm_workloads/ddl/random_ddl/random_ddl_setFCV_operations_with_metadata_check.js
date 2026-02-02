@@ -16,7 +16,8 @@
  *   # test in transaction suites.
  *   does_not_support_transactions,
  *   # TODO (SERVER-104789): config shards cause setFCV to hang because resharding is not aborted.
- *   config_shard_incompatible
+ *   config_shard_incompatible,
+ *   runs_set_fcv,
  * ]
  */
 

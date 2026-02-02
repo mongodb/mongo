@@ -14,6 +14,7 @@
  *   multiversion_incompatible,
  *   # Relies on internalInsertMaxBatchSize to be 64 or above, but it may be fuzzed to lower values.
  *   does_not_support_config_fuzzer,
+ *   runs_set_fcv,
  *  ]
  */
 

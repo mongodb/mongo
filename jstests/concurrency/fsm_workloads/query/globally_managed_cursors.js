@@ -4,6 +4,7 @@
  *
  * The "grandparent test," invalidated_cursors.js, uses $currentOp.
  * @tags: [
+ *   creates_background_indexes,
  *   uses_curop_agg_stage,
  *   state_functions_share_cursor,
  *   assumes_balancer_off,
