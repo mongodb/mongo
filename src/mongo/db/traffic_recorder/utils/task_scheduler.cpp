@@ -76,7 +76,7 @@ private:
 };
 }  // namespace detail
 
-class TaskSchedulerImpl : public TaskScheduler {
+class TaskSchedulerImpl final : public TaskScheduler {
 public:
     TaskSchedulerImpl(std::string name) {
         _worker = stdx::thread([this, token = _stop.get_token(), name = std::move(name)]() {
@@ -85,7 +85,7 @@ public:
         });
     }
 
-    void runAt(Date_t timepoint, unique_function<void()> work) override {
+    void runAt(Date_t timepoint, unique_function<void()> work) final {
         {
             auto ul = std::unique_lock(_mutex);
             _tasks.push({timepoint, std::move(work)});
@@ -93,7 +93,7 @@ public:
         _cv.notify_one();
     }
 
-    void cancelAll() override {
+    void cancelAll() final {
         {
             auto ul = std::unique_lock(_mutex);
             _tasks.clear();
@@ -101,7 +101,8 @@ public:
         _cv.notify_one();
     }
 
-    void stop() override {
+    // This function must stay final as long as it is called from the destructor.
+    void stop() final {
         _stop.request_stop();
         _cv.notify_one();
         if (_worker.joinable()) {
@@ -110,7 +111,7 @@ public:
         stopped.store(true);
     }
 
-    ~TaskSchedulerImpl() override {
+    ~TaskSchedulerImpl() final {
         if (!stopped.load()) {
             stop();
         }

@@ -992,7 +992,7 @@ QueryPlannerAnalysis::Strategy QueryPlannerAnalysis::determineLookupStrategy(
     bool allowDiskUse,
     const CollatorInterface* collator) {
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
-    if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {
+    if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {  // NOLINT
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
     }
 

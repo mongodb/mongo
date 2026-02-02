@@ -701,7 +701,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     ScopedDebugInfo planCacheDiagnostics(
         "PlanCacheDiagnostics", diagnostic_printers::PlanCacheDiagnosticPrinter{solnCacheData});
 
-    if (auto scoped = planFromCacheAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
+    if (auto scoped = planFromCacheAlwaysFails.scoped();
+        MONGO_unlikely(scoped.isActive())) {  // NOLINT
         tasserted(9319600, "Hit planFromCacheAlwaysFails fail point");
     }
 
@@ -2116,7 +2117,7 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     tassert(11321042,
             fmt::format("Expected the primary match expression to be an OR, but found type {}",
                         static_cast<int>(query.getPrimaryMatchExpression()->matchType())),
-            query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);
+            query.getPrimaryMatchExpression()->matchType() == MatchExpression::OR);  // NOLINT
     tassert(11321043,
             "Cannot plan subqueries for an $or with no children",
             query.getPrimaryMatchExpression()->numChildren() > 0);
