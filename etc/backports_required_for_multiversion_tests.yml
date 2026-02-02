@@ -879,8 +879,6 @@ last-continuous:
     ticket: SERVER-113532
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
-  - test_file: jstests/core/index/index_on_incorrect_collection.js
-    ticket: SERVER-113888
   suites: null
 last-lts:
   all:
@@ -1822,6 +1820,4 @@ last-lts:
     ticket: SERVER-113532
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
-  - test_file: jstests/core/index/index_on_incorrect_collection.js
-    ticket: SERVER-113888
   suites: null
