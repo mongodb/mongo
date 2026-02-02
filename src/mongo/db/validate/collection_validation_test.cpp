@@ -62,6 +62,7 @@
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
@@ -1298,6 +1299,22 @@ TEST_F(TimeseriesCollectionValidationTest, ReportErrorsInExtendedRangeBookkeepin
     }
     foregroundValidate(
         _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, MayRequireExtendedRangeSupportExpectTrue) {
+    const auto doc = getExtendedTimeRangeSampleDoc();
+    insertDoc(doc);
+    const auto* coll = CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss);
+    ASSERT_NE(coll, nullptr);
+    EXPECT_TRUE(timeseries::collectionMayRequireExtendedRangeSupport(_opCtx, *coll));
+}
+
+TEST_F(TimeseriesCollectionValidationTest, MayRequireExtendedRangeSupportExpectFalse) {
+    const auto doc = getSampleDoc();
+    insertDoc(doc);
+    const auto* coll = CollectionCatalog::get(_opCtx)->lookupCollectionByNamespace(_opCtx, _nss);
+    ASSERT_NE(coll, nullptr);
+    EXPECT_FALSE(timeseries::collectionMayRequireExtendedRangeSupport(_opCtx, *coll));
 }
 
 }  // namespace
