@@ -136,7 +136,7 @@ int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardI
         // Account for optional fields that can be set per namespace to have a conservative
         // estimate.
         static const ShardVersion mockShardVersion =
-            ShardVersionFactory::make(ChunkVersion::IGNORED());
+            ShardVersionFactory::make(CollectionMetadata::UNTRACKED(), nss);
         static const DatabaseVersion mockDBVersion = DatabaseVersion(UUID::gen(), Timestamp());
 
         NamespaceInfoEntry nsEntry(nss);
