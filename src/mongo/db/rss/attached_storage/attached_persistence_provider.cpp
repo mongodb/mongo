@@ -131,9 +131,6 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }
 
-bool AttachedPersistenceProvider::supportsTableVerify() const {
-    return true;
-}
 
 bool AttachedPersistenceProvider::supportsWriteConcernOptions(
     const WriteConcernOptions& writeConcernOptions) const {

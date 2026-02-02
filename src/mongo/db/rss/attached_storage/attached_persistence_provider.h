@@ -141,11 +141,6 @@ public:
      */
     bool supportsOplogSampling() const override;
 
-    /**
-     * We can support table verify.
-     */
-    bool supportsTableVerify() const override;
-
     bool supportsWriteConcernOptions(const WriteConcernOptions& writeConcernOptions) const override;
 
     bool supportsReadConcernLevel(const repl::ReadConcernLevel& readConcernLevel) const override;

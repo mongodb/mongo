@@ -179,13 +179,6 @@ public:
      */
     virtual bool supportsOplogSampling() const = 0;
 
-    /**
-     * If true, the provider supports table verify.
-     *
-     * TODO SERVER-113061: remove this workaround.
-     */
-    virtual bool supportsTableVerify() const = 0;
-
     virtual bool supportsWriteConcernOptions(
         const WriteConcernOptions& writeConcernOptions) const = 0;
 
