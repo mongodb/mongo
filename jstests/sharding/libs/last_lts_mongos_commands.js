@@ -20,6 +20,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "lockInfo",
     "moveCollection",
     "setQuerySettings",
+    "recreateRangeDeletionTasks",
     "removeQuerySettings",
     "unshardCollection",
     "untrackUnshardedCollection",
