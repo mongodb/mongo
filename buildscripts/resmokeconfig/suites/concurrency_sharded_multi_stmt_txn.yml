@@ -36,6 +36,7 @@ selector:
     - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
     - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
     - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_multi_doc_txn.js
 
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
