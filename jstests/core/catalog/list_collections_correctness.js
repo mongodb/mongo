@@ -1185,10 +1185,14 @@ describe("ListCollectionsCorrectness", function () {
         );
     });
 
+    // TODO SERVER-118646 get rid of buckets namespace checks
     it("should list timeseries collection and its underlying bucket collection, and remove both after drop", () => {
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
+        if (
+            TestData.isRunningFCVUpgradeDowngradeSuite ||
+            FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")
+        ) {
             jsTest.log.info(
-                "Skipping timeseries collection and its underlying bucket collection test because CreateViewlessTimeseriesCollections is enabled",
+                "Skipping timeseries collection and its underlying bucket collection test because CreateViewlessTimeseriesCollections is enabled or might get enabled due to FCV upgrade in background",
             );
             return;
         }
