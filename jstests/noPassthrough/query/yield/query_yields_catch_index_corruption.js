@@ -38,30 +38,34 @@ function createDanglingIndexEntry(doc) {
 
     // Server logs for failed validation command should contain oplog entries related to corrupted
     // index entry.
-    let foundInsert = false;
-    let foundDelete = false;
-    // Look for log message "Oplog entry found for corrupted collection and index entry" (msg id
-    // 7462402).
-    checkLog.containsJson(db.getMongo(), 7464202, {
-        oplogEntryDoc: (oplogDoc) => {
-            let oplogDocId;
-            try {
-                oplogDocId = ObjectId(oplogDoc.o._id.$oid);
-            } catch (ex) {
-                return false;
-            }
-            if (!oplogDocId.equals(docId)) {
-                return false;
-            }
-            jsTestLog("Found oplog entry for corrupted index entry: " + tojson(oplogDoc));
-            if (oplogDoc.op === "d") {
-                foundDelete = true;
-            } else if (oplogDoc.op === "i") {
-                foundInsert = true;
-            }
-            return foundDelete && foundInsert;
-        },
-    });
+    // TODO SERVER-118626: Investigate why we can't open a WT Debug Cursor inside of 'validate'.
+    if (!TestData.notASC) {
+        let foundInsert = false;
+        let foundDelete = false;
+
+        // Look for log message "Oplog entry found for corrupted collection and index entry" (msg id
+        // 7462402).
+        checkLog.containsJson(db.getMongo(), 7464202, {
+            oplogEntryDoc: (oplogDoc) => {
+                let oplogDocId;
+                try {
+                    oplogDocId = ObjectId(oplogDoc.o._id.$oid);
+                } catch (ex) {
+                    return false;
+                }
+                if (!oplogDocId.equals(docId)) {
+                    return false;
+                }
+                jsTestLog("Found oplog entry for corrupted index entry: " + tojson(oplogDoc));
+                if (oplogDoc.op === "d") {
+                    foundDelete = true;
+                } else if (oplogDoc.op === "i") {
+                    foundInsert = true;
+                }
+                return foundDelete && foundInsert;
+            },
+        });
+    }
 
     // A query that accesses the now dangling index entry should fail with a
     // "DataCorruptionDetected" error. Most reads will not detect this problem because they ignore
@@ -99,21 +103,28 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 let validateRes = assert.commandWorked(coll.validate());
 assert.eq(true, validateRes.valid, tojson(validateRes));
 
-// Reintroduce the dangling index entry, and this time fix it using the "repair" flag.
-createDanglingIndexEntry({a: 1, b: 1});
+// TODO SERVER-118625 SERVER-115491: Consider enabling this portion of the test to not depend on
+// reusing the same dbpath across test fixtures.
+if (!TestData.notASC) {
+    // Reintroduce the dangling index entry, and this time fix it using the "repair" flag.
+    createDanglingIndexEntry({a: 1, b: 1});
 
-const dbpath = replSet.getDbPath(primary);
-replSet.stopSet(MongoRunner.EXIT_CLEAN, true /* forRestart */, {skipValidation: true});
+    const dbpath = replSet.getDbPath(primary);
 
-let mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, repair: ""});
-assert.eq(null, mongod, "Expect this to exit cleanly");
+    replSet.stopSet(MongoRunner.EXIT_CLEAN, true /* forRestart */, {skipValidation: true});
 
-// Verify that the server starts up successfully after the repair.
-mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
-assert.neq(null, mongod, "mongod failed to start after repair");
+    let mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, repair: ""});
+    assert.eq(null, mongod, "Expect this to exit cleanly");
 
-db = mongod.getDB("test");
-coll = db.getCollection(collName);
+    // Verify that the server starts up successfully after the repair.
+    mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
+    assert.neq(null, mongod, "mongod failed to start after repair");
 
-// Runs validate before shutting down.
-MongoRunner.stopMongod(mongod);
+    db = mongod.getDB("test");
+    coll = db.getCollection(collName);
+
+    // Runs validate before shutting down.
+    MongoRunner.stopMongod(mongod);
+} else {
+    replSet.stopSet();
+}
