@@ -116,10 +116,8 @@ public:
      * with pipeline syntax only, the cache has not been frozen or abandoned, and no data has been
      * added to it.
      *
-     * TODO SERVER-109932: Delete 'MONGO_MOD_PRIVATE' once 'document_source_lookup_test.cpp' is
-     * split into two files.
      */
-    MONGO_MOD_PRIVATE void reInitializeCache_forTest(size_t maxCacheSizeBytes);
+    void reInitializeCache_forTest(size_t maxCacheSizeBytes);
 
 private:
     GetNextResult doGetNext() final;

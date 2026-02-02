@@ -1365,6 +1365,7 @@ mongo_cc_unit_test(
         ":accumulator",
         ":aggregation_context_fixture",
         ":document_source_internal_apply_oplog_update",
+        ":document_source_lookup_test_util",
         ":document_source_mock",
         ":document_sources_idl",
         ":field_path",
@@ -1426,6 +1427,7 @@ mongo_cc_unit_test(
         ":aggregation_context_fixture",
         ":aggregation_request_helper",
         ":docs_needed_bounds_visitor",
+        ":document_source_internal_apply_oplog_update",
         ":document_source_mock",
         ":document_sources_idl",
         ":expression_context_for_test",
@@ -1631,4 +1633,14 @@ mongo_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [":lite_parsed_document_source"],
+)
+
+mongo_cc_library(
+    name = "document_source_lookup_test_util",
+    srcs = ["document_source_lookup_test_util.cpp"],
+    deps = [
+        ":document_source_mock",
+        ":expression_context_for_test",
+        ":pipeline",
+    ],
 )
