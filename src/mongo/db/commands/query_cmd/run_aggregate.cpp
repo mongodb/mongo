@@ -1370,6 +1370,10 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
             !aggExState->startsWithCollStats() || view.getViewDefinition().timeseries();
 
         if (shouldViewBeExpanded) {
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    "mapReduce on a view is not supported",
+                    !aggExState->getRequest().getIsMapReduceCommand());
+
             // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
             // initial aggExState object unusable.
             auto swResolvedViewAggExState =
@@ -1379,10 +1383,6 @@ Status _runAggregate(std::unique_ptr<AggExState> aggExState, rpc::ReplyBuilderIn
             }
 
             auto resolvedViewAggExState = std::move(swResolvedViewAggExState.getValue());
-
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "mapReduce on a view is not supported",
-                    !resolvedViewAggExState->getRequest().getIsMapReduceCommand());
 
             // With the view and collation resolved, we can relinquish locks on the view namespace.
             // We will create a new catalog state with the underlying collection information.
