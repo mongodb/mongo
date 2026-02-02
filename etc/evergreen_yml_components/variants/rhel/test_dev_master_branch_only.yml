@@ -435,7 +435,7 @@ buildvariants:
     tags: []
     cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - rhel8.8-small
+      - rhel8.8-large
     expansions:
       <<: *enterprise-rhel-8-64-bit-expansions-template
       additional_package_targets: ""
