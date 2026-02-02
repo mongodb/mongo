@@ -798,7 +798,9 @@ RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationConte
               "unshardedCollectionsCount"_attr =
                   drainingProgress.removeShardCounts.getCollectionsToMove(),
               "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
-              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks(),
+              "estimatedRemainingBytes"_attr =
+                  drainingProgress.removeShardCounts.getEstimatedRemainingBytes());
         RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;
@@ -891,7 +893,9 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
               "unshardedCollectionsCount"_attr =
                   drainingProgress.removeShardCounts.getCollectionsToMove(),
               "databaseCount"_attr = drainingProgress.removeShardCounts.getDbs(),
-              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks());
+              "jumboCount"_attr = drainingProgress.removeShardCounts.getJumboChunks(),
+              "estimatedRemainingBytes"_attr =
+                  drainingProgress.removeShardCounts.getEstimatedRemainingBytes());
         RemoveShardProgress progress(ShardDrainingStateEnum::kOngoing);
         progress.setRemaining(drainingProgress.removeShardCounts);
         return progress;

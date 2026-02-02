@@ -5,6 +5,7 @@
  * ]
  */
 
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -74,6 +75,31 @@ describe("shardDrainingStatus correct functionality test", function () {
         assert.eq(res.collectionsToMove, ["TestDB.CollUnsharded"]);
     });
 
+    it("estimatedRemainingBytes is non-negative while draining is ongoing", () => {
+        if (!isFCVgte(this.st.s.getDB("admin"), "8.3")) {
+            jsTestLog("Skipping estimatedRemainingBytes check: requires FCV 8.3 or higher");
+            return;
+        }
+        const res = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
+        assert.commandWorked(res);
+        assert(res.hasOwnProperty("remaining"), "Response should have 'remaining' field: " + tojson(res));
+        assert(
+            res.remaining.hasOwnProperty("estimatedRemainingBytes"),
+            "Response should have 'estimatedRemainingBytes' field: " + tojson(res),
+        );
+        assert.gte(
+            res.remaining.estimatedRemainingBytes,
+            0,
+            "estimatedRemainingBytes should be non-negative during draining: " + tojson(res),
+        );
+        // Since we inserted documents, we expect some bytes to remain
+        assert.gt(
+            res.remaining.estimatedRemainingBytes,
+            0,
+            "estimatedRemainingBytes should be > 0 since documents were inserted: " + tojson(res),
+        );
+    });
+
     it("draining status is 'drainingComplete' when shard is completely drained", () => {
         // Move the unsharded collections
         assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
@@ -85,6 +111,33 @@ describe("shardDrainingStatus correct functionality test", function () {
             assert.commandWorked(drainingStatus_completed);
             return "drainingComplete" == drainingStatus_completed.state;
         }, "shardDrainingStatus did not return 'drainingCompleted' status within the timeout.");
+    });
+
+    it("estimatedRemainingBytes is 0 when draining is complete", () => {
+        if (!isFCVgte(this.st.s.getDB("admin"), "8.3")) {
+            jsTestLog("Skipping estimatedRemainingBytes check: requires FCV 8.3 or higher");
+            return;
+        }
+        // Move the unsharded collections to complete draining
+        assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+
+        // Wait for the shard to be completely drained
+        assert.soon(() => {
+            const res = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
+            assert.commandWorked(res);
+            if (res.state === "drainingComplete") {
+                // Verify estimatedRemainingBytes is 0 when draining is complete
+                if (res.hasOwnProperty("remaining") && res.remaining.hasOwnProperty("estimatedRemainingBytes")) {
+                    assert.eq(
+                        res.remaining.estimatedRemainingBytes,
+                        0,
+                        "estimatedRemainingBytes should be 0 when draining is complete: " + tojson(res),
+                    );
+                }
+                return true;
+            }
+            return false;
+        }, "shardDrainingStatus did not return 'drainingComplete' status within the timeout.");
     });
 
     it("status not returned for non existent shard", () => {

@@ -126,6 +126,11 @@ MONGO_FAIL_POINT_DEFINE(hangAddShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(skipBlockingDDLCoordinatorsDuringAddAndRemoveShard);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
 
+constexpr StringData kNumDocsFieldName = "numDocs"_sd;
+constexpr StringData kNumBytesFieldName = "numBytes"_sd;
+constexpr StringData kAvgObjSizeFieldName = "avgObjSize"_sd;
+constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
+
 const Seconds kRemoteCommandTimeout{60};
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
@@ -204,6 +209,124 @@ long long getCollectionsToMoveForShardCount(OperationContext* opCtx,
         [&collectionsCounter](const Status&) { collectionsCounter = 0; }));
 
     return collectionsCounter;
+}
+
+AggregateCommandRequest makeListAllCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
+                                                                         const ShardId& shardId) {
+    static const BSONObj listStage = fromjson(R"({
+       $listClusterCatalog: { "shards": true }
+     })");
+    const BSONObj shardsCondition = BSON("shards" << shardId);
+    // TODO SERVER-101594 remove condition about type:timeseries. After 9.0 becomes last LTS only
+    // viewless timeseries will exist and they will always have an associated UUID.
+    const BSONObj matchStage = fromjson(str::stream() << R"({
+       $match: {
+           $and: [
+               { sharded: false },
+               { db: {$ne: 'config'} },
+               { db: {$ne: 'admin'} },
+               )" << shardsCondition.jsonString() << R"(,
+               { type: {$ne: "view"} },
+               { $or: [
+                    {type: {$ne: "timeseries"}},
+                    {"info.uuid": {$exists: true}}
+               ]},
+               { ns: {$not: {$regex: "^enxcol_\..*(\.esc|\.ecc|\.ecoc|\.ecoc\.compact)$"} }},
+               { $or: [
+                    {ns: {$not: { $regex: "\.system\." }}},
+                    {ns: {$regex: "\.system\.buckets\."}}
+               ]}
+           ]
+        }
+    })");
+
+    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
+
+    const std::vector<mongo::BSONObj> pipeline{listStage, matchStage};
+    AggregateCommandRequest aggRequest{dbName, pipeline};
+    aggRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+    aggRequest.setWriteConcern({});
+    return aggRequest;
+}
+
+size_t getEstimatedBytesToMoveForShard(OperationContext* opCtx,
+                                       Shard& configShard,
+                                       const ShardId& shardId) {
+    size_t remainingSizeBytes = 0;
+    std::vector<NamespaceString> collNames;
+    const auto listCollectionAggReq =
+        makeListAllCollectionsOnSpecificShardAggregation(opCtx, shardId);
+
+    uassertStatusOK(configShard.runAggregation(
+        opCtx,
+        listCollectionAggReq,
+        Shard::RetryPolicy::kStrictlyNotIdempotent,
+        [&collNames](const std::vector<BSONObj>& batch,
+                     const boost::optional<BSONObj>& postBatchResumeToken) {
+            for (const auto& coll : batch) {
+                auto nss = NamespaceStringUtil::deserialize(boost::none,
+                                                            coll.getField("ns").String(),
+                                                            SerializationContext::stateDefault());
+                collNames.push_back(nss);
+            }
+            return true;
+        },
+        [&collNames](const Status&) { collNames.clear(); }));
+
+    for (const auto& nss : collNames) {
+        std::vector<BSONObj> pipeline;
+        pipeline.push_back(BSON("$collStats" << BSON("storageStats" << BSONObj())));
+        pipeline.push_back(BSON(
+            "$group" << BSON("_id" << BSONNULL << kNumBytesFieldName
+                                   << BSON("$sum" << "$storageStats.size") << kAvgObjSizeFieldName
+                                   << BSON("$sum" << "$storageStats.avgObjSize")
+                                   << kNumDocsFieldName << BSON("$sum" << "$storageStats.count")
+                                   << kNumOrphanDocsFieldName
+                                   << BSON("$sum" << "$storageStats.numOrphanDocs"))));
+
+        AggregateCommandRequest aggRequest(nss, pipeline);
+        aggRequest.setWriteConcern(WriteConcernOptions());
+        aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        const auto targetShard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        size_t totalSize = 0;
+        try {
+            uassertStatusOK(targetShard->runAggregation(
+                opCtx,
+                aggRequest,
+                Shard::RetryPolicy::kIdempotent,
+                [&totalSize, &nss](const std::vector<BSONObj>& batch,
+                                   const boost::optional<BSONObj>&) {
+                    if (!batch.empty()) {
+                        if (nss.isTimeseriesBucketsCollection()) {
+                            totalSize = batch[0].getField(kNumBytesFieldName).safeNumberLong();
+                        } else {
+                            int64_t numDocs = batch[0].getField(kNumDocsFieldName).safeNumberLong();
+                            int64_t numOrphanDocs =
+                                batch[0].getField(kNumOrphanDocsFieldName).safeNumberLong();
+                            int64_t avgObjSize =
+                                batch[0].getField(kAvgObjSizeFieldName).safeNumberLong();
+                            totalSize = avgObjSize * (numDocs - numOrphanDocs);
+                        }
+                    }
+                    return true;
+                },
+                [&totalSize](const Status&) { totalSize = 0; }));
+
+            remainingSizeBytes += totalSize;
+            LOGV2_DEBUG(11794400,
+                        1,
+                        "Current collection size: ",
+                        "curr_coll_size"_attr = totalSize,
+                        "remainingSizeBytes"_attr = remainingSizeBytes);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            LOGV2_DEBUG(11794401,
+                        1,
+                        "Namespace not found while trying to report the remainingSizeBytes.",
+                        logAttrs(nss));
+        }
+    }
+    return remainingSizeBytes;
 }
 
 long long getChunkForShardCount(OperationContext* opCtx, Shard* shard, const ShardId& shardId) {
@@ -722,15 +845,16 @@ boost::optional<ShardType> getExistingShard(OperationContext* opCtx,
     return {boost::none};
 }
 
+
 AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
                                                                            const ShardId& shardId,
                                                                            bool isCount) {
     static const BSONObj listStage = fromjson(R"({
        $listClusterCatalog: { "shards": true }
      })");
-    const BSONObj shardsCondition = BSON("shards" << shardId);
     // TODO SERVER-101594 remove condition about type:timeseries. After 9.0 becomes last LTS only
     // viewless timeseries will exist and they will always have an associated UUID.
+    const BSONObj shardsCondition = BSON("shards" << shardId);
     const BSONObj matchStage = fromjson(str::stream() << R"({
        $match: {
            $and: [
@@ -771,7 +895,7 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
     })");
     const BSONObj countStage = BSON("$count" << "totalCount");
 
-    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
+    const auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
 
     std::vector<mongo::BSONObj> pipeline;
     pipeline.reserve(4);
@@ -788,7 +912,6 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
     aggRequest.setWriteConcern({});
     return aggRequest;
 }
-
 
 Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
                                              RemoteCommandTargeter& targeter,
@@ -1460,9 +1583,12 @@ DrainingShardUsage getDrainingProgress(OperationContext* opCtx,
                                 NamespaceString::kConfigsvrChunksNamespace,
                                 BSON(ChunkType::shard(shardName) << ChunkType::jumbo(true)));
 
-    return {
-        RemainingCounts(shardedChunkCount, unshardedCollectionsCount, databaseCount, jumboCount),
-        totalChunkCount};
+    const auto estimatedRemainingBytes =
+        getEstimatedBytesToMoveForShard(opCtx, *localConfigShard.get(), shardName);
+    RemainingCounts remainingCounts(
+        shardedChunkCount, unshardedCollectionsCount, databaseCount, jumboCount);
+    remainingCounts.setEstimatedRemainingBytes(static_cast<std::int64_t>(estimatedRemainingBytes));
+    return {remainingCounts, totalChunkCount};
 }
 
 // Sets the addOrRemoveShardInProgress cluster parameter to prevent new ShardingDDLCoordinators from

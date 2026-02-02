@@ -61,6 +61,10 @@ structs:
             jumboChunks:
                 description: "Number of jumbo chunks remaining on the shard being removed."
                 type: long
+            estimatedRemainingBytes:
+                description: "Estimated number of bytes remaining to be drained on the shard being removed."
+                type: long
+                optional: true
 
     RemoveShardProgress:
         description: "Remove shard draining progress"
