@@ -72,7 +72,7 @@ function verifyOptimizedForSbe(pipeline, explain) {
     );
 }
 
-function verifyOptimizedForMerger(pipeline, mergerPart) {
+function checkOptimizedForMerger(mergerPart) {
     // The merger part will be in a shape of $mergeCursors - $group - $project if the optimization
     // is applied.
     let groupFound = false;
@@ -84,36 +84,40 @@ function verifyOptimizedForMerger(pipeline, mergerPart) {
             projectFound = true;
         }
     }
-
-    assert(
-        groupFound && projectFound,
-        `Both $group and $project should exist in the merger part: ${D(pipeline, mergerPart)}`,
-    );
+    return groupFound && projectFound;
 }
 
-function verifyOptimized(pipeline, explainFull) {
-    let isShardedCollection = false;
-    const explain = (() => {
-        // If the collection is sharded, the pipeline is split at the $group stage and the shard
-        // plan part does not have $project which is added as part of the optimization. So, we
-        // verify only that the the merger part plan has both $group & $project stages.
-        if (explainFull.hasOwnProperty("splitPipeline") && explainFull.splitPipeline) {
-            isShardedCollection = true;
-            return explainFull.splitPipeline.mergerPart;
-        } else {
-            return getSingleNodeExplain(explainFull);
-        }
-    })();
+function verifyOptimized(pipeline, getExplain) {
+    const explain = getExplain();
+    const isShardedCollection = explain.hasOwnProperty("splitPipeline") && explain.splitPipeline;
 
     if (isShardedCollection) {
-        verifyOptimizedForMerger(pipeline, explain);
-        return;
-    }
-
-    if (getEngine(explain) === "classic") {
-        verifyOptimizedForClassic(pipeline, explain);
+        // Use assert.soon to retry - the routing table may not be available yet on mongos
+        // for unsharded collections, which causes optimizations to be skipped.
+        let lastExplain;
+        assert.soon(
+            () => {
+                if (lastExplain === undefined) {
+                    // First time. Just reuse the explain we already have.
+                    lastExplain = explain;
+                } else {
+                    lastExplain = getExplain();
+                }
+                if (!lastExplain.hasOwnProperty("splitPipeline") || !lastExplain.splitPipeline) {
+                    return false;
+                }
+                return checkOptimizedForMerger(lastExplain.splitPipeline.mergerPart);
+            },
+            () =>
+                `Both $group and $project should exist in the merger part: ${D(pipeline, lastExplain.splitPipeline ? lastExplain.splitPipeline.mergerPart : lastExplain)}`,
+        );
     } else {
-        verifyOptimizedForSbe(pipeline, explain);
+        const singleNodeExplain = getSingleNodeExplain(explain);
+        if (getEngine(singleNodeExplain) === "classic") {
+            verifyOptimizedForClassic(pipeline, singleNodeExplain);
+        } else {
+            verifyOptimizedForSbe(pipeline, singleNodeExplain);
+        }
     }
 }
 
@@ -210,28 +214,15 @@ const doc_t10_sB_x6_y1 = {
     y: 1,
 };
 
-function runTestCase({
-    setup = (db) => {},
-    docs,
-    pipeline,
-    expected,
-    // By default, verifies that the pipeline is optimized in both the classic engine and the SBE.
-    verifyThis = (pipeline, explain) => verifyOptimized(pipeline, explain),
-    tearDown = (db) => {},
-}) {
-    jsTestLog(`Running ${getCallerName()}`);
-    setup(db);
+function runTestCase({docs, pipeline, expected}) {
+    jsTest.log.info(`Running ${getCallerName()}`);
 
-    try {
-        const collName = getCallerName();
-        const coll = prepareCollection(collName, docs);
-        const explainFull = coll.explain().aggregate(pipeline);
-        verifyThis(pipeline, explainFull);
-        const results = coll.aggregate(pipeline).toArray();
-        assertArrayEq({expected: expected, actual: results});
-    } finally {
-        tearDown(db);
-    }
+    const collName = getCallerName();
+    const coll = prepareCollection(collName, docs);
+    const getExplain = () => coll.explain().aggregate(pipeline);
+    verifyOptimized(pipeline, getExplain);
+    const results = coll.aggregate(pipeline).toArray();
+    assertArrayEq({expected: expected, actual: results});
 }
 
 (function testMultipleTopsWithSameSortKeyOptimizedIntoOneTop() {
