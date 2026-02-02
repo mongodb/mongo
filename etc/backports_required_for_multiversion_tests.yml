@@ -643,6 +643,8 @@ last-continuous:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
+  - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+    ticket: SERVER-110953
   suites: null
 last-lts:
   all:
@@ -1338,4 +1340,6 @@ last-lts:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/ddl_abort_index_build_event.js
     ticket: SERVER-93154
+  - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+    ticket: SERVER-110953
   suites: null
