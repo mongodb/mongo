@@ -1,5 +1,6 @@
 /**
  * Tests for the `$vectorSearch` aggregation pipeline stage.
+ * TODO (SERVER-118445): Remove this mocked test file (jstests/with_mongot/vector_search_mocked/vector_search.js) now that this test has been migrated to an e2e suite.
  * @tags: [
  *  requires_fcv_71,
  * ]

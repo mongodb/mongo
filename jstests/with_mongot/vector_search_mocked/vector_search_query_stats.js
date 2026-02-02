@@ -4,6 +4,8 @@
  * Note that this test does not actually require talking to mongot at all because we can test query
  * stats on a nonexistent collection. We use the mock framework because we need to override a server
  * parameter and test on different topologies.
+ *
+ * TODO (SERVER-118445): Remove this mocked test file (jstests/with_mongot/vector_search_mocked/vector_search_query_stats.js) now that this test has been migrated to an e2e suite.
  */
 import {getQueryStats, getQueryStatsServerParameters, getValueAtPath} from "jstests/libs/query/query_stats_utils.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
