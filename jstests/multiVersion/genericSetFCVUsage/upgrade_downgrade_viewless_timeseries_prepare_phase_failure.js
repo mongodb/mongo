@@ -71,9 +71,6 @@ for (const rs of [st.rs0, st.rs1]) {
     assert(!getTimeseriesBucketsColl(shardColl).exists());
 }
 
-// Set FCV to lastLTS to disable the feature flag (required for downgrade command)
-assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-
 // Enable failpoint on shard1 to fail the participant preparecommand
 const failCommandFP = configureFailPoint(st.rs1.getPrimary(), "failCommand", {
     failCommands: ["_shardsvrTimeseriesUpgradeDowngradePrepare"],
@@ -82,12 +79,10 @@ const failCommandFP = configureFailPoint(st.rs1.getPrimary(), "failCommand", {
     namespace: nss,
 });
 
-// Run downgrade - should fail with InternalError (injected by failpoint)
+// Downgrade FCV to lastLTS - This should attempt to convert timeseries
+// collections and fail with InternalError in the prepare phase.
 assert.commandFailedWithCode(
-    db.runCommand({
-        upgradeDowngradeViewlessTimeseries: collName,
-        mode: "downgradeToLegacy",
-    }),
+    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     ErrorCodes.InternalError,
     "Downgrade should have failed due to failpoint",
 );
@@ -110,5 +105,7 @@ assert(collDoc);
 assert.eq(undefined, collDoc.allowMigrations);
 
 failCommandFP.off();
+
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 st.stop();

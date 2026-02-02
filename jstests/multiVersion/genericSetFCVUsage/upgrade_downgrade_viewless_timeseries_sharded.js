@@ -104,38 +104,6 @@ function verifyChangelogEntries(collections) {
     }
 }
 
-// Downgrade all collections to legacy format
-function downgradeToLegacy(collections) {
-    jsTest.log.info("Setting FCV to lastLTS for downgrade");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
-
-    for (const {name, collName} of collections) {
-        jsTest.log.info(`Downgrading ${name} to legacy format`);
-        assert.commandWorked(
-            db.runCommand({
-                upgradeDowngradeViewlessTimeseries: collName,
-                mode: "downgradeToLegacy",
-            }),
-        );
-    }
-}
-
-// Upgrade all collections to viewless format
-function upgradeToViewless(collections) {
-    jsTest.log.info("Setting FCV to latest for upgrade");
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-
-    for (const {name, collName} of collections) {
-        jsTest.log.info(`Upgrading ${name} to viewless format`);
-        assert.commandWorked(
-            db.runCommand({
-                upgradeDowngradeViewlessTimeseries: collName,
-                mode: "upgradeToViewless",
-            }),
-        );
-    }
-}
-
 // SETUP: Create timeseries collections (in viewless format)
 
 jsTest.log.info("Creating sharded timeseries collection");
@@ -204,9 +172,8 @@ const userCollections = [shardedColl, trackedColl, untrackedColl];
 jsTest.log.info("Verifying initial viewless format");
 assertTimeseriesFormat(adminDB, dbName, collections, false /* expectLegacyFormat */);
 
-// DOWNGRADE: Convert to legacy format
-
-downgradeToLegacy(collections);
+// DOWNGRADE FCV: This will convert all timeseries to legacy format
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 jsTest.log.info("Verifying all collections are in legacy format after downgrade");
 assertTimeseriesFormat(adminDB, dbName, collections, true /* expectLegacyFormat */);
@@ -236,9 +203,8 @@ assert.commandWorked(
 );
 assertTimeseriesFormat(adminDB, dbName, [{name: "sharded", collName: "shardedTs"}], true /* expectLegacyFormat */);
 
-// UPGRADE: Convert back to viewless format
-
-upgradeToViewless(collections);
+// UPGRADE FCV: This will convert all timeseries back to viewless format
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 jsTest.log.info("Verifying all collections are in viewless format after upgrade");
 assertTimeseriesFormat(adminDB, dbName, collections, false /* expectLegacyFormat */);

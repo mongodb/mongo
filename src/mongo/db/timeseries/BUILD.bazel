@@ -239,6 +239,19 @@ mongo_cc_library(
     ],
 )
 
+# TODO(SERVER-116499): Remove this target once 9.0 becomes lastLTS.
+mongo_cc_library(
+    name = "upgrade_downgrade_viewless_timeseries_sharded_cluster",
+    srcs = [
+        "upgrade_downgrade_viewless_timeseries_sharded_cluster.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "db_timeseries_test",
     srcs = [

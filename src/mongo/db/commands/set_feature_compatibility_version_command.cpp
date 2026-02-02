@@ -62,7 +62,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
-#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -78,7 +77,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_util.h"
@@ -98,7 +96,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/drop_indexes.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -106,6 +103,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_sharded_cluster.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/user_write_block/write_block_bypass.h"
@@ -113,11 +111,11 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
@@ -1691,11 +1689,13 @@ private:
             maybeModifyDataOnDowngradeForTest(opCtx, requestedVersion, originalVersion);
         }
 
-        // TODO(SERVER-114816): Support timeseries downgrade on sharded clusters
-        // (`role` defined as ShardServer or ConfigServer).
-        if (!role &&
-            !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
-            timeseries::downgradeAllTimeseriesFromViewless(opCtx);
+        if (!gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
+            if (role && role->has(ClusterRole::ConfigServer)) {
+                timeseries::upgradeDowngradeViewlessTimeseriesInShardedCluster(opCtx,
+                                                                               false /*isUpgrade*/);
+            } else if (!role) {
+                timeseries::downgradeAllTimeseriesFromViewless(opCtx);
+            }
         }
 
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);
@@ -1986,11 +1986,13 @@ private:
         // enabled, so no new viewful timeseries collections can be created during the conversion.
         // Note that while the conversion is ongoing, CRUD and DDL operations are supported on both
         // the viewful and viewless timeseries collection formats.
-        // TODO(SERVER-114816): Support timeseries upgrade on sharded clusters
-        // (`role` defined as ShardServer or ConfigServer).
-        if (!role &&
-            gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
-            timeseries::upgradeAllTimeseriesToViewless(opCtx);
+        if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
+            if (isConfigsvr) {
+                timeseries::upgradeDowngradeViewlessTimeseriesInShardedCluster(opCtx,
+                                                                               true /*isUpgrade*/);
+            } else if (!role) {
+                timeseries::upgradeAllTimeseriesToViewless(opCtx);
+            }
         }
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.

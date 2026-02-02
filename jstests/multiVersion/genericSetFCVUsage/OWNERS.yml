@@ -39,6 +39,6 @@ filters:
   - "priority_port_downgrade_checks.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-  - "upgrade_downgrade_viewless_timeseries_*.js":
+  - "*upgrade_downgrade_viewless_timeseries_*.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

@@ -125,6 +125,10 @@ class ReplSetTestHelper {
     isShardedCluster() {
         return false;
     }
+
+    toString() {
+        return "replica set";
+    }
 }
 
 class ShardedClusterTestHelper {
@@ -157,15 +161,15 @@ class ShardedClusterTestHelper {
     isShardedCluster() {
         return true;
     }
+
+    toString() {
+        return "sharded cluster";
+    }
 }
 
 // Run multiversion tests for both replica set and sharded cluster configurations.
-for (const testHelper of [
-    new ReplSetTestHelper(),
-    // TODO: SERVER-114816 Integrate viewless timeseries upgrade/downgrade into setFCV.
-    // new ShardedClusterTestHelper()
-]) {
-    describe("$changeStream", function () {
+for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper()]) {
+    describe(`$changeStream in ${testHelper.toString()}`, function () {
         const testDB1Name = "db1";
         const testDB2Name = "db2";
         const ts1CollName = "tsColl1";

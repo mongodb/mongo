@@ -201,7 +201,25 @@ void RoutingContext::onStaleError(const Status& status,
         //    epoch refresh.
         // 3. If no shard is provided, then the epoch is stale and we must refresh.
         if (auto si = status.extraInfo<StaleConfigInfo>()) {
-            _catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
+            const auto& staleNs = si->getNss();
+
+            if (staleNs.isTimeseriesBucketsCollection()) {
+                // Legacy timeseries: buckets is tracked. Also invalidate the view namespace
+                // in case it was converted to viewless and now the main namespace is tracked.
+                _catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
+                                                        boost::none);
+            } else if (auto it = _nssRoutingInfoMap.find(staleNs); it != _nssRoutingInfoMap.end()) {
+                const auto& cri = it->second.cri;
+                if (cri.hasRoutingTable() && cri.getChunkManager().isNewTimeseriesWithoutView()) {
+                    // Viewless timeseries: view is tracked. Also invalidate the buckets
+                    // namespace in case it was converted to legacy and now the buckets namespace is
+                    // tracked.
+                    _catalogCache->onStaleCollectionVersion(
+                        staleNs.makeTimeseriesBucketsNamespace(), boost::none);
+                }
+            }
+
+            _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
         } else if (auto sei = status.extraInfo<StaleEpochInfo>()) {
             const auto& versionWanted = sei->getVersionWanted();
             if (!versionWanted.has_value() || versionWanted == ShardVersion{}) {
