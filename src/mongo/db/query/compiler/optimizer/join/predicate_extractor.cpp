@@ -225,7 +225,7 @@ struct PredicateExtractor {
 class ExtractExprPredicatesHelper {
 public:
     explicit ExtractExprPredicatesHelper(PathResolver& pathResolver)
-        : _pathResolver(pathResolver) {}
+        : _pathResolver(pathResolver), _expressionIsFullyAbsorbed(true) {}
 
     ExprPredicatesResult extract(const MatchExpression* expr) {
         _expressionIsFullyAbsorbed = true;

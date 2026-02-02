@@ -83,16 +83,15 @@ struct Predicates {
     std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
 };
 
-StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp* stage) {
-    auto expCtx = stage->getSubpipelineExpCtx();
-    if (stage->hasPipeline()) {
-        stage = dynamic_cast<DocumentSourceLookUp*>(stage);
-        auto ds = stage->getResolvedIntrospectionPipeline().peekFront();
+StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp& stage) {
+    auto expCtx = stage.getSubpipelineExpCtx();
+    if (stage.hasPipeline()) {
+        auto ds = stage.getResolvedIntrospectionPipeline().peekFront();
         auto match = dynamic_cast<DocumentSourceMatch*>(ds);
         tassert(11317205, "expected $match stage as leading stage in subpipeline", match);
         // Attempt to split
         auto splitRes = splitJoinAndSingleCollectionPredicates(match->getMatchExpression(),
-                                                               stage->getLetVariables());
+                                                               stage.getLetVariables());
         if (!splitRes.has_value()) {
             return Status(ErrorCodes::QueryFeatureNotAllowed,
                           "Encountered subpipeline with $match containing non-equijoin correlated "
@@ -102,7 +101,7 @@ StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp* stage) 
         std::unique_ptr<CanonicalQuery> cq;
         if (splitRes->singleTablePredicates) {
             auto swCq = createCanonicalQueryFromSingleMatchExpression(
-                expCtx, stage->getFromNs(), std::move(splitRes->singleTablePredicates));
+                expCtx, stage.getFromNs(), std::move(splitRes->singleTablePredicates));
             if (!swCq.isOK()) {
                 return swCq.getStatus();
             }
@@ -328,7 +327,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             // expressed as $expr in $match stage. If there is no subpipeline, this returns no join
             // predicates and a CanonicalQuery with empty predicate. If this returns a bad status,
             // then this extraction failed due to an ineligible stage/expression.
-            auto swPreds = extractPredicatesFromLookup(lookup);
+            auto swPreds = extractPredicatesFromLookup(*lookup);
             if (!swPreds.isOK()) {
                 break;
             }

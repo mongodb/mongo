@@ -107,8 +107,7 @@ public:
      * resolved for the first time a new path id is created, assigned to the winning node and
      * returned from the function. It is important to understand that subsequent 'addNode' calls
      * change how a particular path is resolved. For example:
-     * 1. Call for "a.b.c", no prefixes matched, the field is resolved to "a.b.c" of node
-     * '_baseNode'.
+     * 1. Call for "a.b.c", no prefixes matched, the field is resolved to "a.b.c" of the base node.
      * 2. After 'addNode(1, "a.b")' is called, the field "a.b.c" is resolved to "c" of node 1.
      * 3. After 'addNode(2, "b.c")' is called, the field "a.b.c" is still resolved to "c" of
      * node 1, because embed path of Node 2 does not prefix the path.
@@ -148,7 +147,6 @@ private:
 
     boost::optional<Scope&> getScopeForNode(NodeId node);
 
-    NodeId _baseNode;
     std::vector<ResolvedPath>& _resolvedPaths;
     std::vector<Scope> _scopes;
 };
