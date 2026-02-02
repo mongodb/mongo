@@ -105,6 +105,12 @@ public:
             return true;
         }
 
+        bool hasExtensionVectorSearchStage() const override {
+            return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
+                return pipeline.hasExtensionVectorSearchStage();
+            });
+        }
+
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<RankFusionStageParams>(_originalBson);
         }

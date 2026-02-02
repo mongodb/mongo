@@ -501,10 +501,10 @@ public:
     }
 
     /**
-     * Returns true if this is a vector search stage ($vectorSearch).
+     * Returns true if this is a vector search stage ($vectorSearch) or has a nested $vectorSearch.
      * TODO SERVER-116021 Remove this override when extensions can handle views through ViewPolicy.
      */
-    virtual bool isExtensionVectorSearchStage() const {
+    virtual bool hasExtensionVectorSearchStage() const {
         return false;
     }
 

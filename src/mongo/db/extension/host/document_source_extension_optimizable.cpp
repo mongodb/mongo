@@ -194,13 +194,13 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtension
 }
 
 // TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
-bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::isExtensionVectorSearchStage()
+bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionVectorSearchStage()
     const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
 // TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
-bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isExtensionVectorSearchStage() const {
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
@@ -210,7 +210,7 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
         // disabled.
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << "Extension stages are not allowed to run on a view namespace.",
-                isExtensionVectorSearchStage());
+                hasExtensionVectorSearchStage());
 
         // If this is a $vectorSearch stage, we perform the IFR flag retry kickback to use legacy
         // $vectorSearch instead.

@@ -181,7 +181,7 @@ public:
 
         // TODO SERVER-116021 Remove this override when extensions can handle views through
         // ViewPolicy.
-        bool isExtensionVectorSearchStage() const override;
+        bool hasExtensionVectorSearchStage() const override;
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
@@ -304,7 +304,7 @@ public:
                 getParseTimeName(), _astNode->clone(), _nss);
         }
 
-        bool isExtensionVectorSearchStage() const override;
+        bool hasExtensionVectorSearchStage() const override;
 
         ViewPolicy getViewPolicy() const override;
 

@@ -148,6 +148,10 @@ public:
                     ? boost::none
                     : boost::optional<LiteParsedPipeline>(maybeSubpipeline.front()));
         }
+
+        bool hasExtensionVectorSearchStage() const override {
+            return !_pipelines.empty() && _pipelines[0].hasExtensionVectorSearchStage();
+        }
     };
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,

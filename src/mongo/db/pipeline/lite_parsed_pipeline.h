@@ -225,7 +225,7 @@ public:
      */
     bool hasExtensionVectorSearchStage() const {
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
-            return spec->isExtensionVectorSearchStage();
+            return spec->hasExtensionVectorSearchStage();
         });
     }
 

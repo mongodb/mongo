@@ -76,18 +76,6 @@ selector:
     - jstests/with_mongot/e2e/hybridSearch/union_with_vector_search.js
     - jstests/with_mongot/e2e/metadata/searchScore_as_score_metadata.js
     - jstests/with_mongot/e2e/metadata/sort_by_vector_search_score.js
-    - jstests/with_mongot/e2e/hybridSearch/hybrid_search_weights_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_search_view.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_view.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_score_details_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_union_with.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_with_filter.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_failure_assertions.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_search_view.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_view.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_score_details_test.js
-    - jstests/with_mongot/e2e/hybridSearch/score_multiple_stages.js
     - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos

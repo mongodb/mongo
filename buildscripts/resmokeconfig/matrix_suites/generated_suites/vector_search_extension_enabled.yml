@@ -55,18 +55,6 @@ selector:
     - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
     - jstests/with_mongot/e2e/skip_limit.js
     - jstests/with_mongot/e2e/views/search_with_view_injected.js
-    - jstests/with_mongot/e2e/hybridSearch/hybrid_search_weights_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_search_view.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_view.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_score_details_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_test.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_union_with.js
-    - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_with_filter.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_failure_assertions.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_search_view.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_view.js
-    - jstests/with_mongot/e2e/hybridSearch/score_fusion_score_details_test.js
-    - jstests/with_mongot/e2e/hybridSearch/score_multiple_stages.js
   exclude_with_any_tags:
     - requires_sharding
   roots:
