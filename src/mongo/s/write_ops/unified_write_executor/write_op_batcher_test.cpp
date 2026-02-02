@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -2408,7 +2409,7 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteUpdateCommandBaseSizeE
     ASSERT_LT(diff, 25);
 }
 
-TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandOpSizeEstimate) {
+TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandInsertOpSizeEstimate) {
     const int kNumDocs = 15;
     auto insertDoc = BSON("a" << std::string(200, 'x'));
     std::vector<BSONObj> docsToInsert;
@@ -2435,6 +2436,52 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandOpSizeEstimate)
     int totalEstimate = sizeEstimator.getBaseSizeEstimate();
 
     for (int i = 0; i < static_cast<int>(docsToInsert.size()); i++) {
+        totalEstimate += sizeEstimator.getOpSizeEstimate(i, shardId0);
+        sizeEstimator.addOpToBatch(i, shardId0);
+    }
+
+    BSONObjBuilder builder;
+    batchedRequest.serialize(&builder);
+    auto requestSize = builder.obj().objsize();
+
+    const int diff = totalEstimate - requestSize;
+    ASSERT_GT(diff, 0);
+    ASSERT_LT(diff, 100);
+}
+
+TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandUpdateOpSizeEstimate) {
+    const int kNumOps = 15;
+    auto let = BSON("a" << std::string(500 * 1024, 'a'));
+    std::vector<write_ops::UpdateOpEntry> updates;
+    updates.reserve(kNumOps);
+    for (int i = 0; i < kNumOps; i++) {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << 1)));
+        entry.setUpsert(true);
+        entry.setIncludeQueryStatsMetricsForOpIndex(i);
+        updates.push_back(entry);
+    }
+
+    // Create the BatchedCommandRequested with inserts.
+    BatchedCommandRequest batchedRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(nss0);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setBypassEmptyTsReplacement(true);
+            return writeCommandBase;
+        }());
+        updateOp.setLet(let);
+        updateOp.setUpdates(updates);
+        return updateOp;
+    }());
+
+    auto sizeEstimator =
+        write_op_helpers::BatchedCommandSizeEstimator{getOperationContext(), batchedRequest};
+
+    int totalEstimate = sizeEstimator.getBaseSizeEstimate();
+
+    for (int i = 0; i < static_cast<int>(updates.size()); i++) {
         totalEstimate += sizeEstimator.getOpSizeEstimate(i, shardId0);
         sizeEstimator.addOpToBatch(i, shardId0);
     }

@@ -304,7 +304,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& sort,
                           const mongo::BSONObj& hint,
                           const boost::optional<UUID>& sampleId,
-                          const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
+                          const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                          const boost::optional<int32_t> includeQueryStatsMetricsForOpIndex) {
     using UpdateOpEntry = write_ops::UpdateOpEntry;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
@@ -357,6 +358,11 @@ int getUpdateSizeEstimate(const BSONObj& q,
     if (includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
         estSize += UpdateOpEntry::kAllowShardKeyUpdatesWithoutFullShardKeyInQueryFieldName.size() +
             kBoolSize + kPerElementOverhead;
+    }
+
+    if (includeQueryStatsMetricsForOpIndex) {
+        estSize += UpdateOpEntry::kIncludeQueryStatsMetricsForOpIndexFieldName.size() + kIntSize +
+            kPerElementOverhead;
     }
 
     return estSize;
@@ -527,8 +533,8 @@ bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
                update.getSort(),
                update.getHint(),
                update.getSampleId(),
-               update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) >=
-        update.toBSON().objsize();
+               update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value(),
+               update.getIncludeQueryStatsMetricsForOpIndex()) >= update.toBSON().objsize();
 }
 
 bool verifySizeEstimate(const InsertCommandRequest& insertReq,
@@ -563,7 +569,8 @@ bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
                     update.getSort(),
                     update.getHint(),
                     update.getSampleId(),
-                    update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) +
+                    update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value(),
+                    update.getIncludeQueryStatsMetricsForOpIndex()) +
             kWriteCommandBSONArrayPerElementOverheadBytes;
     }
 

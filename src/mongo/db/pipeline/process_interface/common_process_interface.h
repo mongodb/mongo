@@ -130,7 +130,8 @@ public:
                        boost::none /* sort */,
                        BSONObj() /* hint*/,
                        boost::none /* sampleId */,
-                       false /* $_allowShardKeyUpdatesWithoutFullShardKeyInQuery */) +
+                       false /* $_allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                       boost::none /* includeQueryStatsMetricsForOpIndex */) +
                 write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
         }
     };

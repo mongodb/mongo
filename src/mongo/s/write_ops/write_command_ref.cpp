@@ -153,7 +153,8 @@ int BatchWriteCommandRefImpl::estimateOpSizeInBytes(int index) const {
                     update.getSort(),
                     update.getHint(),
                     update.getSampleId(),
-                    update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value());
+                    update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value(),
+                    update.getIncludeQueryStatsMetricsForOpIndex());
                 // Verify that estSize is at least the BSON serialization size for debug builds.
                 dassert(estSize >= update.toBSON().objsize());
                 return estSize;

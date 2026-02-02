@@ -323,6 +323,10 @@ public:
         return _allowShardKeyUpdatesWithoutFullShardKeyInQuery;
     }
 
+    boost::optional<std::int32_t> getIncludeQueryStatsMetricsForOpIndex() const {
+        return _updateOp.getIncludeQueryStatsMetricsForOpIndex();
+    }
+
     void setIsTimeseriesNamespace(OptionalBool isTimeseriesNamespace) {
         _isTimeseriesNamespace = isTimeseriesNamespace;
     }
