@@ -1,0 +1,6 @@
+description: Runs mongot e2e single shard tests with the $vectorSearch extension loaded but disabled via the featureFlagVectorSearchExtension IFR flag. Because the extension is loaded but disabled, we expect legacy $vectorSearch to be used and identical results as mongot_e2e_single_shard.
+
+base_suite: mongot_e2e_single_shard
+overrides:
+  - vector_search_extension.load_extension_sharded
+  - vector_search_extension.extension_disabled_single_shard

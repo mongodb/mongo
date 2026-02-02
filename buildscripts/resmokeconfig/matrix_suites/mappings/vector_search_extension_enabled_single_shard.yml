@@ -1,0 +1,7 @@
+description: Runs mongot e2e single shard tests with the $vectorSearch extension loaded and enabled via the featureFlagVectorSearchExtension IFR flag.
+
+base_suite: mongot_e2e_single_shard
+overrides:
+  - vector_search_extension.exclude_sharded_incompatible_tests
+  - vector_search_extension.load_extension_sharded
+  - vector_search_extension.extension_enabled_single_shard

@@ -109,6 +109,48 @@
             featureFlagVectorSearchExtension: false
             featureFlagExtensionViewsAndUnionWith: false
 
+- name: extension_enabled_single_shard
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagExtensionViewsAndUnionWith: false
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+        mongos_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagExtensionViewsAndUnionWith: false
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+
+- name: extension_disabled_single_shard
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: false
+            featureFlagExtensionViewsAndUnionWith: false
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+        mongos_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: false
+            featureFlagExtensionViewsAndUnionWith: false
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+
 # Overrides for sharded cluster suites (mongot_e2e_sharded_cluster base).
 # These include gRPC parameters needed for communication with mongot.
 - name: extension_enabled_sharded_cluster

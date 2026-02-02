@@ -1588,6 +1588,53 @@ tasks:
             --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
 
   - <<: *task_template
+    name: vector_search_extension_enabled_single_shard
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "setup mongot-extension"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+
+  - <<: *task_template
+    name: vector_search_extension_disabled_single_shard
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "setup mongot-extension"
+      - func: "run tests"
+        vars:
+          resmoke_jobs_max: 5
+          resmoke_args: >-
+            --disableFeatureFlags=featureFlagVectorSearchExtension
+            --disableFeatureFlags=featureFlagExtensionViewsAndUnionWith
+
+  - <<: *task_template
     name: mongot_community_e2e_sharded_collections
     tags:
       [
