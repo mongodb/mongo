@@ -44,6 +44,7 @@
 #include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/exec/classic/eof.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/record_store_fast_count.h"
 #include "mongo/db/exec/classic/sort_key_generator.h"
@@ -82,6 +83,7 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -114,6 +116,7 @@
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <memory>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -337,15 +340,13 @@ public:
                            const MultipleCollectionAccessor& collections,
                            PlanYieldPolicy::YieldPolicy yieldPolicy,
                            CanonicalQuery* cq,
-                           std::unique_ptr<QueryPlannerParams> plannerParams,
-                           std::unique_ptr<WorkingSet> workingSet)
+                           std::unique_ptr<QueryPlannerParams> plannerParams)
         : _opCtx{opCtx},
           _collections{collections},
           _yieldPolicy{yieldPolicy},
           _cq{cq},
           _plannerParams(std::move(plannerParams)),
-          _result{std::make_unique<ResultType>()},
-          _ws(std::move(workingSet)) {
+          _result{std::make_unique<ResultType>()} {
         tassert(11321301, "canonicalQuery must not be null", _cq);
         if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
             _queryStringForDebugLog = _cq->toStringShort();
@@ -452,6 +453,19 @@ public:
                                                  getCollections(),
                                                  makePlannerData(),
                                                  usingClassic());
+        if (rankerResult.isOK() && rankerResult.getValue().solutions.size() == 1) {
+            // The plan ranker returns a single solution when CBR is used to pick the best plan.
+            captureCardinalityEstimationMethodForQueryStats(
+                rankerResult.getValue().maybeExplainData,
+                rankerResult.getValue().solutions[0].get());
+        }
+
+        if (auto result = maybePlannerFromRankerResult(rankerResult, *_cq)) {
+            // Ranking succeeded in selecting a solution, and returned partial execution state,
+            // from which we were able to construct a planner, reusing the work done during ranking.
+            return result;
+        }
+
         if (!rankerResult.isOK()) {
             // In case the plan ranker failed to return a result, distinguish two cases:
             // - a rooted $or query exceeded kMaxNumberOfOrPlans plans, in which case we need to
@@ -470,10 +484,9 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
                     !_cq->getForcedPlanSolutionHash());
-            _ws = planRanker.extractWorkingSet();
             return buildSubPlan();
         }
-        _ws = planRanker.extractWorkingSet();
+
         std::vector<std::unique_ptr<QuerySolution>> solutions =
             std::move(rankerResult.getValue().solutions);
         // The planner should have returned an error status if there are no solutions.
@@ -495,10 +508,6 @@ public:
         }
 
         if (1 == solutions.size()) {
-            // The plan ranker returns a single solution when CBR is used to pick the best plan.
-            captureCardinalityEstimationMethodForQueryStats(
-                rankerResult.getValue().maybeExplainData, solutions[0].get());
-
             if (!shouldMultiPlanForSingleSolution(rankerResult.getValue(), _cq)) {
                 // Only one possible plan. Build the stages from the solution.
                 solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
@@ -509,6 +518,19 @@ public:
 
         return buildMultiPlan(std::move(solutions),
                               std::move(rankerResult.getValue().maybeExplainData));
+    }
+
+    /**
+     * Plan ranking may include some amount of execution (e.g., MultiPlanner work).
+     *
+     * Discarding this wastes the work that has been done. Some subtypes may be able
+     * to resume from the stashed state the ranker returns.
+     *
+     * If so, a ResultType can be returned to skip re-building a planner from zero.
+     */
+    virtual std::unique_ptr<ResultType> maybePlannerFromRankerResult(
+        StatusWith<plan_ranking::PlanRankingResult>& rankerResult, CanonicalQuery& cq) {
+        return nullptr;
     }
 
     const QueryPlannerParams& getPlannerParams() {
@@ -683,11 +705,6 @@ protected:
     // high enough to enable messages that need it.
     std::string _queryStringForDebugLog;
 
-    // WorkingSet for multi planning runs. It is moved into the PlannerData when needed for planning
-    // like when multiplanning. It is then moved back into this class when planning is done since it
-    // is needed to build the solution stages.
-    std::unique_ptr<WorkingSet> _ws;
-
 private:
     virtual PlannerDataType makePlannerData() = 0;
 };
@@ -697,12 +714,10 @@ class ClassicPrepareExecutionHelper final
 public:
     ClassicPrepareExecutionHelper(OperationContext* opCtx,
                                   const MultipleCollectionAccessor& collections,
-                                  std::unique_ptr<WorkingSet> ws,
                                   CanonicalQuery* cq,
                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
                                   std::unique_ptr<QueryPlannerParams> plannerParams)
-        : PrepareExecutionHelper{
-              opCtx, collections, yieldPolicy, cq, std::move(plannerParams), std::move(ws)} {}
+        : PrepareExecutionHelper{opCtx, collections, yieldPolicy, cq, std::move(plannerParams)} {}
 
 private:
     using CachedSolutionPair =
@@ -711,7 +726,7 @@ private:
     PlannerData makePlannerData() override {
         return PlannerData{_opCtx,
                            _cq,
-                           std::move(_ws),
+                           std::make_unique<WorkingSet>(),
                            _collections,
                            _plannerParams,
                            _yieldPolicy,
@@ -720,6 +735,55 @@ private:
 
     bool usingClassic() final {
         return true;
+    }
+
+    std::unique_ptr<ClassicRuntimePlannerResult> maybePlannerFromRankerResult(
+        StatusWith<plan_ranking::PlanRankingResult>& rankerResult, CanonicalQuery& cq) override {
+        if (!rankerResult.isOK()) {
+            // Ranking failed
+            return nullptr;
+        }
+        auto& rResult = rankerResult.getValue();
+        auto& maybeExecState = rResult.execState;
+        if (!maybeExecState) {
+            // Ranking did not need to execute any plans/did not retain any execution state
+            return nullptr;
+        }
+
+        if (cq.getExplain().has_value()) {
+            // Explain for executionStats cannot resume a partially executed MultiPlanStage.
+            return nullptr;
+        }
+
+        auto& solutions = rResult.solutions;
+        auto& maybeExplainData = rResult.maybeExplainData;
+
+        auto explainData = maybeExplainData ? std::move(*maybeExplainData) : PlanExplainerData{};
+
+        tassert(11727700,
+                "Ranker saved execution state but did not select a single solution",
+                solutions.size() == 1);
+
+        // We wish to cache the plan for every query passing through CBR.
+        // Multi-planning is entangled with plan caching.
+        // If no exec state is returned, a multiplanner will be created by finishPrepare(), and
+        // will cache.
+        // In this case, we have exec state already, so it must be a MultiPlanStage for
+        // the plan to be cached.
+        // Ensure that ranking returning anything but a multi-plan stage in the future will draw
+        // dev attention to this, as it is not trivial to assert "plan has been cached".
+        tassert(11727701,
+                "Ranker saved execution state but it wasn't a multi plan stage",
+                dynamic_cast<MultiPlanStage*>(maybeExecState->root.get()));
+
+        auto result = releaseResult();
+        result->runtimePlanner =
+            std::make_unique<mongo::classic_runtime_planner::SingleSolutionPassthroughPlanner>(
+                makePlannerData(),
+                std::move(solutions[0]),
+                std::move(explainData),
+                std::move(*maybeExecState));
+        return result;
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildIdHackPlan() final {
@@ -870,7 +934,6 @@ public:
     SbeWithClassicRuntimePlanningPrepareExecutionHelperBase(
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
-        std::unique_ptr<WorkingSet> ws,
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<QueryPlannerParams> plannerParams,
@@ -878,7 +941,7 @@ public:
         : PrepareExecutionHelper<CacheKey,
                                  RuntimePlanningResult,
                                  classic_runtime_planner_for_sbe::PlannerDataForSBE>(
-              opCtx, collections, policy, cq, std::move(plannerParams), std::move(ws)),
+              opCtx, collections, policy, cq, std::move(plannerParams)),
           _useSbePlanCache{useSbePlanCache} {}
 
 protected:
@@ -888,7 +951,7 @@ protected:
         return crp_sbe::PlannerDataForSBE{
             this->_opCtx,
             this->_cq,
-            std::move(this->_ws),
+            std::make_unique<WorkingSet>(),
             this->_collections,
             this->_plannerParams,
             this->_yieldPolicy,
@@ -910,8 +973,6 @@ protected:
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
         boost::optional<PlanExplainerData> maybeExplainData) final {
-        this->captureCardinalityEstimationMethodForQueryStats(maybeExplainData, solution.get());
-
         // TODO SERVER-92589: Support CBR with SBE plans
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
@@ -966,17 +1027,11 @@ public:
     SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper(
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
-        std::unique_ptr<WorkingSet> ws,
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<QueryPlannerParams> plannerParams)
-        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{opCtx,
-                                                                  collections,
-                                                                  std::move(ws),
-                                                                  cq,
-                                                                  policy,
-                                                                  std::move(plannerParams),
-                                                                  true /*useSbePlanCache*/} {}
+        : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{
+              opCtx, collections, cq, policy, std::move(plannerParams), true /*useSbePlanCache*/} {}
 
 private:
     sbe::PlanCacheKey buildPlanCacheKey() const override {
@@ -1043,13 +1098,11 @@ public:
     SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper(
         OperationContext* opCtx,
         const MultipleCollectionAccessor& collections,
-        std::unique_ptr<WorkingSet> ws,
         CanonicalQuery* cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<QueryPlannerParams> plannerParams)
         : SbeWithClassicRuntimePlanningPrepareExecutionHelperBase{opCtx,
                                                                   collections,
-                                                                  std::move(ws),
                                                                   cq,
                                                                   policy,
                                                                   std::move(plannerParams),
@@ -1124,7 +1177,6 @@ std::unique_ptr<PlannerInterface> getClassicPlanner(
     ClassicPrepareExecutionHelper helper{
         opCtx,
         collections,
-        std::make_unique<WorkingSet>(),
         canonicalQuery,
         yieldPolicy,
         std::move(plannerParams),
@@ -1149,7 +1201,6 @@ std::unique_ptr<PlannerInterface> getClassicPlannerForSbe(
     PrepareExecutionHelperType helper{
         opCtx,
         collections,
-        std::make_unique<WorkingSet>(),
         std::move(canonicalQuery),
         yieldPolicy,
         std::move(plannerParams),
@@ -1814,12 +1865,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             .collections = collections,
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
-    ClassicPrepareExecutionHelper helper{opCtx,
-                                         collections,
-                                         std::make_unique<WorkingSet>(),
-                                         cq.get(),
-                                         policy,
-                                         std::move(plannerParams)};
+    ClassicPrepareExecutionHelper helper{
+        opCtx, collections, cq.get(), policy, std::move(plannerParams)};
 
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams",
@@ -1986,7 +2033,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     ClassicPrepareExecutionHelper helper{
         opCtx,
         collections,
-        std::make_unique<WorkingSet>(),
         cq.get(),
         policy,
         std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
@@ -2102,12 +2148,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             .plannerOptions = plannerOptions,
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
-    ClassicPrepareExecutionHelper helper{opCtx,
-                                         collections,
-                                         std::make_unique<WorkingSet>(),
-                                         cq.get(),
-                                         yieldPolicy,
-                                         std::move(plannerParams)};
+    ClassicPrepareExecutionHelper helper{
+        opCtx, collections, cq.get(), yieldPolicy, std::move(plannerParams)};
 
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams",

@@ -63,14 +63,6 @@ public:
                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
                                             const MultipleCollectionAccessor& collections,
                                             PlannerData plannerData);
-
-    /**
-     * Transfer ownership of the working set _ws to the caller.
-     */
-    std::unique_ptr<WorkingSet> extractWorkingSet();
-
-private:
-    std::unique_ptr<WorkingSet> _ws;
 };
 
 }  // namespace mongo::plan_ranking

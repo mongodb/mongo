@@ -61,7 +61,6 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
          */
         // TODO SERVER-115496 enumerate solutions once
         auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-        _ws = std::move(plannerData.workingSet);
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus();
         }
@@ -73,7 +72,6 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
         case QueryPlanRankerModeEnum::kExactCE:
         case QueryPlanRankerModeEnum::kHeuristicCE:
         case QueryPlanRankerModeEnum::kHistogramCE: {
-            _ws = std::move(plannerData.workingSet);
             return CBRPlanRankingStrategy().rankPlans(
                 opCtx, query, plannerParams, yieldPolicy, collections);
         }
@@ -91,7 +89,6 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                             collections,
                                                             opCtx,
                                                             std::move(plannerData));
-                    _ws = ranker.extractWorkingSet();
                     return statusWithSolns;
                 }
                 case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
@@ -103,12 +100,10 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                             yieldPolicy,
                                                             collections,
                                                             std::move(plannerData));
-                    _ws = ranker.extractWorkingSet();
                     return statusWithSolns;
                 }
                 case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
                     kHistogramCEWithHeuristicFallback: {
-                    _ws = std::move(plannerData.workingSet);
                     return CBRPlanRankingStrategy().rankPlans(
                         opCtx, query, plannerParams, yieldPolicy, collections);
                 }
@@ -119,13 +114,6 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
         default:
             MONGO_UNREACHABLE;
     }
-}
-
-std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
-    tassert(11484500, "WorkingSet is not initialized", _ws);
-    auto result = std::move(_ws);
-    _ws = nullptr;
-    return result;
 }
 
 bool delayOrSkipSubplanner(const CanonicalQuery& query,

@@ -91,8 +91,8 @@ WorkingSet* ClassicPlannerInterface::ws() const {
     return _plannerData.workingSet.get();
 }
 
-std::unique_ptr<WorkingSet> ClassicPlannerInterface::extractWorkingSet() {
-    return std::move(_plannerData.workingSet);
+SavedExecState ClassicPlannerInterface::extractExecState() && {
+    return {.workingSet = std::move(_plannerData.workingSet), .root = std::move(_root)};
 }
 
 void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,

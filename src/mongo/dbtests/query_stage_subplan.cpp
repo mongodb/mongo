@@ -37,6 +37,7 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

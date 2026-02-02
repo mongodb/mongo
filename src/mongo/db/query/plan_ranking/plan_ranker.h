@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -49,6 +50,12 @@ struct PlanRankingResult {
     // run in a pre-execution phase to measure the amount of work done to produce the
     // first batch, so they can be considered for insertion into the classic plan cache.
     bool needsWorksMeasured{false};
+
+    // Ranker strategies may involve execution; they can return execution-relevant state
+    // here, and the caller can choose to resume execution from that point.
+    // (e.g., MultiPlanStage may contain spooled results, partially evaluated ixscans, etc.)
+    // If none, the caller should consume the provided solution(s) as-is.
+    boost::optional<mongo::classic_runtime_planner::SavedExecState> execState;
 };
 
 /**
@@ -89,11 +96,6 @@ public:
         // multiplanning only runs with classic, even if SBE is enabled.
         PlannerData multiPlannerData,
         bool isClassic);
-
-    std::unique_ptr<WorkingSet> extractWorkingSet();
-
-private:
-    std::unique_ptr<WorkingSet> _ws;
 };
 }  // namespace plan_ranking
 }  // namespace mongo

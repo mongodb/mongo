@@ -41,6 +41,28 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     setRoot(std::move(root));
 }
 
+/**
+ * Replace the existing working set in `plannerData`, with the provided `newWs`.
+ *
+ * Returns the modified PlannerData.
+ */
+PlannerData replaceWorkingSet(PlannerData plannerData, std::unique_ptr<WorkingSet> newWs) {
+    plannerData.workingSet = std::move(newWs);
+    return plannerData;
+}
+
+SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
+    PlannerData plannerData,
+    std::unique_ptr<QuerySolution> querySolution,
+    PlanExplainerData explainData,
+    SavedExecState&& state)
+    : ClassicPlannerInterface(
+          replaceWorkingSet(std::move(plannerData), std::move(state.workingSet)),
+          std::move(explainData)),
+      _querySolution(std::move(querySolution)) {
+    setRoot(std::move(state.root));
+}
+
 Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
     // Nothing to do.
     return Status::OK();

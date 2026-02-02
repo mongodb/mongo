@@ -35,13 +35,11 @@
 #include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/classic/update_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
@@ -50,6 +48,21 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::classic_runtime_planner {
+
+/**
+ * Stores relevant state required to resume executing a partially
+ * evaluated PlanStage at a later time.
+ *
+ * Later, a SingleSolutionPassthroughPlanner can be rebuilt using this.
+ *
+ * This allows CBR strategies which use multiplanning internally to
+ * "stash" the work done, so the caller can create an executor
+ * which does not need to repeat the work done by multiplanning.
+ */
+struct SavedExecState {
+    std::unique_ptr<WorkingSet> workingSet;
+    std::unique_ptr<PlanStage> root;
+};
 
 /*
  * Base abstract class for classic runtime planner implementations. Each planner sub-class needs to
@@ -92,9 +105,9 @@ public:
         std::unique_ptr<CanonicalQuery> canonicalQuery) final;
 
     /**
-     * Extracts the WorkingSet used by this planner.
+     * Extracts the WorkingSet and the root of the executable plan used by this planner.
      */
-    std::unique_ptr<WorkingSet> extractWorkingSet();
+    SavedExecState extractExecState() &&;
 
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
@@ -160,6 +173,11 @@ public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
                                      PlanExplainerData explainData);
+
+    SingleSolutionPassthroughPlanner(PlannerData plannerData,
+                                     std::unique_ptr<QuerySolution> querySolution,
+                                     PlanExplainerData explainData,
+                                     SavedExecState&& state);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

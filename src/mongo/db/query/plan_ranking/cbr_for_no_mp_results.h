@@ -34,6 +34,7 @@
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
@@ -51,10 +52,7 @@ public:
                                             OperationContext* opCtx,
                                             PlannerData plannerData);
 
-    std::unique_ptr<WorkingSet> extractWorkingSet();
-
 protected:
-    std::unique_ptr<WorkingSet> _ws;
     // TODO SERVER-115496. Once solutions are received as argument, this no longer needs to be
     // optional.
     boost::optional<classic_runtime_planner::MultiPlanner> _multiPlanner;

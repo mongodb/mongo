@@ -52,7 +52,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     PlannerData plannerData) {
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
-        _ws = std::move(plannerData.workingSet);
         return statusWithMultiPlanSolns.getStatus();
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
@@ -61,7 +60,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
     // subplanner.
     if (SubplanStage::needsSubplanning(query) && solutions.size() > kMaxNumberOfOrPlans) {
-        _ws = std::move(plannerData.workingSet);
         return Status(ErrorCodes::MaxNumberOfOrPlansExceeded,
                       str::stream()
                           << "exceeded " << kMaxNumberOfOrPlans << " plans. Switch to subplanner");
@@ -71,12 +69,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
         // so it applies everywhere. Only one solution, no need to rank.
         plan_ranking::PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
-        _ws = std::move(plannerData.workingSet);
         return std::move(out);
     }
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
     _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
-    ON_BLOCK_EXIT([&] { _ws = _multiPlanner->extractWorkingSet(); });
     // Cap the number of works per plan during this first trials phase so that the total works
     // across all plans does not exceed internalQueryPlanEvaluationWorks.
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
@@ -149,13 +145,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     return std::move(result.getValue());
 }
 
-std::unique_ptr<WorkingSet> CBRForNoMPResultsStrategy::extractWorkingSet() {
-    tassert(11451400, "WorkingSet is not initialized", _ws);
-    auto result = std::move(_ws);
-    _ws = nullptr;
-    return result;
-}
-
 StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPickBestPlan(
     const trial_period::TrialPhaseConfig& trialsConfig) {
     auto stats = _multiPlanner->getSpecificStats();
@@ -178,6 +167,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPi
 
     // TODO SERVER-117373. Only if explain is needed.
     result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
+    result.execState = std::move(*_multiPlanner).extractExecState();
     return std::move(result);
 }
 }  // namespace plan_ranking

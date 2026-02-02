@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"

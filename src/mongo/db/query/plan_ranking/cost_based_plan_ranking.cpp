@@ -92,6 +92,7 @@ StatusWith<PlanRankingResult> getBestMPPlan(classic_runtime_planner::MultiPlanne
     auto soln = mp.extractQuerySolution();
     tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
     out.solutions.push_back(std::move(soln));
+    out.execState = std::move(mp).extractExecState();
     return std::move(out);
 }
 
@@ -121,7 +122,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(query, plannerParams, topLevelSampleFieldNames);
     if (!statusWithMultiPlanSolns.isOK()) {
-        _ws = std::move(plannerData.workingSet);
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << query.toStringForErrorMsg()
                           << " planner returned error");
@@ -135,7 +135,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
     // subplanner.
     if (SubplanStage::needsSubplanning(query) && numSolutions > kMaxNumberOfOrPlans) {
-        _ws = std::move(plannerData.workingSet);
         return Status(ErrorCodes::MaxNumberOfOrPlansExceeded,
                       str::stream()
                           << "exceeded " << kMaxNumberOfOrPlans << " plans. Switch to subplanner");
@@ -146,7 +145,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
         // so it applies everywhere. Only one solution, no need to rank.
         plan_ranking::PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
-        _ws = std::move(plannerData.workingSet);
         return std::move(out);
     }
 
@@ -191,8 +189,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     // Typically (numWorksPerPlanEst << numWorksPerPlanMP), but some tests may set the number of
     // works to a very small value.
     numWorksPerPlanEst = std::min(numWorksPerPlanEst, numWorksPerPlanMP);
-
-    ON_BLOCK_EXIT([&] { _ws = mp.extractWorkingSet(); });
 
     // Run a brief MP trial phase to collect execution stats.
     trialConfig.maxNumWorksPerPlan = numWorksPerPlanEst;
@@ -294,13 +290,6 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
     LOGV2_INFO(11306800, "AutomaticCE chooses CBR (4)", "Reason"_attr = "it is cheaper than MP");
     return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
-}
-
-std::unique_ptr<WorkingSet> CostBasedPlanRankingStrategy::extractWorkingSet() {
-    tassert(11306810, "WorkingSet is not initialized", _ws);
-    auto result = std::move(_ws);
-    _ws = nullptr;
-    return result;
 }
 
 }  // namespace plan_ranking
