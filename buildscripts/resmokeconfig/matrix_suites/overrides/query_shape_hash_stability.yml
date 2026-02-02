@@ -47,6 +47,12 @@
       # UUID mismatch on update explain
       - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
       - jstests/core/query/parsing/collection_uuid_write_commands.js
+      # TODO SERVER-117999 re-enable the following test
+      - jstests/core/timeseries/write/timeseries_hint_id.js
+      # TODO SERVER-118000 re-enable the following test
+      - jstests/core/timeseries/write/timeseries_update_arbitrary_updates_not_enabled.js
+      # TODO SERVER-118551 re-enable the following test
+      - jstests/core/timeseries/write/timeseries_insert_after_update.js
 
     exclude_with_any_tags:
       - does_not_support_repeated_reads

@@ -135,7 +135,6 @@ selector:
     - assumes_standalone_mongod
     - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
-    - featureFlagTimeseriesUpdatesSupport_incompatible
     - featureFlagRecordIdsReplicated
     - featureFlagRankFusionBasic
     - featureFlagRankFusionFull
