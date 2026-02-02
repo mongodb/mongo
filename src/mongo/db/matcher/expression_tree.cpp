@@ -306,6 +306,9 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
         if (childType == MatchExpression::EQ || childType == MatchExpression::MATCH_IN ||
             childType == MatchExpression::EXISTS) {
             auto* pathMatch = getEligiblePathMatchForNotSerialization(expressionToNegate);
+            // The if statement above ensures that expressionToNegate is a type derived from
+            // PathMatchExpression.
+            tassert(11799200, "Only PathMatchExpression is expected here.", pathMatch);
             BSONObjBuilder pathBob(
                 out->subobjStart(opts.serializeFieldPathFromString(pathMatch->path())));
             if (childType == MatchExpression::EXISTS) {
