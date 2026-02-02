@@ -416,6 +416,7 @@ enable_disagg(const char *mode)
 
     g.opts.palm_map_size_mb = 2048;               /* Set 2GB map size for palm by default. */
     g.opts.disagg_page_log_home = (char *)g.home; /* Set home directory for page log. */
+    g.opts.disagg_drain_threads = 8;              /* Set number of drain threads, 8 by default. */
 
     return 0;
 }

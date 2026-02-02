@@ -331,6 +331,7 @@ configure_disagg_storage(const char *home, char **p, size_t max, char *ext_cfg, 
     opts.disagg_page_log_home = disagg_is_multi_node() ? g.home_page_log : (char *)home;
     opts.disagg_mode = (char *)(g.disagg_leader ? "leader" : "follower");
     opts.disagg_key_provider = GV(DISAGG_KEY_PROVIDER);
+    opts.disagg_drain_threads = GV(DISAGG_DRAIN_THREADS);
     opts.home = (char *)home;
     opts.build_dir = (char *)BUILDDIR;
     opts.palm_map_size_mb = 2048; /* 2 Gigabytes for PALM map */

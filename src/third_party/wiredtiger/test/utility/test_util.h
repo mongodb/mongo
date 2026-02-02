@@ -76,10 +76,10 @@ extern "C" {
 #define DIR_STORE "dir_store"
 #define S3_STORE "s3_store"
 
-/* FIXME-WT-16269: Make drain_threads configurable in test format. */
-#define TESTUTIL_ENV_CONFIG_DISAGG                         \
-    ",disaggregated=(role=%s,page_log=%s,drain_threads=4)" \
-    ",precise_checkpoint=true"                             \
+#define TESTUTIL_ENV_CONFIG_DISAGG                               \
+    ",disaggregated=(role=%s,page_log=%s,drain_threads=%" PRIu64 \
+    ")"                                                          \
+    ",precise_checkpoint=true"                                   \
     ",page_delta=(internal_page_delta=%s,leaf_page_delta=%s)"
 #define TESTUTIL_ENV_CONFIG_DISAGG_EXT                                                   \
     "\"%s/ext/page_log/%s/libwiredtiger_%s.so\"=("                                       \
@@ -109,8 +109,9 @@ typedef struct {
     const char *argv0; /* Exec name */
     char usage[512];   /* Usage string for this parser */
 
-    const char *progname;             /* Truncated program name */
-    char *build_dir;                  /* Build directory path */
+    const char *progname; /* Truncated program name */
+    char *build_dir;      /* Build directory path */
+    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
     const char *disagg_mode;          /* Disaggregated storage mode */
     const char *disagg_page_log;      /* Page and log service for disaggregated storage */
     const char *disagg_page_log_home; /* Page and log service home dir for disaggregated storage */
@@ -141,24 +142,27 @@ typedef struct {
     bool internal_page_delta; /* Use internal page deltas */
     bool leaf_page_delta;     /* Use leaf page deltas */
 
-    bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
-    bool compat;               /* Compatibility */
-    bool disagg_storage;       /* Uses disaggregated storage */
-    bool disagg_key_provider;  /* Uses key provider testing module for disaggregated storage */
-    bool disagg_switch_mode;   /* Switching disaggregated storage mode during the test */
-    bool do_data_ops;          /* Have schema ops use data */
-    bool inmem;                /* In-memory */
-    bool make_bucket_dir;      /* Create bucket when it is a directory */
-    bool preserve;             /* Don't remove files on exit */
-    bool tiered_begun;         /* Tiered storage ready */
-    bool tiered_storage;       /* Configure tiered storage */
-    bool verbose;              /* Run in verbose mode */
-    uint64_t nrecords;         /* Number of records */
-    uint64_t nops;             /* Number of operations */
-    uint64_t nthreads;         /* Number of threads */
-    uint64_t n_append_threads; /* Number of append threads */
-    uint64_t n_read_threads;   /* Number of read threads */
-    uint64_t n_write_threads;  /* Number of write threads */
+    bool absolute_bucket_dir; /* Use an absolute bucket path when it is a directory */
+    bool compat;              /* Compatibility */
+    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
+    bool disagg_storage;      /* Uses disaggregated storage */
+    bool disagg_key_provider; /* Uses key provider testing module for disaggregated storage */
+    bool disagg_switch_mode;  /* Switching disaggregated storage mode during the test */
+    bool do_data_ops;         /* Have schema ops use data */
+    bool inmem;               /* In-memory */
+    bool make_bucket_dir;     /* Create bucket when it is a directory */
+    bool preserve;            /* Don't remove files on exit */
+    bool tiered_begun;        /* Tiered storage ready */
+    bool tiered_storage;      /* Configure tiered storage */
+    bool verbose;             /* Run in verbose mode */
+    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
+    uint64_t disagg_drain_threads; /* Number of drain threads for disaggregated storage*/
+    uint64_t nrecords;             /* Number of records */
+    uint64_t nops;                 /* Number of operations */
+    uint64_t nthreads;             /* Number of threads */
+    uint64_t n_append_threads;     /* Number of append threads */
+    uint64_t n_read_threads;       /* Number of read threads */
+    uint64_t n_write_threads;      /* Number of write threads */
 
     uint64_t tiered_flush_interval_us; /* Microseconds between flush_tier calls */
     uint64_t tiered_flush_next_us;     /* Next tiered flush in epoch microseconds */

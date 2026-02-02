@@ -203,6 +203,8 @@ CONFIG configuration_list[] = {
 
 {"disagg.page_log.verbose", "set page log verbosity (default=WT_VERBOSE_INFO)", C_IGNORE, 0, 0, WT_VERBOSE_DEBUG_5}
 
+{"disagg.drain_threads", "set number of drain threads for disaggregated storage", 0x0, 1, 16, 256}
+
 {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)", C_IGNORE | C_STRING | C_TABLE, 0, 0, 0}
 
 {"disk.data_extend", "configure data file extension", C_BOOL, 5, 0, 0}

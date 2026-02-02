@@ -52,7 +52,8 @@ testutil_disagg_storage_configuration(TEST_OPTS *opts, const char *home, char *d
         }
 
         testutil_snprintf(disagg_cfg, disagg_cfg_size, TESTUTIL_ENV_CONFIG_DISAGG,
-          opts->disagg_mode, opts->disagg_page_log, (opts->internal_page_delta ? "true" : "false"),
+          opts->disagg_mode, opts->disagg_page_log, opts->disagg_drain_threads,
+          (opts->internal_page_delta ? "true" : "false"),
           (opts->leaf_page_delta ? "true" : "false"));
     } else {
         testutil_snprintf(ext_cfg, ext_cfg_size, "\"\"");
