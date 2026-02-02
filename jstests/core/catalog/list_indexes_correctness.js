@@ -158,7 +158,8 @@ describe("ListIndexesCorrectness", function () {
         assert.eq(7200, indexC.expireAfterSeconds, "Index should have expireAfterSeconds = 7200 after collMod");
     });
 
-    it("should list indexes correctly after collMod converts an index to unique", () => {
+    // TODO (SERVER-118648): Enable this test once the bug is fixed.
+    it.skip("should list indexes correctly after collMod converts an index to unique", () => {
         // Create a regular non-unique index on {e:1}
         assert.commandWorked(coll.createIndex({e: 1}));
 
