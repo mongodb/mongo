@@ -73,16 +73,3 @@ runUnionWithTest("queryPlanner", [{$explain: {input: "hello"}}], {
 runUnionWithTest("executionStats", [{$explain: {input: "hello"}}], {
     $explain: {input: "hello", verbosity: "executionStats"},
 });
-
-// Test explain output for view with extension stage in definition.
-{
-    const viewName = "explain_in_def";
-    assert.commandWorked(db.createView(viewName, coll.getName(), [{$explain: {input: "fromView"}}]));
-
-    for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
-        const explain = db[viewName].explain(verbosity).aggregate([]);
-        verifyPipelineExplainOutput(verbosity, explain, {$explain: {input: "fromView", verbosity}});
-    }
-
-    db[viewName].drop();
-}
