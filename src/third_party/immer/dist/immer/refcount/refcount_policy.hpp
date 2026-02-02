@@ -28,7 +28,8 @@ struct refcount_policy
         : refcount{1} {};
     refcount_policy(disowned)
         : refcount{0}
-    {}
+    {
+    }
 
     void inc() { refcount.fetch_add(1, std::memory_order_relaxed); }
 

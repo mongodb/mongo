@@ -39,13 +39,15 @@ struct rrbtree_iterator
         : v_{&v}
         , i_{0}
         , curr_{nullptr, ~size_t{}, ~size_t{}}
-    {}
+    {
+    }
 
     rrbtree_iterator(const tree_t& v, end_t)
         : v_{&v}
         , i_{v.size}
         , curr_{nullptr, ~size_t{}, ~size_t{}}
-    {}
+    {
+    }
 
 private:
     friend iterator_core_access;

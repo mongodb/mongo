@@ -26,6 +26,9 @@ struct champ_iterator
 {
     using tree_t = champ<T, Hash, Eq, MP, B>;
     using node_t = typename tree_t::node_t;
+    using hash_t = typename node_t::hash_t;
+
+    champ_iterator() = default;
 
     struct end_t
     {};
@@ -65,7 +68,7 @@ private:
     T* cur_;
     T* end_;
     count_t depth_;
-    node_t* const* path_[max_depth<B> + 1] = {
+    node_t* const* path_[max_depth<hash_t, B> + 1] = {
         0,
     };
 
@@ -77,7 +80,7 @@ private:
 
     bool step_down()
     {
-        if (depth_ < max_depth<B>) {
+        if (depth_ < max_depth<hash_t, B>) {
             auto parent = *path_[depth_];
             assert(parent);
             if (parent->nodemap()) {
@@ -85,7 +88,7 @@ private:
                 path_[depth_] = parent->children();
                 auto child    = *path_[depth_];
                 assert(child);
-                if (depth_ < max_depth<B>) {
+                if (depth_ < max_depth<hash_t, B>) {
                     if (child->datamap()) {
                         cur_ = child->values();
                         end_ = cur_ + child->data_count();
@@ -110,7 +113,7 @@ private:
                 path_[depth_] = next;
                 auto child    = *path_[depth_];
                 assert(child);
-                if (depth_ < max_depth<B>) {
+                if (depth_ < max_depth<hash_t, B>) {
                     if (child->datamap()) {
                         cur_ = child->values();
                         end_ = cur_ + child->data_count();

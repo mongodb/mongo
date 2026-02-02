@@ -75,7 +75,8 @@ public:
      */
     array(std::initializer_list<T> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a array containing the elements in the range
@@ -88,7 +89,8 @@ public:
                                bool> = true>
     array(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Constructs an array containing the element `val` repeated `n`
@@ -96,7 +98,8 @@ public:
      */
     array(size_type n, T v = {})
         : impl_{impl_t::from_fill(n, v)}
-    {}
+    {
+    }
 
     /*!
      * Returns an iterator pointing at the first element of the
@@ -325,7 +328,8 @@ private:
 
     array(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
     array&& push_back_move(std::true_type, value_type value)
     {

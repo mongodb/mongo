@@ -27,14 +27,15 @@ struct refcount_atom_impl
     using lock_t        = typename MemoryPolicy::lock;
     using scoped_lock_t = typename lock_t::scoped_lock;
 
-    refcount_atom_impl(const refcount_atom_impl&) = delete;
-    refcount_atom_impl(refcount_atom_impl&&)      = delete;
+    refcount_atom_impl(const refcount_atom_impl&)            = delete;
+    refcount_atom_impl(refcount_atom_impl&&)                 = delete;
     refcount_atom_impl& operator=(const refcount_atom_impl&) = delete;
-    refcount_atom_impl& operator=(refcount_atom_impl&&) = delete;
+    refcount_atom_impl& operator=(refcount_atom_impl&&)      = delete;
 
     refcount_atom_impl(box_type b)
         : impl_{std::move(b)}
-    {}
+    {
+    }
 
     box_type load() const
     {
@@ -89,14 +90,15 @@ struct gc_atom_impl
                                no_refcount_policy>::value,
                   "gc_atom_impl can only be used when there is no refcount!");
 
-    gc_atom_impl(const gc_atom_impl&) = delete;
-    gc_atom_impl(gc_atom_impl&&)      = delete;
+    gc_atom_impl(const gc_atom_impl&)            = delete;
+    gc_atom_impl(gc_atom_impl&&)                 = delete;
     gc_atom_impl& operator=(const gc_atom_impl&) = delete;
-    gc_atom_impl& operator=(gc_atom_impl&&) = delete;
+    gc_atom_impl& operator=(gc_atom_impl&&)      = delete;
 
     gc_atom_impl(box_type b)
         : impl_{b.impl_}
-    {}
+    {
+    }
 
     box_type load() const { return {impl_.load()}; }
 
@@ -138,8 +140,8 @@ private:
  *    ``std::atomic`` interface closely, since it attempts to be a higher level
  *    construction, most similar to Clojure's ``(atom)``.  It is remarkable in
  *    particular that, since ``box<T>`` underlying object is immutable, using
- *    ``atom<T>`` is fully thread-safe in ways that ``std::atomic_shared_ptr`` is
- *    not. This is so because dereferencing the underlying pointer in a
+ *    ``atom<T>`` is fully thread-safe in ways that ``std::atomic_shared_ptr``
+ * is not. This is so because dereferencing the underlying pointer in a
  *    ``std::atomic_share_ptr`` may require further synchronization, in
  *    particular when invoking non-const methods.
  *
@@ -153,17 +155,18 @@ public:
     using value_type    = T;
     using memory_policy = MemoryPolicy;
 
-    atom(const atom&) = delete;
-    atom(atom&&)      = delete;
+    atom(const atom&)           = delete;
+    atom(atom&&)                = delete;
     void operator=(const atom&) = delete;
-    void operator=(atom&&) = delete;
+    void operator=(atom&&)      = delete;
 
     /*!
      * Constructs an atom holding a value `b`;
      */
     atom(box_type v = {})
         : impl_{std::move(v)}
-    {}
+    {
+    }
 
     /*!
      * Sets a new value in the atom.

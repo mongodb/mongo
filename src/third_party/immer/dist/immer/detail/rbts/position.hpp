@@ -44,7 +44,8 @@ struct empty_regular_pos
 
     template <typename Visitor, typename... Args>
     void each(Visitor, Args&&...)
-    {}
+    {
+    }
     template <typename Visitor, typename... Args>
     bool each_pred(Visitor, Args&&...)
     {
@@ -168,7 +169,8 @@ struct leaf_descent_pos
 
     template <typename... Args>
     decltype(auto) descend(Args&&...)
-    {}
+    {
+    }
 
     template <typename Visitor, typename... Args>
     decltype(auto) visit(Visitor v, Args&&... args)
@@ -698,16 +700,20 @@ struct null_sub_pos
 
     template <typename Visitor, typename... Args>
     void each_sub(Visitor, Args&&...)
-    {}
+    {
+    }
     template <typename Visitor, typename... Args>
     void each_right_sub(Visitor, Args&&...)
-    {}
+    {
+    }
     template <typename Visitor, typename... Args>
     void each_left_sub(Visitor, Args&&...)
-    {}
+    {
+    }
     template <typename Visitor, typename... Args>
     void visit(Visitor, Args&&...)
-    {}
+    {
+    }
 };
 
 template <typename NodeT>
@@ -735,10 +741,12 @@ struct singleton_regular_sub_pos
 
     template <typename Visitor, typename... Args>
     void each_left_sub(Visitor v, Args&&... args)
-    {}
+    {
+    }
     template <typename Visitor, typename... Args>
     void each(Visitor v, Args&&... args)
-    {}
+    {
+    }
 
     template <typename Visitor, typename... Args>
     decltype(auto) last_sub(Visitor v, Args&&... args)

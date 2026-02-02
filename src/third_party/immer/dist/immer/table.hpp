@@ -150,13 +150,10 @@ class table
 
     struct hash_key
     {
-        std::size_t operator()(const value_t& v) const
-        {
-            return Hash{}(KeyFn{}(v));
-        }
+        auto operator()(const value_t& v) const { return Hash{}(KeyFn{}(v)); }
 
         template <typename Key>
-        std::size_t operator()(const Key& v) const
+        auto operator()(const Key& v) const
         {
             return Hash{}(v);
         }
@@ -193,7 +190,7 @@ public:
     using mapped_type     = T;
     using value_type      = T;
     using size_type       = detail::hamts::size_t;
-    using diference_type  = std::ptrdiff_t;
+    using difference_type = std::ptrdiff_t;
     using hasher          = Hash;
     using key_equal       = Equal;
     using reference       = const value_type&;
@@ -213,7 +210,8 @@ public:
      */
     table(std::initializer_list<value_type> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a table containing the elements in the range
@@ -225,7 +223,8 @@ public:
                                bool> = true>
     table(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Default constructor.  It creates a table of `size() == 0`. It
@@ -537,10 +536,14 @@ private:
         return impl_.sub(value);
     }
 
+    // for immer::persist
+public:
     table(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
+private:
     impl_t impl_ = impl_t::empty();
 };
 

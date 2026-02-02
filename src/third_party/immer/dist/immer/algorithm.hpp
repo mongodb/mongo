@@ -239,8 +239,9 @@ bool all_of(Iter first, Iter last, Pred p)
  * @tparam RemovedFn Unary function that is called whenever a removed element is
  *         found.  It is called with the removed element as argument.
  *
- * @tparam ChangedFn Unary function that is called whenever a changed element is
- *         found.  It is called with the changed element as argument.
+ * @tparam ChangedFn Binary function that is called whenever a changed element is
+ *         found.  It is called with the old value as the first argument and the 
+ *         new value as the second.
  */
 template <class AddedFn, class RemovedFn, class ChangedFn>
 struct differ

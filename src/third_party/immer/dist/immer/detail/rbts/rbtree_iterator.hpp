@@ -36,14 +36,16 @@ struct rbtree_iterator
         , i_{0}
         , base_{~size_t{}}
         , curr_{nullptr}
-    {}
+    {
+    }
 
     rbtree_iterator(const tree_t& v, end_t)
         : v_{&v}
         , i_{v.size}
         , base_{~size_t{}}
         , curr_{nullptr}
-    {}
+    {
+    }
 
     const tree_t& impl() const { return *v_; }
     size_t index() const { return i_; }

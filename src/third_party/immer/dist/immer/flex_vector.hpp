@@ -100,7 +100,8 @@ public:
      */
     flex_vector(std::initializer_list<T> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a flex_vector containing the elements in the range
@@ -112,7 +113,8 @@ public:
                                bool> = true>
     flex_vector(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a vector containing the element `val` repeated `n`
@@ -120,7 +122,8 @@ public:
      */
     flex_vector(size_type n, T v = {})
         : impl_{impl_t::from_fill(n, v)}
-    {}
+    {
+    }
 
     /*!
      * Default constructor.  It creates a flex_vector with the same
@@ -132,7 +135,8 @@ public:
                 v.impl_.shift,
                 v.impl_.root->inc(),
                 v.impl_.tail->inc()}
-    {}
+    {
+    }
 
     /*!
      * Returns an iterator pointing at the first element of the
@@ -527,6 +531,7 @@ public:
 private:
     friend transient_type;
 
+public:
     flex_vector(impl_t impl)
         : impl_(std::move(impl))
     {
@@ -537,6 +542,7 @@ private:
 #endif
     }
 
+private:
     flex_vector&& push_back_move(std::true_type, value_type value)
     {
         impl_.push_back_mut({}, std::move(value));

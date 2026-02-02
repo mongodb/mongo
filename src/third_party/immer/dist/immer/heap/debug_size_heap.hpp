@@ -9,12 +9,13 @@
 #pragma once
 
 #include <immer/config.hpp>
+#include <immer/detail/util.hpp>
 #include <immer/heap/identity_heap.hpp>
 
 #include <cassert>
 #include <cstddef>
-#include <type_traits>
 #include <memory>
+#include <type_traits>
 
 namespace immer {
 
@@ -38,8 +39,9 @@ struct debug_size_heap
     // fixed.
     constexpr static auto extra_size = 8;
 #else
-    constexpr static auto extra_size = sizeof(
-        std::aligned_storage_t<sizeof(std::size_t), alignof(std::max_align_t)>);
+    constexpr static auto extra_size =
+        sizeof(detail::aligned_storage_t<sizeof(std::size_t),
+                                         alignof(std::max_align_t)>);
 #endif
 
     template <typename... Tags>

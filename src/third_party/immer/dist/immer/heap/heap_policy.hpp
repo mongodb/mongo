@@ -108,10 +108,10 @@ struct free_list_heap_policy
     {
         using type =
             split_heap<Size,
-                       with_free_list_node<thread_local_free_list_heap<
+                       thread_local_free_list_heap<
                            Size,
                            Limit,
-                           free_list_heap<Size, Limit, debug_size_heap<Heap>>>>,
+                           free_list_heap<Size, Limit, debug_size_heap<Heap>>>,
                        debug_size_heap<Heap>>;
     };
 };
@@ -131,8 +131,7 @@ struct unsafe_free_list_heap_policy
     {
         using type = split_heap<
             Size,
-            with_free_list_node<
-                unsafe_free_list_heap<Size, Limit, debug_size_heap<Heap>>>,
+            unsafe_free_list_heap<Size, Limit, debug_size_heap<Heap>>,
             debug_size_heap<Heap>>;
     };
 };

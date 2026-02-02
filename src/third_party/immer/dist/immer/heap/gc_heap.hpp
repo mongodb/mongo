@@ -26,7 +26,7 @@ namespace immer {
 
 #ifdef IMMER_GC_REQUIRE_INIT
 #define IMMER_GC_REQUIRE_INIT_ IMMER_GC_REQUIRE_INIT
-#elifdef __APPLE__
+#elif defined __APPLE__
 #define IMMER_GC_REQUIRE_INIT_ 1
 #else
 #define IMMER_GC_REQUIRE_INIT_ 0
@@ -125,6 +125,21 @@ public:
     static void deallocate(std::size_t, void* data, norefs_tag)
     {
         GC_free(data);
+    }
+};
+
+/*!
+ * Disable garbage collection within a scope, re-enabling it and collecting
+ * garbage afterwards.
+ */
+struct gc_disable_guard
+{
+    gc_disable_guard() { GC_disable(); }
+
+    ~gc_disable_guard()
+    {
+        GC_enable();
+        GC_gcollect();
     }
 };
 

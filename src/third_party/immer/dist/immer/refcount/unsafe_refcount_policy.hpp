@@ -27,7 +27,8 @@ struct unsafe_refcount_policy
         : refcount{1} {};
     unsafe_refcount_policy(disowned)
         : refcount{0}
-    {}
+    {
+    }
 
     void inc() { ++refcount; }
     bool dec() { return --refcount == 0; }

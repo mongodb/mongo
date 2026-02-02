@@ -31,10 +31,8 @@ struct node
     using node_t     = node;
     using edit_t     = typename transience::edit;
 
-    struct data_t
-    {
-        aligned_storage_for<T> buffer;
-    };
+    struct data_t : public with_trailing_storage<data_t, T, true>
+    {};
 
     using impl_t = combine_standard_layout_t<data_t, refs_t, ownee_t>;
 
@@ -42,7 +40,9 @@ struct node
 
     constexpr static std::size_t sizeof_n(size_t count)
     {
-        return std::max(immer_offsetof(impl_t, d.buffer) + sizeof(T) * count,
+        return std::max(immer_offsetof(impl_t, d) +
+                            decltype(impl_t::d)::get_storage_offset() +
+                            sizeof(T) * count,
                         sizeof(node));
     }
 
@@ -51,8 +51,8 @@ struct node
     const ownee_t& ownee() const { return get<ownee_t>(impl); }
     ownee_t& ownee() { return get<ownee_t>(impl); }
 
-    const T* data() const { return reinterpret_cast<const T*>(&impl.d.buffer); }
-    T* data() { return reinterpret_cast<T*>(&impl.d.buffer); }
+    const T* data() const { return impl.d.get_storage_ptr(); }
+    T* data() { return impl.d.get_storage_ptr(); }
 
     bool can_mutate(edit_t e) const
     {

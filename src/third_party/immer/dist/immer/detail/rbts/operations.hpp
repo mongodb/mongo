@@ -9,6 +9,7 @@
 #pragma once
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <numeric>
 #include <utility>
@@ -1481,14 +1482,16 @@ struct concat_center_pos
         , count_{1}
         , nodes_{n0}
         , sizes_{s0}
-    {}
+    {
+    }
 
     concat_center_pos(shift_t s, Node* n0, size_t s0, Node* n1, size_t s1)
         : shift_{s}
         , count_{2}
         , nodes_{n0, n1}
         , sizes_{s0, s0 + s1}
-    {}
+    {
+    }
 
     concat_center_pos(shift_t s,
                       Node* n0,
@@ -1501,7 +1504,8 @@ struct concat_center_pos
         , count_{3}
         , nodes_{n0, n1, n2}
         , sizes_{s0, s0 + s1, s0 + s1 + s2}
-    {}
+    {
+    }
 
     template <typename Visitor, typename... Args>
     void each_sub(Visitor v, Args&&... args)
@@ -1574,7 +1578,8 @@ struct concat_merger
         , n_{n}
         , result_{
               shift + B, node_t::make_inner_r_n(std::min(n_, branches<B>)), 0}
-    {}
+    {
+    }
 
     node_t* to_        = {};
     count_t to_offset_ = {};

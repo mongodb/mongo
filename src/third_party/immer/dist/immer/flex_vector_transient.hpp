@@ -81,7 +81,8 @@ public:
                 v.impl_.shift,
                 v.impl_.root->inc(),
                 v.impl_.tail->inc()}
-    {}
+    {
+    }
 
     /*!
      * Returns an iterator pointing at the first element of the
@@ -240,7 +241,8 @@ private:
 
     flex_vector_transient(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
     impl_t impl_ = {};
 };

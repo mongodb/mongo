@@ -192,7 +192,8 @@ private:
 
     vector_transient(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
     impl_t impl_ = {};
 };

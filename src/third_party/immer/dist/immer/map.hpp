@@ -158,7 +158,7 @@ public:
     using mapped_type     = T;
     using value_type      = std::pair<K, T>;
     using size_type       = detail::hamts::size_t;
-    using diference_type  = std::ptrdiff_t;
+    using difference_type = std::ptrdiff_t;
     using hasher          = Hash;
     using key_equal       = Equal;
     using reference       = const value_type&;
@@ -177,7 +177,8 @@ public:
      */
     map(std::initializer_list<value_type> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a map containing the elements in the range
@@ -189,7 +190,8 @@ public:
                                bool> = true>
     map(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Default constructor.  It creates a map of `size() == 0`.  It
@@ -540,11 +542,20 @@ private:
         return impl_.sub(value);
     }
 
+    // for immer::persist
+public:
     map(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
+private:
     impl_t impl_ = impl_t::empty();
 };
+
+static_assert(std::is_nothrow_move_constructible<map<int, int>>::value,
+              "map is not nothrow move constructible");
+static_assert(std::is_nothrow_move_assignable<map<int, int>>::value,
+              "map is not nothrow move assignable");
 
 } // namespace immer

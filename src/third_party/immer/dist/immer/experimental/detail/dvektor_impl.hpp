@@ -16,6 +16,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <limits>
@@ -36,8 +37,8 @@ template <int B, typename T = std::size_t>
 constexpr T mask = branches<B, T> - 1;
 
 template <int B, typename T = std::size_t>
-constexpr auto
-    max_depth = fast_log2(std::numeric_limits<std::size_t>::max()) / B;
+constexpr auto max_depth =
+    fast_log2(std::numeric_limits<std::size_t>::max()) / B;
 
 template <typename T, int B, typename MP>
 struct node;
@@ -71,10 +72,12 @@ struct node
         inner_node_t inner;
         data_t(leaf_node_t n)
             : leaf(std::move(n))
-        {}
+        {
+        }
         data_t(inner_node_t n)
             : inner(std::move(n))
-        {}
+        {
+        }
         ~data_t() {}
     } data;
 
@@ -93,12 +96,14 @@ struct node
     node(leaf_node<T, B> n)
         : kind{leaf_kind}
         , data{std::move(n)}
-    {}
+    {
+    }
 
     node(inner_node<T, B, MP> n)
         : kind{inner_kind}
         , data{std::move(n)}
-    {}
+    {
+    }
 
     inner_node_t& inner() &
     {

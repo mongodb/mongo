@@ -42,7 +42,7 @@ public:
     using mapped_type     = T;
     using value_type      = T;
     using size_type       = detail::hamts::size_t;
-    using diference_type  = std::ptrdiff_t;
+    using difference_type = std::ptrdiff_t;
     using hasher          = Hash;
     using key_equal       = Equal;
     using reference       = const value_type&;
@@ -269,7 +269,8 @@ private:
 
     table_transient(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
     impl_t impl_ = impl_t::empty();
 

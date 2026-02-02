@@ -8,9 +8,6 @@
 
 #pragma once
 
-#include <immer/heap/free_list_node.hpp>
-#include <immer/heap/with_data.hpp>
-
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -19,8 +16,7 @@ namespace immer {
 
 /*!
  * Adaptor that does not release the memory to the parent heap but
- * instead it keeps the memory in a thread-safe global free list. Must
- * be preceded by a `with_data<free_list_node, ...>` heap adaptor.
+ * instead it keeps the memory in a thread-safe global free list.
  *
  * @tparam Size Maximum size of the objects to be allocated.
  * @tparam Base Type of the parent heap.
@@ -28,20 +24,27 @@ namespace immer {
 template <std::size_t Size, std::size_t Limit, typename Base>
 struct free_list_heap : Base
 {
+    struct node_t
+    {
+        node_t* next;
+    };
+
+    static_assert(sizeof(node_t) <= Size,
+                  "free_list_heap size must at least fit a pointer");
+
     using base_t = Base;
 
     template <typename... Tags>
     static void* allocate(std::size_t size, Tags...)
     {
-        assert(size <= sizeof(free_list_node) + Size);
-        assert(size >= sizeof(free_list_node));
+        assert(size <= Size);
 
-        free_list_node* n;
+        node_t* n;
         do {
             n = head().data;
             if (!n) {
-                auto p = base_t::allocate(Size + sizeof(free_list_node));
-                return static_cast<free_list_node*>(p);
+                auto p = base_t::allocate(Size);
+                return p;
             }
         } while (!head().data.compare_exchange_weak(n, n->next));
         head().count.fetch_sub(1u, std::memory_order_relaxed);
@@ -51,15 +54,14 @@ struct free_list_heap : Base
     template <typename... Tags>
     static void deallocate(std::size_t size, void* data, Tags...)
     {
-        assert(size <= sizeof(free_list_node) + Size);
-        assert(size >= sizeof(free_list_node));
+        assert(size <= Size);
 
         // we use relaxed, because we are fine with temporarily having
         // a few more/less buffers in free list
         if (head().count.load(std::memory_order_relaxed) >= Limit) {
-            base_t::deallocate(Size + sizeof(free_list_node), data);
+            base_t::deallocate(Size, data);
         } else {
-            auto n = static_cast<free_list_node*>(data);
+            auto n = static_cast<node_t*>(data);
             do {
                 n->next = head().data;
             } while (!head().data.compare_exchange_weak(n->next, n));
@@ -70,7 +72,7 @@ struct free_list_heap : Base
 private:
     struct head_t
     {
-        std::atomic<free_list_node*> data;
+        std::atomic<node_t*> data;
         std::atomic<std::size_t> count;
     };
 

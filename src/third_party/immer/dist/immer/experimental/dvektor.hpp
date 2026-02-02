@@ -64,7 +64,8 @@ public:
 private:
     dvektor(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
     impl_t impl_ = detail::dvektor::empty<T, B, MemoryPolicy>;
 };
 

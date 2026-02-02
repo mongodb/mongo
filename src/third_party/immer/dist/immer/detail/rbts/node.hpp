@@ -19,6 +19,17 @@
 #include <memory>
 #include <type_traits>
 
+// Disable some warnings for this file as it seems to be causing various
+// false positives when compiling with various versions of GCC.
+#if !defined(_MSC_VER)
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#pragma GCC diagnostic ignored "-Wnonnull"
+#endif
+#endif
+
 namespace immer {
 namespace detail {
 namespace rbts {
@@ -61,15 +72,12 @@ struct node
                                          relaxed_data_no_meta_t,
                                          relaxed_data_with_meta_t>;
 
-    struct leaf_t
-    {
-        aligned_storage_for<T> buffer;
-    };
+    struct leaf_t : public with_trailing_storage<leaf_t, T, true>
+    {};
 
-    struct inner_t
+    struct inner_t : public with_trailing_storage<inner_t, node_t*>
     {
         relaxed_t* relaxed;
-        aligned_storage_for<node_t*> buffer;
     };
 
     union data_t
@@ -97,14 +105,16 @@ struct node
 
     constexpr static std::size_t sizeof_packed_leaf_n(count_t count)
     {
-        return immer_offsetof(impl_t, d.data.leaf.buffer) +
-               sizeof(leaf_t::buffer) * count;
+        return immer_offsetof(impl_t, d.data.leaf) +
+               leaf_t::get_storage_offset() +
+               sizeof(typename leaf_t::storage_type) * count;
     }
 
     constexpr static std::size_t sizeof_packed_inner_n(count_t count)
     {
-        return immer_offsetof(impl_t, d.data.inner.buffer) +
-               sizeof(inner_t::buffer) * count;
+        return immer_offsetof(impl_t, d.data.inner) +
+               inner_t::get_storage_offset() +
+               sizeof(typename inner_t::storage_type) * count;
     }
 
     constexpr static std::size_t sizeof_packed_relaxed_n(count_t count)
@@ -173,13 +183,13 @@ struct node
     node_t** inner()
     {
         IMMER_ASSERT_TAGGED(kind() == kind_t::inner);
-        return reinterpret_cast<node_t**>(&impl.d.data.inner.buffer);
+        return impl.d.data.inner.get_storage_ptr();
     }
 
     T* leaf()
     {
         IMMER_ASSERT_TAGGED(kind() == kind_t::leaf);
-        return reinterpret_cast<T*>(&impl.d.data.leaf.buffer);
+        return impl.d.data.leaf.get_storage_ptr();
     }
 
     static refs_t& refs(const relaxed_t* x)
@@ -461,7 +471,7 @@ struct node
         assert(n >= 1);
         auto p = make_leaf_n(n);
         IMMER_TRY {
-            new (p->leaf()) T{std::forward<U>(x)};
+            new (p->leaf()) T(std::forward<U>(x));
         }
         IMMER_CATCH (...) {
             heap::deallocate(node_t::sizeof_leaf_n(n), p);
@@ -475,7 +485,7 @@ struct node
     {
         auto p = make_leaf_e(e);
         IMMER_TRY {
-            new (p->leaf()) T{std::forward<U>(x)};
+            new (p->leaf()) T(std::forward<U>(x));
         }
         IMMER_CATCH (...) {
             heap::deallocate(node_t::max_sizeof_leaf, p);
@@ -784,7 +794,7 @@ struct node
     {
         auto dst = copy_leaf_n(n + 1, src, n);
         IMMER_TRY {
-            new (dst->leaf() + n) T{std::forward<U>(x)};
+            new (dst->leaf() + n) T(std::forward<U>(x));
         }
         IMMER_CATCH (...) {
             detail::destroy_n(dst->leaf(), n);
@@ -1031,3 +1041,9 @@ constexpr bits_t derive_bits_leaf = derive_bits_leaf_aux<T, MP, B>();
 } // namespace rbts
 } // namespace detail
 } // namespace immer
+
+#if !defined(_MSC_VER)
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+#endif

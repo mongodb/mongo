@@ -274,7 +274,7 @@ struct rbtree
         auto ts       = size - tail_off;
         if (ts < branches<BL>) {
             ensure_mutable_tail(e, ts);
-            new (&tail->leaf()[ts]) T{std::move(value)};
+            new (&tail->leaf()[ts]) T(std::move(value));
         } else {
             auto new_tail = node_t::make_leaf_e(e, std::move(value));
             IMMER_TRY {

@@ -20,7 +20,8 @@ class enable_intrusive_ptr
 public:
     enable_intrusive_ptr()
         : refcount_data_{disowned{}}
-    {}
+    {
+    }
 
     friend void intrusive_ptr_add_ref(const Deriv* x)
     {

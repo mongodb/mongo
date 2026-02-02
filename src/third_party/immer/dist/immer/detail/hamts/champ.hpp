@@ -131,6 +131,7 @@ struct champ
     using edit_t   = typename MemoryPolicy::transience_t::edit;
     using owner_t  = typename MemoryPolicy::transience_t::owner;
     using bitmap_t = typename get_bitmap_type<B>::type;
+    using hash_t   = typename node_t::hash_t;
 
     static_assert(branches<B> <= sizeof(bitmap_t) * 8, "");
 
@@ -139,22 +140,28 @@ struct champ
 
     static node_t* empty()
     {
-        static const auto node = node_t::make_inner_n(0);
-        return node->inc();
+        static const auto empty_ = [] {
+            constexpr auto size = node_t::sizeof_inner_n(0);
+            static std::aligned_storage_t<size, alignof(std::max_align_t)>
+                storage;
+            return node_t::make_inner_n_into(&storage, size, 0u);
+        }();
+        return empty_->inc();
     }
 
-    champ(node_t* r, size_t sz = 0)
+    champ(node_t* r, size_t sz = 0) noexcept
         : root{r}
         , size{sz}
-    {}
+    {
+    }
 
-    champ(const champ& other)
+    champ(const champ& other) noexcept
         : champ{other.root, other.size}
     {
         inc();
     }
 
-    champ(champ&& other)
+    champ(champ&& other) noexcept
         : champ{empty()}
     {
         swap(*this, other);
@@ -167,13 +174,13 @@ struct champ
         return *this;
     }
 
-    champ& operator=(champ&& other)
+    champ& operator=(champ&& other) noexcept
     {
         swap(*this, other);
         return *this;
     }
 
-    friend void swap(champ& x, champ& y)
+    friend void swap(champ& x, champ& y) noexcept
     {
         using std::swap;
         swap(x.root, y.root);
@@ -196,7 +203,7 @@ struct champ
                                size_t hash_mask) const
     {
         auto result = std::size_t{};
-        if (depth < max_depth<B>) {
+        if (depth < max_depth<hash_t, B>) {
             auto nodemap = node->nodemap();
             if (nodemap) {
                 auto fst = node->children();
@@ -207,7 +214,7 @@ struct champ
                             do_check_champ(child,
                                            depth + 1,
                                            path_hash | (idx << (B * depth)),
-                                           (hash_mask << B) | mask<B>);
+                                           (hash_mask << B) | mask<hash_t, B>);
                     }
                 }
             }
@@ -242,7 +249,7 @@ struct champ
     // due some value being moved out of the champ when it should have not.
     bool check_champ() const
     {
-        auto r = do_check_champ(root, 0, 0, mask<B>);
+        auto r = do_check_champ(root, 0, 0, mask<hash_t, B>);
         // assert(r == size);
         return r == size;
     }
@@ -252,7 +259,7 @@ struct champ
                             node_t* node,
                             count_t depth) const
     {
-        if (depth < max_depth<B>) {
+        if (depth < max_depth<hash_t, B>) {
             ++stats.inner_node_count;
             stats.inner_node_w_value_count += node->data_count() > 0;
             stats.inner_node_w_child_count += node->children_count() > 0;
@@ -311,7 +318,7 @@ struct champ
     void
     for_each_chunk_traversal(const node_t* node, count_t depth, Fn&& fn) const
     {
-        if (depth < max_depth<B>) {
+        if (depth < max_depth<hash_t, B>) {
             auto datamap = node->datamap();
             if (datamap)
                 fn(node->values(), node->values() + node->data_count());
@@ -342,7 +349,7 @@ struct champ
     {
         if (old_node == new_node)
             return;
-        if (depth < max_depth<B>) {
+        if (depth < max_depth<hash_t, B>) {
             auto old_nodemap = old_node->nodemap();
             auto new_nodemap = new_node->nodemap();
             auto old_datamap = old_node->datamap();
@@ -531,8 +538,8 @@ struct champ
     {
         auto node = root;
         auto hash = Hash{}(k);
-        for (auto i = count_t{}; i < max_depth<B>; ++i) {
-            auto bit = bitmap_t{1u} << (hash & mask<B>);
+        for (auto i = count_t{}; i < max_depth<hash_t, B>; ++i) {
+            auto bit = bitmap_t{1u} << (hash & mask<hash_t, B>);
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
                 node        = node->children()[offset];
@@ -565,7 +572,7 @@ struct champ
     add_result do_add(node_t* node, T v, hash_t hash, shift_t shift) const
     {
         assert(node);
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -575,7 +582,7 @@ struct champ
                         false};
             return {node_t::copy_collision_insert(node, std::move(v)), true};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -638,7 +645,7 @@ struct champ
     do_add_mut(edit_t e, node_t* node, T v, hash_t hash, shift_t shift) const
     {
         assert(node);
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -657,7 +664,7 @@ struct champ
                             : node_t::copy_collision_insert(node, std::move(v));
             return {node_t::owned(r, e), true, mutate};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -750,7 +757,7 @@ struct champ
     update_result
     do_update(node_t* node, K&& k, Fn&& fn, hash_t hash, shift_t shift) const
     {
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -768,7 +775,7 @@ struct champ
                                   std::forward<Fn>(fn)(Default{}()))),
                     true};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -845,7 +852,7 @@ struct champ
     node_t* do_update_if_exists(
         node_t* node, K&& k, Fn&& fn, hash_t hash, shift_t shift) const
     {
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -858,7 +865,7 @@ struct champ
                                       Project{}(detail::as_const(*fst)))));
             return nullptr;
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -923,7 +930,7 @@ struct champ
                                     hash_t hash,
                                     shift_t shift) const
     {
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -950,7 +957,7 @@ struct champ
                             : node_t::copy_collision_insert(node, std::move(v));
             return {node_t::owned(r, e), true, mutate};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -1062,7 +1069,7 @@ struct champ
                                                         hash_t hash,
                                                         shift_t shift) const
     {
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (; fst != lst; ++fst)
@@ -1084,7 +1091,7 @@ struct champ
                 }
             return {nullptr, false};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -1198,7 +1205,7 @@ struct champ
     sub_result
     do_sub(node_t* node, const K& k, hash_t hash, shift_t shift) const
     {
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (auto cur = fst; cur != lst; ++cur)
@@ -1221,7 +1228,7 @@ struct champ
 #endif
 #endif
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset = node->children_count(bit);
@@ -1300,13 +1307,15 @@ struct champ
             , data{a.data}
             , owned{false}
             , mutated{false}
-        {}
+        {
+        }
         sub_result_mut(sub_result a, bool m)
             : kind{a.kind}
             , data{a.data}
             , owned{false}
             , mutated{m}
-        {}
+        {
+        }
         sub_result_mut()
             : kind{kind_t::nothing}
             , mutated{false} {};
@@ -1342,7 +1351,7 @@ struct champ
                               void* store) const
     {
         auto mutate = node->can_mutate(e);
-        if (shift == max_shift<B>) {
+        if (shift == max_shift<hash_t, B>) {
             auto fst = node->collisions();
             auto lst = fst + node->collision_count();
             for (auto cur = fst; cur != lst; ++cur) {
@@ -1366,7 +1375,7 @@ struct champ
             }
             return {};
         } else {
-            auto idx = (hash & (mask<B> << shift)) >> shift;
+            auto idx = (hash & (mask<hash_t, B> << shift)) >> shift;
             auto bit = bitmap_t{1u} << idx;
             if (node->nodemap() & bit) {
                 auto offset   = node->children_count(bit);
@@ -1503,7 +1512,7 @@ struct champ
     {
         if (a == b)
             return true;
-        else if (depth == max_depth<B>) {
+        else if (depth == max_depth<hash_t, B>) {
             auto nv = a->collision_count();
             return nv == b->collision_count() &&
                    equals_collisions<Eq>(a->collisions(), b->collisions(), nv);

@@ -184,11 +184,11 @@ public:
     IMMER_NODISCARD persistent_type persistent() &
     {
         this->owner_t::operator=(owner_t{});
-        return persistent_type{impl_};
+        return persistent_type(impl_);
     }
     IMMER_NODISCARD persistent_type persistent() &&
     {
-        return persistent_type{std::move(impl_)};
+        return persistent_type(std::move(impl_));
     }
 
 private:
@@ -196,7 +196,8 @@ private:
 
     array_transient(impl_t impl)
         : impl_(std::move(impl))
-    {}
+    {
+    }
 
     impl_t impl_ = impl_t::empty();
 };

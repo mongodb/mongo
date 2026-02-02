@@ -36,9 +36,107 @@ const T& as_const(T& x)
     return x;
 }
 
+template <std::size_t Size, std::size_t Align>
+struct aligned_storage
+{
+    struct type
+    {
+        alignas(Align) unsigned char data[Size];
+    };
+};
+
+template <std::size_t Size, std::size_t Align>
+using aligned_storage_t = typename aligned_storage<Size, Align>::type;
+
 template <typename T>
 using aligned_storage_for =
-    typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+    typename aligned_storage<sizeof(T), alignof(T)>::type;
+
+/*!
+ * CRTP class that allows using the storage immediately following an instance of
+ * the derived class to store objects of type `T` (i.e. "trailing storage").
+ *
+ * The class is guaranteed to be standard layout if the derived class is also
+ * standard_layout.
+ *
+ * `EmptyStruct` should be set to `true` if the derived class is empty, this
+ * allows the optimization of using the storage of the derived class as trailing
+ * storage.
+ */
+template <typename Derived, typename T, bool EmptyStruct = false>
+struct with_trailing_storage;
+
+template <typename Derived, typename T>
+struct alignas(alignof(T)) with_trailing_storage<Derived, T, true>
+{
+    using storage_type = T;
+
+    T* get_storage_ptr()
+    {
+        check_base();
+        return reinterpret_cast<T*>(this);
+    }
+
+    const T* get_storage_ptr() const
+    {
+        check_base();
+        return reinterpret_cast<const T*>(this);
+    }
+
+    static constexpr size_t get_storage_offset()
+    {
+        check_base();
+        return 0;
+    }
+
+private:
+    static constexpr void check_base()
+    {
+        // is_standard_layout requires that only one class in the hierarchy
+        // contains non-static data members. Since this class contains one
+        // member, the static_assert will only hold when the derived class is
+        // empty.
+        static_assert(std::is_standard_layout<Derived>::value,
+                      "Please remove 'true' if the derived class is non emtpy");
+    }
+
+    // Dummy field to make the base class non-empty.
+    char _;
+};
+
+template <typename Derived, typename T>
+struct alignas(alignof(T)) with_trailing_storage<Derived, T, false>
+{
+    using storage_type = T;
+
+    T* get_storage_ptr()
+    {
+        check_base();
+        auto* base = static_cast<Derived*>(this);
+        return reinterpret_cast<T*>(base + 1);
+    }
+
+    const T* get_storage_ptr() const
+    {
+        check_base();
+        auto* base = static_cast<const Derived*>(this);
+        return reinterpret_cast<const T*>(base + 1);
+    }
+
+    static constexpr size_t get_storage_offset()
+    {
+        check_base();
+        return sizeof(Derived);
+    }
+
+private:
+    static constexpr void check_base()
+    {
+        static_assert(std::is_standard_layout<Derived>::value &&
+                          !std::is_empty<Derived>::value,
+                      "Please add 'true' if the derived class is emtpy");
+    }
+};
 
 template <typename T>
 T& auto_const_cast(const T& x)
@@ -102,9 +200,9 @@ auto destroy_n(Iter first, Size n) noexcept
 template <typename Iter1, typename Iter2>
 constexpr bool can_trivially_copy =
     std::is_same<typename std::iterator_traits<Iter1>::value_type,
-                 typename std::iterator_traits<Iter2>::value_type>::value&&
-        std::is_trivially_copyable<
-            typename std::iterator_traits<Iter1>::value_type>::value;
+                 typename std::iterator_traits<Iter2>::value_type>::value &&
+    std::is_trivially_copyable<
+        typename std::iterator_traits<Iter1>::value_type>::value;
 
 template <typename Iter1, typename Iter2>
 auto uninitialized_move(Iter1 first, Iter1 last, Iter2 out) noexcept
@@ -162,7 +260,7 @@ T* make(Args&&... args)
 {
     auto ptr = Heap::allocate(sizeof(T));
     IMMER_TRY {
-        return new (ptr) T{std::forward<Args>(args)...};
+        return new (ptr) T(std::forward<Args>(args)...);
     }
     IMMER_CATCH (...) {
         Heap::deallocate(sizeof(T), ptr);
@@ -233,7 +331,8 @@ auto static_if(F&& f) -> std::enable_if_t<b>
 }
 template <bool b, typename F>
 auto static_if(F&& f) -> std::enable_if_t<!b>
-{}
+{
+}
 
 template <bool b, typename R = void, typename F1, typename F2>
 auto static_if(F1&& f1, F2&& f2) -> std::enable_if_t<b, R>
@@ -274,13 +373,13 @@ distance(Iterator first, Sentinel last)
  * forward range @f$ [first, last) @f$
  */
 template <typename Iterator,
-          typename Sentinel,
+    typename Sentinel,
           std::enable_if_t<
               (!detail::std_distance_supports_v<Iterator, Sentinel>) &&detail::
                       is_forward_iterator_v<Iterator> &&
-                  detail::compatible_sentinel_v<Iterator, Sentinel> &&
-                  (!detail::is_subtractable_v<Sentinel, Iterator>),
-              bool> = true>
+                         detail::compatible_sentinel_v<Iterator, Sentinel> &&
+                         (!detail::is_subtractable_v<Sentinel, Iterator>),
+                     bool> = true>
 typename std::iterator_traits<Iterator>::difference_type
 distance(Iterator first, Sentinel last)
 {
@@ -297,13 +396,13 @@ distance(Iterator first, Sentinel last)
  * random access range @f$ [first, last) @f$
  */
 template <typename Iterator,
-          typename Sentinel,
+    typename Sentinel,
           std::enable_if_t<
               (!detail::std_distance_supports_v<Iterator, Sentinel>) &&detail::
                       is_forward_iterator_v<Iterator> &&
-                  detail::compatible_sentinel_v<Iterator, Sentinel> &&
-                  detail::is_subtractable_v<Sentinel, Iterator>,
-              bool> = true>
+                         detail::compatible_sentinel_v<Iterator, Sentinel> &&
+                         detail::is_subtractable_v<Sentinel, Iterator>,
+                     bool> = true>
 typename std::iterator_traits<Iterator>::difference_type
 distance(Iterator first, Sentinel last)
 {

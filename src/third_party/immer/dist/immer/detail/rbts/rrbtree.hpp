@@ -25,6 +25,16 @@ namespace immer {
 namespace detail {
 namespace rbts {
 
+#if IMMER_THROW_ON_INVALID_STATE
+struct invalid_tree : std::exception
+{};
+#define IMMER_INVALID_STATE_ASSERT(expr)                                       \
+    if (!(expr))                                                               \
+    IMMER_THROW(invalid_tree{})
+#else
+#define IMMER_INVALID_STATE_ASSERT(expr) assert(expr)
+#endif
+
 template <typename T, typename MemoryPolicy, bits_t B, bits_t BL>
 struct rrbtree_iterator;
 
@@ -49,9 +59,10 @@ struct rrbtree
 
     static node_t* empty_root()
     {
-        constexpr auto size = node_t::sizeof_inner_n(0);
-        static const auto empty_ = [&]{
-            static std::aligned_storage_t<size, alignof(std::max_align_t)> storage;
+        static const auto empty_ = [] {
+            constexpr auto size = node_t::sizeof_inner_n(0);
+            static std::aligned_storage_t<size, alignof(std::max_align_t)>
+                storage;
             return node_t::make_inner_n_into(&storage, size, 0u);
         }();
         return empty_->inc();
@@ -59,9 +70,10 @@ struct rrbtree
 
     static node_t* empty_tail()
     {
-        constexpr auto size = node_t::sizeof_leaf_n(0);
-        static const auto empty_ = [&]{
-            static std::aligned_storage_t<size, alignof(std::max_align_t)> storage;
+        static const auto empty_ = [] {
+            constexpr auto size = node_t::sizeof_leaf_n(0);
+            static std::aligned_storage_t<size, alignof(std::max_align_t)>
+                storage;
             return node_t::make_leaf_n_into(&storage, size, 0u);
         }();
         return empty_->inc();
@@ -107,13 +119,32 @@ struct rrbtree
         assert(check_tree());
     }
 
-    rrbtree(size_t sz, shift_t sh, node_t* r, node_t* t) noexcept
+    rrbtree(size_t sz, shift_t sh, node_t* r, node_t* t)
+#if IMMER_THROW_ON_INVALID_STATE
+#else
+        noexcept
+#endif
         : size{sz}
         , shift{sh}
         , root{r}
         , tail{t}
     {
+#if IMMER_THROW_ON_INVALID_STATE
+        // assert only happens in the Debug build, but when
+        // IMMER_THROW_ON_INVALID_STATE is activated, we want to just check_tree
+        // even in Release.
+        try {
+            check_tree();
+        } catch (...) {
+            // This not fully constructed rrbtree owns the nodes already, have
+            // to dec them.
+            if (r && t)
+                dec();
+            throw;
+        }
+#else
         assert(check_tree());
+#endif
     }
 
     rrbtree(const rrbtree& other) noexcept
@@ -448,7 +479,7 @@ struct rrbtree
         auto ts = tail_size();
         if (ts < branches<BL>) {
             ensure_mutable_tail(e, ts);
-            new (&tail->leaf()[ts]) T{std::move(value)};
+            new (&tail->leaf()[ts]) T(std::move(value));
         } else {
             using std::get;
             auto new_tail = node_t::make_leaf_e(e, std::move(value));
@@ -900,9 +931,9 @@ struct rrbtree
                                              r.shift,
                                              r.tail_offset());
                 l               = {l.size + r.size,
-                     concated.shift(),
-                     concated.node(),
-                     r.tail->inc()};
+                                   concated.shift(),
+                                   concated.node(),
+                                   r.tail->inc()};
             }
         }
     }
@@ -961,9 +992,9 @@ struct rrbtree
                                                     add_tail,
                                                     branches<BL>);
                         r             = {l.size + r.size,
-                             get<0>(new_root),
-                             get<1>(new_root),
-                             new_tail};
+                                         get<0>(new_root),
+                                         get<1>(new_root),
+                                         new_tail};
                         return;
                     }
                     IMMER_CATCH (...) {
@@ -1041,9 +1072,9 @@ struct rrbtree
                                              r.shift,
                                              r.tail_offset());
                 r               = {l.size + r.size,
-                     concated.shift(),
-                     concated.node(),
-                     r.tail->inc()};
+                                   concated.shift(),
+                                   concated.node(),
+                                   r.tail->inc()};
                 return;
             }
         }
@@ -1177,9 +1208,9 @@ struct rrbtree
                                              r.shift,
                                              r.tail_offset());
                 l               = {l.size + r.size,
-                     concated.shift(),
-                     concated.node(),
-                     r.tail->inc()};
+                                   concated.shift(),
+                                   concated.node(),
+                                   r.tail->inc()};
                 return;
             }
         }
@@ -1238,9 +1269,9 @@ struct rrbtree
                                                     add_tail,
                                                     branches<BL>);
                         r             = {l.size + r.size,
-                             get<0>(new_root),
-                             get<1>(new_root),
-                             new_tail};
+                                         get<0>(new_root),
+                                         get<1>(new_root),
+                                         new_tail};
                         return;
                     }
                     IMMER_CATCH (...) {
@@ -1321,9 +1352,9 @@ struct rrbtree
                                              r.shift,
                                              r.tail_offset());
                 r               = {l.size + r.size,
-                     concated.shift(),
-                     concated.node(),
-                     r.tail->inc()};
+                                   concated.shift(),
+                                   concated.node(),
+                                   r.tail->inc()};
             }
         }
     }
@@ -1339,13 +1370,13 @@ struct rrbtree
 
     bool check_tree() const
     {
-        assert(shift <= sizeof(size_t) * 8 - BL);
-        assert(shift >= BL);
-        assert(tail_offset() <= size);
-        assert(tail_size() <= branches<BL>);
+        IMMER_INVALID_STATE_ASSERT(shift <= sizeof(size_t) * 8 - BL);
+        IMMER_INVALID_STATE_ASSERT(shift >= BL);
+        IMMER_INVALID_STATE_ASSERT(tail_offset() <= size);
+        IMMER_INVALID_STATE_ASSERT(tail_size() <= branches<BL>);
 #if IMMER_DEBUG_DEEP_CHECK
-        assert(check_root());
-        assert(check_tail());
+        IMMER_INVALID_STATE_ASSERT(check_root());
+        IMMER_INVALID_STATE_ASSERT(check_tail());
 #endif
         return true;
     }

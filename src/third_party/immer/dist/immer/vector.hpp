@@ -114,7 +114,8 @@ public:
      */
     vector(std::initializer_list<T> values)
         : impl_{impl_t::from_initializer_list(values)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a vector containing the elements in the range
@@ -126,7 +127,8 @@ public:
                                bool> = true>
     vector(Iter first, Sent last)
         : impl_{impl_t::from_range(first, last)}
-    {}
+    {
+    }
 
     /*!
      * Constructs a vector containing the element `val` repeated `n`
@@ -134,7 +136,8 @@ public:
      */
     vector(size_type n, T v = {})
         : impl_{impl_t::from_fill(n, v)}
-    {}
+    {
+    }
 
     /*!
      * Returns an iterator pointing at the first element of the
@@ -365,6 +368,8 @@ private:
     friend flex_t;
     friend transient_type;
 
+    // for immer::persist
+public:
     vector(impl_t impl)
         : impl_(std::move(impl))
     {
@@ -375,6 +380,7 @@ private:
 #endif
     }
 
+private:
     vector&& push_back_move(std::true_type, value_type value)
     {
         impl_.push_back_mut({}, std::move(value));
