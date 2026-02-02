@@ -53,7 +53,7 @@ filters:
       - 10gen/server-jstest-infra
   - "generate_and_check_perf_results.py":
     approvers:
-      - 10gen/devprod-performance-analysis
+      - 10gen/devprod-performance-infrastructure
   - "replicaset_transition_to_and_from_csrs.py":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

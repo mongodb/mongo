@@ -137,8 +137,6 @@ groups:
       - "DevProd Evergreen App"
       - "DevProd Evergreen UI"
       - "DevProd Infrastructure"
-      - "DevProd Last Mile"
-      - "DevProd Performance Analysis"
       - "DevProd Performance Infrastructure"
       - "DevProd Release Infrastructure"
       - "DevProd Runtime Environments"
@@ -284,12 +282,6 @@ teams:
   - name: "DevProd Infrastructure"
     slack_tags:
       - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
-  - name: "DevProd Last Mile"
-    slack_tags:
-      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
-  - name: "DevProd Performance Analysis"
-    slack_tags:
-      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
   - name: "DevProd Performance Infrastructure"
     slack_tags:
       - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director

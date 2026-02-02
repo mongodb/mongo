@@ -38,7 +38,7 @@ filters:
       - 10gen/devprod-build
   - "perf-submission.sh":
     approvers:
-      - 10gen/devprod-performance-analysis
+      - 10gen/devprod-performance-infrastructure
   - "streams*":
     approvers:
       - 10gen/streams-engine

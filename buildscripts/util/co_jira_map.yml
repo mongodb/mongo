@@ -2,8 +2,6 @@
   - Build
 10gen/devprod-correctness:
   - Correctness
-10gen/devprod-performance-analysis:
-  - Performance Analysis
 10gen/devprod-performance-infrastructure:
   - Performance Infrastructure
 10gen/devprod-services-integrations:
