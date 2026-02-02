@@ -635,13 +635,20 @@ bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) 
         return true;
     }
 
-    for (const auto& nss : std::vector<NamespaceString>{
-             NamespaceString::kShardCollectionCatalogNamespace,
-             NamespaceString::kConfigShardCatalogDatabasesNamespace,
-             NamespaceString::kConfigShardCatalogCollectionsNamespace,
-             NamespaceString::kConfigShardCatalogChunksNamespace,
-             NamespaceString::kVectorClockNamespace,
-         }) {
+    for (const auto& nss :
+         std::vector<NamespaceString>{NamespaceString::kShardCollectionCatalogNamespace,
+                                      NamespaceString::kConfigShardCatalogDatabasesNamespace,
+                                      NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                                      NamespaceString::kConfigShardCatalogChunksNamespace,
+                                      NamespaceString::kVectorClockNamespace,
+                                      NamespaceString::kConfigDatabasesNamespace,
+                                      NamespaceString::kConfigsvrChunksNamespace,
+                                      NamespaceString::kConfigsvrCollectionsNamespace,
+                                      NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                      NamespaceString::kConfigsvrTagsNamespace,
+                                      NamespaceString::kConfigVersionNamespace,
+                                      NamespaceString::kConfigMongosNamespace,
+                                      NamespaceString::kConfigsvrShardsNamespace}) {
         auto fetcherStatus =
             Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
         bool hasDocument = false;

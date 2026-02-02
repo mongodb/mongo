@@ -26,14 +26,20 @@ describe("add shard with refurbished replicaset", function () {
         };
 
         this.dropMetadata = (rs) => {
-            assert(rs.getPrimary().getDB("config")["shard.collections"].drop());
-            assert(rs.getPrimary().getDB("config")["shard.catalog.databases"].drop());
-            assert(rs.getPrimary().getDB("config")["shard.catalog.collections"].drop());
-            assert(rs.getPrimary().getDB("config")["shard.catalog.chunks"].drop());
-        };
-
-        this.dropVectorClock = (rs) => {
-            assert(rs.getPrimary().getDB("config")["vectorClock"].drop());
+            const config = rs.getPrimary().getDB("config");
+            assert(config.getCollection("shard.collections").drop());
+            assert(config.getCollection("shard.catalog.databases").drop());
+            assert(config.getCollection("shard.catalog.collections").drop());
+            assert(config.getCollection("shard.catalog.chunks").drop());
+            assert(config.getCollection("vectorClock").drop());
+            assert(config.getCollection("databases").drop());
+            assert(config.getCollection("chunks").drop());
+            assert(config.getCollection("collections").drop());
+            assert(config.getCollection("placementHistory").drop());
+            assert(config.getCollection("tags").drop());
+            assert(config.getCollection("version").drop());
+            assert(config.getCollection("mongos").drop());
+            assert(config.getCollection("shards").drop());
         };
 
         this.restartAsShardsvr = (rs) => {
@@ -101,17 +107,12 @@ describe("add shard with refurbished replicaset", function () {
         this.dropDatabase(this.rs, this.dbName);
         this.dropMetadata(this.rs);
         this.restartAsShardsvr(this.rs);
-        assert.commandFailedWithCode(
-            this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}),
-            ErrorCodes.IllegalOperation,
-        );
+        assert.commandWorked(this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}));
     });
 
-    it("cleanup: shardIdentity, data, metadata, vectorClock", () => {
+    it("cleanup: shardIdentity, metadata", () => {
         this.removeShardIdentity(this.rs);
-        this.dropDatabase(this.rs, this.dbName);
         this.dropMetadata(this.rs);
-        this.dropVectorClock(this.rs);
         this.restartAsShardsvr(this.rs);
         assert.commandWorked(this.st.s.adminCommand({addShard: this.rs.getURL(), name: this.shardName}));
     });
