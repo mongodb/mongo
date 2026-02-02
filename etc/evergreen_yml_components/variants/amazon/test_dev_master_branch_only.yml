@@ -388,24 +388,6 @@ buildvariants:
     tasks:
       - name: .magic_restore
 
-  - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-    display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
-    tags: ["required"]
-    activate: true
-    run_on:
-      - amazon2023.3-arm64-m6g-4xlarge
-    expansions:
-      build_timeout_seconds: 900
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=amazon2023
-        --release=True
-        --dbg_level=1
-        --separate_debug=False
-      evergreen_remote_exec: on
-      compile_variant: *al2023-arm64-sep-benchmark
-    tasks:
-      - name: .benchmarks_sep
-
   - name: &al2023-arm64-benchmarks al2023-arm64-benchmarks
     display_name: "* AL2023 arm64 (Benchmarks)"
     tags: ["suggested"]
