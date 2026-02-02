@@ -214,7 +214,6 @@ resumability can be found in
 [IndexBuildsCoordinator::isIndexBuildResumable()](https://github.com/mongodb/mongo/blob/0d45dd9d7ba9d3a1557217a998ad31c68a897d47/src/mongo/db/index_builds_coordinator.cpp#L375).
 Generally, index builds are resumable under the following conditions:
 
-- Storage engine is configured to be persistent with encryption disabled.
 - The index build is running on a voting member of the replica set with the default [commit
   quorum](#commit-quorum) `"votingMembers"`.
 - Majority read concern is enabled.
