@@ -23,20 +23,11 @@ if [ -L /tmp ]; then
     sudo --non-interactive systemctl start tmp.mount
 fi
 
-# selinux policy should work both when applied before and after install
-# we will randomly apply it before or after installation is completed
-SEORDER="$(($(od -An -N1 -tu1 /dev/urandom) % 2))"
-if [ "$SEORDER" == "0" ]; then
-    apply_selinux_policy
-fi
+apply_selinux_policy
 
 pkg="$(find "$HOME"/repo -name 'mongodb-*-server-*.x86_64.rpm' | tee /dev/stderr)"
 if ! sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$pkg"; then
     if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
-fi
-
-if [ "$SEORDER" == "1" ]; then
-    apply_selinux_policy
 fi
 
 # install packages needed by check_has_tag.py

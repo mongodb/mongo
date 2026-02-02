@@ -42,6 +42,9 @@ filters:
   - "streams*":
     approvers:
       - 10gen/streams-engine
+  - "selinux_*":
+    approvers:
+      - 10gen/server-security
   - "generate_sast_report.sh":
     approvers:
       - 10gen/devprod-release-infrastructure

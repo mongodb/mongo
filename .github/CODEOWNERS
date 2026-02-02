@@ -436,6 +436,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/perf-submission.sh @10gen/devprod-performance-analysis @svc-auto-approve-bot
 /evergreen/streams* @10gen/streams-engine @svc-auto-approve-bot
+/evergreen/selinux_* @10gen/server-security @svc-auto-approve-bot
 /evergreen/generate_sast_report.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/write_sast_report_env_file.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/generate_symbol_check_report.py @10gen/devprod-build @svc-auto-approve-bot
@@ -1635,6 +1636,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/resmoke_selftest/OWNERS.yml
 /jstests/resmoke_selftest/**/* @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/selinux/OWNERS.yml
+/jstests/selinux/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/serial_run/OWNERS.yml
 /jstests/serial_run/**/allow_partial_results_with_maxTimeMS* @10gen/query-execution-router @svc-auto-approve-bot
