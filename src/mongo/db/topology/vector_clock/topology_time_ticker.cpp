@@ -32,9 +32,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -73,22 +71,17 @@ void TopologyTimeTicker::onNewLocallyCommittedTopologyTimeAvailable(Timestamp co
                                                                     Timestamp topologyTime) {
     const auto numTickPoints = [&] {
         stdx::lock_guard lg(_mutex);
-        bool skipCausalConsistencyCheck = [] {
-            auto opCtx = cc().getOperationContext();
-            if (!opCtx || opCtx->isEnforcingConstraints()) {
-                // Default case.
-                return false;
-            }
 
-            // The callback is being invoked within the context of an oplog application, where
-            // entries may be received in non strict order for optimisation reasons. Such case may
-            // be considered safe.
-            return true;
-        }();
+        // Inserts only if commitTime was not present yet.
+        auto [iter, inserted] =
+            _topologyTimeByLocalCommitTime.try_emplace(commitTime, topologyTime);
 
-        invariant(skipCausalConsistencyCheck || _topologyTimeByLocalCommitTime.size() == 0 ||
-                  _topologyTimeByLocalCommitTime.crbegin()->first < commitTime);
-        _topologyTimeByLocalCommitTime.emplace(commitTime, topologyTime);
+        // If the key already existed (!inserted), we overwrite its topologyTime value if the new
+        // one is higher.
+        if (!inserted && topologyTime > iter->second) {
+            iter->second = topologyTime;
+        }
+
         return _topologyTimeByLocalCommitTime.size();
     }();
 
@@ -104,25 +97,41 @@ void TopologyTimeTicker::onNewLocallyCommittedTopologyTimeAvailable(Timestamp co
 void TopologyTimeTicker::onMajorityCommitPointUpdate(ServiceContext* service,
                                                      const repl::OpTime& newCommitPoint) {
     Timestamp newMajorityTimestamp = newCommitPoint.getTimestamp();
-    stdx::lock_guard lg(_mutex);
-    if (_topologyTimeByLocalCommitTime.empty())
-        return;
 
-    // Looking for the first tick point that is not majority committed
-    auto itFirstTickPointNonMajorityCommitted =
-        _topologyTimeByLocalCommitTime.upper_bound(newMajorityTimestamp);
+    const auto optMaxMajorityCommittedTopologyTime = [&]() -> boost::optional<LogicalTime> {
+        stdx::lock_guard lg(_mutex);
 
+        if (_topologyTimeByLocalCommitTime.empty()) {
+            return boost::none;
+        }
 
-    if (itFirstTickPointNonMajorityCommitted != _topologyTimeByLocalCommitTime.begin()) {
-        // If some ticks were majority committed, advance the TopologyTime to the most recent one
-        const auto maxMajorityCommittedTopologyTime =
-            std::prev(itFirstTickPointNonMajorityCommitted)->second;
+        // Looking for the first tick point that is not majority committed
+        auto itFirstTickPointNonMajorityCommitted =
+            _topologyTimeByLocalCommitTime.upper_bound(newMajorityTimestamp);
 
-        VectorClockMutable::get(service)->tickTopologyTimeTo(
-            LogicalTime(maxMajorityCommittedTopologyTime));
+        // If the very first element is > majorityTimestamp, we have nothing to commit.
+        if (itFirstTickPointNonMajorityCommitted == _topologyTimeByLocalCommitTime.begin()) {
+            return boost::none;
+        }
 
+        // We have at least one committed tick. Find the max TopologyTime among them.
+        const auto maxMajorityCommittedTopologyTimeIt =
+            std::max_element(_topologyTimeByLocalCommitTime.begin(),
+                             itFirstTickPointNonMajorityCommitted,
+                             [](const auto& a, const auto& b) { return a.second < b.second; });
+
+        LogicalTime maxTopologyTime(maxMajorityCommittedTopologyTimeIt->second);
+
+        // Cleanup processed entries
         _topologyTimeByLocalCommitTime.erase(_topologyTimeByLocalCommitTime.begin(),
                                              itFirstTickPointNonMajorityCommitted);
+
+        return maxTopologyTime;
+    }();
+
+    // Notify the VectorClock without holding the mutex.
+    if (optMaxMajorityCommittedTopologyTime) {
+        VectorClockMutable::get(service)->tickTopologyTimeTo(*optMaxMajorityCommittedTopologyTime);
     }
 }
 
@@ -135,5 +144,11 @@ void TopologyTimeTicker::onReplicationRollback(const repl::OpTime& lastAppliedOp
     _topologyTimeByLocalCommitTime.erase(itFirstElemToBeRemoved,
                                          _topologyTimeByLocalCommitTime.end());
 }
+
+std::map<Timestamp, Timestamp> TopologyTimeTicker::getTopologyTimeByLocalCommitTime_forTest()
+    const {
+    stdx::lock_guard lg(_mutex);
+    return _topologyTimeByLocalCommitTime;
+};
 
 }  // namespace mongo

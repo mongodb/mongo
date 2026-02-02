@@ -35,8 +35,11 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/topology/vector_clock/topology_time_ticker.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -58,25 +61,24 @@ protected:
     }
 
     OID _clusterId;
+    ConfigServerOpObserver _opObserver;
 };
 
 TEST_F(ConfigServerOpObserverTest, NodeClearsCatalogManagerOnConfigVersionRollBack) {
-    ConfigServerOpObserver opObserver;
     OpObserver::RollbackObserverInfo rbInfo;
     rbInfo.configServerConfigVersionRolledBack = true;
 
-    opObserver.onReplicationRollback(operationContext(), rbInfo);
+    _opObserver.onReplicationRollback(operationContext(), rbInfo);
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 
 TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearCatalogManagerWhenConfigVersionNotRolledBack) {
-    ConfigServerOpObserver opObserver;
     OpObserver::RollbackObserverInfo rbInfo;
     rbInfo.configServerConfigVersionRolledBack = false;
 
-    opObserver.onReplicationRollback(operationContext(), rbInfo);
+    _opObserver.onReplicationRollback(operationContext(), rbInfo);
 
     ASSERT_EQ(ErrorCodes::AlreadyInitialized,
               ShardingCatalogManager::get(operationContext())
@@ -87,12 +89,10 @@ using ConfigServerOpObserverTestDeathTest = ConfigServerOpObserverTest;
 DEATH_TEST_F(ConfigServerOpObserverTestDeathTest,
              NodeClearsClusterIDOnConfigVersionRollBack,
              "Invariant failure") {
-    ConfigServerOpObserver opObserver;
     OpObserver::RollbackObserverInfo rbInfo;
     rbInfo.configServerConfigVersionRolledBack = true;
 
-    opObserver.onReplicationRollback(operationContext(), rbInfo);
-
+    _opObserver.onReplicationRollback(operationContext(), rbInfo);
     ClusterIdentityLoader::get(operationContext())->getClusterId();
 }
 
@@ -107,18 +107,239 @@ TEST_F(ConfigServerOpObserverTest, NodeDoesNotClearClusterIDWhenConfigVersionNot
 }
 
 TEST_F(ConfigServerOpObserverTest, ConfigOpTimeAdvancedWhenMajorityCommitPointAdvanced) {
-    ConfigServerOpObserver opObserver;
-
     repl::OpTime a(Timestamp(1, 1), 1);
     repl::OpTime b(Timestamp(1, 2), 1);
 
-    opObserver.onMajorityCommitPointUpdate(getServiceContext(), a);
+    _opObserver.onMajorityCommitPointUpdate(getServiceContext(), a);
     const auto aTime = VectorClock::get(getServiceContext())->getTime();
     ASSERT_EQ(a.getTimestamp(), aTime.configTime().asTimestamp());
 
-    opObserver.onMajorityCommitPointUpdate(getServiceContext(), b);
+    _opObserver.onMajorityCommitPointUpdate(getServiceContext(), b);
     const auto bTime = VectorClock::get(getServiceContext())->getTime();
     ASSERT_EQ(b.getTimestamp(), bTime.configTime().asTimestamp());
+}
+
+void testTopologyTimeTickerNotifications(OperationContext* opCtx,
+                                         repl::MemberState memberState,
+                                         std::function<void()> writeFn,
+                                         Timestamp commitTs,
+                                         std::map<Timestamp, Timestamp> expectedTicks) {
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(memberState));
+
+    // Get the TopologyTimeTicker state before the operation
+    auto& ticker = TopologyTimeTicker::get(opCtx);
+    EXPECT_EQ(0, ticker.getTopologyTimeByLocalCommitTime_forTest().size());
+
+    WriteUnitOfWork wuow(opCtx);
+
+    // Call the provided write function (insert/update)
+    writeFn();
+
+    // TopologyTimeTicker not ticked yet. (should not tick before committing the write unit).
+    ASSERT_EQ(0, ticker.getTopologyTimeByLocalCommitTime_forTest().size());
+
+    ASSERT_OK(shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(commitTs));
+    wuow.commit();
+
+    // Verify that TopologyTimeTicker was notified as expected.
+    const auto tickPointsAfter = ticker.getTopologyTimeByLocalCommitTime_forTest();
+    ASSERT_EQ(expectedTicks, tickPointsAfter);
+}
+
+void testTopologyTimeTickerNotificationsInsert(OperationContext* opCtx,
+                                               ConfigServerOpObserver& opObserver,
+                                               repl::MemberState memberState,
+                                               std::vector<InsertStatement> inserts,
+                                               Timestamp commitTs,
+                                               std::map<Timestamp, Timestamp> expectedTicks) {
+    const auto writeFn = [&]() {
+        NamespaceString nss = NamespaceString::kConfigsvrShardsNamespace;
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
+        opObserver.onInserts(
+            opCtx, collection.getCollectionPtr(), inserts.begin(), inserts.end(), {}, {}, false);
+    };
+
+    testTopologyTimeTickerNotifications(opCtx, memberState, writeFn, commitTs, expectedTicks);
+}
+
+void testTopologyTimeTickerNotificationsUpdate(OperationContext* opCtx,
+                                               ConfigServerOpObserver& opObserver,
+                                               repl::MemberState memberState,
+                                               BSONObj update,
+                                               Timestamp commitTs,
+                                               std::map<Timestamp, Timestamp> expectedTicks) {
+    const auto writeFn = [&]() {
+        NamespaceString nss = NamespaceString::kConfigsvrShardsNamespace;
+        const auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
+        BSONObj preImageDoc = BSON("_id" << "shard0" << "host" << "localhost:27017");
+        CollectionUpdateArgs updateArgs{preImageDoc};
+        updateArgs.criteria = BSON("_id" << "shard0");
+        updateArgs.update = update;
+
+        OplogUpdateEntryArgs entryArgs(&updateArgs, collection.getCollectionPtr());
+        opObserver.onUpdate(opCtx, entryArgs, nullptr);
+    };
+
+    testTopologyTimeTickerNotifications(opCtx, memberState, writeFn, commitTs, expectedTicks);
+}
+
+void resetTopologyTimeTicker(OperationContext* opCtx) {
+    auto& topologyTimeTicker = TopologyTimeTicker::get(opCtx);
+    topologyTimeTicker.onReplicationRollback(repl::OpTime(Timestamp(0, 1), 0));
+    ASSERT_EQ(0, topologyTimeTicker.getTopologyTimeByLocalCommitTime_forTest().size());
+}
+
+TEST_F(ConfigServerOpObserverTest, InsertToConfigShardsNotifiesTopologyTimeTicker) {
+    const auto opCtx = operationContext();
+    const Timestamp newTopologyTime = Timestamp(2, 200);
+
+    const Timestamp commitTimestamp(3, 400);
+    const std::map<Timestamp, Timestamp> expectedTicks = {{commitTimestamp, Timestamp(2, 200)}};
+    const std::vector<InsertStatement> inserts{
+        InsertStatement(BSON("_id" << "shard1"
+                                   << "host"
+                                   << "localhost:27018"
+                                   << "topologyTime" << newTopologyTime))};
+
+    // Nodes in primary and secondary modes expect the TopologyTimeTicker to be notified.
+    testTopologyTimeTickerNotificationsInsert(
+        opCtx, _opObserver, repl::MemberState::RS_PRIMARY, inserts, commitTimestamp, expectedTicks);
+    resetTopologyTimeTicker(opCtx);
+
+    testTopologyTimeTickerNotificationsInsert(opCtx,
+                                              _opObserver,
+                                              repl::MemberState::RS_SECONDARY,
+                                              inserts,
+                                              commitTimestamp,
+                                              expectedTicks);
+    resetTopologyTimeTicker(opCtx);
+
+    // Nodes undergoing initial sync or rollback do not expect the TopologyTimeTicker to be
+    // notified.
+    testTopologyTimeTickerNotificationsInsert(
+        opCtx, _opObserver, repl::MemberState::RS_ROLLBACK, inserts, commitTimestamp, {});
+    resetTopologyTimeTicker(opCtx);
+
+    testTopologyTimeTickerNotificationsInsert(
+        opCtx, _opObserver, repl::MemberState::RS_STARTUP2, inserts, commitTimestamp, {});
+    resetTopologyTimeTicker(opCtx);
+}
+
+TEST_F(ConfigServerOpObserverTest, UpdateToConfigShardsNotifiesTopologyTimeTicker) {
+    const auto opCtx = operationContext();
+    const Timestamp newTopologyTime = Timestamp(2, 200);
+    const Timestamp commitTimestamp(3, 400);
+    const std::map<Timestamp, Timestamp> expectedTicks = {{commitTimestamp, Timestamp(2, 200)}};
+    const auto update =
+        BSON("$v" << 2 << "diff" << BSON("i" << BSON("topologyTime" << newTopologyTime)));
+
+    // Nodes in primary and secondary modes expect the TopologyTimeTicker to be notified.
+    testTopologyTimeTickerNotificationsUpdate(
+        opCtx, _opObserver, repl::MemberState::RS_PRIMARY, update, commitTimestamp, expectedTicks);
+    resetTopologyTimeTicker(opCtx);
+
+    testTopologyTimeTickerNotificationsUpdate(opCtx,
+                                              _opObserver,
+                                              repl::MemberState::RS_SECONDARY,
+                                              update,
+                                              commitTimestamp,
+                                              expectedTicks);
+    resetTopologyTimeTicker(opCtx);
+
+    // Nodes undergoing initial sync or rollback do not expect the TopologyTimeTicker to be
+    // notified.
+    testTopologyTimeTickerNotificationsUpdate(
+        opCtx, _opObserver, repl::MemberState::RS_ROLLBACK, update, commitTimestamp, {});
+    resetTopologyTimeTicker(opCtx);
+
+    testTopologyTimeTickerNotificationsUpdate(
+        opCtx, _opObserver, repl::MemberState::RS_STARTUP2, update, commitTimestamp, {});
+    resetTopologyTimeTicker(opCtx);
+}
+
+TEST_F(ConfigServerOpObserverTest,
+       BatchInsertToConfigShardsNotifiesTopologyTimeTickerWithGreatestTopologyTime) {
+    auto opCtx = operationContext();
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    const Timestamp commitTimestamp(3, 400);
+
+    testTopologyTimeTickerNotificationsInsert(
+        opCtx,
+        _opObserver,
+        repl::MemberState::RS_PRIMARY,
+        {InsertStatement(BSON("_id" << "shard0"
+                                    << "host"
+                                    << "localhost:27017"
+                                    << "topologyTime" << Timestamp(200, 0))),
+         InsertStatement(BSON("_id" << "shard1"
+                                    << "host"
+                                    << "localhost:27018"
+                                    << "topologyTime" << Timestamp(300, 0))),
+         InsertStatement(BSON("_id" << "shard2"
+                                    << "host"
+                                    << "localhost:27019"
+                                    << "topologyTime" << Timestamp(100, 0)))},
+
+        commitTimestamp,
+        {{commitTimestamp, Timestamp(300, 0)}});
+}
+
+TEST_F(ConfigServerOpObserverTest,
+       WritesToConfigShardsWithoutTimestampDoNotNotifyTopologyTimeTicker) {
+    auto opCtx = operationContext();
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    const Timestamp commitTimestamp(3, 400);
+
+    // Insert with document without a topologyTime should not tick.
+    testTopologyTimeTickerNotificationsInsert(opCtx,
+                                              _opObserver,
+                                              repl::MemberState::RS_PRIMARY,
+                                              {InsertStatement(BSON("_id" << "shard1"
+                                                                          << "host"
+                                                                          << "localhost:27018"
+                                                                          << "draining" << true))},
+                                              commitTimestamp,
+                                              {});
+
+    // Insert with topologyTime=Timestamp(0, 0) should not tick.
+    testTopologyTimeTickerNotificationsInsert(
+        opCtx,
+        _opObserver,
+        repl::MemberState::RS_PRIMARY,
+        {InsertStatement(BSON("_id" << "shard1"
+                                    << "host"
+                                    << "localhost:27018"
+                                    << "topologyTime" << Timestamp(0, 0)))},
+        commitTimestamp,
+        {});
+
+    // Update with no topology time change should not tick.
+    testTopologyTimeTickerNotificationsUpdate(
+        opCtx,
+        _opObserver,
+        repl::MemberState::RS_PRIMARY,
+        BSON("$v" << 2 << "diff" << BSON("i" << BSON("draining" << true))),
+        commitTimestamp,
+        {});
+
+    // Update with topologyTime=Timestamp(0, 0) should not tick.
+    testTopologyTimeTickerNotificationsUpdate(
+        opCtx,
+        _opObserver,
+        repl::MemberState::RS_PRIMARY,
+        BSON("$v" << 2 << "diff" << BSON("i" << BSON("topologyTime" << Timestamp(0, 0)))),
+        commitTimestamp,
+        {});
 }
 
 }  // namespace

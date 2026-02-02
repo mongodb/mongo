@@ -37,7 +37,6 @@
 #include "mongo/util/modules.h"
 
 #include <map>
-#include <vector>
 
 namespace mongo {
 
@@ -76,8 +75,11 @@ public:
      */
     void onReplicationRollback(const repl::OpTime& lastAppliedOpTime);
 
+    std::map<Timestamp, Timestamp> getTopologyTimeByLocalCommitTime_forTest() const;
+
 private:
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
+
     /**
      * Container that stores time-related information about a topology change in a sharded cluster.
      * More specifically, the vector clock should start gossiping a new topologyTime once the

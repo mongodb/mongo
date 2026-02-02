@@ -29,18 +29,13 @@
 
 #include "mongo/db/topology/vector_clock/topology_time_ticker.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
-#include <string>
 #include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -134,21 +129,37 @@ TEST_F(TopologyTimeTickerConfigServer, GossipingNewTopologyTimesWhenMajorityComm
         sc, kCommitTimePostTicks, _ticks.back().topologyTime);
 }
 
-using TopologyTimeTickerConfigServerDeathTest = TopologyTimeTickerConfigServer;
-DEATH_TEST_F(TopologyTimeTickerConfigServerDeathTest,
-             InvalidonNewLocallyCommittedTopologyTimeAvailable,
-             "invariant") {
-    // This test verifies that the internal elements on the tick point vector are sorted.
+TEST_F(TopologyTimeTickerConfigServer,
+       GossipingNewTopologyTimesWhenMajorityCommitted_OutOfOrderTopologyTimes) {
     auto sc = getServiceContext();
-    Timestamp topologyTime1(0, 8);
-    Timestamp commitTime1(0, 10);
     auto& topologyTimeTicker = TopologyTimeTicker::get(sc);
-    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(commitTime1, topologyTime1);
+    auto vc = VectorClockMutable::get(sc);
 
-    Timestamp topologyTime2(0, 5);
-    Timestamp commitTime2(0, 6);
-    // Newer tick points must have a greater commit time than older ones
-    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(commitTime2, topologyTime2);
+    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(Timestamp(11, 0),
+                                                                  Timestamp(3, 0));
+    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(Timestamp(12, 0),
+                                                                  Timestamp(2, 0));
+
+    topologyTimeTicker.onMajorityCommitPointUpdate(sc, repl::OpTime(Timestamp(13, 0), -1));
+    const auto time = vc->getTime();
+    ASSERT_EQ(LogicalTime(Timestamp(3, 0)), time.topologyTime());
+}
+
+TEST_F(TopologyTimeTickerConfigServer, MultipleTicksAtSameCommitTime_HighestTopologyTimePrevails) {
+    auto sc = getServiceContext();
+    auto& topologyTimeTicker = TopologyTimeTicker::get(sc);
+    auto vc = VectorClockMutable::get(sc);
+
+    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(Timestamp(10, 0),
+                                                                  Timestamp(3, 0));
+    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(Timestamp(10, 0),
+                                                                  Timestamp(4, 0));
+    topologyTimeTicker.onNewLocallyCommittedTopologyTimeAvailable(Timestamp(10, 0),
+                                                                  Timestamp(2, 0));
+
+    topologyTimeTicker.onMajorityCommitPointUpdate(sc, repl::OpTime(Timestamp(11, 0), -1));
+    const auto time = vc->getTime();
+    ASSERT_EQ(LogicalTime(Timestamp(4, 0)), time.topologyTime());
 }
 
 TEST_F(TopologyTimeTickerConfigServer, RollbackingAllTickPoints) {

@@ -139,16 +139,12 @@ bool NamespaceString::isLegalClientSystemNS() const {
  *
  * Process updates to 'admin.system.version' individually as well so the secondary's FCV when
  * processing each operation matches the primary's when committing that operation.
- *
- * Oplog entries on 'config.shards' should be processed one at a time, otherwise the in-memory state
- * that its kept on the TopologyTimeTicker might be wrong.
- *
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
     auto ns = this->ns();
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
         ns == kDonorReshardingOperationsNamespace.ns() ||
-        ns == kForceOplogBatchBoundaryNamespace.ns() || ns == kConfigsvrShardsNamespace.ns();
+        ns == kForceOplogBatchBoundaryNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS(const boost::optional<TenantId>& tenantId) {

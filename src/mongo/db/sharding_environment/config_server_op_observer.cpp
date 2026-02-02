@@ -145,7 +145,8 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         }
     }
 
-    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    // TODO (SERVER-91505): Change this to check isDataConsistent instead of
+    // isInInitialSyncOrRollback.
     if (!repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         boost::optional<Timestamp> maxTopologyTime;
         for (auto it = begin; it != end; it++) {
@@ -179,6 +180,12 @@ void ConfigServerOpObserver::onUpdate(OperationContext* opCtx,
                                       const OplogUpdateEntryArgs& args,
                                       OpStateAccumulator* opAccumulator) {
     if (args.coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
+        return;
+    }
+
+    // TODO (SERVER-91505): Change this to check isDataConsistent instead of
+    // isInInitialSyncOrRollback.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
         return;
     }
 
