@@ -304,10 +304,10 @@ class TestTestTimeout(_ResmokeSelftest):
 
         with open(reportFile, "r") as f:
             report = json.load(f)
-        timeout = [test for test in report["results"] if test["status"] == "timeout"]
+        failed = [test for test in report["results"] if test["status"] == "fail"]
         passed = [test for test in report["results"] if test["status"] == "pass"]
         self.assertEqual(
-            len(timeout), 1, f"Expected one timed out test. Got {timeout}"
+            len(failed), 1, f"Expected one failed out test. Got {failed}"
         )  # one jstest
         self.assertEqual(
             len(passed), 3, f"Expected 3 passing tests. Got {passed}"

@@ -180,7 +180,10 @@ class TestReport(unittest.TestResult):
                 test_info.end_time = time.time()
                 if test.timed_out.is_set():
                     test_info.status = "timeout"
-                    test_info.evergreen_status = "timeout"
+
+                    # While Evergreen supports a "timeout" status, it does not result in the
+                    # task being marked as a failure and is buried last in the default sorting.
+                    test_info.evergreen_status = "fail"
                 test_status = (
                     "no failures detected" if test_info.status == "pass" else test_info.status
                 )
