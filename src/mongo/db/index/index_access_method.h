@@ -258,8 +258,6 @@ public:
          * duplicate keys.
          * @param yieldFn - A function to invoke to request a yield and then restore. It returns the
          * new CollectionPtr* and IndexCatalogEntry* entry that shall be used from this point on.
-         * @param keyBatchSize -  The maximum number of index keys that will be batched together
-         * into a single storage transaction.
          */
         virtual Status commit(OperationContext* opCtx,
                               RecoveryUnit& ru,
@@ -269,8 +267,7 @@ public:
                               int32_t yieldIterations,
                               const KeyHandlerFn& onDuplicateKeyInserted,
                               const RecordIdHandlerFn& onDuplicateRecord,
-                              const YieldFn& yieldFn,
-                              size_t keyBatchSize) = 0;
+                              const YieldFn& yieldFn) = 0;
 
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 

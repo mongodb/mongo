@@ -969,8 +969,7 @@ public:
                   int32_t yieldIterations,
                   const KeyHandlerFn& onDuplicateKeyInserted,
                   const RecordIdHandlerFn& onDuplicateRecord,
-                  const YieldFn& yieldFn,
-                  size_t keyBatchSize) final;
+                  const YieldFn& yieldFn) final;
 
 protected:
     const MultikeyPaths& getMultikeyPaths() const final;
@@ -1203,8 +1202,7 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
                                int32_t yieldIterations,
                                const KeyHandlerFn& onDuplicateKeyInserted,
                                const RecordIdHandlerFn& onDuplicateRecord,
-                               const YieldFn& yieldFn,
-                               const size_t keyBatchSize) {
+                               const YieldFn& yieldFn) {
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
@@ -1224,9 +1222,6 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
 
     int64_t iterations = 0;
-
-    size_t numKeysInBatch = 0;
-    boost::optional<WriteUnitOfWork> wunit;
     while (it && it->more()) {
         opCtx->checkForInterrupt();
 
@@ -1286,21 +1281,13 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
             continue;
         }
 
-        numKeysInBatch += 1;
         _previousKey = data.first;
 
         try {
             writeConflictRetry(opCtx, "addingKey", _ns, [&] {
-                if (!wunit) {
-                    wunit.emplace(opCtx);
-                }
+                WriteUnitOfWork wunit(opCtx);
                 _addKeyForCommit(opCtx, ru, *collection, data.first);
-                if (numKeysInBatch == keyBatchSize || !it->more()) {
-                    invariant(wunit);
-                    wunit->commit();
-                    wunit.reset();
-                    numKeysInBatch = 0;
-                }
+                wunit.commit();
             });
         } catch (DBException& e) {
             Status status = e.toStatus();
@@ -1316,11 +1303,6 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
 
         // Yield locks every 'yieldIterations' key insertions.
         if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
-            if (wunit) {
-                wunit->commit();
-                wunit.reset();
-                numKeysInBatch = 0;
-            }
             std::tie(collection, entry) = yieldFn(opCtx);
         }
 
@@ -1395,6 +1377,7 @@ private:
     Sorter::Settings _makeSorterSettings() const;
     std::unique_ptr<Sorter> _sorter;
     std::unique_ptr<SortedDataBuilderInterface> _builder;
+
     const IndexBuildMethodEnum& _method;
 };
 

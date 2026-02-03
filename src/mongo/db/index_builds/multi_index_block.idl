@@ -75,15 +75,3 @@ server_parameters:
         validator:
             gte: 1
         redact: false
-
-    primaryDrivenIndexBuildKeyInsertionBatchSize:
-        description: "The number of index keys in a batch when inserting keys from the sorter to the index table. This will be upper-bounded by internalIndexBuildBulkLoadYieldIterations"
-        set_at:
-            - runtime
-            - startup
-        cpp_varname: primaryDrivenIndexBuildKeyInsertionBatchSize
-        cpp_vartype: AtomicWord<int>
-        default: 1000
-        validator:
-            gte: 1
-        redact: false
