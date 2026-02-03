@@ -1326,6 +1326,23 @@ palm_set_last_materialized_lsn(WT_PAGE_LOG *storage, WT_SESSION *session, uint64
 }
 
 /*
+ * palm_trim_table --
+ *     Discard an table for testing purposes.
+ */
+static int
+palm_trim_table(
+  WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t table_id, uint64_t start_lsn, uint64_t *lsnp)
+{
+    (void)page_log;
+    (void)session;
+    (void)table_id;
+    (void)start_lsn;
+    (void)lsnp;
+    /* FIXME-WT-16533: Placeholder for implementation. */
+    return (0);
+}
+
+/*
  * palm_terminate --
  *     Discard any resources on termination
  */
@@ -1400,6 +1417,7 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     palm->page_log.pl_get_open_checkpoint = NULL;
     palm->page_log.pl_open_handle = palm_open_handle;
     palm->page_log.pl_set_last_materialized_lsn = palm_set_last_materialized_lsn;
+    palm->page_log.pl_trim_table = palm_trim_table;
     palm->page_log.terminate = palm_terminate;
 
     /*

@@ -222,11 +222,11 @@ class test_layered38(wttest.WiredTigerTestCase):
         oplog.check(self, session_follow, 0, 2 * self.nitems)
 
         # At this point, everything in the ingest table is redundant, as it's
-        # also in the stable table on the follower. However, it cannot be removed
-        # as there is a cursor open.
+        # also in the stable table on the follower. However, the tombstones cannot be
+        # removed as there is a cursor open.
         self.evict_ingest(session_follow, ts)
         count = self.count_ingest(session_follow, ts)
-        self.assertEqual(count, (self.nitems, 0))
+        self.assertEqual(count, (0, 0))
 
         count = self.count_ingest(session_follow)
         self.assertEqual(count, (0, self.nitems))
@@ -279,6 +279,13 @@ class test_layered38(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
         oplog.check(self, session_follow, 0, self.nitems)
 
+        # At this point, everything in the ingest table is redundant, as it's
+        # also in the stable table on the follower. However, it cannot be removed
+        # as there is a cursor open.
+        self.evict_ingest(session_follow, ts)
+        count = self.count_ingest(session_follow, ts)
+        self.assertEqual(count, (self.nitems, 0))
+
         # Close the cursor held open.
         hold_cursor.close()
 
@@ -287,3 +294,40 @@ class test_layered38(wttest.WiredTigerTestCase):
 
         # Pickup the last checkpoint and perform the final garbage collection
         self.disagg_advance_checkpoint(conn_follow)
+
+        # Now eviction should remove all the items from the ingest table.
+        self.evict_ingest(session_follow, ts)
+        count = self.count_ingest(session_follow, ts)
+        self.assertEqual(count, (0, 0))
+
+    def test_gc_ingest_with_no_open_cursor(self):
+        '''
+        Test picking up the checkpoints when an ingest table has some data but no cursor open.
+        '''
+        oplog, t, conn_follow, session_follow = self.setup()
+
+        oplog.insert(t, self.nitems)
+
+        ts = oplog.last_timestamp()
+
+        # Apply the changes to the leader
+        oplog.apply(self, self.session, 0, self.nitems)
+        oplog.check(self, self.session, 0, self.nitems)
+
+        self.conn.set_timestamp(f'stable_timestamp={self.timestamp_str(ts)}')
+
+        # Take a checkpoint
+        self.session.checkpoint()
+
+        # Apply the changes to the follower
+        oplog.apply(self, session_follow, 0, self.nitems)
+        oplog.check(self, session_follow, 0, self.nitems)
+
+        # Take a checkpoint and advance it, make sure everything is garbage collected
+        self.disagg_advance_checkpoint(conn_follow)
+        oplog.check(self, session_follow, 0, self.nitems)
+
+        # Now eviction should remove all the items from the ingest table.
+        self.evict_ingest(session_follow, ts)
+        count = self.count_ingest(session_follow, ts)
+        self.assertEqual(count, (0, 0))

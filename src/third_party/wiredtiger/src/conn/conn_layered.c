@@ -2976,7 +2976,7 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_LAYERED_TABLE *layered_table;
-    wt_timestamp_t prune_timestamp, btree_checkpoint_timestamp;
+    wt_timestamp_t prune_timestamp;
     int64_t ckpt_inuse, last_ckpt;
     int32_t layered_dhandle_inuse, stable_dhandle_inuse;
 
@@ -3019,7 +3019,6 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
 
     /* Find the last checkpoint which is still in use. */
     while (ckpt_inuse < last_ckpt) {
-        btree_checkpoint_timestamp = WT_TS_NONE;
         stable_dhandle_inuse = 0;
         WT_ERR(__wt_buf_fmt(session, uri_at_checkpoint_buf, "%s/%s.%" PRId64,
           layered_table->stable_uri, WT_CHECKPOINT, ckpt_inuse));
@@ -3032,7 +3031,8 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
         /* If one exists, read all the required info, then release. */
         if (ret == 0) {
             stable_dhandle_inuse = __wt_atomic_load_int32_acquire(&session->dhandle->session_inuse);
-            btree_checkpoint_timestamp = S2BT(session)->checkpoint_timestamp;
+            WT_ASSERT(session, prune_timestamp <= S2BT(session)->checkpoint_timestamp);
+            prune_timestamp = S2BT(session)->checkpoint_timestamp;
             WT_DHANDLE_RELEASE(session->dhandle);
         }
 
@@ -3042,7 +3042,6 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
         if (stable_dhandle_inuse > 0)
             break;
 
-        prune_timestamp = btree_checkpoint_timestamp;
         ++ckpt_inuse;
     }
 
@@ -3080,16 +3079,12 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
         uint64_t btree_prune_timestamp = __wt_atomic_load_uint64_relaxed(&btree->prune_timestamp);
         WT_ASSERT(session, prune_timestamp >= btree_prune_timestamp);
         __wt_atomic_store_uint64_release(&btree->prune_timestamp, prune_timestamp);
-
-        __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5,
-          "GC %s: update prune timestamp from %" PRIu64 " to %" PRIu64, layered_table->iface.name,
-          btree_prune_timestamp, prune_timestamp);
-    }
-    if (ckpt_inuse > 1 || layered_dhandle_inuse == 0) {
         layered_table->last_ckpt_inuse = ckpt_inuse;
 
         __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5,
-          "GC %s: update checkpoint in use from %" PRId64 " to %" PRId64, layered_table->iface.name,
+          "GC %s: update prune timestamp from %" PRIu64 " to %" PRIu64
+          " and checkpoint in use from %" PRId64 " to %" PRId64,
+          layered_table->iface.name, btree_prune_timestamp, prune_timestamp,
           layered_table->last_ckpt_inuse, ckpt_inuse);
     }
 
@@ -3193,6 +3188,71 @@ __layered_last_checkpoint_order(
     WT_ASSERT(session, *ckpt_order == order_from_name);
 
     return (0);
+}
+
+/*
+ * __disagg_remove_shared_metadata --
+ *     Remove an entry from the shared metadata.
+ */
+static int
+__disagg_remove_shared_metadata(WT_SESSION_IMPL *session, const char *key)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "overwrite", NULL};
+
+    WT_ASSERT(session, S2C(session)->layered_table_manager.leader);
+
+    cursor = NULL;
+
+    WT_ERR(__wt_open_cursor(session, WT_DISAGG_METADATA_URI, NULL, cfg, &cursor));
+    cursor->set_key(cursor, key);
+    WT_ERR(cursor->remove(cursor));
+
+    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+      "Removed disaggregated shared metadata: key=\"%s\"", key);
+
+err:
+    if (cursor != NULL)
+        WT_TRET(cursor->close(cursor));
+    return (ret);
+}
+
+/*
+ * __wt_disagg_remove_shared_metadata_layered --
+ *     Remove all metadata relevant to the table_name from the shared metadata table.
+ *
+ * Note: If the table was created and dropped before a checkpoint has occurred, it is expected to
+ *     have no metadata entries on the shared metadata table.
+ */
+int
+__wt_disagg_remove_shared_metadata_layered(WT_SESSION_IMPL *session, const char *table_name)
+{
+    WT_DECL_ITEM(uri_buf);
+    WT_DECL_RET;
+
+    WT_RET(__wt_scr_alloc(session, 0, &uri_buf));
+
+    /* Remove all relevant metadata entries from shared metadata table (if exists). */
+    WT_ERR(__wt_buf_fmt(session, uri_buf, "file:%s.wt_stable", table_name));
+    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    WT_ERR(__wt_buf_fmt(session, uri_buf, "layered:%s", table_name));
+    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    WT_ERR(__wt_buf_fmt(session, uri_buf, "colgroup:%s", table_name));
+    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    WT_ERR(__wt_buf_fmt(session, uri_buf, "table:%s", table_name));
+    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+err:
+    __wt_scr_free(session, &uri_buf);
+    return (ret);
 }
 
 #ifdef HAVE_UNITTEST
