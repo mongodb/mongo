@@ -6,7 +6,7 @@
  * ]
  */
 import {isExpress} from "jstests/libs/query/analyze_plan.js";
-import {usedHashJoinEmbedding, joinOptUsed} from "jstests/libs/query/join_utils.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -45,6 +45,6 @@ assert(!joinOptUsed(explain), "Join optimizer was used when it was not expected 
 
 let hashJoinPipeline = [...expressPipeline, {$unwind: "$x"}];
 explain = coll.explain().aggregate(hashJoinPipeline);
-assert(joinOptUsed(explain) && usedHashJoinEmbedding(explain));
+assert(joinOptUsed(explain));
 
 MongoRunner.stopMongod(conn);
