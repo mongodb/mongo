@@ -1,5 +1,8 @@
 /**
  * Sharding tests that cover a variety of different possible distributed execution scenarios.
+ *
+ * TODO SERVER-118445 Delete this test.
+ *
  * @tags: [
  *   requires_fcv_71,
  * ]

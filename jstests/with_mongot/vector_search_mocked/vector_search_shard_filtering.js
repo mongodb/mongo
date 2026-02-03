@@ -1,6 +1,9 @@
 /**
  * Tests that the _id lookups performed by $vectorSearch have a shard filter applied to them so that
  * orphans are not returned.
+ *
+ * TODO SERVER-118445 Delete this test.
+ *
  * @tags: [
  *   requires_fcv_71,
  * ]

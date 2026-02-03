@@ -2,6 +2,9 @@
  * Verify that `$vectorSearch` queries that set 'vectorSearchScore' succeed on unsharded
  * collections on sharded clusters even with a stage in the pipeline that can't be passed to the
  * shards.
+ *
+ * TODO SERVER-118445 Delete this test.
+ *
  * @tags: [
  *   requires_fcv_71,
  * ]
