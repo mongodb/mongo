@@ -48,7 +48,7 @@ function runCountAndExplain({query, options = {}, expected = {}}) {
     const explain = db.runCommand({explain: cmdObj, verbosity: "executionStats"});
     assert.commandWorked(explain);
 
-    outputCountPlanAndResults(cmdObj, explain, expected, actualCount);
+    outputCountPlanAndResults(coll, cmdObj, explain, expected, actualCount);
 }
 
 section("Simple limit targeting multiple shards");

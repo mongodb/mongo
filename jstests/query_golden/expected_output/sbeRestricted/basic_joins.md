@@ -44,6 +44,10 @@
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -318,6 +322,10 @@ rightEmbeddingField: "x"
 ### Results
 ```json
 { "_id" : "bar", "count" : 14 }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -665,6 +673,10 @@ rightEmbeddingField: "x"
 ```json
 { "_id" : 1, "count" : 2 }
 { "_id" : 2, "count" : 2 }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1069,6 +1081,10 @@ rightEmbeddingField: "y"
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1425,6 +1441,10 @@ rightEmbeddingField: "y"
 ### Results
 ```json
 { "_id" : 2, "count" : 2 }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1845,6 +1865,10 @@ rightEmbeddingField: "y"
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2192,6 +2216,10 @@ rightEmbeddingField: "y"
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2479,6 +2507,10 @@ rightEmbeddingField: "none"
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2837,6 +2869,10 @@ rightEmbeddingField: "z"
 ```json
 { "_id" : 2, "a" : 2, "b" : "bar", "k" : { "y" : { "z" : { "_id" : 0, "b" : "bar", "d" : 2 } } }, "w" : { "y" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3193,6 +3229,10 @@ rightEmbeddingField: "none"
 { "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3510,6 +3550,10 @@ rightEmbeddingField: "x"
 { "_id" : 4, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3820,6 +3864,10 @@ rightEmbeddingField: "none"
 { "_id" : 3, "a" : null, "extra" : null, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 4, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4135,6 +4183,10 @@ rightEmbeddingField: "none"
 ### Results
 ```json
 { "_id" : 0, "a" : 1, "b" : "foo", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4597,6 +4649,10 @@ rightEmbeddingField: "x"
 { "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic

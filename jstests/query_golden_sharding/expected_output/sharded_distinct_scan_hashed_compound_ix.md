@@ -11,6 +11,10 @@
 { "_id" : 0.9 }
 { "_id" : 1.9 }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_m_hashed" ]
+```
 ### Summarized explain
 ```json
 {

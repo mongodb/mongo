@@ -24,6 +24,10 @@
 { "_id" : 1, "accum" : 1 }
 { "_id" : 2, "accum" : 3 }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_b_1" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -110,6 +114,10 @@ Execution Engine: classic
 ```json
 { "_id" : 1, "accum" : 1 }
 { "_id" : 2, "accum" : 3 }
+```
+### Total indexes on the collection
+```json
+[ "_id_", "a_-1_b_-1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -198,6 +206,10 @@ Execution Engine: classic
 { "_id" : 1, "accum" : 1 }
 { "_id" : 2, "accum" : 3 }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1" ]
+```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -251,6 +263,10 @@ Execution Engine: sbe
 { "_id" : 6, "accum" : 7 }
 { "_id" : 7, "accum" : 3 }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1" ]
+```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -300,6 +316,10 @@ Execution Engine: sbe
 ```json
 { "_id" : 1 }
 { "_id" : 2 }
+```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -365,6 +385,10 @@ Execution Engine: classic
 ```json
 { "_id" : 1 }
 { "_id" : 2 }
+```
+### Total indexes on the collection
+```json
+[ "_id_", "b_1_a_1" ]
 ```
 ### Summarized explain
 Execution Engine: sbe
