@@ -82,7 +82,7 @@ rules:
           - assigned_to_jira_team_server_integration
           - assigned_to_jira_team_server_disagg
 
-          # https://github.com/10gen/mothra/blob/main/mothra/teams/rnd_dev_prod.yaml
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/devprod.yaml
           - assigned_to_jira_team_devprod_build
           - assigned_to_jira_team_devprod_correctness
           - assigned_to_jira_team_devprod_infrastructure
@@ -97,9 +97,9 @@ rules:
           # https://github.com/10gen/mothra/blob/main/mothra/teams/et.yaml
           - assigned_to_jira_team_streams
 
-          # TODO (SERVER-116119): This team currently does not exist, delete this comment and link to the
-          # mothra config file the team is defined in once it's created.
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/security.yaml
           - assigned_to_jira_team_platsec_server
+          - assigned_to_jira_team_platsec_ssdlc
         min_num_of_tags: 1
         max_num_of_tags: 1
       # Every task should have required selection tag

@@ -57,7 +57,7 @@ tasks:
           visibility: signed
 
   - name: publish-augmented-sbom
-    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_ssdlc"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version

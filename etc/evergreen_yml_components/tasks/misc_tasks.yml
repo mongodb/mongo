@@ -1972,7 +1972,7 @@ tasks:
             GITHUB_TOKEN: ${github_token}
 
   - name: update_sbom
-    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_ssdlc"]
     exec_timeout_secs: 3600 # 60 minute timeout
     commands:
       - command: manifest.load
@@ -2052,7 +2052,7 @@ tasks:
 
   - name: upload_sbom_via_silkbomb_if_changed
     allowed_requesters: ["commit"]
-    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_ssdlc"]
     exec_timeout_secs: 600 # 10 minute timeout
     commands:
       - command: manifest.load

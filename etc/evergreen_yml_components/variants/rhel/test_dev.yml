@@ -383,7 +383,7 @@ buildvariants:
     activate: true
     paths:
       - "sbom.json"
-    tags: []
+    tags: ["assigned_to_jira_team_platsec_ssdlc"]
     run_on:
       - rhel8.8-small
     stepback: false
