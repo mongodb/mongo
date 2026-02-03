@@ -51,12 +51,14 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
+using AbstractAsyncComponentType = AbstractAsyncComponent<stdx::mutex>;
+
 /**
  * Mock implementation of AbstractAsyncComponent that supports returning errors from
  * _doStartup() and also tracks if this function has ever been called by
  * AbstractAsyncComponent.
  */
-class MockAsyncComponent : public AbstractAsyncComponent {
+class MockAsyncComponent : public AbstractAsyncComponentType {
 public:
     explicit MockAsyncComponent(executor::TaskExecutor* executor);
 
@@ -117,18 +119,18 @@ public:
 };
 
 MockAsyncComponent::MockAsyncComponent(executor::TaskExecutor* executor)
-    : AbstractAsyncComponent(executor, "mock component") {}
+    : AbstractAsyncComponentType(executor, "mock component") {}
 
 Status MockAsyncComponent::checkForShutdownAndConvertStatus_forTest(
     const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _checkForShutdownAndConvertStatus(lock, callbackArgs, message);
+    return this->_checkForShutdownAndConvertStatus(lock, callbackArgs, message);
 }
 
 Status MockAsyncComponent::checkForShutdownAndConvertStatus_forTest(const Status& status,
                                                                     const std::string& message) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _checkForShutdownAndConvertStatus(lock, status, message);
+    return this->_checkForShutdownAndConvertStatus(lock, status, message);
 }
 
 Status MockAsyncComponent::scheduleWorkAndSaveHandle_forTest(
@@ -136,7 +138,7 @@ Status MockAsyncComponent::scheduleWorkAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _scheduleWorkAndSaveHandle(lock, std::move(work), handle, name);
+    return this->_scheduleWorkAndSaveHandle(lock, std::move(work), handle, name);
 }
 
 Status MockAsyncComponent::scheduleWorkAtAndSaveHandle_forTest(
@@ -145,22 +147,22 @@ Status MockAsyncComponent::scheduleWorkAtAndSaveHandle_forTest(
     executor::TaskExecutor::CallbackHandle* handle,
     const std::string& name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _scheduleWorkAtAndSaveHandle(lock, when, std::move(work), handle, name);
+    return this->_scheduleWorkAtAndSaveHandle(lock, when, std::move(work), handle, name);
 }
 
 void MockAsyncComponent::cancelHandle_forTest(executor::TaskExecutor::CallbackHandle handle) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _cancelHandle(lock, handle);
+    this->_cancelHandle(lock, handle);
 }
 
 Status MockAsyncComponent::startupComponent_forTest(
     std::unique_ptr<MockAsyncComponent>& component) {
-    return _startupComponent(component);
+    return this->_startupComponent(component);
 }
 
 void MockAsyncComponent::shutdownComponent_forTest(
     const std::unique_ptr<MockAsyncComponent>& component) {
-    _shutdownComponent(component);
+    this->_shutdownComponent(component);
 }
 
 void MockAsyncComponent::_doStartup(WithLock) {
@@ -201,13 +203,13 @@ TEST_F(AbstractAsyncComponentTest, ConstructorThrowsUserAssertionOnNullTaskExecu
 TEST_F(AbstractAsyncComponentTest, StateTransitionsToRunningAfterSuccessfulStartup) {
     MockAsyncComponent component(&getExecutor());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kPreStart, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kPreStart, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
     ASSERT_OK(component.startup());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_TRUE(component.doStartupCalled);
 }
@@ -215,13 +217,13 @@ TEST_F(AbstractAsyncComponentTest, StateTransitionsToRunningAfterSuccessfulStart
 TEST_F(AbstractAsyncComponentTest, StartupReturnsIllegalOperationIfAlreadyActive) {
     MockAsyncComponent component(&getExecutor());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kPreStart, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kPreStart, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
     ASSERT_OK(component.startup());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_TRUE(component.doStartupCalled);
 
@@ -231,7 +233,7 @@ TEST_F(AbstractAsyncComponentTest, StartupReturnsIllegalOperationIfAlreadyActive
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     ASSERT_EQUALS("mock component already started", status.reason());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 }
@@ -239,20 +241,20 @@ TEST_F(AbstractAsyncComponentTest, StartupReturnsIllegalOperationIfAlreadyActive
 TEST_F(AbstractAsyncComponentTest, StartupReturnsShutdownInProgressIfComponentIsShuttingDown) {
     MockAsyncComponent component(&getExecutor());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kPreStart, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kPreStart, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
     ASSERT_OK(component.startup());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_TRUE(component.doStartupCalled);
 
     component.doStartupCalled = false;
     component.shutdown();
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
@@ -260,7 +262,7 @@ TEST_F(AbstractAsyncComponentTest, StartupReturnsShutdownInProgressIfComponentIs
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status);
     ASSERT_EQUALS("mock component shutting down", status.reason());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
     ASSERT_TRUE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 }
@@ -270,7 +272,7 @@ TEST_F(AbstractAsyncComponentTest,
     MockAsyncComponent component(&getExecutor());
     component.doStartupResult = {ErrorCodes::OperationFailed, "mock component startup failed"};
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kPreStart, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kPreStart, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
@@ -278,7 +280,7 @@ TEST_F(AbstractAsyncComponentTest,
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
     ASSERT_EQUALS("mock component startup failed", status.reason());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kComplete, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kComplete, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_TRUE(component.doStartupCalled);
 }
@@ -286,13 +288,13 @@ TEST_F(AbstractAsyncComponentTest,
 TEST_F(AbstractAsyncComponentTest, ShutdownTransitionsStateToCompleteIfCalledBeforeStartup) {
     MockAsyncComponent component(&getExecutor());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kPreStart, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kPreStart, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
     component.shutdown();
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kComplete, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kComplete, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 
@@ -300,7 +302,7 @@ TEST_F(AbstractAsyncComponentTest, ShutdownTransitionsStateToCompleteIfCalledBef
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status);
     ASSERT_EQUALS("mock component completed", status.reason());
 
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kComplete, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kComplete, component.getState_forTest());
     ASSERT_FALSE(component.isActive());
     ASSERT_FALSE(component.doStartupCalled);
 }
@@ -316,7 +318,7 @@ TEST_F(AbstractAsyncComponentTest,
     // StartupReturnsShutdownInProgressIfComponentIsShuttingDown.
     ASSERT_OK(component.startup());
     component.shutdown();
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
 
     auto status = getDetectableErrorStatus();
     ASSERT_NOT_EQUALS(ErrorCodes::CallbackCanceled, status);
@@ -358,7 +360,7 @@ TEST_F(AbstractAsyncComponentTest,
     // StartupReturnsShutdownInProgressIfComponentIsShuttingDown.
     ASSERT_OK(component.startup());
     component.shutdown();
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
 
     auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
     };
@@ -404,7 +406,7 @@ TEST_F(AbstractAsyncComponentTest,
     // StartupReturnsShutdownInProgressIfComponentIsShuttingDown.
     ASSERT_OK(component.startup());
     component.shutdown();
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
 
     auto when = getExecutor().now() + Seconds(1);
     auto callback = [](const executor::TaskExecutor::CallbackArgs&) {
@@ -481,12 +483,12 @@ TEST_F(AbstractAsyncComponentTest,
        StartupComponentStartsUpChildComponentAndReturnsSuccessIfComponentIsRunning) {
     MockAsyncComponent component(&getExecutor());
     ASSERT_OK(component.startup());
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent().
     auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_OK(component.startupComponent_forTest(childComponent));
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, childComponent->getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, childComponent->getState_forTest());
 }
 
 TEST_F(AbstractAsyncComponentTest,
@@ -496,7 +498,7 @@ TEST_F(AbstractAsyncComponentTest,
     // StartupReturnsShutdownInProgressIfComponentIsShuttingDown.
     ASSERT_OK(component.startup());
     component.shutdown();
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent().
     // _startupComponent() should return early because 'component' is shutting down and
@@ -510,7 +512,7 @@ TEST_F(AbstractAsyncComponentTest,
        StartupComponentResetsChildComponentIfChildComponentStartupFails) {
     MockAsyncComponent component(&getExecutor());
     ASSERT_OK(component.startup());
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent(). Transition child component's
     // state to Complete so that calling startup() will fail.
@@ -518,7 +520,8 @@ TEST_F(AbstractAsyncComponentTest,
     ASSERT_OK(childComponent->startup());
     childComponent->shutdown();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, childComponent->startup());
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, childComponent->getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown,
+                  childComponent->getState_forTest());
 
     // _startupComponent() should pass through the startup() error from the child component
     // and reset the unique_ptr for the child component.
@@ -536,15 +539,16 @@ TEST_F(AbstractAsyncComponentTest,
        ShutdownComponentTransitionsChildComponentToShuttingDownOnSuccess) {
     MockAsyncComponent component(&getExecutor());
     ASSERT_OK(component.startup());
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, component.getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, component.getState_forTest());
 
     // Create a child component to pass to _startupComponent().
     auto childComponent = std::make_unique<MockAsyncComponent>(&getExecutor());
     ASSERT_OK(childComponent->startup());
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kRunning, childComponent->getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kRunning, childComponent->getState_forTest());
 
     component.shutdownComponent_forTest(childComponent);
-    ASSERT_EQUALS(AbstractAsyncComponent::State::kShuttingDown, childComponent->getState_forTest());
+    ASSERT_EQUALS(AbstractAsyncComponentType::State::kShuttingDown,
+                  childComponent->getState_forTest());
 }
 
 }  // namespace
