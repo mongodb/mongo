@@ -51,6 +51,7 @@ def should_activate_core_analysis_task(task: EvgTask, evg_api: RetryingEvergreen
         "disagg_repl_jscore_passthrough",
         "disagg_repl_jscore_passthrough_secondary_reads",
         "disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer",
+        "disagg_two_nodes_repl_jscore_passthrough",
         "no_passthrough_disagg_override",
     ]
     current_task_name = task.display_name
