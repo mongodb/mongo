@@ -647,6 +647,102 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         return nodeHasMatchingFilter(filter.Obj(), collation, trueSoln)
             .withContext("mismatching 'filter' for 'ixscan' node");
+    } else if (STAGE_COUNT_SCAN == trueSoln->getType()) {
+        const CountScanNode* csn = static_cast<const CountScanNode*>(trueSoln);
+        BSONElement el = testSoln["count_scan"];
+        if (el.eoo() || !el.isABSONObj()) {
+            return {ErrorCodes::Error{99745617},
+                    "found a count_scan scan in the solution but no corresponding 'count_scan' "
+                    "object in "
+                    "the provided JSON"};
+        }
+        BSONObj cscanObj = el.Obj();
+        invariant(bsonObjFieldsAreInSet(
+            cscanObj,
+            {"pattern", "name", "startKey", "endKey", "startKeyInclusive", "endKeyInclusive"}));
+
+        BSONElement pattern = cscanObj["pattern"];
+        if (!pattern.eoo()) {
+            if (!pattern.isABSONObj()) {
+                return {
+                    ErrorCodes::Error{99745616},
+                    str::stream()
+                        << "Provided JSON gave a 'count`scan' with a 'pattern', but the pattern "
+                           "was not an object: "
+                        << pattern};
+            }
+            if (SimpleBSONObjComparator::kInstance.evaluate(pattern.Obj() !=
+                                                            csn->index.keyPattern)) {
+                return {ErrorCodes::Error{99745615},
+                        str::stream()
+                            << "Provided JSON gave a 'count_scan' with a 'pattern' which did "
+                               "not match. Expected: "
+                            << pattern.Obj() << " Found: " << csn->index.keyPattern};
+            }
+        }
+
+        auto name = cscanObj["name"];
+        if (!name.eoo()) {
+            if (auto nameStatus = indexNamesMatch(name, csn->index.identifier.catalogName);
+                !nameStatus.isOK()) {
+                return nameStatus;
+            }
+        }
+
+        if (name.eoo() && pattern.eoo()) {
+            return {ErrorCodes::Error{99745614},
+                    "Provided JSON gave a 'count_scan' without a 'name' or a 'pattern.'"};
+        }
+
+        const BSONElement startKey = cscanObj["startKey"];
+        if (startKey.type() != BSONType::array) {
+            return {ErrorCodes::Error{99745613},
+                    str::stream() << "Provided JSON gave a 'count_scan' with a 'startKey' "
+                                     "which is not an array."};
+        }
+        if (csn->startKey.woCompare(startKey.Obj(), Ordering::allAscending(), 0) != 0) {
+            return {
+                ErrorCodes::Error{99745612},
+                str::stream() << "Provided JSON gave a 'count_scan' with a 'startKey' which did "
+                                 "not match."};
+        }
+        const BSONElement endKey = cscanObj["endKey"];
+        if (endKey.type() != BSONType::array) {
+            return {ErrorCodes::Error{99745611},
+                    str::stream() << "Provided JSON gave a 'count_scan' with an 'endKey' "
+                                     "which is not an array."};
+        }
+        if (csn->endKey.woCompare(endKey.Obj(), Ordering::allAscending(), 0) != 0) {
+            return {ErrorCodes::Error{99745610},
+                    str::stream() << "Provided JSON gave a 'count_scan' with an 'endKey' which did "
+                                     "not match."};
+        }
+        const BSONElement startKeyInclusive = cscanObj["startKeyInclusive"];
+        if (startKeyInclusive.type() != BSONType::boolean) {
+            return {ErrorCodes::Error{99745609},
+                    str::stream() << "Provided JSON gave a 'count_scan' with a 'startKeyInclusive' "
+                                     "which is not a boolean."};
+        }
+        if (csn->startKeyInclusive != startKeyInclusive.boolean()) {
+            return {ErrorCodes::Error{99745608},
+                    str::stream()
+                        << "Provided JSON gave a 'count_scan' with a 'startKeyInclusive' which did "
+                           "not match."};
+        }
+        const BSONElement endKeyInclusive = cscanObj["endKeyInclusive"];
+        if (endKeyInclusive.type() != BSONType::boolean) {
+            return {ErrorCodes::Error{99745607},
+                    str::stream() << "Provided JSON gave a 'count_scan' with an 'endKeyInclusive' "
+                                     "which is not a boolean."};
+        }
+        if (csn->endKeyInclusive != endKeyInclusive.boolean()) {
+            return {ErrorCodes::Error{99745606},
+                    str::stream()
+                        << "Provided JSON gave a 'count_scan' with an 'endKeyInclusive' which did "
+                           "not match."};
+        }
+
+        return Status::OK();
     } else if (STAGE_GEO_NEAR_2D == trueSoln->getType()) {
         const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(trueSoln);
         BSONElement el = testSoln["geoNear2d"];

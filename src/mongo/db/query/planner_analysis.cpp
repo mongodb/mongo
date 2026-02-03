@@ -1554,7 +1554,16 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
                 !mustFinalizeDistinctScan || didFinalizeDistinctScan);
     }
 
+    if (query.isCountLike()) {
+        turnIxscanIntoCount(soln.get());
+    }
+
     return soln;
+}
+
+
+bool QueryPlannerAnalysis::isCountScan(QuerySolution* soln) {
+    return STAGE_COUNT_SCAN == soln->root()->getType();
 }
 
 bool QueryPlannerAnalysis::turnIxscanIntoCount(QuerySolution* soln) {

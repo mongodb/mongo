@@ -34,6 +34,7 @@
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/planner_analysis.h"
 
 namespace mongo {
 namespace plan_ranking {
@@ -57,6 +58,17 @@ StatusWith<plan_ranking::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << query.toStringForErrorMsg()
                           << " planner returned error");
+    }
+
+    if (statusWithMultiPlanSolns.getValue().size() == 1 &&
+        (!query.getExplain() ||
+         // TODO(SERVER-118659): Remove this disjunction once we support costing count_scan
+         QueryPlannerAnalysis::isCountScan(statusWithMultiPlanSolns.getValue()[0].get()))) {
+        // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
+        // so it applies everywhere. Only one solution, no need to rank.
+        std::vector<std::unique_ptr<QuerySolution>> solns;
+        solns.push_back(std::move(statusWithMultiPlanSolns.getValue()[0]));
+        return plan_ranking::PlanRankingResult{std::move(solns)};
     }
 
     using namespace cost_based_ranker;

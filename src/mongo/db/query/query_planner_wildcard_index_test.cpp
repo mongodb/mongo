@@ -655,8 +655,8 @@ TEST_F(QueryPlannerWildcardTest, CoveredIxscanForCountOnIndexedPath) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a': 1},"
-        "bounds: {'$_path': [['a','a',true,true]], 'a': [[5,5,true,true]]}}}");
+        "{count_scan: {pattern: {'$_path': 1, 'a': 1},"
+        "startKey: ['a', 5], endKey: ['a', 5], startKeyInclusive: true, endKeyInclusive: true}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, InBasic) {

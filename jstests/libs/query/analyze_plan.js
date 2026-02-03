@@ -904,6 +904,14 @@ export function isIxscan(db, root) {
 }
 
 /**
+ * Returns true if the BSON representation of a plan rooted at 'root' is using
+ * a count scan scan, and false otherwise.
+ */
+export function isCountScan(db, root) {
+    return planHasStage(db, root, "COUNT_SCAN");
+}
+
+/**
  * Returns true if the plan is formed of a single EOF stage. False otherwise.
  */
 export function isEofPlan(db, root) {

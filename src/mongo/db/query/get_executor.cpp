@@ -103,7 +103,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -491,21 +490,6 @@ public:
             std::move(rankerResult.getValue().solutions);
         // The planner should have returned an error status if there are no solutions.
         tassert(11413100, "No solutions!!", !solutions.empty());
-
-        // See if one of our solutions is a fast count hack in disguise.
-        if (_cq->isCountLike()) {
-            for (size_t i = 0; i < solutions.size(); ++i) {
-                if (QueryPlannerAnalysis::turnIxscanIntoCount(solutions[i].get())) {
-                    LOGV2_DEBUG(20925,
-                                2,
-                                "Using fast count",
-                                "query"_attr = redact(_queryStringForDebugLog));
-                    return buildSingleSolutionPlan(
-                        std::move(solutions[i]),
-                        std::move(rankerResult.getValue().maybeExplainData));
-                }
-            }
-        }
 
         if (1 == solutions.size()) {
             if (!shouldMultiPlanForSingleSolution(rankerResult.getValue(), _cq)) {
@@ -898,17 +882,7 @@ private:
             return boost::none;
         }
 
-        std::unique_ptr<QuerySolution> querySolution = std::move(statusWithQs.getValue());
-        if (_cq->isCountLike()) {
-            const bool usedFastCount =
-                QueryPlannerAnalysis::turnIxscanIntoCount(querySolution.get());
-            if (usedFastCount) {
-                LOGV2_DEBUG(
-                    5968201, 2, "Using fast count", "query"_attr = redact(_queryStringForDebugLog));
-            }
-        }
-
-        return {std::make_pair(std::move(cs), std::move(querySolution))};
+        return {std::make_pair(std::move(cs), std::move(statusWithQs.getValue()))};
     }
 
     boost::optional<size_t> _cachedPlanHash;

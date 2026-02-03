@@ -190,6 +190,11 @@ public:
     static bool isEligibleForHashJoin(const CollectionInfo& foreignCollInfo);
 
     /**
+     * Returns 'true' if the provided solution uses a fast counting stage.
+     */
+    static bool isCountScan(QuerySolution* soln);
+
+    /**
      * Returns 'true' if the provided solution 'soln' can be rewritten to use a fast counting stage.
      * Mutates the tree in 'soln->root'.
      *

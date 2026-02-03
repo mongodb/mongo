@@ -84,7 +84,6 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
@@ -1705,6 +1704,20 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "Forced plan solution hash not present in candidate plan set.");
+    }
+
+    // See if one of our solutions is a fast count hack in disguise.
+    // If so, follow with the heuristic of choosing the first
+    // fast-count plan, if available.
+    // TODO(SERVER-118659): Disable this FOR CBR by supporting CountScanNode in CBR.
+    if (query.isCountLike()) {
+        for (size_t i = 0; i < out.size(); ++i) {
+            if (QueryPlannerAnalysis::isCountScan(out[i].get())) {
+                LOGV2_DEBUG(
+                    20925, 2, "Using fast count", "query"_attr = redact(query.toStringShort()));
+                return singleSolution(std::move(out[i]));
+            }
+        }
     }
 
     return {std::move(out)};

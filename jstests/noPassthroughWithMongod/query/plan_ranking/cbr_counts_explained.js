@@ -6,6 +6,7 @@ import {
     getRejectedPlans,
     getWinningPlanFromExplain,
     isIxscan,
+    isCountScan,
 } from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
@@ -18,9 +19,9 @@ for (let i = 0; i < 10000; i++) {
 }
 assert.commandWorked(coll.insertMany(docs));
 
-assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
+assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {a: 1, b: 1}]));
 
-function runTest() {
+function runTestIxscan() {
     const explain = coll
         .explain("allPlansExecution")
         .find({a: {$gte: 1}, b: {$gte: 2}, c: 1})
@@ -38,6 +39,20 @@ function runTest() {
     }
 }
 
+function runTestFastScan() {
+    const explain = coll
+        .explain("allPlansExecution")
+        .find({a: {$gte: 0}})
+        .count();
+
+    assertExplainCount({explainResults: explain, expectedCount: 10000});
+    assert(isCountScan(db, getWinningPlanFromExplain(explain)), {explain});
+
+    const rejectedPlans = getRejectedPlans(explain);
+    // We throw away all other plans if we have a fast count.
+    assert(rejectedPlans.length == 0, {explain});
+}
+
 const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"})).was;
 const prevAutoPlanRankingStrategy = assert.commandWorked(
     assert.commandWorked(db.adminCommand({getParameter: 1, automaticCEPlanRankingStrategy: 1})),
@@ -48,7 +63,8 @@ try {
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running with:", {cbrFallbackStrategy});
         assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}));
-        runTest();
+        runTestIxscan();
+        runTestFastScan();
     }
 } finally {
     assert.commandWorked(

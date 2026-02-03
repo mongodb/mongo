@@ -261,7 +261,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 });
 
                 // Execute a query that will trigger the cost-based ranker sampling CE path.
-                coll.find({}).toArray();
+                coll.find({a: 0, b: 0}).toArray();
 
                 // Verify that the nDocsSampled metric matches the expected sample size for the given margin of error and confidence interval.
                 const stats = getQueryStats(conn, {collName: collName});
@@ -329,7 +329,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                     primaryNodeOnly: true,
                 });
 
-                coll.find({a: {$lt: 50}}).toArray();
+                coll.find({a: {$lt: 50}, b: 0}).toArray();
 
                 const stats = getQueryStats(conn, {collName: collName});
                 assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
