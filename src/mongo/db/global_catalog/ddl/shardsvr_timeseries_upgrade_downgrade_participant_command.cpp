@@ -40,6 +40,7 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -226,6 +227,9 @@ public:
                     opCtx->getCancellationToken(),
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+                ForwardableOperationMetadata forwardableOpMetadata(opCtx);
+                forwardableOpMetadata.setOn(newOpCtx.get());
 
                 if (isTracked) {
                     // For tracked collections, we need to update range deletion tasks to use the
