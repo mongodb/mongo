@@ -530,6 +530,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/s:forwardable_operation_metadata",
+        "//src/mongo/db/s:range_deletion_task",
         "//src/mongo/db/s:resharding_server_parameters_idl",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",

@@ -33,6 +33,11 @@ export const ShardTransitionUtil = (function () {
                     // ShardNotFound.
                     return true;
                 }
+                if (!res.ok && res.code === ErrorCodes.RemoveShardDrainingInProgress) {
+                    // If orphanCleanupDelaySecs hasn't elapsed yet, the command will fail with
+                    // RemoveShardDrainingInProgress. Keep retrying until the delay elapses.
+                    return false;
+                }
                 assert.commandWorked(res);
                 return res.state == "completed";
             },

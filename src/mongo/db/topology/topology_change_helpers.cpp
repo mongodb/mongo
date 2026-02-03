@@ -91,6 +91,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_common.h"
@@ -390,28 +391,6 @@ void setAddOrRemoveShardInProgressClusterParam(OperationContext* opCtx, bool new
             continue;
         }
     }
-}
-
-boost::optional<RemoveShardProgress> checkCollectionsAreEmpty(
-    OperationContext* opCtx, const std::vector<NamespaceString>& collections) {
-    for (const auto& nss : collections) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        if (!autoColl) {
-            // Can't find the collection, so it must not have data.
-            continue;
-        }
-
-        if (!autoColl->isEmpty(opCtx)) {
-            LOGV2(9022300, "removeShard: found non-empty local collection", logAttrs(nss));
-            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
-            progress.setFirstNonEmptyCollection(nss);
-            progress.setPendingRangeDeletions(
-                0);  // Set this to 0 so that it is serialized in the response
-            return {progress};
-        }
-    }
-
-    return boost::none;
 }
 
 void waitUntilReadyToBlockNewDDLCoordinators(OperationContext* opCtx) {
@@ -723,6 +702,50 @@ std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
 long long getRangeDeletionCount(OperationContext* opCtx) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     return static_cast<long long>(store.count(opCtx, BSONObj()));
+}
+
+boost::optional<RangeDeletionTask> getLatestNonPendingNonProcessingRangeDeletionTask(
+    OperationContext* opCtx) {
+    AutoGetCollection collRangeDeletionLock(
+        opCtx, NamespaceString::kRangeDeletionNamespace, MODE_S);
+    DBDirectClient client(opCtx);
+
+    // Get latest non pending and non processing range deletion task scheduled for future cleanup
+    // We do not expect to find any pending tasks because we join migrations before this.
+    FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+    findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName
+                               << BSON("$ne" << true) << RangeDeletionTask::kPendingFieldName
+                               << BSON("$ne" << true)));
+    findCommand.setSort(BSON(RangeDeletionTask::kTimestampFieldName << -1));
+    auto bsonDoc = client.findOne(std::move(findCommand));
+    if (bsonDoc.isEmpty()) {
+        return boost::none;
+    }
+    return RangeDeletionTask::parse(
+        bsonDoc, IDLParserContext("getLatestNonPendingNonProcessingRangeDeletionTask"));
+}
+
+void checkOrphanCleanupDelayElapsed(OperationContext* opCtx, const RangeDeletionTask& task) {
+    auto elapsedSec =
+        getGlobalServiceContext()->getFastClockSource()->now().toMillisSinceEpoch() / 1000 -
+        task.getTimestamp()->getSecs();
+    // Note that in the normal range deletions workflow we begin waiting for
+    // orphanCleanupDelaySecs after pending field is unset and it is marked as processing by the
+    // range deleter service. Here the behavior is different and we wait since the time the task
+    // was registered in DB.
+    if (elapsedSec < orphanCleanupDelaySecs.load()) {
+        LOGV2(1039900,
+              "removeShard: waiting for orphanCleanupDelaySecs to complete",
+              "elapsed"_attr = elapsedSec,
+              "orphanCleanupDelaySecs"_attr = orphanCleanupDelaySecs.load());
+        RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
+        progress.setPendingRangeDeletionTask(task.toBSON());
+        uasserted(RemoveShardDrainingInfo(progress),
+                  "The configured orphanCleanupDelaySecs must elapse before transitioning "
+                  "to a dedicated config server. Elapsed time: " +
+                      std::to_string(elapsedSec) + " seconds, orphanCleanupDelaySecs: " +
+                      std::to_string(orphanCleanupDelaySecs.load()));
+    }
 }
 
 void joinMigrations(OperationContext* opCtx) {
@@ -1654,26 +1677,10 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
     // config server can transition back to catalog shard mode without requiring users to
     // manually drop them.
 
-    // First, verify all collections we would drop are empty. In normal operation, a
-    // collection may still have data because of a sharded drop (which non-atomically
-    // updates metadata before dropping user data). If this state persists, manual
-    // intervention will be required to complete the transition, so we don't accidentally
-    // delete real data.
-    LOGV2(9022301, "Checking all local collections are empty", "shardId"_attr = shardName);
-
     for (auto&& db : trackedDBs) {
         tassert(7783700,
                 "Cannot drop admin or config database from the config server",
                 !db.getDbName().isConfigDB() && !db.getDbName().isAdminDB());
-
-        auto collections = [&] {
-            Lock::DBLock dbLock(opCtx, db.getDbName(), MODE_S);
-            auto catalog = CollectionCatalog::get(opCtx);
-            return catalog->getAllCollectionNamesFromDb(opCtx, db.getDbName());
-        }();
-        if (auto pendingDataCleanupState = checkCollectionsAreEmpty(opCtx, collections)) {
-            return *pendingDataCleanupState;
-        }
     }
 
     // Now actually drop the databases; each request must either succeed or resolve into a
@@ -1686,14 +1693,6 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
             uassertStatusOK(dropStatus);
         }
         hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
-    }
-
-    // Check if the sessions collection is empty. We defer dropping this collection to the caller
-    // since it should only be dropped if featureFlagSessionsCollectionCoordinatorOnConfigServer is
-    // disabled so the drop must be done in a fixed FCV region.
-    if (auto pendingDataCleanupState =
-            checkCollectionsAreEmpty(opCtx, {NamespaceString::kLogicalSessionsNamespace})) {
-        return *pendingDataCleanupState;
     }
 
     return boost::none;

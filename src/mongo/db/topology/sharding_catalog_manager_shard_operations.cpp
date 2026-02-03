@@ -106,6 +106,7 @@
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_cmds_gen.h"
@@ -807,12 +808,15 @@ RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationConte
     }
 
     if (shardId == ShardId::kConfigServerId) {
-        // Wait for range deletions to complete
-        auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
-        if (pendingRangeDeletions > 0) {
-            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
-            progress.setPendingRangeDeletions(pendingRangeDeletions);
-            return progress;
+        auto task =
+            topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+        if (task) {
+            try {
+                topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
+            } catch (const ExceptionFor<ErrorCodes::RemoveShardDrainingInProgress>& ex) {
+                const auto drainingProgress = ex.extraInfo<RemoveShardDrainingInfo>();
+                return drainingProgress->getProgress();
+            }
         }
     }
 
@@ -854,17 +858,18 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     if (shardId == ShardId::kConfigServerId) {
         topology_change_helpers::joinMigrations(opCtx);
         // The config server may be added as a shard again, so we locally drop its drained
-        // sharded collections to enable that without user intervention. But we have to wait for
-        // the range deleter to quiesce to give queries and stale routers time to discover the
-        // migration, to match the usual probabilistic guarantees for migrations.
-        auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
-        if (pendingRangeDeletions > 0) {
-            LOGV2(7564600,
-                  "removeShard: waiting for range deletions",
-                  "pendingRangeDeletions"_attr = pendingRangeDeletions);
-            RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
-            progress.setPendingRangeDeletions(pendingRangeDeletions);
-            return progress;
+        // sharded collections to enable that without user intervention. We wait for
+        // orphanCleanupDelaySecs as a best effort since creation of latest non pending range
+        // deletion task.
+        auto task =
+            topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+        if (task) {
+            try {
+                topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
+            } catch (const ExceptionFor<ErrorCodes::RemoveShardDrainingInProgress>& ex) {
+                const auto drainingProgress = ex.extraInfo<RemoveShardDrainingInfo>();
+                return drainingProgress->getProgress();
+            }
         }
     }
 
@@ -943,6 +948,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                         &result)) {
                     uassertStatusOK(getStatusFromCommandResult(result));
                 }
+            }
+            DBDirectClient client(opCtx);
+            BSONObj rangeDeletionsResult;
+            if (!client.dropCollection(
+                    NamespaceString::kRangeDeletionNamespace,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                    &rangeDeletionsResult)) {
+                uassertStatusOK(getStatusFromCommandResult(rangeDeletionsResult));
             }
         }
 

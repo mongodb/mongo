@@ -85,3 +85,7 @@ structs:
                 type: namespacestring
                 description: "First non empty collection found on the shard being removed."
                 optional: true
+            pendingRangeDeletionTask:
+                type: object_owned
+                description: "The range deletion task we are waiting on for ophanCleanupDelaySecs to elapse"
+                optional: true

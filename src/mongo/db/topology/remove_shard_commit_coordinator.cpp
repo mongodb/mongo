@@ -137,19 +137,13 @@ void RemoveShardCommitCoordinator::_setReplicaSetNameOnDocument(OperationContext
 void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions(OperationContext* opCtx) {
     topology_change_helpers::joinMigrations(opCtx);
     // The config server may be added as a shard again, so we locally drop its drained
-    // sharded collections to enable that without user intervention. But we have to wait for
-    // the range deleter to quiesce to give queries and stale routers time to discover the
-    // migration, to match the usual probabilistic guarantees for migrations.
-    auto pendingRangeDeletions = topology_change_helpers::getRangeDeletionCount(opCtx);
-    if (pendingRangeDeletions > 0) {
-        LOGV2(9782400,
-              "removeShard: waiting for range deletions",
-              "pendingRangeDeletions"_attr = pendingRangeDeletions);
-        RemoveShardProgress progress(ShardDrainingStateEnum::kPendingDataCleanup);
-        progress.setPendingRangeDeletions(pendingRangeDeletions);
-        uasserted(
-            RemoveShardDrainingInfo(progress),
-            "Range deletions must complete before transitioning to a dedicated config server.");
+    // sharded collections to enable that without user intervention. We only wait for
+    // orphanCleanupDelaySecs as a best effort since creation of latest non pending range deletion
+    // task. Any ongoing queries on primary or secondary from older chunk metadata will throw with
+    // QueryPlanKilled error and can be retried by the user.
+    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+    if (task) {
+        topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
     }
 }
 
@@ -197,11 +191,18 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
     }
 
     DBDirectClient client(opCtx);
-    BSONObj result;
+    BSONObj sessionsResult;
     if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                               &result)) {
-        uassertStatusOK(getStatusFromCommandResult(result));
+                               &sessionsResult)) {
+        uassertStatusOK(getStatusFromCommandResult(sessionsResult));
+    }
+
+    BSONObj rangeDeletionsResult;
+    if (!client.dropCollection(NamespaceString::kRangeDeletionNamespace,
+                               ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                               &rangeDeletionsResult)) {
+        uassertStatusOK(getStatusFromCommandResult(rangeDeletionsResult));
     }
 }
 

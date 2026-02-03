@@ -61,6 +61,11 @@ function removeShardOld(s, shardName, timeout) {
                     // We should retry the operation when this happens.
                     return kRetry;
                 }
+                if (shardName == "config" && res.code === ErrorCodes.RemoveShardDrainingInProgress) {
+                    // If orphanCleanupDelaySecs hasn't elapsed yet, the command will fail with
+                    // RemoveShardDrainingInProgress. Keep retrying until the delay elapses.
+                    return kRetry;
+                }
             }
             assert.commandWorked(res);
             return res.state == "completed";
@@ -87,6 +92,11 @@ function removeShardNew(s, shardName, timeout) {
                         // The mongos may exhaust its retries due to having consecutive config
                         // stepdowns. In this case, the mongos will return a HostUnreachable error.
                         // We should retry the operation when this happens.
+                        return kRetry;
+                    }
+                    if (res.code === ErrorCodes.RemoveShardDrainingInProgress) {
+                        // If orphanCleanupDelaySecs hasn't elapsed yet, the command will fail with
+                        // RemoveShardDrainingInProgress. Keep retrying until the delay elapses.
                         return kRetry;
                     }
                 }

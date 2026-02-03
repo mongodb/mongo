@@ -315,6 +315,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "range_deletion_task",
+    srcs = ["range_deletion_task_gen"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
     name = "sharding_runtime_d",
     srcs = [
         "active_migrations_registry.cpp",
@@ -345,7 +355,6 @@ mongo_cc_library(
         "random_migration_testing_utils.cpp",
         "range_deleter_service.cpp",
         "range_deleter_service_op_observer.cpp",
-        "range_deletion_task_gen",
         "range_deletion_util.cpp",
         "ready_range_deletions_processor.cpp",
         "session_catalog_migration.cpp",
@@ -437,6 +446,7 @@ mongo_cc_library(
         ":balancer_stats_registry",
         ":forwardable_operation_metadata",
         ":query_analysis_writer",
+        ":range_deletion_task",
         ":resharding_server_parameters_idl",
         ":sharding_coord_d",
         ":transaction_coordinator",
@@ -1046,8 +1056,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_util_test.cpp",
         "//src/mongo/db/sharding_environment:config_server_op_observer_test.cpp",
+        "//src/mongo/db/topology:remove_shard_commit_coordinator_test.cpp",
         "//src/mongo/db/topology:sharding_catalog_manager_add_shard_test.cpp",
         "//src/mongo/db/topology:sharding_catalog_manager_remove_shard_test.cpp",
+        "//src/mongo/db/topology:topology_change_helpers_test.cpp",
         "//src/mongo/db/topology/cluster_parameters:set_cluster_parameter_coordinator_test.cpp",
         "//src/mongo/db/topology/vector_clock:topology_time_ticker_test.cpp",
         "//src/mongo/db/topology/vector_clock:vector_clock_config_server_test.cpp",
