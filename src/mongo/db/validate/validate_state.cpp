@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -115,71 +116,43 @@ ValidateState::ValidateState(OperationContext* opCtx,
         invariant(!isBackground());
     }
 
-    if (false) {  // TODO(SERVER-117795): Check feature flag here
-        if (enforceFastCountRequested()) {
-            auto fastCountType = getDetectedFastCountType(opCtx);
-            uassert(ErrorCodes::InvalidOptions,
-                    "Both FastCount tables found",
-                    fastCountType != FastCountType::both);
+    // TODO(SERVER-118531): Move this check to the validate() call after this constructor is
+    // invoked, and append the errors to the result output parameter rather than logging.
+    if (enforceFastCountRequested()) {
+        const FastCountType fastCountType = getDetectedFastCountType(opCtx);
+        if (fastCountType == FastCountType::both) {
+            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Both FastCount tables found");
+        } else if (fastCountType == FastCountType::neither) {
+            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
         }
     }
 }
 
-
-// TODO(SERVER-117795)
-Status ValidateState::_getReplicatedFastCountCollection(OperationContext* opCtx) const {
-    // try {
-    //     auto fastCountNss = NamespaceString::makeGlobalConfigCollection(
-    //         NamespaceString::kSystemReplicatedFastCountStore);
-    //     boost::optional<CollectionOrViewAcquisition> acquisition =
-    //         acquireCollectionOrViewMaybeLockFree(
-    //             opCtx,
-    //             CollectionOrViewAcquisitionRequest::fromOpCtx(
-    //                 opCtx, fastCountNss, AcquisitionPrerequisites::OperationType::kRead));
-
-    //     if (!acquisition || !acquisition->collectionExists()) {
-    //         return Status(
-    //             ErrorCodes::NamespaceNotFound,
-    //             str::stream()
-    //                 << "Internal FastCount Collection '" << fastCountNss.toStringForErrorMsg()
-    //                 << "' does not exist to validate. Required for enforcing fast count.");
-    //     }
-
-    //     // TODO(SERVER-117795): Is this needed? Unused at the moment, might be needed?
-    //     // _fastCountCollection = std::move(acquisition);
-    // } catch (const ExceptionFor<ErrorCodes::SnapshotTooOld>&) {
-    //     // TODO(SERVER-117795): Is this the right exception? Is it relevant?
-    //     if (isBackground()) {
-    //         // This will throw SnapshotTooOld to indicate we cannot find an available snapshot at
-    //         // the provided timestamp. This is likely because minSnapshotHistoryWindowInSeconds
-    //         has
-    //         // been changed to a lower value from the default of 5 minutes.
-    //         return Status(
-    //             ErrorCodes::NamespaceNotFound,
-    //             fmt::format("Cannot run background validation on collection {} because the "
-    //                         "snapshot history is no longer available",
-    //                         _nss.toStringForErrorMsg()));
-    //     }
-    //     throw;
-    // }
+Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
+    const NamespaceString fastCountNss = NamespaceString::makeGlobalConfigCollection(
+        NamespaceString::kSystemReplicatedFastCountStore);
+    const auto catalog = CollectionCatalog::get(opCtx);
+    if (!catalog->lookupCollectionByNamespace(opCtx, fastCountNss)) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream()
+                          << "Internal FastCount Collection '" << fastCountNss.toStringForErrorMsg()
+                          << "' does not exist to validate. Required for enforcing fast count.");
+    }
     return Status::OK();
 }
 
-// TODO(SERVER-117795): Get state from the storage engine.
-Status ValidateState::_getUnreplicatedFastCountCollection(OperationContext* opCtx) const {
-    try {
-        // std::string filename = ident::kSizeStorer + ".wt";
-        // boost::filesystem::path sizeStorerAbsoluteFilePath =
-        //     boost::filesystem::path(storageGlobalParams.dbpath) / filename;
-        // if (boost::filesystem::exists(sizeStorerAbsoluteFilePath)) {
-        //     return Status::OK();
-        // }
-
-        return Status::OK();
-        // return Status(ErrorCodes::NonExistentPath, "SizeStorer doesn't exist");
-    } catch (...) {
-        return exceptionToStatus();
+Status ValidateState::_checkUnreplicatedFastCountCollectionExists(OperationContext* opCtx) const {
+    const StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const bool tableExists = storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(opCtx), ident::kSizeStorer);
+    // CollectionValidation::validate requires that no storage transactions are open during the call
+    // to setPrepareConflictBehavior, so we abandon the snapshot created in hasIdent after checking
+    // if the table exists.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    if (!tableExists) {
+        return Status(ErrorCodes::NonExistentPath, "SizeStorer doesn't exist");
     }
+    return Status::OK();
 }
 
 bool ValidateState::shouldEnforceFastCount() const {
@@ -217,19 +190,17 @@ bool ValidateState::shouldEnforceFastCount() const {
 }
 
 FastCountType ValidateState::getDetectedFastCountType(OperationContext* opCtx) const {
-    // TODO(SERVER-117795): Uncomment.
-    return FastCountType::legacySizeStorer;
-    // auto replicatedFastCountStatus = _getReplicatedFastCountCollection(opCtx);
-    // auto legacyFastCountStatus = _getUnreplicatedFastCountCollection(opCtx);
-    // if (replicatedFastCountStatus.isOK() && legacyFastCountStatus.isOK()) {
-    //     return FastCountType::both;
-    // } else if (replicatedFastCountStatus.isOK()) {
-    //     return FastCountType::replicated;
-    // } else if (legacyFastCountStatus.isOK()) {
-    //     return FastCountType::legacySizeStorer;
-    // } else {
-    //     return FastCountType::none;
-    // }
+    const Status replicatedFastCountStatus = _checkReplicatedFastCountCollectionExists(opCtx);
+    const Status legacyFastCountStatus = _checkUnreplicatedFastCountCollectionExists(opCtx);
+    if (replicatedFastCountStatus.isOK() && legacyFastCountStatus.isOK()) {
+        return FastCountType::both;
+    } else if (replicatedFastCountStatus.isOK()) {
+        return FastCountType::replicated;
+    } else if (legacyFastCountStatus.isOK()) {
+        return FastCountType::legacySizeStorer;
+    } else {
+        return FastCountType::neither;
+    }
 }
 
 void ValidateState::yieldCursors(OperationContext* opCtx) {

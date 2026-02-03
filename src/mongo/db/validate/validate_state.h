@@ -77,8 +77,7 @@ enum struct FastCountType {
     legacySizeStorer,
     replicated,
     both,
-    none,
-    invalid,
+    neither,
 };
 
 /**
@@ -98,8 +97,8 @@ public:
     }
 
     /**
-     * Returns true if fast count is being validated, and the collection
-     * supports fast count. Certain internal collections are not supported by fast count.
+     * Returns true if fast count is being validated, and the collection supports fast count.
+     * Certain internal collections are not supported by fast count.
      */
     bool shouldEnforceFastCount() const;
 
@@ -166,10 +165,16 @@ private:
     ValidateState() = delete;
 
     /**
-     * These functions use catalog and on-disk state to determine which system is being used.
+     * Checks if the fast count replicated collection exists by looking up the collection in the
+     * catalog. Returns Status::OK() if the collection exists and an error otherwise.
      */
-    Status _getReplicatedFastCountCollection(OperationContext* opCtx) const;
-    Status _getUnreplicatedFastCountCollection(OperationContext* opCtx) const;
+    Status _checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const;
+
+    /**
+     * Checks if the underlying storage engine contains an internal size storer table. Returns
+     * Status::OK() if the collection exists and an error otherwise.
+     */
+    Status _checkUnreplicatedFastCountCollectionExists(OperationContext* opCtx) const;
 
     // This lock needs to be obtained before the global lock. Initialise in the validation
     // constructor. Oplog Batch Applier takes this lock in exclusive mode when applying the batch.

@@ -708,6 +708,11 @@ public:
 
     StatusWith<BSONObj> getStorageMetadata(StringData ident) const override;
 
+    // TODO(SERVER-118851): Remove.
+    WiredTigerSizeStorer* getSizeStorer_forTest() const {
+        return _sizeStorer.get();
+    };
+
     KeyFormat getKeyFormat(RecoveryUnit&, StringData ident) const override;
 
     /**

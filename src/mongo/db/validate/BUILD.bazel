@@ -119,3 +119,15 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:sorted_data_interface_test_assert",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "validate_state_test",
+    srcs = [
+        "validate_state_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":collection_validation",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)

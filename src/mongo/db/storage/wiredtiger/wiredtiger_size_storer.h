@@ -106,6 +106,14 @@ public:
      */
     void flush(bool syncToDisk);
 
+    /**
+     * Performs cleanup of internal data structures for tests when runtime assertions about state at
+     * the time of destruction don't matter.
+     *
+     * TODO(SERVER-118851): Remove.
+     */
+    void cleanup_forTest();
+
 private:
     WiredTigerConnection* _conn;
     const std::string _storageUri;

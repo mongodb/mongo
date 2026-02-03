@@ -1303,27 +1303,28 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         switch (fastCountType) {
             case CollectionValidation::FastCountType::legacySizeStorer:
                 if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
-                    results->addError(str::stream() << "fast count (" << fastCount
-                                                    << ") does not match number of records ("
-                                                    << _numRecords << ") for collection '"
-                                                    << coll->ns().toStringForErrorMsg() << "'");
+                    results->addError(
+                        fmt::format("fast count ({}) does not match number of "
+                                    "records ({}) for collection '{}'",
+                                    fastCount,
+                                    _numRecords,
+                                    coll->ns().toStringForErrorMsg()));
                 }
                 break;
             case CollectionValidation::FastCountType::replicated:
                 if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
-                    results->addError(str::stream() << "replicated fast count (" << fastCount
-                                                    << ") does not match number of records ("
-                                                    << _numRecords << ") for collection '"
-                                                    << coll->ns().toStringForErrorMsg() << "'");
+                    results->addError(
+                        fmt::format("replicated fast count ({}) does not match number of "
+                                    "records ({}) for collection '{}'",
+                                    fastCount,
+                                    _numRecords,
+                                    coll->ns().toStringForErrorMsg()));
                 }
                 break;
             case CollectionValidation::FastCountType::both:
                 uasserted(ErrorCodes::InvalidOptions, "Both FastCount tables found");
                 break;
-            case CollectionValidation::FastCountType::none:
-                uasserted(ErrorCodes::InvalidOptions, "No FastCount tables found");
-                break;
-            case CollectionValidation::FastCountType::invalid:
+            case CollectionValidation::FastCountType::neither:
                 uasserted(ErrorCodes::InvalidOptions, "No FastCount tables found");
                 break;
         }
