@@ -375,6 +375,11 @@ function validateListCatalogToListCollectionsConsistency(listCatalog, listCollec
             if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
         });
     }
+    // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
+    if (!TestData.notASC) {
+        listCollectionsFromListCatalog.forEach((e) => delete e.options.recordIdsReplicated);
+        sortedListCollections.forEach((e) => delete e.options.recordIdsReplicated);
+    }
     const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
         const message =
