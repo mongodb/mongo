@@ -62,9 +62,8 @@ assert(
     "collMod failed to remove recordIdsReplicated flag from collection options",
 );
 
-// Running collMod on a collection that does not replicate record IDs is disallowed.
-let error = assert.commandFailedWithCode(db.runCommand({collMod: collName, recordIdsReplicated: false}), 8650600);
-jsTestLog("Error from running collMod on a collection that does not replicate record IDs: " + tojson(error));
+// Running collMod to unset 'recordIdsReplicated' on a collection that does not replicate record IDs is allowed.
+assert.commandWorked(db.runCommand({collMod: collName, recordIdsReplicated: false}));
 
 // Modifying with a true 'recordIdsReplicated' value is not allowed
 assert.commandFailedWithCode(db.runCommand({collMod: collName, recordIdsReplicated: true}), ErrorCodes.InvalidOptions);

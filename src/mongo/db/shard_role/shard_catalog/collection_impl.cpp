@@ -1040,9 +1040,9 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
 }
 
 void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {
-    uassert(8650600,
-            "This collection does not replicate record IDs",
-            _metadata->options.recordIdsReplicated);
+    if (!_metadata->options.recordIdsReplicated) {
+        return;
+    }
 
     LOGV2_DEBUG(8650601,
                 1,

@@ -221,6 +221,8 @@ function testIdempotency(primary, testFun, testName) {
                 "o.startIndexBuild": {$exists: false},
                 "o.abortIndexBuild": {$exists: false},
                 "o.commitIndexBuild": {$exists: false},
+                // TODO (SERVER-117265): Revisit if this is needed.
+                "o.collMod": {$exists: false},
             },
             {ts: 0, t: 0, h: 0, v: 0},
         )
