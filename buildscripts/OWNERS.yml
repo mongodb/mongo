@@ -47,3 +47,18 @@ filters:
   - "compare_evergreen_versions.py":
     approvers:
       - 10gen/devprod-correctness
+  - "ciconfig":
+    approvers:
+      - 10gen/devprod-correctness
+  - "append_result_tasks.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "generate_result_tasks.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "evergreen_activate_gen_tasks.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "bazel_burn_in.py":
+    approvers:
+      - 10gen/devprod-correctness

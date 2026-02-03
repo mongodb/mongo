@@ -363,6 +363,10 @@ class Variant(object):
         """Return True if the variant is a required variant."""
         return self.display_name.startswith("!")
 
+    def is_suggested_variant(self) -> bool:
+        """Return True if the variant is a suggested variant."""
+        return self.display_name.startswith("*")
+
     def get_task(self, task_name):
         """Return the task with the given name as an instance of VariantTask.
 

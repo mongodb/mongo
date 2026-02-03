@@ -2,6 +2,7 @@
 """Activate an evergreen task in the existing build."""
 
 import os
+import re
 import sys
 
 import click
@@ -32,6 +33,7 @@ LOGGER = structlog.getLogger(__name__)
 EVG_CONFIG_FILE = "./.evergreen.yml"
 BURN_IN_TAGS = "burn_in_tags"
 BURN_IN_TESTS = "burn_in_tests"
+BAZEL_BURN_IN_TESTS = r"resmoke_tests_burn_in*"
 BURN_IN_VARIANT_SUFFIX = "generated-by-burn-in-tags"
 
 
@@ -69,30 +71,41 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
     tasks_not_activated = []
     if expansions.task == BURN_IN_TAGS:
         version = evg_api.version_by_id(expansions.version_id)
-        burn_in_build_variants = [
-            variant
-            for variant in version.build_variants_map.keys()
-            if variant.endswith(BURN_IN_VARIANT_SUFFIX)
-        ]
-        for build_variant in burn_in_build_variants:
+        for build_variant in version.build_variants_map.keys():
             build_id = version.build_variants_map[build_variant]
             task_list = evg_api.tasks_by_build(build_id)
-
-            for task in task_list:
-                if task.display_name == BURN_IN_TESTS:
-                    LOGGER.info(
-                        "Activating task", task_id=task.task_id, task_name=task.display_name
-                    )
-                    try:
-                        evg_api.configure_task(task.task_id, activated=True)
-                    except Exception:
-                        LOGGER.error(
-                            "Could not activate task",
-                            task_id=task.task_id,
-                            task_name=task.display_name,
-                            exc_info=True,
+            if build_variant.endswith(BURN_IN_VARIANT_SUFFIX):
+                for task in task_list:
+                    if task.display_name == BURN_IN_TESTS:
+                        LOGGER.info(
+                            "Activating task", task_id=task.task_id, task_name=task.display_name
                         )
-                        tasks_not_activated.append(task.task_id)
+                        try:
+                            evg_api.configure_task(task.task_id, activated=True)
+                        except Exception:
+                            LOGGER.error(
+                                "Could not activate task",
+                                task_id=task.task_id,
+                                task_name=task.display_name,
+                                exc_info=True,
+                            )
+                            tasks_not_activated.append(task.task_id)
+            else:
+                for task in task_list:
+                    if re.match(BAZEL_BURN_IN_TESTS, task.display_name):
+                        LOGGER.info(
+                            "Activating task", task_id=task.task_id, task_name=task.display_name
+                        )
+                        try:
+                            evg_api.configure_task(task.task_id, activated=True)
+                        except Exception:
+                            LOGGER.error(
+                                "Could not activate task",
+                                task_id=task.task_id,
+                                task_name=task.display_name,
+                                exc_info=True,
+                            )
+                            tasks_not_activated.append(task.task_id)
 
     else:
         task_list = retry_call(

@@ -6,6 +6,7 @@ exports_files([
     "lsan.suppressions",
     "tsan.suppressions",
     "extensions.yml",
+    "burn_in_tests.yml",
 ])
 
 # This is a hack to work around the fact that the cc_library flag additional_compiler_inputs doesn't

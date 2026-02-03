@@ -1265,6 +1265,7 @@ functions:
         build_variant: ${build_variant}
         distro_id: ${distro_id}
         execution: ${execution}
+        generate_burn_in_targets: ${generate_burn_in_targets}
         otel_parent_id: ${otel_parent_id}
         otel_trace_id: ${otel_trace_id}
         project: ${project}
@@ -1282,16 +1283,6 @@ functions:
     - *apply_version_expansions
     - *f_expansions_write
     - *execute_resmoke_tests_via_bazel_sh
-
-  "download build events json":
-    - command: s3.get
-      display_name: "download build events json"
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        bucket: mciuploads
-        remote_file: ${project}/${version_id}/${build_variant}/resmoke_tests/build_events.json
-        local_file: "build_events.json"
 
   "fetch remote test results":
     - command: subprocess.exec
@@ -1410,6 +1401,7 @@ functions:
       optional: true
       files:
         - src/generated_resmoke_config/*.json
+        - src/generated_bazel_tasks.json
 
   "generate version":
     - *f_expansions_write
@@ -1428,6 +1420,8 @@ functions:
     - *validate_generate_tasks_config
 
   "generate version burn in":
+    - *get_version_expansions
+    - *apply_version_expansions
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - command: subprocess.exec
@@ -1441,6 +1435,17 @@ functions:
     - *validate_generate_tasks_config
     - *upload_burn_in_generate_tasks_config
     - *generate_resmoke_tasks_config
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/generated_bazel_tasks.json
+        remote_file: ${project}/${version_id}/${build_variant}/{task_name}/generated_bazel_tasks.json
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/json
 
   "initialize multiversion tasks":
     - *f_expansions_write

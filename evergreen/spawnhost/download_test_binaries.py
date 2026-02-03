@@ -16,8 +16,15 @@ def main():
     task = evg_api.task_by_id(task_id)
     tasks_in_variant = evg_api.tasks_by_build(task.build_id)
 
-    resmoke_tests_task = list(filter(lambda t: t.display_name == "resmoke_tests", tasks_in_variant))
-    assert len(resmoke_tests_task) == 1, "Could not find a unique resmoke_tests task"
+    if "_burn_in_" in task.display_name:
+        resmoke_tests_task = list(
+            filter(lambda t: t.display_name.startswith("resmoke_tests_burn_in"), tasks_in_variant)
+        )
+    else:
+        resmoke_tests_task = list(
+            filter(lambda t: t.display_name == "resmoke_tests", tasks_in_variant)
+        )
+    assert len(resmoke_tests_task) == 1, "Could not find a unique resmoke test task"
     resmoke_tests_task = resmoke_tests_task[0]
 
     output_dir = "/data/mci/artifacts-resmoke_tests"

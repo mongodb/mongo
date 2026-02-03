@@ -78,6 +78,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/evergreen_gen_streams* @10gen/streams-engine @svc-auto-approve-bot
 /buildscripts/compare_evergreen_versions.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/ciconfig @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/append_result_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/generate_result_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/evergreen_activate_gen_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/bazel_burn_in.py @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/antithesis/OWNERS.yml
 /buildscripts/antithesis/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -331,8 +336,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/tests/test_evergreen_task_timeout.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/tests/test_generate_sbom.py @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
-# The following patterns are parsed from ./buildscripts/tests/burn_in_tests_end2end/OWNERS.yml
-/buildscripts/tests/burn_in_tests_end2end/ @10gen/devprod-correctness @svc-auto-approve-bot
+# The following patterns are parsed from ./buildscripts/tests/burn_in/OWNERS.yml
+/buildscripts/tests/burn_in/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tests/monitor_build_status/OWNERS.yml
 /buildscripts/tests/monitor_build_status/ @10gen/devprod-correctness @svc-auto-approve-bot

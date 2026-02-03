@@ -24,3 +24,5 @@ RUST_BACKTRACE=full PATH=$PATH:$HOME:/ ./mongo-task-generator \
     --burn-in \
     --burn-in-tests-command "python buildscripts/burn_in_tests.py run --origin-rev=$base_revision" \
     $@
+
+$python buildscripts/bazel_burn_in.py generate-tasks "$base_revision" --outfile=generated_bazel_tasks.json

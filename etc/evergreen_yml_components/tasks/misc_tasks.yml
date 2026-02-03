@@ -2136,6 +2136,9 @@ tasks:
   - name: version_burn_in_gen
     run_on: ubuntu2404-medium
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     commands:
       - command: manifest.load
       - func: "git get shallow project"
@@ -2146,6 +2149,14 @@ tasks:
       - func: "cleanup environment"
       - func: "set up venv"
       - func: "upload pip requirements"
+      - func: "get engflow creds"
+      - func: "build all resmoke configs"
+        vars:
+          targets: //...
+          bazel_args: >-
+            --build_tag_filters=resmoke_config
+            --noincompatible_enable_cc_toolchain_resolution
+            --repo_env=no_c++_toolchain=1
       - func: "generate version burn in"
 
   - name: version_gen

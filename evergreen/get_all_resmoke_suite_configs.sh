@@ -15,10 +15,8 @@ set -o verbose
 source ./evergreen/bazel_evergreen_shutils.sh
 BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
 
-# Queries all resmoke_config targets: kind(resmoke_config, //...)
-# and outputs YAML key-value pair created by the starlark expression for each target.
-#   str(target.label).replace('@@','') -> the target name, like //buildscripts/resmokeconfig:core_config
-#   f.path for f in target.files.to_list() -> the path to the config file, like bazel-out/k8-fastbuild/bin/buildscripts/resmokeconfig/core.yml
-${BAZEL_BINARY} cquery ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} \
-    --define=MONGO_VERSION=${version} ${patch_compile_flags} "kind(resmoke_config, //...)" \
-    --output=starlark --starlark:expr "': '.join([str(target.label).replace('@@','')] + [f.path for f in target.files.to_list()])" >resmoke_suite_configs.yml
+# Queries all resmoke_config targets and outputs YAML key-value pairs mapping targets to their config files.
+bazel_evergreen_shutils::query_resmoke_configs \
+    "${BAZEL_BINARY}" \
+    "${bazel_args} ${bazel_compile_flags} ${task_compile_flags} --define=MONGO_VERSION=${version} ${patch_compile_flags}" \
+    "resmoke_suite_configs.yml"

@@ -53,11 +53,20 @@ for strategy in "${strategies[@]}"; do
 done
 
 ALL_FLAGS="${ci_flags} ${LOCAL_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
 # Save the invocation, intentionally excluding CI specific flags.
 echo "python buildscripts/install_bazel.py" >bazel-invocation.txt
 echo "bazel test ${bazel_args} ${targets}" >>bazel-invocation.txt
+
+if [ "${generate_burn_in_targets}" = "true" ]; then
+    echo "Generating burn-in test targets..."
+    base_revision="$(git merge-base ${revision} HEAD)"
+    ${BAZEL_BINARY} build ${CONFIG_FLAGS} //... --build_tag_filters=resmoke_config
+    bazel_evergreen_shutils::query_resmoke_configs "${BAZEL_BINARY}" "${CONFIG_FLAGS}" "resmoke_suite_configs.yml"
+    ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:bazel_burn_in -- generate-targets "$base_revision" || echo "Failed to generate burn-in targets"
+fi
 
 set +o errexit
 
@@ -92,11 +101,12 @@ if [[ "$RET" != "0" ]]; then
 
     # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
     # Strip out anything that isn't a --config flag that could interfere with the run command.
-    CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
     eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
 fi
 
 eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:append_result_tasks -- --outfile=generated_tasks.json
+
+eval ${BAZEL_BINARY} shutdown # Explicitly shutdown the bazel server in case the Evergreen agent is tracking it for completion of this process.
 
 # Return code 3 from `bazel test` indicates that the build was OK, but some tests failed or timed out.
 # The test failures are reported in individual results tasks, so don't fail the task here.

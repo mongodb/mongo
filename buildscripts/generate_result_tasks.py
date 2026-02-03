@@ -28,8 +28,7 @@ RESMOKE_TEST_QUERY = 'attr(tags, "resmoke_suite_test", //...)'
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
-def make_task(target: str) -> Task:
-    print(f"Generating task for {target}")
+def make_results_task(target: str) -> Task:
     commands = [
         FunctionCall("fetch remote test results", {"test_label": target}),
     ]
@@ -61,7 +60,7 @@ def main(outfile: Annotated[str, typer.Option()]):
 
     test_targets = query_targets()
 
-    tasks = [make_task(target) for target in test_targets]
+    tasks = [make_results_task(target) for target in test_targets]
     project = {"tasks": [task.as_dict() for task in tasks]}
 
     with open(outfile, "w") as f:

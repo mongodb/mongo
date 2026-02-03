@@ -1,7 +1,7 @@
 # This file is used to exclude suites, tasks or tests from running in the burn_in_test task.
 selector:
   js_test:
-    # Exclude list of resmoke.py suite names.
+    # Exclude list of resmoke.py suite names or resmoke_suite_test target names.
     exclude_suites:
       # Requires an HTTP server to be running in the background.
       - queryable_wt

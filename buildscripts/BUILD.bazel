@@ -264,11 +264,47 @@ py_binary(
 )
 
 py_binary(
+    name = "burn_in_tests",
+    srcs = ["burn_in_tests.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/patch_builds",
+        "//buildscripts/resmokelib",
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_binary(
+    name = "bazel_burn_in",
+    srcs = ["bazel_burn_in.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:burn_in_tests",
+        "//buildscripts:generate_result_tasks",
+        "//buildscripts/util",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "shrub-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_binary(
     name = "generate_result_tasks",
     srcs = ["generate_result_tasks.py"],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts:gather_failed_tests",
         dependency(
             "typer",
             group = "core",
@@ -285,6 +321,7 @@ py_binary(
     srcs = ["append_result_tasks.py"],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:bazel_burn_in",
         "//buildscripts:gather_failed_tests",
         dependency(
             "typer",

@@ -20,12 +20,15 @@ Options:
 
 import json
 import os
+import re
 
 import typer
 from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, TaskGroup
 from shrub.v2.command import BuiltInCommand
+from shrub.v2.task import ExistingTask
 from typing_extensions import Annotated
 
+from buildscripts.bazel_burn_in import BAZEL_BURN_IN_TESTS
 from buildscripts.gather_failed_tests import process_bep
 from buildscripts.util.read_config import read_config_file
 
@@ -38,6 +41,7 @@ def main(outfile: Annotated[str, typer.Option()], build_events: str = "build_eve
 
     expansions = read_config_file("../expansions.yml")
     build_variant = expansions.get("build_variant")
+    task_name = expansions.get("task_name")
 
     failed_tests, successful_tests = process_bep(build_events)
     tasks = failed_tests + successful_tests
@@ -45,21 +49,33 @@ def main(outfile: Annotated[str, typer.Option()], build_events: str = "build_eve
     # Shrub's TaskGroup doesn't supporting adding existing tasks, so leave `tasks` empty and patch
     # the real list in later.
     task_group = TaskGroup(
-        name=f"resmoke_tests_results_{build_variant}",
+        name=f"{task_name}_results_{build_variant}",
         tasks=[],
         max_hosts=len(tasks),
+        setup_group_can_fail_task=True,
         setup_group=[
             FunctionCall("git get project and add git tag"),
             FunctionCall("get engflow cert"),
             FunctionCall("get engflow key"),
-            FunctionCall("download build events json"),
+            BuiltInCommand(
+                "s3.get",
+                {
+                    "aws_key": "${aws_key}",
+                    "aws_secret": "${aws_secret}",
+                    "local_file": "build_events.json",
+                    "remote_file": "${project}/${version_id}/${build_variant}/"
+                    + f"{task_name}/build_events.json",
+                    "bucket": "mciuploads",
+                },
+            ),
             BuiltInCommand(
                 "s3.get",
                 {
                     "aws_key": "${aws_key}",
                     "aws_secret": "${aws_secret}",
                     "local_file": "resmoke-tests-bazel-invocation.txt",
-                    "remote_file": "${project}/${build_variant}/${revision}/bazel-invocation-resmoke_tests-0.txt",
+                    "remote_file": "${project}/${build_variant}/${revision}/"
+                    + f"bazel-invocation-{task_name}-0.txt",
                     "bucket": "mciuploads",
                 },
             ),
@@ -135,6 +151,13 @@ def main(outfile: Annotated[str, typer.Option()], build_events: str = "build_eve
     )
 
     build_variant = BuildVariant(name=build_variant)
+    if re.match(BAZEL_BURN_IN_TESTS, task_name):
+        build_variant.display_task(
+            display_name="burn_in_tests",
+            execution_existing_tasks=[ExistingTask(task_name)]
+            + [ExistingTask(task) for task in tasks],
+        )
+
     build_variant.add_task_group(task_group)
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)

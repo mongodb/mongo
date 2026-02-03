@@ -1,0 +1,47 @@
+py_library(
+    name = "all_python_files",
+    srcs = glob(["*.py"]),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "test_burn_in",
+    srcs = [
+        "test_burn_in.py",
+    ],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+        "//etc:burn_in_tests.yml",
+    ],
+    deps = [
+        "//buildscripts:burn_in_tests",
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_burn_in_end2end",
+    srcs = [
+        "test_burn_in_end2end.py",
+    ],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+        "//etc:burn_in_tests.yml",
+    ],
+    deps = [
+        "//buildscripts:burn_in_tests",
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_bazel_burn_in",
+    srcs = [
+        "test_bazel_burn_in.py",
+    ],
+    deps = [
+        "//buildscripts:bazel_burn_in",
+    ],
+)

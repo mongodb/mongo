@@ -351,3 +351,19 @@ bazel_evergreen_shutils::maybe_scale_test_timeout_and_append() {
         bazel_args="${bazel_args:-} --test_timeout=${scaled}"
     fi
 }
+
+# Queries all resmoke_config targets and outputs YAML key-value pairs.
+# Usage: bazel_evergreen_shutils::query_resmoke_configs <bazel_binary> <flags> <output_file>
+#   example: bazel_evergreen_shutils::query_resmoke_configs "$BAZEL_BINARY" "${CONFIG_FLAGS}" "resmoke_suite_configs.yml"
+# Outputs YAML entries like:
+#   //buildscripts/resmokeconfig:core_config: bazel-out/k8-fastbuild/bin/buildscripts/resmokeconfig/core.yml
+bazel_evergreen_shutils::query_resmoke_configs() {
+    local BAZEL_BINARY="$1"
+    local FLAGS="$2"
+    local OUTPUT_FILE="$3"
+
+    ${BAZEL_BINARY} cquery ${FLAGS} 'kind(resmoke_config, //...)' \
+        --output=starlark \
+        --starlark:expr='": ".join([str(target.label).replace("@@","")] + [f.path for f in target.files.to_list()])' \
+        >"${OUTPUT_FILE}"
+}

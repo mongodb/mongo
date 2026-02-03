@@ -39,8 +39,9 @@ def bd_comment(labels: List[str], comment: str, attr: str = "", value: str = "")
     _bd_command(f"comment {attr} {value} {comment}", labels)
 
 
-def bd_print(labels: List[str], attrs: List[str]) -> None:
-    _bd_command(f'print {" ".join(attrs)}', labels)
+def bd_print(labels: List[str], attrs: List[str]) -> str:
+    p = _bd_command(f'print {" ".join(attrs)}', labels)
+    return p.stdout
 
 
 def bd_new_load(packages: List[str], path: str, rules: List[str]) -> None:

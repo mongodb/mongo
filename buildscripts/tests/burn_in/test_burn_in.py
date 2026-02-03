@@ -9,9 +9,9 @@ import subprocess
 import sys
 import unittest
 from io import StringIO
+from unittest.mock import MagicMock, Mock, patch
 
 import yaml
-from mock import MagicMock, Mock, patch
 
 import buildscripts.burn_in_tests as under_test
 import buildscripts.resmokelib.parser as _parser
@@ -514,3 +514,7 @@ class TestYamlBurnInExecutor(unittest.TestCase):
         results = yaml.safe_load(yaml_raw)
         self.assertEqual(n_tasks, len(results["discovered_tasks"]))
         self.assertEqual(n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"]))
+
+
+if __name__ == "__main__":
+    unittest.main()
