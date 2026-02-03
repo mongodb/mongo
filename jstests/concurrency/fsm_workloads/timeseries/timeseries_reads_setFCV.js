@@ -1,11 +1,12 @@
 /**
- * Tests listCollections returns consistent results for timeseries collections
- * while upgrading/downgrading in the background.
+ * Tests listCollections and reads (find/aggregate/...) return consistent results for timeseries
+ * collections while upgrading/downgrading the FCV in the background.
  * This is designed to exercise viewless timeseries upgrade/downgrade.
  * TODO(SERVER-114573): Consider removing this test once 9.0 becomes lastLTS.
  *
  * @tags: [
  *   requires_timeseries,
+ *   requires_getmore,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   # TODO (SERVER-104171) Remove the 'assumes_balancer_off' tag
@@ -13,11 +14,29 @@
  *   # Runs setFCV, which can interfere with other tests.
  *   incompatible_with_concurrency_simultaneous,
  *   runs_set_fcv,
+ *   # TODO(SERVER-110441): Remove once point-in-time reads work with timeseries upgrade/downgrade.
+ *   # Causal consistency suites read from secondaries, which always read at a point-in-time
+ *   # even if one is not explictly requested (see ReadSource::kLastApplied).
+ *   does_not_support_causal_consistency,
  * ]
  */
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
+// Runs `func` and retries if it is interrupted with a transient timeseries upgrade/downgrade error.
+function withRetryOnTimeseriesUpgradeDowngradeError(func) {
+    let result;
+    assert.soonRetryOnAcceptableErrors(
+        () => {
+            result = func();
+            return true;
+        },
+        ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade,
+        "Timed out waiting for timeseries operation to succeed without upgrade/downgrade error",
+    );
+    return result;
+}
 
 export const $config = (function () {
     // Use the workload name as a prefix for the collection name,
@@ -28,6 +47,12 @@ export const $config = (function () {
     function getCollection(db, num) {
         return db.getCollection(prefix + "_" + num);
     }
+
+    // Generate test documents; 150 docs ensures find() uses multiple batches via getMore.
+    const expectedDocs = Array.from({length: 150}, (_, i) => ({
+        t: new Date(ISODate("2024-01-01T00:00:00.000Z").getTime() + i * 1000),
+        temp: i,
+    }));
 
     const states = {
         init: function (db, collName) {},
@@ -61,6 +86,38 @@ export const $config = (function () {
                 assert.eq(isViewfulTimeseries, hasBuckets, tojson(listCollections));
             }
         },
+
+        find: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const actualDocs = withRetryOnTimeseriesUpgradeDowngradeError(() => coll.find({}, {_id: 0}).toArray());
+            assert.sameMembers(expectedDocs, actualDocs);
+        },
+
+        findOne: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const doc = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                coll.findOne({t: expectedDocs[0].t}, {_id: 0}),
+            );
+            assert.eq(doc, expectedDocs[0]);
+        },
+
+        aggregate: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const result = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                coll.aggregate([{$group: {_id: null, minTemp: {$min: "$temp"}}}]).toArray(),
+            );
+            assert.eq(result[0].minTemp, expectedDocs[0].temp);
+        },
+
+        countDocuments: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const count = withRetryOnTimeseriesUpgradeDowngradeError(() => coll.countDocuments({}));
+            assert.eq(count, expectedDocs.length);
+        },
     };
 
     const setup = function (db, collName, cluster) {
@@ -69,6 +126,7 @@ export const $config = (function () {
         for (let i = 0; i < numCollections; i++) {
             const coll = getCollection(db, i);
             assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t"}}));
+            assert.commandWorked(coll.insertMany(expectedDocs));
         }
 
         // Increase the pending commit time in the catalog to exercise the fix for SERVER-115811.
