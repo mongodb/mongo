@@ -34,7 +34,7 @@
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
-
+#include "mongo/util/modules.h"
 namespace mongo {
 
 class MultiUpdateCoordinatorExternalState {

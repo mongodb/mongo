@@ -40,6 +40,7 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"

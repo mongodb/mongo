@@ -35,10 +35,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace analyze_shard_key {

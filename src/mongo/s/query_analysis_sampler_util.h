@@ -46,6 +46,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
@@ -56,6 +57,8 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace analyze_shard_key {

@@ -37,6 +37,7 @@
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -46,7 +47,7 @@ namespace analyze_shard_key {
 /**
  * OpObserver for query analysis in a shard svr.
  */
-class QueryAnalysisOpObserverShardSvr final : public QueryAnalysisOpObserver {
+class MONGO_MOD_PUBLIC QueryAnalysisOpObserverShardSvr final : public QueryAnalysisOpObserver {
     QueryAnalysisOpObserverShardSvr(const QueryAnalysisOpObserverShardSvr&) = delete;
     QueryAnalysisOpObserverShardSvr& operator=(const QueryAnalysisOpObserverShardSvr&) = delete;
 

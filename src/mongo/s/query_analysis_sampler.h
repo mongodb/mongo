@@ -38,6 +38,7 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/uuid.h"
@@ -65,7 +66,7 @@ namespace analyze_shard_key {
  * standalone replica set, a sampler is any mongod in the set and the coordinator is the primary
  * mongod.
  */
-class QueryAnalysisSampler final {
+class MONGO_MOD_PUBLIC QueryAnalysisSampler final {
     QueryAnalysisSampler(const QueryAnalysisSampler&) = delete;
     QueryAnalysisSampler& operator=(const QueryAnalysisSampler&) = delete;
 
@@ -114,7 +115,7 @@ public:
      * Controls the per-second rate at which queries against a collection are sampled on this
      * sampler. Uses token bucket.
      */
-    class SampleRateLimiter {
+    class MONGO_MOD_PRIVATE SampleRateLimiter {
     public:
         static constexpr double kEpsilon = 0.001;
 

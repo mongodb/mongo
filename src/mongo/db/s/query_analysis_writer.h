@@ -43,6 +43,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/uuid.h"
 

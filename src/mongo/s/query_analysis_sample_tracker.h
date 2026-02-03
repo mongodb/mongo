@@ -37,6 +37,7 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
