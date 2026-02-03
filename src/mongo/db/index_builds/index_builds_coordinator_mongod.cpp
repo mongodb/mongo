@@ -77,6 +77,7 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -107,7 +108,7 @@ const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActive
 /**
  * Constructs the options for the loader thread pool.
  */
-ThreadPool::Options makeDefaultThreadPoolOptions() {
+ThreadPool::Options makeDefaultThreadPoolOptions(bool killableByStepdown) {
     ThreadPool::Options options;
     options.poolName = "IndexBuildsCoordinatorMongod";
     options.minThreads = 0;
@@ -120,11 +121,11 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     options.maxThreads = ThreadPool::Options::kUnlimited;
 
     // Ensure all threads have a client.
-    options.onCreateThread = [](const std::string& threadName) {
+    options.onCreateThread = [killableByStepdown](const std::string& threadName) {
         Client::initThread(threadName,
                            getGlobalServiceContext()->getService(),
                            Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
+                           ClientOperationKillableByStepdown{killableByStepdown});
     };
 
     return options;
@@ -211,10 +212,7 @@ void runVoteCommand(OperationContext* opCtx,
 };
 }  // namespace
 
-IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
-    : _threadPool(makeDefaultThreadPoolOptions()) {
-    _threadPool.startup();
-
+IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod() {
     // Change the 'setOnUpdate' function for the server parameter to signal the condition variable
     // when the value changes.
     using ParamT =
@@ -227,9 +225,19 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
         });
 }
 
-void IndexBuildsCoordinatorMongod::shutdown(OperationContext*) {
+ThreadPool& IndexBuildsCoordinatorMongod::_ensureThreadPool(bool killableByStepdown) {
+    auto pool = _threadPool.synchronize();
+    if ((*pool) == nullptr) {
+        *pool = std::make_unique<ThreadPool>(makeDefaultThreadPoolOptions(killableByStepdown));
+        (*pool)->startup();
+    }
+    return **pool;
+}
+
+void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
+    auto& pool = _ensureThreadPool(true);
     // Stop new scheduling.
-    _threadPool.shutdown();
+    pool.shutdown();
 
     // Join the step-up thread if it was started. The thread's opCtx should have been
     // interrupted by the shutdown signal, causing it to exit promptly.
@@ -238,11 +246,32 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext*) {
         _stepUpThread.join();
     }
 
+    // TODO SERVER-109664: just filter by protocol == kPrimaryDriven
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
+
+    // Primary-driven index builds interrupted by stepdown have already exited
+    // _runIndexBuildInner(). If they are still pending here, they did not receive the external
+    // abort they are awaiting, and have to be aborted now to unblock shutdown. Two-phase index
+    // builds on the other hand are all working inside _runIndexBuildInner() and will be interrupted
+    // by shutdown there.
+    if (usingPrimaryDrivenIndexBuilds) {
+        auto indexBuildFilter = [&](const auto& replState) {
+            return replState.isAwaitingPrimaryAbort();
+        };
+        for (const auto& replState : activeIndexBuilds.filterIndexBuilds(indexBuildFilter)) {
+            // No need to acquire the collection since no writes are performed.
+            _completeAbortForShutdown(opCtx, replState, CollectionPtr::null);
+        }
+    }
+
     // Wait for all active builds to stop.
     activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
-    _threadPool.join();
+    pool.join();
 }
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
@@ -476,20 +505,20 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
     // build thread is done running.
     onScopeExitGuard.dismiss();
     unregisterUnscheduledIndexBuild.dismiss();
-    _threadPool.schedule([this,
-                          buildUUID,
-                          dbName,
-                          nss,
-                          indexBuildOptions,
-                          opDesc,
-                          replState,
-                          startPromise = std::move(startPromise),
-                          startTimestamp,
-                          shardVersion = oss.getShardVersion(nss),
-                          dbVersion = oss.getDbVersion(dbName),
-                          resumeInfo,
-                          forwardableOpMetadata =
-                              std::move(forwardableOpMetadata)](auto status) mutable {
+    auto& pool = _ensureThreadPool(usingPrimaryDrivenIndexBuilds);
+    pool.schedule([this,
+                   buildUUID,
+                   dbName,
+                   nss,
+                   indexBuildOptions,
+                   opDesc,
+                   replState,
+                   startPromise = std::move(startPromise),
+                   startTimestamp,
+                   shardVersion = oss.getShardVersion(nss),
+                   dbVersion = oss.getDbVersion(dbName),
+                   resumeInfo,
+                   forwardableOpMetadata = std::move(forwardableOpMetadata)](auto status) mutable {
         ScopeGuard onScopeExitGuard([&] {
             stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
             _numActiveIndexBuilds--;
@@ -796,7 +825,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
                   "buildUUID"_attr = replState->buildUUID);
             replState->getNextActionFuture().wait(opCtx);
         }
-        // The promise was fullfilled before waiting.
+        // The promise was fulfilled before waiting.
         return;
     } catch (const DBException&) {
         // External aborts must wait for the builder thread, so we cannot be in an already aborted

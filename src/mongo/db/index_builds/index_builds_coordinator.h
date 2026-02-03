@@ -915,12 +915,6 @@ protected:
     /** Called by implementations to bump the waitForCommitQuorum counter when they do so.*/
     void _incWaitForCommitQuorum();
 
-    /**
-     * Returns a list of index builds matching the criteria 'indexBuildFilter'.
-     * Requires caller to lock '_mutex'.
-     */
-    using IndexBuildFilterFn = std::function<bool(const ReplIndexBuildState& replState)>;
-
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;
 

@@ -92,8 +92,8 @@ secFp.wait();
 jsTest.log.info("10. Allow new primary to abort the index build");
 secFp.off();
 
-// "Index build: attempting to abort".
-checkLog.containsJson(newPrimary, 4656010, {
+// "Cleaned up index build after abort".
+checkLog.containsJson(newPrimary, 465611, {
     buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
     },

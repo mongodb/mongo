@@ -381,11 +381,15 @@ bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
         return false;
     }
 
-    LOGV2(20347,
-          "Index build: aborted without cleanup",
-          "buildUUID"_attr = buildUUID,
-          "collectionUUID"_attr = collection->uuid(),
-          logAttrs(collection->ns()));
+    logv2::DynamicAttributes attrs;
+    boost::optional<UUID> collectionUUID;
+    attrs.add("buildUUID", buildUUID);
+    if (collection) {
+        collectionUUID = collection->uuid();
+        attrs.add("collectionUUID", *collectionUUID);
+        attrs.add("namespace", collection->ns());
+    }
+    LOGV2(20347, "Index build: aborted without cleanup", attrs);
 
     builder.getValue()->abortWithoutCleanup(opCtx, collection, isResumable);
 

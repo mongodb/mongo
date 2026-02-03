@@ -45,6 +45,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -160,13 +161,20 @@ private:
         IndexBuildOptions indexBuildOptions,
         const boost::optional<ResumeIndexInfo>& resumeInfo);
 
+    /**
+     * Returns the thread pool, lazily creating and starting it if uninitialized.
+     * Primary driven index builds should be interrupted by stepdown, while two phase index builds
+     * are built simultaneously on all nodes.
+     */
+    ThreadPool& _ensureThreadPool(bool killableByStepdown);
+
     // Thread pool on which index builds are run.
-    ThreadPool _threadPool;
+    synchronized_value<std::unique_ptr<ThreadPool>> _threadPool;
 
     // Manages _numActiveIndexBuilds and _indexBuildFinished.
     mutable stdx::mutex _throttlingMutex;
 
-    // Protected by _mutex.
+    // Protected by _throttlingMutex.
     int _numActiveIndexBuilds = 0;
 
     // Condition signalled to indicate that an index build thread finished executing.

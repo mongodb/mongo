@@ -470,6 +470,11 @@ public:
     bool isFailureCleanUp() const;
 
     /**
+     * Returns true if this index build is awaiting primary abort.
+     */
+    bool isAwaitingPrimaryAbort() const;
+
+    /**
      * Returns abort reason.
      */
     std::string getAbortReason() const;

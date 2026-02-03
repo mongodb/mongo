@@ -388,6 +388,11 @@ bool ReplIndexBuildState::isFailureCleanUp() const {
     return _indexBuildState.isFailureCleanUp();
 }
 
+bool ReplIndexBuildState::isAwaitingPrimaryAbort() const {
+    stdx::lock_guard lk(_mutex);
+    return _indexBuildState.isAwaitingPrimaryAbort();
+}
+
 std::string ReplIndexBuildState::getAbortReason() const {
     stdx::lock_guard lk(_mutex);
     invariant(_indexBuildState.isAborted() || _indexBuildState.isAborting(),

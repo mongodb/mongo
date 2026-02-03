@@ -3126,43 +3126,59 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 // our error without doing anything else, as the index build is already cleaned
                 // up, and the server will terminate otherwise.
             } else {
-                // Take RSTL to observe and prevent replication state from changing.
-                auto autoGetcoll = std::move(
-                    _autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get()).getValue());
+                // Note for primary-driven index builds: because the IndexBuildsCoordinator threads
+                // are made interruptible by replica set state transitions, both primary stepdown
+                // and secondary stepup can reach here, in addition to other index build failures
+                // encountered by the primary during the index build.
+                auto allowSecondaryToFailInPrimaryDriven = [replState, status]() {
+                    LOGV2(11785200,
+                          "Index build: skipping self-abort after stepdown for primary-driven "
+                          "index build",
+                          "buildUUID"_attr = replState->buildUUID,
+                          logAttrs(replState->dbName),
+                          "collectionUUID"_attr = replState->collectionUUID,
+                          "error"_attr = status);
+                    // Since we are not primary any more, we cannot proceed with the self-abort and
+                    // must wait for external abort from primary.
+                    replState->requestAbortFromPrimary();
+                    // Reset the promise and wait for the new primary to coordinate the index build
+                    // and send the new signal/action.
+                    replState->resetNextActionPromise();
+                };
+                try {
+                    // Take RSTL to observe and prevent replication state from changing.
+                    auto autoGetcoll =
+                        std::move(_autoGetCollectionExclusiveWithTimeout(abortCtx, replState.get())
+                                      .getValue());
 
-                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-                auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
-                if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                    if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
-                        LOGV2(11785200,
-                              "Index build: skipping self-abort after stepdown for primary-driven "
-                              "index build",
-                              "buildUUID"_attr = replState->buildUUID,
-                              logAttrs(replState->dbName),
-                              "collectionUUID"_attr = replState->collectionUUID,
-                              "error"_attr = status);
-                        // We reached here after calling ReplIndexBuildState::setPostFailureState().
-                        // That state disallows concurrent aborts and blocks
-                        // ReplIndexBuildState::tryAbort() from proceeding. Since we are exiting
-                        // early without completing the self-abort, change the state to allow
-                        // external aborts.
-                        replState->requestAbortFromPrimary();
-                        return;
+                    const NamespaceStringOrUUID dbAndUUID(replState->dbName,
+                                                          replState->collectionUUID);
+                    auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
+                    if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
+                        if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
+                            return allowSecondaryToFailInPrimaryDriven();
+                        }
+
+                        // Index builds may not fail on secondaries. If a primary replicated an
+                        // abortIndexBuild oplog entry, then this index build would have been
+                        // externally aborted.
+                        fassert(51101,
+                                status.withContext(str::stream()
+                                                   << "Index build: " << replState->buildUUID
+                                                   << "; Database: "
+                                                   << replState->dbName.toStringForErrorMsg()));
                     }
 
-                    // Index builds may not fail on secondaries. If a primary replicated an
-                    // abortIndexBuild oplog entry, then this index build would have been externally
-                    // aborted.
-                    fassert(51101,
-                            status.withContext(str::stream()
-                                               << "Index build: " << replState->buildUUID
-                                               << "; Database: "
-                                               << replState->dbName.toStringForErrorMsg()));
+                    AutoGetCollection indexBuildEntryColl(
+                        abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                    _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
+                } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+                    if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
+                        allowSecondaryToFailInPrimaryDriven();
+                    } else {
+                        throw;
+                    }
                 }
-
-                AutoGetCollection indexBuildEntryColl(
-                    abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-                _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
             }
         });
 }
@@ -3541,13 +3557,17 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
                     RecoveryUnit::ReadSource::kNoTimestamp);
         invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
+        // Primary-driven index builds need to replicate container writes.
+        auto operationType = isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))
+            ? AcquisitionPrerequisites::kWrite
+            : AcquisitionPrerequisites::kUnreplicatedWrite;
         const auto collection = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest(
                 NamespaceStringOrUUID{replState->dbName, replState->collectionUUID},
                 PlacementConcern::kPretendUnsharded,
                 repl::ReadConcernArgs::get(opCtx),
-                AcquisitionPrerequisites::kUnreplicatedWrite),
+                operationType),
             MODE_IX);
 
         tassert(7683105, "Expected collection to exist", collection.exists());
@@ -3574,9 +3594,12 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        auto autoGetCollOptions =
-            auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+        // Primary-driven index builds need to replicate container writes.
+        auto intent = isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))
+            ? rss::consensus::IntentRegistry::Intent::Write
+            : rss::consensus::IntentRegistry::Intent::LocalWrite;
+        auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
+            Lock::GlobalLockOptions{.explicitIntent = intent});
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
