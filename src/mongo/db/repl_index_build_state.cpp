@@ -188,13 +188,15 @@ ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
                                          const DatabaseName& dbName,
                                          const std::vector<BSONObj>& specs,
-                                         IndexBuildProtocol protocol)
+                                         IndexBuildProtocol protocol,
+                                         Date_t startTime)
     : buildUUID(indexBuildUUID),
       collectionUUID(collUUID),
       dbName(dbName),
       indexNames(extractIndexNames(specs)),
       indexSpecs(specs),
-      protocol(protocol) {
+      protocol(protocol),
+      _metrics(IndexBuildMetrics{.startTime = startTime}) {
     _waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
     if (protocol == IndexBuildProtocol::kTwoPhase)
         commitQuorumLock.emplace(indexBuildUUID.toString());
@@ -694,6 +696,21 @@ void ReplIndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     builder->append("resumable", !_lastOpTimeBeforeInterceptors.isNull());
 
     _indexBuildState.appendBuildInfo(builder);
+}
+
+IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    return _metrics;
+}
+
+void ReplIndexBuildState::setVotedToCommitTime(const Date_t& time) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    _metrics.voteCommitTime = time;
+}
+
+void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& time) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    _metrics.commitIndexOplogEntryTime = time;
 }
 
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {

@@ -104,6 +104,7 @@ MONGO_FAIL_POINT_DEFINE(hangInRemoveIndexBuildEntryAfterCommitOrAbort);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry);
 
 
 IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
@@ -126,6 +127,12 @@ constexpr StringData kIndexesFieldName = "indexes"_sd;
 constexpr StringData kKeyFieldName = "key"_sd;
 constexpr StringData kUniqueFieldName = "unique"_sd;
 constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillis =
+    "lastTimeBetweenCommitOplogAndCommitMillis"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
+    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisRestore =
+    "lastTimeBetweenCommitOplogAndCommitMillisRestore"_sd;
 
 /**
  * Checks if unique index specification is compatible with sharding configuration.
@@ -521,6 +528,38 @@ IndexBuildsCoordinator* IndexBuildsCoordinator::get(OperationContext* OperationC
     return get(OperationContext->getServiceContext());
 }
 
+void IndexBuildsCoordinator::_storeLastCommittedDuration(const ReplIndexBuildState& replState) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    const auto now = Date_t::now();
+    const auto elapsedTime = (now - metrics.startTime).count();
+    indexBuildsSSS.lastCommittedMillis.store(elapsedTime);
+}
+
+void IndexBuildsCoordinator::_storeLastTimeBetweenVoteAndCommitMillis(
+    const ReplIndexBuildState& replState) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    if (metrics.voteCommitTime == Date_t::min()) {
+        // It's possible that this node skipped voting for commit quorum (e.g, this was a single
+        // phase index build, or the commit quorum was disabled). In this case, return early to
+        // avoid storing a nonsensical duration.
+        return;
+    }
+    const auto now = Date_t::now();
+    const auto elapsedTime = (now - metrics.voteCommitTime).count();
+    indexBuildsSSS.lastTimeBetweenVoteAndCommitMillis.store(elapsedTime);
+}
+
+void IndexBuildsCoordinator::_storeLastTimeBetweenCommitOplogAndCommit(
+    const ReplIndexBuildState& replState, StringData metricName, AtomicWord<int64_t>& metric) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    const auto now = Date_t::now();
+    tassert(11436300,
+            str::stream() << "commitIndexOplogEntryTime was not set before setting " << metricName,
+            metrics.commitIndexOplogEntryTime != Date_t::min());
+    const auto elapsedTime = (now - metrics.commitIndexOplogEntryTime).count();
+    metric.store(elapsedTime);
+}
+
 
 std::unique_ptr<DiskSpaceMonitor::Action>
 IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
@@ -665,7 +704,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collection->uuid(), nss.dbName(), specs, protocol);
+            buildUUID, collection->uuid(), nss.dbName(), specs, protocol, Date_t::now());
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -788,7 +827,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     auto protocol = IndexBuildProtocol::kTwoPhase;
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collection->uuid(), dbName, specs, protocol);
+        buildUUID, collection->uuid(), dbName, specs, protocol, Date_t::now());
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {
@@ -1190,7 +1229,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
     auto swReplState = _getIndexBuild(buildUUID);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
+    bool restartingPausedIndexInStandaloneOrRestore = false;
     // Index builds are not restarted in standalone mode. If the node is started with
     // recoverFromOplogAsStandalone and when replaying the commitIndexBuild oplog entry for a paused
     // index, there is no active index build thread to commit.
@@ -1207,16 +1246,17 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
         // Get the builder.
         swReplState = _getIndexBuild(buildUUID);
+        restartingPausedIndexInStandaloneOrRestore = true;
     }
     auto replState = uassertStatusOK(swReplState);
-
+    replState->setReceivedCommitIndexBuildEntryTime(Date_t::now());
+    hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry.pauseWhileSet(opCtx);
     // Retry until we are able to put the index build in the kApplyCommitOplogEntry state. None of
     // the conditions for retrying are common or expected to be long-lived, so we believe this to be
     // safe to poll at this frequency.
     while (!_tryCommit(opCtx, replState)) {
         opCtx->sleepFor(Milliseconds(100));
     }
-
     auto fut = replState->sharedPromise.getFuture();
     auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
     auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
@@ -1225,6 +1265,22 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
           "buildUUID"_attr = buildUUID,
           "waitResult"_attr = waitStatus,
           "status"_attr = buildStatus);
+    if (restartingPausedIndexInStandaloneOrRestore) {
+        _storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisRestore,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisRestore);
+    } else if (inReplicationRecovery(opCtx->getServiceContext())) {
+        _storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery);
+    } else {
+        _storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillis,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillis);
+    }
 
     // Throws if there was an error building the index.
     fut.get();
@@ -2259,7 +2315,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, dbName, filteredSpecs, protocol);
+        buildUUID, collectionUUID, dbName, filteredSpecs, protocol, Date_t::now());
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
 
     auto status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
@@ -3140,7 +3196,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     if (MONGO_unlikely(hangIndexBuildBeforeCommit.shouldFail())) {
         LOGV2(4841706, "Hanging before committing index build");
-        hangIndexBuildBeforeCommit.pauseWhileSet();
+        hangIndexBuildBeforeCommit.pauseWhileSet(opCtx);
     }
 
     // Need to return the collection lock back to exclusive mode to complete the index build.
@@ -3236,7 +3292,9 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                     opCtx, collection.get(), replState->buildUUID));
             }
         }
+
         indexBuildsSSS.commit.addAndFetch(1);
+        _storeLastCommittedDuration(*replState);
 
         // If two phase index builds is enabled, index build will be coordinated using
         // startIndexBuild and commitIndexBuild oplog entries.
@@ -3308,6 +3366,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
           "indexesBuilt"_attr = replState->indexNames,
           "numIndexesBefore"_attr = replState->stats.numIndexesBefore,
           "numIndexesAfter"_attr = replState->stats.numIndexesAfter);
+    _storeLastTimeBetweenVoteAndCommitMillis(*replState);
     return CommitResult::kSuccess;
 }
 
@@ -3525,5 +3584,4 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
 
     return normalSpecs;
 }
-
 }  // namespace mongo

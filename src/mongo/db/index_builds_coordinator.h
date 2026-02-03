@@ -552,6 +552,15 @@ public:
             phases.append("processConstraintsViolatonTableOnCommit",
                           processConstraintsViolatonTableOnCommit.loadRelaxed());
             phases.append("commit", commit.loadRelaxed());
+            phases.append("lastCommittedMillis", lastCommittedMillis.loadRelaxed());
+            phases.append("lastTimeBetweenCommitOplogAndCommitMillis",
+                          lastTimeBetweenCommitOplogAndCommitMillis.loadRelaxed());
+            phases.append("lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery",
+                          lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery.loadRelaxed());
+            phases.append("lastTimeBetweenCommitOplogAndCommitMillisRestore",
+                          lastTimeBetweenCommitOplogAndCommitMillisRestore.loadRelaxed());
+            phases.append("lastTimeBetweenVoteAndCommitMillis",
+                          lastTimeBetweenVoteAndCommitMillis.loadRelaxed());
             indexBuilds.append("phases", phases.obj());
 
             return indexBuilds.obj();
@@ -566,6 +575,20 @@ public:
         AtomicWord<int> drainSideWritesTableOnCommit;
         AtomicWord<int> processConstraintsViolatonTableOnCommit;
         AtomicWord<int> commit;
+        // The duration of the last committed index build.
+        AtomicWord<int64_t> lastCommittedMillis{0};
+        // The duration between receiving the commitIndexBuild oplog entry and committing the index
+        // build for steady state replication for the last committed index build.
+        AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
+        // The duration between receiving the commitIndexBuild oplog entry and committing the index
+        // build during startup recovery for the last committed index build.
+        AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery;
+        // The duration between receiving the commitIndexBuild oplog entry and committing the index
+        // build for the last index build, when restoring a node using magic restore or when
+        // restoring it from the oplog as a standalone node.
+        AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisRestore;
+        // The duration between voting to commit and committing the index build.
+        AtomicWord<int64_t> lastTimeBetweenVoteAndCommitMillis;
     } indexBuildsSSS;
 
 private:
@@ -926,6 +949,26 @@ protected:
      * it is fine to examine the returned index builds without re-locking 'mutex'.
      */
     std::vector<std::shared_ptr<ReplIndexBuildState>> _getIndexBuilds() const;
+
+    /**
+     * Stores the duration of the most recently committed index build in the indexBuilds server
+     * status section.
+     */
+    void _storeLastCommittedDuration(const ReplIndexBuildState& replState);
+
+    /**
+     * Stores the time at which which we voted to commit an index build.
+     */
+    void _storeLastTimeBetweenVoteAndCommitMillis(const ReplIndexBuildState& replState);
+
+    /**
+     * Stores the duration between receiving the `commitIndexBuild` oplog entry and committing the
+     * index build, parameterized for the different scenarios that we could be applying the entry
+     * from.
+     */
+    void _storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState,
+                                                   StringData metricName,
+                                                   AtomicWord<int64_t>& metric);
 
     /**
      * Returns a list of index builds matching the criteria 'indexBuildFilter'.

@@ -288,6 +288,18 @@ private:
 };
 
 /**
+ * Tracks metrics for an index build of one or more indexes.
+ */
+struct IndexBuildMetrics {
+    // The time at which the index build begins.
+    Date_t startTime;
+    // The time at which we voted to commit the index build.
+    Date_t voteCommitTime = Date_t::min();
+    // The time at which we received a 'commitIndexBuild' oplog entry.
+    Date_t commitIndexOplogEntryTime = Date_t::min();
+};
+
+/**
  * Tracks the cross replica set progress of a particular index build identified by a build UUID.
  *
  * This is intended to only be used by the IndexBuildsCoordinator class.
@@ -303,7 +315,8 @@ public:
                         const UUID& collUUID,
                         const DatabaseName& dbName,
                         const std::vector<BSONObj>& specs,
-                        IndexBuildProtocol protocol);
+                        IndexBuildProtocol protocol,
+                        Date_t startTime);
 
     /**
      * The index build thread has been scheduled, from now on it should be possible to interrupt the
@@ -504,6 +517,21 @@ public:
      */
     void appendBuildInfo(BSONObjBuilder* builder) const;
 
+    /**
+     * Returns the metrics for this index build.
+     */
+    IndexBuildMetrics getIndexBuildMetrics() const;
+
+    /**
+     * Stores the time at which which we voted to commit an index build.
+     */
+    void setVotedToCommitTime(const Date_t& time);
+
+    /**
+     * Stores the time at which we received the `commitIndexBuild` oplog entry.
+     */
+    void setReceivedCommitIndexBuildEntryTime(const Date_t& time);
+
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;
 
@@ -603,6 +631,9 @@ private:
 
     // Set once setup is complete, indicating that a clean up is required in case of abort.
     bool _cleanUpRequired = false;
+
+    // Metrics for this index build. Used for server status reporting.
+    IndexBuildMetrics _metrics;
 };
 
 }  // namespace mongo
