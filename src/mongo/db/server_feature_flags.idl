@@ -137,6 +137,15 @@ feature_flags:
         version: 8.1
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
+    # TODO SERVER-118776: remove this feature flag and instead use
+    # gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe()
+    featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError:
+        description: >-
+            Enables throwing InterruptedDueTimeseriesUpgradeDowngrade error when yielding/restoring
+            collection acquisitions concurrently with timeseries upgrade/downgrade.
+        cpp_varname: gFeatureFlagViewlessTimeseriesUpgradeDowngradeRetriableError
+        default: false
+        fcv_gated: false
     featureFlagCreateViewlessTimeseriesCollections:
         description: >-
             Enables the creation of viewless timeseries collections.
