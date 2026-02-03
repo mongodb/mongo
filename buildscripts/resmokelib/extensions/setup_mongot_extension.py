@@ -20,6 +20,11 @@ CONF_FILENAME = "mongot-extension.conf"
 
 def get_so_path(is_evergreen: bool) -> str:
     """Get the full path to the mongot-extension .so file."""
+    # Allow overriding with environment variable for custom builds.
+    custom_path = os.environ.get("MONGOT_EXTENSION_PATH")
+    if custom_path:
+        return custom_path
+
     search_dirs = EVERGREEN_SEARCH_DIRS if is_evergreen else LOCAL_SEARCH_DIRS
     install_dir = next((d for d in search_dirs if os.path.isdir(d)), search_dirs[0])
     return os.path.join(install_dir, SO_FILENAME)
@@ -91,13 +96,22 @@ def setup_mongot_extension(
     so_path = get_so_path(is_evergreen)
     conf_path = os.path.join(CONF_OUT_DIR, CONF_FILENAME)
 
-    # If both .so and config already exist, return early.
-    if os.path.isfile(so_path) and os.path.isfile(conf_path):
-        logger.info("mongot-extension already configured")
-        return conf_path
+    # If using a custom path (via env var), skip download and just create config.
+    if os.environ.get("MONGOT_EXTENSION_PATH"):
+        if not os.path.isfile(so_path):
+            raise RuntimeError(
+                f"MONGOT_EXTENSION_PATH is set to {so_path} but file does not exist. "
+                "Please ensure the extension binary is at this location."
+            )
+        logger.info("Using custom mongot-extension from %s", so_path)
+    else:
+        # If both .so and config already exist, return early.
+        if os.path.isfile(so_path) and os.path.isfile(conf_path):
+            logger.info("mongot-extension already configured")
+            return conf_path
 
-    # Download the .so file.
-    download_extension(so_path, logger)
+        # Download the .so file.
+        download_extension(so_path, logger)
 
     # Create config file.
     os.makedirs(CONF_OUT_DIR, exist_ok=True)
