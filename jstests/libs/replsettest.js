@@ -4079,6 +4079,18 @@ function checkOplogs(rst, msgPrefix = "checkOplogs", secondaries) {
     secondaries = secondaries || rst._secondaries;
 
     function assertOplogEntriesEq(oplogEntry0, oplogEntry1, reader0, reader1, prevOplogEntry) {
+        // TODO SERVER-116413: Remove the skipConsistencyCheckForNewPrimaryOpEntry param and this early return.
+        if (
+            TestData.skipConsistencyCheckForNewPrimaryOpEntry &&
+            oplogEntry0.o &&
+            oplogEntry0.o.msg === "new primary" &&
+            oplogEntry1.o &&
+            oplogEntry1.o.msg === "new primary"
+        ) {
+            jsTest.log.info(`Skipping oplog consistency check for 'new primary' entry type`);
+            return;
+        }
+
         if (!bsonBinaryEqual(oplogEntry0, oplogEntry1)) {
             const query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
             rst.nodes.forEach((node) => rst.dumpOplog(node, query, 100));

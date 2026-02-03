@@ -8,7 +8,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const runTest = (db, coll) => {
     // Test that explain is legal with all readConcern levels.
-    const readConcernLevels = ["local", "majority", "available", "linearizable", "snapshot"];
+    let readConcernLevels = ["local", "majority", "available", "snapshot"];
+
+    // TODO SLS-2089: always include linearizable in readConcernLevels.
+    if (!TestData.notASC) {
+        readConcernLevels.push("linearizable");
+    }
+
     readConcernLevels.forEach(function (readConcernLevel) {
         assert.commandWorked(coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
 
