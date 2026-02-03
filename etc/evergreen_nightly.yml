@@ -75,3 +75,6 @@ patch_aliases:
     description: "Runs bazel build system tests"
     variant_tags: ["bazel_check"]
     task: ".*"
+  - alias: coverity_scan
+    variant: bv_coverity_analysis
+    task: run_coverity
