@@ -8,6 +8,12 @@ import {reconfig} from "jstests/replsets/rslib.js";
 
 const st = new ShardingTest({
     name: "custom_write_concern_test",
+    other: {
+        // TODO SERVER-118767: Remove this once the issue is fixed.
+        // When the balancer is enabled and balancerStop is called, it can cause the test to hang with stepdown suites,
+        // like sharding_csrs_continuous_config_stepdown.
+        enableBalancer: !TestData.runningWithConfigStepdowns,
+    },
     shards: {
         rs0: {
             nodes: [
@@ -72,7 +78,24 @@ cfg.settings.getLastErrorModes = {
     multiRegion: {region: 2},
     multiDC: {dc: 2},
 };
-reconfig(st.configRS, cfg);
+
+// Perform the replica set reconfiguration with retry logic to handle transient errors
+// such as ErrorCodes.NotWritablePrimary, which can occur if replSetReconfig is invoked
+// during a stepdown and runs on a SECONDARY instead of the PRIMARY.
+assert.soon(() => {
+    try {
+        reconfig(st.configRS, cfg);
+        jsTest.log.info("CSRS reconfig successful");
+        return true;
+    } catch (e) {
+        if (e.code === ErrorCodes.NotWritablePrimary) {
+            jsTest.log.info("Waiting for stable primary before reconfig...");
+            st.configRS.awaitNodesAgreeOnPrimary();
+            return false;
+        }
+        throw e;
+    }
+}, "Failed to reconfig CSRS");
 
 // Ensure that setting the write concern to a custom value that exists only on the CSRS fails.
 assert.commandFailedWithCode(
