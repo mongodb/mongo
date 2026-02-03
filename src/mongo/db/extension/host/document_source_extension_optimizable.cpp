@@ -336,8 +336,11 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
     processFields(_properties.getProvidedMetadataFields(),
                   [&](auto metaType) { deps->setMetadataAvailable(metaType); });
 
-    // Retain entire metadata and do not optimize, as it may be needed by the extension.
-    return DepsTracker::State::NOT_SUPPORTED;
+    // Return SEE_NEXT to ensure metadata dependencies are propagated to the pipeline.
+    // Returning NOT_SUPPORTED would prevent our metadata requests from being honored.
+    // We still need whole document since extensions may access any fields.
+    deps->needWholeDocument = true;
+    return DepsTracker::State::SEE_NEXT;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>

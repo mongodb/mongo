@@ -32,18 +32,9 @@
         - jstests/with_mongot/e2e/skip_limit.js
         - jstests/with_mongot/e2e/views/search_with_view_injected.js
 
-        # TODO SERVER-118499: Remove this exclusion when sortKey is propogated correctly.
-        - jstests/with_mongot/e2e/metadata/meta_dependency_validation.js
-        - jstests/with_mongot/e2e/views/vector_search/unionWith.js
-        - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_verbose_replace_root_test.js
-        - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_verbose_test.js
-        - jstests/with_mongot/e2e/hybridSearch/score_fusion_verbose_test.js
-        - jstests/with_mongot/e2e/hybridSearch/union_with_vector_search.js
-        - jstests/with_mongot/e2e/metadata/searchScore_as_score_metadata.js
-        - jstests/with_mongot/e2e/metadata/sort_by_vector_search_score.js
-
         # TODO SERVER-117794: Remove this exclusion.
         - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
+        - jstests/with_mongot/e2e/views/vector_search/unionWith.js
 
 - name: load_extension
   value:

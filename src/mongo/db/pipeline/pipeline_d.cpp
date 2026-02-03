@@ -976,6 +976,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
             sortPattern->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
                 .toBson();
     }
+
+    // If the pushed-down sort stage will output sortKey metadata, mark it as available for the
+    // remaining pipeline stages. This ensures that stages like extension stages or $setWindowFields
+    // can declare dependencies on sortKey metadata even after the sort has been pushed down.
+    if (sortStage && sortStage->shouldSetSortKeyMetadata()) {
+        availableMetadata.set(DocumentMetadataFields::kSortKey);
+    }
+
     // =============================================================================================
     // The end of last-minute pipeline optimizations.
     // =============================================================================================
