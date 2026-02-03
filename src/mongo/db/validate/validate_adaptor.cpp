@@ -93,7 +93,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <fmt/ranges.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -157,8 +156,8 @@ enum class TimeseriesValidationResult {
     kIndexOutOfRange,
     kIndexBadValue,
     kInvalidBSONInDataField,
-    kExtendedRangeMismatch,
 };
+
 
 struct TimeseriesValidationStatus {
     TimeseriesValidationResult result;
@@ -219,9 +218,6 @@ const char* _describeTimeseriesValidationResult(TimeseriesValidationResult resul
                    "more info, see logs with log id 6698300.";
         case TimeseriesValidationResult::kInvalidBSONInDataField:
             return "Invalid BSON In Data Field. For more info, see logs with log id 6698300.";
-        case TimeseriesValidationResult::kExtendedRangeMismatch:
-            return "An extended range timestamp was found in a collection without extended range "
-                   "support. For more info, see logs with log id 6698300.";
     }
 
     MONGO_UNREACHABLE;
@@ -751,42 +747,6 @@ TimeseriesValidationStatus _validateTimeSeriesDataFields(const CollectionPtr& co
 }
 
 /**
- * Checks for mismatches in the collection where an extended range timestamp exits in the bucket
- * control or _id block. This function should be called after schema validation as field presense is
- * not checked before access and exceptions will be thrown if the BSONObj does not contain the
- * expected field.
- */
-TimeseriesValidationStatus _validateTimeseriesExtendedRangeTimestamps(
-    bool requiresExtendedRangeSupport, StringData timeFieldName, const BSONObj& recordBson) {
-    if (!requiresExtendedRangeSupport) {
-        // Check the control block and _id fields for an extended timestamp and flag an error if
-        // one exists while the collection metadata is not correctly set.
-
-        std::vector<std::string> extendedRangeTimestampChecks;
-
-        if (const auto oid = recordBson["_id"].OID(); timeseries::oidHasExtendedRangeTime(oid)) {
-            extendedRangeTimestampChecks.push_back("_id");
-        }
-        if (const auto controlMinTimestamp = recordBson["control"]["min"][timeFieldName].Date();
-            timeseries::dateOutsideStandardRange(controlMinTimestamp)) {
-            extendedRangeTimestampChecks.push_back(fmt::format("control.min.{}", timeFieldName));
-        }
-        if (const auto controlMaxTimestamp = recordBson["control"]["max"][timeFieldName].Date();
-            timeseries::dateOutsideStandardRange(controlMaxTimestamp)) {
-            extendedRangeTimestampChecks.push_back(fmt::format("control.max.{}", timeFieldName));
-        }
-
-        if (!extendedRangeTimestampChecks.empty()) {
-            return {TimeseriesValidationResult::kExtendedRangeMismatch,
-                    fmt::format("[ {} ] contain extended range timestamps unsupported by the "
-                                "collection metadata",
-                                fmt::join(extendedRangeTimestampChecks, ", "))};
-        }
-    }
-    return {TimeseriesValidationResult::kValid, ""};
-}
-
-/**
  * Validates the consistency of a time-series bucket.
  */
 TimeseriesValidationStatus _validateTimeSeriesBucketRecord(OperationContext* opCtx,
@@ -810,14 +770,6 @@ TimeseriesValidationStatus _validateTimeSeriesBucketRecord(OperationContext* opC
     }
 
     if (auto status = _validateTimeSeriesDataFields(coll, recordBson, results, bucketVersion);
-        status.result != TimeseriesValidationResult::kValid) {
-        return status;
-    }
-
-    if (auto status = _validateTimeseriesExtendedRangeTimestamps(
-            coll->getRequiresTimeseriesExtendedRangeSupport(),
-            timeseriesOptions.getTimeField(),
-            recordBson);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }

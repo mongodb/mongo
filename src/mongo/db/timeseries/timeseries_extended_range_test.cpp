@@ -115,12 +115,5 @@ TEST(TimeseriesExtendedRangeSupport, BucketsHaveDateOutsideStandardRange) {
         options, mixedWithMilliseconds.begin(), mixedWithMilliseconds.end()));
 }
 
-TEST(TimeseriesExtendedRangeSupport, OIDHasExtendedRangeTimeComponent) {
-    const auto extendedRangeOid = OID::createFromString("e980f6cc8bee049fcc1c4d88"_sd);
-    EXPECT_TRUE(timeseries::oidHasExtendedRangeTime(extendedRangeOid));
-    const auto nonExtendedRangeOid = OID::createFromString("61be04541ad72e8d5d257550"_sd);
-    EXPECT_FALSE(timeseries::oidHasExtendedRangeTime(nonExtendedRangeOid));
-}
-
 }  // namespace
 }  // namespace mongo

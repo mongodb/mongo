@@ -862,7 +862,7 @@ public:
     void insertDoc(BSONObj doc, ErrorCodes::Error expected = ErrorCodes::OK) {
         ASSERT_OK(storageInterface()->createCollection(_opCtx, _nss, _options));
         WriteUnitOfWork wuow(_opCtx);
-        AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
         EXPECT_EQ(expected, Helpers::insert(_opCtx, *coll, doc));
         wuow.commit();
@@ -920,7 +920,6 @@ TEST_P(TimeseriesCollectionValidationValidBucketsTest, TimeseriesValidationGoodD
     {
         WriteUnitOfWork wuow(_opCtx);
         AutoGetCollection coll(_opCtx, _nss, MODE_IX);
-        coll->setRequiresTimeseriesExtendedRangeSupport(_opCtx);
         ASSERT_TRUE(coll->isTimeseriesCollection());
         ASSERT_OK(Helpers::insert(_opCtx, *coll, bson));
         wuow.commit();
@@ -1287,18 +1286,6 @@ TEST_P(TimeseriesCollectionValidationSchemaViolationTest,
                            {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
                            {CollectionValidation::ValidateMode::kForegroundFullCheckBSON});
     }
-}
-
-
-TEST_F(TimeseriesCollectionValidationTest, ReportErrorsInExtendedRangeBookkeeping) {
-    const auto doc = getExtendedTimeRangeSampleDoc();
-    insertDoc(doc);
-    {
-        AutoGetCollection coll(_opCtx, _nss, MODE_IS);
-        EXPECT_FALSE(coll->getRequiresTimeseriesExtendedRangeSupport());
-    }
-    foregroundValidate(
-        _nss, _opCtx, {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0});
 }
 
 TEST_F(TimeseriesCollectionValidationTest, MayRequireExtendedRangeSupportExpectTrue) {
