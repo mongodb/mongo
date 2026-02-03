@@ -6,10 +6,9 @@
  * to complete the index builds. The expectation is that these values are close to each other.
  *
  * @tags: [
- *   # While secondaries do not build indexes and do not drain side writes, this test specifically
- *   # fails due to in-progress index builds being aborted on step up.
- *   # TODO SERVER-111896 - This test may also not be relevant for primary driven index builds overall.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *   # Since secondaries do not build indexes and do not drain side writes in primary driven index
+ *   # builds, running this test has very little benefit.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  *

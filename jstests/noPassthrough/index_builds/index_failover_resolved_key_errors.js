@@ -7,9 +7,9 @@
  * build for the entire replica set.
  *
  * @tags: [
- *   # On step up, we abort in-progress index builds on the new primary.
- *   # TODO SERVER-111896: This test may also not be relevant for primary driven index builds.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *   # Secondaries do not perform collection scans in primary driven index builds, making this test
+ *   # irrelevant.
+ *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

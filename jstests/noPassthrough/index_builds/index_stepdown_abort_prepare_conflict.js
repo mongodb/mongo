@@ -12,13 +12,12 @@
  *    block stepDown. Since abort must acquire the RSTL to write its oplog entry, ensures that the
  *    index build is able to retry after failing once due to a stepDown.
  * 6) Steps up a new primary. Ensure that the blocked index build on the secondary does not prevent
- *    step-up from ocurring.
+ *    step-up from occurring.
  *
  * @tags: [
- *   # When primary-driven index builds are enabled, secondaries do not run their own index builds.
- *   # TODO SERVER-111896: May also be subject to investigation for whether this scenario is relevant
- *   # to primary driven index builds
- *   primary_driven_index_builds_incompatible,
+ *   # This test passes for the wrong reason. The new primary aborts the index build on step up,
+ *   # without trying to resume, which is expected to fail with a CannotIndexParallelArrays error.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

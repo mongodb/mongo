@@ -12,8 +12,7 @@
  *    block stepDown.
  *
  * @tags: [
- *   # Primary driven index builds are aborted when a new primary steps up. This test may also be
- *   # not relevant to primary driven index builds. See SERVER-111896.
+ *   # Primary driven index builds are aborted when a new primary steps up.
  *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,

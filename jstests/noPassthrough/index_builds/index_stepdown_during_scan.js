@@ -2,15 +2,13 @@
  * Confirms that background index builds on a primary are not aborted when the node steps down during
  * the collection scan phase.
  * @tags: [
- *   # TODO (SERVER-111896) This test becomes racy with primary driven index builds but otherwise
- *   # does not seem to have a correctness issue. We should investigate as part of the linked ticket.
- *   primary_driven_index_builds_incompatible,
+ *   # With primary driven index builds, the node will abort the in-progress index build on step up.
+ *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -59,13 +57,8 @@ assert.neq(0, exitCode, "expected shell to exit abnormally due to index build be
 // after the node becomes primary again.
 rst.awaitReplication();
 
-// TODO(SERVER-109578): Remove this check when the feature flag is removed.
-// With primary driven index builds, the node will abort the in-progress index build on step up.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
-    IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);
-} else {
-    IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
-    const secondaryColl = rst.getSecondary().getCollection(coll.getFullName());
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
-}
+IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
+const secondaryColl = rst.getSecondary().getCollection(coll.getFullName());
+IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
+
 rst.stopSet();
