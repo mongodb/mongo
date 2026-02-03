@@ -37,6 +37,8 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
@@ -414,6 +416,114 @@ TEST_F(CollModTimestampedTest, CollModTimeseriesMixedSchemaFlagPointInTimeLookup
             collBefore->getTimeseriesMixedSchemaBucketsState().canStoreMixedSchemaBucketsSafely());
         ASSERT_NE(true, collBefore->timeseriesBucketingParametersHaveChanged());
     }
+}
+
+CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+
+    ASSERT_TRUE(coll.exists()) << "Unable to get collection options for "
+                               << nss.toStringForErrorMsg()
+                               << " because collection does not exist.";
+
+    return coll.getCollectionPtr()->getCollectionOptions();
+}
+
+TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_Succeeds) {
+    auto opCtx = makeOpCtx();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");
+
+    // Enabling the Replicated RecordId flag
+    RAIIServerParameterControllerForTest featureFlagRecordIdsReplicatedController(
+        "featureFlagRecordIdsReplicated", true);
+
+    // Creating the collection, it will have replicated record Ids since the feature flag is on.
+    CreateCommand cmd = CreateCommand(nss);
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    // Confirm it has replicated record Ids
+    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+
+    // Modify it disabling replicated record Ids
+    CollMod collModCmd(nss);
+    collModCmd.setRecordIdsReplicated(false);
+    BSONObjBuilder result;
+    uassertStatusOK(processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result));
+
+    // Confirm replicated record Ids have been disabled
+    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+}
+
+TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {
+    auto opCtx = makeOpCtx();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");
+
+    // Creating the collection, it will Not have replicated record Ids since the feature
+    // flag is not enabled.
+    CreateCommand cmd = CreateCommand(nss);
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    // Confirm it doesn't have replicated record Ids
+    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+
+    // Attempt to modify it disabling replicated record Ids
+    CollMod collModCmd(nss);
+    collModCmd.setRecordIdsReplicated(true);
+    BSONObjBuilder result;
+    // collMod should fail.
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result).code());
+
+    // Confirm it still doesn't have replicated record Ids
+    ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+}
+
+class MockPersistenceProviderRequiringReplicatedRecordIds
+    : public rss::AttachedPersistenceProvider {
+public:
+    std::string name() const override {
+        return "MockPersistenceProviderRequiringReplicatedRecordIds";
+    }
+
+    bool shouldUseReplicatedRecordIds() const override {
+        return true;
+    }
+};
+
+TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequiresIt_Fails) {
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(
+            std::make_unique<MockPersistenceProviderRequiringReplicatedRecordIds>());
+
+    auto opCtx = makeOpCtx();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");
+
+    // Enabling the Replicated RecordId flag
+    RAIIServerParameterControllerForTest featureFlagRecordIdsReplicatedController(
+        "featureFlagRecordIdsReplicated", true);
+
+    // Creating the collection, it will have replicated record Ids since the feature flag is on.
+    CreateCommand cmd = CreateCommand(nss);
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    // Confirm it has replicated record Ids
+    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+
+    // Attempt to modify it disabling replicated record Ids
+    CollMod collModCmd(nss);
+    collModCmd.setRecordIdsReplicated(false);
+    BSONObjBuilder result;
+    // collMod should fail.
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              processCollModCommand(opCtx.get(), nss, collModCmd, nullptr, &result).code());
+
+    // Confirm it still have replicated record Ids
+    ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
 }
 
 }  // namespace

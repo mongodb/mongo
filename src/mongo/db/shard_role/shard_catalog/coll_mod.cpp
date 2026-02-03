@@ -49,6 +49,7 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -631,6 +632,13 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
     if (auto recordIdsReplicated = cmr.getRecordIdsReplicated()) {
         if (*recordIdsReplicated) {
             return {ErrorCodes::InvalidOptions, "Cannot set recordIdsReplicated to true"};
+        }
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        if (provider.shouldUseReplicatedRecordIds()) {
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "Cannot set recordIdsReplicated to false for provider "
+                                  << provider.name()};
         }
 
         parsed.recordIdsReplicated = recordIdsReplicated;
