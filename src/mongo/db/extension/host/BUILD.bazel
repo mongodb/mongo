@@ -66,6 +66,7 @@ mongo_cc_library(
     srcs = [
         "document_source_extension_for_query_shape.cpp",
         "document_source_extension_optimizable.cpp",
+        "document_source_visitor_docs_needed_bounds.cpp",
         "extension_stage.cpp",
     ],
     deps = [
@@ -81,6 +82,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
     ],
 )

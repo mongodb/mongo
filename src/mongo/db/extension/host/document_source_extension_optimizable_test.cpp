@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -2455,6 +2456,19 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
                          MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
                          ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
                          viewNss.coll().data());
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsReturnsUnknown) {
+    auto astNode = std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>();
+    AggStageAstNodeHandle handle{new sdk::ExtensionAggStageAstNode(std::move(astNode))};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
 }
 
 }  // namespace mongo::extension
