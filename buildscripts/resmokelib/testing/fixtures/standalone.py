@@ -17,6 +17,7 @@ from buildscripts.resmokelib.extensions import (
     delete_extension_configs,
     find_and_generate_extension_configs,
 )
+from buildscripts.resmokelib.extensions.setup_mongot_extension import setup_mongot_extension
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import certs
@@ -73,6 +74,14 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 mongod_options=self.mongod_options,
             )
             add_extensions_signature_pub_key_path(self.mongod_options)
+
+        # Automatically download and configure mongot-extension if needed.
+        if "mongot-extension" in self.mongod_options.get("loadExtensions", ""):
+            self.logger.info("Setting up mongot-extension")
+            setup_mongot_extension(
+                is_evergreen=bool(self.config.EVERGREEN_TASK_ID),
+                logger=self.logger,
+            )
 
         if "set_parameters" not in self.mongod_options:
             self.mongod_options["set_parameters"] = {}

@@ -269,6 +269,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/resmokelib/extensions/OWNERS.yml
+/buildscripts/resmokelib/extensions/**/* @10gen/query-integration-extensions-api @svc-auto-approve-bot
+/buildscripts/resmokelib/extensions/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/OWNERS.yml
 /buildscripts/resmokelib/testing/**/queryable_server.py @10gen/server-backup-restore @svc-auto-approve-bot
 
@@ -441,7 +445,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/write_sast_report_env_file.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/generate_symbol_check_report.py @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/verify_extension_visibility_test.sh @10gen/query-integration-extensions-api @svc-auto-approve-bot
-/evergreen/functions/setup_mongot_extension.sh @10gen/query-integration-extensions-api @svc-auto-approve-bot
 
 # The following patterns are parsed from ./evergreen/functions/security_reporting_scripts/OWNERS.yml
 /evergreen/functions/security_reporting_scripts/ @10gen/platsec-server @svc-auto-approve-bot

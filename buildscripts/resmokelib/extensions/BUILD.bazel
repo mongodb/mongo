@@ -7,6 +7,10 @@ py_library(
         "delete_extension_configs.py",
         "find_and_generate_extension_configs.py",
         "generate_extension_configs.py",
+        "setup_mongot_extension.py",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/s3_binary:download",
+    ],
 )

@@ -14,6 +14,7 @@ from buildscripts.resmokelib.extensions import (
     delete_extension_configs,
     find_and_generate_extension_configs,
 )
+from buildscripts.resmokelib.extensions.setup_mongot_extension import setup_mongot_extension
 from buildscripts.resmokelib.testing.fixtures import _builder, external, interface
 from buildscripts.resmokelib.utils import certs
 from buildscripts.resmokelib.utils.sharded_cluster_util import (
@@ -88,6 +89,16 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             add_extensions_signature_pub_key_path(
                 mongod_options=self.mongod_options,
                 mongos_options=self.mongos_options,
+            )
+
+        # Automatically download and configure mongot-extension if needed.
+        if "mongot-extension" in self.mongod_options.get(
+            "loadExtensions", ""
+        ) or "mongot-extension" in self.mongos_options.get("loadExtensions", ""):
+            self.logger.info("Setting up mongot-extension")
+            setup_mongot_extension(
+                is_evergreen=bool(self.config.EVERGREEN_TASK_ID),
+                logger=self.logger,
             )
 
         self.mongod_executable = mongod_executable

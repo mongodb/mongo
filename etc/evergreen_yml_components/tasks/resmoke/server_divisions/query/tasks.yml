@@ -1463,7 +1463,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1485,7 +1484,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1509,7 +1507,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1532,7 +1529,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1556,7 +1552,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1579,7 +1574,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1603,7 +1597,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
@@ -1626,7 +1619,6 @@ tasks:
     commands:
       - func: "do setup"
       - func: "get mongot version"
-      - func: "setup mongot-extension"
       - func: "run tests"
         vars:
           resmoke_jobs_max: 5
