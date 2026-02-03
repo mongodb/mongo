@@ -5,6 +5,7 @@ selector:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_batching_1.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_batching_2.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_bad_setup.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_dlq.js
 
 executor:
   fixture:
