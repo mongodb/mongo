@@ -108,6 +108,21 @@ export const $config = (function () {
                 throw e;
             }
         },
+        updateMany: function (db, collName) {
+            const coll = db[getCollNames()[0]];
+            try {
+                const res = assert.commandWorked(
+                    coll.updateMany({[metaFieldName]: rndMeta()}, {$set: {[metaFieldName]: rndMeta()}}),
+                );
+                jsTest.log(`${coll.getName()} updateMany: ${tojsononeline(res)}`);
+            } catch (e) {
+                const acceptedErrors = [ErrorCodes.InterruptedDueToTimeseriesUpgradeDowngrade];
+                if (e.code && acceptedErrors.includes(e.code)) {
+                    return;
+                }
+                throw e;
+            }
+        },
         find: function (db, collName) {
             const coll = db[getCollNames()[0]];
             try {
