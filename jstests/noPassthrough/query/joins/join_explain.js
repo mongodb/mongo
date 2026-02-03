@@ -50,7 +50,6 @@ function runTest(pipeline) {
     for (const stage of stages) {
         // TODO SERVER-111913: Once we have estimates from single table nodes, we can extend this to
         // check other kinds of stages and test that numDocs/keys are reported in the output.
-        // TODO SERVER-116505: Verify that cost info is present in explain here too.
         if (stage.stage.includes("JOIN_EMBEDDING") || stage.stage.includes("COLLSCAN")) {
             assert(
                 stage.hasOwnProperty("cardinalityEstimate"),
@@ -61,8 +60,7 @@ function runTest(pipeline) {
                 stage.hasOwnProperty("costEstimate"),
                 "Cost estimate not found in stage: " + tojson(stage) + ", " + tojson(explain),
             );
-            // TODO SERVER-117480: Change this assert to be strictly greater than zero.
-            assert.gte(stage.costEstimate, 0, "Cost estimate is not greater than 0");
+            assert.gt(stage.costEstimate, 0, "Cost estimate is not greater than 0");
         }
     }
 }
