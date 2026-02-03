@@ -325,13 +325,14 @@ const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
         }));
     }
 
-    // Test transaction involving sharded collection with concurrent drop, where the transaction
-    // attempts to read the dropped collection.
+    // Test transaction involving sharded collection with concurrent drop or rename, where the
+    // transaction attempts to read the dropped or renamed-from collection.
     {
-        function runTest(readConcernLevel, command) {
-            jsTest.log("Test transaction with concurrent drop. Command: " + command +
-                       " Read Concern: " + readConcernLevel);
-            const dbName = 'test_txn_and_drop_with_' + command + '_and_' + readConcernLevel;
+        function runTest(readConcernLevel, operation, command) {
+            jsTest.log("Test transaction with concurrent " + operation + ". Command: " + command +
+                       ", read concern: " + readConcernLevel);
+            const dbName =
+                'test_txn_and_' + operation + '_with_' + command + '_and_' + readConcernLevel;
             const collName1 = 'coll1';
             const collName2 = 'coll2';
             const ns1 = dbName + '.' + collName1;
@@ -339,8 +340,8 @@ const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
             let coll1 = st.s.getDB(dbName)[collName1];
             let coll2 = st.s.getDB(dbName)[collName2];
 
-            jsTest.log("Running transaction + drop test with read concern " + readConcernLevel +
-                       " and command " + command);
+            jsTest.log("Running transaction + " + operation + " test with read concern " +
+                       readConcernLevel + " and command " + command);
             assert(command === 'find' || command === 'aggregate' || command === 'update' ||
                    command === 'bulkWrite');
             // Initial state:
@@ -348,7 +349,7 @@ const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
             //    shard1: collA(sharded)
             //
             // 1. Start txn, hit shard0 for collB
-            // 2. Drop collA
+            // 2. Drop or rename collA
             // 3. Read collA. Will target only shard0 because the router believes it is no longer
             //    sharded, so it would read the sharded coll (but just half of it). Therefore, a
             //    conflict must be raised.
@@ -374,8 +375,14 @@ const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
             session.startTransaction({readConcern: {level: readConcernLevel}});
             assert.eq(1, sessionColl2.find().itcount());  // Targets shard0.
 
-            // While the transaction is still open, drop coll1.
-            assert(coll1.drop());
+            // While the transaction is still open, drop or rename coll1.
+            if (operation === "drop") {
+                assert(coll1.drop());
+            } else if (operation === "rename") {
+                assert.commandWorked(coll1.renameCollection("coll3"));
+            } else {
+                throw new Error("Unsupported operation: " + operation);
+            }
 
             // Refresh the router so that it doesn't send a stale SV to the shard, which would cause
             // the txn to be aborted.
@@ -407,9 +414,13 @@ const commands = ['find', 'aggregate', 'update', 'bulkWrite'];
             }
         }
 
-        readConcerns.forEach((readConcern) => commands.forEach((command) => {
-            runTest(readConcern, command);
-        }));
+        ["drop", "rename"].forEach(
+            (operation) => readConcerns.forEach(
+                (readConcern) => commands.forEach((command) => {
+                    runTest(readConcern, operation, command);
+                }),
+                ),
+        );
     }
 
     // Test transaction concurrent with reshardCollection.
