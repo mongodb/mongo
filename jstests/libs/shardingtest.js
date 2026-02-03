@@ -952,6 +952,7 @@ export class ShardingTest {
         const rs = this._rs[idx].test;
         const startOptions = {...rs.startOptions};
         rs.stopSet(null, false, {skipValidation: true});
+        rs.reprovisionExternalResources();
         rs.startSet(startOptions);
         rs.initiate();
         rs.awaitNodesAgreeOnPrimary();

@@ -3496,6 +3496,12 @@ export class ReplSetTest {
             timeout,
         );
     }
+
+    /**
+     * Hollow method meant to be implemented by subclasses of ReplSetTest that need to reprovision external
+     * mongod resources to support the restart of a replica set following a 'stopSet(forRestart: false)' invocation.
+     */
+    reprovisionExternalResources() {}
 }
 
 /**
