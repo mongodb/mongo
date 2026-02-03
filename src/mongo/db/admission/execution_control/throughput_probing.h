@@ -61,6 +61,12 @@ MONGO_MOD_PRIVATE Status validateMinConcurrency(int32_t concurrency,
 MONGO_MOD_PRIVATE Status validateMaxConcurrency(int32_t concurrency,
                                                 const boost::optional<TenantId>&);
 
+/**
+ * on_update callback for the throughputProbingConcurrencyAdjustmentIntervalMillis parameter.
+ * Updates the throughput probing periodic job's interval.
+ */
+Status onUpdateConcurrencyAdjustmentIntervalMillis(const int32_t& newValue);
+
 }  // namespace MONGO_MOD_PUBLIC throughput_probing
 
 /**
@@ -72,14 +78,23 @@ class MONGO_MOD_PUBLIC ThroughputProbing {
 public:
     ThroughputProbing(ServiceContext* svcCtx,
                       TicketHolder* readTicketHolder,
-                      TicketHolder* writeTicketHolder,
-                      Milliseconds interval);
+                      TicketHolder* writeTicketHolder);
 
     void appendStats(BSONObjBuilder& builder) const;
 
     void start();
 
     void stop();
+
+    /**
+     * Sets the period for the throughput probing periodic job.
+     */
+    void setPeriod(Milliseconds period);
+
+    /**
+     * Gets the period for the throughput probing periodic job.
+     */
+    Milliseconds getPeriod() const;
 
 private:
     friend class throughput_probing::ThroughputProbingTest;
@@ -116,7 +131,6 @@ private:
     ProbingState _state = ProbingState::kStable;
     int64_t _prevNumFinishedProcessing = -1;
 
-    Milliseconds _interval;
     Timer _timer;
 
     struct Stats {

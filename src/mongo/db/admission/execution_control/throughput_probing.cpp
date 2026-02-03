@@ -75,7 +75,7 @@ Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantI
 }
 
 Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
-    if (concurrency < gMinConcurrency) {
+    if (concurrency < gMinConcurrency.load()) {
         return {ErrorCodes::BadValue,
                 "Throughput probing maximum concurrency cannot be less than minimum concurrency"};
     }
@@ -89,12 +89,10 @@ using namespace throughput_probing;
 
 ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* readTicketHolder,
-                                     TicketHolder* writeTicketHolder,
-                                     Milliseconds interval)
+                                     TicketHolder* writeTicketHolder)
     : _svcCtx(svcCtx),
       _readTicketHolder(readTicketHolder),
       _writeTicketHolder(writeTicketHolder),
-      _interval(interval),
       _timer(svcCtx->getTickSource()) {}
 
 void ThroughputProbing::start() {
@@ -110,7 +108,7 @@ void ThroughputProbing::start() {
         _job = _svcCtx->getPeriodicRunner()->makeJob(
             PeriodicRunner::PeriodicJob{"ThroughputProbingTicketHolderMonitor",
                                         [this](Client* client) { _run(client); },
-                                        _interval,
+                                        Milliseconds{gConcurrencyAdjustmentIntervalMillis.load()},
                                         true /* isKillableByStepdown */});
         _job.start();
     }
@@ -127,6 +125,21 @@ void ThroughputProbing::stop() {
 
 void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
     _stats.serialize(builder);
+}
+
+void ThroughputProbing::setPeriod(Milliseconds period) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_job.isValid()) {
+        _job.setPeriod(period);
+    }
+}
+
+Milliseconds ThroughputProbing::getPeriod() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_job.isValid()) {
+        return _job.getPeriod();
+    }
+    return Milliseconds{throughput_probing::gConcurrencyAdjustmentIntervalMillis.load()};
 }
 
 void ThroughputProbing::_run(Client* client) {
@@ -186,7 +199,7 @@ std::pair<int32_t, int32_t> newReadWriteConcurrencies(double stableConcurrency, 
     auto readPct = gReadWriteRatio.load();
     auto writePct = 1 - readPct;
 
-    auto min = gMinConcurrency;
+    auto min = gMinConcurrency.load();
     auto max = gMaxConcurrency.load();
 
     auto clamp = [&](double pct) {
@@ -215,7 +228,7 @@ void ThroughputProbing::_probeStable(OperationContext* opCtx, double throughput)
         // At least one of the ticket pools is exhausted, so try increasing concurrency.
         _state = ProbingState::kUp;
         _increaseConcurrency(opCtx);
-    } else if (readPeak > gMinConcurrency || writePeak > gMinConcurrency) {
+    } else if (readPeak > gMinConcurrency.load() || writePeak > gMinConcurrency.load()) {
         // Neither of the ticket pools are exhausted, so try decreasing concurrency to just
         // below the current level of usage.
         _state = ProbingState::kDown;
@@ -379,7 +392,7 @@ void ThroughputProbing::_decreaseConcurrency(OperationContext* opCtx) {
 }
 
 void ThroughputProbing::_initState() {
-    int32_t minTotalConcurrency = gMinConcurrency * 2;
+    int32_t minTotalConcurrency = gMinConcurrency.load() * 2;
     int32_t maxTotalConcurrency = gMaxConcurrency.load() * 2;
     // Warn if the configured initial concurrency is outside the valid range. The value will be
     // clamped below, but users should be aware their setting was not honored. The valid range is

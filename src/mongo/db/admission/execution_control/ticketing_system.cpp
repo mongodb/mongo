@@ -131,6 +131,23 @@ bool isClientDeprioritizationExempted(Client* client) {
 
 }  // namespace
 
+namespace throughput_probing {
+/**
+ * on_update callback for the throughputProbingConcurrencyAdjustmentIntervalMillis parameter.
+ * Updates the throughput probing periodic job's interval.
+ */
+Status onUpdateConcurrencyAdjustmentIntervalMillis(const int32_t& newValue) {
+    if (hasGlobalServiceContext()) {
+        auto* ticketingSystem = TicketingSystem::get(getGlobalServiceContext());
+        if (ticketingSystem) {
+            ticketingSystem->setProbingPeriod(Milliseconds{newValue});
+        }
+    }
+    return Status::OK();
+}
+
+}  // namespace throughput_probing
+
 Status TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth(
     std::int32_t newWriteMaxQueueDepth) {
     return updateSettings("write max queue depth", [=](Client*, TicketingSystem* ticketingSystem) {
@@ -336,10 +353,7 @@ TicketingSystem::TicketingSystem(
               .deprioritization = {.gate = gDeprioritizationGate.load(),
                                    .heuristic = gHeuristicDeprioritization.load(),
                                    .backgroundTasks = gBackgroundTasksDeprioritization.load()}}),
-      _throughputProbing(svcCtx,
-                         normal.read.get(),
-                         normal.write.get(),
-                         Milliseconds{throughput_probing::gConcurrencyAdjustmentIntervalMillis}) {
+      _throughputProbing(svcCtx, normal.read.get(), normal.write.get()) {
     _holders[static_cast<size_t>(AdmissionContext::Priority::kNormal)] = std::move(normal);
     _holders[static_cast<size_t>(AdmissionContext::Priority::kLow)] = std::move(low);
 };
@@ -709,6 +723,10 @@ void TicketingSystem::startThroughputProbe() {
             _state.loadRelaxed().usesThroughputProbing);
 
     _throughputProbing.start();
+}
+
+void TicketingSystem::setProbingPeriod(Milliseconds period) {
+    _throughputProbing.setPeriod(period);
 }
 
 TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, OperationType o) const {

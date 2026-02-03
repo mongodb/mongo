@@ -232,6 +232,11 @@ public:
      */
     void startThroughputProbe();
 
+    /**
+     * Sets the period for the throughput probing periodic job.
+     */
+    void setProbingPeriod(Milliseconds period);
+
 private:
     /**
      * Returns the appropriate TicketHolder based on the given priority and operation type.

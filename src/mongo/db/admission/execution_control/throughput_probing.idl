@@ -62,8 +62,8 @@ server_parameters:
         description: >-
             The minimum number of concurrent read/write transactions for throughput probing. This minimum
             is applied to reads and writes separately.
-        set_at: startup
-        cpp_vartype: int32_t
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gMinConcurrency
         default: 4
         validator:
@@ -123,12 +123,13 @@ server_parameters:
     throughputProbingConcurrencyAdjustmentIntervalMillis:
         description: >-
             The interval in milliseconds in which to run the concurrency adjustment algorithm.
-        set_at: startup
-        cpp_vartype: int32_t
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrencyAdjustmentIntervalMillis
         deprecated_name:
             - storageEngineConcurrencyAdjustmentIntervalMillis
         default: 100
+        on_update: onUpdateConcurrencyAdjustmentIntervalMillis
         validator:
             gte: 10
         redact: false

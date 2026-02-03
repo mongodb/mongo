@@ -56,7 +56,7 @@ TEST(ThroughputProbingParameterTest, InitialConcurrency) {
     // deferred to _initState() to avoid startup failures due to parameter ordering issues.
     // All values should pass validation.
     ASSERT_OK(validateInitialConcurrency(0, {}));
-    ASSERT_OK(validateInitialConcurrency(gMinConcurrency * 2, {}));
+    ASSERT_OK(validateInitialConcurrency(gMinConcurrency.load() * 2, {}));
     ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 2, {}));
     ASSERT_OK(validateInitialConcurrency(1, {}));                           // Below minimum
     ASSERT_OK(validateInitialConcurrency(gMaxConcurrency.load() * 3, {}));  // Above maximum
@@ -73,8 +73,9 @@ protected:
 
     void createAndInitProbing(int32_t initialConcurrency) {
         gInitialConcurrency = initialConcurrency;
-        _throughputProbing = std::make_unique<ThroughputProbing>(
-            _svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1});
+        throughput_probing::gConcurrencyAdjustmentIntervalMillis.store(1);
+        _throughputProbing =
+            std::make_unique<ThroughputProbing>(_svcCtx, &_readTicketHolder, &_writeTicketHolder);
         _throughputProbing->_initState();
     }
 
@@ -99,7 +100,7 @@ TEST_F(InitStateWarningTest, NoWarningForDefaultValue) {
 TEST_F(InitStateWarningTest, NoWarningForValidRange) {
     // Values within [2 * minConcurrency, 2 * maxConcurrency] should not produce warnings.
     unittest::LogCaptureGuard logs;
-    createAndInitProbing(gMinConcurrency * 2);
+    createAndInitProbing(gMinConcurrency.load() * 2);
     logs.stop();
 
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352800)), 0);
@@ -108,7 +109,7 @@ TEST_F(InitStateWarningTest, NoWarningForValidRange) {
 
 TEST_F(InitStateWarningTest, WarningForBelowMinimum) {
     // Values below 2 * minConcurrency should log warning 11352800.
-    int32_t belowMin = gMinConcurrency;  // This is < 2 * gMinConcurrency
+    int32_t belowMin = gMinConcurrency.load();  // This is < 2 * gMinConcurrency
     unittest::LogCaptureGuard logs;
     createAndInitProbing(belowMin);
     logs.stop();
@@ -117,10 +118,11 @@ TEST_F(InitStateWarningTest, WarningForBelowMinimum) {
     ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11352801)), 0);
 
     // Verify the warning contains the expected attributes.
-    ASSERT_EQ(logs.countBSONContainingSubset(
-                  BSON("id" << 11352800 << "attr"
-                            << BSON("configured" << belowMin << "minimum" << gMinConcurrency * 2))),
-              1);
+    ASSERT_EQ(
+        logs.countBSONContainingSubset(BSON(
+            "id" << 11352800 << "attr"
+                 << BSON("configured" << belowMin << "minimum" << gMinConcurrency.load() * 2))),
+        1);
 }
 
 TEST_F(InitStateWarningTest, WarningForAboveMaximum) {
@@ -149,9 +151,9 @@ TEST(ThroughputProbingParameterTest, MinConcurrency) {
 }
 
 TEST(ThroughputProbingParameterTest, MaxConcurrency) {
-    ASSERT_OK(validateMaxConcurrency(gMinConcurrency, {}));
+    ASSERT_OK(validateMaxConcurrency(gMinConcurrency.load(), {}));
     ASSERT_OK(validateMaxConcurrency(256, {}));
-    ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency - 1, {}));
+    ASSERT_NOT_OK(validateMaxConcurrency(gMinConcurrency.load() - 1, {}));
 }
 
 class ThroughputProbingTest : public ServiceContextTest {
@@ -165,8 +167,9 @@ protected:
         // The ThroughputProbing constructor requires the periodic runner to be set up on _svcCtx.
         throughput_probing::gInitialConcurrency = size;
         throughput_probing::gReadWriteRatio.store(readWriteRatio);
-        _throughputProbing = std::make_unique<ThroughputProbing>(
-            _svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1});
+        throughput_probing::gConcurrencyAdjustmentIntervalMillis.store(1);
+        _throughputProbing =
+            std::make_unique<ThroughputProbing>(_svcCtx, &_readTicketHolder, &_writeTicketHolder);
 
         {
             auto client = _svcCtx->getService()->makeClient("ThroughputProbingInit");
@@ -175,7 +178,7 @@ protected:
                 _svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
                     "ThroughputProbingTicketHolderMonitor",
                     [this](Client* client) { _throughputProbing->_run(client); },
-                    Milliseconds{1},
+                    Milliseconds{throughput_probing::gConcurrencyAdjustmentIntervalMillis.load()},
                     true /* isKillableByStepdown */});
             _throughputProbing->_initState();
             _throughputProbing->_resetConcurrency(opCtx.get());
@@ -270,7 +273,7 @@ class ThroughputProbingMinConcurrencyTest : public ThroughputProbingTest {
 protected:
     // This input is the total initial concurrency between both ticketholders, so it will be split
     // evenly between each ticketholder. We are attempting to test a limit that is per-ticketholder.
-    ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency * 2) {}
+    ThroughputProbingMinConcurrencyTest() : ThroughputProbingTest(gMinConcurrency.load() * 2) {}
 };
 
 class ThroughputProbingReadHeavyTest : public ThroughputProbingTest {
@@ -613,6 +616,19 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     _run();
     ASSERT_EQ(_readTicketHolder.outof(), reads - 1);
     ASSERT_LT(_writeTicketHolder.outof(), writes);
+}
+
+TEST_F(ThroughputProbingTest, SetPeriodUpdatesProbingInterval) {
+    // Verify initial period matches the configured interval.
+    ASSERT_EQ(_throughputProbing->getPeriod(),
+              Milliseconds{gConcurrencyAdjustmentIntervalMillis.load()});
+
+    // Update period to a new value.
+    Milliseconds newPeriod{500};
+    _throughputProbing->setPeriod(newPeriod);
+
+    // Verify period was updated.
+    ASSERT_EQ(_throughputProbing->getPeriod(), newPeriod);
 }
 
 }  // namespace mongo::admission::execution_control::throughput_probing

@@ -47,8 +47,6 @@ void ThroughputProbing::setup() {
     const auto initialTickets =
         admission::execution_control::throughput_probing::gInitialConcurrency;
     constexpr auto initialMaxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
-    Milliseconds probingInterval{
-        admission::execution_control::throughput_probing::gConcurrencyAdjustmentIntervalMillis};
 
     constexpr bool trackPeakUsed = true;
     _readTicketHolder = std::make_unique<TicketHolder>(
@@ -64,12 +62,14 @@ void ThroughputProbing::setup() {
     }();
 
     _throughputProbing = std::make_unique<admission::execution_control::ThroughputProbing>(
-        svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get(), probingInterval);
+        svcCtx(), _readTicketHolder.get(), _writeTicketHolder.get());
 
-    _probingThread = stdx::thread([this, probingInterval]() {
+    _probingThread = stdx::thread([this]() {
         _probing.store(true);
         while (_probing.load()) {
-            if (queue().wait_for(probingInterval, EventQueue::WaitType::Observer)) {
+            if (queue().wait_for(Milliseconds{admission::execution_control::throughput_probing::
+                                                  gConcurrencyAdjustmentIntervalMillis.load()},
+                                 EventQueue::WaitType::Observer)) {
                 _runner->run(client());
             }
         }
