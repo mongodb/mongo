@@ -449,4 +449,38 @@ describe("View policy extension stages", function () {
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
     });
+
+    describe("$disallowViews in nested view contexts", function () {
+        it("should fail when $disallowViews used on nested view (view on view)", function () {
+            const baseViewName = "nested_base_disallow";
+            const baseViewPipe = [{$addFields: {fromBase: true}}];
+            assert.commandWorked(db.createView(baseViewName, collName, baseViewPipe));
+
+            const topViewName = "nested_top_disallow";
+            const topViewPipe = [{$addFields: {fromTop: true}}];
+            assert.commandWorked(db.createView(topViewName, baseViewName, topViewPipe));
+
+            const pipeline = [{$disallowViews: {}}];
+            testDisallowViewsFails(topViewName, pipeline);
+
+            dropView(topViewName);
+            dropView(baseViewName);
+        });
+
+        it("should fail when $disallowViews used in $unionWith targeting nested view", function () {
+            const baseViewName = "nested_base_unionwith_disallow";
+            const baseViewPipe = [{$addFields: {fromBase: true}}];
+            assert.commandWorked(db.createView(baseViewName, collName, baseViewPipe));
+
+            const topViewName = "nested_top_unionwith_disallow";
+            const topViewPipe = [{$addFields: {fromTop: true}}];
+            assert.commandWorked(db.createView(topViewName, baseViewName, topViewPipe));
+
+            const pipeline = [{$unionWith: {coll: topViewName, pipeline: [{$disallowViews: {}}]}}];
+            testDisallowViewsFails(collName, pipeline);
+
+            dropView(topViewName);
+            dropView(baseViewName);
+        });
+    });
 });
