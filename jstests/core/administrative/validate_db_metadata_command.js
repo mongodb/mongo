@@ -72,16 +72,44 @@ validate({
     apiStrict: true,
 });
 
+//
 // Cases where the command returns an error.
-validate({apiStrict: true, error: true});
-validate({coll: coll1.getName(), apiStrict: true, error: true});
-validate({
-    dbName: testDB.getName(),
-    coll: coll1.getName(),
-    apiStrict: true,
-    error: {code: ErrorCodes.APIStrictError},
-});
-validate({dbName: testDB.getName(), apiStrict: true, error: true});
+//
+
+const assertValidateError = (cb) => {
+    assert.soon(() => {
+        try {
+            // Run validate command callback.
+            // If it does not throw, then the validation failed as expected, and there
+            // is no need to retry..
+            cb();
+            return true;
+        } catch (err) {
+            // The callback threw, so the validate command did not report an error as expected.
+            // This means we need to try again until the validation eventually fails.
+            return false;
+        }
+    });
+};
+
+assertValidateError(() => validate({coll: coll1.getName(), apiStrict: true, error: true}));
+
+assertValidateError(() =>
+    validate({
+        dbName: testDB.getName(),
+        coll: coll1.getName(),
+        apiStrict: true,
+        error: {code: ErrorCodes.APIStrictError},
+    }),
+);
+
+assertValidateError(() => validate({dbName: testDB.getName(), apiStrict: true, error: true}));
+
+// Validation fails because text indexes are not supported in the stable API version 1.
+// The error message we'll get here is:
+// "The index with name p_text is not allowed in API version 1".
+// The text index in question is created earlier in this test.
+assertValidateError(() => validate({apiStrict: true, error: true}));
 
 //
 // Tests for views.
