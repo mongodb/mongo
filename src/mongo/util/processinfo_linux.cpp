@@ -773,11 +773,13 @@ public:
                  "/sys/fs/cgroup/memory.max",                   // cgroups v2
                  "/sys/fs/cgroup/memory/memory.limit_in_bytes"  // cgroups v1
              }) {
-            unsigned long long groupMemBytes = 0;
-            std::string groupLimit = parseLineFromFile(file);
-            if (!groupLimit.empty() && NumberParser{}(groupLimit, &groupMemBytes).isOK()) {
-                return std::min(systemMemBytes, groupMemBytes);
-            }
+            std::string str = parseLineFromFile(file);
+            if (str.empty())
+                continue;
+            if (str == "max")
+                break;
+            if (unsigned long long sz; NumberParser{}(str, &sz).isOK())
+                return std::min(systemMemBytes, sz);
         }
         return systemMemBytes;
     }
@@ -929,7 +931,7 @@ unsigned long countNumaNodes() {
 /**
  * Append CPU Cgroup v2 info of the current process.
  */
-void appendCpuCgrouopV2Info(BSONObjBuilder& bob) {
+void appendCpuCgroupV2Info(BSONObjBuilder& bob) {
     std::string cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight;
     LinuxSysHelper::getCpuCgroupV2Info(
         ProcessId::getCurrent(), cpuMax, cpuMaxBurst, cpuUclampMin, cpuUclampMax, cpuWeight);
@@ -1172,7 +1174,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     appendIfExists(&bExtra, "cpuRevision", cpuRevision);
 
     // Append CPU Cgroup v2 information, if they exist.
-    appendCpuCgrouopV2Info(bExtra);
+    appendCpuCgroupV2Info(bExtra);
 
     if (auto res = ProcessInfo::readTransparentHugePagesParameter("enabled"); res.isOK()) {
         appendIfExists(&bExtra, "thp_enabled", res.getValue());
