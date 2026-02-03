@@ -980,7 +980,15 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                    cm.getAllShardIds(&shardIdsSet);
                    const auto toShard =
                        _coordinatorDoc.getShardDistribution().get().front().getShard();
-                   return !cm.isSharded() && shardIdsSet.find(toShard) != shardIdsSet.end();
+
+                   if (!cm.isSharded()) {
+                       uassert(ErrorCodes::NamespaceNotSharded,
+                               "Collection is already unsharded on a different shard. Use "
+                               "moveCollection.",
+                               shardIdsSet.find(toShard) != shardIdsSet.end());
+                       return true;
+                   }
+                   return false;
                }
 
                const auto currentShardKey = cm.getShardKeyPattern().getKeyPattern();

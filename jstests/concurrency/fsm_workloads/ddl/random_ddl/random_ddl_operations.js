@@ -126,6 +126,8 @@ export const $config = (function () {
                 ErrorCodes.ReshardCollectionAborted,
                 // The command is sent while a node is undergoing initial sync
                 ErrorCodes.SnapshotTooOld,
+                // Handles the case where the collection is already unsharded
+                ErrorCodes.NamespaceNotSharded,
             ]);
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);

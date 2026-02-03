@@ -205,23 +205,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded());
             } else if (resharding::isUnshardCollection(provenance)) {
-                // If the collection is already unsharded, this request should be a no-op. Check
-                // that the user didn't specify a "to" shard other than the shard the collection
-                // lives on - if it is different, return an error.
-                if (!cmOld.isSharded()) {
-                    if (_doc.getShardDistribution()) {
-                        std::set<ShardId> currentShards;
-                        cmOld.getAllShardIds(&currentShards);
-                        const auto toShard = _doc.getShardDistribution().get().front().getShard();
-                        uassert(ErrorCodes::NamespaceNotSharded,
-                                "Collection is already unsharded. Call moveCollection to move this "
-                                "collection to a different shard.",
-                                currentShards.find(toShard) != currentShards.end());
-                    }
-
-                    return;
-                }
-
                 // Pick the "to" shard if the client did not specify one.
                 if (!_doc.getShardDistribution()) {
                     auto toShard = sharding_util::selectLeastLoadedNonDrainingShard(opCtx);
