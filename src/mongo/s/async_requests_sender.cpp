@@ -138,14 +138,12 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
             // also have that unyield error.
             auto failedResponse = std::move(response);
 
-            // TODO (SERVER-97256): Remove this workaround once a proper solution is implemented.
-            //
-            // This temporary workaround ensures that the routing information entry is invalidated
-            // when a stale exception is raised during a remote request within a transaction. We
-            // achieve this by decorating the TransactionParticipantFailedUnyieldInfo with the
-            // remote error. This is necessary because the unyield error can override the stale
-            // exception, preventing the router from invalidating the stale routing entry and
-            // causing it to not converge.
+            // This workaround ensures that the routing information entry is invalidated when a
+            // stale exception is raised during a remote request within a transaction. We achieve
+            // this by decorating the TransactionParticipantFailedUnyieldInfo with the remote error.
+            // This is necessary because the unyield error can override the stale exception,
+            // preventing the router from invalidating the stale routing entry and causing it to not
+            // converge.
             if (auto si = _interruptStatus.extraInfo<TransactionParticipantFailedUnyieldInfo>();
                 si && failedResponse.swResponse.isOK()) {
                 auto status = getStatusFromCommandResult(failedResponse.swResponse.getValue().data);

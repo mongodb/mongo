@@ -69,11 +69,10 @@ public:
      * Returns the status received from the last executed remote response when a transaction
      * participant shard failed to unyield its resources.
      *
-     * TODO (SERVER-97256): Currently, the AsyncRequestsSender may replace the last remote response
-     * with an unyield error, giving precedence to the unyield error over the original remote
-     * response. This can result in the loss of some exceptions that needed to mark the routing
-     * information as stale. Using this parameter serves as a temporary workaround to address this
-     * issue. Once a permanent solution is implemented, this parameter should be removed.
+     * The AsyncRequestsSender may replace the last remote response with an unyield error, giving
+     * precedence to the unyield error over the original remote response. This can result in the
+     * loss of some exceptions that needed to mark the routing information as stale. Using this
+     * parameter serves as a workaround to address this issue.
      */
     const auto& getOriginalResponseStatus() const {
         return _originalResponseStatus;
