@@ -538,14 +538,17 @@ export function getExplainedPipelineFromAggregation(
     pipeline,
     {inhibitOptimization = true, postPlanningResults = false, hint} = {},
 ) {
-    // Prevent stages from being absorbed into the .find() layer
+    // Prevent stages from being absorbed into the .find() layer by pushing an optimization-
+    // inhibiting stage. Do this on a copy of the pipeline to prevent changing the input param,
+    // which callers may not expect.
+    const pipeCopy = Array.from(pipeline);
     if (inhibitOptimization) {
-        pipeline.unshift({$_internalInhibitOptimization: {}});
+        pipeCopy.unshift({$_internalInhibitOptimization: {}});
     }
 
     const aggOptions = hint ? {hint: hint} : {};
 
-    const result = coll.explain().aggregate(pipeline, aggOptions);
+    const result = coll.explain().aggregate(pipeCopy, aggOptions);
 
     assert.commandWorked(result);
     return getExplainPipelineFromAggregationResult(result, {inhibitOptimization, postPlanningResults});

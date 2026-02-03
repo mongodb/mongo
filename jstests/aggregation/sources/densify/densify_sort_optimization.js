@@ -274,6 +274,7 @@ const testCases = [
 for (let i = 0; i < testCases.length; i++) {
     let result;
 
+    jsTest.log.info("Running test case " + i);
     assert.soon(
         () => {
             result = getExplainedPipelineFromAggregation(db, coll, testCases[i][0]);
