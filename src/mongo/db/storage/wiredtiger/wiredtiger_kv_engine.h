@@ -337,6 +337,14 @@ protected:
 
     // Configuration parameters to configure the WiredTiger instance.
     WiredTigerConfig _wtConfig;
+    // This mutex is needed to prevent concurrent access to the config, only for the parts of the
+    // config that are writable (i.e. due to runtime-settable server params). We don't take it for
+    // read-only fields.
+    //
+    // TODO(SERVER-118642): Remove this mutex once runtime-settable configs are removed from the
+    // _wtConfig.
+    stdx::mutex _configUpdateMutex;
+
     std::string _canonicalName;
     std::string _path;
     std::string _rsOptions;

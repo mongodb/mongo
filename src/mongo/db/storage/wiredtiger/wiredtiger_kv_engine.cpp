@@ -3275,6 +3275,7 @@ Status WiredTigerKVEngine::updateEvictionThreadsMax(const int32_t& threadsMax) {
 
         WiredTigerKVEngine* kvEngine =
             static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
+        stdx::unique_lock lk(kvEngine->_configUpdateMutex);
         kvEngine->_wtConfig.evictionThreadsMax = threadsMax;
 
         std::stringstream ss;
@@ -3291,6 +3292,7 @@ Status WiredTigerKVEngine::updateEvictionThreadsMin(const int32_t& threadsMin) {
 
         WiredTigerKVEngine* kvEngine =
             static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
+        stdx::unique_lock lk(kvEngine->_configUpdateMutex);
         kvEngine->_wtConfig.evictionThreadsMin = threadsMin;
 
         std::stringstream ss;
