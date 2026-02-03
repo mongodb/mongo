@@ -123,8 +123,9 @@ inline Status makeShutdownTerminationStatus() {
         const auto& key = entry.first;
         if (key.starts_with(kReservedMetadataKeyPrefix) &&
             !kRecognizedClientMetadataKeys.contains(key)) {
+            // We do not send the invalid metadata back to the client for security reasons.
             return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
-                                  fmt::format("Unrecognized reserved metadata key: \"{}\"", key));
+                                  "Unrecognized reserved metadata key.");
         }
     }
     return ::grpc::Status::OK;
@@ -136,11 +137,10 @@ inline Status makeShutdownTerminationStatus() {
         clientIdEntry != clientMetadata.end()) {
         auto clientIdStatus = UUID::parse(clientIdEntry->second);
         if (!clientIdStatus.isOK()) {
-            return ::grpc::Status(
-                ::grpc::StatusCode::INVALID_ARGUMENT,
-                fmt::format("The provided client ID (\"{}\") is not a valid UUID: {}",
-                            clientIdEntry->second,
-                            clientIdStatus.getStatus().toString()));
+            // We do not send the invalid metadata or error string back to the client for security
+            // reasons.
+            return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                                  "The provided client ID is not a valid UUID.");
         }
         clientId = std::move(clientIdStatus.getValue());
     }
