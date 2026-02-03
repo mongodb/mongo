@@ -192,6 +192,14 @@ private:
                                            bool forward,
                                            const MatchExpression* filter);
 
+    /**
+     * Schedules an async task that will recover the sharding metadata. It does not wait for the
+     * recovery to complete.
+     */
+    void _scheduleMetadataRecovery(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const Status& staleStatus);
+
     // Protects the state below.
     mutable stdx::mutex _stateMutex;
 
@@ -204,6 +212,12 @@ private:
 
     bool _shuttingDown = false;
     Seconds _ttlMonitorSleepSecs;
+
+    // Set of namespaces for which a sharding metadata recovery is pending.
+    stdx::unordered_set<NamespaceString> _namespacesRequiringMetadataRefresh;
+
+    // Executor used to schedule sharding metadata recovery tasks.
+    std::shared_ptr<executor::TaskExecutor> _metadataRefreshTaskExecutor;
 };
 
 }  // namespace MONGO_MOD_PRIVATE mongo

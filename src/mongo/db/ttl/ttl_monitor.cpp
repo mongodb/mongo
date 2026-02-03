@@ -69,7 +69,6 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/ttl/ttl.h"
@@ -78,6 +77,8 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -245,7 +246,22 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
 
 TTLMonitor::TTLMonitor()
     : BackgroundJob(false /* selfDelete */),
-      _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {}
+      _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = "TTLMonitorMetadataRefresh";
+    threadPoolOptions.threadNamePrefix = "TTLMonitorMetadataRefresh-";
+    threadPoolOptions.minThreads = 0;
+    threadPoolOptions.maxThreads = ttlMonitorMaxMetadataRecoveryThreads.load();
+    threadPoolOptions.onCreateThread = [](const std::string& name) {
+        Client::initThread(name, getGlobalServiceContext()->getService());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
+    };
+
+    _metadataRefreshTaskExecutor = executor::ThreadPoolTaskExecutor::create(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface("TTLMonitorMetadataRefreshNetwork"));
+    _metadataRefreshTaskExecutor->startup();
+}
 
 TTLMonitor* TTLMonitor::get(ServiceContext* serviceCtx) {
     return getTTLMonitor(serviceCtx).get();
@@ -347,6 +363,12 @@ void TTLMonitor::shutdown() {
         _shuttingDown = true;
         _notificationCV.notify_all();
     }
+
+    if (_metadataRefreshTaskExecutor) {
+        _metadataRefreshTaskExecutor->shutdown();
+        _metadataRefreshTaskExecutor->join();
+    }
+
     wait();
     LOGV2(3684101, "Finished shutting down TTL collection monitor thread");
 }
@@ -506,17 +528,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         // present.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
             staleInfo && !staleInfo->getCriticalSectionSignal()) {
-            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-            ExecutorFuture<void>(executor)
-                .then(
-                    [serviceContext = opCtx->getServiceContext(), nss, staleError = ex.toStatus()] {
-                        ThreadClient tc("TTLShardVersionRecovery", serviceContext->getService());
-                        auto uniqueOpCtx = tc->makeOperationContext();
-                        auto opCtx = uniqueOpCtx.get();
-                        shard_role_loop::RetryContext shardRoleRetryCtx;
-                        shard_role_loop::handleStaleError(opCtx, staleError, shardRoleRetryCtx);
-                    })
-                .getAsync([](auto) {});
+            _scheduleMetadataRecovery(opCtx, staleInfo->getNss(), ex.toStatus());
         }
         LOGV2_WARNING(6353000,
                       "Error running TTL job on collection: the shard should refresh "
@@ -854,5 +866,31 @@ long long TTLMonitor::getTTLExaminedKeys_forTest() {
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
     return ttlInvalidTTLIndexSkips.get();
 }
+
+void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const Status& staleStatus) {
+    {
+        stdx::lock_guard lk(_stateMutex);
+        if (!_namespacesRequiringMetadataRefresh.insert(nss).second) {
+            // This nss already has a refresh scheduled.
+            return;
+        }
+    }
+
+    ExecutorFuture<void>(_metadataRefreshTaskExecutor)
+        .then([staleStatus] {
+            auto uniqueOpCtx = cc().makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+            shard_role_loop::RetryContext shardRoleRetryCtx;
+            shard_role_loop::handleStaleError(opCtx, staleStatus, shardRoleRetryCtx);
+        })
+        .onCompletion([this, nss](const Status& s) {
+            stdx::lock_guard lk(_stateMutex);
+            _namespacesRequiringMetadataRefresh.erase(nss);
+        })
+        .getAsync([](auto) {});
+}
+
 
 }  // namespace mongo

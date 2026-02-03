@@ -102,3 +102,15 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    ttlMonitorMaxMetadataRecoveryThreads:
+        description:
+            "Limits the maximum size of the thread pool the TTLMonitor uses to recover sharding
+            metadata."
+        set_at: [startup]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: ttlMonitorMaxMetadataRecoveryThreads
+        default: 5
+        validator:
+            gte: 1
+        redact: false

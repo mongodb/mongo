@@ -69,7 +69,8 @@
 namespace mongo {
 
 // Must exist in the mongo namespace to be a friend class of the TTLMonitor.
-class TTLTest : public ServiceContextMongoDTest {
+class TTLTest : public service_context_test::WithSetupTransportLayer,
+                public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
