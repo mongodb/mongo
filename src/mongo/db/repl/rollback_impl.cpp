@@ -501,6 +501,14 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
                 }
                 break;
             }
+            case OplogEntry::CommandType::kUpgradeDowngradeViewlessTimeseries: {
+                // Viewless timeseries upgrade/downgrade works like a rename from
+                // 'coll' to 'system.buckets.coll' or vice versa, so add both namespaces.
+                auto mainNss = CommandHelpers::parseNsCollectionRequired(opNss.dbName(), obj);
+                namespaces.insert(mainNss);
+                namespaces.insert(mainNss.makeTimeseriesBucketsNamespace());
+                break;
+            }
             case OplogEntry::CommandType::kDbCheck:
             case OplogEntry::CommandType::kCreate:
             case OplogEntry::CommandType::kDrop:

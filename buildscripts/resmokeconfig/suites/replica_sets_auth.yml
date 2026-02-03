@@ -29,6 +29,8 @@ selector:
     - jstests/replsets/test_only_repl_commands.js
     # This test applies an internal unregistered 'truncateRange' command.
     - jstests/replsets/replicated_truncate.js
+    # This test applies an internal unregistered 'upgradeDowngradeViewlessTimeseries' command.
+    - jstests/replsets/rollback_upgrade_downgrade_viewless_timeseries.js
 
 executor:
   config:
