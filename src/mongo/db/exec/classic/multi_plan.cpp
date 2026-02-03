@@ -590,6 +590,7 @@ bool MultiPlanStage::hasBackupPlan() const {
         planExplainerData.rejectedPlansWithStages.push_back(
             {std::move(_candidates[i + candidateOffset].solution), std::move(_rejected[i])});
     }
+    _rejected.clear();
     return planExplainerData;
 }
 
