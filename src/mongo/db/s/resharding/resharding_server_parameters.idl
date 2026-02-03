@@ -491,3 +491,23 @@ server_parameters:
         cpp_varname: gReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
         default: true
         redact: false
+
+    reshardingIndexVerification:
+        description: >-
+            Controls whether resharding should compare the index specs on the recipients and
+            the donors.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingIndexVerification
+        default: false
+        redact: false
+
+    reshardingCollectionOptionsVerification:
+        description: >-
+            Controls whether resharding should compare the collection options on the recipients and
+            the donors.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingCollectionOptionsVerification
+        default: false
+        redact: false

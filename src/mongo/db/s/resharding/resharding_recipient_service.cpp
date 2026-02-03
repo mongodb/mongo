@@ -934,9 +934,7 @@ void ReshardingRecipientService::RecipientStateMachine::
             _metadata.getTempReshardingNss(), _metadata.getReshardingUUID(), createCollRequest);
         notifyChangeStreamsOnShardCollection(opCtx.get(), notification);
 
-        if (resharding::gFeatureFlagReshardingVerification.isEnabled(
-                VersionContext::getDecoration(opCtx.get()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (resharding::gReshardingCollectionOptionsVerification.load()) {
             auto [sourceCollOptions, _] = _externalState->getCollectionOptions(
                 opCtx.get(),
                 _metadata.getSourceNss(),
@@ -1305,9 +1303,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 .thenRunOn(**executor)
                 .then([this, &factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
                     if (auto opCtx = factory.makeOperationContext(&cc());
-                        resharding::gFeatureFlagReshardingVerification.isEnabled(
-                            VersionContext::getDecoration(opCtx.get()),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        resharding::gReshardingIndexVerification.load()) {
                         auto [sourceIdxSpecs, _] = _externalState->getCollectionIndexes(
                             opCtx.get(),
                             _metadata.getSourceNss(),

@@ -119,6 +119,9 @@ const ShardId recipientShardId{"myShardId"};
 const long approxBytesToCopy = 10000;
 const long approxDocumentsToCopy = 100;
 
+std::vector<BSONObj> sourceCollectionIndexSpecs;
+const std::vector<BSONObj> tempReshardingCollectionIndexSpecs;
+
 const BSONObj sourceCollectionOptions = BSONObj();
 BSONObj tempReshardingCollectionOptions = BSONObj();
 
@@ -243,6 +246,10 @@ public:
         if (nss == _sourceNss) {
             return {sourceCollectionOptions, uuid};
         } else {
+            // The indexes for the temporary collection isn't retrieved via the ExternalState.
+            // So this piece of the code is not reachable at the moment. This is why in the unit
+            // tests for mismatched index specs, we set sourceCollectionIndexSpecs instead of
+            // tempReshardingCollectionIndexSpecs.
             return {tempReshardingCollectionOptions, uuid};
         }
     }
@@ -267,7 +274,11 @@ public:
         bool expandSimpleCollation) {
         invariant(nss == _sourceNss);
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kGetCollectionIndexes);
-        return {std::vector<BSONObj>{}, BSONObj()};
+        if (nss == _sourceNss) {
+            return {sourceCollectionIndexSpecs, BSONObj()};
+        } else {
+            return {tempReshardingCollectionIndexSpecs, BSONObj()};
+        }
     }
 
     void route(
@@ -775,6 +786,15 @@ public:
                 return stateDoc.getMutableState().getState();
             }));
     }
+
+    void tearDown() override {
+        repl::PrimaryOnlyServiceMongoDTest::tearDown();
+        // The following are set in some unit tests to mock mismatched index specs or collection
+        // options.
+        sourceCollectionIndexSpecs.clear();
+        tempReshardingCollectionOptions = BSONObj();
+    }
+
 
     RecipientStateTransitionController* controller() {
         return _controller.get();
@@ -2897,11 +2917,131 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
     }
 }
 
+// The index specs for the source and temporary collections are both defaulted to empty vectors,
+// so the verification will pass since both index specs are equal.
+TEST_F(ReshardingRecipientServiceTest, TestVerifyIndexSpecsHappyPath) {
+    RAIIServerParameterControllerForTest serverParameter("reshardingIndexVerification", true);
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        setupFeatureFlags(testOptions);
+
+        LOGV2(11863900,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+        PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                          RecipientStateEnum::kStrictConsistency};
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
+        stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
+
+        awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, TestVerifyIndexSpecsThrowsExceptionOnMismatchedIndexes) {
+    RAIIServerParameterControllerForTest serverParameter("reshardingIndexVerification", true);
+
+    // Set sourceCollectionIndexSpecs to create mismatched index specs.
+    sourceCollectionIndexSpecs = {BSON("key" << BSON("a" << 1) << "name"
+                                             << "a_1")};
+
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        setupFeatureFlags(testOptions);
+
+        LOGV2(11863901,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+
+        boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+        stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kError);
+
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        // Ensure we get to the errored state when we try to match index specs.
+        // If we do not get to an errored state this test should hang here and time out.
+        stateTransitionsGuard->wait(RecipientStateEnum::kError);
+        stateTransitionsGuard->unset(RecipientStateEnum::kError);
+
+        recipient->abort(false);
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest,
+       TestVerifyIndexSpecsDoesNotPerformVerificationIfFeatureFlagIsNotSet) {
+    RAIIServerParameterControllerForTest indexVerificationServerParameter(
+        "reshardingIndexVerification", false);
+    // Enable the other resharding feature flags or server parameters to verify that they do not
+    // override the index verification feature flag.
+    RAIIServerParameterControllerForTest countVerificationFeatureFlag(
+        "featureFlagReshardingVerification", true);
+    RAIIServerParameterControllerForTest collectionOptionsVerificationServerParameter(
+        "reshardingCollectionOptionsVerification", true);
+
+    // Set sourceCollectionIndexSpecs to create mismatched index specs.
+    sourceCollectionIndexSpecs = {BSON("key" << BSON("a" << 1) << "name"
+                                             << "a_1")};
+
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        setupFeatureFlags(testOptions);
+
+        LOGV2(11863902,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+        PauseDuringStateTransitions stateTransitionsGuard{controller(),
+                                                          RecipientStateEnum::kStrictConsistency};
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+        notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+        stateTransitionsGuard.wait(RecipientStateEnum::kStrictConsistency);
+        stateTransitionsGuard.unset(RecipientStateEnum::kStrictConsistency);
+
+        awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    }
+}
+
 // The collection options for the source and temporary collections are both defaulted to BSONObj(),
 // so this test will pass since both collection options are equal.
 TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
-                                                               true);
+    RAIIServerParameterControllerForTest serverParameter("reshardingCollectionOptionsVerification",
+                                                         true);
     for (const auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);
 
@@ -2935,8 +3075,12 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
 
 TEST_F(ReshardingRecipientServiceTest,
        TestVerifyCollectionOptionsThrowsExceptionOnMismatchedOptions) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
-                                                               true);
+    RAIIServerParameterControllerForTest serverParameter("reshardingCollectionOptionsVerification",
+                                                         true);
+
+    // Set tempReshardingCollectionOptions to create mismatched collection options.
+    tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
+
     for (const auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);
 
@@ -2944,6 +3088,10 @@ TEST_F(ReshardingRecipientServiceTest,
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
+
+        boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+        stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kError);
+
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
             BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
@@ -2952,14 +3100,7 @@ TEST_F(ReshardingRecipientServiceTest,
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
-        // options.
-        tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
-
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-
-        boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
-        stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kError);
 
         // Ensure we get to the errored state when we try to match options.
         // If we do not get to an errored state this test should hang here and time out.
@@ -2969,8 +3110,6 @@ TEST_F(ReshardingRecipientServiceTest,
         recipient->abort(false);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-
-        tempReshardingCollectionOptions = BSONObj();
     }
 }
 
@@ -2978,8 +3117,18 @@ TEST_F(ReshardingRecipientServiceTest,
 // If the feature was turned on we would catch the mismatched options and throw an exception.
 TEST_F(ReshardingRecipientServiceTest,
        TestVerifyCollectionOptionsDoesNotPerformVerificationIfFeatureFlagIsNotSet) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingVerification",
-                                                               false);
+    RAIIServerParameterControllerForTest collectionOptionsVerificationServerParameter(
+        "reshardingCollectionOptionsVerification", false);
+
+    // Set tempReshardingCollectionOptions to create mismatched collection options.
+    tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
+
+    // Enable the other resharding feature flags or server parameters to verify that they do not
+    // override the collection options validation feature flag.
+    RAIIServerParameterControllerForTest countVerificationFeatureFlag(
+        "featureFlagReshardingVerification", true);
+    RAIIServerParameterControllerForTest indexVerificationServerParameter(
+        "reshardingIndexVerification", true);
     for (const auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);
 
@@ -2997,10 +3146,6 @@ TEST_F(ReshardingRecipientServiceTest,
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        // Add dummy data to tempReshardingCollectionOptions to create mismatched collection
-        // options.
-        tempReshardingCollectionOptions = BSONObjBuilder().append("viewOn", "bar").obj();
-
         notifyToStartCloning(opCtx.get(), *recipient, doc);
         awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
         notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
@@ -3012,8 +3157,6 @@ TEST_F(ReshardingRecipientServiceTest,
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-
-        tempReshardingCollectionOptions = BSONObj();
     }
 }
 
