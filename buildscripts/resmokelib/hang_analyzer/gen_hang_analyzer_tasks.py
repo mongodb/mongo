@@ -46,7 +46,13 @@ def should_activate_core_analysis_task(task: EvgTask, evg_api: RetryingEvergreen
     # We hardcode some task names where the core analysis is extending the long pole
     # of required patch builds by 100 mins and the BFs are taking too long to fix.
     # This list is a quick fix to improve development velocity.
-    skip_tasks = ["no_passthrough_disagg_override", "disagg_repl_jscore_passthrough"]
+    # TODO(SERVER-118661): Remove disagg suites from skip list.
+    skip_tasks = [
+        "disagg_repl_jscore_passthrough",
+        "disagg_repl_jscore_passthrough_secondary_reads",
+        "disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer",
+        "no_passthrough_disagg_override",
+    ]
     current_task_name = task.display_name
     if task.parent_task_id:
         parent_task = evg_api.task_by_id(task.parent_task_id)

@@ -46,12 +46,14 @@ session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(
-    testDB.getCollection("system.profile").insert({name: "new"}),
-    ErrorCodes.OperationNotSupportedInTransaction,
-);
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+if (!TestData.notASC) {
+    session.startTransaction({readConcern: {level: "snapshot"}});
+    assert.commandFailedWithCode(
+        testDB.getCollection("system.profile").insert({name: "new"}),
+        ErrorCodes.OperationNotSupportedInTransaction,
+    );
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+}
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(systemDotViews.insert({_id: "new.view", viewOn: "bar", pipeline: []}), [

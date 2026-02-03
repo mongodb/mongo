@@ -292,8 +292,9 @@ assert.commandFailedWithCode(
 // include the cluster key as one of the fields.
 validateCompoundSecondaryIndexes(replicatedDB, replicatedColl, {_id: 1});
 
-if (FixtureHelpers.isMongos(db)) {
+if (FixtureHelpers.isMongos(db) || TestData.notASC) {
     // Using the local database is not supported through mongos, so end the test here.
+    // Only ASC nodes support the local database.
     quit();
 }
 

@@ -20,9 +20,12 @@ if (!TestData.testingReplicaSetEndpoint) {
     const localDB = db.getSiblingDB("local");
     const configDB = db.getSiblingDB("config");
 
+    // Only ASC supports 'local' database.
+    const dbsToTest = TestData.notASC ? [adminDB, configDB] : [localDB, adminDB, configDB];
+
     // Check that we cannot set 'changeStreamPreAndPostImages' on the local, admin and config
     // databases.
-    for (const db of [localDB, adminDB, configDB]) {
+    for (const db of dbsToTest) {
         assertDropCollection(db, collName);
         assert.commandFailedWithCode(
             db.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),

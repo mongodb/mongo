@@ -45,6 +45,9 @@
 
 namespace mongo {
 
+// TODO (SERVER-113365): Remove once resharding is working on disagg.
+MONGO_FAIL_POINT_DEFINE(disableRandomMoveCollection);
+
 namespace {
 
 template <class T>
@@ -411,6 +414,11 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
 
     if (auto sfp = fpBalancerShouldReturnRandomMigrations->scoped();
         MONGO_unlikely(sfp.isActive())) {
+
+        if (disableRandomMoveCollection.shouldFail()) {
+            return result;
+        }
+
         if (availableShards->size() < 2) {
             return result;
         }

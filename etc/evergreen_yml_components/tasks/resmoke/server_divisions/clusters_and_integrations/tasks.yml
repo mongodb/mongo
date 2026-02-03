@@ -3135,6 +3135,22 @@ tasks:
           resmoke_jobs_max: 10
 
   - <<: *gen_task_template
+    name: disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "large",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer
+          use_large_distro: "true"
+          resmoke_jobs_max: 2
+
+  - <<: *gen_task_template
     name: disagg_concurrency_sharded_replication_gen
     tags:
       [
