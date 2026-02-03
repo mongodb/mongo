@@ -578,13 +578,19 @@ def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
     # Tools packages are only published to the latest RHEL version supported on master, but
     # the tools binaries are cross compatible with other RHEL versions
     # (see https://jira.mongodb.org/browse/SERVER-92939)
+    def extract_rhel_major(rhel_string: str) -> str:
+        """Extract major version from rhel string (e.g., 'rhel93' -> '9', 'rhel10' -> '10')."""
+        version_part = rhel_string[4:]  # Remove 'rhel' prefix
+        if not version_part:
+            return ""
+        # For rhel10+, take first 2 digits; otherwise take first digit
+        if version_part[0] == "1" and len(version_part) > 1 and version_part[1].isdigit():
+            return version_part[:2]
+        return version_part[0]
+
     def major_version_matches(download_name: str) -> bool:
-        if (
-            os_name.startswith("rhel")
-            and download_name.startswith("rhel")
-            and os_name[4] == download_name[4]
-        ):
-            return True
+        if os_name.startswith("rhel") and download_name.startswith("rhel"):
+            return extract_rhel_major(os_name) == extract_rhel_major(download_name)
         return download_name == os_name
 
     for download in current_tools_releases["versions"][0]["downloads"]:
