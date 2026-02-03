@@ -1,7 +1,0 @@
-- name: enable
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          set_parameters:
-            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"

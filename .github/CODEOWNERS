@@ -138,7 +138,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*query_shape_hash_stability* @10gen/query-execution-query-settings @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*pqs* @10gen/query-execution-query-settings @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/generated_suites/replica_sets_recordids_replicated_jscore_passthrough.yml @10gen/server-collection-write-path @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/*execution_control* @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/generated_suites/replica_sets_reconfig* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -171,7 +170,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/fcv_upgrade_downgrade_primary_step_down_passthrough.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_kill_secondaries_jscore_passthrough.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_recordids_replicated_jscore_passthrough.yml @10gen/server-collection-write-path @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/*execution_control* @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/transitioning_replica_sets_jscore_passthrough.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/mappings/**/replica_sets_reconfig* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -195,7 +193,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/fcv_upgrade_downgrade_primary_step_down_overrides.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/primary_driven_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/replica_sets_kill_secondary.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
-/buildscripts/resmokeconfig/matrix_suites/overrides/**/recordids_replicated.yml @10gen/server-collection-write-path @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/execution_control_params.yml @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/priority_ports.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
 /buildscripts/resmokeconfig/matrix_suites/overrides/**/vector_search_extension.yml @10gen/query-integration-extensions-api @svc-auto-approve-bot
