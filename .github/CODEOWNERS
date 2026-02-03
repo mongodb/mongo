@@ -1158,6 +1158,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/query-execution/ @10gen/query-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution-change-streams/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-execution-change-streams/ @10gen/query-execution-change-streams @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution-classic/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/query-execution-classic/ @10gen/query-execution-classic @svc-auto-approve-bot
 

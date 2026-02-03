@@ -603,6 +603,7 @@ mongo_cc_library(
         "//src/mongo/db:startup_warnings_common",
         "//src/mongo/db/stats:system_buckets_metrics",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_refresher",
+        "//src/mongo/db:change_streams_cluster_parameter",
         "//src/mongo/otel/traces:tracing_initialization",
         "//src/mongo/transport:ingress_handshake_metrics",
         "//src/mongo/transport:service_executor",
