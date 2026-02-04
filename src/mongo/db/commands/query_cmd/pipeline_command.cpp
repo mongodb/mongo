@@ -60,7 +60,6 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -375,14 +374,7 @@ public:
                                                           opMsgRequest.validatedTenancyScope,
                                                           boost::none,
                                                           serializationCtx);
-
-            const auto& pipeline = aggregationRequest.getPipeline();
-            const auto hasMergeCursor =
-                std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
-                    return stage.firstElementFieldNameStringData() ==
-                        DocumentSourceMergeCursors::kStageName;
-                });
-            return !hasMergeCursor;
+            return !aggregation_request_helper::hasMergeCursors(aggregationRequest);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

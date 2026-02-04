@@ -105,14 +105,7 @@ struct UnionWithSharedState {
     VariablesParseState _variablesParseState;
 };
 
-class UnionWithStageParams : public mongo::DefaultStageParams {
-public:
-    UnionWithStageParams(mongo::BSONElement element, boost::optional<LiteParsedPipeline> pipeline);
-    static const Id& id;
-    Id getId() const final {
-        return id;
-    }
-};
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(UnionWith);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceUnionWith final : public DocumentSource {
 public:
@@ -141,12 +134,7 @@ public:
         }
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            const auto& maybeSubpipeline = getSubPipelines();
-            return std::make_unique<UnionWithStageParams>(
-                _originalBson,
-                maybeSubpipeline.empty()
-                    ? boost::none
-                    : boost::optional<LiteParsedPipeline>(maybeSubpipeline.front()));
+            return std::make_unique<UnionWithStageParams>(_originalBson);
         }
 
         bool hasExtensionVectorSearchStage() const override {

@@ -48,6 +48,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
@@ -240,6 +241,13 @@ void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Valu
     } else {
         doc[AggregateCommandRequest::kFromMongosFieldName] = value;
     }
+}
+
+bool hasMergeCursors(const AggregateCommandRequest& request) {
+    const auto& pipeline = request.getPipeline();
+    return std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
+        return stage.firstElementFieldNameStringData() == DocumentSourceMergeCursors::kStageName;
+    });
 }
 }  // namespace aggregation_request_helper
 

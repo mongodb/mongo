@@ -126,6 +126,11 @@ void setFromRouter(const VersionContext& vCtx,
 
 // TODO SERVER-95358 remove once 9.0 becomes last LTS.
 void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Value value);
+
+/**
+ * Returns true if this aggregation request has a $mergeCursors stage.
+ */
+bool hasMergeCursors(const AggregateCommandRequest& request);
 }  // namespace aggregation_request_helper
 
 /**

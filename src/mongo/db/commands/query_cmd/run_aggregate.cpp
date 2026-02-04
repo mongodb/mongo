@@ -1498,6 +1498,12 @@ Status runAggregate(
     auto onIFRError =
         [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
             stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
+            // If this pipeline is merging cursors, we need to propagate the error and retry from
+            // the very beginning (back on the router originating the request) in order to
+            // reestablish the cursors.
+            if (aggregation_request_helper::hasMergeCursors(request)) {
+                throw ex;
+            }
             ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
                 ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
         };

@@ -43,6 +43,15 @@
 namespace mongo::pipeline_factory {
 
 namespace {
+
+LiteParsedPipeline makeLiteParsedPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          const std::vector<BSONObj>& rawPipeline) {
+    return LiteParsedPipeline(expCtx->getNamespaceString(),
+                              rawPipeline,
+                              false,
+                              LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+}
+
 std::unique_ptr<Pipeline> finalizePipeline(std::unique_ptr<Pipeline> pipeline,
                                            const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const MakePipelineOptions& opts) {
@@ -102,11 +111,7 @@ std::unique_ptr<Pipeline> makePipeline(BSONElement rawPipelineElement,
 std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MakePipelineOptions opts) {
-    LiteParsedPipeline liteParsedPipeline =
-        LiteParsedPipeline(expCtx->getNamespaceString(),
-                           rawPipeline,
-                           false,
-                           LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+    LiteParsedPipeline liteParsedPipeline = makeLiteParsedPipeline(expCtx, rawPipeline);
 
     if (opts.desugar) {
         LiteParsedDesugarer::desugar(&liteParsedPipeline);
@@ -138,10 +143,7 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
     }
 
     LiteParsedPipeline liteParsedPipeline =
-        LiteParsedPipeline(expCtx->getNamespaceString(),
-                           aggRequest.getPipeline(),
-                           false,
-                           LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
+        makeLiteParsedPipeline(expCtx, aggRequest.getPipeline());
 
     if (opts.desugar) {
         LiteParsedDesugarer::desugar(&liteParsedPipeline);
@@ -219,20 +221,26 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
         // This is scoped as to ensure that viewLiteParsedPipeline gets destroyed while
         // resolvedNs.pipeline is still alive. There is a call to std::move(resolvedNs.pipeline)
         // below.
-        LiteParsedPipeline viewLiteParsedPipeline(resolvedNs.ns, resolvedNs.pipeline);
+        LiteParsedPipeline viewLiteParsedPipeline(
+            makeLiteParsedPipeline(subPipelineExpCtx, resolvedNs.pipeline));
         subPipelineExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
     }
 
     // Create a LiteParsedPipeline for the user pipeline and apply view handling with ViewPolicy
     // callbacks.
-    LiteParsedPipeline userLiteParsedPipeline(resolvedNs.ns, currentPipeline);
+    LiteParsedPipeline userLiteParsedPipeline(
+        makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
     if (opts.desugar) {
         LiteParsedDesugarer::desugar(&userLiteParsedPipeline);
     }
 
     // Apply the view to the user pipeline.
     const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
-    PipelineResolver::applyViewToLiteParsed(&userLiteParsedPipeline, resolvedView, originalNs);
+    PipelineResolver::applyViewToLiteParsed(
+        &userLiteParsedPipeline,
+        resolvedView,
+        originalNs,
+        LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()});
 
     // Parse from the modified LiteParsedPipeline. Skip desugar since we already did it above.
     auto optsWithoutDesugar = opts;
@@ -246,7 +254,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
 std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipeline,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                             PipelineValidatorCallback validator) {
-    LiteParsedPipeline liteParsedPipeline(expCtx->getNamespaceString(), rawPipeline);
+    LiteParsedPipeline liteParsedPipeline(makeLiteParsedPipeline(expCtx, rawPipeline));
     return Pipeline::parseFromLiteParsed(
         liteParsedPipeline, expCtx, validator, true /*isFacetPipeline*/);
 }

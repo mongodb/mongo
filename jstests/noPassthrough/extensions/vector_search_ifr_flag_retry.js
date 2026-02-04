@@ -104,14 +104,36 @@ function runViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTe
  * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
  * @param {boolean} featureFlagValue - The value to set for the feature flag.
  * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
+ * @param {Object|null} unionWithStage - The $unionWith stage to use. If null, a default stage with $vectorSearch is used.
+ * @param {boolean} shouldExplain - Whether to run the explain query.
+ * @param {string|null} viewName - The view name that the $unionWith stage should run against.
+ *                                  If null, $unionWith will run on the default test collection.
+ * @param {Array|null} viewPipeline - The view pipeline if running a view.
  */
-function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
+function runUnionWithVectorSearchTests({
+    conn,
+    mongotMock,
+    featureFlagValue,
+    shardingTest = null,
+    unionWithStage = null,
+    shouldExplain = true,
+    viewName = null,
+    viewPipeline = null,
+    isKickbackExecutedOnMongos = false,
+}) {
     setFeatureFlags(conn, featureFlagValue);
     // Create collection with search index on the collection namespace (not the view).
     createTestCollectionAndIndex(conn, mongotMock, shardingTest);
 
     const testDb = conn.getDB(kTestDbName);
     const coll = testDb[kTestCollName];
+
+    unionWithStage = unionWithStage || {
+        $unionWith: {
+            coll: viewName ? viewName : coll.getName(),
+            pipeline: [{$vectorSearch: vectorSearchQuery}],
+        },
+    };
 
     // Standalone $unionWith explain runs the subpipeline twice: once during the initial
     // execution to collect main pipeline execution stats, and once in UnionWith::serialize()
@@ -123,31 +145,35 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
     const numAggregationPipelineExecutionsPerNode = 1;
     const numNodes = shardingTest ? kNumShards : 1;
 
-    // Set up MongotMock cursor for explain query, using a cursorId of 123.
-    let cursorId = setUpMongotMockForVectorSearch(mongotMock, {
-        vectorSearchQuery,
-        verbosity: "executionStats",
-        shardingTest,
-        startingCursorId: 123,
-        coll,
-        testDb,
-        numPipelineExecutionsPerNode: numExplainPipelineExecutionsPerNode,
-    });
-
-    const unionWithStage = {
-        $unionWith: {
-            coll: coll.getName(),
-            pipeline: [{$vectorSearch: vectorSearchQuery}],
-        },
-    };
-
     // Get the current feature flag value to determine if we expect retries.
     const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-    // We expect 1 retry per query per shard - one for the explain and one for the aggregate.
+    // If we are expecting retries, we should always have 1 per shard for the aggregate,
+    // and 1 for the explain, if we are running it.
     // In sharded mode, the kickback retry happens on each shard.
-    const expectedUnionWithKickbackRetryDelta = expectRetry ? 2 * numNodes : 0;
+    let expectedUnionWithKickbackRetryDelta = expectRetry ? Number(shouldExplain) + 1 : 0;
 
-    // Set up MongotMock cursor for aggregate query.
+    if (shardingTest && isKickbackExecutedOnMongos) {
+        // TODO SERVER-117797 Fix double counting of kickback on mongos and remove this parameter/block.
+        expectedUnionWithKickbackRetryDelta = 2 * expectedUnionWithKickbackRetryDelta;
+    }
+
+    let cursorId = 123;
+    if (shouldExplain) {
+        // Set up MongotMock cursor for the explain query.
+        cursorId = setUpMongotMockForVectorSearch(mongotMock, {
+            vectorSearchQuery,
+            verbosity: "executionStats",
+            shardingTest,
+            startingCursorId: cursorId,
+            coll,
+            testDb,
+            numPipelineExecutionsPerNode: numExplainPipelineExecutionsPerNode,
+            viewName,
+            viewPipeline,
+        });
+    }
+
+    // Set up MongotMock cursor for the aggregate query.
     setUpMongotMockForVectorSearch(mongotMock, {
         vectorSearchQuery,
         shardingTest,
@@ -155,10 +181,13 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
         coll,
         testDb,
         numPipelineExecutionsPerNode: numAggregationPipelineExecutionsPerNode,
+        viewName,
+        viewPipeline,
     });
 
     const expectedLegacyDelta =
-        numExplainPipelineExecutionsPerNode * numNodes + numAggregationPipelineExecutionsPerNode * numNodes;
+        Number(shouldExplain) * numExplainPipelineExecutionsPerNode * numNodes +
+        numAggregationPipelineExecutionsPerNode * numNodes;
 
     runQueriesAndVerifyMetrics({
         conn,
@@ -168,8 +197,10 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
         expectedRetryDelta: expectedUnionWithKickbackRetryDelta,
         expectedLegacyDelta,
         runExplainQuery: () => {
-            const explain = coll.explain("executionStats").aggregate([unionWithStage]);
-            assert.commandWorked(explain);
+            if (shouldExplain) {
+                const explain = coll.explain("executionStats").aggregate([unionWithStage]);
+                assert.commandWorked(explain);
+            }
         },
         runAggregateQuery: () => {
             coll.aggregate([unionWithStage]).toArray();
@@ -178,66 +209,53 @@ function runUnionWithVectorSearchTests(conn, mongotMock, featureFlagValue, shard
     });
 }
 
-/**
- * Runs $vectorSearch within a $unionWith on a view.
- * This function sets feature flags, then runs the actual tests.
- *
- * @param {Mongo|Object} conn - The connection to use (mongos or mongod).
- * @param {MongotMock} mongotMock - The mongot mock instance for configuring responses.
- * @param {boolean} featureFlagValue - The value to set for the feature flag.
- * @param {ShardingTest|null} shardingTest - The ShardingTest instance if available, null otherwise.
- */
 function runUnionWithOnViewVectorSearchTests(conn, mongotMock, featureFlagValue, shardingTest = null) {
-    setFeatureFlags(conn, featureFlagValue);
-    createTestViewAndIndex(conn, mongotMock, shardingTest);
+    // The test driver will set up the view for us. We just need to provide parameters to indicate that
+    // we should use it. Skipping explain because $unionWith + a view + explain + legacy $vectorSearch
+    // fails (SERVER-117879).
+    runUnionWithVectorSearchTests({
+        conn,
+        mongotMock,
+        featureFlagValue,
+        shardingTest,
+        viewName: kTestViewName,
+        viewPipeline: kTestViewPipeline,
+        shouldExplain: false,
+        isKickbackExecutedOnMongos: true,
+    });
+}
 
+function runUnionWithOnViewWithVectorSearchInViewDefinitionTests(
+    conn,
+    mongotMock,
+    featureFlagValue,
+    shardingTest = null,
+) {
     const testDb = conn.getDB(kTestDbName);
-    const coll = testDb[kTestCollName];
-    const viewName = kTestViewName;
 
-    const numNodes = shardingTest ? kNumShards : 1;
+    // Create a view that runs the $vectorSearch query. The results will look
+    // identical to a $unionWith + $vectorSearch on the base collection, but the
+    // code path is different because the kickback must happen after view
+    // resolution instead of during parsing.
+    const vectorSearchViewPipeline = [{$vectorSearch: vectorSearchQuery}];
+    const vectorSearchViewName = kTestViewName + "_vectorSearch";
+    assert.commandWorked(testDb.createView(vectorSearchViewName, kTestCollName, vectorSearchViewPipeline));
 
     const unionWithStage = {
         $unionWith: {
-            coll: viewName,
-            pipeline: [{$vectorSearch: vectorSearchQuery}],
+            coll: vectorSearchViewName,
+            pipeline: [],
         },
     };
-
-    // Get the current feature flag value to determine if we expect retries.
-    const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
-    // We expect 1 retry per shard for the aggregate (no explain query is run in this test).
-    const expectedUnionWithOnViewKickbackRetryDelta = expectRetry ? numNodes : 0;
-
-    // Set up MongotMock cursor for aggregate query.
-    setUpMongotMockForVectorSearch(mongotMock, {
-        vectorSearchQuery,
-        shardingTest,
-        startingCursorId: 123,
-        coll,
-        testDb,
-        viewName,
-        viewPipeline: kTestViewPipeline,
-    });
-
-    // We expect one legacy vector search per query per shard.
-    const expectedLegacyDelta = shardingTest ? kNumShards : 1;
-
-    runQueriesAndVerifyMetrics({
+    // Skipping explain because $unionWith + a view + explain + legacy $vectorSearch
+    // fails (SERVER-117879).
+    runUnionWithVectorSearchTests({
         conn,
-        testDb,
-        getRetryCountFn: getInUnionWithKickbackRetryCount,
-        retryMetricName: "inUnionWithKickbackRetries",
-        expectedRetryDelta: expectedUnionWithOnViewKickbackRetryDelta,
-        expectedLegacyDelta,
-        runExplainQuery: () => {
-            // Skipping this since $unionWith + legacy $vectorSearch + explain
-            // executionStats on a view fails (SERVER-117879).
-        },
-        runAggregateQuery: () => {
-            coll.aggregate([unionWithStage]).toArray();
-        },
+        mongotMock,
+        featureFlagValue,
         shardingTest,
+        unionWithStage,
+        shouldExplain: false,
     });
 }
 
@@ -253,15 +271,29 @@ function runTests(conn, mongotMock, shardingTest = null) {
     // Run with the feature flag set to true. The IFR retry kickback logic should trigger
     // and legacy vector search should be used.
     runViewVectorSearchTests(conn, mongotMock, true, shardingTest);
-    runUnionWithVectorSearchTests(conn, mongotMock, true, shardingTest);
+    runUnionWithVectorSearchTests({
+        conn,
+        mongotMock,
+        featureFlagValue: true,
+        shardingTest,
+        isKickbackExecutedOnMongos: true,
+    });
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, true, shardingTest);
+    runUnionWithOnViewWithVectorSearchInViewDefinitionTests(conn, mongotMock, true, shardingTest);
 
     // Run with the feature flag set to false.
     // No IFR retry kickback logic should be triggered. This is because the shards get the feature flag value from
     // the IFR context passed from the router, and the router already has the feature flag disabled.
     runViewVectorSearchTests(conn, mongotMock, false, shardingTest);
-    runUnionWithVectorSearchTests(conn, mongotMock, false, shardingTest);
+    runUnionWithVectorSearchTests({
+        conn,
+        mongotMock,
+        featureFlagValue: false,
+        shardingTest,
+        isKickbackExecutedOnMongos: true,
+    });
     runUnionWithOnViewVectorSearchTests(conn, mongotMock, false, shardingTest);
+    runUnionWithOnViewWithVectorSearchInViewDefinitionTests(conn, mongotMock, false, shardingTest);
 
     // Run hybrid search tests ($rankFusion/$scoreFusion with $vectorSearch subpipelines).
     // These always trigger the IFR kickback retry regardless of featureFlagExtensionViewsAndUnionWith.

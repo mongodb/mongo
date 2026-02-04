@@ -37,8 +37,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/extension/host/extension_vector_search_server_status.h"
-#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
@@ -114,24 +112,6 @@ void validateUnionWithCollectionlessPipeline(
     );
 }
 }  // namespace
-
-// TODO SERVER-117794 Move kickback to DocumentSourceExtensionOptimizable and remove
-// UnionWithStageParams.
-UnionWithStageParams::UnionWithStageParams(mongo::BSONElement element,
-                                           boost::optional<LiteParsedPipeline> pipeline)
-    : mongo::DefaultStageParams(element) {
-    // Check for an extension $vectorSearch stage and throw the IFR retry error if the feature flag
-    // is not enabled. We check this here because we need access to the LiteParsedPipeline to check
-    // for the stage, but we can't throw the retry error until we are safely within the retry loop
-    // block, which isn't until after lite parsing happens.
-    if (pipeline && pipeline->hasExtensionVectorSearchStage() &&
-        !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
-        vector_search_metrics::inUnionWithKickbackRetryCount.increment(1);
-        uassertStatusOK(
-            Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                   "The $vectorSearch extension stage is not supported in a $unionWith"));
-    }
-}
 
 UnionWithSharedState::UnionWithSharedState(std::unique_ptr<Pipeline> pipeline,
                                            std::unique_ptr<exec::agg::Pipeline> execPipeline,
@@ -676,6 +656,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
+    subExpCtx->setInUnionWith(true);
     if (resolvedNs.ns.isTimeseriesBucketsCollection() &&
         isRawDataOperation(expCtx->getOperationContext())) {
         // Raw Data operations on timeseries collections operate without the timeseries view.
