@@ -49,36 +49,36 @@ assert(res.valid);
 // Compressed bucket with the compressed time field in-order and version set to 3. This should fail,
 // since this bucket's measurements are in-order on time field, meaning this bucket shouldn't have
 // been promoted to v3.
-assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, tsColl).insert(
-        {
-            _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
-            control: {
-                version: TimeseriesTest.BucketVersion.kCompressedUnsorted,
-                min: {
-                    _id: ObjectId("65a6eba7e6d2e848e08c3750"),
-                    t: ISODate("2024-01-16T20:48:00Z"),
-                    a: 1,
-                },
-                max: {
-                    _id: ObjectId("65a6eba7e6d2e848e08c3751"),
-                    t: ISODate("2024-01-16T20:48:39.448Z"),
-                    a: 1,
-                },
-                count: NumberInt(2),
-            },
-            meta: 0,
-            data: {
-                t: BinData(7, "CQAYhggUjQEAAIAOAAAAAAAAAAA="),
-                a: BinData(7, "AQAAAAAAAAAAAJAuAAAAAAAAAAA="),
-                _id: BinData(7, "BwBlpuun5tLoSOCMN1CALgAAAAAAAAAA"),
-            },
+const invalidVersion3Doc = {
+    _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
+    control: {
+        version: TimeseriesTest.BucketVersion.kCompressedUnsorted,
+        min: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3750"),
+            t: ISODate("2024-01-16T20:48:00Z"),
+            a: 1,
         },
-        getRawOperationSpec(testDB),
-    ),
+        max: {
+            _id: ObjectId("65a6eba7e6d2e848e08c3751"),
+            t: ISODate("2024-01-16T20:48:39.448Z"),
+            a: 1,
+        },
+        count: NumberInt(2),
+    },
+    meta: 0,
+    data: {
+        t: BinData(7, "CQAYhggUjQEAAIAOAAAAAAAAAAA="),
+        a: BinData(7, "AQAAAAAAAAAAAJAuAAAAAAAAAAA="),
+        _id: BinData(7, "BwBlpuun5tLoSOCMN1CALgAAAAAAAAAA"),
+    },
+};
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, tsColl).insert(invalidVersion3Doc, getRawOperationSpec(testDB)),
 );
 res = assert.commandWorked(tsColl.validate());
 assert(!res.valid);
 assert.eq(res.errors.length, 1);
+
+TimeseriesTest.checkForDocumentValidationFailureLog(tsColl, invalidVersion3Doc);
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});

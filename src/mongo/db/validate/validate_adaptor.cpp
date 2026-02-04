@@ -1193,15 +1193,27 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 case Collection::SchemaValidationResult::kError:
                 case Collection::SchemaValidationResult::kErrorAndLog:
                 case Collection::SchemaValidationResult::kWarn:
-                    LOGV2_WARNING_OPTIONS(5363500,
-                                          {logv2::LogTruncation::Disabled},
-                                          "Document is not compliant with the collection's schema",
-                                          logAttrs(coll->ns()),
-                                          "recordId"_attr = record->id,
-                                          "reason"_attr = schemaValidationResult);
-                    nNonCompliantDocuments++;
-                    isTimeseries ? results->addError(kSchemaValidationFailedReason)
-                                 : results->addWarning(kSchemaValidationFailedReason);
+                    ++nNonCompliantDocuments;
+                    if (isTimeseries) {
+                        LOGV2_WARNING_OPTIONS(11634800,
+                                              {logv2::LogTruncation::Disabled},
+                                              "Time-series bucket document is not compliant with "
+                                              "the collection's schema",
+                                              logAttrs(coll->ns()),
+                                              "recordId"_attr = record->id,
+                                              "record"_attr = record->data.toBson(),
+                                              "reason"_attr = schemaValidationResult);
+                        results->addError(kSchemaValidationFailedReason);
+                    } else {
+                        LOGV2_WARNING_OPTIONS(
+                            5363500,
+                            {logv2::LogTruncation::Disabled},
+                            "Document is not compliant with the collection's schema",
+                            logAttrs(coll->ns()),
+                            "recordId"_attr = record->id,
+                            "reason"_attr = schemaValidationResult);
+                        results->addWarning(kSchemaValidationFailedReason);
+                    }
                     break;
                 case Collection::SchemaValidationResult::kPass:
                     if (isTimeseries) {
@@ -1221,6 +1233,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                 "Document is not compliant with time-series specifications",
                                 logAttrs(coll->ns()),
                                 "recordId"_attr = record->id,
+                                "record"_attr = record->data.toBson(),
                                 "reason"_attr = timeseriesValidationResult.reason);
                             nNonCompliantDocuments++;
                             // We should not add data-annotated error strings to the set, since
@@ -1239,6 +1252,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                   kMalformedMinMaxTimeseriesBucket,
                                                   logAttrs(coll->ns()),
                                                   "recordId"_attr = record->id,
+                                                  "record"_attr = record->data.toBson(),
                                                   "error"_attr =
                                                       containsMixedSchemaDataResponse.getStatus());
                         } else if (containsMixedSchemaDataResponse.isOK() &&
@@ -1264,6 +1278,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                       kUnexpectedMixedSchemaTimeseriesError,
                                                       logAttrs(coll->ns()),
                                                       "recordId"_attr = record->id,
+                                                      "record"_attr = record->data.toBson(),
                                                       "objSize"_attr = recordBson.objsize(),
                                                       "measurementCount"_attr = count);
                             }

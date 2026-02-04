@@ -88,6 +88,9 @@ export function getRawOperationSpec(db) {
  * rawData operations on the main collection.
  *
  * When rawData is not supported this function returns the underlying system.buckets collection.
+ * @param {DB} db
+ * @param {DBCollection | string} coll collection or collection name string
+ * @return {DBCollection | string}
  */
 export function getTimeseriesCollForRawOps(db, coll) {
     return isRawOperationSupported(db) ? coll : getTimeseriesBucketsColl(coll);

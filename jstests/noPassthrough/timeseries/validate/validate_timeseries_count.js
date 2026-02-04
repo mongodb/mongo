@@ -68,6 +68,10 @@ assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);
 
+// Formatting in the log may vary based on serialization methods.  Sanity check that an attribute record with the expected ID exists in the log but do not strictly check all fields.
+const record = getTimeseriesCollForRawOps(db, coll).findOneWithRawData();
+TimeseriesTest.checkForDocumentValidationFailureLog(coll, record);
+
 // As of SERVER-86451, time-series inconsistencies detected during validation
 // will error in testing, instead of being warnings. In this case,
 // validation on shutdown would fail, whereas before only a warning would be thrown.

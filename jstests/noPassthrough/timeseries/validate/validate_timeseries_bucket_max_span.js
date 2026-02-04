@@ -3,6 +3,7 @@
  * bucket max span.
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 const conn = MongoRunner.runMongod();
@@ -32,5 +33,8 @@ res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);
+
+const record = getTimeseriesCollForRawOps(db, coll).findOneWithRawData();
+TimeseriesTest.checkForDocumentValidationFailureLog(coll, record);
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
