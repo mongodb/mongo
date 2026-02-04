@@ -41,11 +41,6 @@ namespace mongo {
 
 Status createFastcountCollection(OperationContext* opCtx) {
     try {
-        LOGV2(11718601,
-              "Creating internal fastcount collection.",
-              "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                              NamespaceString::kSystemReplicatedFastCountStore)
-                              .toStringForErrorMsg());
 
         WriteUnitOfWork wuow(opCtx);
         Status createCollectionStatus = createCollection(
@@ -63,6 +58,21 @@ Status createFastcountCollection(OperationContext* opCtx) {
                               << createCollectionStatus.code(),
                 createCollectionStatus.isOK() ||
                     createCollectionStatus.code() == ErrorCodes::NamespaceExists);
+
+        if (createCollectionStatus.isOK()) {
+            LOGV2(11718601,
+                  "Created internal fastcount collection.",
+                  "ns"_attr = NamespaceString::makeGlobalConfigCollection(
+                                  NamespaceString::kSystemReplicatedFastCountStore)
+                                  .toStringForErrorMsg());
+        } else if (createCollectionStatus.code() == ErrorCodes::NamespaceExists) {
+            LOGV2(11886900,
+                  "Internal fastcount collection already exists.",
+                  "ns"_attr = NamespaceString::makeGlobalConfigCollection(
+                                  NamespaceString::kSystemReplicatedFastCountStore)
+                                  .toStringForErrorMsg());
+        }
+
         wuow.commit();
 
     } catch (const DBException& ex) {
