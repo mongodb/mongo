@@ -203,6 +203,7 @@ void RoutingContext::onStaleError(const Status& status,
         if (auto si = status.extraInfo<StaleConfigInfo>()) {
             const auto& staleNs = si->getNss();
 
+            // TODO(SERVER-118822): Remove this once 9.0 becomes last LTS
             if (staleNs.isTimeseriesBucketsCollection()) {
                 // Legacy timeseries: buckets is tracked. Also invalidate the view namespace
                 // in case it was converted to viewless and now the main namespace is tracked.

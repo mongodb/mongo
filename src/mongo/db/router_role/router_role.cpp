@@ -193,6 +193,7 @@ void CollectionRouterCommon::_onException(RoutingRetryInfo* retryInfo, Status s)
             uassertStatusOK(s);
         }
 
+        // TODO(SERVER-118822): Remove this once 9.0 becomes last LTS
         // Refresh the view namespace if the stale namespace is a buckets timeseries collection.
         if (staleNs.isTimeseriesBucketsCollection()) {
             // A timeseries might've been created, so we need to invalidate the original namespace
