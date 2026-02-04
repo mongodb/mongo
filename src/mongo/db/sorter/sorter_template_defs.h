@@ -511,14 +511,13 @@ protected:
                        "targetNumSpills"_attr = numTargetedSpills,
                        "parallelNumSpills"_attr = numParallelSpills);
 
-            auto storage = _spillHelper->mergeSpills(this->_opts,
-                                                     this->_settings,
-                                                     this->_stats,
-                                                     this->_iters,
-                                                     _comp,
-                                                     numTargetedSpills,
-                                                     numParallelSpills);
-            _spillHelper->setStorage(std::move(storage));
+            _spillHelper->mergeSpills(this->_opts,
+                                      this->_settings,
+                                      this->_stats,
+                                      this->_iters,
+                                      _comp,
+                                      numTargetedSpills,
+                                      numParallelSpills);
         }
     }
 

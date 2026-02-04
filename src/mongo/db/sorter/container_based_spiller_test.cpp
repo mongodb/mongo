@@ -599,7 +599,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(4, 1), 0));
 
     SorterStats sorterStats{nullptr};
-    auto storage = spiller.mergeSpills(
+    spiller.mergeSpills(
         SortOptions{},
         SorterSpiller<IntWrapper, NullValue>::Settings{},
         sorterStats,
@@ -607,7 +607,6 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         [](const IntWrapper& left, const IntWrapper& right) { return IWComparator{}(left, right); },
         2,
         2);
-    spiller.setStorage(std::move(storage));
 
     EXPECT_EQ(iterators.size(), 2);
     EXPECT_EQ(container.entries().size(), data.size());
@@ -672,7 +671,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     }
 
     SorterStats sorterStats{nullptr};
-    auto storage = spiller.mergeSpills(
+    spiller.mergeSpills(
         SortOptions{},
         SorterSpiller<IntWrapper, NullValue>::Settings{},
         sorterStats,
@@ -680,7 +679,6 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         [](const IntWrapper& left, const IntWrapper& right) { return IWComparator{}(left, right); },
         3,
         2);
-    spiller.setStorage(std::move(storage));
 
     EXPECT_EQ(iterators.size(), 3);
     EXPECT_EQ(container.entries().size(), data.size());

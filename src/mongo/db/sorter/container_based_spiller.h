@@ -358,14 +358,13 @@ public:
           _opCtx(opCtx),
           _batchSize(batchSize) {}
 
-    std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
-        const SortOptions& opts,
-        const SorterSpillerBase<Key, Value>::Settings& settings,
-        SorterStats& stats,
-        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
-        SorterSpillerBase<Key, Value>::Comparator comp,
-        std::size_t numTargetedSpills,
-        std::size_t numParallelSpills) override {
+    void mergeSpills(const SortOptions& opts,
+                     const SorterSpillerBase<Key, Value>::Settings& settings,
+                     SorterStats& stats,
+                     std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
+                     SorterSpillerBase<Key, Value>::Comparator comp,
+                     std::size_t numTargetedSpills,
+                     std::size_t numParallelSpills) override {
         std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
         while (iters.size() > numTargetedSpills) {
             oldIters.swap(iters);
@@ -408,7 +407,6 @@ public:
             }
             oldIters.clear();
         }
-        return std::move(this->_storage);
     }
 
 private:

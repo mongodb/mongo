@@ -572,16 +572,13 @@ public:
                                                   std::span<std::pair<Key, Value>> data,
                                                   uint32_t idx) = 0;
 
-    virtual std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
-        const SortOptions& opts,
-        const Settings& settings,
-        SorterStats& stats,
-        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
-        Comparator comp,
-        std::size_t numTargetedSpills,
-        std::size_t numParallelSpills) = 0;
-
-    virtual void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) = 0;
+    virtual void mergeSpills(const SortOptions& opts,
+                             const Settings& settings,
+                             SorterStats& stats,
+                             std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
+                             Comparator comp,
+                             std::size_t numTargetedSpills,
+                             std::size_t numParallelSpills) = 0;
 
     virtual SorterStorage<Key, Value>& getStorage() = 0;
 
@@ -626,10 +623,6 @@ public:
             heap.pop();
         }
         return _storage->makeIterator(std::move(writer));
-    }
-
-    void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) override {
-        _storage = std::move(newStorage);
     }
 
     SorterStorage<Key, Value>& getStorage() override {
