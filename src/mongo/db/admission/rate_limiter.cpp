@@ -256,6 +256,10 @@ Status RateLimiter::tryAcquireToken(double numTokensToConsume) {
     return Status::OK();
 }
 
+void RateLimiter::returnTokens(double numTokensToReturn) {
+    _impl->readScopedTokenBucket().returnTokens(numTokensToReturn);
+}
+
 void RateLimiter::recordExemption() {
     _impl->stats.exemptedAdmissions.incrementRelaxed();
 }

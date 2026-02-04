@@ -555,5 +555,29 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationDeadline) {
         advanceTime(Milliseconds(5));
     });
 }
+
+TEST_F(RateLimiterWithMockClockTest, ReturnTokens) {
+    RateLimiter rateLimiter = makeRateLimiter("RateLimiterReturnTokens",
+                                              /*refreshRate=*/100,
+                                              /*burstCapacitySecs=*/3,
+                                              /*maxQueueDepth=*/100);
+    auto opCtx = makeOperationContext();
+    auto maxTokens = 100 * 3;  // refreshRate * getBurstCapacitySecs
+    auto tokensToConsume = 100;
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens);
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx.get(), tokensToConsume));
+
+    // Assert we should have 300 - 100 tokens as a balance here.
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - tokensToConsume);
+
+    // Return some tokens
+    auto tokensToReturn = 50;
+    rateLimiter.returnTokens(tokensToReturn);
+
+    // Assert that calling returnTokens returns the expected number of tokens to the bucket.
+    ASSERT_EQ(rateLimiter.tokenBalance(), maxTokens - tokensToConsume + tokensToReturn);
+}
+
 }  // namespace
 }  // namespace mongo::admission

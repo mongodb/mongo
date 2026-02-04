@@ -116,6 +116,11 @@ public:
     Status tryAcquireToken(double numTokensToConsume = 1.0);
 
     /**
+     * Returns tokens back to the bucket.
+     */
+    void returnTokens(double numTokensToReturn);
+
+    /**
      * Updates metrics for admission granted without having called acquireToken.
      * Use this function in place of acquireToken when admission must be granted immediately.
      * Admission granted in this way does not consume any tokens.
