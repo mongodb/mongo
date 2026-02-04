@@ -137,6 +137,11 @@ structs:
                 type: objectid
                 optional: true
                 validator: { callback: "validateReplicaSetIdNotNull"}
+            autoPromoteHidden:
+                type: safeBool
+                default: false
+                description: "When true, allows hidden nodes to be automatically promoted to appear
+                              in the hosts list when all non-hidden secondary nodes are unhealthy"
 
     ReplSetConfigBase:
         description: "The complete configuration for the replica set"
