@@ -392,4 +392,78 @@ TEST_F(HashLookupStageTest, ForceSpillTest) {
 
     lookupStage->close();
 }
+
+TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
+    constexpr size_t kDupCount = 16;
+    const BSONObj kKey = BSON("k" << 1);
+
+    // Set the memory limit so that the initial key fits into memory, but adding more duplicates
+    // push memory over the limit.
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        static_cast<long long>(kKey.objsize() + 8 * kDupCount / 2));
+
+    BSONArrayBuilder innerJoin;
+    BSONArrayBuilder lookupOutputBuilder;
+    for (size_t i = 0; i < kDupCount; ++i) {
+        BSONObj obj = BSON("_id" << static_cast<long long>(i));
+        innerJoin.append(BSON_ARRAY(obj << kKey));
+        lookupOutputBuilder.append(obj);
+    }
+    BSONArray lookupOutput = lookupOutputBuilder.arr();
+    BSONObj lookupInput = BSON("_id" << 1);
+
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, innerJoin.arr());
+    auto [outerScanSlots, outerScanStage] =
+        generateVirtualScanMulti(2, BSON_ARRAY(BSON_ARRAY(lookupInput << kKey)));
+
+    auto ctx = makeCompileCtx();
+
+    value::SlotId lookupStageOutputSlot = generateSlotId();
+    SlotExprPair agg = std::make_pair(
+        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+    auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
+                                              std::move(innerScanStage),
+                                              outerScanSlots[1],
+                                              innerScanSlots[1],
+                                              innerScanSlots[0],
+                                              std::move(agg),
+                                              boost::none,
+                                              kEmptyPlanNodeId);
+
+    value::SlotVector lookupSlots;
+    lookupSlots.reserve(2);
+    lookupSlots.push_back(outerScanSlots[0]);
+    lookupSlots.push_back(lookupStageOutputSlot);
+    auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
+
+    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> actualResults;
+    std::vector<std::pair<value::TypeTags, value::Value>> flatValues;
+    while (lookupStage->getNext() == PlanState::ADVANCED) {
+        std::vector<std::pair<value::TypeTags, value::Value>> results{};
+        results.reserve(resultAccessors.size());
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            flatValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
+            results.emplace_back(flatValues.back());
+        }
+        actualResults.emplace_back(std::move(results));
+    }
+
+    ValueVectorGuard resultsGuard{flatValues};
+    lookupStage->close();
+
+    ASSERT_EQ(actualResults.size(), 1);
+    ASSERT_EQ(actualResults[0].size(), 2);
+    ASSERT_EQ(value::compareValue(actualResults[0][0].first,
+                                  actualResults[0][0].second,
+                                  value::TypeTags::bsonObject,
+                                  value::bitcastFrom<const char*>(lookupInput.objdata())),
+              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
+    ASSERT_EQ(value::compareValue(actualResults[0][1].first,
+                                  actualResults[0][1].second,
+                                  value::TypeTags::bsonArray,
+                                  value::bitcastFrom<const char*>(lookupOutput.objdata())),
+              std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
+}
+
 }  // namespace mongo::sbe
