@@ -212,16 +212,22 @@ __page_unpack_deltas(WT_SESSION_IMPL *session, WT_ITEM *deltas, size_t delta_siz
 
 /*
  * __page_merge_base_internal_deltas --
- *     Merge base and multiple internal delta arrays into a single set of WT_REFs. Always prefers
- *     the latest version (delta) when keys are equal.
+ *     Merge a base internal page and multiple internal delta arrays into a single internal-page
+ *     disk image in new_image. When ta is non-NULL (diagnostic builds), aggregate each emitted
+ *     child address time aggregate into ta as entries are packed.
  */
 static int
 __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *base,
   size_t base_entries, WT_CELL_UNPACK_DELTA_INT **unpacked_deltas, size_t *delta_size_each,
   size_t *delta_idx, size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, WT_ITEM *new_image,
-  uint64_t latest_write_gen)
+  uint64_t latest_write_gen
+#ifdef HAVE_DIAGNOSTIC
+  ,
+  WT_TIME_AGGREGATE *ta
+#endif
+)
 {
-    WT_CELL_UNPACK_ADDR *base_key, *base_val;
+    WT_CELL_UNPACK_ADDR *first_base_key, *first_base_val;
     WT_CELL_UNPACK_DELTA_INT *min_delta;
     WT_ITEM base_key_buf, delta_key_buf;
     WT_REF **refs;
@@ -233,6 +239,11 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
     WT_ASSERT(session, base != NULL);
     WT_ASSERT(session, base_entries != 0);
     WT_ASSERT(session, refsp != NULL);
+    WT_ASSERT(session, new_image != NULL && new_image->mem != NULL);
+
+#ifdef HAVE_DIAGNOSTIC
+    WT_TIME_AGGREGATE_INIT_MERGE(ta);
+#endif
 
     refs = *refsp;
     entry_count = 0;
@@ -240,16 +251,13 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
     min_delta = NULL;
     p_ptr = NULL;
 
-    WT_UNUSED(new_image);
-
     /*
      * Encode the first key always from the base image. The btrees using customized collator cannot
      * handle the truncated first key.
      */
-    base_key = &base[i++];
-    base_val = &base[i++];
+    first_base_key = &base[i++];
+    first_base_val = &base[i++];
 
-    WT_ASSERT(session, new_image != NULL);
     p_ptr = WT_PAGE_HEADER_BYTE(S2BT(session), new_image->data);
     /*
      * Initialize new_image->size here since __wt_rec_pack_internal_key_addr uses it to calculate
@@ -258,10 +266,14 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
     new_image->size = WT_PTRDIFF(p_ptr, new_image->data);
 
     WT_RET(__wt_cell_pack_internal_key_addr(
-      session, new_image, base_key, base_val, NULL, false, &p_ptr));
+      session, new_image, first_base_key, first_base_val, NULL, false, &p_ptr));
 
     entry_count += 2;   /* key + value cells */
-    final_entries += 1; /* one ref (child) emitted */
+    final_entries += 1; /* one child emitted */
+
+#ifdef HAVE_DIAGNOSTIC
+    WT_TIME_AGGREGATE_MERGE(session, ta, &first_base_val->ta);
+#endif
 
     /*
      * !!!
@@ -347,8 +359,12 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
 
             entry_count += 2;   /* key + value cells */
             final_entries += 1; /* one ref (child) emitted */
+#ifdef HAVE_DIAGNOSTIC
+            WT_TIME_AGGREGATE_MERGE(session, ta, &base[i + 1].ta);
+#endif
             i += 2;
         } else {
+            /* Delta entry wins (or equals). */
             if (!__wt_delta_cell_type_visible_all(min_delta)) {
                 /*
                  * Pack internal delta entry.
@@ -361,9 +377,13 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
                   session, new_image, NULL, NULL, min_delta, true, &p_ptr));
                 entry_count += 2;   /* key + value */
                 final_entries += 1; /* one ref (child) emitted */
+#ifdef HAVE_DIAGNOSTIC
+                WT_TIME_AGGREGATE_MERGE(session, ta, &min_delta->value.ta);
+#endif
             }
             if (cmp == 0)
                 i += 2;
+
             delta_idx[min_d]++;
             /* We consumed this delta, so recompute next round */
             min_delta = NULL;
@@ -506,6 +526,30 @@ __page_free_delta_leaf_merge_state(
 }
 
 /*
+ * __time_window_clear_obsolete --
+ *     Where possible modify time window values to avoid writing obsolete values to the cell.
+ */
+static WT_INLINE void
+__time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
+{
+    /* Return if the start time window is empty. */
+    if (!WT_TIME_WINDOW_HAS_START(tw))
+        return;
+
+    /*
+     * Check if the start of the time window is globally visible, and if so remove unnecessary
+     * values.
+     */
+    if (__wt_txn_tw_start_visible_all(session, tw)) {
+        /* The durable timestamp should never be less than the start timestamp. */
+        WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
+
+        tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
+        tw->start_txn = WT_TXN_NONE;
+    }
+}
+
+/*
  * __page_init_dsk_leaf_merge_state --
  *     Initialize new disk leaf merge state.
  */
@@ -525,11 +569,17 @@ __page_init_dsk_leaf_merge_state(
 
 /*
  * __wti_page_merge_deltas_with_base_image_leaf --
- *     Merge leaf deltas with base image into disk image in a single pass.
+ *     Merge leaf deltas with base image into disk image in a single pass. While emitting k/v cells,
+ *     incrementally aggregate time windows into ta (if non-NULL, diagnostic builds only).
  */
 int
 __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *deltas,
-  size_t delta_size, WT_ITEM *new_image, WT_PAGE_HEADER *base_dsk)
+  size_t delta_size, WT_ITEM *new_image, WT_PAGE_HEADER *base_dsk
+#ifdef HAVE_DIAGNOSTIC
+  ,
+  WT_TIME_AGGREGATE *ta
+#endif
+)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -545,6 +595,11 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     WT_CLEAR(disk_s);
     btree = S2BT(session);
     dsk = NULL;
+
+#ifdef HAVE_DIAGNOSTIC
+    WT_TIME_AGGREGATE_INIT_MERGE(ta);
+#endif
+
     WT_ASSERT(session, new_image != NULL);
     WT_ERR(__page_init_delta_leaf_merge_state(session, btree, deltas, delta_size, &delta_s));
     WT_ERR(__page_init_base_leaf_merge_state(session, btree, base_dsk, &base_s));
@@ -575,14 +630,20 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
               session, btree->collator, base_s.current_key, delta_s[j].current_key, &cmp));
 
         /* Build disk image */
-        if (cmp < 0)
+        if (cmp < 0) {
+            __time_window_clear_obsolete(session, &base_s.unpack_value->tw);
             /* Pack row-leaf base key/value. */
             WT_ERR(__wt_cell_pack_leaf_kv(session, base_s.empty_value_cell,
               base_s.current_key->data, base_s.current_key->size, base_s.unpack_value->data,
               base_s.unpack_value->size, &base_s.unpack_value->tw, new_image, &disk_s));
-        else {
+
+#ifdef HAVE_DIAGNOSTIC
+            WT_TIME_AGGREGATE_UPDATE(session, ta, &base_s.unpack_value->tw);
+#endif
+        } else {
             /* Pack row-leaf delta entry. */
-            if (!F_ISSET(delta_s[j].unpack, WT_DELTA_LEAF_IS_DELETE))
+            if (!F_ISSET(delta_s[j].unpack, WT_DELTA_LEAF_IS_DELETE)) {
+                __time_window_clear_obsolete(session, &delta_s[j].unpack->delta_value.tw);
                 WT_ERR(__wt_cell_pack_leaf_kv(session,
                   delta_s[j].unpack->delta_value_data.size == 0 &&
                     WT_TIME_WINDOW_IS_EMPTY(&delta_s[j].unpack->delta_value.tw),
@@ -590,6 +651,11 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
                   delta_s[j].unpack->delta_value_data.data,
                   delta_s[j].unpack->delta_value_data.size, &delta_s[j].unpack->delta_value.tw,
                   new_image, &disk_s));
+
+#ifdef HAVE_DIAGNOSTIC
+                WT_TIME_AGGREGATE_UPDATE(session, ta, &delta_s[j].unpack->delta_value.tw);
+#endif
+            }
 
             /* We've packed a delta entry, reset the unpack status and clear the min delta index. */
             delta_s[j].unpacked = false;
@@ -655,12 +721,19 @@ err:
 
 /*
  * __wti_page_merge_deltas_with_base_image_int --
- *     Merge deltas with base image into disk image in a single pass.
+ *     Merge deltas with base image into disk image in a single pass. While emitting child address
+ *     cells, the merge helper will aggregate child time aggregates into ta (if non-NULL, diagnostic
+ *     builds only).
  */
 int
-__wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *deltas,
-  size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, WT_ITEM *new_image,
-  const void *base_image_addr)
+__wti_page_merge_deltas_with_base_image_int(
+  WT_SESSION_IMPL *session, WT_ITEM *deltas, size_t delta_size, WT_REF ***refsp,
+  size_t *ref_entriesp, WT_ITEM *new_image, const void *base_image_addr
+#ifdef HAVE_DIAGNOSTIC
+  ,
+  WT_TIME_AGGREGATE *ta
+#endif
+)
 {
     WT_CELL_UNPACK_ADDR *base = NULL;
     WT_CELL_UNPACK_DELTA_INT **unpacked_deltas = NULL;
@@ -669,8 +742,10 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     size_t *delta_size_each = NULL, *delta_idx = NULL;
     size_t base_entries, estimated_entries, k;
     uint32_t d;
-    WT_PAGE_HEADER *base_image_header = (WT_PAGE_HEADER *)base_image_addr;
+    WT_PAGE_HEADER *base_image_header;
     uint64_t latest_write_gen;
+
+    base_image_header = (WT_PAGE_HEADER *)base_image_addr;
 
     WT_RET(__page_unpack_deltas(
       session, deltas, delta_size, &unpacked_deltas, &delta_size_each, base_image_addr));
@@ -692,10 +767,14 @@ __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *d
     WT_ERR(__wt_calloc_def(session, estimated_entries, &refs));
     WT_ERR(__wt_calloc_def(session, delta_size, &delta_idx));
 
-    /* Common merge logic (disk mode) */
-    WT_ERR(__page_merge_base_internal_deltas(session, base, base_entries, unpacked_deltas,
-      delta_size_each, delta_idx, delta_size, &refs, ref_entriesp, new_image, latest_write_gen));
-
+    ret = __page_merge_base_internal_deltas(session, base, base_entries, unpacked_deltas,
+      delta_size_each, delta_idx, delta_size, &refs, ref_entriesp, new_image, latest_write_gen
+#ifdef HAVE_DIAGNOSTIC
+      ,
+      ta
+#endif
+    );
+    WT_ERR(ret);
     *refsp = refs;
     /*
      * Ownership of 'refs' and its elements is transferred to the caller. Null the local pointer so

@@ -493,7 +493,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
     /* Try to move the pinned timestamp forward. */
     if (strict)
-        __wti_txn_update_pinned_timestamp(session, false);
+        __wt_txn_update_pinned_timestamp(session, false);
 
     /*
      * For pure read-only workloads, or if the update isn't forced and the oldest ID isn't too far

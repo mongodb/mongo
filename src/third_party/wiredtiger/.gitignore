@@ -15,6 +15,7 @@ build_*/
 dist/clang-format
 /docs/
 test-compatibility-run/
+COMPATIBILITY_TEST/
 TCMALLOC_LIB/
 
 # Python artifacts

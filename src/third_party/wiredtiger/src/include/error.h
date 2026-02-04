@@ -15,13 +15,7 @@
 
 /* In DIAGNOSTIC mode, yield in places where we want to encourage races (except for with
  * antithesis). */
-#if defined HAVE_DIAGNOSTIC && defined NON_BARRIER_DIAGNOSTIC_YIELDS && !defined ENABLE_ANTITHESIS
-#define WT_DIAGNOSTIC_YIELD      \
-    do {                         \
-        __wt_yield_no_barrier(); \
-    } while (0)
-#elif defined HAVE_DIAGNOSTIC && !defined NON_BARRIER_DIAGNOSTIC_YIELDS && \
-  !defined ENABLE_ANTITHESIS
+#if defined HAVE_DIAGNOSTIC && !defined ENABLE_ANTITHESIS
 #define WT_DIAGNOSTIC_YIELD \
     do {                    \
         __wt_yield();       \

@@ -144,11 +144,9 @@ class test_truncate_fast_delete(test_truncate_base):
                 cursor.update()
             cursor.close()
 
-        # FIXME-WT-14977 Remove the conditional for layered tables once disaggregated storage can handle checkpoint id after restart.
-        if self.type != 'layered:':
-            self.session.checkpoint()
+        self.session.checkpoint()
         # Close and re-open it so we get a disk image, not an insert skiplist.
-            self.reopen_conn()
+        self.reopen_conn()
 
         # Optionally read/write a few rows before truncation.
         if self.readbefore or self.writebefore:

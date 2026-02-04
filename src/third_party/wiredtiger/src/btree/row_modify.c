@@ -380,7 +380,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
 
-    prune_timestamp = __wt_atomic_load_uint64_acquire(&CUR2BT(cbt)->prune_timestamp);
+    prune_timestamp = __wt_atomic_load_uint64_relaxed(&CUR2BT(cbt)->prune_timestamp);
 
     oldest_id = __wt_txn_oldest_id(session);
 

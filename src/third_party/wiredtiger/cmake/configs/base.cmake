@@ -122,12 +122,6 @@ config_bool(
 )
 
 config_bool(
-    NON_BARRIER_DIAGNOSTIC_YIELDS
-    "Don't set a full barrier when yielding threads in diagnostic mode. Requires diagnostic mode to be enabled."
-    DEFAULT OFF
-)
-
-config_bool(
     HAVE_UNITTEST
     "Enable C++ Catch2 based WiredTiger unit tests"
     DEFAULT OFF
@@ -508,10 +502,6 @@ endif()
 # Error logging is always enabled in diagnostic build.
 if (HAVE_DIAGNOSTIC AND NOT HAVE_ERROR_LOG)
     set(HAVE_ERROR_LOG ON CACHE BOOL "" FORCE)
-endif()
-
-if (NON_BARRIER_DIAGNOSTIC_YIELDS AND NOT HAVE_DIAGNOSTIC)
-    message(FATAL_ERROR "`NON_BARRIER_DIAGNOSTIC_YIELDS` can only be enabled when `HAVE_DIAGNOSTIC` is enabled.")
 endif()
 
 if (HAVE_UNITTEST_ASSERTS AND NOT HAVE_UNITTEST)

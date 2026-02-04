@@ -689,7 +689,7 @@ __recovery_txn_setup_initial_state(WT_SESSION_IMPL *session, WT_RECOVERY *r)
      * Now that timestamps extracted from the checkpoint metadata have been configured, configure
      * the pinned timestamp.
      */
-    __wti_txn_update_pinned_timestamp(session, true);
+    __wt_txn_update_pinned_timestamp(session, true);
 
     WT_ASSERT(session,
       conn->txn_global.has_stable_timestamp == false &&

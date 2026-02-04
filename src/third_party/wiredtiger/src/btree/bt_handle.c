@@ -812,7 +812,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     btree->checkpoint_timestamp =
       __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_timestamp);
     if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-        btree->prune_timestamp = btree->checkpoint_timestamp;
+        __wt_atomic_store_uint64_relaxed(&btree->prune_timestamp, btree->checkpoint_timestamp);
 
     return (0);
 }

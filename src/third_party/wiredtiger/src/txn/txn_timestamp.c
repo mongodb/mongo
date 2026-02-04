@@ -251,12 +251,12 @@ __wt_txn_query_timestamp(
 }
 
 /*
- * __wti_txn_update_pinned_timestamp --
+ * __wt_txn_update_pinned_timestamp --
  *     Update the pinned timestamp (the oldest timestamp that has to be maintained for current or
  *     future readers).
  */
 void
-__wti_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
+__wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
 {
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t last_pinned_timestamp, pinned_timestamp;
@@ -465,7 +465,7 @@ set:
     __wt_writeunlock(session, &txn_global->rwlock);
 
     if (has_oldest || has_stable)
-        __wti_txn_update_pinned_timestamp(session, force);
+        __wt_txn_update_pinned_timestamp(session, force);
 
     return (0);
 }

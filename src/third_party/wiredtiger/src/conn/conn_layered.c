@@ -1299,6 +1299,17 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
       metadata.oldest_timestamp, __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[1]),
       (int)metadata.checkpoint_len, metadata.checkpoint);
 
+    /* Update the pinned timestamp. */
+    __wt_txn_update_pinned_timestamp(session, false);
+    uint64_t pinned_timestamp;
+    __wt_txn_pinned_timestamp(session, &pinned_timestamp);
+    if (pinned_timestamp != WT_TS_NONE && metadata.oldest_timestamp > pinned_timestamp)
+        WT_IGNORE_RET(__wt_panic(session, EINVAL,
+          "Disaggregated storage checkpoint oldest_timestamp %s is greater than the current pinned "
+          "timestamp %s",
+          __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[0]),
+          __wt_timestamp_to_string(pinned_timestamp, ts_string[1])));
+
     /* Load crypt key data with the key provider extension, if any. */
     WT_ERR(__disagg_load_crypt_key(session, &metadata));
 
@@ -3078,7 +3089,11 @@ __layered_update_ingest_table_prune_timestamp(WT_SESSION_IMPL *session, const ch
     if (prune_timestamp != WT_TS_NONE) {
         uint64_t btree_prune_timestamp = __wt_atomic_load_uint64_relaxed(&btree->prune_timestamp);
         WT_ASSERT(session, prune_timestamp >= btree_prune_timestamp);
-        __wt_atomic_store_uint64_release(&btree->prune_timestamp, prune_timestamp);
+        /*
+         * The prune timestamp should be monotonically increasing. It is fine for the user to read
+         * the obsolete value. Therefore, no synchronization is required.
+         */
+        __wt_atomic_store_uint64_relaxed(&btree->prune_timestamp, prune_timestamp);
         layered_table->last_ckpt_inuse = ckpt_inuse;
 
         __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5,
@@ -3188,71 +3203,6 @@ __layered_last_checkpoint_order(
     WT_ASSERT(session, *ckpt_order == order_from_name);
 
     return (0);
-}
-
-/*
- * __disagg_remove_shared_metadata --
- *     Remove an entry from the shared metadata.
- */
-static int
-__disagg_remove_shared_metadata(WT_SESSION_IMPL *session, const char *key)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "overwrite", NULL};
-
-    WT_ASSERT(session, S2C(session)->layered_table_manager.leader);
-
-    cursor = NULL;
-
-    WT_ERR(__wt_open_cursor(session, WT_DISAGG_METADATA_URI, NULL, cfg, &cursor));
-    cursor->set_key(cursor, key);
-    WT_ERR(cursor->remove(cursor));
-
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
-      "Removed disaggregated shared metadata: key=\"%s\"", key);
-
-err:
-    if (cursor != NULL)
-        WT_TRET(cursor->close(cursor));
-    return (ret);
-}
-
-/*
- * __wt_disagg_remove_shared_metadata_layered --
- *     Remove all metadata relevant to the table_name from the shared metadata table.
- *
- * Note: If the table was created and dropped before a checkpoint has occurred, it is expected to
- *     have no metadata entries on the shared metadata table.
- */
-int
-__wt_disagg_remove_shared_metadata_layered(WT_SESSION_IMPL *session, const char *table_name)
-{
-    WT_DECL_ITEM(uri_buf);
-    WT_DECL_RET;
-
-    WT_RET(__wt_scr_alloc(session, 0, &uri_buf));
-
-    /* Remove all relevant metadata entries from shared metadata table (if exists). */
-    WT_ERR(__wt_buf_fmt(session, uri_buf, "file:%s.wt_stable", table_name));
-    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    WT_ERR(__wt_buf_fmt(session, uri_buf, "layered:%s", table_name));
-    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    WT_ERR(__wt_buf_fmt(session, uri_buf, "colgroup:%s", table_name));
-    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-    WT_ERR(__wt_buf_fmt(session, uri_buf, "table:%s", table_name));
-    WT_SAVE_DHANDLE(session, ret = __disagg_remove_shared_metadata(session, uri_buf->data));
-    WT_ERR_NOTFOUND_OK(ret, false);
-
-err:
-    __wt_scr_free(session, &uri_buf);
-    return (ret);
 }
 
 #ifdef HAVE_UNITTEST

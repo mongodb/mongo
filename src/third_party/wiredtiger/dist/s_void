@@ -189,7 +189,6 @@ func_ok()
         -e '/int palm_handle_verify_page$/d' \
         -e '/int palm_kv_err$/d' \
         -e '/int palm_set_last_materialized_lsn$/d' \
-        -e '/int palm_trim_table$/d' \
         -e '/int revint_terminate$/d' \
         -e '/int rotn_error$/d' \
         -e '/int rotn_sizing$/d' \

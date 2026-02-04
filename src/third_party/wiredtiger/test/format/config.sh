@@ -199,7 +199,7 @@ CONFIG configuration_list[] = {
 
 {"disagg.page_log", "configure page log for disaggregated storage (off | palm | palite)", C_IGNORE | C_STRING, 0, 0, 0}
 
-{"disagg.key_provider", "configure a key provider for disaggregated storage", C_BOOL, 5, 0, 0}
+{"disagg.key_provider", "configure a key provider for disaggregated storage", C_BOOL, 20, 0, 0}
 
 {"disagg.page_log.verbose", "set page log verbosity (default=WT_VERBOSE_INFO)", C_IGNORE, 0, 0, WT_VERBOSE_DEBUG_5}
 

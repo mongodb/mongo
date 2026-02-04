@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Checks that the test format config is consistent with config.sh.
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_top
+setup_trap
+check_fast_mode_flag
+
+# Files potentially modified by config.sh.
+fc="format_config_def.c"
+fh="config.h"
+
+# Go to the test/format directory where config.sh is located and run from.
+cd test/format
+
+# Calculate checksums before and after running config.sh.
+fc_checksum_before=$(md5sum "$fc" 2>/dev/null | awk '{print $1}')
+fh_checksum_before=$(md5sum "$fh" 2>/dev/null | awk '{print $1}')
+./config.sh
+fc_checksum_after=$(md5sum "$fc" 2>/dev/null | awk '{print $1}')
+fh_checksum_after=$(md5sum "$fh" 2>/dev/null | awk '{print $1}')
+
+# Record if any files were modified.
+changed_files=()
+if [[ "$fc_checksum_before" != "$fc_checksum_after" ]]; then
+  changed_files+=("$fc")
+fi
+if [[ "$fh_checksum_before" != "$fh_checksum_after" ]]; then
+  changed_files+=("$fh")
+fi
+
+# Output the list of changed files, if any.
+if [[ ${#changed_files[@]} -ne 0 ]]; then
+  for file in "${changed_files[@]}"; do
+    echo "Modified $file"
+  done
+fi
