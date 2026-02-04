@@ -101,7 +101,7 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::transitionToDedicatedConfigServer));
+                            ActionType::getTransitionToDedicatedConfigServerStatus));
         }
     };
     std::string help() const override {

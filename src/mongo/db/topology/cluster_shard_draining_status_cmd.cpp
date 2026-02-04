@@ -100,7 +100,7 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::removeShard));
+                            ActionType::shardDrainingStatus));
         }
     };
     std::string help() const override {

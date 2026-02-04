@@ -118,6 +118,7 @@ enums:
             getParameter: "getParameter"
             getShardMap: "getShardMap"
             getShardVersion: "getShardVersion"
+            getTransitionToDedicatedConfigServerStatus: "getTransitionToDedicatedConfigServerStatus"
             grantRole: "grantRole"
             grantPrivilegesToRole: "grantPrivilegesToRole" # ID only
             grantRolesToRole: "grantRolesToRole" # ID only
@@ -194,6 +195,7 @@ enums:
             setParameter: "setParameter"
             setUserWriteBlockMode: "setUserWriteBlockMode"
             shardCollection: "shardCollection" # ID only
+            shardDrainingStatus: "shardDrainingStatus"
             shardedDataDistribution: "shardedDataDistribution"
             shardingState: "shardingState"
             shutdown: "shutdown"

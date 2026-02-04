@@ -273,7 +273,6 @@ const skippedAuthTestingCommands = [
     "getAuditConfig",
     "getChangeStreamState",
     "getShardingReady",
-    "getTransitionToDedicatedConfigServerStatus",
     "grantPrivilegesToRole",
     "grantRolesToRole",
     "grantRolesToUser",
@@ -319,7 +318,6 @@ const skippedAuthTestingCommands = [
     "setChangeStreamState",
     "setCommittedSnapshot",
     "setIndexCommitQuorum",
-    "shardDrainingStatus",
     "startShardDraining",
     "startTransitionToDedicatedConfigServer",
     "stopTransitionToDedicatedConfigServer",
@@ -5402,6 +5400,19 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "getTransitionToDedicatedConfigServerStatus",
+            command: {getTransitionToDedicatedConfigServerStatus: 1},
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: Object.merge(roles_monitoring, roles_clusterManager),
+                    privileges: [{resource: {cluster: true}, actions: ["getTransitionToDedicatedConfigServerStatus"]}],
+                    expectFail: true,
+                },
+            ],
+        },
+        {
             testname: "hostInfo",
             command: {hostInfo: 1},
             testcases: [
@@ -7166,6 +7177,19 @@ export const authCommandsLib = {
                 },
                 {runOnDb: firstDbName, roles: {}},
                 {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
+            testName: "shardDrainingStatus",
+            command: {shardDrainingStatus: "x"},
+            skipUnlessSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: Object.merge(roles_monitoring, roles_clusterManager),
+                    privileges: [{resource: {cluster: true}, actions: ["shardDrainingStatus"]}],
+                    expectFail: true,
+                },
             ],
         },
         {

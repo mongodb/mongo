@@ -254,6 +254,7 @@ roles:
           - getLog
           - getParameter
           - getShardMap
+          - getTransitionToDedicatedConfigServerStatus
           - hostInfo
           - listClusterCatalog
           - listDatabases
@@ -265,6 +266,7 @@ roles:
           - replSetGetConfig # clusterManager gets this also
           - replSetGetStatus # clusterManager gets this also
           - serverStatus
+          - shardDrainingStatus
           - top
           - useUUID
           - inprog
@@ -371,6 +373,8 @@ roles:
           - checkMetadataConsistency
           - transitionFromDedicatedConfigServer
           - transitionToDedicatedConfigServer
+          - getTransitionToDedicatedConfigServerStatus # clusterMonitor gets this also
+          - shardDrainingStatus # clusterMonitor gets this also
 
       - matchType: any_normal
         actions: &clusterManagerRoleDatabaseActions
