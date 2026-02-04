@@ -342,6 +342,10 @@ private:
     const Milliseconds _minimumOperationDuration;
     const boost::optional<std::size_t> _oplogBatchTaskCount;
 
+    // Set to true if this recipient should skip cloning documents because it is not going to own
+    // any chunks for the collection after resharding.
+    const bool _skipCloning;
+
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.recipient.
     RecipientShardContext _recipientCtx;

@@ -70,6 +70,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/stdx/unordered_set.h"
@@ -361,6 +362,12 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     recipientDoc.setMetrics(std::move(metrics));
 
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+    if (resharding::gFeatureFlagReshardingSkipCloningIfApplicable.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !metadata.currentShardHasAnyChunks()) {
+        recipientDoc.setSkipCloning(true);
+    }
 
     recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
 

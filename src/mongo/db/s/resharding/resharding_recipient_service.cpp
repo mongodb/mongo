@@ -304,6 +304,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
+      _skipCloning{recipientDoc.getSkipCloning().value_or(false)},
       _recipientCtx{recipientDoc.getMutableState()},
       _donorShards{recipientDoc.getDonorShards()},
       _cloneTimestamp{recipientDoc.getCloneTimestamp()},
@@ -841,7 +842,8 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& abortToken,
     const CancelableOperationContextFactory& factory) {
-    const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kCloning;
+    const bool cloningDone =
+        _recipientCtx.getState() > RecipientStateEnum::kCloning || _skipCloning;
 
     if (!_dataReplication) {
         auto dataReplication = _makeDataReplication(opCtx, cloningDone);
