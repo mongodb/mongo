@@ -128,7 +128,7 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
             "--bes_backend=",
             "--bes_results_url=",
             "--noinclude_artifacts",
-            'mnemonic("CppCompile|LinkCompile", deps(//src/...))',
+            'mnemonic("CppCompile|LinkCompile", //src/...)',
             "--output=jsonproto",
         ]
     )
