@@ -33,8 +33,10 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -44,6 +46,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -55,6 +59,12 @@
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(ftdcThrowBSONObjectTooLarge);
+
+namespace {
+auto& totalDiscardedSamples = *MetricBuilder<Counter64>("ftdc.totalDiscardedSamples");
+}  // namespace
 
 long long FTDCController::getNumAsyncPeriodicCollectors() {
     return _numAsyncPeriodicCollectors.get();
@@ -371,6 +381,10 @@ void FTDCController::doLoop(Service* service) try {
 
         sectionSizes.clear();
         try {
+            if (MONGO_unlikely(ftdcThrowBSONObjectTooLarge.shouldFail())) {
+                uasserted(ErrorCodes::BSONObjectTooLarge,
+                          "Injected BSONObjectTooLarge exception for testing");
+            }
             auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
                 ? _asyncPeriodicCollectors->collect(client, sectionSizes)
                 : _periodicCollectors.collect(client, sectionSizes);
@@ -384,11 +398,18 @@ void FTDCController::doLoop(Service* service) try {
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
                 _mostRecentPeriodicDocument = std::get<0>(collectSample);
             }
-        } catch (...) {
-            for (const auto& entry : sectionSizes) {
-                LOGV2_INFO(
-                    10630200, "FTDC Entry", "name"_attr = entry.first, "size"_attr = entry.second);
+        } catch (const DBException& e) {
+            logCollectionError(e.toStatus(), sectionSizes);
+            // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
+            // catch the code directly because it does not have a definition in error_codes.yml.
+            if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
+                gDiagnosticDataCollectionDiscardLargeSamples.load()) {
+                totalDiscardedSamples.increment();
+                continue;
             }
+            throw;
+        } catch (...) {
+            logCollectionError(exceptionToStatus(), sectionSizes);
             throw;
         }
 
@@ -401,12 +422,14 @@ void FTDCController::doLoop(Service* service) try {
                     client, std::get<0>(collectSample), std::get<1>(collectSample));
                 iassert(s);
 
-            } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
-                for (const auto& entry : sectionSizes) {
-                    LOGV2_INFO(10630202,
-                               "FTDC Entry",
-                               "name"_attr = entry.first,
-                               "size"_attr = entry.second);
+            } catch (const DBException& e) {
+                logCollectionError(e.toStatus(), sectionSizes);
+                // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
+                // catch the code directly because it does not have a definition in error_codes.yml.
+                if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
+                    gDiagnosticDataCollectionDiscardLargeSamples.load()) {
+                    totalDiscardedSamples.increment();
+                    continue;
                 }
                 throw;
             }
@@ -417,6 +440,15 @@ void FTDCController::doLoop(Service* service) try {
                 "Exception thrown in full-time diagnostic data capture subsystem. Terminating the "
                 "process because diagnostics cannot be captured.",
                 "exception"_attr = exceptionToStatus());
+}
+
+void FTDCController::logCollectionError(
+    Status error, const std::vector<std::pair<std::string, int>>& sectionSizes) {
+    LOGV2_DEBUG(11558500,
+                _serverStatusSectionsLogSeverity().toInt(),
+                "Encountered an error while collecting an FTDC sample",
+                "error"_attr = error,
+                "sectionSizes"_attr = logv2::mapLog(sectionSizes));
 }
 
 }  // namespace mongo
