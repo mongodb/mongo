@@ -56,8 +56,6 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/sorter/container_based_spiller.h"
-#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -65,6 +63,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -1495,43 +1494,24 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexCatalogEntry* entry,
+    std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     const DatabaseName& dbName,
     const IndexBuildMethodEnum& method) {
     const SortOptions& opts = makeSortOptions(maxMemoryUsageBytes, dbName);
-    if (method == IndexBuildMethodEnum::kPrimaryDriven) {
-        invariant(!stateInfo);
-        return std::make_unique<HybridBulkBuilder>(
-            entry,
-            this,
-            std::make_shared<sorter::ContainerBasedSpiller<key_string::Value, mongo::NullValue>>(
-                *opCtx,
-                *shard_role_details::getRecoveryUnit(opCtx),
-                collection,
-                entry->indexBuildInterceptor()->getSorterContainer(),
-                indexBulkBuilderSSS.sorterContainerStats,
-                dbName,
-                opts.checksumVersion),
-            opts,
-            method);
-    }
-
-    using FileBasedSpiller = sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>;
-    auto& fileStats = indexBulkBuilderSSS.sorterFileStats;
-    boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
-
-    auto fileName = stateInfo ? (*stateInfo).getStorageIdentifier() : boost::none;
-    auto spiller = fileName
-        ? std::make_shared<FileBasedSpiller>(
-              std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
-              tmpPath,
-              dbName)
-        : std::make_shared<FileBasedSpiller>(tmpPath, &fileStats, dbName);
-
     return stateInfo
-        ? std::make_unique<HybridBulkBuilder>(entry, this, spiller, *stateInfo, opts, method)
-        : std::make_unique<HybridBulkBuilder>(entry, this, spiller, opts, method);
+        ? std::make_unique<HybridBulkBuilder>(
+              entry, this, std::move(spiller), *stateInfo, opts, method)
+        : std::make_unique<HybridBulkBuilder>(entry, this, std::move(spiller), opts, method);
+}
+
+SorterFileStats& SortedDataIndexAccessMethod::getSorterFileStats() {
+    return indexBulkBuilderSSS.sorterFileStats;
+}
+
+SorterContainerStats& SortedDataIndexAccessMethod::getSorterContainerStats() {
+    return indexBulkBuilderSSS.sorterContainerStats;
 }
 
 void SortedDataIndexAccessMethod::getKeys(

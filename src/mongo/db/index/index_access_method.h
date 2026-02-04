@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/ident.h"
@@ -303,10 +304,15 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
+        std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,
         const IndexBuildMethodEnum& method) = 0;
+
+    virtual SorterFileStats& getSorterFileStats() = 0;
+
+    virtual SorterContainerStats& getSorterContainerStats() = 0;
 };
 
 /**
@@ -633,13 +639,19 @@ public:
                                     int64_t* keysInserted,
                                     int64_t* keysDeleted) final;
 
-    std::unique_ptr<BulkBuilder> initiateBulk(OperationContext* opCtx,
-                                              const CollectionPtr& collection,
-                                              const IndexCatalogEntry* entry,
-                                              size_t maxMemoryUsageBytes,
-                                              const boost::optional<IndexStateInfo>& stateInfo,
-                                              const DatabaseName& dbName,
-                                              const IndexBuildMethodEnum& method) final;
+    std::unique_ptr<BulkBuilder> initiateBulk(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const IndexCatalogEntry* entry,
+        std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
+        size_t maxMemoryUsageBytes,
+        const boost::optional<IndexStateInfo>& stateInfo,
+        const DatabaseName& dbName,
+        const IndexBuildMethodEnum& method) final;
+
+    SorterFileStats& getSorterFileStats() final;
+
+    SorterContainerStats& getSorterContainerStats() final;
 
     static long long getDuplicateKeyErrors_forTest();
 

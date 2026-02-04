@@ -61,6 +61,9 @@
 #include "mongo/db/shard_role/shard_catalog/collection_yield_restore.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sorter/container_based_spiller.h"
+#include "mongo/db/sorter/file_based_spiller.h"
+#include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -182,6 +185,38 @@ bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collec
     // secondary ever becomes primary, it must retry any previously-skipped documents before
     // committing.
     return !isPrimary;
+}
+
+std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> makeSpiller(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexCatalogEntry* entry,
+    const boost::optional<IndexStateInfo>& stateInfo,
+    SorterFileStats& fileStats,
+    SorterContainerStats& containerStats,
+    const DatabaseName& dbName,
+    IndexBuildMethodEnum method) {
+    if (method == IndexBuildMethodEnum::kPrimaryDriven) {
+        invariant(!stateInfo);
+        return std::make_shared<sorter::ContainerBasedSpiller<key_string::Value, mongo::NullValue>>(
+            *opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            collection,
+            entry->indexBuildInterceptor()->getSorterContainer(),
+            containerStats,
+            dbName,
+            SorterChecksumVersion::v2);
+    }
+
+    using FileBasedSpiller = sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>;
+    boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
+    auto fileName = stateInfo ? stateInfo->getStorageIdentifier() : boost::none;
+    return fileName
+        ? std::make_shared<FileBasedSpiller>(
+              std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
+              tmpPath,
+              dbName)
+        : std::make_shared<FileBasedSpiller>(tmpPath, &fileStats, dbName);
 }
 
 }  // namespace
@@ -446,13 +481,22 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
             // at the same call site.
             if (_method != IndexBuildMethodEnum::kPrimaryDriven) {
-                index.bulk = index.real->initiateBulk(opCtx,
-                                                      collection.get(),
-                                                      indexCatalogEntry,
-                                                      eachIndexBuildMaxMemoryUsageBytes,
-                                                      stateInfo,
-                                                      collection->ns().dbName(),
-                                                      _method);
+                index.bulk =
+                    index.real->initiateBulk(opCtx,
+                                             collection.get(),
+                                             indexCatalogEntry,
+                                             makeSpiller(opCtx,
+                                                         collection.get(),
+                                                         indexCatalogEntry,
+                                                         stateInfo,
+                                                         index.real->getSorterFileStats(),
+                                                         index.real->getSorterContainerStats(),
+                                                         collection->ns().dbName(),
+                                                         _method),
+                                             eachIndexBuildMaxMemoryUsageBytes,
+                                             stateInfo,
+                                             collection->ns().dbName(),
+                                             _method);
             }
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
@@ -652,6 +696,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                 opCtx,
                 collection->getCollectionPtr(),
                 indexCatalogEntry,
+                makeSpiller(opCtx,
+                            collection->getCollectionPtr(),
+                            indexCatalogEntry,
+                            /*stateInfo=*/boost::none,
+                            index.real->getSorterFileStats(),
+                            index.real->getSorterContainerStats(),
+                            collection->nss().dbName(),
+                            _method),
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
                 collection->nss().dbName(),
@@ -679,6 +731,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                         opCtx,
                         collection->getCollectionPtr(),
                         indexCatalogEntry,
+                        makeSpiller(opCtx,
+                                    collection->getCollectionPtr(),
+                                    indexCatalogEntry,
+                                    /*stateInfo=*/boost::none,
+                                    index.real->getSorterFileStats(),
+                                    index.real->getSorterContainerStats(),
+                                    collection->nss().dbName(),
+                                    _method),
                         getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                         /*stateInfo=*/boost::none,
                         collection->nss().dbName(),
