@@ -198,13 +198,16 @@ copy_js_engine() {
     local build_dir="$1"
     local target_dir="$2"
 
-    log "Copying JS engine production output from $build_dir/dist to $target_dir"
+    log "Copying JS engine production output to $target_dir"
 
     # Create target directory if it doesn't exist
     mkdir -p "$target_dir"
 
     # Copy only the dist folder contents with proper permissions
-    cp -r "$build_dir/dist"/* "$target_dir/"
+    cp -r "$build_dir/dist" "$target_dir/"
+    cp -r "$build_dir/node_modules" "$target_dir/"
+    cp -r "$build_dir/proto" "$target_dir/"
+    cp "$build_dir/package.json" "$target_dir/"
     chmod -R 755 "$target_dir"
 
     log "✓ JS engine production output copied successfully"

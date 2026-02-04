@@ -55,8 +55,8 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-typedef unsigned long long ScriptingFunction;
-typedef BSONObj (*NativeFunction)(const BSONObj& args, void* data);
+using ScriptingFunction MONGO_MOD_PUBLIC = unsigned long long;
+using NativeFunction MONGO_MOD_PUBLIC = BSONObj (*)(const BSONObj& args, void* data);
 typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
 class DBClientBase;
@@ -67,7 +67,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
     const StringData source;
 };
 
-struct JSRegEx {
+struct MONGO_MOD_PUBLIC JSRegEx {
     std::string pattern;
     std::string flags;
 
@@ -76,7 +76,7 @@ struct JSRegEx {
         : pattern(std::move(pattern)), flags(std::move(flags)) {}
 };
 
-class MONGO_MOD_PUB Scope {
+class MONGO_MOD_OPEN Scope {
     Scope(const Scope&) = delete;
     Scope& operator=(const Scope&) = delete;
 
@@ -237,7 +237,7 @@ protected:
 
 enum class MONGO_MOD_PUB ExecutionEnvironment { Server, TestRunner };
 
-class MONGO_MOD_PUB ScriptEngine : public KillOpListenerInterface {
+class MONGO_MOD_OPEN ScriptEngine : public KillOpListenerInterface {
     ScriptEngine(const ScriptEngine&) = delete;
     ScriptEngine& operator=(const ScriptEngine&) = delete;
 
@@ -308,7 +308,11 @@ public:
     void interrupt(ClientLock&, OperationContext*) override {}
     void interruptAll(ServiceContextLock&) override {}
 
-    static std::string getInterpreterVersionString();
+    /**
+     * Returns a string identifying the JavaScript interpreter implementation.
+     * For example: "MozJS", "ExternalJS", etc.
+     */
+    virtual std::string getInterpreterVersionString() const = 0;
 
 protected:
     virtual Scope* createScope() = 0;
@@ -324,6 +328,12 @@ bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
 MONGO_MOD_PUB ScriptEngine* getGlobalScriptEngine();
-void setGlobalScriptEngine(ScriptEngine* impl);
+MONGO_MOD_PUB void setGlobalScriptEngine(ScriptEngine* impl);
 
+/**
+ * Returns true if external scripting is enabled.
+ * Default implementation returns false.
+ * Enterprise module provides an override that returns the IDL-controlled value.
+ */
+bool isExternalScriptingEnabled();
 }  // namespace mongo

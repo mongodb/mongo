@@ -21,6 +21,11 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "config_gen",
+    src = "config.idl",
+)
+
+idl_generator(
     name = "deadline_monitor_gen",
     src = "deadline_monitor.idl",
 )
@@ -33,6 +38,7 @@ mongo_cc_library(
         "engine.cpp",
         "jsexception.cpp",
         "utils.cpp",
+        ":config_gen",
         ":deadline_monitor_gen",
     ],
     deps = [

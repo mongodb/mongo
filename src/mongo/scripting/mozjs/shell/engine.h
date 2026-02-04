@@ -75,6 +75,8 @@ public:
     std::string getLoadPath() const override;
     void setLoadPath(const std::string& loadPath) override;
 
+    std::string getInterpreterVersionString() const override;
+
     void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
     void unregisterOperation(OperationContext* opCtx);
 

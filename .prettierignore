@@ -64,3 +64,5 @@ bazel-*
 
 # Streams specific
 src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist
+# asp-js-engine is an external module copied during Docker builds
+asp-js-engine

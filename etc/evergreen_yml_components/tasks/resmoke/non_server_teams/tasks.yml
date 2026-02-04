@@ -323,7 +323,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -338,7 +338,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -353,7 +353,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -368,7 +368,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -383,7 +383,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -398,7 +398,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 
@@ -413,9 +413,25 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: streams_externaljs
+    tags:
+      [
+        "assigned_to_jira_team_streams",
+        "default",
+        "streams_release_test",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run streams tests"
+        vars:
+          resmoke_jobs_max: 1
+          HAS_JS_ENGINE: "true"
 
   - <<: *task_template
     name: streams_aspio_pubsub
@@ -428,7 +444,7 @@ tasks:
       ]
     commands:
       - func: "do setup"
-      - func: "run tests"
+      - func: "run streams tests"
         vars:
           resmoke_jobs_max: 1
 

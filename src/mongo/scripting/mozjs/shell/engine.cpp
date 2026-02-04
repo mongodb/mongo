@@ -32,9 +32,11 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/scripting/config_gen.h"
 #include "mongo/scripting/mozjs/shell/engine_gen.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/scripting/mozjs/shell/proxyscope.h"
@@ -61,6 +63,10 @@ void DisableExtraThreads();
 
 namespace mongo {
 
+bool isExternalScriptingEnabled() {
+    return gEnableExternalScripting;
+}
+
 namespace {
 auto operationMozJSScopeBaseDecoration =
     OperationContext::declareDecoration<mozjs::MozJSImplScope*>();
@@ -71,15 +77,23 @@ void ScriptEngine::setup(ExecutionEnvironment environment) {
         return;
     }
 
+    // If gEnableExternalScripting is true, don't set up the MozJS engine.
+    if (isExternalScriptingEnabled()) {
+        if (!serverGlobalParams.quiet.load()) {
+            LOGV2_INFO(8972601, "External scripting is enabled. Not setting up MozJS engine.");
+        }
+        return;
+    }
+
+    if (!serverGlobalParams.quiet.load()) {
+        LOGV2_INFO(8972602, "Setting up MozJS engine.");
+    }
+
     setGlobalScriptEngine(new mozjs::MozJSScriptEngine(environment));
 
     if (hasGlobalServiceContext()) {
         getGlobalServiceContext()->registerKillOpListener(getGlobalScriptEngine());
     }
-}
-
-std::string ScriptEngine::getInterpreterVersionString() {
-    return fmt::format("MozJS-{}", MOZJS_MAJOR_VERSION);
 }
 
 namespace mozjs {
@@ -155,6 +169,10 @@ std::string MozJSScriptEngine::getLoadPath() const {
 
 void MozJSScriptEngine::setLoadPath(const std::string& loadPath) {
     _loadPath = loadPath;
+}
+
+std::string MozJSScriptEngine::getInterpreterVersionString() const {
+    return fmt::format("MozJS-{}", MOZJS_MAJOR_VERSION);
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {

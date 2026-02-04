@@ -1,0 +1,31 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - src/mongo/db/modules/*/jstests/streams/externaljs/*.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          # Prevent auto-execution of imported test modules. Tests in this suite
+          # use containerized mongostream and must control when tests run.
+          skipDefaultRun: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      bind_ip_all: ""
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagStreams: true
+        diagnosticDataCollectionEnabled: false
+        # ExternalJS server parameters
+        # These can be overridden via --setParameter on the command line
+        enableExternalScripting: true
+        jsBinPath: "/usr/bin/node"
+        jsSvrPath: "/app/externaljs/dist/server.js"
+        jsSvrPort: 50051
+        jsSvrWrkDir: "/tmp/"
+        jsSvrStartTimeoutMs: 10000
+    num_nodes: 1

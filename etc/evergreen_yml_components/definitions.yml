@@ -1254,6 +1254,23 @@ functions:
         OTEL_PARENT_ID: ${otel_parent_id}
         OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
 
+  "execute resmoke tests with asp js engine":
+    &execute_resmoke_tests_with_asp_js_engine_token
+    command: subprocess.exec
+    display_name: "execute resmoke tests with asp js engine"
+    type: test
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/resmoke_tests_execute.sh"
+      env:
+        OTEL_TRACE_ID: ${otel_trace_id}
+        OTEL_PARENT_ID: ${otel_parent_id}
+        OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
+        # Path to the asp-js-engine module cloned via Evergreen modules
+        ASP_JS_ENGINE_PATH: ${workdir}/asp-js-engine
+        HAS_JS_ENGINE: ${HAS_JS_ENGINE|}
+
   "execute resmoke tests via bazel sh": &execute_resmoke_tests_via_bazel_sh
     command: subprocess.exec
     display_name: "execute resmoke tests via bazel sh"
@@ -1652,6 +1669,75 @@ functions:
     - *sign_macos_dev_binaries
     - *multiversion_exclude_tags_generate
     - *execute_resmoke_tests_with_aws_credentials
+      # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
+      # directly actionable. We use type=setup rather than type=system or type=test for this command
+    # because we don't intend for any human to look at this failure.
+    - *check_run_tests_infrastructure_failure
+    - *check_resmoke_failure
+
+  # Run streams tests that require access to the private asp-js-engine repo
+  # Clone the asp-js-engine module and restore git history/tags so resmoke's git describe works
+  # Re-fetch and extract binaries after git clone because the clone overwrites src/ (including tarballs and dist-test/)
+  # Copy asp-js-engine from src/ to workdir where resmoke expects it (ASP_JS_ENGINE_PATH=${workdir}/asp-js-engine)
+  "run streams tests":
+    - *f_expansions_write
+    - *git_get_shallow_streams_project
+    - *restore_git_history_and_tags
+    # Copy asp-js-engine module from src/ to workdir where ASP_JS_ENGINE_PATH expects it
+    - command: subprocess.exec
+      display_name: "copy asp-js-engine to workdir"
+      params:
+        binary: bash
+        args:
+          - "-c"
+          - |
+            set -o errexit
+            set -o verbose
+            # git.get_project clones into src/, so asp-js-engine module is at src/asp-js-engine/asp-js-engine
+            # ASP_JS_ENGINE_PATH expects it at ${workdir}/asp-js-engine with package.json at root
+            rm -rf asp-js-engine
+            cp -r src/asp-js-engine/asp-js-engine asp-js-engine
+    - *fetch_binaries
+    - *fetch_binaries_zstd
+    - *fetch_tgz_binary_shas
+    - *fetch_and_verify_binaries_sha
+    - *fetch_and_verify_binaries_sha_zstd
+    - *fetch_jstestshell
+    - *verify_jstestshell_sha
+    - *extract_binaries
+    - *extract_jstestshell
+    - *configure_evergreen_api_credentials
+    - *determine_task_timeout
+    - *update_task_timeout_expansions
+    - *f_expansions_write
+    - *update_task_timeout
+    - *f_expansions_write
+    - *set_code_coverage_expansion
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        env:
+          CEDAR_USER: ${cedar_user}
+          CEDAR_API_KEY: ${cedar_api_key}
+        updates:
+          - key: aws_key_remote
+            value: ${mongodatafiles_aws_key}
+          - key: aws_profile_remote
+            value: mongodata_aws
+          - key: aws_secret_remote
+            value: ${mongodatafiles_aws_secret}
+    - *f_expansions_write
+    - *set_up_remote_credentials
+    - *f_expansions_write
+    - *determine_resmoke_jobs
+    - *update_resmoke_jobs_expansions
+    - *f_expansions_write
+    - *configure_evergreen_api_credentials
+    - *sign_macos_dev_binaries
+    - *multiversion_exclude_tags_generate
+    - *assume_ecr_role
+    - *fetch_module_images
+    - *execute_resmoke_tests_with_asp_js_engine_token
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
     # because we don't intend for any human to look at this failure.

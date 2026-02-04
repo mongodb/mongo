@@ -35,8 +35,4 @@ namespace mongo {
 void ScriptEngine::setup(ExecutionEnvironment environment) {
     // noop
 }
-
-std::string ScriptEngine::getInterpreterVersionString() {
-    return "";
-}
 }  // namespace mongo
