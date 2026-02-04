@@ -49,6 +49,9 @@ filters:
   - "distinct_access*":
     approvers:
       - 10gen/query-optimization
+  - "engine_selection*":
+    approvers:
+      - 10gen/query-execution
   - "eof_node_type*":
     approvers:
       - 10gen/query-optimization

@@ -358,8 +358,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
      * This method updates this QueryPlannerParams object as needed so that it can be used with
      * the SBE engine.
      */
-    void setTargetSbeStageBuilder(OperationContext* opCtx,
-                                  const CanonicalQuery& canonicalQuery,
+    void setTargetSbeStageBuilder(const CanonicalQuery& canonicalQuery,
                                   const MultipleCollectionAccessor& collections);
 
     /**

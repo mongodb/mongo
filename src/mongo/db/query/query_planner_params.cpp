@@ -558,8 +558,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
         opCtx, mainColl, &mainCollectionInfo.stats, false /* includeSizeStats */);
 }
 
-void QueryPlannerParams::setTargetSbeStageBuilder(OperationContext* opCtx,
-                                                  const CanonicalQuery& canonicalQuery,
+void QueryPlannerParams::setTargetSbeStageBuilder(const CanonicalQuery& canonicalQuery,
                                                   const MultipleCollectionAccessor& collections) {
     // Set 'TARGET_SBE_STAGE_BUILDER' on the main collection and the secondary collections. We
     // also update 'providedOptions' in case fillOutSecondaryCollectionsPlannerParams() hasn't
