@@ -91,7 +91,7 @@ const std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
     {IndexDescriptor::kIndexVersionFieldName, {}},
     {IndexDescriptor::kKeyPatternFieldName, {}},
     {IndexDescriptor::kLanguageOverrideFieldName, {}},
-    // TODO(SERVER-100328): remove after 9.0 is branched.
+    // TODO (SERVER-100328): remove after 9.0 is branched.
     {IndexDescriptor::kNamespaceFieldName, {}},
     {IndexDescriptor::kPartialFilterExprFieldName, {}},
     {IndexDescriptor::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
@@ -102,11 +102,12 @@ const std::map<StringData, std::set<IndexType>> kAllowedFieldNames = {
     {IndexDescriptor::kWeightsFieldName, {IndexType::INDEX_TEXT}},
     {IndexDescriptor::kOriginalSpecFieldName, {}},
     {IndexDescriptor::kPrepareUniqueFieldName, {}},
+    // TODO (SERVER-100328): remove after 9.0 is branched.
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     {"_id", {}},
-    // TODO SERVER-76108: Field names are not validated to match index type. This was used for the
-    // removed 'geoHaystack' index type, but users could have set it for other index types as well.
-    // We need to keep allowing it until FCV upgrade is implemented to clean this up.
+    // TODO (SERVER-100328): remove after 9.0 is branched.
+    // Field names are not validated to match index type. This was used for the removed
+    // 'geoHaystack' index type, but users could have set it for other index types as well.
     {"bucketSize"_sd, {}}};
 
 const std::map<StringData, std::set<IndexType>> kNonDeprecatedAllowedFieldNames = [] {
