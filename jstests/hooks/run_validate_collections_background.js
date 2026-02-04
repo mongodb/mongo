@@ -5,6 +5,10 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
+import {
+    filterGetAllCollectionsExcludingViews,
+    filterGetAllCollectionsExcludingViewsAndTimeseries,
+} from "src/mongo/shell/data_consistency_checker.js";
 
 if (typeof db === "undefined") {
     throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
@@ -123,18 +127,42 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
             conn._setSecurityToken(token);
             let db = conn.getDB(dbName);
 
-            // TODO (SERVER-25493): Change filter to {type: 'collection'}.
-            const listCollRes = assert.commandWorked(
-                db.runCommand({
-                    "listCollections": 1,
-                    "nameOnly": true,
-                    "filter": {$or: [{type: "collection"}, {type: {$exists: false}}]},
-                    "$readPreference": {"mode": "nearest"},
-                }),
-            );
-            const collectionNames = new DBCommandCursor(db, listCollRes).map(function (z) {
-                return z.name;
-            });
+            // Don't run validate on view namespaces.
+            // Don't run validate on timeseries buckets directly. Timeseries collections will be
+            // validated via their main namespace.
+            // Use {type: {$ne: "view"}} to skip loading the view catalog.
+            let collectionNames;
+            try {
+                const listCollRes = assert.commandWorked(
+                    db.runCommand({
+                        "listCollections": 1,
+                        "nameOnly": true,
+                        "filter": filterGetAllCollectionsExcludingViews(),
+                        "$readPreference": {"mode": "nearest"},
+                    }),
+                );
+                collectionNames = new DBCommandCursor(db, listCollRes)
+                    .map((z) => z.name)
+                    // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+                    // Filter out system.buckets.* collections
+                    .filter((name) => !name.startsWith("system.buckets."));
+            } catch (e) {
+                // If the new filter {type: {$ne: "view"}} fails with InvalidViewDefinition in
+                // multiversion environments,, fall back to the old filter
+                if (e.code === ErrorCodes.InvalidViewDefinition) {
+                    const listCollRes = assert.commandWorked(
+                        db.runCommand({
+                            "listCollections": 1,
+                            "nameOnly": true,
+                            "filter": filterGetAllCollectionsExcludingViewsAndTimeseries(),
+                            "$readPreference": {"mode": "nearest"},
+                        }),
+                    );
+                    collectionNames = new DBCommandCursor(db, listCollRes).map((z) => z.name);
+                } else {
+                    throw e;
+                }
+            }
 
             for (let collectionName of collectionNames) {
                 let res = conn

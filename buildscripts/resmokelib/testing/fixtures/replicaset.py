@@ -1301,7 +1301,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         excluded_any_db_collections = ["system.profile"]
 
         base_hashes = {}
-        filter = {"type": "collection"}
+        # Exclude views.
+        filter = {"type": {"$ne": "view"}}
         for node in self.nodes:
             client = interface.build_client(node, self.auth_options)
             # Skip validating collections for arbiters.
@@ -1322,6 +1323,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 db = client.get_database(db_name)
                 for coll in db.list_collections(filter=filter):
                     coll_name = coll["name"]
+                    # TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+                    # Filter out system.buckets.* collections.
+                    if coll_name.startswith("system.buckets."):
+                        continue
                     # Skip excluded collections which all live in the 'config' database.
                     if db_name == "config" and coll_name in excluded_config_collections:
                         continue

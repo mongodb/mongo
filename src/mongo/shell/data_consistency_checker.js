@@ -1,3 +1,24 @@
+/**
+ * Returns a filter for listCollections that excludes views but includes timeseries collections.
+ * This filter prevents reloading the view catalog and is available in MongoDB 8.3+.
+ *
+ * @returns {Object} Filter object: {type: {$ne: "view"}}
+ */
+function filterGetAllCollectionsExcludingViews() {
+    return {type: {$ne: "view"}};
+}
+
+/**
+ * Returns a filter for listCollections that excludes both views and timeseries collections.
+ * This is the legacy filter used for multiversion compatibility with MongoDB < 8.3.
+ * Also prevents reloading the view catalog.
+ *
+ * @returns {Object} Filter object: {$or: [{type: "collection"}, {type: {$exists: false}}]}
+ */
+function filterGetAllCollectionsExcludingViewsAndTimeseries() {
+    return {$or: [{type: "collection"}, {type: {$exists: false}}]};
+}
+
 class CollInfos {
     /**
      * OO wrapper around the response of db.getCollectionInfos() to avoid calling it multiple times.
@@ -5,14 +26,34 @@ class CollInfos {
      * single collection, so a collName is typically required to be passed in as a parameter.
      */
     constructor(conn, connName, dbName) {
-        // Special listCollections filter to prevent reloading the view catalog.
-        const listCollectionsFilter = {
-            $or: [{type: "collection"}, {type: {$exists: false}}],
-        };
+        // Special listCollections filter to prevent reloading the view catalog, also skips timeseries collections.
+        const listCollectionsSkipTimeseriesAndViewsFilter = filterGetAllCollectionsExcludingViewsAndTimeseries();
+        // filter to skip views, also prevents reloading the view catalog
+        const listCollectionsFilterSkipViews = filterGetAllCollectionsExcludingViews();
         this.conn = conn;
         this.connName = connName;
         this.dbName = dbName;
-        this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsFilter);
+        // For multiversion tests, listCollectionsFilterSkipViews is only available in 8.3+
+        // If it fails, fall back to the old filter that doesn't include timeseries collections
+        // This is okay because viewless timeseries are disabled in older binaries
+        try {
+            this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsFilterSkipViews);
+            // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+            // Filter out system.buckets. collections
+            // listCollectionsFilterSkipViews also returns the type "timeseries"
+            // we will send commands directly the main namespace instead of targeting system.buckets
+            this.collInfosRes = this.collInfosRes.filter((c) => !c.name.startsWith("system.buckets."));
+        } catch (e) {
+            // If the filter fails with InvalidViewDefinition (e.g., in multiversion environments),
+            // fall back to the old filter. It's okay if it's excluding timeseries because viewless timeseries
+            // are not disabled in older versions, so we will test legacy timeseries through
+            // their system.buckets namespace
+            if (e.code === ErrorCodes.InvalidViewDefinition) {
+                this.collInfosRes = conn.getDB(dbName).getCollectionInfos(listCollectionsSkipTimeseriesAndViewsFilter);
+            } else {
+                throw e;
+            }
+        }
         const result = assert.commandWorked(conn.getDB("admin").runCommand({serverStatus: 1}));
         this.binVersion = MongoRunner.getBinVersionFor(result.version);
     }
@@ -672,4 +713,9 @@ class DataConsistencyChecker {
     }
 }
 
-export {CollInfos, DataConsistencyChecker};
+export {
+    CollInfos,
+    DataConsistencyChecker,
+    filterGetAllCollectionsExcludingViews,
+    filterGetAllCollectionsExcludingViewsAndTimeseries,
+};

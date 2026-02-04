@@ -199,9 +199,6 @@ def validate_database(
         skipEnforceFastCountOnValidate = test_data.get(
             "skipEnforceFastCountOnValidate", skipEnforceFastCountOnValidate
         )
-        skipValidationOnInvalidViewDefinitions = test_data.get(
-            "skipValidationOnInvalidViewDefinitions", False
-        )
         skipValidationOnNamespaceNotFound = test_data.get("skipValidationOnNamespaceNotFound", True)
 
         validate_opts = {
@@ -215,15 +212,8 @@ def validate_database(
             "collHash": True,
         }
 
-        # Don't run validate on view namespaces.
-        filter = {"type": "collection"}
-        if skipValidationOnInvalidViewDefinitions:
-            # If skipValidationOnInvalidViewDefinitions=true, then we avoid resolving the view
-            # catalog on the admin database.
-            #
-            # TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
-            # versions of MongoDB <= 3.2 is no longer supported.
-            filter = {"$or": [filter, {"type": {"$exists": False}}]}
+        # Don't run validate on view namespaces, include timeseries collections.
+        filter = {"type": {"$ne": "view"}}
 
         # In a sharded cluster with in-progress validate command for the config database
         # (i.e. on the config server), a listCommand command on a mongos or shardsvr mongod that
@@ -251,7 +241,24 @@ def validate_database(
                     raise
             raise RuntimeError(f"Timed out while trying to list collections for {db_name}")
 
-        coll_names = list_collections(db, filter)
+        # Try the new filter first, and if it fails with InvalidViewDefinition
+        # in multiversion environments, fall back to the old filter
+        try:
+            coll_names = list_collections(db, filter)
+            # TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+            # Filter out system.buckets.* collections
+            # timeseries collections will be tested through their main namespace
+            coll_names = [name for name in coll_names if not name.startswith("system.buckets.")]
+        except pymongo.errors.OperationFailure as ex:
+            # Error code 182 is 'InvalidViewDefinition'
+            if ex.code and ex.code == 182:
+                logger.warning(
+                    f"Received InvalidViewDefinition error with new filter, falling back to old filter for {db_name}"
+                )
+                filter = {"$or": [{"type": "collection"}, {"type": {"$exists": False}}]}
+                coll_names = list_collections(db, filter)
+            else:
+                raise
 
         for coll_name in coll_names:
             futures.append(
@@ -298,6 +305,20 @@ def validate_collection(
             # validation and continue to next.
             logger.info(
                 f"Skipping collection validation for {coll_name} since collection was not found"
+            )
+            return True
+        # TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+        elif (
+            "codeName" in ret
+            and ret["codeName"] == "NamespaceNotFound"
+            and "errmsg" in ret
+            and "Timeseries buckets collection does not exist" in ret["errmsg"]
+        ):
+            # A legacy timeseries view exists but its corresponding bucket collection doesn't.
+            # This can happen when tests intentionally create views on non-existent buckets
+            # or drop the bucket without dropping the view. Skip validation in this case.
+            logger.info(
+                f"Skipping collection validation for {coll_name} since it is a legacy timeseries view without a bucket"
             )
             return True
         elif "codeName" in ret and ret["codeName"] == "CommandNotSupportedOnView":

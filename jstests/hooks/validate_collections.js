@@ -1,6 +1,10 @@
 // Wrapper around the validate command that can be used to validate index key counts.
 import {Thread} from "jstests/libs/parallelTester.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
+import {
+    filterGetAllCollectionsExcludingViews,
+    filterGetAllCollectionsExcludingViewsAndTimeseries,
+} from "src/mongo/shell/data_consistency_checker.js";
 
 export class CollectionValidator {
     validateCollections(db, obj) {
@@ -113,15 +117,7 @@ function validateCollectionsImpl(db, obj) {
     let full_res = {ok: 1, failed_res: [], hashes: {}};
 
     // Don't run validate on view namespaces.
-    let filter = {type: "collection"};
-    if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
-        // If skipValidationOnInvalidViewDefinitions=true, then we avoid resolving the view
-        // catalog on the admin database.
-        //
-        // TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
-        // versions of MongoDB <= 3.2 is no longer supported.
-        filter = {$or: [filter, {type: {$exists: false}}]};
-    }
+    let filter = filterGetAllCollectionsExcludingViews();
 
     // Optionally skip collections.
     if (
@@ -147,14 +143,24 @@ function validateCollectionsImpl(db, obj) {
     // has stale routing info may fail since a refresh would involve running read commands
     // against the config database. The read commands are lock free so they are not blocked by
     // the validate command and instead are subject to failing with a ObjectIsBusy error. Since
-    // this is a transient state, we shoud retry.
+    // this is a transient state, we should retry.
     let collInfo;
     assert.soon(() => {
         try {
             collInfo = db.getCollectionInfos(filter);
+            // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+            // Filter out system.buckets.* collections
+            // timeseries collections will be tested through their main namespace
+            collInfo = collInfo.filter((c) => !c.name.startsWith("system.buckets."));
         } catch (ex) {
             if (ex.code === ErrorCodes.ObjectIsBusy) {
                 return false;
+            }
+            // If the new filter {type: {$ne: "view"}} fails with InvalidViewDefinition in
+            // multiversion environments, fall back to the old filter
+            if (ex.code === ErrorCodes.InvalidViewDefinition) {
+                filter = filterGetAllCollectionsExcludingViewsAndTimeseries();
+                return false; // Retry with the fallback filter
             }
             throw ex;
         }
@@ -172,6 +178,18 @@ function validateCollectionsImpl(db, obj) {
                 // In this case we skip the collection if the ns was not found at time of
                 // validation and continue to next.
                 print("Skipping collection validation for " + coll.getFullName() + " since collection was not found");
+                continue;
+            } else if (
+                res.codeName === "NamespaceNotFound" &&
+                res.errmsg?.includes("Timeseries buckets collection does not exist")
+            ) {
+                // TODO(SERVER-118882): Remove this once 9.0 becomes last LTS.
+                // A legacy timeseries view exists but its corresponding bucket collection doesn't.
+                // This can happen when tests intentionally create views on non-existent buckets
+                // or drop the bucket without dropping the view. Skip validation in this case.
+                print(
+                    `Skipping collection validation for ${coll.getFullName()} since it is a legacy timeseries view without a bucket`,
+                );
                 continue;
             } else if (res.codeName === "CommandNotSupportedOnView") {
                 // Even though we pass a filter to getCollectionInfos() to only fetch
