@@ -136,7 +136,7 @@ buildvariants:
     stepback: true
     expansions: &amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
       <<: *amazon_linux2023_arm64_dynamic_expansions
-      tss_enabled: true
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
       has_packages: false
