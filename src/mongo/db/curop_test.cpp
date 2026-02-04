@@ -618,6 +618,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
                                          "ns",
                                          "isFromPriorityPortConnection",
                                          "command",
+                                         "opid",
                                          "numYield",
                                          "locks",
                                          "millis",

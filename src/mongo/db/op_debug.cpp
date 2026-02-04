@@ -237,6 +237,7 @@ void OpDebug::report(OperationContext* opCtx,
             pAttrs->add("command", redact(query));
         }
     }
+    pAttrs->add("opid", opCtx->getOpID());
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
@@ -591,6 +592,7 @@ void OpDebug::append(OperationContext* opCtx,
         appendResolvedViewsInfo(b);
     }
 
+    b.appendNumber("opid", static_cast<long long>(opCtx->getOpID()));
     OPDEBUG_APPEND_NUMBER(b, nShards);
     OPDEBUG_APPEND_NUMBER(b, cursorid);
     if (mongotCursorId) {
@@ -920,6 +922,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
         }
     });
 
+    addIfNeeded("opid", [](auto field, auto args, auto& b) {
+        OPDEBUG_APPEND_NUMBER2(b, field, static_cast<long long>(args.opCtx->getOpID()));
+    });
     addIfNeeded("nShards", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_NUMBER2(b, field, args.op.nShards);
     });

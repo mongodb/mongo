@@ -4,6 +4,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 function assertLogLineContains(conn, parts) {
     if (typeof parts == "string") {
@@ -132,5 +133,60 @@ logLine = priorityPortFFEnabled
       ];
 
 assertLogLineContains(conn, logLine);
+
+// Use a parallel shell to run currentOp and find operation ID
+function findOpIdInCurrentOp(conn, comment) {
+    let ops = conn.getDB("admin").currentOp({"command.comment": comment});
+    if (ops.inprog.length > 0) {
+        return ops.inprog[0].opid;
+    }
+    return null;
+}
+
+const failPoint = configureFailPoint(testDB, "waitInFindBeforeMakingBatch", {
+    comment: "find_getmore_test_fp",
+});
+
+// Start a parallel shell that will run the find operation
+let parallelShell = startParallelShell(function () {
+    print("Starting find operation in parallel shell");
+    let testDb = db.getSiblingDB("log_getmore");
+    testDb.test.find().comment("find_getmore_test_fp").itcount();
+    print("Finished find operation in parallel shell");
+}, conn.port);
+
+failPoint.wait();
+
+let foundOpid = findOpIdInCurrentOp(conn, "find_getmore_test_fp");
+assert(foundOpid !== null, "ERROR: Could not find operation in currentOp");
+failPoint.off();
+// Wait for the parallel shell to complete
+parallelShell();
+
+// Function to check if a specific opid exists in slow query logs
+function isOpidInSlowQueryLogs(conn, targetOpid) {
+    let logLines = checkLog.getGlobalLog(conn);
+
+    for (let i = 0; i < logLines.length; i++) {
+        let line = logLines[i];
+
+        if (line.includes("Slow query") && line.includes('"opid":')) {
+            let opidMatch = line.match(/"opid":(\d+)/);
+            if (opidMatch && parseInt(opidMatch[1]) === targetOpid) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// Check if our foundOpid exists in slow query logs
+let foundInLogs = isOpidInSlowQueryLogs(conn, foundOpid);
+if (foundInLogs) {
+    print("SUCCESS: Operation ID " + foundOpid + " found in slow query logs!");
+} else {
+    assert(false, "ERROR: Operation ID " + foundOpid + " not found in slow query logs");
+}
 
 MongoRunner.stopMongod(conn);
