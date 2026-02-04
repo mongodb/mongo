@@ -66,6 +66,15 @@ struct ProxiedEndpoints {
     SockAddr destinationAddress;
 };
 
+struct ProxiedSupplementaryDataEntry {
+    // Types are defined below in sections 2.2.X:
+    // https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+    uint8_t type;
+    std::string data;
+};
+
+using ProxiedSupplementaryData = std::vector<ProxiedSupplementaryDataEntry>;
+
 /**
  * Contains the results of parsing a Proxy Protocol header. bytesParsed contains the
  * length of the parsed header, and endpoints contains any endpoint information that the
@@ -75,17 +84,21 @@ struct ParserResults {
     // The endpoint metadata should be populated iff parsing is complete, the connection
     // is marked as remote, and the connection is not marked as UNKNOWN.
     boost::optional<ProxiedEndpoints> endpoints = {};
+    // Optional tlv vectors supplied by the client. This is only supported on V2 of the proxy
+    // protocol.
+    ProxiedSupplementaryData tlvs = {};
     size_t bytesParsed = 0;
 };
 
 /**
- * Parses a string potentially starting with a proxy protocol header (either V1 or V2).
+ * Parses a string potentially starting with a proxy protocol header (either V1 or V2). The parsing
+ * logic adjusts based on whether the socket being read from is a Unix domain socket (`isUnixSock`).
  * If the string begins with a partial but incomplete header, returns an empty optional;
  * otherwise, returns a ParserResults with the results of the parse.
  *
  * Will throw eagerly on a malformed header.
  */
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer);
+boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isUnixSock);
 
 /**
  * Peek a buffer fo at least 12 bytes to determine if it may be a proxy protocol header.

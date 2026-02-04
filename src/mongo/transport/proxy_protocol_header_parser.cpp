@@ -65,6 +65,13 @@ StringData parseToken(StringData& s, const char c) {
     s = s.substr(pos + 1);
     return result;
 }
+
+bool isValidTLVType(uint8_t type) {
+    // Valid TLV types are defined here:
+    // https://www.haproxy.com/documentation/haproxy-configuration-tutorials/proxying-essentials/client-ip-preservation/enable-proxy-protocol/#tlv-format
+    return (type >= 0x01 && type <= 0x05) || (type >= 0x20 && type <= 0x25) || (type == 0x30) ||
+        (type >= 0xE0 && type <= 0xEF);
+}
 }  // namespace
 
 namespace proxy_protocol_details {
@@ -192,6 +199,38 @@ T extract(StringData& data) {
     return result;
 }
 
+// Parses buffer to extract TLV vectors into tlvs. This function assumes that buffer only contains
+// TLV vectors.
+void parseTLVVectors(StringData& buffer, ProxiedSupplementaryData& tlvs) {
+    while (buffer.size()) {
+        static constexpr size_t kTLVHeaderSize = 3;
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("Proxy Protocol Version 2 TLV header size larger than buffer size. "
+                            "Expected {} > {}",
+                            buffer.size(),
+                            kTLVHeaderSize),
+                buffer.size() > kTLVHeaderSize);
+
+        auto type = extract<uint8_t>(buffer);
+        uassert(ErrorCodes::FailedToParse,
+                fmt::format("Proxy Protocol Version 2 TLV type not valid: {}", type),
+                isValidTLVType(type));
+
+        auto length = endian::bigToNative(extract<uint16_t>(buffer));
+        uassert(
+            ErrorCodes::FailedToParse,
+            fmt::format(
+                "Proxy Protocol Version 2 TLV length larger than buffer size. Expected {} >= {}",
+                buffer.size(),
+                length),
+            buffer.size() >= length);
+
+        std::string data(buffer.data(), length);
+        buffer = buffer.substr(length);
+        tlvs.emplace_back(type, std::move(data));
+    }
+}
+
 constexpr StringData kV1Start = "PROXY"_sd;
 
 bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
@@ -290,7 +329,8 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
 // Since this string contains a null, it's critical we use a literal here.
 constexpr StringData kV2Start = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"_sd;
 
-bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoints) {
+bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) {
+    auto& endpoints = results.endpoints;
     buffer = buffer.substr(kV2Start.size());
     if (buffer.empty())
         return false;
@@ -427,11 +467,18 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
 
                 endpoints = ProxiedEndpoints{SockAddr((sockaddr*)&src_addr, sizeof(sockaddr_un)),
                                              SockAddr((sockaddr*)&dst_addr, sizeof(sockaddr_un))};
+
+                buffer = buffer.substr(kUnixProxyProtocolSize);
                 break;
             }
             default:
                 MONGO_UNREACHABLE;
         }
+        // Only parse TLV vectors for server connections over a unix domain socket.
+        if (isUnixSock) {
+            parseTLVVectors(buffer, results.tlvs);
+        }
+
         buffer = resultBuffer;
         return true;
     } catch (const std::out_of_range&) {
@@ -441,7 +488,7 @@ bool parseV2Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
 
 }  // namespace
 
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
+boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isUnixSock) {
     // Check if the buffer presented is V1, V2, or neither.
     const size_t originalBufferSize = buffer.size();
 
@@ -450,7 +497,7 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
     if (buffer.starts_with(kV1Start)) {
         complete = parseV1Buffer(buffer, results.endpoints);
     } else if (buffer.starts_with(kV2Start)) {
-        complete = parseV2Buffer(buffer, results.endpoints);
+        complete = parseV2Buffer(buffer, results, isUnixSock);
     } else {
         uassert(ErrorCodes::FailedToParse,
                 fmt::format("Initial Proxy Protocol header bytes invalid: {}; "

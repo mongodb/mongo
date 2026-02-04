@@ -505,7 +505,8 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     return AsyncTry([this, buffer] {
                const auto bytesRead = peekASIOStream(
                    _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
-               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead));
+               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
+                                                          localAddr().getType() == AF_UNIX);
            })
         .until([deadline, proxyHeaderTimeout, reactor](
                    StatusWith<boost::optional<ParserResults>> sw) {
