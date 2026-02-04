@@ -106,7 +106,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
     OperationContext* opCtx,
     const LogicalSessionId& lsid,
     boost::optional<KillToken> killToken,
-    Milliseconds* timeout) {
+    Date_t deadline) {
     if (killToken) {
         dassert(killToken->lsidToKill == lsid);
     } else {
@@ -133,8 +133,6 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionInner(
         hangAfterIncrementingNumWaitingToCheckOut.pauseWhileSet(opCtx);
         ul.lock();
     }
-
-    auto deadline = timeout ? Date_t::now() + *timeout : Date_t::max();
     const auto ok = opCtx->waitForConditionOrInterruptUntil(
         sri->availableCondVar,
         ul,
@@ -169,14 +167,14 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
 
 SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationContext* opCtx,
                                                                      KillToken killToken,
-                                                                     Milliseconds* timeout) {
+                                                                     Date_t deadline) {
     // This method is not supposed to be called with an already checked-out session due to risk of
     // deadlock
     invariant(!operationSessionDecoration(opCtx));
     invariant(!opCtx->getTxnNumber());
 
     auto lsid = killToken.lsidToKill;
-    return SessionToKill(_checkOutSessionInner(opCtx, lsid, std::move(killToken), timeout));
+    return SessionToKill(_checkOutSessionInner(opCtx, lsid, std::move(killToken), deadline));
 }
 
 void SessionCatalog::scanSession(const LogicalSessionId& lsid,

@@ -40,6 +40,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -59,6 +60,17 @@
 namespace mongo {
 namespace {
 
+/** Helper method to determine deadline for an individual session checkout. Some reapers enforce a
+ * per session time limit, while others enforce a deadline for checking out/killing all matching
+ * sessions, so this helper determines which to use for the deadline on a per session level. */
+Date_t getSessionCheckoutDeadline(Milliseconds* timeout, Date_t deadline) {
+    if (!timeout) {
+        return deadline;
+    } else {
+        return std::min(Date_t::now() + *timeout, deadline);
+    }
+}
+
 /**
  * Shortcut method shared by the various forms of session kill below. Every session kill operation
  * consists of the following stages:
@@ -74,8 +86,9 @@ void killSessionsAction(
     const std::function<bool(const ObservableSession&)>& filterFn,
     const std::function<void(OperationContext*, const SessionToKill&)>& killSessionFn,
     ErrorCodes::Error reason = ErrorCodes::Interrupted,
-    Milliseconds* timeout = nullptr,
-    int64_t* numTimeOuts = nullptr) {
+    Milliseconds* perSessionTimeout = nullptr,
+    int64_t* numTimeOuts = nullptr,
+    Date_t killSessionsDeadline = Date_t::max()) {
     const auto catalog = SessionCatalog::get(opCtx);
 
     std::vector<SessionCatalog::KillToken> sessionKillTokens;
@@ -85,9 +98,23 @@ void killSessionsAction(
     });
 
     for (auto& sessionKillToken : sessionKillTokens) {
+        Date_t checkoutStartTime = Date_t::now();
         try {
-            auto session =
-                catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken), timeout);
+            auto session = catalog->checkOutSessionForKill(
+                opCtx,
+                std::move(sessionKillToken),
+                getSessionCheckoutDeadline(perSessionTimeout, killSessionsDeadline));
+            Milliseconds checkoutDuration = Date_t::now() - checkoutStartTime;
+
+            if (checkoutDuration > Milliseconds(gTransactionLifetimeLimitSeconds.load())) {
+                auto participant = TransactionParticipant::get(session);
+                LOGV2(11790800,
+                      "Slow session checkout",
+                      "session"_attr = session.getSessionId().toBSON(),
+                      "txnNumberAndRetryCounter"_attr =
+                          participant.getActiveTxnNumberAndRetryCounter().toBSON(),
+                      "duration"_attr = checkoutDuration);
+            }
 
             // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
             // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill
@@ -97,7 +124,18 @@ void killSessionsAction(
             ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
             killSessionFn(opCtx, session);
         } catch (const ExceptionFor<ErrorCodes::ExceededTimeLimit>&) {
-            // Failed to check out the session for kill, continue killing the rest of the sessions.
+            // If we exceed the time limit while checking out sessions for step up or step down,
+            // then we crash the node and dump info on the session.
+            LOGV2(11790801,
+                  "Exceeded time limit while checking out session",
+                  "lsidToKill"_attr = sessionKillToken.lsidToKill,
+                  "duration"_attr = Date_t::now() - checkoutStartTime);
+            if (reason == ErrorCodes::InterruptedDueToReplStateChange) {
+                LOGV2_FATAL(11790802,
+                            "Failed to check out session for kill",
+                            "lsidToKill"_attr = sessionKillToken.lsidToKill);
+            }
+            // Failed to check out the session for kill, continue with the next sessionKillToken.
             if (numTimeOuts)
                 (*numTimeOuts)++;
             continue;
@@ -109,7 +147,8 @@ void killSessionsAction(
 
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
-                                             ErrorCodes::Error reason) {
+                                             ErrorCodes::Error reason,
+                                             Date_t killSessionsDeadline) {
     killSessionsAction(
         opCtx,
         matcher,
@@ -131,7 +170,10 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                 participant.abortTransaction(opCtx);
             }
         },
-        reason);
+        reason,
+        /*perSessionTimeout*/ nullptr,
+        /*numTimeouts*/ 0,
+        killSessionsDeadline);
 }
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
@@ -147,7 +189,7 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
 }
 
 void killAllExpiredTransactions(OperationContext* opCtx,
-                                Milliseconds timeout,
+                                Milliseconds perSessionTimeout,
                                 int64_t* numKills,
                                 int64_t* numTimeOuts) {
     SessionKiller::Matcher matcherAllSessions(
@@ -179,12 +221,12 @@ void killAllExpiredTransactions(OperationContext* opCtx,
             }
         },
         ErrorCodes::TransactionExceededLifetimeLimitSeconds,
-        &timeout,
+        &perSessionTimeout,
         numTimeOuts);
 }
 
 void killOldestTransaction(OperationContext* opCtx,
-                           Milliseconds timeout,
+                           Milliseconds perSessionTimeout,
                            int64_t* numKills,
                            int64_t* numSkips,
                            int64_t* numTimeOuts) {
@@ -231,8 +273,10 @@ void killOldestTransaction(OperationContext* opCtx,
         auto killToken =
             SessionCatalog::get(opCtx)->killSession(*oldest, ErrorCodes::TemporarilyUnavailable);
 
-        auto session =
-            sessionCatalog->checkOutSessionForKill(opCtx, std::move(killToken), &timeout);
+        auto session = sessionCatalog->checkOutSessionForKill(
+            opCtx,
+            std::move(killToken),
+            getSessionCheckoutDeadline(&perSessionTimeout, /*killSessionsDeadline*/ Date_t::max()));
 
         // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill

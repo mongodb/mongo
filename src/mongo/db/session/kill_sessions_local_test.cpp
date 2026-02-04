@@ -31,8 +31,10 @@
 
 #include "mongo/db/session/session_catalog_test.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -46,7 +48,7 @@ protected:
             auto txnParticipant = TransactionParticipant::get(opCtx, session.get());
             txnParticipant.transitionToInProgressForTest();
             txnParticipant.setTransactionExpiredDate(Date_t::now() - Milliseconds(1));
-            // Timer as to be started in order to update metrics in the transactionMetricsObserver
+            // Timer has to be started in order to update metrics in the transactionMetricsObserver
             // as a part of aborting transactions.
             advanceTransactionMetricsTimer(opCtx, txnParticipant);
         };
@@ -202,6 +204,58 @@ TEST_F(KillSessionsTest, killOldestTransactionTimesOut) {
     ASSERT_EQ(0, numKills);
     ASSERT_EQ(0, numSkips);
     ASSERT_EQ(1, numTimeOuts);
+}
+
+using KillSessionsDeathTest = KillSessionsTest;
+DEATH_TEST_F(KillSessionsDeathTest, killSessionsAbortUnpreparedTransactionsTimesOut, "11790802") {
+    auto lsid = makeLogicalSessionIdForTest();
+    createSession(lsid);
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    // Check out the session and never release it so it will block the session killer thread.
+    OperationContextSession firstCheckOut(opCtx.get());
+    auto txnParticipant = TransactionParticipant::get(opCtx.get());
+    txnParticipant.transitionToInProgressForTest();
+
+    auto client = getServiceContext()->getService()->makeClient("CheckOutForKillTimeout");
+    AlternativeClientRegion acr(client);
+    auto killOpCtx = cc().makeOperationContext();
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
+    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
+
+    // Pass old time as deadline to ensure the function times out.
+    Date_t deadline = Date_t::now() - Milliseconds(100);
+    killSessionsAbortUnpreparedTransactions(
+        killOpCtx.get(), matcherAllSessions, killReason, deadline);
+}
+
+TEST_F(KillSessionsTest, killSessionsAbortUnpreparedTransactionsSuccessfully) {
+    auto lsid = makeLogicalSessionIdForTest();
+    createSession(lsid);
+    auto opCtx = makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+
+    // Check out the session and mark it in progress.
+    {
+        OperationContextSession firstCheckOut(opCtx.get());
+        auto txnParticipant = TransactionParticipant::get(opCtx.get());
+        txnParticipant.transitionToInProgressForTest();
+        // Timer has to be started in order to update metrics in the transactionMetricsObserver
+        // as a part of aborting transactions.
+        advanceTransactionMetricsTimer(opCtx.get(), txnParticipant);
+    }
+    auto client = getServiceContext()->getService()->makeClient("CheckOutForKillTimeout");
+    AlternativeClientRegion acr(client);
+    auto killOpCtx = cc().makeOperationContext();
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx.get())});
+    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
+
+    Date_t deadline = Date_t::now() + Milliseconds(10000);
+    killSessionsAbortUnpreparedTransactions(
+        killOpCtx.get(), matcherAllSessions, killReason, deadline);
 }
 
 }  // namespace

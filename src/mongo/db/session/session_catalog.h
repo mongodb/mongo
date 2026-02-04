@@ -122,7 +122,7 @@ public:
      */
     SessionToKill checkOutSessionForKill(OperationContext* opCtx,
                                          KillToken killToken,
-                                         Milliseconds* timeout = nullptr);
+                                         Date_t deadline = Date_t::max());
 
     /**
      * Iterates through the SessionCatalog under the SessionCatalog mutex and applies 'workerFn' to
@@ -243,7 +243,7 @@ private:
     ScopedCheckedOutSession _checkOutSessionInner(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid,
                                                   boost::optional<KillToken> killToken,
-                                                  Milliseconds* timeout = nullptr);
+                                                  Date_t deadline = Date_t::max());
 
     /**
      * Blocking method, which checks-out the session set on 'opCtx'.

@@ -1647,9 +1647,9 @@ TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
             ASSERT_EQ(1U, killTokens.size());
 
             // Checkout session for kill should time out.
-            auto timeout = Milliseconds(0);
+            auto deadline = Date_t::now() + Milliseconds(0);
             ASSERT_THROWS_CODE(catalog()->checkOutSessionForKill(
-                                   sideOpCtx.get(), std::move(killTokens[0]), &timeout),
+                                   sideOpCtx.get(), std::move(killTokens[0]), deadline),
                                DBException,
                                ErrorCodes::ExceededTimeLimit);
         });

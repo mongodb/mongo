@@ -122,7 +122,7 @@ private:
      * It will spawn a new thread killOpThread to kill operations that conflict with state
      * transitions (step up and step down).
      */
-    void _startKillOpThread();
+    void _startKillOpThread(Date_t deadline = Date_t::max());
 
     /**
      * On state transition, we need to kill all write operations and all transactional
@@ -148,7 +148,7 @@ private:
      * transactions.
      * Terminates once killSignaled is set true.
      */
-    void _killOpThreadFn();
+    void _killOpThreadFn(Date_t deadline = Date_t::max());
 
     /*
      * Signals killOpThread to stop killing operations.

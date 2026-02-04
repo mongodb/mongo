@@ -66,7 +66,11 @@ AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpStepDown(
     _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
     ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
-    _startKillOpThread();
+
+    // Start the killOpThread with a deadline, since checking out/killing sessions is
+    // uninterruptible, it can hang and stall the RSTL acquisition. We pass the RSTL deadline to
+    // this thread so we can explicitly fail step up/down if we exceed this time limit.
+    _startKillOpThread(deadline);
 
     // Wait for RSTL to be acquired.
     _rstlLock->waitForLockUntil(deadline, [opCtx, rstlTimeout, start] {
@@ -108,12 +112,12 @@ AutoGetRstlForStepUpStepDown::~AutoGetRstlForStepUpStepDown() {
         _stepUpStepDownCoord->autoGetRstlExitStepDown();
 }
 
-void AutoGetRstlForStepUpStepDown::_startKillOpThread() {
+void AutoGetRstlForStepUpStepDown::_startKillOpThread(Date_t deadline) {
     invariant(!_killOpThread);
-    _killOpThread = std::make_unique<stdx::thread>([this] { _killOpThreadFn(); });
+    _killOpThread = std::make_unique<stdx::thread>([this, deadline] { _killOpThreadFn(deadline); });
 }
 
-void AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
+void AutoGetRstlForStepUpStepDown::_killOpThreadFn(Date_t deadline) {
     Client::initThread("RstlKillOpThread",
                        getGlobalServiceContext()->getService(),
                        Client::noSession(),
@@ -139,7 +143,7 @@ void AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
         // Destroy all stashed transaction resources, in order to release locks.
         SessionKiller::Matcher matcherAllSessions(
             KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions, killReason);
+        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions, killReason, deadline);
 
         // Operations (like batch insert) that have currently yielded the global lock during step
         // down can reacquire global lock in IX mode when this node steps back up after a brief

@@ -52,7 +52,8 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
  */
 void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
                                              const SessionKiller::Matcher& matcher,
-                                             ErrorCodes::Error reason = ErrorCodes::Interrupted);
+                                             ErrorCodes::Error reason = ErrorCodes::Interrupted,
+                                             Date_t deadline = Date_t::max());
 
 /**
  * Aborts any expired transactions.
