@@ -93,20 +93,6 @@ constexpr std::array<uint64_t, operation_latency_histogram_details::kMaxBuckets>
     1099511627776  // 0x10000000000
 };
 
-// Returns a string representation of the ith lower bound.
-StringData bucketName(size_t i) {
-    static const std::vector<std::string> kBucketNames = []() {
-        std::vector<std::string> bucketNames;
-        bucketNames.reserve(kLowerBounds.size());
-        for (uint64_t lowerBound : kLowerBounds) {
-            bucketNames.push_back(absl::StrFormat("%1.2eμs_count", lowerBound));
-        }
-        return bucketNames;
-    }();
-    tassert(11456500, "Bucket index out of bounds", i < kBucketNames.size());
-    return kBucketNames[i];
-}
-
 // Computes the log base 2 of value, and checks for cases of split buckets.
 size_t getBucket(uint64_t value) {
     if (value == 0) {
@@ -200,7 +186,7 @@ void appendHistogram(const HistogramDataType& data,
     if (includeHistograms) {
         uint64_t bucketValue = 0;
         int lowestFilteredBoundIndex = -1;
-        BSONObjBuilder countBuilder(histogramBuilder.subobjStart("histogram"));
+        BSONArrayBuilder arrayBuilder(histogramBuilder.subarrayStart("histogram"));
         for (size_t i = 0; i < operation_latency_histogram_details::kMaxBuckets; i++) {
             bucketValue += [&] {
                 if constexpr (std::is_same_v<HistogramDataType,
@@ -232,8 +218,11 @@ void appendHistogram(const HistogramDataType& data,
                 continue;
             }
 
-            countBuilder.append(bucketName(i - (i % logBucketScalingFactor)),
-                                static_cast<long long>(bucketValue));
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append(
+                "micros", static_cast<long long>(kLowerBounds[i - (i % logBucketScalingFactor)]));
+            entryBuilder.append("count", static_cast<long long>(bucketValue));
+            entryBuilder.doneFast();
             bucketValue = 0;
         }
 
@@ -245,10 +234,13 @@ void appendHistogram(const HistogramDataType& data,
         // buckets above it.
         if (filterBuckets && lowestFilteredBoundIndex > 0 &&
             (bucketValue > 0 || includeEmptyBuckets)) {
-            countBuilder.append(bucketName(lowestFilteredBoundIndex),
-                                static_cast<long long>(bucketValue));
+            BSONObjBuilder entryBuilder(arrayBuilder.subobjStart());
+            entryBuilder.append("micros",
+                                static_cast<long long>(kLowerBounds[lowestFilteredBoundIndex]));
+            entryBuilder.append("count", static_cast<long long>(bucketValue));
+            entryBuilder.doneFast();
         }
-        countBuilder.doneFast();
+        arrayBuilder.doneFast();
     }
 
     uint64_t latency, ops, queryableEncryptionLatencyMicros;

@@ -45,9 +45,6 @@
 #include <numeric>
 #include <vector>
 
-#include <absl/strings/numbers.h>
-#include <absl/strings/str_cat.h>
-#include <absl/strings/strip.h>
 
 namespace mongo {
 namespace {
@@ -55,23 +52,6 @@ namespace {
 const int kMaxBuckets = operation_latency_histogram_details::kMaxBuckets;
 const std::array<uint64_t, kMaxBuckets>& kLowerBounds =
     operation_latency_histogram_details::getLowerBounds();
-const std::string kBucketNameSuffix = "μs_count";
-
-// Returns the numeric value of a bucket based on parsing the field name.
-double bucketFromFieldName(BSONElement field) {
-    absl::string_view bucketName = field.fieldName();
-    if (!absl::ConsumeSuffix(&bucketName, kBucketNameSuffix)) {
-        FAIL(absl::StrCat("Bucket name: ",
-                          bucketName,
-                          " did not contain the proper suffix: ",
-                          kBucketNameSuffix));
-    }
-    double parsedValue;
-    if (!absl::SimpleAtod(bucketName, &parsedValue)) {
-        FAIL(absl::StrCat("Could not parse the stripped bucket name as a double: ", bucketName));
-    }
-    return parsedValue;
-}
 
 TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
     OperationLatencyHistogram hist;
@@ -111,22 +91,17 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
     BSONObjBuilder outBuilder;
     hist.append(true, false, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["queryableEncryptionLatencyMicros"].Long()),
-                  0);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["queryableEncryptionLatencyMicros"].Long()), 0);
 
     // Each bucket has three counts with the exception of the last bucket, which has two.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxBuckets));
+    EXPECT_EQ(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxBuckets));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        // The parsed value should be close to the bucket value but may be slightly different since
-        // it takes a fixed number of characters.
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), (bucketIndex < kMaxBuckets - 1) ? 3 : 2);
+    for (const BSONElement& elem : readBuckets) {
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(elem["count"].Long(), (bucketIndex < kMaxBuckets - 1) ? 3 : 2);
         ++bucketIndex;
     }
 }
@@ -143,19 +118,17 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyExcludeEmptyBuck
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
     // bucket.
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>((kMaxBuckets + 1) / 2));
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>((kMaxBuckets + 1) / 2));
     size_t arrayIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         size_t bucketIndex = arrayIndex * 2;
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), 1);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(elem["count"].Long(), 1);
         ++arrayIndex;
     }
 }
@@ -172,19 +145,17 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyIncludeEmptyBuck
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
     // bucket.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxBuckets));
+    EXPECT_EQ(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxBuckets));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), (bucketIndex % 2 == 0) ? 1 : 0);
+    for (const BSONElement& elem : readBuckets) {
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(elem["count"].Long(), (bucketIndex % 2 == 0) ? 1 : 0);
         ++bucketIndex;
     }
 }
@@ -211,20 +182,18 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBuckets) {
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     const size_t kMaxUnFilteredBuckets = 23;
     // Each bucket has three counts with the exception of the last bucket, which has two.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxUnFilteredBuckets + 1));
+    EXPECT_EQ(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 1));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         ASSERT_LESS_THAN_OR_EQUALS(bucketIndex, kMaxUnFilteredBuckets);
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), (bucketIndex < kMaxUnFilteredBuckets) ? 3 : 83);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(elem["count"].Long(), (bucketIndex < kMaxUnFilteredBuckets) ? 3 : 83);
         ++bucketIndex;
     }
 }
@@ -247,24 +216,21 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsExclu
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     const size_t kMaxUnFilteredBuckets = 23;
     // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
     // bucket.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(),
-                  static_cast<unsigned int>((kMaxUnFilteredBuckets + 1) / 2 + 1));
+    EXPECT_EQ(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>((kMaxUnFilteredBuckets + 1) / 2 + 1));
     size_t bucketIndex = 0;
     size_t arrayIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         bucketIndex = arrayIndex * 2;
         ASSERT_LESS_THAN_OR_EQUALS(bucketIndex, kMaxUnFilteredBuckets + 1);
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), bucketIndex < kMaxUnFilteredBuckets ? 1 : 14);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(elem["count"].Long(), bucketIndex < kMaxUnFilteredBuckets ? 1 : 14);
         ++arrayIndex;
     }
 }
@@ -287,26 +253,24 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencySlowBucketsInclu
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     const size_t kMaxUnFilteredBuckets = 23;
     // Every other bucket has one count. Add one to kMaxBuckets since we start with the first
     // bucket.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxUnFilteredBuckets + 1));
+    EXPECT_EQ(out["reads"]["ops"].Long(), (kMaxBuckets + 1) / 2);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 1));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         ASSERT_LESS_THAN_OR_EQUALS(bucketIndex, kMaxUnFilteredBuckets);
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
         if (bucketIndex < static_cast<int>(kMaxUnFilteredBuckets)) {
             // Regular buckets
-            ASSERT_EQUALS(field.Long(), bucketIndex % 2 == 0 ? 1 : 0);
+            EXPECT_EQ(elem["count"].Long(), bucketIndex % 2 == 0 ? 1 : 0);
         } else {
             // Aggregate bucket
-            ASSERT_EQUALS(field.Long(), 14);
+            EXPECT_EQ(elem["count"].Long(), 14);
         }
         ++bucketIndex;
     }
@@ -329,13 +293,11 @@ TEST(OperationLatencyHistogram, CheckBucketCountsSlowBucketsIncludeEmptyBucketsH
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
 
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxBuckets));
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxBuckets));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
+    for (const BSONElement& elem : readBuckets) {
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
         ++bucketIndex;
     }
 }
@@ -362,31 +324,28 @@ TEST(OperationLatencyHistogram,
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     const size_t kMaxUnFilteredBuckets = 23;
     // Two out of six buckets has one count. Add one since if there were 1 bucket there would be 1
     // read (not zero), and because of the specific value of kMaxBuckets % 6.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(),
-                  static_cast<unsigned int>(kMaxUnFilteredBuckets + 2) / 6 + 1);
+    EXPECT_EQ(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 2) / 6 + 1);
     size_t arrayIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         // The aggregate bucket is actually kMaxUnFilteredBuckets + 1, because there is no entry in
         // bucket with index kMaxUnFilteredBuckets (23), but one in the next bucket.
         size_t bucketIndex = std::min(arrayIndex * 6, kMaxUnFilteredBuckets + 1);
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
         if (bucketIndex < static_cast<int>(kMaxUnFilteredBuckets)) {
             // Regular buckets. Because the pattern of counts is 1,0,1,0,0,0, the counts are always
             // 2. E.g., Buckets 0 and 2 are incremented, which means the first appended (0-2)
             // contains 2 values, while the next possible bucket (3-5) is skipped.
-            ASSERT_EQUALS(field.Long(), 2);
+            EXPECT_EQ(elem["count"].Long(), 2);
         } else {
             // Aggregate bucket
-            ASSERT_EQUALS(field.Long(), 10);
+            EXPECT_EQ(elem["count"].Long(), 10);
         }
         ++arrayIndex;
     }
@@ -414,39 +373,34 @@ TEST(OperationLatencyHistogram,
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
 
     const size_t kMaxUnFilteredBuckets = 23;
     // Two out of six buckets has one count. Add one since if there were 1 bucket there would be 1
     // read (not zero), and because of the specific value of kMaxBuckets % 6.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(),
-                  static_cast<unsigned int>(kMaxUnFilteredBuckets + 2) / 3 + 1);
+    EXPECT_EQ(out["reads"]["ops"].Long(), kMaxBuckets / 3 + 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 2) / 3 + 1);
     size_t arrayIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& elem : readBuckets) {
         size_t bucketIndex = std::min(arrayIndex * 3, kMaxUnFilteredBuckets);
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
+        EXPECT_EQ(elem["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
         if (bucketIndex < static_cast<int>(kMaxUnFilteredBuckets)) {
             // Regular buckets. Because the pattern of counts is 1,0,1,0,0,0, the counts alternate
             // between 0 and 2. E.g., Buckets 0 and 2 are incremented, which means the first
             // appended (0-2) contains 2 values, while the next appended (3-5) contains none.
-            ASSERT_EQUALS(field.Long(), bucketIndex % 6 == 0 ? 2 : 0);
+            EXPECT_EQ(elem["count"].Long(), bucketIndex % 6 == 0 ? 2 : 0);
         } else {
             // Aggregate bucket
-            ASSERT_EQUALS(field.Long(), 10);
+            EXPECT_EQ(elem["count"].Long(), 10);
         }
         ++arrayIndex;
     }
 }
 
-// Returns the last field of `obj`.
-BSONElement getLastElement(BSONObj& obj) {
-    std::vector<BSONElement> elems;
-    obj.elems(elems);
-    return elems[elems.size() - 1];
+// Returns the last element of an array.
+BSONElement getLastElement(std::vector<BSONElement>& arr) {
+    return arr[arr.size() - 1];
 }
 
 TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorExcludeEmptyBuckets) {
@@ -471,14 +425,12 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorExcludeEm
     BSONObjBuilder outBuilder1;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
     BSONObj out = outBuilder1.done();
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
     // All points are above the slowMS threshold, so we just have the last bucket.
-    ASSERT_EQUALS(readBuckets.nFields(), 1);
+    ASSERT_EQUALS(readBuckets.size(), 1);
     BSONElement lastElement = getLastElement(readBuckets);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket3Ms]),
-                        kLowerBounds[kSlowBucket3Ms] / 100);
-    ASSERT_EQ(lastElement.Long(), 3);
+    EXPECT_EQ(lastElement["micros"].Long(), static_cast<long long>(kLowerBounds[kSlowBucket3Ms]));
+    ASSERT_EQ(lastElement["count"].Long(), 3);
 
     // With slowMS of 4, one more bucket is added because there is now a point below the slowMS
     // threshold.
@@ -490,13 +442,11 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorExcludeEm
     BSONObjBuilder outBuilder2;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
     out = outBuilder2.done();
-    readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 2);
     lastElement = getLastElement(readBuckets);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket4Ms]),
-                        kLowerBounds[kSlowBucket4Ms] / 100);
-    ASSERT_EQ(lastElement.Long(), 2);
+    EXPECT_EQ(lastElement["micros"].Long(), static_cast<long long>(kLowerBounds[kSlowBucket4Ms]));
+    ASSERT_EQ(lastElement["count"].Long(), 2);
 
     // With slowMS of 6, no buckets are added since the 5ms latency goes into the last non-aggregate
     // bucket according to the logBucketScalingFactor.
@@ -508,14 +458,11 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorExcludeEm
     BSONObjBuilder outBuilder3;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder3);
     out = outBuilder3.done();
-    readBuckets = out["reads"]["histogram"].Obj();
-    std::cout << readBuckets << std::endl;
-    ASSERT_EQUALS(readBuckets.nFields(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 2);
     lastElement = getLastElement(readBuckets);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(lastElement),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket6Ms]),
-                        kLowerBounds[kSlowBucket6Ms] / 100);
-    ASSERT_EQ(lastElement.Long(), 1);
+    EXPECT_EQ(lastElement["micros"].Long(), static_cast<long long>(kLowerBounds[kSlowBucket6Ms]));
+    ASSERT_EQ(lastElement["count"].Long(), 1);
 }
 
 
@@ -537,11 +484,10 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorIncludeEm
     BSONObjBuilder outBuilder1;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
     BSONObj out = outBuilder1.done();
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 5);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket3Ms]),
-                        kLowerBounds[kSlowBucket3Ms] / 100);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 5);
+    EXPECT_EQ(getLastElement(readBuckets)["micros"].Long(),
+              static_cast<long long>(kLowerBounds[kSlowBucket3Ms]));
 
     // With slowMS of 4, one more bucket is added because there is a new non-aggregate bucket
     // according to the logBucketScalingFactor.
@@ -553,11 +499,10 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorIncludeEm
     BSONObjBuilder outBuilder2;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
     out = outBuilder2.done();
-    readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 6);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket4Ms]),
-                        kLowerBounds[kSlowBucket4Ms] / 100);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 6);
+    EXPECT_EQ(getLastElement(readBuckets)["micros"].Long(),
+              static_cast<long long>(kLowerBounds[kSlowBucket4Ms]));
 
     // With slowMS of 6, no buckets are added since the 4ms bucket gets folded into the last
     // non-aggregate bucket according to the logBucketScalingFactor.
@@ -569,11 +514,10 @@ TEST(OperationLatencyHistogram, WhichBucketIsSlowLogBucketScalingFactorIncludeEm
     BSONObjBuilder outBuilder3;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder3);
     out = outBuilder3.done();
-    readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 6);
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(getLastElement(readBuckets)),
-                        static_cast<int64_t>(kLowerBounds[kSlowBucket6Ms]),
-                        kLowerBounds[kSlowBucket6Ms] / 100);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 6);
+    EXPECT_EQ(getLastElement(readBuckets)["micros"].Long(),
+              static_cast<long long>(kLowerBounds[kSlowBucket6Ms]));
 }
 
 TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsExcludeEmptyBuckets) {
@@ -599,16 +543,14 @@ TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsExcludeEmptyBucke
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
     out = outBuilder1.done();
 
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 1);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(out["reads"]["ops"].Long(), 1);
     // Only one entry, so just one bucket.
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 1);
-    BSONElement field = readBuckets.firstElement();
-    ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                        static_cast<int64_t>(kLowerBounds[kUnfilteredBucket]),
-                        kLowerBounds[kUnfilteredBucket] / 100);
-    ASSERT_EQUALS(field.Long(), 1);
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 1);
+    BSONElement field = readBuckets[0];
+    EXPECT_EQ(field["micros"].Long(), static_cast<long long>(kLowerBounds[kUnfilteredBucket]));
+    EXPECT_EQ(field["count"].Long(), 1);
 
     // Add a filtered entry.
     hist.increment(kLowerBounds[kMaxUnFilteredBuckets + 2],
@@ -620,23 +562,21 @@ TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsExcludeEmptyBucke
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
     out = outBuilder2.done();
 
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 2);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(out["reads"]["ops"].Long(), 2);
     // Two buckets, one for the initial entry and one for the filtered entry.
-    readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), 2);
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
+    for (const BSONElement& field : readBuckets) {
         if (bucketIndex == 0) {
-            ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                                static_cast<int64_t>(kLowerBounds[kUnfilteredBucket]),
-                                kLowerBounds[kUnfilteredBucket] / 100);
+            EXPECT_EQ(field["micros"].Long(),
+                      static_cast<long long>(kLowerBounds[kUnfilteredBucket]));
         } else {
-            ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                                static_cast<int64_t>(kLowerBounds[kMaxUnFilteredBuckets + 2]),
-                                kLowerBounds[kMaxUnFilteredBuckets + 2] / 100);
+            EXPECT_EQ(field["micros"].Long(),
+                      static_cast<long long>(kLowerBounds[kMaxUnFilteredBuckets + 2]));
         }
-        ASSERT_EQUALS(field.Long(), 1);
+        EXPECT_EQ(field["count"].Long(), 1);
         ++bucketIndex;
     }
 }
@@ -664,17 +604,16 @@ TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsIncludeEmptyBucke
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder1);
     out = outBuilder1.done();
 
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 1);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(out["reads"]["ops"].Long(), 1);
 
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxUnFilteredBuckets + 1));
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 1));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), bucketIndex == static_cast<int>(kUnfilteredBucket) ? 1 : 0);
+    for (const BSONElement& field : readBuckets) {
+        EXPECT_EQ(field["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(field["count"].Long(),
+                  bucketIndex == static_cast<int>(kUnfilteredBucket) ? 1 : 0);
         ++bucketIndex;
     }
 
@@ -688,18 +627,16 @@ TEST(OperationLatencyHistogram, CheckLastBucketValueSlowBucketsIncludeEmptyBucke
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/true, &outBuilder2);
     out = outBuilder2.done();
 
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 2);
-    readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxUnFilteredBuckets + 1));
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(out["reads"]["ops"].Long(), 2);
+    readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxUnFilteredBuckets + 1));
     bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
+    for (const BSONElement& field : readBuckets) {
+        EXPECT_EQ(field["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
         bool isPopulatedBucket = (bucketIndex == static_cast<int>(kUnfilteredBucket)) ||
             (bucketIndex == static_cast<int>(kMaxUnFilteredBuckets));
-        ASSERT_EQUALS(field.Long(), isPopulatedBucket ? 1 : 0);
+        EXPECT_EQ(field["count"].Long(), isPopulatedBucket ? 1 : 0);
         ++bucketIndex;
     }
 }
@@ -728,15 +665,13 @@ TEST(OperationLatencyHistogram, CheckLastBucketValuePresentLogScalingFactor) {
         BSONObjBuilder outBuilder;
         hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
         out = outBuilder.done();
-        BSONObj readBuckets = out["reads"]["histogram"].Obj();
+        std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
 
-        ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(1));
+        ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(1));
         int64_t expectedBucketValue =
             kLowerBounds[kMaxBuckets - 1 - ((kMaxBuckets - 1) % logScalingFactor)];
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(readBuckets.firstElement()),
-                            expectedBucketValue,
-                            expectedBucketValue / 100);
-        ASSERT_EQUALS(readBuckets.firstElement().Long(), 1);
+        EXPECT_EQ(readBuckets[0]["micros"].Long(), expectedBucketValue);
+        EXPECT_EQ(readBuckets[0]["count"].Long(), 1);
     }
 }
 
@@ -759,21 +694,19 @@ TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatencyQueryableEncrypt
     BSONObjBuilder outBuilder;
     hist.append(/*includeHistograms=*/true, /*slowMSBucketsOnly=*/false, &outBuilder);
     BSONObj out = outBuilder.done();
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
-    ASSERT_EQUALS(static_cast<uint64_t>(out["reads"]["queryableEncryptionLatencyMicros"].Long()),
-                  expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["latency"].Long()), expectedSum);
+    EXPECT_EQ(static_cast<uint64_t>(out["reads"]["queryableEncryptionLatencyMicros"].Long()),
+              expectedSum);
 
     // Each bucket has three counts with the exception of the last bucket, which has two.
-    ASSERT_EQUALS(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
+    EXPECT_EQ(out["reads"]["ops"].Long(), 3 * kMaxBuckets - 1);
 
-    BSONObj readBuckets = out["reads"]["histogram"].Obj();
-    ASSERT_EQUALS(readBuckets.nFields(), static_cast<unsigned int>(kMaxBuckets));
+    std::vector<BSONElement> readBuckets = out["reads"]["histogram"].Array();
+    ASSERT_EQUALS(readBuckets.size(), static_cast<size_t>(kMaxBuckets));
     size_t bucketIndex = 0;
-    for (const BSONElement field : readBuckets) {
-        ASSERT_APPROX_EQUAL(bucketFromFieldName(field),
-                            static_cast<int64_t>(kLowerBounds[bucketIndex]),
-                            kLowerBounds[bucketIndex] / 100);
-        ASSERT_EQUALS(field.Long(), (bucketIndex < kMaxBuckets - 1) ? 3 : 2);
+    for (const BSONElement& field : readBuckets) {
+        EXPECT_EQ(field["micros"].Long(), static_cast<long long>(kLowerBounds[bucketIndex]));
+        EXPECT_EQ(field["count"].Long(), (bucketIndex < kMaxBuckets - 1) ? 3 : 2);
         ++bucketIndex;
     }
 }
