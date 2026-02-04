@@ -770,4 +770,67 @@ TEST_F(ExtensionMetricsTest, NullExtensionMetricsDoesNotCrash) {
     ASSERT_EQ(pipeline.getStages().size(), 1);
 }
 
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(MockForIsExtensionStage);
+ALLOCATE_STAGE_PARAMS_ID(mockForIsExtensionStage, MockForIsExtensionStageStageParams::id);
+
+class IsRegisteredExtensionStageTest : public unittest::Test {
+protected:
+    void tearDown() override {
+        LiteParsedDocumentSource::unregisterParser_forTest(_extensionStageName);
+        LiteParsedDocumentSource::unregisterParser_forTest(_nonExtensionStageName);
+    }
+
+    void registerExtensionParser() {
+        LiteParsedDocumentSource::registerParser(
+            _extensionStageName,
+            {.parser = MockForIsExtensionStageLiteParsed::parse,
+             .fromExtension = true,
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
+    }
+
+    void registerNonExtensionParser() {
+        LiteParsedDocumentSource::registerParser(
+            _nonExtensionStageName,
+            {.parser = MockForIsExtensionStageLiteParsed::parse,
+             .fromExtension = false,
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
+    }
+
+    const std::string _extensionStageName = "$testExtensionStage";
+    const std::string _nonExtensionStageName = "$testNonExtensionStage";
+};
+
+TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForUnregisteredStage) {
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$unregisteredStage"_sd));
+}
+
+TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForNonExtensionStage) {
+    registerNonExtensionParser();
+
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage(_nonExtensionStageName));
+}
+
+TEST_F(IsRegisteredExtensionStageTest, ReturnsTrueForExtensionStage) {
+    registerExtensionParser();
+
+    ASSERT_TRUE(LiteParsedDocumentSource::isRegisteredExtensionStage(_extensionStageName));
+}
+
+TEST_F(IsRegisteredExtensionStageTest,
+       CorrectlyDistinguishesBetweenExtensionAndNonExtensionStages) {
+    registerExtensionParser();
+    registerNonExtensionParser();
+
+    ASSERT_TRUE(LiteParsedDocumentSource::isRegisteredExtensionStage(_extensionStageName));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage(_nonExtensionStageName));
+}
+
+TEST_F(IsRegisteredExtensionStageTest, ReturnsFalseForBuiltInStages) {
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$match"_sd));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$project"_sd));
+    ASSERT_FALSE(LiteParsedDocumentSource::isRegisteredExtensionStage("$limit"_sd));
+}
+
 }  // namespace mongo

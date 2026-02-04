@@ -381,6 +381,11 @@ public:
                              "enable the corresponding feature flag");
     }
 
+    /**
+     * Returns true if the given stage name is registered as an extension stage.
+     */
+    static bool isRegisteredExtensionStage(StringData stageName);
+
     void setApiStrict(AllowedWithApiStrict& apiStrict) {
         _apiStrict = apiStrict;
     }
@@ -660,6 +665,7 @@ private:
     friend class extension::host::LoadNativeVectorSearchTest;
     friend class LiteParsedDesugarerTest;
     friend class ExtensionMetricsTest;
+    friend class IsRegisteredExtensionStageTest;
 
     /**
      * Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding

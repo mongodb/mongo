@@ -215,6 +215,15 @@ const ParserMap& LiteParsedDocumentSource::getParserMap() {
     return parserMap;
 }
 
+bool LiteParsedDocumentSource::isRegisteredExtensionStage(StringData stageName) {
+    const auto it = parserMap.find(stageName);
+    if (it == parserMap.end()) {
+        return false;
+    }
+
+    return it->second.getParserInfo().fromExtension;
+}
+
 ViewInfo::~ViewInfo() = default;
 ViewInfo::ViewInfo(ViewInfo&&) noexcept = default;
 ViewInfo& ViewInfo::operator=(ViewInfo&&) noexcept = default;

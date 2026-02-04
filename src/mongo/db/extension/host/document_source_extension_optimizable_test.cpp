@@ -2159,7 +2159,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest, DistributedPlanLogicReturnsNoneWh
 }
 
 namespace {
-class InvalidDPLLogicalStage : public sdk::shared_test_stages::TransformLogicalAggStage {
+class InvalidDPLLogicalStageWithMismatch
+    : public sdk::shared_test_stages::TransformLogicalAggStage {
 public:
     boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
         sdk::DistributedPlanLogic dpl;
@@ -2176,18 +2177,48 @@ public:
         return dpl;
     }
 };
+
+class InvalidDPLLogicalStageWithHostAllocatedExtension
+    : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        sdk::DistributedPlanLogic dpl;
+
+        {
+            std::vector<VariantDPLHandle> elements;
+            // Using createHostAggStageParseNode with extension stage BSON.
+            elements.emplace_back(sdk::HostServicesAPI::getInstance()->createHostAggStageParseNode(
+                BSON(std::string(sdk::shared_test_stages::kTransformName) << BSONObj())));
+            dpl.mergingPipeline = sdk::DPLArrayContainer(std::move(elements));
+        }
+
+        return dpl;
+    }
+};
 }  // namespace
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        DistributedPlanLogicReturnsErrorWhenGivenMismatchedLogicalStage) {
     auto logicalStage =
-        new sdk::ExtensionLogicalAggStage(std::make_unique<InvalidDPLLogicalStage>());
+        new sdk::ExtensionLogicalAggStage(std::make_unique<InvalidDPLLogicalStageWithMismatch>());
     auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
 
     auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
 
     ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(nullptr), AssertionException, 11513800);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       DistributedPlanLogicReturnsErrorWhenGivenDPLWithHostAllocatedExtension) {
+    auto logicalStage = new sdk::ExtensionLogicalAggStage(
+        std::make_unique<InvalidDPLLogicalStageWithHostAllocatedExtension>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(nullptr), AssertionException, 11882000);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, DistributedPlanLogicWithMergeOnlyStage) {

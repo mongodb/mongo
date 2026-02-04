@@ -360,7 +360,18 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanCo
                         // Host-allocated: parse the host-allocated parse node.
                         const auto& hostParse =
                             *static_cast<const HostAggStageParseNode*>(dplElement.get());
-                        return DocumentSource::parse(getExpCtx(), hostParse.getBsonSpec());
+                        const auto& bsonSpec = hostParse.getBsonSpec();
+
+                        // Validate that the host parse node does not contain an extension stage.
+                        auto stageName = bsonSpec.firstElementFieldNameStringData();
+                        uassert(11882000,
+                                str::stream() << "Extension stage '" << getSourceName()
+                                              << "' returned an invalid distributedPlanLogic: the "
+                                                 "host parse node contains extension stage '"
+                                              << stageName,
+                                !LiteParsedDocumentSource::isRegisteredExtensionStage(stageName));
+
+                        return DocumentSource::parse(getExpCtx(), bsonSpec);
                     } else {
                         // Extension-allocated: expand the parse node.
                         return expandParseNode(getExpCtx(), dplElement);
