@@ -1,6 +1,6 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestUnwind
 [2] project [s6 = 
-    if isNull(s5) 
+    if (isNull(s5) && !((exists(s3) && (isArray(s3) && isArrayEmpty(s3))))) 
     then s2 
     else makeBsonObj(MakeObjSpec([a = Set(0)], Open, NewObj, 0), s2, s4) 
 ] 

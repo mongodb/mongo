@@ -2114,71 +2114,40 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
     const std::string& indexOutputPath = hasIndexPath ? un.indexPath->fullPath() : ""s;
 
     if (hasIndexPath) {
-        // "includeArrayIndex" option (Cases 1-3). The index is always projected in these.
-
-        // Case 1: index Null, unwind val //////////////////////////////////////////////////////////
-        SbExpr indexNullUnwindValProjExpr[2];
-
-        for (int copy = 0; copy < 2; ++copy) {
-            indexNullUnwindValProjExpr[copy] = projectUnwindOutputs(_state,
-                                                                    childResultSlot,
-                                                                    unwindPath,
-                                                                    unwindSlot,
-                                                                    indexOutputPath,
-                                                                    b.makeNullConstant());
-        }
-
-        // Case 2: index val, unwind val ///////////////////////////////////////////////////////////
-        SbExpr indexValUnwindValProjExpr = projectUnwindOutputs(
-            _state, childResultSlot, unwindPath, unwindSlot, indexOutputPath, arrayIndexSlot);
-
-        // Case 3: index Null //////////////////////////////////////////////////////////////////////
-        SbExpr indexNullProjExpr =
-            projectUnwindOutputs(_state, childResultSlot, indexOutputPath, b.makeNullConstant());
-
-        // Wrap the above projection subexpressions in conditionals that correctly handle quirky MQL
-        // edge cases:
-        //   if isNull(index)
-        //      then if exists(unwind)
-        //              then project {Null, unwind}
-        //              else project {Null,       }
-        //      else if index >= 0
-        //              then project {index, unwind}
-        //              else project {Null,  unwind}
-        finalProjectExpr =
-            /* outer if */ b.makeIf(
-                b.makeFunction("isNull", arrayIndexSlot),
-                /* outer then */
-                b.makeIf(
-                    /* inner1 if */ b.makeFunction("exists", unwindSlot),
-                    /* inner1 then */ std::move(indexNullUnwindValProjExpr[0]),
-                    /* inner1 else */ std::move(indexNullProjExpr)),
-                /* outer else */
-                b.makeIf(
-                    /* inner2 if */ b.makeBinaryOp(
-                        abt::Operations::Gte, arrayIndexSlot, b.makeInt64Constant(0)),
-                    /* inner2 then */ std::move(indexValUnwindValProjExpr),
-                    /* inner2 else */ std::move(indexNullUnwindValProjExpr[1])));
+        // Include the unwound array element in the output if and only if is it not Nothing. We have
+        // to explicitly case here because adding a dotted path whose value is Nothing is not a
+        // no-op. Adding a Nothing dotted path removes the last element of the path. When the input
+        // to unwind is [], the code will do this, because getFieldSlot will exist but
+        // childResultSlot will be Nothing. Include the array index unconditionally.
+        finalProjectExpr = b.makeIf(
+            b.makeFunction("exists", getFieldSlot),
+            projectUnwindOutputs(
+                _state, childResultSlot, unwindPath, unwindSlot, indexOutputPath, arrayIndexSlot),
+            projectUnwindOutputs(_state, childResultSlot, indexOutputPath, arrayIndexSlot));
     } else {
-        // No "includeArrayIndex" option (Cases 4-5). The index is never projected in these.
-
-        // Case 4: unwind val //////////////////////////////////////////////////////////////////////
         SbExpr unwindValProjExpr =
             projectUnwindOutputs(_state, childResultSlot, unwindPath, unwindSlot);
 
-        // Case 5: NO-OP - original doc ////////////////////////////////////////////////////////////
-        // Does not need a generateProjection() call as it will be handled in the wrapper logic.
+        // If 'preserveNullAndEmptyArrays' is false, 'arrayIndexSlot' is Null if and only if
+        // 'getFieldSlot' is Nothing or Null.
+        auto cond = b.makeFunction("isNull", arrayIndexSlot);
 
-        // Wrap 'unwindValProjExpr' in a conditional that correctly handles the quirky MQL edge
-        // cases. If the unwind field was not an array (indicated by 'arrayIndexSlot' containing
-        // Null), we avoid projecting its value to the result, as if it is Nothing (instead of a
-        // singleton) this would incorrectly create the dotted path above that value in the result
-        // document. We don't need to project in the singleton case either as the result doc already
-        // has that singleton at the unwind field location.
-        finalProjectExpr = b.makeIf(
-            /* if */ b.makeFunction("isNull", arrayIndexSlot),
-            /* then no-op */ childResultSlot,
-            /* else project */ std::move(unwindValProjExpr));
+        if (un.preserveNullAndEmptyArrays) {
+            // If 'preserveNullAndEmptyArrays' is true, 'arrayIndexSlot' may also be Null if
+            // 'getFieldSlot' is [].
+            cond =
+                b.makeBinaryOp(abt::Operations::And,
+                               std::move(cond),
+                               b.makeNot(b.makeBinaryOp(
+                                   abt::Operations::And,
+                                   b.makeFunction("exists", getFieldSlot),
+                                   b.makeBinaryOp(abt::Operations::And,
+                                                  b.makeFunction("isArray", getFieldSlot),
+                                                  b.makeFunction("isArrayEmpty", getFieldSlot)))));
+        }
+        finalProjectExpr = b.makeIf(std::move(cond),
+                                    /* then no-op */ childResultSlot,
+                                    /* else project */ std::move(unwindValProjExpr));
     }  // else no "includeArrayIndex"
 
     // Create the ProjectStage that adds the output(s) to the result doc via 'finalProjectExpr'.
