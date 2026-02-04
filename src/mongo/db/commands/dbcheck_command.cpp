@@ -63,21 +63,21 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/debug_util.h"
@@ -87,13 +87,9 @@
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
-#include <chrono>
-#include <compare>
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <mutex>
-#include <ratio>
 #include <string>
 #include <utility>
 #include <vector>
@@ -346,7 +342,9 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 
     boost::optional<UUID> uuid;
     try {
-        const auto coll = acquireCollection(
+        // Use acquireCollectionWithBucketsLookup to handle legacy timeseries collections.
+        // This will translate the main namespace to the bucket namespace if needed.
+        auto [coll, _] = timeseries::acquireCollectionWithBucketsLookup(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -355,9 +353,10 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                 "Collection " + invocation.getColl() + " not found",
                 coll.exists());
         uuid = coll.uuid();
+        nss = coll.nss();
     } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>& ex) {
         // Collection acquisition fails with 'CommandNotSupportedOnView' if the namespace is
-        // referring to a view.
+        // referring to a regular view (not a timeseries view).
         ex.addContext(invocation.getColl() + " is a view hence 'dbcheck' is not supported.");
         throw;
     }

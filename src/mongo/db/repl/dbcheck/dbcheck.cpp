@@ -57,6 +57,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -328,12 +329,15 @@ DbCheckAcquisition::DbCheckAcquisition(OperationContext* opCtx,
       // where we throw these errors should already be writing to the health log anyway.
       prevDataCorruptionMode(
           swapDataCorruptionMode(opCtx, DataCorruptionDetectionMode::kLogAndContinue)),
-      // We don't need to write to the collection, so we use acquireCollectionMaybeLockFree with a
-      // read acquisition request.
-      _coll(acquireCollectionMaybeLockFree(
-          opCtx,
-          CollectionAcquisitionRequest::fromOpCtx(
-              opCtx, nss, AcquisitionPrerequisites::OperationType::kRead))) {}
+      // We don't need to write to the collection. Use acquireCollectionWithBucketsLookup to handle
+      // legacy timeseries collections, which will translate the main namespace to the bucket
+      // namespace if needed.
+      _coll(timeseries::acquireCollectionWithBucketsLookup(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, nss, AcquisitionPrerequisites::OperationType::kRead),
+                MODE_IS)
+                .first) {}
 
 DbCheckAcquisition::~DbCheckAcquisition() {
     // We remove the going-to-be-stale reference since it cannot survive outside of a snapshot.
