@@ -33,6 +33,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -59,7 +60,11 @@ enum S2IndexVersion {
 
     // The third version of the S2 index, introduced in MongoDB 3.2.0. Introduced
     // performance improvements and changed the key type from string to numeric
-    S2_INDEX_VERSION_3 = 3
+    S2_INDEX_VERSION_3 = 3,
+
+    // The fourth version of the S2 index. Changed parsing order for object-type
+    // geometry elements to try GeoJSON parsing before legacy point parsing.
+    S2_INDEX_VERSION_4 = 4
 };
 
 struct S2IndexingParams {
@@ -100,5 +105,16 @@ void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
 void initialize2dsphereParams(const BSONObj& infoObj,
                               const CollatorInterface* collator,
                               S2IndexingParams* out);
+
+/**
+ * Returns the default S2 index version based on the feature flag.
+ * If the feature flag for version 4 is enabled, returns S2_INDEX_VERSION_4,
+ * otherwise returns S2_INDEX_VERSION_3.
+ *
+ * @param versionContext The version context to use for feature flag checks.
+ *                       Defaults to kVersionContextIgnored_UNSAFE.
+ */
+S2IndexVersion getDefaultS2IndexVersion(
+    const VersionContext& versionContext = kVersionContextIgnored_UNSAFE);
 }  // namespace index2dsphere
 }  // namespace mongo

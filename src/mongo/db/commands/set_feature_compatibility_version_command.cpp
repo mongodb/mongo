@@ -62,6 +62,8 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -1551,6 +1553,46 @@ private:
                     "Cannot downgrade when priority ports are present in the replSetConfig. "
                     "Please run ReplSetReconfig to remove priority ports prior to downgrade",
                     replConfig.getCountOfMembersWithPriorityPort() == 0);
+        }
+
+        // Check for v4 2dsphere indexes when downgrading below 8.3
+        if (feature_flags::gFeatureFlag2dsphereIndexVersion4
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            static const std::string kIndexVersionFieldName("2dsphereIndexVersion");
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx, dbName, MODE_IS, [&](const Collection* collection) -> bool {
+                        auto indexCatalog = collection->getIndexCatalog();
+                        auto indexIterator = indexCatalog->getIndexIterator(
+                            IndexCatalog::InclusionPolicy::kReady |
+                            IndexCatalog::InclusionPolicy::kUnfinished);
+                        while (indexIterator->more()) {
+                            const IndexCatalogEntry* entry = indexIterator->next();
+                            const IndexDescriptor* descriptor = entry->descriptor();
+                            const BSONObj& infoObj = descriptor->infoObj();
+
+                            // Check if this is a 2dsphere index
+                            if (descriptor->getAccessMethodName() == IndexNames::GEO_2DSPHERE) {
+                                BSONElement versionElt = infoObj[kIndexVersionFieldName];
+                                if (versionElt.isNumber() && versionElt.numberInt() == 4) {
+                                    uasserted(
+                                        ErrorCodes::CannotDowngrade,
+                                        fmt::format(
+                                            "Cannot downgrade the cluster when there are 2dsphere "
+                                            "indexes with version 4. Version 4 indexes require "
+                                            "FCV 8.3 or higher. Please drop the index(es) before "
+                                            "downgrading. First detected index: {} on collection "
+                                            "{} (UUID: {}).",
+                                            descriptor->indexName(),
+                                            collection->ns().toStringForErrorMsg(),
+                                            collection->uuid().toString()));
+                                }
+                            }
+                        }
+                        return true;
+                    });
+            }
         }
     }
 

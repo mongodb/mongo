@@ -38,8 +38,12 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -97,11 +101,25 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     }
 }
 
+std::string formatAllowedVersions(const std::set<long long>& allowedVersions) {
+    std::string result;
+    bool first = true;
+    for (long long version : allowedVersions) {
+        if (!first) {
+            result += ",";
+        }
+        result += std::to_string(version);
+        first = false;
+    }
+    return result;
+}
+
 StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
                                             const std::string& message,
                                             const std::string& expectedVersions = str::stream()
                                                 << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2
-                                                << "," << S2_INDEX_VERSION_3,
+                                                << "," << S2_INDEX_VERSION_3 << ","
+                                                << S2_INDEX_VERSION_4,
                                             const std::string& extraMessage = "") {
     return {ErrorCodes::CannotCreateIndex,
             str::stream() << message << " { " << kIndexVersionFieldName << " : " << indexVersionElt
@@ -109,15 +127,23 @@ StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
                           << extraMessage};
 }
 
-StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
-                                                   boost::optional<long long> expectedVersion) {
-    // If the spec object doesn't have field "2dsphereIndexVersion", add {2dsphereIndexVersion: 3},
-    // which is the default for newly-built indexes.
+StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(
+    const BSONObj& specObj, boost::optional<std::set<long long>> allowedVersions) {
+    // If the spec object doesn't have field "2dsphereIndexVersion", add the default version
+    // based on the feature flag.
     BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
+    long long defaultVersion = static_cast<long long>(index2dsphere::getDefaultS2IndexVersion());
     if (indexVersionElt.eoo()) {
+        // Validate the default version against allowed versions if provided.
+        if (allowedVersions && !allowedVersions->contains(defaultVersion)) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "Default geo index version " << defaultVersion
+                                  << " is not in the allowed set: ["
+                                  << formatAllowedVersions(*allowedVersions) << "]"};
+        }
         BSONObjBuilder bob;
         bob.appendElements(specObj);
-        bob.append(kIndexVersionFieldName, S2_INDEX_VERSION_3);
+        bob.append(kIndexVersionFieldName, defaultVersion);
         return bob.obj();
     }
 
@@ -131,23 +157,30 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
         return cannotCreateIndexStatus(indexVersionElt, "Invalid value for geo index version");
     }
 
-    const auto indexVersion = indexVersionElt.safeNumberLong();
+    long long indexVersion = indexVersionElt.safeNumberLong();
 
-    if (expectedVersion) {
-        // If we have an expectedVersion, we must be in timeseries.
-        if (indexVersion != *expectedVersion) {
-            return cannotCreateIndexStatus(indexVersionElt,
-                                           "unsupported geo index version",
-                                           std::to_string(*expectedVersion),
-                                           " for timeseries");
-        }
+    if (allowedVersions && !allowedVersions->contains(indexVersion)) {
+        // If we have allowedVersions, validate that the index version is in the set.
+        return cannotCreateIndexStatus(indexVersionElt,
+                                       "unsupported geo index version",
+                                       formatAllowedVersions(*allowedVersions),
+                                       "");
     } else {
-        // Index version must be either 1, 2 or 3.
+        // Index version must be either 1, 2, 3, or 4.
         switch (indexVersion) {
             case S2_INDEX_VERSION_1:
             case S2_INDEX_VERSION_2:
             case S2_INDEX_VERSION_3:
                 break;
+            case S2_INDEX_VERSION_4: {
+                // Gate version 4 behind feature flag.
+                if (index2dsphere::getDefaultS2IndexVersion() != S2_INDEX_VERSION_4) {
+                    return Status(ErrorCodes::CannotCreateIndex,
+                                  "2dsphereIndexVersion 4 requires feature flag "
+                                  "'featureFlag2dsphereIndexVersion4' to be enabled");
+                }
+                break;
+            }
             default:
                 return cannotCreateIndexStatus(indexVersionElt, "unsupported geo index version");
         }
@@ -158,6 +191,104 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
 // static
 StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
     return S2AccessMethod::_fixSpecHelper(specObj);
+}
+
+// static
+KeyStringSet S2AccessMethod::generateKeysForValidation(const BSONObj& indexSpec,
+                                                       const CollatorInterface* collator,
+                                                       const BSONObj& document,
+                                                       Ordering ordering,
+                                                       const boost::optional<RecordId>& recordId,
+                                                       key_string::Version keyStringVersion) {
+    S2IndexingParams params;
+    index2dsphere::initialize2dsphereParams(indexSpec, collator, &params);
+    // Force version 4 for validation comparison
+    params.indexVersion = S2_INDEX_VERSION_4;
+
+    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+
+    BSONObj keyPattern = indexSpec.getObjectField("key");
+    index2dsphere::getS2Keys(pool,
+                             document,
+                             keyPattern,
+                             params,
+                             &keys,
+                             &multikeyPaths,
+                             keyStringVersion,
+                             SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                             ordering,
+                             recordId);
+
+    return keys;
+}
+
+// static
+bool S2AccessMethod::isVersion3(const BSONObj& indexSpec) {
+    BSONElement versionElt = indexSpec["2dsphereIndexVersion"];
+    return versionElt.isNumber() && versionElt.numberInt() == S2_INDEX_VERSION_3;
+}
+
+bool S2AccessMethod::shouldCheckMissingIndexEntryAlternative(OperationContext* opCtx,
+                                                             const IndexCatalogEntry& entry) const {
+    // Only proceed with expensive record lookup for version 3 indexes, which may need
+    // to be checked for version 4 upgrade scenarios.
+    return isVersion3(entry.descriptor()->infoObj());
+}
+
+boost::optional<std::pair<std::string, std::string>>
+S2AccessMethod::checkMissingIndexEntryAlternative(OperationContext* opCtx,
+                                                  const IndexCatalogEntry& entry,
+                                                  const key_string::Value& missingKey,
+                                                  const RecordId& recordId,
+                                                  const BSONObj& document) const {
+    // Only check for version 3 to version 4 upgrade scenarios.
+    if (!isVersion3(entry.descriptor()->infoObj())) {
+        return boost::none;
+    }
+
+    try {
+        // Generate version 4 keys for this document.
+        KeyStringSet keysV4 =
+            generateKeysForValidation(entry.descriptor()->infoObj(),
+                                      entry.getCollator(),
+                                      document,
+                                      getSortedDataInterface()->getOrdering(),
+                                      recordId,
+                                      getSortedDataInterface()->getKeyStringVersion());
+
+        // Check if version 4 keys exist in the index. If they do, this indicates the
+        // validation failure was caused by SERVER-84794 and the index should be
+        // upgraded to v4.
+        if (!keysV4.empty()) {
+            auto sortedDataInterface = getSortedDataInterface();
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            auto cursor = sortedDataInterface->newCursor(opCtx, ru);
+            bool foundMatchingKey =
+                std::any_of(keysV4.begin(), keysV4.end(), [&](const auto& keyV4) {
+                    // seekForKeyString checks if the key exists in the index and
+                    // returns the KeyStringEntry with the RecordId if found.
+                    auto ksEntry = cursor->seekForKeyString(ru, keyV4.getView());
+                    return ksEntry && ksEntry->loc == recordId;
+                });
+
+            if (foundMatchingKey) {
+                const std::string indexName = entry.descriptor()->indexName();
+                std::string errorMsg = "Index '" + indexName +
+                    "' was created with 2dsphereIndexVersion 3, but validation indicates it should "
+                    "be "
+                    "rebuilt with version 4. Please drop and recreate this index with version 4.";
+                std::string warningMsg =
+                    "Index '" + indexName + "' needs to be rebuilt with 2dsphereIndexVersion 4.";
+                return std::make_pair(errorMsg, warningMsg);
+            }
+        }
+    } catch (...) {
+        // If key generation fails with version 4, continue with normal error reporting.
+    }
+
+    return boost::none;
 }
 
 void S2AccessMethod::validateDocument(const CollectionPtr& collection,

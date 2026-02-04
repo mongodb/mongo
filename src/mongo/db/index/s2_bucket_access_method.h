@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/s2_access_method.h"
@@ -37,6 +36,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/modules.h"
+
+#include <set>
 
 namespace mongo {
 
@@ -56,7 +57,8 @@ public:
      * Returns a non-OK status if 'specObj' is invalid.
      */
     static StatusWith<BSONObj> fixSpec(const BSONObj& specObj) {
-        return S2AccessMethod::_fixSpecHelper(specObj, /*expectedVersion*/ S2_INDEX_VERSION_3);
+        std::set<long long> allowedVersions = {S2_INDEX_VERSION_4, S2_INDEX_VERSION_3};
+        return S2AccessMethod::_fixSpecHelper(specObj, allowedVersions);
     }
 };
 

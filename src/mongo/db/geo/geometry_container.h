@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -48,6 +49,8 @@
 #include <s2polyline.h>
 #include <s2region.h>
 #include <s2regionunion.h>
+
+#include <boost/optional.hpp>
 
 
 namespace mongo {
@@ -70,7 +73,9 @@ public:
     /**
      * Loads an empty GeometryContainer from stored geometry.
      */
-    Status parseFromStorage(const BSONElement& elem, bool skipValidation = false);
+    Status parseFromStorage(const BSONElement& elem,
+                            bool skipValidation = false,
+                            boost::optional<S2IndexVersion> indexVersion = boost::none);
 
     /**
      * Is the geometry any of {Point, Line, Polygon}?
@@ -153,6 +158,9 @@ private:
     class R2BoxRegion;
 
     Status parseFromGeoJSON(bool skipValidation = false);
+    Status parseForS2Version(const BSONElement& elem,
+                             bool skipValidation,
+                             boost::optional<S2IndexVersion> indexVersion);
 
     // Does 'this' intersect with the provided type?
     bool intersects(const S2Cell& otherPoint) const;
