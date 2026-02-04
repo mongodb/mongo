@@ -67,12 +67,12 @@ public:
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString);
 };
 
-struct MockMongoInterface final : public ExecutableStubMongoProcessInterface {
+struct ChangeStreamMockMongoInterface final : public ExecutableStubMongoProcessInterface {
     // Used by operations which need to obtain the oplog's UUID.
     static const UUID& oplogUuid();
 
-    MockMongoInterface(std::vector<repl::OplogEntry> transactionEntries = {},
-                       std::vector<Document> documentsForLookup = {});
+    ChangeStreamMockMongoInterface(std::vector<repl::OplogEntry> transactionEntries = {},
+                                   std::vector<Document> documentsForLookup = {});
 
     // For tests of transactions that involve multiple oplog entries.
     std::unique_ptr<TransactionHistoryIteratorBase> createTransactionHistoryIterator(

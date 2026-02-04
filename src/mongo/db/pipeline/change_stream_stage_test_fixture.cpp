@@ -110,19 +110,19 @@ ChangeStreamStageTestNoSetup::ChangeStreamStageTestNoSetup(NamespaceString nsStr
     getExpCtx()->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
 }
 
-const UUID& MockMongoInterface::oplogUuid() {
+const UUID& ChangeStreamMockMongoInterface::oplogUuid() {
     static const UUID* oplog_uuid = new UUID(UUID::gen());
     return *oplog_uuid;
 }
 
-MockMongoInterface::MockMongoInterface(std::vector<repl::OplogEntry> transactionEntries,
-                                       std::vector<Document> documentsForLookup)
+ChangeStreamMockMongoInterface::ChangeStreamMockMongoInterface(
+    std::vector<repl::OplogEntry> transactionEntries, std::vector<Document> documentsForLookup)
     : _transactionEntries(std::move(transactionEntries)),
       _documentsForLookup{std::move(documentsForLookup)} {}
 
 // For tests of transactions that involve multiple oplog entries.
 std::unique_ptr<TransactionHistoryIteratorBase>
-MockMongoInterface::createTransactionHistoryIterator(repl::OpTime time) const {
+ChangeStreamMockMongoInterface::createTransactionHistoryIterator(repl::OpTime time) const {
     auto iterator = std::make_unique<MockTransactionHistoryIterator>();
 
     // Simulate a lookup on the oplog timestamp by manually advancing the iterator until we
@@ -140,12 +140,12 @@ MockMongoInterface::createTransactionHistoryIterator(repl::OpTime time) const {
 
 // Called by DocumentSourceAddPreImage to obtain the UUID of the oplog. Since that's the only
 // piece of collection info we need for now, just return a BSONObj with the mock oplog UUID.
-BSONObj MockMongoInterface::getCollectionOptions(OperationContext* opCtx,
-                                                 const NamespaceString& nss) {
+BSONObj ChangeStreamMockMongoInterface::getCollectionOptions(OperationContext* opCtx,
+                                                             const NamespaceString& nss) {
     return BSON("uuid" << oplogUuid());
 }
 
-boost::optional<Document> MockMongoInterface::lookupSingleDocument(
+boost::optional<Document> ChangeStreamMockMongoInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     boost::optional<UUID> collectionUUID,
@@ -183,8 +183,8 @@ void ChangeStreamStageTest::checkTransformation(
     auto execPipeline = makeExecPipeline(entry.getEntry().toBSON(), spec);
     auto lastStage = execPipeline->getStages().back();
 
-    getExpCtx()->setMongoProcessInterface(
-        std::make_unique<MockMongoInterface>(transactionEntries, std::move(documentsForLookup)));
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        transactionEntries, std::move(documentsForLookup)));
 
     if (expectedErrorCode) {
         ASSERT_THROWS_CODE(
@@ -229,7 +229,7 @@ std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(
     std::vector<BSONObj> entries, const BSONObj& spec, bool removeEnsureResumeTokenStage) {
     std::list<boost::intrusive_ptr<DocumentSource>> result =
         DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>());
 
     // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
     // from executing as a safety mechanism, since it needs to use the collection-default

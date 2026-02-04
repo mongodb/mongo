@@ -2276,7 +2276,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
 
     // Create an oplog entry representing the commit for the prepared transaction. The commit has a
     // 'prevWriteOpTimeInTransaction' value that matches the 'preparedApplyOps' entry, which the
-    // MockMongoInterface will pretend is in the oplog.
+    // ChangeStreamMockMongoInterface will pretend is in the oplog.
     OperationSessionInfo sessionInfo;
     sessionInfo.setTxnNumber(1);
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
@@ -2413,7 +2413,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
         std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
@@ -2592,12 +2592,12 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(
-        std::make_unique<MockMongoInterface>(std::vector<repl::OplogEntry>{transactionEntry5,
-                                                                           transactionEntry4,
-                                                                           transactionEntry3,
-                                                                           transactionEntry2,
-                                                                           transactionEntry1}));
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
+        std::vector<repl::OplogEntry>{transactionEntry5,
+                                      transactionEntry4,
+                                      transactionEntry3,
+                                      transactionEntry2,
+                                      transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
     // applyOps entries.
@@ -2685,7 +2685,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
     invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
         std::vector<repl::OplogEntry>{transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
@@ -2781,7 +2781,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
         std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
     // We should get three documents from the change stream, based on the documents in the two
@@ -2928,7 +2928,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     invariant(dynamic_cast<exec::agg::ChangeStreamTransformStage*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>(
         std::vector<repl::OplogEntry>{commitEntry, transactionEntry2, transactionEntry1}));
 
     // We should get two documents from the change stream, based on the documents in the
@@ -4345,7 +4345,7 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
 
     auto execPipeline = makeExecPipeline(insert.getEntry().toBSON(), kDefaultSpec);
 
-    getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
+    getExpCtx()->setMongoProcessInterface(std::make_unique<ChangeStreamMockMongoInterface>());
 
     getExpCtx()->setNeedsMerge(false);
 
