@@ -17,6 +17,10 @@ from buildscripts.s3_binary.download import download_s3_binary
 SO_FILENAME = "mongot-extension.so"
 CONF_FILENAME = "mongot-extension.conf"
 
+# Pinned release version. Uses release URL (not latest) so normal mongot-extension
+# pushes don't overwrite the artifact — only sign-and-publish-release does.
+MONGOT_EXTENSION_VERSION = "0.0.0"
+
 
 def get_so_path(is_evergreen: bool) -> str:
     """Get the full path to the mongot-extension .so file."""
@@ -50,8 +54,7 @@ def get_tarball_url() -> str:
         if "ID=amzn" in os_release or 'ID="amzn"' in os_release:
             if 'VERSION_ID="2"' in os_release or "VERSION_ID=2\n" in os_release:
                 platform_str = "amazon2"
-
-    return f"https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-{platform_str}-{arch_str}.tgz"
+    return f"https://mongot-extension.s3.amazonaws.com/release/mongot-extension-{MONGOT_EXTENSION_VERSION}-{platform_str}-{arch_str}.tgz"
 
 
 def download_extension(so_path: str, logger: logging.Logger) -> None:

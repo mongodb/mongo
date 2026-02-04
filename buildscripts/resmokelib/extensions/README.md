@@ -7,9 +7,9 @@ This module provides utilities for setting up and configuring MongoDB extensions
 Extensions are dynamically loaded shared objects (`.so` files) that provide additional functionality to MongoDB. The utilities in this folder can handle:
 
 1. Discovering extension `.so` files in build directories
-1. Generating `.conf` configuration files for extensions
-1. Downloading external extensions (e.g. `mongot-extension`) from S3.
-1. Cleaning up configuration files after tests
+2. Generating `.conf` configuration files for extensions
+3. Downloading external extensions (e.g. `mongot-extension`) from S3.
+4. Cleaning up configuration files after tests
 
 ## Configuration File Generation in Tests
 
@@ -32,9 +32,9 @@ extensionOptions:
 The `generate_extension_configs.py` module creates `.conf` files:
 
 1. Receives a list of `.so` file paths (either from automatic discovery via `find_and_generate_extension_configs.py`, or manually via `--so-files` command-line argument)
-1. For each `.so`, creates a `.conf` file in the temp directory (`/tmp/mongo/extensions/`)
-1. Looks up corresponding extension options from `src/mongo/db/extension/test_examples/configurations.yml`, if any are specified
-1. Writes the config file with `sharedLibraryPath` and any `extensionOptions`
+2. For each `.so`, creates a `.conf` file in the temp directory (`/tmp/mongo/extensions/`)
+3. Looks up corresponding extension options from `src/mongo/db/extension/test_examples/configurations.yml`, if any are specified
+4. Writes the config file with `sharedLibraryPath` and any `extensionOptions`
 
 ### Automatic Discovery and Generation
 
@@ -43,8 +43,8 @@ The `find_and_generate_extension_configs.py` module combines discovery and gener
 1. Searches for `*_mongo_extension.so` files in build directories:
    - **Evergreen:** `dist-test/lib/`
    - **Local:** `bazel-bin/install-dist-test/lib/` or `bazel-bin/install-extensions/lib/`
-1. Generates `.conf` files with a unique UUID suffix to avoid collisions
-1. Adds the `loadExtensions` parameter to mongod/mongos options
+2. Generates `.conf` files with a unique UUID suffix to avoid collisions
+3. Adds the `loadExtensions` parameter to mongod/mongos options
 
 ## `mongot-extension` Setup
 
@@ -53,46 +53,41 @@ All `vector_search_extension_*` test suites use this framework to run server Ext
 
 ### How It Works
 
-1. Downloads the appropriate `mongot-extension` tarball from S3 based on platform and architecture
-1. Verifies the download using SHA256 checksums from `buildscripts/s3_binary/hashes.py`
-1. Extracts the `.so` file and creates a configuration file
+1. Builds the download URL from the **pinned release version** (see `MONGOT_EXTENSION_VERSION` in `setup_mongot_extension.py`).
+   We use the **release/** path (e.g. `release/mongot-extension-0.0.0-{platform}-{arch}.tgz`), not **latest/**, so normal mongot-extension pushes do not overwrite the artifact.
+   Only **sign-and-publish-release** will change the content when run.
+2. Downloads the tarball from S3 and verifies it using the hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
+3. Extracts the `.so` file and creates a configuration file
 
 ### Updating Checksums
 
-The `mongot-extension` binaries are stored in S3 and verified using hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`. When the binary is updated on S3, that file can fall out of date.
-To prevent unexpected test failures caused by untracked updates, all executable code downloaded from S3 must undergo checksum verification.
-This ensures that every change is explicitly documented in the commit history, providing full visibility into what has changed between runs.
-
-> [!IMPORTANT]
-> You may see a `ValueError: Hash mismatch` when running resmoke because `hashes.py` does not contain the expected (now outdated) hash. If you are in that situation, update the checksums as follows.
+The `mongot-extension` binaries are stored in S3 and verified using hardcoded SHA256 checksums in `buildscripts/s3_binary/hashes.py`.
+When the mongot-extension team overwrites **release/0.0.0** (by running `sign-and-publish-release`), the content at the same URL changes and the hashes in `hashes.py` must be updated.
+This ensures every change is explicitly documented in the commit history and no component changes without an auditable commit.
 
 This cross-repo test infrastructure is temporary for the initial rollout of extension `$vectorSearch`. Long-term, all extension testing will live outside the server repository.
 
 **To update the checksums:**
 
-1. Run the following commands to get the current SHA256 hash for each platform/architecture variant. Use **all four** even if you only need one for your local runs, so that Evergreen and other developers have correct hashes.
+1. Run the following to download each tarball and print its SHA256. Use **all four** so Evergreen and other developers have the correct hashes.
 
 ```bash
-# Get the SHA256 hash for each platform/architecture combination
-curl -fsSL https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2023-x86_64.tgz | sha256sum
-curl -fsSL https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2023-aarch64.tgz | sha256sum
-curl -fsSL https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2-x86_64.tgz | sha256sum
-curl -fsSL https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2-aarch64.tgz | sha256sum
+for s in amazon2023-x86_64 amazon2023-aarch64 amazon2-x86_64 amazon2-aarch64; do
+  url="https://mongot-extension.s3.amazonaws.com/release/mongot-extension-0.0.0-${s}.tgz"
+  curl -sL -o "/tmp/mongot-${s}.tgz" "$url"
+  echo "$url"
+  sha256sum "/tmp/mongot-${s}.tgz" | awk '{print $1}'
+done
 ```
 
-2. Update the corresponding entries in `buildscripts/s3_binary/hashes.py` with the latest hash values:
+2. In `buildscripts/s3_binary/hashes.py`, replace the four mongot-extension **hash values** with the four printed hashes in the same order:
 
-```python
-S3_SHA256_HASHES = {
-    # ... other entries ...
-    "https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2023-x86_64.tgz": "<new-hash>",
-    "https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2023-aarch64.tgz": "<new-hash>",
-    "https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2-x86_64.tgz": "<new-hash>",
-    "https://mongot-extension.s3.amazonaws.com/latest/mongot-extension-latest-amazon2-aarch64.tgz": "<new-hash>",
-}
-```
+- `amazon2023-x86_64`
+- `amazon2023-aarch64`
+- `amazon2-x86_64`
+- `amazon2-aarch64`
 
-3. Commit the updated `hashes.py` as part of your PR so that Evergreen and others can use the new checksums.
+3. Commit the updated `hashes.py` so Evergreen and others use the new checksums.
 
 ### Using a Custom Extension Binary
 
