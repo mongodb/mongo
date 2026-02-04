@@ -223,8 +223,8 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
     _advanceTime(
         {newDurableTime.clusterTime(), newDurableTime.configTime(), newDurableTime.topologyTime()});
 
-    LOGV2_DEBUG(1,
-                6011000,
+    LOGV2_DEBUG(6011000,
+                1,
                 "Recovered persisted vector clock",
                 "configTime"_attr = newDurableTime.configTime(),
                 "topologyTime"_attr = newDurableTime.topologyTime());
