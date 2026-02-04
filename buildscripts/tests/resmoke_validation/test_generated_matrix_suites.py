@@ -2,13 +2,21 @@ import logging
 import os
 import unittest
 
-from buildscripts.resmokelib import config, suitesconfig
+from buildscripts.resmokelib import config, configure_resmoke, suitesconfig
 from buildscripts.resmokelib.logging import loggers
 
 
 class ValidateGeneratedSuites(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # make sure we have modules set up for the test
+        config.MODULES_CONFIG_PATH = os.path.join(
+            "buildscripts", "resmokeconfig", "resmoke_modules.yml"
+        )
+        modules = configure_resmoke._get_module_configs()
+        config.MODULES = modules.keys()
+        configure_resmoke._set_up_modules()
+
         config.CONFIG_DIR = "buildscripts/resmokeconfig"
         cls.matrix_suite_config = suitesconfig.MatrixSuiteConfig()
         loggers.ROOT_EXECUTOR_LOGGER = logging

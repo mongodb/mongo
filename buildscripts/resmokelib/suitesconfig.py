@@ -426,7 +426,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if not os.path.exists(generated_path):
             raise errors.InvalidMatrixSuiteError(
                 f"No generated suite file was found for {suite_name}"
-                + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`"
+                + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites"
             )
 
         new_text = cls.generate_matrix_suite_text(suite_name)
@@ -442,7 +442,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                 loggers.ROOT_EXECUTOR_LOGGER.error(new_text)
                 raise errors.InvalidMatrixSuiteError(
                     f"The generated file found on disk did not match the mapping file for {suite_name}. "
-                    + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`"
+                    + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites"
                 )
 
         config = expand_from_target_selector(config)
