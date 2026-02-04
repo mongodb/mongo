@@ -9,6 +9,8 @@
  *  assumes_stable_shard_list,
  *  # Needs backport of SERVER-93430, otherwise hits transaction-terminating errors.
  *  does_not_support_transactions,
+ *  # v7.0 does not support moveCollection
+ *  multiversion_incompatible,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
