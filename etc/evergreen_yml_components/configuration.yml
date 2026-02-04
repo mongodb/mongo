@@ -102,6 +102,7 @@ modules:
     repo: asp-js-engine
     prefix: asp-js-engine
     branch: master
+    ref: v0.1.0
     auto_update: true
 
 # Pre task steps
