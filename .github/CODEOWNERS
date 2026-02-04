@@ -38,6 +38,9 @@ MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 .tmp/* @10gen/devprod-build @svc-auto-approve-bot
 
+# The following patterns are parsed from ./.augment/OWNERS.yml
+/.augment/ @10gen/genai-coding-policy @svc-auto-approve-bot
+
 # The following patterns are parsed from ./.cursor/rules/OWNERS.yml
 /.cursor/rules/**/cs-* @10gen/server-cluster-scalability @svc-auto-approve-bot
 

@@ -26,6 +26,9 @@ REDACTED_STRINGS = []
 EXCLUDED_PATTERNS = [
     "src/mongo/db/modules/",
     "buildscripts/modules/",
+    ".augment/",
+    ".cursor/",
+    "AGENTS.md",
 ]
 
 # Commit hash of Copybara to use (v20251110)
