@@ -118,10 +118,6 @@ public:
         return std::make_unique<Cursor>(_entries);
     }
 
-    std::shared_ptr<IntegerKeyedContainer::Cursor> getSharedCursor(RecoveryUnit&) const override {
-        return std::make_shared<Cursor>(_entries);
-    }
-
     const std::vector<Entry>& entries() const {
         return _entries;
     }

@@ -88,8 +88,6 @@ public:
     int remove(WiredTigerRecoveryUnit& ru, WT_CURSOR& cursor, int64_t key);
 
     std::unique_ptr<IntegerKeyedContainer::Cursor> getCursor(RecoveryUnit& ru) const final;
-
-    std::shared_ptr<IntegerKeyedContainer::Cursor> getSharedCursor(RecoveryUnit& ru) const final;
 };
 
 class WiredTigerStringKeyedContainer : public WiredTigerContainer, public StringKeyedContainerBase {
@@ -121,8 +119,6 @@ public:
     int remove(WiredTigerRecoveryUnit& ru, WT_CURSOR& cursor, std::span<const char> key);
 
     std::unique_ptr<StringKeyedContainer::Cursor> getCursor(RecoveryUnit& ru) const final;
-
-    std::shared_ptr<StringKeyedContainer::Cursor> getSharedCursor(RecoveryUnit& ru) const final;
 };
 
 }  // namespace mongo

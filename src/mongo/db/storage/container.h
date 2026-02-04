@@ -88,11 +88,6 @@ public:
      * Returns a cursor on this container.
      */
     virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
-
-    /**
-     * Returns a shared cursor on this container.
-     */
-    virtual std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const = 0;
 };
 
 /**
@@ -146,11 +141,6 @@ public:
      * Returns a cursor on this container.
      */
     virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
-
-    /**
-     * Returns a shared cursor on this container.
-     */
-    virtual std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const = 0;
 };
 
 }  // namespace mongo

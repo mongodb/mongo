@@ -110,11 +110,6 @@ std::unique_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::
     return std::make_unique<Cursor>(ru, tableId(), uri());
 }
 
-std::shared_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::getSharedCursor(
-    RecoveryUnit& ru) const {
-    return std::make_shared<Cursor>(ru, tableId(), uri());
-}
-
 WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)
     : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
               uri,
@@ -185,11 +180,6 @@ int WiredTigerStringKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
 std::unique_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::getCursor(
     RecoveryUnit& ru) const {
     return std::make_unique<Cursor>(ru, tableId(), uri());
-}
-
-std::shared_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::getSharedCursor(
-    RecoveryUnit& ru) const {
-    return std::make_shared<Cursor>(ru, tableId(), uri());
 }
 
 WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)

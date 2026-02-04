@@ -46,9 +46,6 @@ public:
     std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const final {
         return nullptr;
     }
-    std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const final {
-        return nullptr;
-    }
 };
 
 class StubStringKeyedContainer final : public StringKeyedContainerBase {
@@ -61,9 +58,6 @@ public:
         return Status::OK();
     }
     std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const final {
-        return nullptr;
-    }
-    std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const final {
         return nullptr;
     }
 };
