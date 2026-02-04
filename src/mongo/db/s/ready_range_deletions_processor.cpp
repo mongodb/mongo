@@ -171,8 +171,18 @@ void ReadyRangeDeletionsProcessor::emplaceRangeDeletion(const RangeDeletionTask&
 
 void ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    dassert(!_queue.empty());
+    tassert(ErrorCodes::InternalError,
+            "Queue cannot be empty while popping queue element",
+            !_queue.empty());
     _queue.pop();
+}
+
+RangeDeletionTask ReadyRangeDeletionsProcessor::_peekFront() const {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    tassert(ErrorCodes::InternalError,
+            "Queue cannot be empty while peeking at front element",
+            !_queue.empty());
+    return _queue.front();
 }
 
 void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
@@ -215,10 +225,7 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
             continue;
         }
 
-        auto task = [&] {
-            stdx::unique_lock<stdx::mutex> lock(_mutex);
-            return _queue.front();
-        }();
+        const RangeDeletionTask task = _peekFront();
         const auto dbName = task.getNss().dbName();
         const auto collectionUuid = task.getCollectionUuid();
         const auto range = task.getRange();

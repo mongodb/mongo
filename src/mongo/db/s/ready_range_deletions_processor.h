@@ -83,6 +83,11 @@ private:
      */
     void _runRangeDeletions();
 
+    /**
+     * Returns a copy of the task at the front of the queue.
+     */
+    RangeDeletionTask _peekFront() const;
+
     ServiceContext* const _service;
 
     mutable stdx::mutex _mutex;
