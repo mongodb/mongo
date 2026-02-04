@@ -2135,6 +2135,13 @@ class RunPlugin(PluginInterface):
             help="Loads all available test extensions in the server upon startup.",
         )
 
+        mongodb_server_options.add_argument(
+            "--skipExtensionsSignatureVerification",
+            dest="skip_extensions_signature_verification",
+            action="store_true",
+            help="Skips extensions signature verification at load time during server startup.",
+        )
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=(

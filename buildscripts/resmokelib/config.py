@@ -217,6 +217,8 @@ DEFAULTS = {
     "load_all_extensions": False,
     # Avoids running hooks as part of the suite.
     "no_hooks": False,
+    # Avoids performing signature verification on test extensions at load time.
+    "skip_extensions_signature_verification": False,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -869,3 +871,6 @@ NO_HOOKS = False
 
 # Whether ASAN (AddressSanitizer) is enabled, determined by the presence of ASAN_OPTIONS.
 IS_ASAN = bool(os.environ.get("ASAN_OPTIONS"))
+
+# Skips signature verification for extensions loaded into the server. This option has no effect on release builds.
+SKIP_EXTENSIONS_SIGNATURE_VERIFICATION = False

@@ -80,6 +80,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         hide_initial_sync_node_from_conn_string=False,
         launch_mongot=False,
         load_all_extensions=False,
+        skip_extensions_signature_verification=False,
         router_endpoint_for_mongot: Optional[int] = None,
         disagg_base_config=None,
         use_priority_ports=False,
@@ -102,7 +103,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 logger=self.logger,
                 mongod_options=self.mongod_options,
             )
-            add_extensions_signature_pub_key_path(self.mongod_options)
+            add_extensions_signature_pub_key_path(
+                skip_extensions_signature_verification, self.config, self.mongod_options
+            )
 
         # Automatically download and configure mongot-extension if needed.
         if "mongot-extension" in self.mongod_options.get("loadExtensions", ""):

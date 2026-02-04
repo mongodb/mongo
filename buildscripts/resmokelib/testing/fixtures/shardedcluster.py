@@ -52,6 +52,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         random_migrations=False,
         launch_mongot=False,
         load_all_extensions=False,
+        skip_extensions_signature_verification=False,
         set_cluster_parameter=None,
         inject_catalog_metadata=None,
         shard_replset_name_prefix="shard-rs",
@@ -87,8 +88,10 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 mongos_options=self.mongos_options,
             )
             add_extensions_signature_pub_key_path(
-                mongod_options=self.mongod_options,
-                mongos_options=self.mongos_options,
+                skip_extensions_signature_verification,
+                self.config,
+                self.mongod_options,
+                self.mongos_options,
             )
 
         # Automatically download and configure mongot-extension if needed.

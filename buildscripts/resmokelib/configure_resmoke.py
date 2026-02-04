@@ -248,6 +248,9 @@ def _validate_config(parser: argparse.ArgumentParser):
     if not sys.platform.startswith("linux") and _config.LOAD_ALL_EXTENSIONS:
         parser.error("--loadAllExtensions is only supported on Linux")
 
+    if not sys.platform.startswith("linux") and _config.SKIP_EXTENSIONS_SIGNATURE_VERIFICATION:
+        parser.error("--skipExtensionsSignatureVerification is only supported on Linux")
+
     # Ranges through param specs and checks that they are valid parameter declarations.
     for param_type in config_fuzzer_params:
         _validate_params_spec(parser, config_fuzzer_params[param_type])
@@ -828,6 +831,9 @@ flags in common: {common_set}
     _config.SANITY_CHECK = config.pop("sanity_check")
     _config.PAUSE_AFTER_POPULATE = config.pop("pause_after_populate")
     _config.LOAD_ALL_EXTENSIONS = config.pop("load_all_extensions")
+    _config.SKIP_EXTENSIONS_SIGNATURE_VERIFICATION = config.pop(
+        "skip_extensions_signature_verification"
+    )
     _config.NO_HOOKS = config.pop("no_hooks")
     _config.HANG_ANALYZER_HOOK_TIMEOUT = config.pop("hang_analyzer_hook_timeout")
 

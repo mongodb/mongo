@@ -40,6 +40,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         port: Optional[int] = None,
         launch_mongot: bool = False,
         load_all_extensions: bool = False,
+        skip_extensions_signature_verification=False,
         use_priority_port: bool = False,
     ):
         """Initialize MongoDFixture with different options for the mongod process.
@@ -73,7 +74,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 logger=self.logger,
                 mongod_options=self.mongod_options,
             )
-            add_extensions_signature_pub_key_path(self.mongod_options)
+            add_extensions_signature_pub_key_path(
+                skip_extensions_signature_verification, self.config, self.mongod_options
+            )
 
         # Automatically download and configure mongot-extension if needed.
         if "mongot-extension" in self.mongod_options.get("loadExtensions", ""):
