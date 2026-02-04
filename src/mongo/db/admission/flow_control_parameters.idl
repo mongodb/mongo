@@ -58,8 +58,8 @@ server_parameters:
 
     flowControlMaxSamples:
         description: "The maximum number of samples the flow control algorithm will hold onto."
-        set_at: [startup]
-        cpp_vartype: "int"
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int32_t>"
         cpp_varname: "gFlowControlMaxSamples"
         default: 1000000
         validator: {gt: 0}

@@ -329,7 +329,12 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
-        "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000, "fuzz_at": ["startup"]},
+        "flowControlMaxSamples": {
+            "min": 1,
+            "max": 1000 * 1000,
+            "period": 5,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "flowControlMinTicketsPerSecond": {
             "min": 1,
             "max": 10 * 1000,

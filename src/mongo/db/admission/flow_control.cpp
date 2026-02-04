@@ -568,7 +568,7 @@ void FlowControl::sample(Timestamp timestamp, std::uint64_t opsApplied) {
                 "lockAcquisitions"_attr = lockAcquisitions);
 
     if (_sampledOpsApplied.size() <
-        static_cast<std::deque<Sample>::size_type>(gFlowControlMaxSamples)) {
+        static_cast<std::deque<Sample>::size_type>(gFlowControlMaxSamples.load())) {
         _sampledOpsApplied.emplace_back(
             static_cast<std::uint64_t>(timestamp.asULL()), _numOpsSinceStartup, lockAcquisitions);
     } else {

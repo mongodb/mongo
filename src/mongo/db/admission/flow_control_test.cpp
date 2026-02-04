@@ -288,4 +288,31 @@ TEST_F(FlowControlTest, DisableUntil) {
     // After the deadline passes, the override should take effect.
     ASSERT_EQ(ticketOverride, flowControl->getNumTickets(reenabled));
 }
+
+TEST_F(FlowControlTest, MaxSamplesRuntimeChange) {
+    const auto& samples = flowControl->_getSampledOpsApplied_forTest();
+
+    // Save original value and set max samples to a small value.
+    int32_t originalValue = gFlowControlMaxSamples.load();
+    gFlowControlMaxSamples.store(5);
+
+    // Add samples up to the limit.
+    for (int i = 1; i <= 10; ++i) {
+        flowControl->sample(Timestamp(i), 1);
+    }
+    // Should cap at 5 samples (newest ones get overwritten per the algorithm).
+    ASSERT_EQ(5u, samples.size());
+
+    // Increase limit at runtime.
+    gFlowControlMaxSamples.store(10);
+
+    // Add more samples - now we can grow beyond 5.
+    for (int i = 11; i <= 15; ++i) {
+        flowControl->sample(Timestamp(i), 1);
+    }
+    ASSERT_GT(samples.size(), 5u);
+
+    // Restore original value.
+    gFlowControlMaxSamples.store(originalValue);
+}
 }  // namespace mongo
