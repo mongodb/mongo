@@ -32,42 +32,14 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 
 #include <string>
 #include <vector>
 
-namespace mongo {
+namespace mongo::dbtests {
 
-namespace optionenvironment {
-class OptionSection;
-class Environment;
-}  // namespace optionenvironment
+std::vector<std::string> getFrameworkSuites();
 
-namespace moe = mongo::optionenvironment;
-
-struct FrameworkGlobalParams {
-    unsigned perfHist;
-    unsigned long long seed;
-    int runsPerTest;
-    std::string dbpathSpec;
-    std::vector<std::string> suites;
-    std::string filter;
-};
-
-extern FrameworkGlobalParams frameworkGlobalParams;
-
-Status addTestFrameworkOptions(moe::OptionSection* options);
-
-std::string getTestFrameworkHelp(StringData name, const moe::OptionSection& options);
-
-/**
- * Handle options that should come before validation, such as "help".
- *
- * Returns false if an option was found that implies we should prematurely exit with success.
- */
-bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
-                                             const std::vector<std::string>& args);
-
-Status storeTestFrameworkOptions(const moe::Environment& params,
-                                 const std::vector<std::string>& args);
-}  // namespace mongo
+}  // namespace mongo::dbtests

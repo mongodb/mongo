@@ -230,21 +230,18 @@ void decodeFromInputsOrStream(const KSDecodeOptions& options) {
 }
 
 int ksDecodeMain(int argc, char* argv[]) try {
-    constexpr auto OptionUsage =
-        moe::OptionSection::OptionParserUsageType::BaseServerOptionsException;
     moe::OptionSection opts;
-    opts.addOptionChaining("keystring", "keystring", moe::String, "KeyString", {}, {}, OptionUsage)
+    opts.addOptionChaining("keystring", "keystring", moe::String, "KeyString", {}, {})
         .hidden()
         .positional(1, 1);
-    opts.addOptionChaining("help", "h", moe::Switch, "Help output", {}, {}, OptionUsage);
-    opts.addOptionChaining("output", "o", moe::String, "Output format", {}, {}, OptionUsage);
-    opts.addOptionChaining("pattern", "p", moe::String, "Key pattern", {}, {}, OptionUsage);
-    opts.addOptionChaining("typeBits", "t", moe::String, "Type bits", {}, {}, OptionUsage);
-    opts.addOptionChaining("recordId", "r", moe::String, "RecordId type", {}, {}, OptionUsage);
-    opts.addOptionChaining(
-        "logErrors", "l", moe::Switch, "Ignore and log errors", {}, {}, OptionUsage);
-    opts.addOptionChaining("quiet", "q", moe::Switch, "Quiet", {}, {}, OptionUsage);
-    opts.addOptionChaining("append", "a", moe::Switch, "Append", {}, {}, OptionUsage);
+    opts.addOptionChaining("help", "h", moe::Switch, "Help output", {}, {});
+    opts.addOptionChaining("output", "o", moe::String, "Output format", {}, {});
+    opts.addOptionChaining("pattern", "p", moe::String, "Key pattern", {}, {});
+    opts.addOptionChaining("typeBits", "t", moe::String, "Type bits", {}, {});
+    opts.addOptionChaining("recordId", "r", moe::String, "RecordId type", {}, {});
+    opts.addOptionChaining("logErrors", "l", moe::Switch, "Ignore and log errors", {}, {});
+    opts.addOptionChaining("quiet", "q", moe::Switch, "Quiet", {}, {});
+    opts.addOptionChaining("append", "a", moe::Switch, "Append", {}, {});
 
     moe::OptionsParser parser;
     moe::Environment environment;

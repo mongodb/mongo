@@ -70,29 +70,24 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo {
-namespace dbtests {
+namespace mongo::dbtests {
 
 unittest::MainProgress initializeDbTests(std::vector<std::string> argVec) {
     unittest::MainProgress progress({}, std::move(argVec));
     progress.initialize();
 
-    if (!frameworkGlobalParams.suites.empty()) {
+    if (auto suites = getFrameworkSuites(); !suites.empty()) {
         auto& o = progress.options().filter;
         if (!o)
             o.emplace();
-        LOGV2(11723900, "Dbtest overriding suites.", "suites"_attr = frameworkGlobalParams.suites);
-        o->suites = frameworkGlobalParams.suites;
+        LOGV2(11723900, "Dbtest overriding suites.", "suites"_attr = suites);
+        o->suites = std::move(suites);
     }
 
     return progress;
 }
 
 int runDbTests(unittest::MainProgress& progress) {
-    frameworkGlobalParams.perfHist = 1;
-    frameworkGlobalParams.seed = time(nullptr);
-    frameworkGlobalParams.runsPerTest = 1;
-
     auto serviceContext = getGlobalServiceContext();
 
     registerShutdownTask([serviceContext] {
@@ -116,7 +111,7 @@ int runDbTests(unittest::MainProgress& progress) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
     });
 
-    srand((unsigned)frameworkGlobalParams.seed);  // NOLINT
+    srand(static_cast<unsigned>(time(nullptr)));  // NOLINT
 
     // Set up the periodic runner for background job execution, which is required by the storage
     // engine to be running beforehand.
@@ -145,5 +140,4 @@ int runDbTests(unittest::MainProgress& progress) {
     return ret;
 }
 
-}  // namespace dbtests
-}  // namespace mongo
+}  // namespace mongo::dbtests

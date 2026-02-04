@@ -9,18 +9,11 @@ exports_files(
     ]),
 )
 
-idl_generator(
-    name = "framework_options_gen",
-    src = "framework_options.idl",
-)
-
 mongo_cc_library(
     name = "testframework",
     srcs = [
         "framework.cpp",
         "framework_options.cpp",
-        "framework_options_gen",
-        "framework_options_init.cpp",
     ],
     deps = [
         "//src/mongo/db:dbdirectclient",
