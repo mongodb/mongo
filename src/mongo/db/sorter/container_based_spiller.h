@@ -351,9 +351,12 @@ public:
                           IntegerKeyedContainer& container,
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
-                          SorterChecksumVersion checksumVersion)
+                          SorterChecksumVersion checksumVersion,
+                          int64_t batchSize)
         : SorterSpillerBase<Key, Value>(std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
-              opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)) {}
+              opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)),
+          _opCtx(opCtx),
+          _batchSize(batchSize) {}
 
     std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
         const SortOptions& opts,
@@ -419,14 +422,24 @@ private:
         std::span<std::pair<Key, Value>> data,
         uint32_t idx) override {
         auto writer = this->_storage->makeWriter(opts, settings);
+        int64_t numAdded = 0;
+        boost::optional<WriteUnitOfWork> wuow{boost::in_place_init, &_opCtx};
         for (auto&& [key, value] : data.subspan(idx)) {
             writer->addAlreadySorted(key, value);
+            ++numAdded;
             ++_current;
+            if (numAdded % _batchSize == 0) {
+                wuow->commit();
+                wuow.emplace(&_opCtx);
+            }
         }
+        wuow->commit();
         _containerBasedStorage().updateCurrKey(_current);
         return std::move(writer);
     }
 
+    OperationContext& _opCtx;
+    int64_t _batchSize;
     int64_t _current = 1;
 };
 

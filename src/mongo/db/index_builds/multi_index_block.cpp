@@ -205,7 +205,8 @@ std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> makeSpiller(
             entry->indexBuildInterceptor()->getSorterContainer(),
             containerStats,
             dbName,
-            SorterChecksumVersion::v2);
+            SorterChecksumVersion::v2,
+            primaryDrivenIndexBuildSorterInsertionBatchSize.load());
     }
 
     using FileBasedSpiller = sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>;

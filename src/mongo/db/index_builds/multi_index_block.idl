@@ -75,3 +75,15 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    primaryDrivenIndexBuildSorterInsertionBatchSize:
+        description: "The number of index keys in a batch when inserting into the sorter."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: primaryDrivenIndexBuildSorterInsertionBatchSize
+        cpp_vartype: AtomicWord<int>
+        default: 1000
+        validator:
+            gte: 1
+        redact: false
