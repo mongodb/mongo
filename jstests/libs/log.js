@@ -85,3 +85,10 @@ export function getMatchingLoglinesCount(logLines, fields, ignoreFields) {
     }
     return count;
 }
+
+// Finds and returns the first logline for a slow in-progress query with the given comment, or null
+// if no such logline was found.
+export function findSlowInProgressQueryLogLine(db, comment) {
+    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    return findMatchingLogLine(globalLog.log, {id: 1794200, comment: comment});
+}
