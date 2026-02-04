@@ -1,4 +1,13 @@
-// Verifies that findAndModify commands with an invalid command object failed as expected.
+/**
+ * Verifies that findAndModify commands with an invalid command object fail as expected.
+ *
+ * @tags: [
+ *   cannot_run_during_upgrade_downgrade,
+ *   does_not_support_stepdowns,
+ *   # Avoid spurious 'ShardNotFound' errors in some overrides and multiversion tests.
+ *   multiversion_incompatible,
+ * ]
+ */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
