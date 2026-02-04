@@ -86,8 +86,16 @@ rem Set up environment variables for terminal output (for engflow_check.py)
 rem On Windows, we use CON device for console output
 rem Note: Windows doesn't support file descriptor duplication like Unix,
 rem so we'll set these to indicate console output should go to CON
-set "MONGO_WRAPPER_STDOUT_FD=CON"
-set "MONGO_WRAPPER_STDERR_FD=CON"
+if not "%MONGO_WRAPPER_OUTPUT_ALL%"=="" (
+    set "MONGO_WRAPPER_STDOUT_FD="
+    set "MONGO_WRAPPER_STDERR_FD="
+) else if not "%CI%"=="" (
+    set "MONGO_WRAPPER_STDOUT_FD="
+    set "MONGO_WRAPPER_STDERR_FD="
+) else (
+    set "MONGO_WRAPPER_STDOUT_FD=CON"
+    set "MONGO_WRAPPER_STDERR_FD=CON"
+)
 
 rem === Start timing ===
 set STARTTIME=%TIME%

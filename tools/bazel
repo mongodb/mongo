@@ -147,8 +147,14 @@ if [ "$skip_python" == "1" ]; then
   exec "$bazel_real" "$@"  
 fi  
 
+wrapper_output_all=0
+if [[ -n "${MONGO_WRAPPER_OUTPUT_ALL}" ]] || [[ -n "${CI}" ]]; then
+    wrapper_output_all=1
+fi
 
-if [[ "$SLOW_PATH" == "1" ]] && [[ -z "${MONGO_WRAPPER_OUTPUT_ALL}" ]]; then
+wrapper_redirect_output=0
+if [[ "$SLOW_PATH" == "1" ]] && [[ "$wrapper_output_all" == "0" ]]; then
+    wrapper_redirect_output=1
     ORIGINAL_ARGS=("$@")      
   
     # Save original terminal output FDs
@@ -293,11 +299,15 @@ fi
 if [[ $autocomplete_query == 1 ]]; then  
   plus_targets=$(</tmp/mongo_autocomplete_plus_targets)  
   query_output=$("${new_args[@]@Q}")  
-  echo $query_output $plus_targets | tr " " "\n" >&3  
+  if [[ "$wrapper_redirect_output" == "1" ]]; then
+      echo $query_output $plus_targets | tr " " "\n" >&3
+  else
+      echo $query_output $plus_targets | tr " " "\n"
+  fi
 else  
   trap 'cleanup_logfile' EXIT
   # Slow path: restore stdout/stderr so Bazel prints normally  
-  if [[ -z "${MONGO_WRAPPER_OUTPUT_ALL}" ]]; then
+  if [[ "$wrapper_redirect_output" == "1" ]]; then
       exec 1>&3 2>&4
   fi
   
