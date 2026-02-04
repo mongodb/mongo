@@ -110,15 +110,6 @@ Document applyTransformation(const repl::OplogEntry& oplogEntry,
     return transformer.applyTransformation(oplogDoc);
 }
 
-repl::OplogEntry makeContainerOplogEntry() {
-    const repl::OpTime entryOpTime{Timestamp(3, 4), 5};
-    StringData containerIdent = "container_ident";
-    auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
-    auto value = BSONBinData("v", 1, BinDataType::BinDataGeneral);
-
-    return makeContainerInsertOplogEntry(entryOpTime, nss, containerIdent, key, value);
-}
-
 TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
     const auto documentKey = Document{{"x", 1}, {"y", 1}};
     auto updateField =
@@ -458,7 +449,7 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestInvalidCommand,
                  "Tripwire assertion.*11352605.*Unsupported command type") {
 
-    // "applyOps" command type not supported by the event transformer
+    // "applyOps" oplog entry types are not supported by the event transformer.
     Document unsupportedCommandType{
         {"applyOps", Value{std::vector<Document>{}}},
         {"prepare", true},
@@ -494,13 +485,48 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
 }
 
 DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnexpectedContainerInsert,
+                 "Tripwire assertion.*11888300") {
+    // Container insert ("ci") oplog type is not supported by the event transformer.
+    auto oplogEntry =
+        repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+                                            nss,
+                                            "containerIdent"_sd,
+                                            1LL,
+                                            BSONBinData("V", 1, BinDataGeneral));
+
+    // This will tassert in the event transformer, because it does not expect a 'ci' oplog entry.
+    ASSERT_THROWS_CODE(applyTransformation(oplogEntry), AssertionException, 11888300);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnexpectedContainerDelete,
+                 "Tripwire assertion.*11888301") {
+    // Container delete ("cd") oplog type is not supported by the event transformer.
+    auto oplogEntry = repl::makeContainerDeleteOplogEntry(
+        repl::OpTime(Timestamp(10, 10), 1 /* term */), nss, "containerIdent"_sd, 1LL);
+
+    // This will tassert in the event transformer, because it does not expect a 'cd' oplog entry.
+    ASSERT_THROWS_CODE(applyTransformation(oplogEntry), AssertionException, 11888301);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestUnsupportedOplogEntryType,
                  "Tripwire assertion.*11352603.*Unsupported oplog entry type") {
+    // Need to create an invalid oplog 'document' here, as 'repl::OplogEntry' validates its invalid
+    // and cannot be created with an invalid "op" type.
+    auto oplogDoc = Document{{"op", "unexpected"_sd}, {"ns", nss.toString_forTest()}};
 
-    auto oplogEntry = makeContainerOplogEntry();
+    // Cannot simply call 'applyTransformation()' here, because it expects a 'repl::OplogEntry'
+    // parameter. Thus create the transformer manually here in order to execute it with an invalid
+    // input 'Document'.
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAtOperationTime(kDefaultTs);
 
-    // Applying the transform on unsupported container insert should throw a TAssert.
-    applyTransformation(oplogEntry);
+    ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(nss), spec);
+
+    // Applying the transform on unsupported "applyOps" oplog entry should throw a TAssert.
+    ASSERT_THROWS_CODE(transformer.applyTransformation(oplogDoc), AssertionException, 11352603);
 }
 
 TEST(

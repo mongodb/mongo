@@ -3180,17 +3180,21 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 
 // A `ci` (container insert) is an internal storage operation used for inserting into containers.
 // `ci` ops should always be filtered out by the change stream.
-TEST_F(ChangeStreamStageTest, MatchFiltersCi) {
-    auto ci = repl::makeContainerInsertOplogEntry(
-        repl::OpTime(), nss, "containerIdent"_sd, 1LL, BSONBinData("V", 1, BinDataGeneral));
+TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
+    auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+                                                  nss,
+                                                  "containerIdent"_sd,
+                                                  1LL,
+                                                  BSONBinData("V", 1, BinDataGeneral));
 
     checkTransformation(ci, boost::none);
 }
 
 // A `cd` (container delete) is an internal storage operation used for deleting from containers.
 // `cd` ops should always be filtered out by the change stream.
-TEST_F(ChangeStreamStageTest, MatchFiltersCd) {
-    auto cd = repl::makeContainerDeleteOplogEntry(repl::OpTime(), nss, "containerIdent"_sd, 1LL);
+TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
+    auto cd = repl::makeContainerDeleteOplogEntry(
+        repl::OpTime(Timestamp(10, 10), 1 /* term */), nss, "containerIdent"_sd, 1LL);
 
     checkTransformation(cd, boost::none);
 }

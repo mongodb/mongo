@@ -164,6 +164,15 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
     }
 }
 
+// Warns about the usage of an unsupported oplog entry type by logging an error and tasserting.
+[[noreturn]] void throwUnsupportedOplogEntryType(const Document& input, std::string error) {
+    LOGV2_WARNING(
+        11352602, "Unsupported oplog entry type", "error"_attr = error, "input"_attr = input);
+    tasserted(11352603,
+              str::stream() << "Unsupported oplog entry type, error " << error << ": "
+                            << input.toString());
+}
+
 Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
     MutableDocument doc(source);
     for (auto fieldName : fieldNames) {
@@ -314,7 +323,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     Value ns = input[repl::OplogEntry::kNssFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::string);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    auto opType = getOplogOpType(input);
+
+    const auto opType = [&]() -> repl::OpTypeEnum {
+        try {
+            return getOplogOpType(input);
+        } catch (const DBException& ex) {
+            // If parsing the oplog entry type failed, bail out.
+            throwUnsupportedOplogEntryType(input, ex.toString());
+        }
+    }();
 
     NamespaceString nss = createNamespaceStringFromOplogEntry(ns.getStringData());
 
@@ -591,16 +608,20 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
             // We should never see an unknown noop entry.
             LOGV2_WARNING(11352600, "Invalid noop entry", "o2Field"_attr = o2Field);
-            tasserted(11352601, str::stream() << "Invalid noop entry" << o2Field.toString());
+            tasserted(11352601, str::stream() << "Invalid noop entry " << o2Field.toString());
+        }
+        case repl::OpTypeEnum::kContainerInsert: {
+            // Container insert ('ci') oplog entries should not show up when we get here. They
+            // should have been filtered out by the change stream's oplog match filter already.
+            tasserted(11888300, "Change stream encountered unexpected 'ci' oplog entry");
+        }
+        case repl::OpTypeEnum::kContainerDelete: {
+            // Container delete ('cd') oplog entries should not show up when we get here. They
+            // should have been filtered out by the change stream's oplog match filter already.
+            tasserted(11888301, "Change stream encountered unexpected 'cd' oplog entry");
         }
         default: {
-            LOGV2_WARNING(11352602,
-                          "Unsupported oplog entry type",
-                          "opType"_attr = static_cast<int>(opType),
-                          "input"_attr = input);
-
-            tasserted(11352603,
-                      str::stream() << "Unsupported oplog entry type " << static_cast<int>(opType));
+            throwUnsupportedOplogEntryType(input, "unhandled case" /* error */);
         }
     }
 

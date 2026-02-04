@@ -148,7 +148,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     // The standard event filter, before it is combined with the user filter, is as follows:
     //    {
     //      $or: [
-    //        {ns: nsMatch, $nor: [{op: "n"}, {op: "c"}]},    // CRUD events
+    //        {ns: nsMatch, $nor: [{op: "n"}, {op: "c"},
+    //                             {op: "ci"}, {op: "cd"}]},  // CRUD events
     //        {ns: cmdNsMatch, op: "c", $or: [                // Commands on relevant DB(s)
     //          {"o.drop": collMatch},                        // Drops of relevant collection(s)
     //          {"o.renameCollection": nsMatch},              // Renames of relevant collection(s)
@@ -165,7 +166,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     // (1) CRUD events on a monitored namespace.
     auto crudEvents = backingBsonObjs.emplace_back(
         BSON("ns" << nsMatch.firstElement() << "$nor"
-                  << BSON_ARRAY(BSON("op" << "n") << BSON("op" << "c"))));
+                  << BSON_ARRAY(BSON("op" << "n")
+                                << BSON("op" << "c") << BSON("op" << "ci") << BSON("op" << "cd"))));
 
     BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
 
