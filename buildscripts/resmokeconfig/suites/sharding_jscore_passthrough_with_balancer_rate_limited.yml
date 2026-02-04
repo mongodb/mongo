@@ -81,6 +81,8 @@ executor:
       global_vars:
         TestData:
           runningWithBalancer: true
+          # Read-only flag to quickly know this suite is setting the pauseMigrationsDuringMultiUpdates on every mongos
+          pauseMigrationsDuringMultiUpdates: true
       eval: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
   hooks:
     - class: CheckReplDBHash
@@ -114,6 +116,7 @@ executor:
           mode:
             activationProbability: 0.25
     num_rs_nodes_per_shard: 1
+    num_mongos: 3
     num_shards: 2
     enable_balancer: true
     random_migrations: true

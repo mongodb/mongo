@@ -135,6 +135,7 @@ executor:
   fixture:
     class: ShardedClusterFixture
     config_shard: "any"
+    num_mongos: 3
     num_shards: 3
     mongos_options:
       set_parameters:

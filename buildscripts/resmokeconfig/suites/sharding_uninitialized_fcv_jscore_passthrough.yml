@@ -102,6 +102,7 @@ executor:
         enableTestCommands: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
+    num_mongos: 3
     num_shards: 1
     num_rs_nodes_per_shard: 2
     shard_options:

@@ -3,6 +3,13 @@
 // ]
 
 // Basic examples for $bit
+// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
+// When a database is dropped, a stale router will report "database not found" error for
+// deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
+if (TestData.pauseMigrationsDuringMultiUpdates) {
+    TestData.pinToSingleMongos = true;
+}
+
 let res;
 const coll = db[jsTestName()];
 coll.drop();

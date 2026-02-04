@@ -4,6 +4,13 @@
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 
+// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
+// When a database is dropped, a stale router will report "database not found" error for
+// deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
+if (TestData.pauseMigrationsDuringMultiUpdates) {
+    TestData.pinToSingleMongos = true;
+}
+
 const coll = db.jstests_not2;
 coll.drop();
 

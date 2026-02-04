@@ -12,6 +12,13 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
+// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
+// When a database is dropped, a stale router will report "database not found" error for
+// deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
+if (TestData.pauseMigrationsDuringMultiUpdates) {
+    TestData.pinToSingleMongos = true;
+}
+
 const collection = db.index_key_expression;
 
 /**

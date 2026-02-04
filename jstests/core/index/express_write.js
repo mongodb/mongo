@@ -15,6 +15,13 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {isExpress} from "jstests/libs/query/analyze_plan.js";
 
+// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
+// When a database is dropped, a stale router will report "database not found" error for
+// deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
+if (TestData.pauseMigrationsDuringMultiUpdates) {
+    TestData.pinToSingleMongos = true;
+}
+
 const collName = "express_write_coll";
 const coll = db.getCollection(collName);
 const docs = [
