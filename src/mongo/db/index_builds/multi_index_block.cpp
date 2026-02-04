@@ -1125,7 +1125,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                         });
                 },
                 onDuplicateRecord,
-                yieldFn);
+                yieldFn,
+                (this->_method == IndexBuildMethodEnum::kPrimaryDriven)
+                    ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()
+                    : 1);
 
             if (!status.isOK()) {
                 return status;

@@ -968,7 +968,8 @@ public:
                   int32_t yieldIterations,
                   const KeyHandlerFn& onDuplicateKeyInserted,
                   const RecordIdHandlerFn& onDuplicateRecord,
-                  const YieldFn& yieldFn) final;
+                  const YieldFn& yieldFn,
+                  size_t keyBatchSize) final;
 
 protected:
     const MultikeyPaths& getMultikeyPaths() const final;
@@ -1201,7 +1202,8 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
                                int32_t yieldIterations,
                                const KeyHandlerFn& onDuplicateKeyInserted,
                                const RecordIdHandlerFn& onDuplicateRecord,
-                               const YieldFn& yieldFn) {
+                               const YieldFn& yieldFn,
+                               const size_t keyBatchSize) {
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
@@ -1221,6 +1223,21 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
 
     int64_t iterations = 0;
+
+    size_t numKeysInBatch = 0;
+    boost::optional<WriteUnitOfWork> wunit;
+    auto commitAndResetWunit = [&wunit, &numKeysInBatch]() {
+        wunit->commit();
+        wunit.reset();
+        numKeysInBatch = 0;
+    };
+    // Handles when we don't commit the wunit and exit the while-loop early. For example, if we
+    // encounter duplicate multikey metadata keys.
+    ScopeGuard commitAndResetWunitOuterGuard([&] {
+        if (wunit) {
+            commitAndResetWunit();
+        }
+    });
     while (it && it->more()) {
         opCtx->checkForInterrupt();
 
@@ -1283,12 +1300,29 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
         _previousKey = data.first;
 
         try {
+            // TODO SERVER-118845: Move the writeConflictRetry to a higher level to correctly
+            // resolve batched write conflict failures.
             writeConflictRetry(opCtx, "addingKey", _ns, [&] {
-                WriteUnitOfWork wunit(opCtx);
+                ScopeGuard commitAndResetWunitInnerGuard([&] {
+                    invariant(wunit);
+                    commitAndResetWunit();
+                });
+                if (!wunit) {
+                    wunit.emplace(opCtx);
+                }
                 _addKeyForCommit(opCtx, ru, *collection, data.first);
-                wunit.commit();
+                numKeysInBatch++;
+                if (numKeysInBatch == keyBatchSize || !it->more()) {
+                    invariant(wunit);
+                    commitAndResetWunit();
+                }
+                commitAndResetWunitInnerGuard.dismiss();
             });
         } catch (DBException& e) {
+            if (wunit) {
+                wunit.reset();
+                numKeysInBatch = 0;
+            }
             Status status = e.toStatus();
             // Duplicates are checked before inserting.
             invariant(status.code() != ErrorCodes::DuplicateKey);
@@ -1302,6 +1336,9 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
 
         // Yield locks every 'yieldIterations' key insertions.
         if (yieldIterations > 0 && (++iterations % yieldIterations == 0)) {
+            if (wunit) {
+                commitAndResetWunit();
+            }
             std::tie(collection, entry) = yieldFn(opCtx);
         }
 
@@ -1376,7 +1413,6 @@ private:
     Sorter::Settings _makeSorterSettings() const;
     std::unique_ptr<Sorter> _sorter;
     std::unique_ptr<SortedDataBuilderInterface> _builder;
-
     const IndexBuildMethodEnum& _method;
 };
 
