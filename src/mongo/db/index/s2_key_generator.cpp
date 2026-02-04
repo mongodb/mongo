@@ -64,7 +64,7 @@ Status S2GetKeysForElement(const BSONElement& element,
                            const S2IndexingParams& params,
                            std::vector<S2CellId>* out) {
     GeometryContainer geoContainer;
-    Status status = geoContainer.parseFromStorage(element, false, params.indexVersion);
+    Status status = geoContainer.parseFromStorage(element);
     if (!status.isOK())
         return status;
 
@@ -224,7 +224,7 @@ bool getS2BucketGeoKeys(const BSONObj& document,
             BSONArrayBuilder coordinates(shape.subarrayStart("coordinates"));
             for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
                 GeometryContainer container;
-                auto status = container.parseFromStorage(*i, false, params.indexVersion);
+                auto status = container.parseFromStorage(*i, false);
                 uassert(183934,
                         str::stream() << "Can't extract geo keys: " << status.reason(),
                         status.isOK());

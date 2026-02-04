@@ -381,10 +381,3 @@ feature_flags:
         cpp_varname: gFeatureFlagExtensionViewsAndUnionWith
         default: false
         fcv_gated: false
-
-    featureFlag2dsphereIndexVersion4:
-        description: "Feature flag to enable v4 of 2dsphereIndexVersion."
-        cpp_varname: gFeatureFlag2dsphereIndexVersion4
-        default: true
-        fcv_gated: true
-        version: 8.3

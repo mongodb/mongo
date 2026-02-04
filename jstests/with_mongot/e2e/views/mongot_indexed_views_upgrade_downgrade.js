@@ -35,51 +35,7 @@ const vectorSearchIndexDef = {
 
 const adminDB = testDb.getMongo().getDB("admin");
 
-/**
- * Drops all v4 2dsphere indexes from all collections in all databases.
- * This is necessary before downgrading FCV below 8.3, as v4 indexes are not supported.
- */
-function dropAllV4_2dsphereIndexes() {
-    const mongo = adminDB.getMongo();
-    const dbNames = mongo.getDBNames();
-
-    for (const dbName of dbNames) {
-        const db = mongo.getDB(dbName);
-        // Use getCollectionInfos to get only collections (not views)
-        const collInfos = db.getCollectionInfos({type: "collection"});
-
-        for (const collInfo of collInfos) {
-            const collName = collInfo.name;
-            // Skip system collections
-            if (collName.startsWith("system.")) {
-                continue;
-            }
-
-            const coll = db.getCollection(collName);
-            const indexes = coll.getIndexes();
-
-            for (const index of indexes) {
-                // Check if this is a v4 2dsphere index
-                if (index.key) {
-                    const keyFields = Object.keys(index.key);
-                    const has2dsphere = keyFields.some((field) => index.key[field] === "2dsphere");
-
-                    if (has2dsphere && index["2dsphereIndexVersion"] === 4) {
-                        jsTest.log.info(
-                            "Dropping v4 2dsphere index: " + index.name + " on collection " + dbName + "." + collName,
-                        );
-                        assert.commandWorked(coll.dropIndex(index.name));
-                    }
-                }
-            }
-        }
-    }
-}
-
 function upgradeDowngradeFCV(commands) {
-    // Drop any v4 2dsphere indexes before downgrading, as they are not supported below FCV 8.3.
-    dropAllV4_2dsphereIndexes();
-
     // Downgrade to lastLTSFCV (8.0).
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 

@@ -41,8 +41,6 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/server_options.h"
 
 #include <memory>
 #include <ostream>
@@ -235,16 +233,9 @@ void initialize2dsphereParams(const BSONObj& infoObj,
             str::stream() << "unsupported geo index version { " << kIndexVersionFieldName << " : "
                           << out->indexVersion << " }, only support versions: ["
                           << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
-                          << S2_INDEX_VERSION_3 << "," << S2_INDEX_VERSION_4 << "]",
-            out->indexVersion == S2_INDEX_VERSION_4 || out->indexVersion == S2_INDEX_VERSION_3 ||
-                out->indexVersion == S2_INDEX_VERSION_2 || out->indexVersion == S2_INDEX_VERSION_1);
-}
-
-S2IndexVersion getDefaultS2IndexVersion(const VersionContext& versionContext) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return feature_flags::gFeatureFlag2dsphereIndexVersion4.isEnabled(versionContext, fcvSnapshot)
-        ? S2_INDEX_VERSION_4
-        : S2_INDEX_VERSION_3;
+                          << S2_INDEX_VERSION_3 << "]",
+            out->indexVersion == S2_INDEX_VERSION_3 || out->indexVersion == S2_INDEX_VERSION_2 ||
+                out->indexVersion == S2_INDEX_VERSION_1);
 }
 }  // namespace index2dsphere
 }  // namespace mongo

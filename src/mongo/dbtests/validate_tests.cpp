@@ -41,7 +41,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/index_builds_common.h"
@@ -4231,133 +4230,6 @@ public:
     }
 };
 
-// Test that validates an S2 index created with v4 code but persisted as v3 gets reported as
-// needing upgrade to v4.
-class ValidateS2IndexVersion3NeedsUpgrade : public ValidateBase {
-public:
-    ValidateS2IndexVersion3NeedsUpgrade() : ValidateBase(/*full=*/false, /*background=*/false) {}
-
-    void run() {
-        // Create a new collection and insert a document with a GeoJSON Point.
-        lockDb(MODE_X);
-
-        {
-            beginTransaction();
-            ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
-            _db->createCollection(&_opCtx, _nss);
-            commitTransaction();
-        }
-
-        // Insert the document with location field.
-        BSONObj originalDoc = BSON(
-            "_id" << 1 << "location"
-                  << BSON("latitude" << 38.7348661 << "longitude" << -9.1447487 << "coordinates"
-                                     << BSON_ARRAY(-9.1447487 << 38.7348661) << "type"
-                                     << "Point"));
-        {
-            beginTransaction();
-            insertDocument(originalDoc);
-            commitTransaction();
-        }
-
-        // Create a 2dsphere index. This will default to v4 and generate v4 keys.
-        const auto indexName = "location_2dsphere";
-        auto status =
-            createIndexFromSpec(BSON("name" << indexName << "key" << BSON("location" << "2dsphere")
-                                            << "v" << static_cast<int>(kIndexVersion)));
-        ASSERT_OK(status);
-
-        // Now modify the durable catalog to change the index version from v4 to v3.
-        // This simulates an index that was created with v4 code but persisted as v3.
-        CollectionWriter writer(&_opCtx, coll()->ns());
-        {
-            beginTransaction();
-            auto collMetadata = durable_catalog::getParsedCatalogEntry(
-                                    &_opCtx, coll()->getCatalogId(), MDBCatalog::get(&_opCtx))
-                                    ->metadata;
-            int offset = collMetadata->findIndexOffset(indexName);
-            ASSERT_GTE(offset, 0);
-
-            auto& indexMetadata = collMetadata->indexes[offset];
-            // Modify the spec to change version from v4 to v3.
-            BSONObjBuilder specBuilder;
-            for (BSONObjIterator bi(indexMetadata.spec); bi.more();) {
-                BSONElement e = bi.next();
-                if (e.fieldNameStringData() == "2dsphereIndexVersion") {
-                    specBuilder.append("2dsphereIndexVersion", S2_INDEX_VERSION_3);
-                } else {
-                    specBuilder.append(e);
-                }
-            }
-            indexMetadata.spec = specBuilder.obj();
-            writer.getWritableCollection(&_opCtx)->replaceMetadata(&_opCtx,
-                                                                   std::move(collMetadata));
-            commitTransaction();
-        }
-
-        // Reload the index from the modified catalog.
-        {
-            beginTransaction();
-            auto writableCatalog = writer.getWritableCollection(&_opCtx)->getIndexCatalog();
-            auto entry = writableCatalog->findIndexByName(&_opCtx, indexName);
-            writableCatalog->refreshEntry(&_opCtx,
-                                          writer.getWritableCollection(&_opCtx),
-                                          entry,
-                                          CreateIndexEntryFlags::kIsReady);
-            commitTransaction();
-        }
-
-        releaseDb();
-
-        // Run validate and check that it reports the index needs to be upgraded to v4.
-        {
-            ValidateResults results;
-
-            ASSERT_OK(CollectionValidation::validate(
-                &_opCtx,
-                _nss,
-                ValidationOptions{CollectionValidation::ValidateMode::kForeground,
-                                  CollectionValidation::RepairMode::kNone,
-                                  kLogDiagnostics},
-                &results));
-
-            ScopeGuard dumpOnErrorGuard([&] {
-                StorageDebugUtil::printValidateResults(results);
-                StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
-            });
-
-            // Validation should fail because the index has v4 keys but is marked as v3.
-            ASSERT_FALSE(results.isValid());
-
-            // Check that the index results contain the upgrade message.
-            auto indexResultsIt = results.getIndexResultsMap().find(indexName);
-            ASSERT(indexResultsIt != results.getIndexResultsMap().end());
-            const auto& indexResults = indexResultsIt->second;
-
-            // Check that there's an error and warning message about needing to upgrade to v4.
-            bool foundError =
-                std::any_of(indexResults.getErrors().begin(),
-                            indexResults.getErrors().end(),
-                            [](const auto& error) {
-                                return error.find("2dsphereIndexVersion 3") != std::string::npos &&
-                                    error.find("version 4") != std::string::npos;
-                            });
-            ASSERT_TRUE(foundError) << "Expected error message about upgrading to v4";
-
-            bool foundWarning =
-                std::any_of(results.getWarnings().begin(),
-                            results.getWarnings().end(),
-                            [&indexName](const auto& warning) {
-                                return warning.find(indexName) != std::string::npos &&
-                                    warning.find("2dsphereIndexVersion 4") != std::string::npos;
-                            });
-            ASSERT_TRUE(foundWarning) << "Expected warning about rebuilding with v4";
-
-            dumpOnErrorGuard.dismiss();
-        }
-    }
-};
-
 class ValidateInvalidBSONOnClusteredCollection : public ValidateBase {
 public:
     explicit ValidateInvalidBSONOnClusteredCollection(bool background)
@@ -5022,9 +4894,6 @@ public:
         add<ValidateMultikeyPathCoverageRepair>();
 
         add<ValidateAddNewMultikeyPaths>();
-
-        // Test that validates S2 index version upgrade detection.
-        add<ValidateS2IndexVersion3NeedsUpgrade>();
 
         // Tests that validation works on clustered collections.
         add<ValidateInvalidBSONOnClusteredCollection>(false);

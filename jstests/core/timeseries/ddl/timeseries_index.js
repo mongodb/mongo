@@ -95,31 +95,6 @@ TimeseriesTest.run((insert) => {
     };
 
     /**
-     * Helper function to check if an index spec contains a 2dsphere index.
-     */
-    const has2dsphereIndex = function (spec) {
-        for (const key in spec) {
-            if (spec[key] === "2dsphere") {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    /**
-     * Helper function to add 2dsphereIndexVersion: 3 to options if the spec contains a 2dsphere index.
-     * TODO SERVER-118561 Remove this and use the default server-selected version when 9.0 is last LTS.
-     */
-    const add2dsphereVersionIfNeeded = function (spec, options = {}) {
-        if (has2dsphereIndex(spec) && TestData.isRunningFCVUpgradeDowngradeSuite) {
-            // Pin the index version to v3 when upgrading/downgrading FCV during the test run,
-            // such that we don't need to drop v4 indexes to downgrade the FCV.
-            options["2dsphereIndexVersion"] = 3;
-        }
-        return options;
-    };
-
-    /**
      * Tests time-series
      *   - createIndex
      *   - queryable index (both on the measurements, and underlying bucket documents,
@@ -165,10 +140,7 @@ TimeseriesTest.run((insert) => {
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
-        assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec)),
-            "failed to create index: " + tojson(spec),
-        );
+        assert.commandWorked(coll.createIndex(spec), "failed to create index: " + tojson(spec));
         assertIndexExists(coll, spec, bucketSpec);
         assertIndexNotHidden(coll, spec, bucketSpec);
 
@@ -233,20 +205,14 @@ TimeseriesTest.run((insert) => {
         );
 
         // Check that we are able to drop the index by name (single name and array of names).
-        assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "myindex1"})),
-            "failed to create index: " + tojson(spec),
-        );
+        assert.commandWorked(coll.createIndex(spec, {name: "myindex1"}), "failed to create index: " + tojson(spec));
         assertIndexExists(coll, spec, bucketSpec);
         assertIndexNotHidden(coll, spec, bucketSpec);
 
         assert.commandWorked(coll.dropIndex("myindex1"), "failed to drop index: myindex1");
         assertIndexNotExists(coll, spec, bucketSpec);
 
-        assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "myindex2"})),
-            "failed to create index: " + tojson(spec),
-        );
+        assert.commandWorked(coll.createIndex(spec, {name: "myindex2"}), "failed to create index: " + tojson(spec));
         assertIndexExists(coll, spec, bucketSpec);
         assertIndexNotHidden(coll, spec, bucketSpec);
 
@@ -254,10 +220,7 @@ TimeseriesTest.run((insert) => {
         assertIndexNotExists(coll, spec, bucketSpec);
 
         // Check that we are able to hide and unhide the index by name.
-        assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "hide1"})),
-            "failed to create index: " + tojson(spec),
-        );
+        assert.commandWorked(coll.createIndex(spec, {name: "hide1"}), "failed to create index: " + tojson(spec));
 
         assertIndexExists(coll, spec, bucketSpec);
         assertIndexNotHidden(coll, spec, bucketSpec);
@@ -284,10 +247,7 @@ TimeseriesTest.run((insert) => {
         assertIndexNotExists(coll, spec, bucketSpec);
 
         // Check that we are able to hide and unhide the index by key.
-        assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "hide2"})),
-            "failed to create index: " + tojson(spec),
-        );
+        assert.commandWorked(coll.createIndex(spec, {name: "hide2"}), "failed to create index: " + tojson(spec));
         assertIndexExists(coll, spec, bucketSpec);
         assertIndexNotHidden(coll, spec, bucketSpec);
 
@@ -313,7 +273,7 @@ TimeseriesTest.run((insert) => {
 
         // Check that we are able to create the index as hidden.
         assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "hide3", hidden: true})),
+            coll.createIndex(spec, {name: "hide3", hidden: true}),
             "failed to create index: " + tojson(spec),
         );
         assertIndexExists(coll, spec, bucketSpec);
@@ -337,7 +297,7 @@ TimeseriesTest.run((insert) => {
         // Check that user hints on queries will be allowed and will reference the raw indexes on
         // the buckets directly.
         assert.commandWorked(
-            coll.createIndex(spec, add2dsphereVersionIfNeeded(spec, {name: "index_for_hint_test"})),
+            coll.createIndex(spec, {name: "index_for_hint_test"}),
             "failed to create index index_for_hint_test: " + tojson(spec),
         );
         assertIndexExists(coll, spec, bucketSpec);

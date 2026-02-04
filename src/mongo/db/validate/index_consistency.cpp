@@ -245,55 +245,20 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     // Inform which indexes have inconsistencies and add the BSON objects of the inconsistent index
     // entries to the results vector.
     int numMissingIndexEntryErrors = _missingIndexEntries.size();
-
-    // Track which indexes should get custom error messages from their access methods.
-    std::map<std::string, std::pair<std::string, std::string>> indexesWithCustomErrors;
-
     for (const auto& [missingIndexKey, missingRecordId] : _missingIndexEntries) {
-        const IndexInfo& info = *missingIndexKey.first;
-        const std::string& indexName = info.indexName;
-
-        // Check if the access method has an alternative explanation for this missing entry.
-        const auto entry =
-            _validateState->getCollection()->getIndexCatalog()->findIndexByName(opCtx, indexName);
-        if (entry) {
-            auto accessMethod = entry->accessMethod()->asSortedData();
-            if (accessMethod) {
-                if (accessMethod->shouldCheckMissingIndexEntryAlternative(opCtx, *entry)) {
-                    auto record = _validateState->getSeekRecordStoreCursor()->seekExact(
-                        opCtx, missingRecordId);
-                    if (record) {
-                        BSONObj document = record->data.toBson();
-                        auto alternative = accessMethod->checkMissingIndexEntryAlternative(
-                            opCtx, *entry, missingIndexKey.second, missingRecordId, document);
-                        if (alternative) {
-                            indexesWithCustomErrors[indexName] = *alternative;
-                            continue;  // Skip normal error reporting for this entry.
-                        }
-                    }
-                }
-            }
-        }
-
-        // Mark the error as an inconsistency.
         _foundInconsistency(opCtx,
                             missingIndexKey,
                             missingRecordId,
                             *results,
                             /*isMissing=*/true);
 
+        const std::string& indexName = missingIndexKey.first->indexName;
         if (!results->getIndexResultsMap().at(indexName).isValid()) {
             continue;
         }
         StringBuilder ss;
         ss << "Index with name '" << indexName << "' has inconsistencies.";
         results->getIndexResultsMap().at(indexName).addError(ss.str(), false);
-    }
-
-    // Add custom error messages for indexes that need upgrades.
-    for (const auto& [indexName, messages] : indexesWithCustomErrors) {
-        results->getIndexResultsMap().at(indexName).addError(messages.first, false);
-        results->addWarning(messages.second);
     }
 
     int numExtraIndexEntryErrors = 0;

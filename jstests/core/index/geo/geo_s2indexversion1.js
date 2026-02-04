@@ -7,26 +7,8 @@
 // Tests 2dsphere index option "2dsphereIndexVersion".  Verifies that GeoJSON objects that are new
 // in version 2 are not allowed in version 1.
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
-
 let coll = db.getCollection("geo_s2indexversion1");
 coll.drop();
-
-/**
- * Helper function to get the appropriate 2dsphere index version based on feature flag.
- * Returns version 4 if the feature flag is enabled and we're in a stable FCV suite.
- * Returns version 3 otherwise (to avoid having to drop v4 indexes during FCV transitions).
- */
-function get2dsphereIndexVersion() {
-    const version = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3;
-    if (!isStableFCVSuite()) {
-        // If we are upgrading/downgrading the FCV, avoid having to drop any v4 indexes by pinning the version to 3.
-        // TODO SERVER-118561 Remove this when 9.0 is last LTS.
-        return 3;
-    }
-    return version;
-}
 
 //
 // Index build should fail for invalid values of "2dsphereIndexVersion".
@@ -41,7 +23,7 @@ res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 5});
+res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
 assert.commandFailed(res);
 coll.drop();
 
@@ -89,51 +71,16 @@ res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(2)
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 3});
-assert.commandWorked(res);
-coll.drop();
-
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(3)});
-assert.commandWorked(res);
-coll.drop();
-
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(3)});
-assert.commandWorked(res);
-coll.drop();
-
-const kDefault2dSphereIndexVersion = get2dsphereIndexVersion();
-
-if (kDefault2dSphereIndexVersion == 4) {
-    res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
-    assert.commandWorked(res);
-    coll.drop();
-
-    res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(4)});
-    assert.commandWorked(res);
-    coll.drop();
-
-    res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(4)});
-    assert.commandWorked(res);
-    coll.drop();
-}
-
 //
-// The default 2dsphere index version should match what the feature flag determines.
-// Avoid allowing default version in background fcv upgrade/downgrade tests.
+// {2dsphereIndexVersion: 3} should be the default for new indexes.
 //
-const options = {
-    name: "geo_2dsphere",
-};
-// TODO SERVER-118561 Remove this when 9.0 is last LTS.
-if (!isStableFCVSuite()) {
-    options["2dsphereIndexVersion"] = get2dsphereIndexVersion(); // Note this will always be v3.
-}
-res = coll.createIndex({geo: "2dsphere"}, options);
+
+res = coll.createIndex({geo: "2dsphere"});
 assert.commandWorked(res);
 let specObj = coll.getIndexes().filter(function (z) {
     return z.name == "geo_2dsphere";
 })[0];
-assert.eq(kDefault2dSphereIndexVersion, specObj["2dsphereIndexVersion"]);
+assert.eq(3, specObj["2dsphereIndexVersion"]);
 coll.drop();
 
 //
