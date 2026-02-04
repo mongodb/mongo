@@ -32,6 +32,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace coordinate_multi_update_util {

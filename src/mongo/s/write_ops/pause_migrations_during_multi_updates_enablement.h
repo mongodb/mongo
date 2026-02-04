@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+
 #pragma once
+
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 

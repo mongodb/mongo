@@ -40,6 +40,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <string>
