@@ -226,7 +226,6 @@ private:
     void logCollectionError(Status error,
                             const std::vector<std::pair<std::string, int>>& sectionSizes);
 
-private:
     /**
      * Private enum to track state.
      *
