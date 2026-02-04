@@ -96,7 +96,7 @@ buildvariants:
   display_name: "Amazon Linux 2 arm64"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-latest-small
+  - amazon2-arm64-latest-m8g-xlarge
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -116,24 +116,24 @@ buildvariants:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: org
-    large_distro_name: amazon2-arm64-latest-large
-    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
+    core_analyzer_distro_name: amazon2-arm64-latest-m8g-4xlarge
+    large_distro_name: amazon2-arm64-latest-m8g-4xlarge
     compile_variant: amazon2-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-m8g-16xlarge
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
   - name: .development_critical !.requires_large_host !.incompatible_community
   - name: .development_critical .requires_large_host !.incompatible_community
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-m8g-4xlarge
   - name: .release_critical !.requires_large_host !.incompatible_community
   - name: .release_critical .requires_large_host !.incompatible_community
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-m8g-4xlarge
 
 - name: amazon2023
   display_name: "Amazon Linux 2023"
@@ -380,7 +380,7 @@ buildvariants:
   tags: []
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - amazon2-arm64-latest-small
+  - amazon2-arm64-latest-m8g-xlarge
   expansions:
     additional_package_targets: >-
       archive-mongocryptd-stripped
@@ -402,25 +402,26 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     compile_variant: enterprise-amazon2-arm64
-    core_analyzer_distro_name: amazon2-arm64-latest-xlarge
+    core_analyzer_distro_name: amazon2-arm64-latest-m8g-4xlarge
+    large_distro_name: amazon2-arm64-latest-m8g-4xlarge
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
-    - amazon2-arm64-latest-xlarge
+    - amazon2-arm64-latest-m8g-16xlarge
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
-    - amazon2-arm64-latest-xlarge
+    - amazon2-arm64-latest-m8g-4xlarge
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
   - name: .development_critical !.requires_large_host
   - name: .development_critical .requires_large_host
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-m8g-4xlarge
   - name: .release_critical !.requires_large_host
   - name: .release_critical .requires_large_host
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2-arm64-latest-m8g-4xlarge
 
 - name: enterprise-amazon2-arm64-grav4
   display_name: "Enterprise Amazon Linux 2 arm64 Graviton 4"
