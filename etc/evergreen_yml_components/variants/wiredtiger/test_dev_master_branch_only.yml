@@ -170,9 +170,6 @@ buildvariants:
       - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
       - name: external_auth
       - name: external_auth_aws
-      - name: external_auth_windows
-        distros:
-          - windows-2016-dc
       - name: .jscore .common !.sharding !.requires_large_host
       - name: .jscore .common !.sharding .requires_large_host
         distros:

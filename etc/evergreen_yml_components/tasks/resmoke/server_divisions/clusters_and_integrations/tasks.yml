@@ -801,18 +801,6 @@ tasks:
             - "src/evergreen/external_auth_gcp_setup.sh"
       - func: "run tests"
 
-  - <<: *task_template
-    name: external_auth_windows
-    # Disabled until windows-2016-dc is replaced with newer DC distro with Python 3.13 (see SERVER-117162)
-    disable: true
-    tags: ["assigned_to_jira_team_server_security", "experimental"]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-        vars:
-          suite: external_auth
-          resmoke_args: --includeWithAnyTags=requires_domain_controller
-
   ## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
   - name: fetch_and_run_libfuzzertests
     tags: ["assigned_to_jira_team_server_security", "experimental"]
