@@ -63,6 +63,8 @@
   value:
     executor:
       fixture:
+        mongos_options:
+          loadExtensions: mongot-extension
         mongod_options:
           loadExtensions: mongot-extension
 

@@ -51,6 +51,7 @@ executor:
         useGrpcForSearch: 1
     mongos_options:
       keyFile: jstests/with_mongot/keyfile_for_testing
+      loadExtensions: mongot-extension
       set_parameters:
         enableTestCommands: 1
         featureFlagEgressGrpcForSearch: true
