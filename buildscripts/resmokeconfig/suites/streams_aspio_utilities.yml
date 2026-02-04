@@ -2,9 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_changestream.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_changestream2.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/stack_traces.js
 
 executor:
   fixture:

@@ -16,6 +16,7 @@ selector:
       - streams_aspio_iceberg_3
       - streams_aspio_iceberg_4
       - streams_aspio_iceberg_5
+      - streams_aspio_utilities
       - streams_aspio_pubsub
     # Exclude list of etc/evergreen.yml task names.
     exclude_tasks:

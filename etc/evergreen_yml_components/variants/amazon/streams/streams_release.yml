@@ -60,6 +60,7 @@ buildvariants:
       - name: streams_aspio_iceberg_3
       - name: streams_aspio_iceberg_4
       - name: streams_aspio_iceberg_5
+      - name: streams_aspio_utilities
       - name: streams_externaljs
       - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
@@ -119,6 +120,7 @@ buildvariants:
       - name: streams_aspio_iceberg_3
       - name: streams_aspio_iceberg_4
       - name: streams_aspio_iceberg_5
+      - name: streams_aspio_utilities
       - name: streams_externaljs
       - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
