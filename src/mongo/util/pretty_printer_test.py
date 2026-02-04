@@ -28,7 +28,9 @@ def test_decorable():
 
     search(up_pattern, gdb.execute("print up", to_string=True))
     search(set_pattern, gdb.execute("print set_type", to_string=True))
-    search(static_member_pattern, gdb.execute("print testClass::static_member", to_string=True))
+    # TODO(SERVER-118950): re-enable when problem relating to debug symbols is solved:
+    # `Missing ELF symbol "_ZN9testClass13static_memberE"`.
+    # search(static_member_pattern, gdb.execute("print testClass::static_member", to_string=True))
 
 
 def test_dbname_nss():
@@ -85,8 +87,7 @@ if __name__ == "__main__":
     try:
         gdb.execute("run")
         gdb.execute("frame function main")
-        # TODO(SERVER-110170): Currently bugged in clang
-        # test_decorable()
+        test_decorable()
         test_dbname_nss()
         test_string_map()
         test_boost_optional()

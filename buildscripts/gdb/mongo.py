@@ -13,7 +13,7 @@ import gdb
 
 if not gdb:
     sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr, get_unique_ptr_bytes
+    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_bytes, get_unique_ptr
 
 
 def detect_toolchain(progspace):
@@ -280,7 +280,7 @@ def get_decorations(obj):
 
 
 def get_object_decoration(decorable, start, index):
-    decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_data"])
+    decoration_data = get_bytes(decorable["_decorations"]["_data"])
     entry = start[index]
     deco_type_info = str(entry["typeInfo"])
     deco_type_name = re.sub(r".* <typeinfo for (.*)>", r"\1", deco_type_info)
