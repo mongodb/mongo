@@ -208,23 +208,12 @@ void validateTTLOptions(OperationContext* opCtx,
  * Ensures that the user is authorized to create an index of a given type.
  */
 void validateIndexType(OperationContext* opCtx, const CreateIndexesCommand& cmd) {
-    const boost::optional<auth::ValidatedTenancyScope>& vts =
-        auth::ValidatedTenancyScope::get(opCtx);
-    const auto tenantId =
-        vts && vts->hasTenantId() ? boost::make_optional(vts->tenantId()) : boost::none;
-
-    const bool isAuthForInternal =
-        AuthorizationSession::get(opCtx->getClient())
-            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(tenantId),
-                                               ActionType::internal);
     for (const auto& elem : cmd.getIndexes()) {
         for (const auto& key : elem.getField("key").Obj()) {
             const auto type = key.str();  // will return "" for btree
-            if (IndexNames::isInternalOnly(type)) {
-                uassert(ErrorCodes::CannotCreateIndex,
-                        fmt::format("Index Type {} is for internal use only", type),
-                        isAuthForInternal);
-            }
+            uassert(ErrorCodes::CannotCreateIndex,
+                    fmt::format("Index Type {} is for internal use only", type),
+                    !IndexNames::isVirtualIndexType(type));
         }
     }
 }

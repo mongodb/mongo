@@ -139,10 +139,9 @@ IndexType IndexNames::nameToType(StringData accessMethod) {
 }
 
 // static
-bool IndexNames::isInternalOnly(const std::string& name) {
+bool IndexNames::isVirtualIndexType(const std::string& name) {
     if (isKnownName(name)) {
         switch (nameToType(name)) {
-            case INDEX_2DSPHERE_BUCKET:
             case INDEX_ENCRYPTED_RANGE:
                 return true;
             default:

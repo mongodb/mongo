@@ -99,7 +99,7 @@ public:
     /**
      * Index is not intended to be user facing.
      */
-    static bool isInternalOnly(const std::string& name);
+    static bool isVirtualIndexType(const std::string& name);
 };
 
 /**

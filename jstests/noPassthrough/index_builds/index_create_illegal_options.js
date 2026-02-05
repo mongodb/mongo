@@ -27,24 +27,34 @@ withOrWithoutAuth.forEach((withAuth) => {
             this.db = this.admin.getSiblingDB("test");
         });
 
-        let legalIndexTypes = [1, "2d", "2dsphere", "text", "hashed"];
-        let illegalIndexTypes = [
+        const legalIndexTypes = [1, "2d", "2dsphere", "text", "hashed"];
+        const legalIndexTypesForTimeseries = [1, "2dsphere"];
+        const illegalIndexTypes = [
             {type: "queryable_encrypted_range", codes: [ErrorCodes.CannotCreateIndex]},
             {type: "wildcard", codes: [7246202]},
             {type: "columnstore", codes: [ErrorCodes.NotImplemented]},
             {type: "geoHaystack", codes: [ErrorCodes.CannotCreateIndex]},
         ];
 
-        if (withAuth) {
-            illegalIndexTypes.push({type: "2dsphere_bucket", codes: [ErrorCodes.CannotCreateIndex]});
-        } else {
-            legalIndexTypes.push("2dsphere_bucket");
-        }
+        legalIndexTypes.forEach(function (indexType) {
+            it(`Can create a '${indexType == 1 ? "btree" : indexType}' index auth=${withAuth}`, function () {
+                this.testCollName = collName + "." + indexType;
+                assert.commandWorked(this.db[this.testCollName].createIndex({"foo": indexType}));
+            });
+        });
+
+        legalIndexTypesForTimeseries.forEach(function (indexType) {
+            it(`Can create a '${indexType == 1 ? "btree" : indexType}' index on a timeseries collection auth=${withAuth}`, function () {
+                this.testCollName = collName + "." + indexType;
+                assert.commandWorked(this.db.runCommand({create: this.testCollName, timeseries: {timeField: "t"}}));
+                assert.commandWorked(this.db[this.testCollName].createIndex({"foo": indexType}));
+            });
+        });
 
         illegalIndexTypes.forEach((args) => {
             const indexType = args.type;
             const expectedErrorCodes = args.codes;
-            it(`Cannot create a '${indexType}' index`, function () {
+            it(`Cannot create a '${indexType}' index auth=${withAuth}`, function () {
                 this.testCollName = collName + "." + indexType;
                 assert.commandFailedWithCode(
                     this.db[this.testCollName].createIndex({"foo": indexType}),
@@ -55,13 +65,6 @@ withOrWithoutAuth.forEach((withAuth) => {
                     [this.testCollName],
                     `The ${this.testCollName} collection should not be implicitly created upon failing to create the index.`,
                 );
-            });
-        });
-
-        legalIndexTypes.forEach(function (indexType) {
-            it(`Can create a '${indexType == 1 ? "btree" : indexType}' index`, function () {
-                this.testCollName = collName + "." + indexType;
-                assert.commandWorked(this.db[this.testCollName].createIndex({"foo": indexType}));
             });
         });
 
