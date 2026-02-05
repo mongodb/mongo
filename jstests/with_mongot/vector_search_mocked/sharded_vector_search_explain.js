@@ -1,7 +1,7 @@
 /**
  * Sharding tests for using "explain" with the $vectorSearch aggregation stage.
  *
- * TODO SERVER-118445 Delete this test.
+ * TODO SERVER-118983 Delete this test once we can test multiple rs nodes in the E2E suite.
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

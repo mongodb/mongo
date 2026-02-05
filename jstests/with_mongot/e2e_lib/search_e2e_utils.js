@@ -2,7 +2,7 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
+import {createSearchIndex, dropSearchIndex, waitForSearchIndexQueryable} from "jstests/libs/search.js";
 import {getMovieData, getMovieDataWithEnrichedTitle} from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {assertViewAppliedCorrectly, assertViewNotApplied} from "jstests/with_mongot/e2e_lib/explain_utils.js";
@@ -485,11 +485,7 @@ export function checkForExistingIndex(coll, indexName) {
             return true;
         }
         // Wait for the index to be queryable.
-        assert.soon(() => {
-            const curr = coll.aggregate([{$listSearchIndexes: {name: indexName}}]).toArray();
-            assert.eq(curr.length, 1, curr);
-            return curr[0].queryable;
-        });
+        waitForSearchIndexQueryable(coll, indexName);
         return true;
     }
 

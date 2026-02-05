@@ -150,6 +150,22 @@ function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefi
     return response;
 }
 
+/**
+ * Waits for a search index to become queryable on all relevant mongods.
+ * For sharded clusters: uses replicateSearchIndexCommand to wait on all target hosts.
+ * For non-sharded environments: uses _runListSearchIndexOnNode to poll until queryable.
+ * @param {Collection} coll - The collection with the search index.
+ * @param {string} indexName - The name of the search index to wait for.
+ */
+export function waitForSearchIndexQueryable(coll, indexName) {
+    if (isShardedHelper(coll) || FixtureHelpers.isMongos(coll.getDB())) {
+        const listCmd = {$listSearchIndexes: {name: indexName}};
+        assert.commandWorked(coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd: listCmd}));
+    } else {
+        _runListSearchIndexOnNode(coll, indexName, null);
+    }
+}
+
 export function updateSearchIndex(
     coll,
     keys,

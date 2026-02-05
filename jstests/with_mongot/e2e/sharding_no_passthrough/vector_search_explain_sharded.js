@@ -18,6 +18,7 @@ import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {getShardNames} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
+const testDb = db.getSiblingDB(jsTestName());
 const collName = jsTestName();
 
 const queryVector = [1.0, 2.0, 3.0];
@@ -28,15 +29,15 @@ const index = "vector_search_sharded_explain_index";
 
 describe("$vectorSearch sharded explain", function () {
     before(function () {
-        const shardNames = getShardNames(db.getMongo());
+        const shardNames = getShardNames(testDb.getMongo());
         assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
         const primaryShardName = shardNames[0];
         const otherShardName = shardNames[1];
 
         // Enable sharding on the database with a specific primary shard.
-        assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: primaryShardName}));
+        assert.commandWorked(testDb.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}));
 
-        const coll = db.getCollection(collName);
+        const coll = testDb.getCollection(collName);
         coll.drop();
 
         // Insert documents that will be split across shards.
@@ -57,9 +58,9 @@ describe("$vectorSearch sharded explain", function () {
         );
 
         // Shard the collection and split at _id: 10.
-        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-        assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 11}, to: otherShardName}));
+        assert.commandWorked(testDb.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(testDb.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
+        assert.commandWorked(testDb.adminCommand({moveChunk: coll.getFullName(), find: {_id: 11}, to: otherShardName}));
 
         createSearchIndex(coll, {
             name: index,
@@ -78,13 +79,13 @@ describe("$vectorSearch sharded explain", function () {
     });
 
     after(function () {
-        const coll = db.getCollection(collName);
+        const coll = testDb.getCollection(collName);
         dropSearchIndex(coll, {name: index});
         coll.drop();
     });
 
     it("should optimize $limit to exact values on each shard and in merger", function () {
-        const coll = db.getCollection(collName);
+        const coll = testDb.getCollection(collName);
         const userLimit = vectorSearchLimit - 1;
         const expectedLimitVal = Math.min(userLimit, vectorSearchLimit);
         const pipeline = [
@@ -119,38 +120,39 @@ describe("$vectorSearch sharded explain", function () {
         }
     });
 
-    it("should work with primary and secondary read preferences", function () {
-        const coll = db.getCollection(collName);
-        const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: vectorSearchLimit, index}}];
+    // TODO SERVER-118983 Enable this test.
+    // it("should work with primary and secondary read preferences", function () {
+    //     const coll = testDb.getCollection(collName);
+    //     const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: vectorSearchLimit, index}}];
 
-        for (const readPref of ["primary", "secondary"]) {
-            db.getMongo().setReadPref(readPref);
-            try {
-                for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
-                    const result = coll.explain(verbosity).aggregate(pipeline);
+    //     for (const readPref of ["primary", "secondary"]) {
+    //         testDb.getMongo().setReadPref(readPref);
+    //         try {
+    //             for (const verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
+    //                 const result = coll.explain(verbosity).aggregate(pipeline);
 
-                    // Verify explain succeeds and has expected structure.
-                    assert(result.ok, `Explain should succeed with ${readPref} read pref: ${tojson(result)}`);
+    //                 // Verify explain succeeds and has expected structure.
+    //                 assert(result.ok, `Explain should succeed with ${readPref} read pref: ${tojson(result)}`);
 
-                    // Should have exactly 2 $vectorSearch stages (one per shard).
-                    const vectorSearchStages = getAggPlanStages(result, "$vectorSearch");
-                    assert.eq(
-                        vectorSearchStages.length,
-                        2,
-                        `Expected 2 $vectorSearch stages with ${readPref} read pref: ${tojson(result)}`,
-                    );
+    //                 // Should have exactly 2 $vectorSearch stages (one per shard).
+    //                 const vectorSearchStages = getAggPlanStages(result, "$vectorSearch");
+    //                 assert.eq(
+    //                     vectorSearchStages.length,
+    //                     2,
+    //                     `Expected 2 $vectorSearch stages with ${readPref} read pref: ${tojson(result)}`,
+    //                 );
 
-                    // Should have exactly 2 $_internalSearchIdLookup stages (one per shard).
-                    const idLookupStages = getAggPlanStages(result, "$_internalSearchIdLookup");
-                    assert.eq(
-                        idLookupStages.length,
-                        2,
-                        `Expected 2 $_internalSearchIdLookup stages with ${readPref} read pref: ${tojson(result)}`,
-                    );
-                }
-            } finally {
-                db.getMongo().setReadPref("primary");
-            }
-        }
-    });
+    //                 // Should have exactly 2 $_internalSearchIdLookup stages (one per shard).
+    //                 const idLookupStages = getAggPlanStages(result, "$_internalSearchIdLookup");
+    //                 assert.eq(
+    //                     idLookupStages.length,
+    //                     2,
+    //                     `Expected 2 $_internalSearchIdLookup stages with ${readPref} read pref: ${tojson(result)}`,
+    //                 );
+    //             }
+    //         } finally {
+    //             testDb.getMongo().setReadPref("primary");
+    //         }
+    //     }
+    // });
 });
