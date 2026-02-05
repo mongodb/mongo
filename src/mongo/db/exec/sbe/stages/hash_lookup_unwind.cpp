@@ -48,6 +48,7 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
                                              value::SlotId innerProjectSlot,
                                              value::SlotId lookupStageOutputSlot,
                                              boost::optional<value::SlotId> collatorSlot,
+                                             sbe::JoinType joinType,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
     : PlanStage("hash_lookup_unwind"_sd,
@@ -58,9 +59,14 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
       _innerKeySlot(innerKeySlot),
       _innerProjectSlot(innerProjectSlot),
       _lookupStageOutputSlot(lookupStageOutputSlot),
-      _collatorSlot(collatorSlot) {
+      _collatorSlot(collatorSlot),
+      _joinType(joinType) {
     _children.emplace_back(std::move(outer));
     _children.emplace_back(std::move(inner));
+
+    tassert(11846700,
+            "Expecting either inner or left join in hash lookup unwind stage",
+            _joinType == JoinType::Inner || _joinType == JoinType::Left);
 }
 
 std::unique_ptr<PlanStage> HashLookupUnwindStage::clone() const {
@@ -71,6 +77,7 @@ std::unique_ptr<PlanStage> HashLookupUnwindStage::clone() const {
                                                    _innerProjectSlot,
                                                    _lookupStageOutputSlot,
                                                    _collatorSlot,
+                                                   _joinType,
                                                    _commonStats.nodeId,
                                                    participateInTrialRunTracking());
 }
@@ -192,18 +199,24 @@ PlanState HashLookupUnwindStage::getNext() {
             // We just got this outer doc, so reset the iterator to the outer key.
             auto [outerKeyTag, outerKeyVal] = _inOuterMatchAccessor->getViewOfValue();
             _hashTable.htIter.reset(outerKeyTag, outerKeyVal);
+            // No match yet.
+            _innerSideMatched = false;
         }
 
         size_t matchIndex = _hashTable.htIter.getNextMatchingIndex();
         if (matchIndex != LookupHashTableIter::kNoMatchingIndex) {
             boost::optional<value::TagValueView> innerMatch =
                 _hashTable.getValueAtIndex(matchIndex);
-            if (innerMatch) {
-                _lookupStageOutputAccessor.reset(*innerMatch);
-                return trackPlanState(PlanState::ADVANCED);
-            }
+            tassert(11846701, "Expected non-empty innerMatch", innerMatch);
+            _lookupStageOutputAccessor.reset(*innerMatch);
+            _innerSideMatched = true;
+            return trackPlanState(PlanState::ADVANCED);
         }
         _outerKeyOpen = false;
+        if (_joinType == sbe::JoinType::Left && !_innerSideMatched) {
+            _lookupStageOutputAccessor.reset(false, value::TypeTags::Nothing, 0);
+            return trackPlanState(PlanState::ADVANCED);
+        }
     }  // while true
 }  // HashLookupUnwindStage::getNext
 
@@ -248,6 +261,19 @@ const SpecificStats* HashLookupUnwindStage::getSpecificStats() const {
 
 void HashLookupUnwindStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
                                          DebugPrintInfo& debugPrintInfo) const {
+
+    switch (_joinType) {
+        case JoinType::Inner:
+            ret.emplace_back(DebugPrinter::Block("inner"));
+            break;
+        case JoinType::Left:
+            ret.emplace_back(DebugPrinter::Block("left"));
+            break;
+        case JoinType::Right:
+            ret.emplace_back(DebugPrinter::Block("right"));
+            break;
+    }
+
     DebugPrinter::addIdentifier(ret, _lookupStageOutputSlot);
 
     if (_collatorSlot) {

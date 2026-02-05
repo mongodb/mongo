@@ -22,6 +22,7 @@ const countryDocs = [
         {_id: 1, name: "USA"},
         {_id: 2, name: "Canada"},
         {_id: 3, name: "France"},
+        {_id: 4, name: "Romania"},
     ],
 ];
 
@@ -41,6 +42,10 @@ const indexes = [
     [{collection: "countries", key: {name: 1}}],
     [{collection: "countries", key: {_id: 1}}],
 ];
+
+// The choice between HJ and NLJ is made based on the value of 'allowDiskUse' setting (because all
+// data in these tests is small and that enables HJ as long as 'allowDiskUse' is 'true').
+const aggOptions = [{allowDiskUse: true}, {allowDiskUse: false}];
 
 function setupCollections(countries, cities, indexList) {
     db.countries.drop();
@@ -65,11 +70,13 @@ countryDocs.forEach((countries, cIdx) => {
                         // absent.
                         const pipeline = [match, lookup, unwind].filter((x) => x != null);
 
-                        for (let i = 0; i < 3; ++i) {
-                            const result = db.countries.aggregate(pipeline).toArray();
-                            printjson(result);
-                            ++counter;
-                        }
+                        aggOptions.forEach((options) => {
+                            for (let i = 0; i < 3; ++i) {
+                                const result = db.countries.aggregate(pipeline, options).toArray();
+                                printjson(result);
+                                ++counter;
+                            }
+                        });
                     });
                 });
             });

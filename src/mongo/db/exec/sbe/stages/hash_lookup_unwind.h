@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/lookup_hash_table.h"
+#include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -45,11 +46,11 @@
 
 namespace mongo::sbe {
 /**
- * Performs a multi-key hash lookup, that is a combination of left join and wind operations. Rows
- * from 'inner' and 'outer' sides can be associated with multiple keys. 'inner' and 'outer' rows are
- * considered matching, if they match on at least one of the associated keys. The result of a lookup
- * is each 'outer' paired with an array containing all matched 'inner' rows for that 'outer' row. If
- * no 'inner' rows match, Nothing value will be used instead of array.
+ * Performs a multi-key hash lookup, that is a combination of join (left or inner) and unwind
+ * operations. Rows from 'inner' and 'outer' sides can be associated with multiple keys. 'inner' and
+ * 'outer' rows are considered matching, if they match on at least one of the associated keys. The
+ * result of a lookup is each 'outer' paired with all the matched 'inner' rows one by one for that
+ * 'outer' row. For left joins, if no 'inner' rows match, Nothing value will be used.
  *
  * All rows from the 'inner' side are used to construct a hash table. Each 'inner' row can be
  * associated with multiple hash table entries. To avoid space amplification, each 'inner' row is
@@ -76,7 +77,7 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *   hash_lookup lookupStageOutputSlot collatorSlot?
+ *   hash_lookup_unwind [inner|left] lookupStageOutputSlot collatorSlot?
  *     outer outerKeySlot outerStage
  *     inner innerKeySlot innerProject innerStage
  */
@@ -89,6 +90,7 @@ public:
                           value::SlotId innerProjectSlot,
                           value::SlotId lookupStageOutputSlot,
                           boost::optional<value::SlotId> collatorSlot,
+                          sbe::JoinType joinType,
                           PlanNodeId planNodeId,
                           bool participateInTrialRunTracking = true);
 
@@ -167,6 +169,10 @@ private:
     LookupHashTable _hashTable;
     // Tracks whether we are already processing an outer key.
     bool _outerKeyOpen{false};
+
+    // Left join is used if preserveNullAndEmptyArrays = true.
+    const sbe::JoinType _joinType;
+    bool _innerSideMatched{false};
 
     void doForceSpill() final {
         _hashTable.forceSpill();

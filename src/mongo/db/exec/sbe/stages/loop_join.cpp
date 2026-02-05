@@ -150,7 +150,7 @@ void LoopJoinStage::open(bool reOpen) {
 void LoopJoinStage::openInner() {
     // Reset back to the inputs.
     if (_joinType == JoinType::Left) {
-        for (auto&& [k, v] : _outProjectAccessors) {
+        for (auto&& [_, v] : _outProjectAccessors) {
             v.setIndex(0);
         }
     }
@@ -183,7 +183,7 @@ PlanState LoopJoinStage::getNext() {
         }
 
         if (_joinType == JoinType::Left && !innerSideMatched) {
-            for (auto&& [k, v] : _outProjectAccessors) {
+            for (auto&& [_, v] : _outProjectAccessors) {
                 v.setIndex(1);
             }
             return trackPlanState(PlanState::ADVANCED);

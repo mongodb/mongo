@@ -669,7 +669,7 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     // would be hard to do so here as it requires several inputs we do not have. It is also hard to
     // move that determination earlier as it occurs in the deep stack under createLegacyExecutor().
     if (nextUnwind && !_unwindSrc && nextUnwind->getUnwindPath() == _as.fullPath()) {
-        if (nextUnwind->preserveNullAndEmptyArrays() || nextUnwind->indexPath()) {
+        if (nextUnwind->indexPath()) {
             downgradeSbeCompatibility(SbeCompatibility::notCompatible);
         } else {
             downgradeSbeCompatibility(SbeCompatibility::requiresTrySbe);

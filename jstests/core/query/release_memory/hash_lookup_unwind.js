@@ -79,7 +79,7 @@ const animasDocs = [
 assert.commandWorked(locations.insertMany(locationsDocs));
 assert.commandWorked(animals.insertMany(animasDocs));
 
-const pipeline = [
+const pipeline1 = [
     {
         $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
     },
@@ -94,101 +94,118 @@ const pipeline = [
     },
 ];
 
-jsTest.log.info("Running pipeline: ", pipeline);
+const pipeline2 = [
+    {
+        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+    },
+    {$unwind: {path: "$location", preserveNullAndEmptyArrays: true}},
+    {
+        $project: {
+            locationName: false,
+            "location.extra": false,
+            "location.coordinates": false,
+            "colors": false,
+        },
+    },
+];
 
-const explain = animals.explain().aggregate(pipeline);
-if (getEngine(explain) === "classic") {
-    jsTest.log.info("Skipping test, $lookup does not spill in classic", explain);
-    quit();
-}
-const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP_UNWIND");
-if (eqLookupNodes.length === 0) {
-    jsTest.log.info("Skipping test, $lookup-$unwind has not been pushed to SBE", explain);
-    quit();
-}
+for (let pipeline of [pipeline1, pipeline2]) {
+    jsTest.log.info("Running pipeline: ", pipeline);
 
-// Get all the results to use as a reference. Set 'allowDiskUse' to false to disable
-// increased spilling in debug builds.
-const expectedResults = animals.aggregate(pipeline, {"allowDiskUse": false}).toArray();
-jsTest.log.info("Expected results: ", expectedResults);
-{
-    jsTest.log(`Running no spill in first batch`);
-    setServerParameter(memoryKnob, 100 * 1024 * 1024);
-    let initialSpillCount = getSpillCounter();
+    const explain = animals.explain().aggregate(pipeline);
+    if (getEngine(explain) === "classic") {
+        jsTest.log.info("Skipping test, $lookup does not spill in classic", explain);
+        continue;
+    }
+    const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP_UNWIND");
+    if (eqLookupNodes.length === 0) {
+        jsTest.log.info("Skipping test, $lookup-$unwind has not been pushed to SBE", explain);
+        continue;
+    }
 
-    // Retrieve the first batch without spilling.
-    const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
+    // Get all the results to use as a reference. Set 'allowDiskUse' to false to disable
+    // increased spilling in debug builds.
+    const expectedResults = animals.aggregate(pipeline, {"allowDiskUse": false}).toArray();
+    jsTest.log.info("Expected results: ", expectedResults);
+    {
+        jsTest.log(`Running no spill in first batch`);
+        setServerParameter(memoryKnob, 100 * 1024 * 1024);
+        let initialSpillCount = getSpillCounter();
 
-    // Assert it did not spill during the first batch.
-    const newSpillCount = getSpillCounter();
-    assert.eq(initialSpillCount, newSpillCount);
-    initialSpillCount = newSpillCount;
+        // Retrieve the first batch without spilling.
+        const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
 
-    // Release memory (i.e., spill)
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.lt(initialSpillCount, getSpillCounter());
+        // Assert it did not spill during the first batch.
+        const newSpillCount = getSpillCounter();
+        assert.eq(initialSpillCount, newSpillCount);
+        initialSpillCount = newSpillCount;
 
-    jsTest.log.info("Running getMore");
-    const results = cursor.toArray();
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.lt(initialSpillCount, getSpillCounter());
 
-    assertArrayEq({actual: results, expected: expectedResults});
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
 
-    setServerParameter(memoryKnob, memoryInitialValue);
-}
+        assertArrayEq({actual: results, expected: expectedResults});
 
-// Run query with increased spilling to spill while creating the first batch.
-{
-    jsTest.log(`Running spill in first batch`);
-    setServerParameter(memoryKnob, 1);
-    let initialSpillCount = getSpillCounter();
+        setServerParameter(memoryKnob, memoryInitialValue);
+    }
 
-    // Retrieve the first batch.
-    const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
+    // Run query with increased spilling to spill while creating the first batch.
+    {
+        jsTest.log(`Running spill in first batch`);
+        setServerParameter(memoryKnob, 1);
+        let initialSpillCount = getSpillCounter();
 
-    // Assert it spilt during the first batch.
-    const newSpillCount = getSpillCounter();
-    assert.lt(initialSpillCount, newSpillCount);
-    initialSpillCount = newSpillCount;
+        // Retrieve the first batch.
+        const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
 
-    // Release memory (i.e., spill)
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
-    assert.eq(initialSpillCount, getSpillCounter());
+        // Assert it spilt during the first batch.
+        const newSpillCount = getSpillCounter();
+        assert.lt(initialSpillCount, newSpillCount);
+        initialSpillCount = newSpillCount;
 
-    jsTest.log.info("Running getMore");
-    const results = cursor.toArray();
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.eq(initialSpillCount, getSpillCounter());
 
-    assertArrayEq({actual: results, expected: expectedResults});
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
 
-    setServerParameter(memoryKnob, memoryInitialValue);
-}
+        assertArrayEq({actual: results, expected: expectedResults});
 
-// No disk space available for spilling.
-{
-    jsTest.log(`Running releaseMemory with no disk space available`);
-    const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
-    const cursorId = cursor.getId();
+        setServerParameter(memoryKnob, memoryInitialValue);
+    }
 
-    // Release memory (i.e., spill)
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-    assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
+    // No disk space available for spilling.
+    {
+        jsTest.log(`Running releaseMemory with no disk space available`);
+        const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
 
-    jsTest.log.info("Running getMore");
-    assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
+        // Release memory (i.e., spill)
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
+
+        jsTest.log.info("Running getMore");
+        assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
+    }
 }
 
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);

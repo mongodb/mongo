@@ -13,7 +13,7 @@ assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(o
 const testDB = conn.getDB("test");
 
 /**
- * Executes an aggregrate with 'options.pipeline' and confirms that 'options.numResults' were
+ * Executes an aggregate with 'options.pipeline' and confirms that 'options.numResults' were
  * returned.
  */
 function runTest(options) {
@@ -24,6 +24,7 @@ function runTest(options) {
 
     testDB.source.drop();
     assert.commandWorked(testDB.source.insert({x: 1}));
+    assert.commandWorked(testDB.source.insert({x: 2}));
 
     testDB.dest.drop();
     for (let i = 0; i < 5; ++i) {
@@ -61,6 +62,26 @@ runTest({
         },
     ],
     numResults: 5,
+});
+
+runTest({
+    pipeline: [
+        {
+            $lookup: {
+                from: "dest",
+                localField: "x",
+                foreignField: "x",
+                as: "matches",
+            },
+        },
+        {
+            $unwind: {
+                path: "$matches",
+                preserveNullAndEmptyArrays: true,
+            },
+        },
+    ],
+    numResults: 6,
 });
 
 runTest({

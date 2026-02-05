@@ -94,6 +94,7 @@ public:
                                                         innerScanSlots[0],
                                                         lookupStageOutputSlot,
                                                         collatorSlot,
+                                                        sbe::JoinType::Inner,
                                                         kEmptyPlanNodeId);
 
         StageResultsPrinters::SlotNames slotNames;
@@ -307,6 +308,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
                                                     innerScanSlots[0],
                                                     lookupStageOutputSlot,
                                                     collatorSlot,
+                                                    sbe::JoinType::Inner,
                                                     kEmptyPlanNodeId);
 
     value::SlotVector lookupSlots;

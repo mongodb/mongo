@@ -62,7 +62,7 @@ enum class JoinType : uint8_t { Inner, Left, Right };
  *
  * Debug string format:
  *
- *  nlj [<outer projects>] [<outer correlated>] { predicate }
+ *  nlj [inner|left] [<outer projects>] [<outer correlated>] { predicate }
  *      left childStage
  *      right childStage
  */
@@ -143,7 +143,7 @@ private:
 
     // Switching between the input and Nothing/null for outer joins. Unused for inner joins.
     value::SlotMap<value::SwitchAccessor> _outProjectAccessors;
-    // Defaults to Nothing. We have to explicitely reset to null if we want the null extenstion.
+    // Defaults to Nothing. We have to explicitly reset to null if we want the null extension.
     value::OwnedValueAccessor _constant;
 
     // '_outerProjects' as a set (for faster checking of accessors, provided by the 'outer' child).
