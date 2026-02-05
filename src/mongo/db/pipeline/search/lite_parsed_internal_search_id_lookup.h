@@ -64,7 +64,7 @@ public:
         uassert(ErrorCodes::FailedToParse,
                 "$_internalSearchIdLookup specification must be an object",
                 spec.type() == BSONType::object);
-        return std::make_unique<LiteParsedInternalSearchIdLookUp>(spec, spec.Obj().getOwned());
+        return std::make_unique<LiteParsedInternalSearchIdLookUp>(spec.wrap().getOwned());
     }
 
     bool isInitialSource() const override {
@@ -73,11 +73,11 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<InternalSearchIdLookupStageParams>(
-            _ownedSpec["limit"].safeNumberLong(), _viewPipeline);
+            (*_ownedBson)["$_internalSearchIdLookup"]["limit"].safeNumberLong(), _viewPipeline);
     }
 
     const BSONObj& getBsonSpec() const {
-        return _ownedSpec;
+        return *_ownedBson;
     }
 
     ViewPolicy getViewPolicy() const final {
@@ -87,13 +87,10 @@ public:
                           }};
     }
 
-    // TODO SERVER-114038 Remove redundancy of storing both originalBson and ownedSpec.
-    LiteParsedInternalSearchIdLookUp(const BSONElement& specElem, BSONObj spec)
-        : LiteParsedDocumentSourceDefault(specElem),
-          _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
+    LiteParsedInternalSearchIdLookUp(BSONObj spec)
+        : LiteParsedDocumentSourceDefault(spec.getOwned()) {}
 
 private:
-    BSONObj _ownedSpec;
     mutable boost::optional<LiteParsedPipeline> _viewPipeline;
 };
 

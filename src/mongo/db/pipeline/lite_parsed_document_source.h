@@ -713,6 +713,9 @@ public:
     LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
         : LiteParsedDocumentSource(originalBson) {}
 
+    explicit LiteParsedDocumentSourceDefault(BSONObj ownedBson)
+        : LiteParsedDocumentSource(std::move(ownedBson)) {}
+
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
         return stdx::unordered_set<NamespaceString>();
     }

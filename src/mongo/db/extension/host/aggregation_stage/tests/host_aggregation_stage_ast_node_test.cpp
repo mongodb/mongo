@@ -70,14 +70,13 @@ TEST(HostAstNodeTest, GetSpec) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
     // Get BSON spec directly, build a LiteParsed that holds the spec.
-    auto astNode = host::AggStageAstNode{std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-        spec.firstElement(), spec.getOwned())};
+    auto astNode = host::AggStageAstNode{
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())};
     ASSERT_TRUE(astNode.getIdLookupSpec().binaryEqual(spec));
 
     // Get BSON spec through handle.
-    auto noOpAstNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{noOpAstNode};
     ASSERT_TRUE(
         static_cast<host::HostAggStageAstNode*>(handle.get())->getIdLookupSpec().binaryEqual(spec));
@@ -86,8 +85,8 @@ TEST(HostAstNodeTest, GetSpec) {
 TEST(HostAstNodeTest, IsHostAllocated) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
-    auto noOpAstNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
-        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.firstElement(), spec)));
+    auto noOpAstNode = new host::HostAggStageAstNode(
+        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*handle.get()));
@@ -151,9 +150,8 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostBindUnimplemented, "11133600") {
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
-    auto astNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Clone the AST node.
@@ -170,9 +168,8 @@ TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodeIsIndependent) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
-    auto astNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Clone the AST node.
@@ -191,9 +188,8 @@ TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
     AggStageAstNodeHandle clonedHandle{nullptr};
 
     {
-        auto astNode = new host::HostAggStageAstNode(
-            NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-                spec.firstElement(), spec.getOwned())));
+        auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+            std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
         auto handle = AggStageAstNodeHandle{astNode};
 
         // Clone before original goes out of scope.
@@ -211,9 +207,8 @@ TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
 TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
 
-    auto astNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Create multiple clones.
@@ -239,9 +234,8 @@ DEATH_TEST(HostAstNodeViewPolicyTest,
            HostAstNodeCannotGetFirstStageViewApplicationPolicy,
            "11507401") {
     auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
-    auto astNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{astNode};
     handle->getFirstStageViewApplicationPolicy();
 }
@@ -249,9 +243,8 @@ DEATH_TEST(HostAstNodeViewPolicyTest,
 DEATH_TEST(HostAstNodeViewInfoTest, HostAstNodeCannotBindViewInfo, "11507501") {
     std::string stageName = "$_internalSearchIdLookup";
     auto spec = BSON(stageName << BSONObj());
-    auto astNode = new host::HostAggStageAstNode(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(
-            spec.firstElement(), spec.getOwned())));
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec.getOwned())));
     auto handle = AggStageAstNodeHandle{astNode};
 
     std::string viewName = "testViewName";

@@ -136,5 +136,46 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackWithEmptyViewPipe
     ASSERT_EQ(typedParams->limit, 10);
 }
 
+TEST_F(LiteParsedInternalSearchIdLookUpTest, BsonSpecSurvivesAfterOriginalDestroyed) {
+    std::unique_ptr<LiteParsedInternalSearchIdLookUp> liteParsed;
+    const long long expectedLimit = 123;
+
+    {
+        // Create BSONObj in a limited scope.
+        BSONObj spec = BSON("$_internalSearchIdLookup" << BSON("limit" << expectedLimit));
+        liteParsed = LiteParsedInternalSearchIdLookUp::parse(
+            kTestNss, spec.firstElement(), LiteParserOptions{});
+        ASSERT_EQ(liteParsed->getBsonSpec()["$_internalSearchIdLookup"]["limit"].safeNumberLong(),
+                  expectedLimit);
+    }
+    // Original BSONObj is now destroyed.
+
+    // Verify getBsonSpec() still returns valid data after original is destroyed.
+    const auto& ownedSpec = liteParsed->getBsonSpec();
+    ASSERT_FALSE(ownedSpec.isEmpty());
+    ASSERT_EQ(ownedSpec["$_internalSearchIdLookup"]["limit"].safeNumberLong(), expectedLimit);
+
+    // Verify getStageParams() still works correctly.
+    auto stageParams = liteParsed->getStageParams();
+    auto* typedParams = dynamic_cast<InternalSearchIdLookupStageParams*>(stageParams.get());
+    ASSERT_TRUE(typedParams != nullptr);
+    ASSERT_EQ(typedParams->limit, expectedLimit);
+}
+
+TEST_F(LiteParsedInternalSearchIdLookUpTest, GetBsonSpecReturnsReferenceToOwnedBson) {
+    BSONObj spec = BSON("$_internalSearchIdLookup" << BSON("limit" << 456 << "field" << "value"));
+    auto liteParsed =
+        LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
+
+    // Get a reference to the owned BSON.
+    const auto& ownedSpec1 = liteParsed->getBsonSpec();
+    const auto& ownedSpec2 = liteParsed->getBsonSpec();
+
+    // Both references should point to the same owned BSON.
+    ASSERT_TRUE(ownedSpec1.binaryEqual(ownedSpec2));
+    ASSERT_EQ(ownedSpec1["$_internalSearchIdLookup"]["limit"].safeNumberLong(), 456);
+    ASSERT_EQ(ownedSpec1["$_internalSearchIdLookup"]["field"].str(), "value");
+}
+
 }  // namespace
 }  // namespace mongo

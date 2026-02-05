@@ -172,8 +172,7 @@ private:
         return wrapCXXAndConvertExceptionToStatus([&]() {
             auto* hostAstNode = static_cast<const HostAggStageAstNode*>(astNode);
             auto spec = hostAstNode->getIdLookupSpec();
-            auto clonedLiteParsed =
-                std::make_unique<LiteParsedInternalSearchIdLookUp>(spec.firstElement(), spec);
+            auto clonedLiteParsed = std::make_unique<LiteParsedInternalSearchIdLookUp>(spec);
             auto clonedAstNode = std::make_unique<AggStageAstNode>(std::move(clonedLiteParsed));
             *output = new HostAggStageAstNode(std::move(clonedAstNode));
         });
