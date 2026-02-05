@@ -34,7 +34,7 @@ fi
 main_pid=$!
 echo "Process-under-test started with PID: ${main_pid}"
 
-# This is mocked out in buildscripts/bazel_testbuilds/verify_coredump_test.sh, make sure
+# This is mocked out in buildscripts/bazel_testbuilds/verify_unittest_coredump_test.sh, make sure
 # to update the test if this is changed.
 timeout_seconds=600
 

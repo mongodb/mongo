@@ -17,6 +17,7 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:create_rbe_sysroot",
         "//buildscripts:simple_report",
         "//buildscripts/resmokelib/run",
         "//buildscripts/resmokelib/symbolizer",
@@ -40,5 +41,16 @@ py_library(
             "shrub-py",
             group = "testing",
         ),
+    ],
+)
+
+py_binary(
+    name = "gen_hang_analyzer_tasks",
+    srcs = ["gen_hang_analyzer_tasks.py"],
+    main = "gen_hang_analyzer_tasks.py",
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/core",
+        "//buildscripts/resmokelib/hang_analyzer",
     ],
 )

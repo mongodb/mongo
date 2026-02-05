@@ -52,3 +52,14 @@ py_test(
         "//buildscripts/resmokelib/hang_analyzer",
     ],
 )
+
+py_test(
+    name = "test_gen_hang_analyzer_tasks",
+    srcs = [
+        "test_gen_hang_analyzer_tasks.py",
+    ],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/hang_analyzer",
+    ],
+)

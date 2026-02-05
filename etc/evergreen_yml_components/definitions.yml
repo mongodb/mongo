@@ -1302,12 +1302,18 @@ functions:
     - *execute_resmoke_tests_via_bazel_sh
 
   "fetch remote test results":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
         add_expansions_to_env: true
         args:
           - "./src/evergreen/fetch_remote_test_results.sh"
+    - command: expansions.update
+      params:
+        file: "${workdir}/results/test_failures_exist.yml"
+        ignore_missing_file: true
+    - *f_expansions_write
 
   "assume ECR role": &assume_ecr_role
     command: ec2.assume_role
@@ -2933,6 +2939,65 @@ functions:
         aws_secret: ${aws_secret}
         local_file: src/hang_analyzer_task.json
         remote_file: ${project}/${build_variant}/${revision}/hang_analyzer_tasks/${task_name}-${build_id}.json
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/json
+        display_name: Generated Hang Analyzer Task Config - Execution ${execution}
+        optional: true
+    - command: generate.tasks
+      params:
+        optional: true
+        files:
+          - src/hang_analyzer_task.json
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/run_python_script.sh"
+          - "buildscripts/resmokelib/hang_analyzer/attach_core_analyzer_task.py"
+    - command: attach.artifacts
+      params:
+        optional: true
+        exact_file_names: true
+        files:
+          - src/core_analyzer_artifact.json
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/core_analyzer_results.txt
+        remote_file: ${core_analyzer_results_url}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/plain
+        display_name: Core Analyzer Results
+        optional: true
+
+  "generate result task hang analyzer":
+    - command: expansions.update
+      params:
+        updates:
+          - key: core_analyzer_results_url
+            value: ${project}/${build_variant}/${task_id}/${execution}/core-analyzer-results.tgz
+          - key: parent_task_id
+            value: ${parent_task_id}
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "Generate core analysis task"
+      params:
+        binary: bash
+        include_expansions_in_env:
+          - workdir
+          - test_failures_exist
+        args:
+          - "src/evergreen/generate_core_analysis_task.sh"
+          - "--tests-use-bazel"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/hang_analyzer_task.json
+        remote_file: ${project}/${build_variant}/${revision}/hang_analyzer_tasks/${task_id}.json
         bucket: mciuploads
         permissions: public-read
         content_type: application/json

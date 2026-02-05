@@ -143,6 +143,7 @@ def main(outfile: Annotated[str, typer.Option()], build_events: str = "build_eve
                     "content_type": "text/plain",
                 },
             ),
+            FunctionCall("generate result task hang analyzer"),
         ],
         teardown_group=[
             FunctionCall("kill processes"),

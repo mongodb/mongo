@@ -1,6 +1,7 @@
 # Bazel build definitions used to test bazel features during build system development.
 
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_unit_test")
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -40,5 +41,27 @@ mongo_cc_unit_test(
         # Manual tag to prevent this from running in normal test suites
         # since it's designed to fail/timeout
         "manual",
+    ],
+)
+
+resmoke_suite_test(
+    name = "jstest_timeout",
+    srcs = [
+        "jstest_timeout.js",
+    ],
+    config = "jstest_timeout.yml",
+    data = [
+        "//buildscripts/resmokeconfig:common_jstest_data",
+    ],
+    resmoke_args = [
+        "--testTimeout=10",  # The test sleeps for 30 seconds, so it should get killed.
+    ],
+    tags = [
+        # Manual tag to prevent this from running in normal test suites
+        # since it's designed to fail.
+        "manual",
+    ],
+    deps = [
+        "//src/mongo/shell:mongo",
     ],
 )

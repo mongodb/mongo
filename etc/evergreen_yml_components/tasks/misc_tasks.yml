@@ -2359,4 +2359,26 @@ tasks:
         params:
           binary: bash
           args:
-            - "./src/buildscripts/bazel_testbuilds/verify_coredump_test.sh"
+            - "./src/buildscripts/bazel_testbuilds/verify_unittest_coredump_test.sh"
+
+  - name: verify_resmoke_coredump
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    exec_timeout_secs: 1800 # 30 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "get engflow creds"
+      - command: subprocess.exec
+        display_name: "Verify resmoke coredump generation"
+        type: test
+        timeout_secs: 1800 # 30 minutes
+        params:
+          binary: bash
+          include_expansions_in_env:
+            - workdir
+          args:
+            - "./src/buildscripts/bazel_testbuilds/verify_resmoke_coredump_test.sh"

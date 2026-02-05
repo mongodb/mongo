@@ -5,6 +5,7 @@ from urllib.request import urlretrieve
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 from download_archive_dist_test_debug import get_task_id
 
+from buildscripts.resmokelib.hang_analyzer.extractor import find_test_task_with_binaries
 from buildscripts.resmokelib.utils import evergreen_conn
 
 
@@ -13,19 +14,7 @@ def main():
     evg_api = evergreen_conn.get_evergreen_api(evergreen_config=evg_config)
     task_id = get_task_id(evg_api)
 
-    task = evg_api.task_by_id(task_id)
-    tasks_in_variant = evg_api.tasks_by_build(task.build_id)
-
-    if "_burn_in_" in task.display_name:
-        resmoke_tests_task = list(
-            filter(lambda t: t.display_name.startswith("resmoke_tests_burn_in"), tasks_in_variant)
-        )
-    else:
-        resmoke_tests_task = list(
-            filter(lambda t: t.display_name == "resmoke_tests", tasks_in_variant)
-        )
-    assert len(resmoke_tests_task) == 1, "Could not find a unique resmoke test task"
-    resmoke_tests_task = resmoke_tests_task[0]
+    resmoke_tests_task = find_test_task_with_binaries(evg_api, task_id)
 
     output_dir = "/data/mci/artifacts-resmoke_tests"
     os.mkdir(output_dir)

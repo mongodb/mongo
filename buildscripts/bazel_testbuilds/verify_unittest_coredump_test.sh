@@ -7,7 +7,7 @@
 #   2. Verifies that a coredump file is created in the test outputs
 #
 # Usage:
-#   ./buildscripts/bazel_testbuilds/verify_coredump_test.sh
+#   ./buildscripts/bazel_testbuilds/verify_unittest_coredump_test.sh
 #
 # Exit codes:
 #   0 - Success (coredump was created)

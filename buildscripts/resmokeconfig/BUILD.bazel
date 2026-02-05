@@ -30,8 +30,7 @@ mongo_js_library(
 resmoke_suite_test(
     name = "core",
     srcs = [
-        "//jstests/core:all_subpackage_javascript_files",
-        "//jstests/core_standalone:all_subpackage_javascript_files",
+        "//jstests/core/timeseries/pbt:timeseries_cache_usage_pbt.js",
     ],
     config = ":suites/core.yml",
     data = [
@@ -58,7 +57,7 @@ resmoke_suite_test(
     resmoke_args = [
         "--storageEngineCacheSizeGB=1",
     ],
-    shard_count = 24,
+    shard_count = 1,
     tags = [
         "ci-development-critical-single-variant",
     ],

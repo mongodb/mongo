@@ -481,6 +481,7 @@ py_binary(
     srcs = [
         "create_rbe_sysroot.py",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "local_rbe_container_url",
     ],

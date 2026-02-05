@@ -15,7 +15,7 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from datetime import datetime, timedelta
 from io import StringIO
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import psutil
 from opentelemetry import trace
@@ -739,6 +739,7 @@ class GDBDumper(Dumper):
         install_dir: str,
         analysis_dir: str,
         multiversion_dir: str,
+        sysroot_dir: Optional[str],
         gdb_index_cache: str,
         boring_core_dump_pids: set = None,
         max_core_dumps: int = 10,
@@ -783,6 +784,7 @@ class GDBDumper(Dumper):
                     exit_code, status = self.analyze_core(
                         core_file_path=core_file_path,
                         install_dir=install_dir,
+                        sysroot_dir=sysroot_dir,
                         analysis_dir=analysis_dir,
                         tmp_dir=tmp_dir,
                         logger=logger,
@@ -841,6 +843,7 @@ class GDBDumper(Dumper):
         self,
         core_file_path: str,
         install_dir: str,
+        sysroot_dir: Optional[str],
         analysis_dir: str,
         tmp_dir: str,
         multiversion_dir: str,
@@ -880,6 +883,9 @@ class GDBDumper(Dumper):
         basename = os.path.basename(core_file_path)
         logging_dir = os.path.join(analysis_dir, basename)
         os.makedirs(logging_dir, exist_ok=True)
+
+        if sysroot_dir:
+            cmds.append(f"set sysroot {sysroot_dir}")
 
         cmds += [
             f"set solib-search-path {lib_dir}",

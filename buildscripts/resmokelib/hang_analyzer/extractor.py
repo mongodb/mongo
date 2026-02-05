@@ -12,6 +12,7 @@ import sys
 import tarfile
 import time
 import urllib.request
+import zipfile
 from logging import Logger
 from pathlib import Path
 from typing import Callable, Optional
@@ -20,8 +21,12 @@ from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 from retry import retry
 
+from buildscripts.create_rbe_sysroot import create_rbe_sysroot
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
-from buildscripts.resmokelib.setup_multiversion.download import DownloadError
+from buildscripts.resmokelib.setup_multiversion.download import (
+    DownloadError,
+    download_from_s3_with_requests,
+)
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     _DownloadOptions,
@@ -441,10 +446,12 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
         root_looger.debug("Finished recalculating the debuglink for %s", file_path)
 
-    dist_dir = os.path.join(download_dir, "install", "dist-test")
-    bin_dir = os.path.join(dist_dir, "bin")
+    install_dir = os.path.join(download_dir, "install")
+    if os.path.exists(os.path.join(install_dir, "dist-test")):
+        install_dir = os.path.join(install_dir, "dist-test")
+    bin_dir = os.path.join(install_dir, "bin")
     bin_files = [os.path.join(bin_dir, file_path) for file_path in os.listdir(bin_dir)]
-    lib_dir = os.path.join(dist_dir, "lib")
+    lib_dir = os.path.join(install_dir, "lib")
     lib_files = []
     if os.path.exists(lib_dir):
         lib_files = [os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)]
@@ -737,3 +744,261 @@ def _get_symbol_files():
             for needle in glob.glob(haystack):
                 out.append((needle, os.path.join(os.getcwd(), os.path.basename(needle))))
     return out
+
+
+def check_manifest_for_cores(root_logger: Logger, manifest_url: str) -> bool:
+    """Check if a test.outputs manifest contains core dumps."""
+    try:
+        with urllib.request.urlopen(manifest_url) as response:
+            manifest_content = response.read().decode("utf-8")
+
+            has_cores = ".core" in manifest_content or ".mdmp" in manifest_content
+            if has_cores:
+                root_logger.info("Manifest indicates core dumps are present")
+            else:
+                root_logger.info("Manifest indicates no core dumps")
+            return has_cores
+    except Exception as ex:
+        root_logger.warning(
+            f"Could not read manifest: {ex}. Will download entire test outputs and check for cores."
+        )
+        return True  # If we can't read the manifest, assume cores might be present
+
+
+@TRACER.start_as_current_span("core_analyzer.download_bazel_result_task_cores")
+def download_bazel_result_task_cores(root_logger: Logger, task_id: str, download_dir: str) -> bool:
+    root_logger.info(f"Downloading cores from task {task_id}")
+    current_span = get_default_current_span({"download_task_id": task_id})
+
+    evg_api = evergreen_conn.get_evergreen_api()
+    task_info = evg_api.task_by_id(task_id)
+
+    core_dumps_dir = os.path.join(download_dir, "core-dumps")
+    os.makedirs(core_dumps_dir, exist_ok=True)
+
+    outputs_artifacts = []
+    manifest_map = {}  # Map of outputs zip archive to its manifest
+    for artifact in task_info.artifacts:
+        if "test.outputs" in artifact.name and artifact.name.endswith(".zip"):
+            outputs_artifacts.append(artifact)
+        elif "_manifest__MANIFEST" in artifact.name:
+            manifest_map[artifact.name.replace("_manifest__MANIFEST", "__outputs.zip")] = (
+                artifact.url
+            )
+
+    if not outputs_artifacts:
+        root_logger.warning("No test.outputs artifacts found in result task")
+        return False
+
+    core_dumps_found = 0
+
+    for artifact in outputs_artifacts:
+        root_logger.info(f"Processing artifact: {artifact.name}")
+
+        # Check manifest first to see if cores are present
+        manifest_url = manifest_map.get(artifact.name)
+        if manifest_url:
+            if not check_manifest_for_cores(root_logger, manifest_url):
+                root_logger.info(f"Skipping {artifact.name} - no cores in manifest")
+                continue
+        else:
+            root_logger.warning(f"No manifest found for {artifact.name}, will download anyway")
+
+        file_name = artifact.name
+        zip_path = os.path.join(download_dir, file_name)
+
+        try:
+
+            @retry(tries=3, delay=5)
+            def download_outputs_zip():
+                root_logger.info(f"Downloading {file_name}")
+                if os.path.exists(zip_path):
+                    os.remove(zip_path)
+                download_from_s3_with_requests(artifact.url, zip_path)
+
+            download_outputs_zip()
+
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                for member in zip_ref.namelist():
+                    if member.endswith(".core") or member.endswith(".mdmp"):
+                        core_name = os.path.basename(member)
+                        extract_path = os.path.join(core_dumps_dir, core_name)
+                        root_logger.info(f"Extracting core dump: {core_name}")
+
+                        with zip_ref.open(member) as source, open(extract_path, "wb") as target:
+                            shutil.copyfileobj(source, target)
+
+                        core_dumps_found += 1
+
+            os.remove(zip_path)
+
+        except Exception as ex:
+            root_logger.error(f"Error processing artifact {artifact.name}: {ex}")
+            current_span.set_status(
+                StatusCode.ERROR, f"Failed to download artifact {artifact.name}"
+            )
+            current_span.set_attribute("download_error", str(ex))
+
+    root_logger.info(f"Downloaded {core_dumps_found} core dump(s)")
+
+    if core_dumps_found == 0:
+        root_logger.error("No core dumps found in test.outputs")
+        current_span.set_status(StatusCode.ERROR, "No core dumps found")
+        return False
+
+    current_span.set_attribute("core_dumps_found", core_dumps_found)
+    return True
+
+
+def find_test_task_with_binaries(evg_api, results_task_id: str):
+    """
+    Find the test task in the same build that has dist-tests artifacts.
+
+    :param evg_api: Evergreen API client
+    :param results_task_id:
+    :return: Task ID of the resmoke_tests task, or None if not found
+    """
+
+    try:
+        task = evg_api.task_by_id(results_task_id)
+        tasks = evg_api.tasks_by_build(task.build_id)
+
+        if "_burn_in_" in task.display_name:
+            resmoke_tests_task = list(
+                filter(lambda t: t.display_name.startswith("resmoke_tests_burn_in"), tasks)
+            )
+        else:
+            resmoke_tests_task = list(filter(lambda t: t.display_name == "resmoke_tests", tasks))
+        assert (
+            len(resmoke_tests_task) == 1
+        ), f"Could not find a unique resmoke test task in this variant {task.build_variant_display_name}"
+
+        return resmoke_tests_task[0]
+
+    except Exception as ex:
+        print(f"ERROR: Failed to query Evergreen for test task: {ex}")
+        return None
+
+
+@TRACER.start_as_current_span("core_analyzer.download_bazel_test_task_binaries")
+def download_bazel_test_task_binaries(root_logger: Logger, task_id: str, download_dir: str) -> bool:
+    evg_api = evergreen_conn.get_evergreen_api()
+    resmoke_task = find_test_task_with_binaries(evg_api, task_id)
+
+    root_logger.info(f"Downloading binaries from task {resmoke_task.task_id}")
+
+    dist_tests_artifacts = [
+        a for a in resmoke_task.artifacts if "Test binaries and libraries" in a.name
+    ]
+    if not dist_tests_artifacts:
+        root_logger.error("No binary archive found in the resmoke_test task")
+        return False
+
+    install_dir = os.path.join(download_dir, "install")
+    os.makedirs(install_dir, exist_ok=True)
+
+    for artifact in dist_tests_artifacts:
+        file_name = "resmoke_tests.tgz"
+        download_path = os.path.join(download_dir, file_name)
+
+        try:
+
+            @retry(tries=3, delay=5)
+            def download_binary_artifact():
+                root_logger.info(f"Downloading {file_name}")
+                if os.path.exists(download_path):
+                    os.remove(download_path)
+                download_from_s3_with_requests(artifact.url, download_path)
+
+            download_binary_artifact()
+
+            root_logger.info(f"Extracting {file_name}")
+
+            with tarfile.open(download_path, "r:gz") as tar:
+                # Extract members, mapping dist-tests -> dist-test
+                for member in tar.getmembers():
+                    if member.name.startswith("dist-tests/"):
+                        member.name = member.name.replace("dist-tests/", "dist-test/", 1)
+                    tar.extract(member, install_dir)
+
+            os.remove(download_path)
+
+        except Exception as ex:
+            root_logger.error(f"Error downloading/extracting {file_name}: {ex}")
+            return False
+
+    root_logger.info("Successfully downloaded and extracted binaries")
+    return True
+
+
+@TRACER.start_as_current_span("core_analyzer.download_bazel_task_artifacts")
+def download_bazel_task_artifacts(
+    root_logger: Logger,
+    task_id: str,
+    download_dir: str,
+    retry_secs: int = 10,
+    download_timeout_secs: int = 30 * 60,
+) -> bool:
+    if os.path.exists(download_dir):
+        # quick sanity check to ensure we don't delete a repo
+        if os.path.exists(os.path.join(download_dir, ".git")):
+            raise RuntimeError(f"Input dir cannot be a git repo: {download_dir}")
+
+        shutil.rmtree(download_dir)
+        root_logger.info(f"Deleted existing dir at {download_dir}")
+
+    os.mkdir(download_dir)
+
+    current_span = get_default_current_span({"task_id": task_id})
+
+    # Download cores and binaries in parallel
+    with OtelThreadPoolExecutor() as executor:
+        futures = []
+
+        # Download core dumps from result task
+        futures.append(
+            executor.submit(
+                run_with_retries,
+                root_logger=root_logger,
+                func=download_bazel_result_task_cores,
+                timeout_secs=download_timeout_secs,
+                retry_secs=retry_secs,
+                task_id=task_id,
+                download_dir=download_dir,
+            )
+        )
+
+        # Download binaries from test task
+        futures.append(
+            executor.submit(
+                run_with_retries,
+                root_logger=root_logger,
+                func=download_bazel_test_task_binaries,
+                timeout_secs=download_timeout_secs,
+                retry_secs=retry_secs,
+                task_id=task_id,
+                download_dir=download_dir,
+            )
+        )
+
+        all_downloaded = True
+        for future in concurrent.futures.as_completed(futures):
+            if not future.result():
+                current_span.set_status(
+                    StatusCode.ERROR, "Errors occurred while fetching artifacts"
+                )
+                current_span.set_attribute(
+                    "download_bazel_task_artifacts_error",
+                    "Errors occurred while fetching artifacts",
+                )
+                root_logger.error("Errors occurred while fetching bazel artifacts")
+                all_downloaded = False
+                break
+
+    if all_downloaded and sys.platform.startswith("linux"):
+        sysroot = os.path.join(download_dir, "rbe_sysroot")
+        create_rbe_sysroot(sysroot)
+
+        post_install_gdb_optimization(download_dir, root_logger)
+
+    return all_downloaded, sysroot

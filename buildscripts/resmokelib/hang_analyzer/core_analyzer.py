@@ -10,7 +10,10 @@ from opentelemetry.trace.status import StatusCode
 
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.hang_analyzer import dumper
-from buildscripts.resmokelib.hang_analyzer.extractor import download_task_artifacts
+from buildscripts.resmokelib.hang_analyzer.extractor import (
+    download_bazel_task_artifacts,
+    download_task_artifacts,
+)
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 
@@ -29,6 +32,7 @@ class CoreAnalyzer(Subcommand):
             self.boring_core_dump_pids = set(pid for pid in boring_pids_str.split(",") if pid)
         else:
             self.boring_core_dump_pids = set()
+        self.is_bazel_task = options.get("is_bazel_task", False)
         self.root_logger = self.setup_logging(logger)
         self.extra_otel_options = {}
         for option in options["otel_extra_data"]:
@@ -38,6 +42,7 @@ class CoreAnalyzer(Subcommand):
     @TRACER.start_as_current_span("core_analyzer.execute")
     def execute(self):
         base_dir = self.options["working_dir"]
+        sysroot_dir = None
         current_span = get_default_current_span(
             {"failed_task_id": self.task_id} | self.extra_otel_options
         )
@@ -55,24 +60,51 @@ class CoreAnalyzer(Subcommand):
                         )
 
             multiversion_dir = os.path.join(base_dir, "multiversion")
-            if not skip_download and not download_task_artifacts(
-                self.root_logger,
-                self.task_id,
-                base_dir,
-                dumpers.dbg,
-                multiversion_dir,
-                self.execution,
-            ):
-                self.root_logger.error("Artifacts were not found.")
-                current_span.set_attributes(
-                    {
-                        "core_analyzer_execute_error": "Artifacts were not found.",
-                    }
-                )
-                current_span.set_status(StatusCode.ERROR, description="Artifacts were not found.")
-                raise RuntimeError(
-                    "Artifacts were not found for specified task. Could not analyze cores."
-                )
+
+            if self.is_bazel_task:
+                if not skip_download:
+                    all_downloaded, sysroot_dir = download_bazel_task_artifacts(
+                        self.root_logger,
+                        self.task_id,
+                        base_dir,
+                        multiversion_dir,
+                        self.execution,
+                    )
+                    if not all_downloaded:
+                        self.root_logger.error("Artifacts were not found.")
+                        current_span.set_attributes(
+                            {
+                                "core_analyzer_execute_error": "Artifacts were not found.",
+                            }
+                        )
+                        current_span.set_status(
+                            StatusCode.ERROR, description="Bazel artifacts were not found."
+                        )
+                        raise RuntimeError(
+                            "Artifacts were not found for specified tasks. Could not analyze cores."
+                        )
+
+            else:
+                if not skip_download and not download_task_artifacts(
+                    self.root_logger,
+                    self.task_id,
+                    base_dir,
+                    dumpers.dbg,
+                    multiversion_dir,
+                    self.execution,
+                ):
+                    self.root_logger.error("Artifacts were not found.")
+                    current_span.set_attributes(
+                        {
+                            "core_analyzer_execute_error": "Artifacts were not found.",
+                        }
+                    )
+                    current_span.set_status(
+                        StatusCode.ERROR, description="Artifacts were not found."
+                    )
+                    raise RuntimeError(
+                        "Artifacts were not found for specified task. Could not analyze cores."
+                    )
 
             with open(task_id_file, "w") as file:
                 file.write(self.task_id)
@@ -92,6 +124,7 @@ class CoreAnalyzer(Subcommand):
             install_dir,
             analysis_dir,
             multiversion_dir,
+            sysroot_dir,
             self.gdb_index_cache,
             self.boring_core_dump_pids,
         )
@@ -147,6 +180,13 @@ class CoreAnalyzerPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--is-bazel-task",
+            action="store_true",
+            default=False,
+            help="Indicates that this is a bazel task and should use bazel-specific artifact download.",
+        )
+
+        parser.add_argument(
             "--execution",
             "-e",
             action="store",
@@ -162,7 +202,7 @@ class CoreAnalyzerPlugin(PluginInterface):
             action="store",
             type=str,
             default=None,
-            help="Directory that contains binaires and debugsymbols.",
+            help="Directory that contains binaries and debugsymbols.",
         )
 
         parser.add_argument(

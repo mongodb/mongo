@@ -53,6 +53,7 @@ class TestCoreDumpFiltering(unittest.TestCase):
                         install_dir,
                         analysis_dir,
                         multiversion_dir,
+                        None,
                         "on",
                         boring_pids,
                     )
@@ -88,7 +89,13 @@ class TestCoreDumpFiltering(unittest.TestCase):
 
                     # Pass empty set of boring PIDs
                     report = self.dumper.analyze_cores(
-                        tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", set()
+                        tmpdir,
+                        "/mock/install",
+                        tmpdir,
+                        "/mock/multiversion",
+                        None,
+                        "on",
+                        set(),
                     )
 
                     # Should analyze all cores
@@ -112,7 +119,13 @@ class TestCoreDumpFiltering(unittest.TestCase):
 
                     # Pass None for boring PIDs
                     report = self.dumper.analyze_cores(
-                        tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", None
+                        tmpdir,
+                        "/mock/install",
+                        tmpdir,
+                        "/mock/multiversion",
+                        None,
+                        "on",
+                        None,
                     )
 
                     # Should analyze all cores
@@ -137,7 +150,13 @@ class TestCoreDumpFiltering(unittest.TestCase):
 
                     # Should cap at 10 by default
                     report = self.dumper.analyze_cores(
-                        tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", None
+                        tmpdir,
+                        "/mock/install",
+                        tmpdir,
+                        "/mock/multiversion",
+                        None,
+                        "on",
+                        None,
                     )
 
                     # Should only analyze 10 cores (default max)
@@ -166,6 +185,7 @@ class TestCoreDumpFiltering(unittest.TestCase):
                         "/mock/install",
                         tmpdir,
                         "/mock/multiversion",
+                        None,
                         "on",
                         None,
                         max_core_dumps=10,
@@ -202,6 +222,7 @@ class TestCoreDumpFiltering(unittest.TestCase):
                         "/mock/install",
                         tmpdir,
                         "/mock/multiversion",
+                        None,
                         "on",
                         boring_pids,
                         max_core_dumps=20,
@@ -234,7 +255,13 @@ class TestCoreDumpFiltering(unittest.TestCase):
                     boring_pids = {"12345"}
 
                     self.dumper.analyze_cores(
-                        tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", boring_pids
+                        tmpdir,
+                        "/mock/install",
+                        tmpdir,
+                        "/mock/multiversion",
+                        None,
+                        "on",
+                        boring_pids,
                     )
 
                     # Should analyze 2 cores (the unparseable ones are treated as interesting)
@@ -271,7 +298,13 @@ class TestCoreDumpFiltering(unittest.TestCase):
                     boring_pids = {"12345"}
 
                     self.dumper.analyze_cores(
-                        tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", boring_pids
+                        tmpdir,
+                        "/mock/install",
+                        tmpdir,
+                        "/mock/multiversion",
+                        None,
+                        "on",
+                        boring_pids,
                     )
 
                     # Should analyze 2 interesting cores

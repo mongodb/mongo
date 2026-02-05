@@ -93,6 +93,7 @@ buildvariants:
       build_mongot: true
       download_mongot_release: true
       compile_variant: *amazon-linux2023-arm64-static-compile
+      core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
       evergreen_remote_exec: on
       skip_debug_link: true
       remote_link: true

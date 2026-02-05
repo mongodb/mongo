@@ -4,9 +4,8 @@
 #   bash fetch_remote_test_results.sh
 #
 # Assumes the following files exist:
-#  ./"build_events.json"            Build events JSON containing the records of remote test executions
-#  "${workdir}/src/engflow.cert"    EngFlow cert
-#  "${workdir}/src/engflow.key"     EngFlow key
+#  ./"build_events.json"                       Build events JSON containing the records of remote test executions
+#  engflow.cert and engflow.key located in either ${workdir}/src or ${HOME}/.engflow/creds
 #
 # Required environment variables:
 # * ${test_label} - The resmoke bazel target to get results for, like //buildscripts/resmokeconfig:core
@@ -180,15 +179,48 @@ function write_bazel_invocation() {
     sed "s/\S*\$/${test_label_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
 }
 
+# Writes a YAML file indicating that test failures exist.
+function write_test_failures_expansion() {
+    local output_file="${workdir}/results/test_failures_exist.yml"
+    mkdir -p "$(dirname "$output_file")"
+    echo "test_failures_exist: true" >"$output_file"
+}
+
 # Print the contents of all *test.log files.
 function print_executor_logs() {
     echo "Executor logs for all failed shards:"
     find "${workdir}/results" -name '*test.log' -type f -exec cat {} +
 }
 
+# Resolves a file path from a list of candidate locations. Returns the first existing file path found.
+function resolve_file() {
+    local -n paths=$1
+    for path in "${paths[@]}"; do
+        if [ -f "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    return 1
+}
+
 BEP_FILE='build_events.json'
-ENGFLOW_CERT="${workdir}/src/engflow.cert"
-ENGFLOW_KEY="${workdir}/src/engflow.key"
+
+if ! [ -f "$ENGFLOW_CERT" ]; then
+    cert_candidates=(
+        "${workdir}/src/engflow.cert"
+        "${HOME}/.engflow/creds/engflow.crt"
+    )
+    ENGFLOW_CERT=$(resolve_file cert_candidates)
+fi
+
+if ! [ -f "$ENGFLOW_KEY" ]; then
+    key_candidates=(
+        "${workdir}/src/engflow.key"
+        "${HOME}/.engflow/creds/engflow.key"
+    )
+    ENGFLOW_KEY=$(resolve_file key_candidates)
+fi
 
 if [ ! -f "$BEP_FILE" ]; then
     echo "Error: File '$BEP_FILE' not found" >&2
@@ -217,6 +249,7 @@ while IFS= read -r test_result; do
     if is_failure "$test_result"; then
         is_failure_flag=1
         fail_task=1
+        write_test_failures_expansion
     fi
 
     download_outputs "$test_result" "$is_failure_flag"
@@ -239,6 +272,7 @@ if [[ "$failures" == 'No report.json files found' ]]; then
     if [[ "$fail_task" -eq 1 ]]; then
         echo 'No report/test logs were found, but the bazel test failed. Check the test executor logs below.'
     fi
+    write_test_failures_expansion
     print_executor_logs
     exit $fail_task
 else

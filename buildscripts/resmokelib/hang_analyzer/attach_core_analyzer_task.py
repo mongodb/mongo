@@ -12,7 +12,6 @@ sys.path.append(mongo_path)
 from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import (
     GENERATED_TASK_PREFIX,
     RANDOM_STRING_LENGTH,
-    should_activate_core_analysis_task,
 )
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.util.read_config import read_config_file
@@ -49,7 +48,9 @@ def maybe_attach_core_analyzer_task(
     search_tasks = build.tasks
 
     # The task id uses underscores instead of hyphens
-    task_id_search_term = f"{GENERATED_TASK_PREFIX}_{current_task_name.replace('-', '_')}"
+    task_id_search_term = (
+        f"{GENERATED_TASK_PREFIX}_{current_task_name.replace('-', '_').replace('/', '_')}"
+    )
 
     matching_task = None
     matching_execution = None
@@ -99,16 +100,11 @@ def maybe_attach_core_analyzer_task(
     if not gen_from_cur_execution:
         return
 
-    if should_activate_core_analysis_task(current_task):
-        first_line = "Core analysis is in progress."
-    else:
-        first_line = "Core analysis was not scheduled because only archived fails were detected."
-
     file_lines = [
-        first_line,
         "This file will be overwritten with the results when core analysis is finished.",
         "You can view the core analysis task at this here:",
         core_analysis_task_url,
+        "If it was not scheduled, it can be manually activated.",
     ]
 
     with open(results_output_file, "w") as file:
