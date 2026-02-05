@@ -237,6 +237,27 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
         is_dirty = true;
 
     /*
+     * Track the largest page size seen at eviction, it tells us something about our ability to
+     * force pages out before they're larger than the cache. We don't care about races, it's just a
+     * statistic.
+     */
+    page_size = __wt_atomic_load_size_relaxed(&page->memory_footprint);
+
+    if (!is_dirty)
+        /* Clean page */
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_clean_page_size_per_checkpoint, page_size);
+    else
+        /* Dirty page */
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_dirty_page_size_per_checkpoint, page_size);
+
+    /* Check if the page has updates */
+    if (page->modify != NULL)
+        __wt_atomic_stats_max_uint64(
+          &conn->evict->evict_max_updates_page_size_per_checkpoint, page_size);
+
+    /*
      * No need to reconcile the page if it is from a dead tree or it is clean. Stable tables on the
      * follower are never modified, and should never be reconciled.
      */
@@ -261,28 +282,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     /* Count evictions of internal pages during normal operation. */
     if (!closing && F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_internal);
-
-    /*
-     * Track the largest page size seen at eviction, it tells us something about our ability to
-     * force pages out before they're larger than the cache. We don't care about races, it's just a
-     * statistic.
-     */
-    page_size = __wt_atomic_load_size_relaxed(&page->memory_footprint);
-
-    /* Clean page */
-    if (!is_dirty) {
-        __wt_atomic_stats_max_uint64(
-          &conn->evict->evict_max_clean_page_size_per_checkpoint, page_size);
-    } else {
-        /* Dirty page */
-        __wt_atomic_stats_max_uint64(
-          &conn->evict->evict_max_dirty_page_size_per_checkpoint, page_size);
-    }
-    /* Check if the page has updates */
-    if (page->modify != NULL) {
-        __wt_atomic_stats_max_uint64(
-          &conn->evict->evict_max_updates_page_size_per_checkpoint, page_size);
-    }
 
     /* Figure out whether reconciliation was done on the page */
     if (__wt_page_evict_clean(page)) {
