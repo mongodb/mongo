@@ -39,6 +39,7 @@
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,6 +48,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/filesystem/path.hpp>
 
 namespace mongo::sorter {
 namespace {
@@ -708,6 +711,51 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     ASSERT_TRUE(iterators[2]->more());
     EXPECT_EQ(iterators[2]->next().first, 175);
     EXPECT_FALSE(iterators[2]->more());
+}
+
+TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
+    auto opCtx = makeOperationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest("test", "container_based_spiller");
+    CollectionMock coll{ns};
+    CollectionPtr collPtr{&coll};
+    SorterContainerStats stats{nullptr};
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const boost::filesystem::path basePath{storageGlobalParams.dbpath};
+    const auto dbComponent = ident::createDBNamePathComponent(ns.dbName());
+    const auto sorterStem = "sorter";
+
+    struct TestCase {
+        bool directoryPerDB;
+        bool directoryForIndexes;
+        boost::filesystem::path expectedPath;
+    };
+    const std::vector<TestCase> testCases = {
+        {false, false, basePath},
+        {false, true, basePath},
+        {true, false, basePath / dbComponent},
+        {true, true, basePath / dbComponent},
+    };
+
+    for (const auto& testCase : testCases) {
+        auto indexIdent = ident::generateNewIndexIdent(
+            ns.dbName(), testCase.directoryPerDB, testCase.directoryForIndexes);
+        auto internalIdent = ident::generateNewInternalIndexBuildIdent(sorterStem, indexIdent);
+        ViewableIntegerKeyedContainer container{std::make_shared<Ident>(internalIdent)};
+        ContainerBasedSorterStorage<IntWrapper, NullValue> storage{*opCtx,
+                                                                   ru,
+                                                                   collPtr,
+                                                                   container,
+                                                                   stats,
+                                                                   /*currKey=*/0,
+                                                                   ns.dbName(),
+                                                                   SorterChecksumVersion::v2};
+
+        auto spillPath = storage.getSpillDirPath();
+        ASSERT(spillPath);
+        EXPECT_EQ(*spillPath, testCase.expectedPath);
+    }
 }
 
 }  // namespace

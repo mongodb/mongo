@@ -306,8 +306,14 @@ public:
     };
 
     boost::optional<boost::filesystem::path> getSpillDirPath() override {
-        // TODO SERVER-117548 Call ident::getDirectory when function returns full path.
-        return boost::filesystem::path(storageGlobalParams.dbpath + "/_tmp");
+        auto ident = _container.ident();
+        invariant(ident);
+        auto dir = ident::getDirectory(ident->getIdent());
+        boost::filesystem::path path{storageGlobalParams.dbpath};
+        if (!dir.empty()) {
+            path /= std::string{dir};
+        }
+        return path;
     };
 
     /**
