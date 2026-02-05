@@ -3516,6 +3516,13 @@ export function dropDefaultMovieSearchAndOrVectorIndexes() {
     const testDb = db.getSiblingDB("vector_search_shared_db");
     const coll = testDb.moviesColl;
 
-    dropSearchIndex(coll, {name: defaultVectorIndexName});
-    dropSearchIndex(coll, {name: defaultSearchIndexName});
+    // Drop the vector index if it exists.
+    if (checkForExistingIndex(coll, defaultVectorIndexName)) {
+        dropSearchIndex(coll, {name: defaultVectorIndexName});
+    }
+
+    // Drop the search index if it exists.
+    if (checkForExistingIndex(coll, defaultSearchIndexName)) {
+        dropSearchIndex(coll, {name: defaultSearchIndexName});
+    }
 }

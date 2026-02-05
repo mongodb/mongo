@@ -18,14 +18,12 @@ description: |
   are not implicitly sharded by test infrastructure.
 
 selector:
+  # IMPORTANT: THIS SUITE IS OPT-IN ONLY.
+  # We do _not_ select all the tests in the e2e directory. We assume that the hot path taken for
+  # queries in this suite matches the hot path taken in the mongot_e2e_single_shard suite,
+  # so we don't need to repeat coverage.
   roots:
-    - jstests/with_mongot/e2e/**/*.js
-    - jstests/with_mongot/e2e_infrastructure_tests/*.js
-    - jstests/with_mongot/e2e_lib/*_test.js
-  exclude_files:
-    - jstests/with_mongot/e2e_infrastructure_tests/verify_coll_is_sharded.js
-  exclude_with_any_tags:
-    - assumes_against_mongod_not_mongos
+    - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
 
 executor:
   config:
@@ -45,8 +43,7 @@ executor:
     auth_options: *authOptions
     launch_mongot: true
     num_shards: 2
-    # TODO SERVER-118983 Bump this back to 2 and re-generate matrix suites.
-    num_rs_nodes_per_shard: 1
+    num_rs_nodes_per_shard: 2
     num_mongos: 3
     mongod_options:
       keyFile: *keyFile
