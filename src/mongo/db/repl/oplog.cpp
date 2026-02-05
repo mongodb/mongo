@@ -126,6 +126,7 @@
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_oplog_entry_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/update/update_util.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/idl/idl_parser.h"
@@ -1499,6 +1500,104 @@ void logOplogConstraintViolation(OperationContext* opCtx,
     oplogConstraintViolationLogger->logViolationIfReady(type, opObj, status);
 }
 
+UpdateResult updateObjectByRid(OperationContext* opCtx,
+                               const OplogEntry& op,
+                               const CollectionPtr& collPtr,
+                               OpCounters* opCounters,
+                               const BSONElement& idField,
+                               OplogApplication::Mode mode,
+                               CollectionAcquisition& coll,
+                               UpdateRequest request,
+                               bool recordPreImage,
+                               BSONObj& preImage) {
+    tassert(7834903, "updateObjectByRid does not support upsert requests", !request.isUpsert());
+    auto rid = *op.getDurableReplOperation().getRecordId();
+
+    auto cursor = collPtr.get()->getCursor(opCtx);
+    boost::optional<Record> record = cursor->seekExact(rid);
+
+    if (!record.has_value()) {
+        invariant(!recordPreImage);
+        return {false, /* existing */
+                false, /* modifiers */
+                0ULL,  /* numDocsModified */
+                0ULL,  /* numMatched */
+                BSONObj::kEmptyObject /* upsertedObject */};
+    }
+
+    record->data.makeOwned();
+    auto obj = Snapshotted<BSONObj>(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
+                                    record->data.releaseToBson());
+
+    if (recordPreImage) {
+        // Make a copy since obj needs to be used to perform the update.
+        preImage = obj.value().copy();
+    }
+
+    // Oplog entries from the applyOps command need to perform shard filtering when run against
+    // primary nodes, so we route all ApplyOps oplog application through the query system to ensure
+    // correctness. Shard filtering is not performed on secondary nodes so we don't need to do this
+    // for other oplog application modes.
+    if (mode == OplogApplication::Mode::kApplyOpsCmd) {
+        return doUpdate(opCtx, coll, request);
+    }
+
+    // Check for a mismatch between the _id in the oplog entry and the _id
+    // in the fetched record. A difference during steady state replication
+    // is indicative of data corruption.
+    auto fetchedIdField = obj.value()["_id"];
+    if (!idField.binaryEqual(fetchedIdField)) {
+        if (mode == OplogApplication::Mode::kSecondary) {
+            const auto& opObj = redact(op.toBSONForLogging());
+            opCounters->gotRecordIdsReplicatedDocIdMismatch();
+            logOplogConstraintViolation(
+                opCtx,
+                op.getNss(),
+                OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
+                "update",
+                opObj,
+                boost::none /* status */);
+            // This error is always fatal regardless of steady state constraints. We throw an error
+            // here instead of deferring to the typical numMatched = 0 handling since this should
+            // also be a fatal error for capped collections.
+            uasserted(7834902,
+                      fmt::format("While applying an oplog entry : '{}' during steady "
+                                  "state replication to a replicated record id "
+                                  "collection, the record : '{}' had a different _id "
+                                  "than we were expecting.",
+                                  opObj.toString(),
+                                  redact(obj.value()).toString()));
+        }
+        return {false, /* existing */
+                false, /* modifiers */
+                0ULL,  /* numDocsModified */
+                0ULL,  /* numMatched */
+                BSONObj::kEmptyObject /* upsertedObject */};
+    }
+
+    return update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
+}
+
+UpdateResult updateObject(OperationContext* opCtx,
+                          const OplogEntry& op,
+                          const CollectionPtr& collection,
+                          CollectionAcquisition& collectionAcquisition,
+                          const UpdateRequest& request,
+                          bool recordPreImage,
+                          BSONObj& preImage) {
+    if (recordPreImage) {
+        // Load the document version before update to be used as the change stream pre-image since
+        // the update operation will load the new version of the document.
+        invariant(op.getObject2());
+        auto&& documentId = *op.getObject2();
+
+        auto documentFound = Helpers::findById(opCtx, collection->ns(), documentId, preImage);
+        invariant(documentFound);
+    }
+
+    return doUpdate(opCtx, collectionAcquisition, request);
+}
+
 DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                const OplogEntry& op,
                                const CollectionPtr& collection,
@@ -1532,18 +1631,16 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                 "delete",
                 opObj,
                 boost::none /* status */);
-            // This error is fatal when we are enforcing steady state
-            // constraints. We throw an error here since instead of
-            // deferring to the typical nDeleted = 0 handling since this
-            // should also be a fatal error for capped collections.
-            uassert(783500,
-                    fmt::format("While applying an oplog entry : '{}' during steady "
-                                "state replication to a replicated record id "
-                                "collection, the record : '{}' had a different _id "
-                                "than we were expecting.",
-                                opObj.toString(),
-                                redact(preImage.value()).toString()),
-                    !oplogApplicationEnforcesSteadyStateConstraints.load());
+            // This error is always fatal regardless of steady state constraints. We throw an error
+            // here instead of deferring to the typical nDeleted = 0 handling since this should also
+            // be a fatal error for capped collections.
+            uasserted(7835001,
+                      fmt::format("While applying an oplog entry : '{}' during steady "
+                                  "state replication to a replicated record id "
+                                  "collection, the record : '{}' had a different _id "
+                                  "than we were expecting.",
+                                  opObj.toString(),
+                                  redact(preImage.value()).toString()));
         }
         return {.nDeleted = 0};
     }
@@ -2078,11 +2175,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             // The o2 field may contain additional fields besides the _id (like the shard key
             // fields), but we want to do the update by just _id so we can take advantage of the
-            // IDHACK.
+            // the Express executor.
             BSONObj updateCriteria = idField.wrap();
 
             const bool upsertOplogEntry = op.getUpsert().value_or(false);
-            const bool upsert = alwaysUpsert || upsertOplogEntry;
+            // TODO SERVER-118695 The upsert oplog field should only ever be true on applyOps
+            // entries. It may make more sense to only allow this flag on entries that don't specify
+            // a specific RecordId.
+            tassert(7834905,
+                    "Oplog entries with upsert:true are not allowed to also contain a RecordId",
+                    !upsertOplogEntry || !op.getDurableReplOperation().getRecordId().has_value());
+            const bool upsert =
+                (alwaysUpsert && !op.getDurableReplOperation().getRecordId().has_value()) ||
+                upsertOplogEntry;
             auto request = UpdateRequest();
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
@@ -2165,26 +2270,42 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(timestamp));
                     }
 
-                    if (recordChangeStreamPreImage && request.shouldReturnNewDocs()) {
-                        // Load the document version before update to be used as the change stream
-                        // pre-image since the update operation will load the new version of the
-                        // document.
-                        invariant(op.getObject2());
-                        auto&& documentId = *op.getObject2();
-
-                        auto documentFound = Helpers::findById(
-                            opCtx, collection->ns(), documentId, changeStreamPreImage);
-                        invariant(documentFound);
-                    }
-
-                    UpdateResult ur = doUpdate(opCtx, collectionAcquisition, request);
+                    UpdateResult ur = [&]() {
+                        bool recordPreImage =
+                            recordChangeStreamPreImage && request.shouldReturnNewDocs();
+                        if (op.getDurableReplOperation().getRecordId().has_value()) {
+                            // TODO SERVER-118695 Support upsert requests
+                            request.setUpsert(false);
+                            return updateObjectByRid(opCtx,
+                                                     op,
+                                                     collection,
+                                                     opCounters,
+                                                     idField,
+                                                     mode,
+                                                     collectionAcquisition,
+                                                     request,
+                                                     recordPreImage,
+                                                     changeStreamPreImage);
+                        } else {
+                            return updateObject(opCtx,
+                                                op,
+                                                collection,
+                                                collectionAcquisition,
+                                                request,
+                                                recordPreImage,
+                                                changeStreamPreImage);
+                        }
+                    }();
                     if (ur.numMatched == 0 && ur.upsertedId.isEmpty()) {
                         if (collection && collection->isCapped() &&
-                            mode == OplogApplication::Mode::kSecondary) {
+                            mode == OplogApplication::Mode::kSecondary &&
+                            !op.getDurableReplOperation().getRecordId().has_value()) {
                             // We can't assume there was a problem when the collection is capped,
                             // because the item may have been deleted by the cappedDeleter.  This
                             // only matters for steady-state mode, because all errors on missing
                             // updates are ignored at a higher level for recovery and initial sync.
+                            // Capped collections with Replicated RecordIds should be the same on
+                            // every node so we don't allow this leniency.
                             LOGV2_DEBUG(2170003,
                                         2,
                                         "couldn't find doc in capped collection",
@@ -2205,7 +2326,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     } else if (!upsertOplogEntry && !ur.upsertedId.isEmpty() &&
                                !(collection && collection->isCapped())) {
                         // This indicates we upconverted an update to an upsert, and it did indeed
-                        // upsert.  In steady state mode this is unexpected.
+                        // upsert. In steady state mode this is unexpected.
                         if (mode == OplogApplication::Mode::kSecondary) {
                             opCounters->gotUpdateOnMissingDoc();
                             logOplogConstraintViolation(

@@ -761,7 +761,6 @@ UpdateResult performUpdate(OperationContext* opCtx,
         },
         nss);
 
-
     auto collection = preConditions.acquireCollectionAndCheck(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),

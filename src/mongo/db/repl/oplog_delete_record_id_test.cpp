@@ -240,7 +240,7 @@ TEST_F(DeleteWithRecordIdTestEnableSteadyStateConstraints, RecordIdNotFoundInSec
     ASSERT_NOT_OK(runOpSteadyState(op));
 }
 
-TEST_F(DeleteWithRecordIdTestDisableSteadyStateConstraints, IdMismatch) {
+TEST_F(DeleteWithRecordIdTestDisableSteadyStateConstraints, IdMismatchFails) {
     // Insert a document at a known recordId with _id = 1.
     const RecordId rid(1);
     const BSONObj doc = BSON("_id" << 1 << "x" << 100);
@@ -250,9 +250,9 @@ TEST_F(DeleteWithRecordIdTestDisableSteadyStateConstraints, IdMismatch) {
     // This simulates data corruption where the record at the given rid has a different _id.
     auto op = makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 999), rid);
 
-    // In kSecondary mode with steady state constraints disabled, this should succeed but the record
+    // In kSecondary mode with steady state constraints disabled, this should fail and the record
     // should not be deleted.
-    ASSERT_OK(runOpSteadyState(op));
+    ASSERT_EQ(runOpSteadyState(op).code(), 7835001);
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 

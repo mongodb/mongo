@@ -43,9 +43,14 @@
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/write_ops/canonical_update.h"
+#include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -576,6 +581,71 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
     }
 
     return {newObj, docWasModified};
+}
+
+UpdateResult parseAndTransformOplogUpdate(OperationContext* opCtx,
+                                          const CollectionAcquisition& coll,
+                                          const Snapshotted<BSONObj>& oldObj,
+                                          const UpdateRequest& request,
+                                          const RecordId& rid,
+                                          const SeekableRecordCursor* cursor) {
+    // TODO SERVER-118695 Support upsert requests
+    tassert(7834901, "This helper cannot be used to serve upsert requests.", !request.isUpsert());
+    tassert(7834900,
+            "This helper cannot serve update requests that have a collation set.",
+            request.getCollation().isEmpty());
+    auto [collatorToUse, expCtxCollationMatchesDefault] =
+        resolveCollator(opCtx, request.getCollation(), coll.getCollectionPtr());
+
+    // Create an ExpressionContext. This will allow us to create a ParsedUpdate and then a
+    // CanonicalUpdate to obtain an UpdateDriver.
+    auto expCtx = ExpressionContextBuilder{}
+                      .fromRequest(opCtx, request)
+                      .collator(std::move(collatorToUse))
+                      .collationMatchesDefault(expCtxCollationMatchesDefault)
+                      .build();
+
+    auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
+        expCtx,
+        &request,
+        makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &request.getNsString())));
+
+    auto canonicalUpdate = uassertStatusOK(
+        CanonicalUpdate::make(expCtx, std::move(parsedUpdate), coll.getCollectionPtr()));
+
+    mutablebson::Document doc{};
+    auto* driver = canonicalUpdate->getDriver();
+    // This helper should only be used for oplog application.
+    constexpr bool isUserInitiatedWrite = false;
+    auto [newObj, docWasModified] = transformDocument(opCtx,
+                                                      coll,
+                                                      oldObj,
+                                                      doc,
+                                                      isUserInitiatedWrite,
+                                                      nullptr, /* cq */
+                                                      rid,
+                                                      driver,
+                                                      &request,
+                                                      false,   /* shouldWriteToOrphan */
+                                                      nullptr, /* updatedRecordIds*/
+                                                      cursor);
+
+    // If we called this function, then we must have matched the targeted document.
+    unsigned long long numMatched = 1ULL;
+    UpdateResult ur{docWasModified,
+                    driver->type() == UpdateDriver::UpdateType::kOperator, /* modifiers */
+                    docWasModified ? 1ULL : 0ULL,                          /* numDocsModified */
+                    numMatched,
+                    BSONObj::kEmptyObject, /* upsertedObject */
+                    driver->containsDotsAndDollarsField()};
+
+    if (request.shouldReturnNewDocs()) {
+        ur.requestedDocImage = newObj.getOwned();
+    } else if (request.shouldReturnOldDocs()) {
+        ur.requestedDocImage = oldObj.value().getOwned();
+    }
+
+    return ur;
 }
 
 }  // namespace update

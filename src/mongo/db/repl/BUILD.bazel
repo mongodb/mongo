@@ -1890,6 +1890,7 @@ mongo_cc_unit_test(
         "oplog_fetcher_test.cpp",
         "oplog_insert_record_id_test.cpp",
         "oplog_test.cpp",
+        "oplog_update_record_id_test.cpp",
         "oplog_writer_batcher_test.cpp",
         "oplog_writer_impl_test.cpp",
         "oplog_writer_test.cpp",

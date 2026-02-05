@@ -158,5 +158,15 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                                            bool shouldWriteToOrphan,
                                            RecordIdSet* _updatedRecordIds,
                                            const SeekableRecordCursor* cursor);
+
+// TODO SERVER-118695 Support upsert requests
+// Parse an oplog update, perform the transformation, and write the result to storage. This function
+// cannot be used for upserts or requests that have a collation set.
+MONGO_MOD_PUBLIC UpdateResult parseAndTransformOplogUpdate(OperationContext* opCtx,
+                                                           const CollectionAcquisition& coll,
+                                                           const Snapshotted<BSONObj>& oldObj,
+                                                           const UpdateRequest& request,
+                                                           const RecordId& rid,
+                                                           const SeekableRecordCursor* cursor);
 }  // namespace update
 }  // namespace mongo
