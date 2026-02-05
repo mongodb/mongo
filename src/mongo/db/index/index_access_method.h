@@ -285,9 +285,6 @@ public:
     protected:
         static void countNewBuildInStats();
         static void countResumedBuildInStats();
-        static SorterFileStats& bulkBuilderFileStats();
-        static SorterContainerStats& bulkBuilderContainerStats();
-        static SorterTracker* bulkBuilderTracker();
     };
 
     /**
