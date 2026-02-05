@@ -137,8 +137,6 @@ StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next() {
         return interruptStatus;
     }
 
-    CurOp::get(_opCtx)->maybeLogSlowQueryStalled();
-
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());

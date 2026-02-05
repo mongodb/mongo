@@ -1066,8 +1066,6 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
         return interruptStatus;
     }
 
-    CurOp::get(_opCtx)->maybeLogSlowQueryStalled();
-
     // Schedule remote work on hosts for which we need more results.
     std::vector<RemoteCursorPtr> remotes;
     for (auto& remote : _remotes) {

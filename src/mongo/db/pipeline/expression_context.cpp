@@ -131,7 +131,7 @@ ExpressionContext::CollatorStash::~CollatorStash() {
 
 void ExpressionContext::InterruptChecker::checkForInterruptVerySlow() {
     _verySlowTick = kVerySlowInterruptCheckPeriod;
-    CurOp::get(_expressionContext->getOperationContext())->maybeLogSlowQuery();
+    CurOp::get(_expressionContext->getOperationContext())->logLongRunningOperationIfNeeded();
 }
 
 std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarilyChangeCollator(

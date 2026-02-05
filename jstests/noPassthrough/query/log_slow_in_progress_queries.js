@@ -2,7 +2,12 @@
  * Confirms that long-running operations are logged once during their progress.
  */
 
-import {findSlowInProgressQueryLogLine} from "jstests/libs/log.js";
+import {findMatchingLogLine} from "jstests/libs/log.js";
+
+function findSlowInProgressQueryLogLine(db, comment) {
+    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    return findMatchingLogLine(globalLog.log, {id: 1794200, comment: comment});
+}
 
 function assertSlowInProgressQueryLogged(db, comment, expectedPlanSummary) {
     const logLine = findSlowInProgressQueryLogLine(db, comment);

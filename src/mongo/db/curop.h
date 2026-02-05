@@ -191,6 +191,8 @@ public:
                                  boost::optional<long long> slowMsOverride = boost::none,
                                  bool forceLog = false);
 
+    void logLongRunningOperationIfNeeded();
+
     bool haveOpDescription() const {
         return !_opDescription.isEmpty();
     }
@@ -707,22 +709,6 @@ public:
 
     void updateSpillStorageStats(std::unique_ptr<StorageStats> operationStorageStats);
 
-    MONGO_COMPILER_ALWAYS_INLINE void maybeLogSlowQueryStalled() {
-        // Only check if we need to log every kStalledLogCheckPeriod ticks.
-        if (_eligibleForLongRunningQueryLogging && --_readTick == 0) {
-            // Perform the actual, slow check.
-            logLongRunningOperationIfNeeded();
-            _readTick = kStalledLogCheckPeriod;
-        }
-    }
-
-    MONGO_COMPILER_ALWAYS_INLINE void maybeLogSlowQuery() {
-        // Check if we need to log every time this is called.
-        if (_eligibleForLongRunningQueryLogging) {
-            logLongRunningOperationIfNeeded();
-        }
-    }
-
 private:
     class CurOpStack;
 
@@ -825,13 +811,6 @@ private:
      * while waiting for the global lock.
      */
     void _fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal);
-
-    /*
-     * Checks if the current operation is eligible for long-running query logging and, if so,
-     * determines whether it meets the criteria for logging as a slow in-progress query. Ensures
-     * that each operation is only considered once for long-running query logging.
-     */
-    void logLongRunningOperationIfNeeded();
 
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
@@ -944,10 +923,5 @@ private:
     // in-progress operation, we can keep it true and allow storage stats to be fetched multiple
     // times.
     bool _allowStorageStatsUpdate{true};
-
-    static constexpr int32_t kStalledLogCheckPeriod = 64;
-    // Variable for keeping track of whether to check if a read query has run long enough to
-    // log a Slow Query warning.
-    int32_t _readTick = kStalledLogCheckPeriod;
 };
 }  // namespace mongo

@@ -114,7 +114,7 @@ void YieldPolicyCallbacksImpl::preCheckInterruptOnly(OperationContext* opCtx) co
 }
 
 void YieldPolicyCallbacksImpl::_tryLogLongRunningQueries(OperationContext* opCtx) const {
-    CurOp::get(opCtx)->maybeLogSlowQuery();
+    CurOp::get(opCtx)->logLongRunningOperationIfNeeded();
 }
 
 }  // namespace mongo
