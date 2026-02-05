@@ -1168,5 +1168,8 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  # Internal error used to trigger the lazy initialization of config.placementHistory
+  - {code: 487, name: PlacementHistoryInitializationMissing}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

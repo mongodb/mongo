@@ -636,10 +636,6 @@ public:
             // Determine placement history initialization point if not yet computed. The
             // initialization point must always be present in the placement history, otherwise this
             // would violate a design invariant.
-            // TODO SERVER-111901: There is currently the possibility of failing to retrieve an
-            // initialization point upon the execution of the first call to the strict mode query.
-            // This will be fixed by raising an exception in the strict mode query and triggering a
-            // lazy initialization.
             if (!placementHistoryInitializationPoint.has_value()) {
                 // Only calculate initialization point once per invocation.
                 placementHistoryInitializationPoint = _findPlacementHistoryInitializationPoint();
@@ -1147,7 +1143,7 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
         return HistoricalPlacement{{}, HistoricalPlacementStatus::FutureClusterTime};
     }
 
-    // 1. Execute the request by performing a snapshot read.
+    // 1. Execute the request by performing a snapshot read at the latest majority committed time.
     HistoricalPlacementReader reader(opCtx, nss, vcTime, _localCatalogClient.get());
     auto response = ignoreRemovedShards
         ? reader.getHistoricalPlacementIgnoreRemovedShardsMode(atClusterTime)
@@ -1173,6 +1169,14 @@ HistoricalPlacement ShardingCatalogManager::getHistoricalPlacement(
             return HistoricalPlacement{{}, HistoricalPlacementStatus::NotAvailable};
         }
     }
+
+    // If "V2 change stream readers" are enabled, the snapshot read can only return a
+    // HistoricalPlacementStatus::NotAvailable response when there is currently no initialization
+    // metadata within config.placementHistory. When this happens, raise an exception to trigger
+    // their re-generation.
+    uassert(ErrorCodes::PlacementHistoryInitializationMissing,
+            "Initialization metadata missing from config.placementHistory",
+            response.getStatus() != HistoricalPlacementStatus::NotAvailable);
 
     return response;
 }

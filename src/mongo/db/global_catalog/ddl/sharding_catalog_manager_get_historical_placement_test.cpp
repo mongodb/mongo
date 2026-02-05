@@ -766,19 +766,20 @@ TEST_F(GetHistoricalPlacementTestFixture, getHistoricalPlacement_WithMarkers) {
 
     setupConfigShard(opCtx, 4 /*nShards*/);
 
-    // A query that predates the earliest initialization doc produces a 'NotAvailable' result.
-    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-        opCtx,
-        NamespaceString::createNamespaceString_forTest("db.collection1"),
-        kDawnOfTime,
-        true /* checkIfPointInTimeIsInFuture */,
-        false /* ignoreRemovedShards */);
-    ASSERT_EQ(historicalPlacement.getStatus(), HistoricalPlacementStatus::NotAvailable);
-    ASSERT(historicalPlacement.getShards().empty());
+    // A query that predates the earliest initialization doc raises an exception.
+    ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
+                           opCtx,
+                           NamespaceString::createNamespaceString_forTest("db.collection1"),
+                           kDawnOfTime,
+                           true /* checkIfPointInTimeIsInFuture */,
+                           false /* ignoreRemovedShards */),
+                       DBException,
+                       ErrorCodes::PlacementHistoryInitializationMissing);
+
 
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
-    historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
+    auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
         opCtx,
         NamespaceString::createNamespaceString_forTest("db.collection1"),
         Timestamp(2, 0),
@@ -4387,44 +4388,43 @@ TEST_F(GetHistoricalPlacementTestFixture, GetShardsThatOwnDataAtClusterTime_Empt
 
     setupConfigShard(opCtx, 1 /* nShards */);
 
-    // Querying an empty placementHistory must return a "NotAvailable" result for all kinds of
-    // search. Collection-level query
+    // Querying an empty config.placementHistory must raise a
+    // "PlacementHistoryInitializationMissing" exception for any search kind.
+
+    // Collection-level query
     {
-        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db.collection1"),
-            Timestamp(4, 0),
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */);
-        assertPlacementsEqual(
-            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
-            historicalPlacement);
+        ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
+                               opCtx,
+                               NamespaceString::createNamespaceString_forTest("db.collection1"),
+                               Timestamp(4, 0),
+                               true /* checkIfPointInTimeIsInFuture */,
+                               false /* ignoreRemovedShards */),
+                           DBException,
+                           ErrorCodes::PlacementHistoryInitializationMissing);
     }
 
     // DB-level query
     {
-        auto historicalPlacement = shardingCatalogManager().getHistoricalPlacement(
-            opCtx,
-            NamespaceString::createNamespaceString_forTest("db"),
-            Timestamp(4, 0),
-            true /* checkIfPointInTimeIsInFuture */,
-            false /* ignoreRemovedShards */);
-        assertPlacementsEqual(
-            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
-            historicalPlacement);
+        ASSERT_THROWS_CODE(shardingCatalogManager().getHistoricalPlacement(
+                               opCtx,
+                               NamespaceString::createNamespaceString_forTest("db"),
+                               Timestamp(4, 0),
+                               true /* checkIfPointInTimeIsInFuture */,
+                               false /* ignoreRemovedShards */),
+                           DBException,
+                           ErrorCodes::PlacementHistoryInitializationMissing);
     }
 
     // Cluster-level query
     {
-        auto historicalPlacement =
+        ASSERT_THROWS_CODE(
             shardingCatalogManager().getHistoricalPlacement(opCtx,
                                                             boost::none,
                                                             Timestamp(4, 0),
                                                             true /* checkIfPointInTimeIsInFuture */,
-                                                            false /* ignoreRemovedShards */);
-        assertPlacementsEqual(
-            ExpectedResponseBuilder{HistoricalPlacementStatus::NotAvailable}.value,
-            historicalPlacement);
+                                                            false /* ignoreRemovedShards */),
+            DBException,
+            ErrorCodes::PlacementHistoryInitializationMissing);
     }
 }
 
