@@ -135,14 +135,14 @@ class TestCoreDumpFiltering(unittest.TestCase):
                 with patch.object(self.dumper, "analyze_core") as mock_analyze:
                     mock_analyze.return_value = (0, "pass")
 
-                    # Should cap at 50 by default
+                    # Should cap at 10 by default
                     report = self.dumper.analyze_cores(
                         tmpdir, "/mock/install", tmpdir, "/mock/multiversion", "on", None
                     )
 
-                    # Should only analyze 50 cores (default max)
-                    self.assertEqual(mock_analyze.call_count, 50)
-                    self.assertEqual(len(report["results"]), 50)
+                    # Should only analyze 10 cores (default max)
+                    self.assertEqual(mock_analyze.call_count, 10)
+                    self.assertEqual(len(report["results"]), 10)
 
     def test_max_core_dumps_custom_limit(self):
         """Test that custom max_core_dumps limit is respected."""

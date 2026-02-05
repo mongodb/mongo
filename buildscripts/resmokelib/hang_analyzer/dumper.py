@@ -139,7 +139,8 @@ def filter_core_dumps(
     if len(core_files) > max_core_dumps:
         logger.warning(
             f"Found {len(core_files)} core dumps, which exceeds the maximum of {max_core_dumps}. "
-            f"Only the first {max_core_dumps} core dumps will be analyzed."
+            f"Only the first {max_core_dumps} core dumps will be analyzed. "
+            f"The remaining {len(core_files) - max_core_dumps} core dumps will be skipped to avoid execution timeout."
         )
         core_files = core_files[:max_core_dumps]
 
@@ -369,7 +370,7 @@ class WindowsDumper(Dumper):
         install_dir: str,
         analysis_dir: str,
         boring_core_dump_pids: set = None,
-        max_core_dumps: int = 50,
+        max_core_dumps: int = 10,
     ):
         install_dir = os.path.abspath(install_dir)
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
@@ -740,7 +741,7 @@ class GDBDumper(Dumper):
         multiversion_dir: str,
         gdb_index_cache: str,
         boring_core_dump_pids: set = None,
-        max_core_dumps: int = 50,
+        max_core_dumps: int = 10,
     ) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         analyze_cores_span = get_default_current_span()
@@ -769,6 +770,7 @@ class GDBDumper(Dumper):
             core_file_path = os.path.abspath(filename)
             basename = os.path.basename(filename)
             self._root_logger.info("Starting analysis of %s", basename)
+            sys.stdout.flush()  # Flush immediately so timestamp reflects actual start time
             log_stream = StringIO()
             logger = logging.Logger(basename, level=logging.DEBUG)
             handler = logging.StreamHandler(log_stream)
@@ -821,6 +823,7 @@ class GDBDumper(Dumper):
                 report["failures"] += 1
             report["results"].append(result)
             self._root_logger.info("Analysis of %s ended with status %s", basename, status)
+            sys.stdout.flush()  # Flush immediately so timestamp reflects actual end time
         analyze_cores_span.set_attributes(
             {
                 "failures": report["failures"],
