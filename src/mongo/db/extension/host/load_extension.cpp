@@ -121,6 +121,7 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
+#ifdef __linux
     if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
         if (!extensionNames.empty()) {
             LOGV2_ERROR(10668500,
@@ -150,7 +151,10 @@ bool loadExtensions(const std::vector<std::string>& extensionNames) {
 
         LOGV2(10668503, "Successfully loaded extension", "extensionName"_attr = extension);
     }
-
+#else
+    LOGV2(11901200,
+          "Loading extensions on non-linux platforms is not supported - skipping loading.");
+#endif
     return true;
 }
 
@@ -198,6 +202,7 @@ ExtensionConfig ExtensionLoader::loadExtensionConfig(const std::string& extensio
 }
 
 void ExtensionLoader::load(const std::string& name, const ExtensionConfig& config) {
+#ifdef __linux
     uassert(10845400,
             str::stream() << "Loading extension '" << name << "' failed: "
                           << "Extension has already been loaded",
@@ -239,6 +244,10 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                                              YAML::Dump(extOptionsWithMongotHost),
                                              std::move(hostPortal)};
     extHandle->initialize(&portal, &host_connector::HostServicesAdapter::get());
+#else
+    LOGV2(11901201,
+          "Loading extensions on non-linux platforms is not supported - skipping loading.");
+#endif
 }
 
 stdx::unordered_map<std::string, ExtensionConfig> ExtensionLoader::getLoadedExtensions() {
