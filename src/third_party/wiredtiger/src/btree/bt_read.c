@@ -159,12 +159,7 @@ __page_read_build_full_disk_image(WT_SESSION_IMPL *session, WT_ITEM *deltas, siz
 {
     WT_DECL_RET;
     WT_PAGE_HEADER *base_dsk;
-    WT_REF **refs;
-    size_t refs_entries, i;
     uint64_t time_start, time_stop;
-
-    refs = NULL;
-    refs_entries = 0;
 
     base_dsk = (WT_PAGE_HEADER *)base_image_addr;
     WT_ASSERT(session, base_dsk != NULL);
@@ -189,7 +184,7 @@ __page_read_build_full_disk_image(WT_SESSION_IMPL *session, WT_ITEM *deltas, siz
     } else {
         time_start = __wt_clock(session);
         ret = __wti_page_merge_deltas_with_base_image_int(
-          session, deltas, delta_size, &refs, &refs_entries, new_image, base_image_addr
+          session, deltas, delta_size, new_image, base_image_addr
 #ifdef HAVE_DIAGNOSTIC
           ,
           ta
@@ -203,12 +198,6 @@ __page_read_build_full_disk_image(WT_SESSION_IMPL *session, WT_ITEM *deltas, siz
     }
 
 err:
-    /* COMMON CLEANUP PATH (both success and error). */
-    if (refs != NULL) {
-        for (i = 0; i < refs_entries; ++i)
-            __wt_free(session, refs[i]);
-        __wt_free(session, refs);
-    }
 
     return (ret);
 }

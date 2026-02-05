@@ -56,7 +56,7 @@ race:__wt_reconcile
 # FIXME-WT-14856 Unresolved warnings for ex_all
 race:__wti_conn_reconfig
 race:__wt_session_cursor_cache_sweep
-race:__wt_txn_update_pinned_timestamp
+race:__wti_txn_update_pinned_timestamp
 race:__capacity_config
 
 # FIXME-WT-15772 Issues caused by lack of atomics synchornization for double-checked locking pattern in the TAILQ implementation.

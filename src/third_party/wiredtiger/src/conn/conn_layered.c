@@ -1299,17 +1299,6 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
       metadata.oldest_timestamp, __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[1]),
       (int)metadata.checkpoint_len, metadata.checkpoint);
 
-    /* Update the pinned timestamp. */
-    __wt_txn_update_pinned_timestamp(session, false);
-    uint64_t pinned_timestamp;
-    __wt_txn_pinned_timestamp(session, &pinned_timestamp);
-    if (pinned_timestamp != WT_TS_NONE && metadata.oldest_timestamp > pinned_timestamp)
-        WT_IGNORE_RET(__wt_panic(session, EINVAL,
-          "Disaggregated storage checkpoint oldest_timestamp %s is greater than the current pinned "
-          "timestamp %s",
-          __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[0]),
-          __wt_timestamp_to_string(pinned_timestamp, ts_string[1])));
-
     /* Load crypt key data with the key provider extension, if any. */
     WT_ERR(__disagg_load_crypt_key(session, &metadata));
 

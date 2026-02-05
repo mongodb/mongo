@@ -1139,8 +1139,8 @@ __wti_rec_row_leaf(
              * onpage prepared update. Otherwise, we leak the prepared update.
              */
             WT_ASSERT_ALWAYS(session,
-              !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || F_ISSET(conn, WT_CONN_IN_MEMORY) ||
-                F_ISSET(btree, WT_BTREE_IN_MEMORY) || !WT_TIME_WINDOW_HAS_PREPARE(twp),
+              !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || F_ISSET(btree, WT_BTREE_IN_MEMORY) ||
+                !WT_TIME_WINDOW_HAS_PREPARE(twp),
               "leaked prepared update.");
         } else
             twp = &upd_select.tw;

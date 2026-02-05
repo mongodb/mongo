@@ -987,10 +987,9 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_me
             (checkpoint && addr == NULL && addr_sizep == NULL),
           "Incorrect arguments passed to rec_write for a checkpoint call");
 
-        /* In-memory databases shouldn't write pages. */
-        WT_ASSERT_ALWAYS(session,
-          !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !F_ISSET(btree, WT_BTREE_IN_MEMORY),
-          "Attempted to write page to disk when WiredTiger is configured to be in-memory");
+        /* In-memory btrees shouldn't write pages. */
+        WT_ASSERT_ALWAYS(session, !F_ISSET(btree, WT_BTREE_IN_MEMORY),
+          "Attempted to write page to disk when the btree is configured to be in-memory");
 
         /*
          * We're passed a table's disk image. Decompress if necessary and verify the image. Always

@@ -573,12 +573,12 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * to the history store. Checkpoint will also skip this tree.
      */
     WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
-    if (cval.val)
+    if (cval.val || F_ISSET(conn, WT_CONN_IN_MEMORY))
         F_SET(btree, WT_BTREE_IN_MEMORY);
     else
         F_CLR(btree, WT_BTREE_IN_MEMORY);
 
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY)) {
+    if (F_ISSET(btree, WT_BTREE_IN_MEMORY)) {
         F_SET(btree, WT_BTREE_LOGGED);
         WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
         if (!cval.val)
@@ -1252,8 +1252,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
      * items are stored on a different page within the same tree, which cannot be handled by
      * disaggregated storage.
      */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY) ||
-      F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
+    if (F_ISSET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_DISAGGREGATED)) {
         btree->maxleafkey = WT_BTREE_MAX_OBJECT_SIZE;
         btree->maxleafvalue = WT_BTREE_MAX_OBJECT_SIZE;
         return (0);

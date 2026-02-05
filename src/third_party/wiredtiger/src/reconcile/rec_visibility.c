@@ -392,7 +392,7 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
 
     btree = S2BT(session);
 
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY))
+    if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
         return (false);
     /*
      * We need to save the update chain to check whether the reconciliation makes progress for
@@ -1424,7 +1424,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
     WT_PAGE *page;
     WT_UPDATE *first_txn_upd, *first_upd, *onpage_upd, *upd;
     size_t upd_memsize;
-    bool has_newer_updates, write_prepare, is_inmem;
+    bool has_newer_updates, write_prepare;
 
     /*
      * The "saved updates" return value is used independently of returning an update we can write,
@@ -1450,9 +1450,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
         if ((first_upd = WT_ROW_UPDATE(page, rip)) == NULL)
             return (0);
     }
-    is_inmem =
-      F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY);
-    if (is_inmem) {
+
+    if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY)) {
         /* Never write prepared updates for in-memory btree */
         write_prepare = false;
         WT_RET(__rec_upd_select_inmem(session, r, vpack, first_upd, upd_select, &first_txn_upd,

@@ -1656,8 +1656,10 @@ __evict_walk_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p
     dhandle = *dhandle_p;
     if (dhandle != NULL)
         dhandle = TAILQ_NEXT(dhandle, q);
-    if (dhandle == NULL)
+    if (dhandle == NULL) {
         dhandle = TAILQ_FIRST(&conn->dhqh);
+        WT_STAT_CONN_INCR(session, eviction_dhandle_complete_walk);
+    }
 
     WT_UNUSED(dh_bucket_count);
     WT_UNUSED(rnd_bucket);

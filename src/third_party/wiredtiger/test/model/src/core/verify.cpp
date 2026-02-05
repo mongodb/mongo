@@ -176,23 +176,15 @@ kv_table_verifier::verify(WT_CONNECTION *connection, kv_checkpoint_ptr ckpt)
         if (model_cursor.has_next())
             throw verify_exception("There are still more key-value pairs in the model.");
 
-        /*
-         * Only do the verify if all the tests have passed. Make sure all cursors are closed before
-         * calling verify to avoid EBUSY. We don't need to tolerate non-fatal errors for the final
-         * step.
-         *
-         * FIXME-WT-16404: The disaggregated check should go away once it's ready.
-         */
-        if (!_table.is_disaggregated()) {
-            ret = session->verify(session, uri.c_str(), "strict");
-            if (ret == EBUSY) {
-                std::cerr << "Warning: Table " << uri << " verify is skipped because of EBUSY"
-                          << std::endl;
-                ret = 0;
-            }
-            if (ret != 0)
-                throw wiredtiger_exception(session, ret);
+        /* Try to call verify() as the last step. */
+        ret = session->verify(session, uri.c_str(), "strict");
+        if (ret == EBUSY) {
+            std::cerr << "Warning: Table " << uri << " verify is skipped because of EBUSY"
+                      << std::endl;
+            ret = 0;
         }
+        if (ret != 0)
+            throw wiredtiger_exception(session, ret);
 
     } catch (std::exception &e) {
         if (_verbose)
