@@ -410,25 +410,12 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
             _systemBucketsHook.onBeforeRun(opCtx, invocation);
         }
 
-        void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
-                              CommandInvocation* invocation) override {
-            _transportHook.onBeforeAsyncRun(rec, invocation);
-            _systemBucketsHook.onBeforeAsyncRun(rec, invocation);
-        }
-
         void onAfterRun(OperationContext* opCtx,
                         CommandInvocation* invocation,
                         rpc::ReplyBuilderInterface* response) override {
             _transportHook.onAfterRun(opCtx, invocation, response);
             _systemBucketsHook.onAfterRun(opCtx, invocation, response);
             _onAfterRunImpl(opCtx);
-        }
-
-        void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
-                             CommandInvocation* invocation) override {
-            _transportHook.onAfterAsyncRun(rec, invocation);
-            _systemBucketsHook.onAfterAsyncRun(rec, invocation);
-            _onAfterRunImpl(rec->getOpCtx());
         }
 
     private:

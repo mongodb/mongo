@@ -1,8 +1,5 @@
 version: 1.0.0
 filters:
-  - "async_command_execution_test.*":
-    approvers:
-      - 10gen/server-programmability
   - "authentication_commands.*":
     approvers:
       - 10gen/server-security

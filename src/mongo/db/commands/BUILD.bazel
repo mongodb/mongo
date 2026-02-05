@@ -45,7 +45,6 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
-        "//src/mongo/executor:async_request_executor",
         "//src/mongo/util:buildinfo",
     ],
 )
@@ -942,7 +941,6 @@ mongo_cc_library(
         "//src/mongo/db/validate:collection_validation",
         "//src/mongo/db/views:pipeline_resolver",
         "//src/mongo/db/views:view_catalog_helpers",
-        "//src/mongo/executor:async_request_executor",
         "//src/mongo/rpc:rewrite_state_change_errors",
         "//src/mongo/s:query_analysis_sampler",
         "//src/mongo/s:sharding_router_api",
@@ -1070,25 +1068,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-)
-
-mongo_cc_unit_test(
-    name = "async_command_execution_test",
-    srcs = [
-        "async_command_execution_test.cpp",
-    ],
-    tags = ["mongo_unittest_first_group"],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:commands",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/auth:authorization_manager_global",
-        "//src/mongo/db/commands:standalone",
-        "//src/mongo/db/shard_role:service_context_non_d",
-        "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
-        "//src/mongo/util:version_impl",
-    ],
 )
 
 mongo_cc_unit_test(

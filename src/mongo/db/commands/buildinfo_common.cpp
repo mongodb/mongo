@@ -37,31 +37,6 @@
 namespace mongo {
 namespace {
 Atomic<BuildInfoAuthModeEnum> gBuildInfoAuthMode{BuildInfoAuthModeEnum::kRequiresAuth};
-
-class BuildInfoExecutor final : public AsyncRequestExecutor {
-public:
-    BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
-
-    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
-        auto result = rec->getReplyBuilder()->getBodyBuilder();
-        getBuildInfo().serialize(&result);
-        return Status::OK();
-    }
-
-    static BuildInfoExecutor* get(ServiceContext* svc);
-};
-
-const auto getBuildInfoExecutor = ServiceContext::declareDecoration<BuildInfoExecutor>();
-BuildInfoExecutor* BuildInfoExecutor::get(ServiceContext* svc) {
-    return const_cast<BuildInfoExecutor*>(&getBuildInfoExecutor(svc));
-}
-
-const auto buildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "BuildInfoExecutor",
-    [](ServiceContext* ctx) { getBuildInfoExecutor(ctx).start(); },
-    [](ServiceContext* ctx) {
-        getBuildInfoExecutor(ctx).stop();
-    }};
 }  // namespace
 
 void BuildInfoAuthModeServerParameter::append(OperationContext*,
@@ -114,18 +89,6 @@ BuildInfo CmdBuildInfoCommon::Invocation::typedRun(OperationContext* opCtx) {
               mode == BuildInfoAuthModeEnum::kAllowedPreAuth ||
               mode == BuildInfoAuthModeEnum::kVersionOnlyIfPreAuth);
     return checked_cast<const CmdBuildInfoCommon*>(definition())->generateBuildInfo(opCtx);
-}
-
-Future<void> CmdBuildInfoCommon::Invocation::runAsync(
-    std::shared_ptr<RequestExecutionContext> rec) {
-    auto* svcCtx = rec->getOpCtx()->getServiceContext();
-    auto* executor =
-        checked_cast<const CmdBuildInfoCommon*>(definition())->getAsyncRequestExecutor(svcCtx);
-    return executor->schedule(std::move(rec));
-}
-
-AsyncRequestExecutor* CmdBuildInfoCommon::getAsyncRequestExecutor(ServiceContext* svcCtx) const {
-    return BuildInfoExecutor::get(svcCtx);
 }
 
 }  // namespace mongo

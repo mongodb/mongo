@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/executor/async_request_executor.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -99,8 +98,6 @@ public:
         }
 
         Reply typedRun(OperationContext*);
-
-        Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec) override;
     };
 
     /**
@@ -108,11 +105,6 @@ public:
      * preAuth).
      */
     virtual Reply generateBuildInfo(OperationContext*) const;
-
-    /**
-     * Provide an executor on which to run the command.
-     */
-    virtual AsyncRequestExecutor* getAsyncRequestExecutor(ServiceContext* svcCtx) const;
 };
 
 }  // namespace mongo

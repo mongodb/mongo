@@ -84,7 +84,6 @@
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/executor/async_request_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
@@ -526,42 +525,12 @@ BuildInfo getShardBuildInfo(OperationContext* opCtx) {
     return reply;
 }
 
-// Provides the means to asynchronously run `buildinfo` commands.
-class ShardBuildInfoExecutor final : public AsyncRequestExecutor {
-public:
-    ShardBuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
-
-    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) override {
-        auto result = rec->getReplyBuilder()->getBodyBuilder();
-        getShardBuildInfo(rec->getOpCtx()).serialize(&result);
-        return Status::OK();
-    }
-
-    static ShardBuildInfoExecutor* get(ServiceContext* svc);
-};
-
-const auto getShardBuildInfoExecutor = ServiceContext::declareDecoration<ShardBuildInfoExecutor>();
-ShardBuildInfoExecutor* ShardBuildInfoExecutor::get(ServiceContext* svc) {
-    return const_cast<ShardBuildInfoExecutor*>(&getShardBuildInfoExecutor(svc));
-}
-
-const auto shardBuildInfoExecutorRegisterer = ServiceContext::ConstructorActionRegisterer{
-    "ShardBuildInfoExecutor",
-    [](ServiceContext* ctx) { getShardBuildInfoExecutor(ctx).start(); },
-    [](ServiceContext* ctx) {
-        getShardBuildInfoExecutor(ctx).stop();
-    }};
-
 class CmdBuildInfoShard : public CmdBuildInfoCommon {
 public:
     using CmdBuildInfoCommon::CmdBuildInfoCommon;
 
     BuildInfo generateBuildInfo(OperationContext* opCtx) const final {
         return getShardBuildInfo(opCtx);
-    }
-
-    AsyncRequestExecutor* getAsyncRequestExecutor(ServiceContext* svcCtx) const final {
-        return ShardBuildInfoExecutor::get(svcCtx);
     }
 };
 MONGO_REGISTER_COMMAND(CmdBuildInfoShard).forShard();

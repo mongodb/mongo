@@ -122,7 +122,6 @@ core.commands:
   meta:
     fully_marked: true
   files:
-    - src/mongo/db/commands/async_command_execution_test.cpp
     - src/mongo/db/commands/buildinfo_common.*
     - src/mongo/db/commands/cpuload.cpp
     - src/mongo/db/commands/db_command_test_fixture.h
@@ -716,7 +715,6 @@ networking.execution:
     - src/mongo/db/baton*
     - src/mongo/db/default_baton*
     - src/mongo/executor/async_multicaster*
-    - src/mongo/executor/async_request_executor*
     - src/mongo/executor/async_timer_*
     - src/mongo/executor/async_transaction_rpc.h
     - src/mongo/executor/executor_integration_test_*

@@ -240,18 +240,6 @@ mongo_cc_library(
     ],
 )
 
-mongo_cc_library(
-    name = "async_request_executor",
-    srcs = [
-        "async_request_executor.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:thread_pool",
-    ],
-)
-
 idl_generator(
     name = "task_executor_cursor_parameters_gen",
     src = "task_executor_cursor_parameters.idl",

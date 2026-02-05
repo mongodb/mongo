@@ -236,16 +236,6 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     return replyBuilder.releaseBody();
 }
 
-Future<void> CommandHelpers::runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
-                                                  std::shared_ptr<CommandInvocation> invocation,
-                                                  bool useDedicatedThread) {
-    if (useDedicatedThread)
-        return makeReadyFutureWith([rec = std::move(rec), invocation = std::move(invocation)] {
-            runCommandInvocation(rec->getOpCtx(), invocation.get(), rec->getReplyBuilder());
-        });
-    return runCommandInvocationAsync(std::move(rec), std::move(invocation));
-}
-
 void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
                                           CommandInvocation* invocation,
                                           rpc::ReplyBuilderInterface* response) {
@@ -266,20 +256,6 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
     if (hooks) {
         hooks->onAfterRun(opCtx, invocation, response);
     }
-}
-
-Future<void> CommandHelpers::runCommandInvocationAsync(
-    std::shared_ptr<RequestExecutionContext> rec,
-    std::shared_ptr<CommandInvocation> invocation) try {
-    auto&& hooks = getCommandInvocationHooks(rec->getOpCtx()->getServiceContext());
-    if (hooks)
-        hooks->onBeforeAsyncRun(rec, invocation.get());
-    return invocation->runAsync(rec).then([rec, hooks = hooks.get(), invocation] {
-        if (hooks)
-            hooks->onAfterAsyncRun(rec, invocation.get());
-    });
-} catch (const DBException& e) {
-    return e.toStatus();
 }
 
 void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
@@ -997,16 +973,6 @@ private:
             BSONObjBuilder bob = result->getBodyBuilder();
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
         }
-    }
-
-    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec) override {
-        return _command->runAsync(rec, _dbName).onError([rec](Status status) {
-            if (status.code() != ErrorCodes::FailedToRunWithReplyBuilder)
-                return status;
-            BSONObjBuilder bob = rec->getReplyBuilder()->getBodyBuilder();
-            CommandHelpers::appendSimpleCommandStatus(bob, false);
-            return Status::OK();
-        });
     }
 
     void explain(OperationContext* opCtx,

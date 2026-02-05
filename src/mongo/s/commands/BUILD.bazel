@@ -235,7 +235,6 @@ mongo_cc_library(
         "//src/mongo/db/transaction:transaction_api",
         "//src/mongo/db/views",
         "//src/mongo/executor:async_multicaster",
-        "//src/mongo/executor:async_request_executor",
         "//src/mongo/executor:inline_executor",
         "//src/mongo/rpc:rewrite_state_change_errors",
         "//src/mongo/s:grid",

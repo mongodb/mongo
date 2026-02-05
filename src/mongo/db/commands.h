@@ -139,14 +139,6 @@ public:
     virtual void onBeforeRun(OperationContext* opCtx, CommandInvocation* invocation) = 0;
 
     /**
-     * A behavior to perform before CommandInvocation::asyncRun(). Defaults to `onBeforeRun(...)`.
-     */
-    virtual void onBeforeAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
-                                  CommandInvocation* invocation) {
-        onBeforeRun(rec->getOpCtx(), invocation);
-    }
-
-    /**
      * A behavior to perform after CommandInvocation::run(). Note that the response argument is not
      * const, because the ReplyBuilderInterface does not expose any const methods to inspect the
      * response body. However, onAfterRun must not mutate the response body.
@@ -154,14 +146,6 @@ public:
     virtual void onAfterRun(OperationContext* opCtx,
                             CommandInvocation* invocation,
                             rpc::ReplyBuilderInterface* response) = 0;
-
-    /**
-     * A behavior to perform after CommandInvocation::asyncRun(). Defaults to `onAfterRun(...)`.
-     */
-    virtual void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
-                                 CommandInvocation* invocation) {
-        onAfterRun(rec->getOpCtx(), invocation, rec->getReplyBuilder());
-    }
 };
 
 // Various helpers unrelated to any single command or to the command registry.
@@ -314,14 +298,6 @@ struct CommandHelpers {
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
     /**
-     * Runs the command synchronously in presence of a dedicated thread.
-     * Otherwise, runs the command asynchronously.
-     */
-    static Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
-                                             std::shared_ptr<CommandInvocation> invocation,
-                                             bool useDedicatedThread);
-
-    /**
      * Runs a previously parsed CommandInvocation and propagates the result to the
      * ReplyBuilderInterface. This function is agnostic to the derived type of the CommandInvocation
      * but may mirror, forward, or do other supplementary actions with the request.
@@ -329,15 +305,6 @@ struct CommandHelpers {
     static void runCommandInvocation(OperationContext* opCtx,
                                      CommandInvocation* invocation,
                                      rpc::ReplyBuilderInterface* response);
-
-    /**
-     * Runs a previously parsed command and propagates the result to the ReplyBuilderInterface. For
-     * commands that do not offer an implementation tailored for asynchronous execution, the future
-     * schedules the execution of the default implementation, historically designed for synchronous
-     * execution.
-     */
-    static Future<void> runCommandInvocationAsync(std::shared_ptr<RequestExecutionContext> rec,
-                                                  std::shared_ptr<CommandInvocation> invocation);
 
     /**
      * If '!invocation', we're logging about a Command pre-parse. It has to punt on the logged
@@ -822,16 +789,6 @@ public:
      */
     virtual void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) = 0;
 
-    /**
-     * Returns a future that can schedule asynchronous execution of the command. By default, the
-     * future falls back to the execution of `run(...)`, thus the default semantics of
-     * `runAsync(...)` is identical to that of `run(...).
-     */
-    virtual Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec) {
-        run(rec->getOpCtx(), rec->getReplyBuilder());
-        return Status::OK();
-    }
-
     virtual void explain(OperationContext* opCtx,
                          ExplainOptions::Verbosity verbosity,
                          rpc::ReplyBuilderInterface* result) {
@@ -1066,19 +1023,6 @@ public:
                                      const DatabaseName& dbName,
                                      const BSONObj& cmdObj,
                                      rpc::ReplyBuilderInterface* replyBuilder) = 0;
-
-    /**
-     * Provides a future that may run the command asynchronously. By default, it falls back to
-     * runWithReplyBuilder.
-     */
-    virtual Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec,
-                                  const DatabaseName& dbName) {
-        if (!runWithReplyBuilder(
-                rec->getOpCtx(), dbName, rec->getRequest().body, rec->getReplyBuilder()))
-            return Status(ErrorCodes::FailedToRunWithReplyBuilder,
-                          fmt::format("Failed to run command: {}", rec->getCommand()->getName()));
-        return Status::OK();
-    }
 
     /**
      * Commands which can be explained override this method. Any operation which has a query
