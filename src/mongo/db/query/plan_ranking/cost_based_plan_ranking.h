@@ -32,16 +32,16 @@
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 
 namespace mongo::plan_ranking {
 
-class CostBasedPlanRankingStrategy {
+// SERVER-118020: Investigate a more distinctive name to contrast with CBRPlanRankingStrategy
+class CostBasedPlanRankingStrategy : public PlanRankingStrategy {
 public:
-    ~CostBasedPlanRankingStrategy() = default;
-
     /**
      * Choose a plan ranking approach - either multi-planning (MP) or CBR for the plans of 'query'
      * based on a cost model of MP and CBR.
@@ -57,12 +57,7 @@ public:
      *
      * Returns the best plan or error.
      */
-    StatusWith<PlanRankingResult> rankPlans(OperationContext* opCtx,
-                                            CanonicalQuery& query,
-                                            QueryPlannerParams& plannerParams,
-                                            PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                            const MultipleCollectionAccessor& collections,
-                                            PlannerData plannerData);
+    StatusWith<plan_ranking::PlanRankingResult> rankPlans(PlannerData& pd) override;
 };
 
 }  // namespace mongo::plan_ranking

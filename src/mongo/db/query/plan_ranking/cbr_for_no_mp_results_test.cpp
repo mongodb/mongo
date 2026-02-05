@@ -51,7 +51,26 @@ public:
 class CBRForNoMPResultsTest : public plan_ranking::PlanRankingTestFixture {
 public:
     CBRForNoMPResultsTest() : PlanRankingTestFixture(kNss) {}
+
+    struct ParamsHelper {
+        std::vector<IndexEntry> indices = {};
+        std::unique_ptr<stats::CollectionStatistics> collStats = nullptr;
+        size_t options = 0;
+    };
+
+    auto makePlannerParams(ParamsHelper params) {
+        auto res = std::make_shared<QueryPlannerParams>(QueryPlannerParams::ArgsForTest{});
+        res->mainCollectionInfo.indexes = params.indices;
+        res->mainCollectionInfo.collStats = std::move(params.collStats);
+        res->mainCollectionInfo.options = params.options;
+        return res;
+    }
 };
+
+StatusWith<plan_ranking::PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& strategy,
+                                                        PlannerData& plannerData) {
+    return strategy.rankPlans(plannerData);
+}
 
 TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
     insertNDocuments(10);
@@ -59,15 +78,9 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
 
     auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42 << "b" << 7));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
+    plannerData.plannerParams = makePlannerParams({.indices = indices});
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
@@ -82,18 +95,12 @@ TEST_F(CBRForNoMPResultsTest, QueryPlannerFailsReturnsError) {
     // Create a query that won't have any index plans since we haven't created any indexes.
     auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-
     // Set options to forbid table scan. Since there are no available indexes, planning will fail.
-    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
+    plannerData.plannerParams =
+        makePlannerParams({.indices = indices, .options = QueryPlannerParams::NO_TABLE_SCAN});
 
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
 
     ASSERT_NOT_OK(status.getStatus());
     ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoQueryExecutionPlans);
@@ -107,15 +114,9 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
 
     auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 4 << "b" << 4));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
+    plannerData.plannerParams = makePlannerParams({.indices = indices});
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
@@ -146,15 +147,9 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
     auto [cq, plannerData] =
         createCQAndPlannerData(colls, BSON("a" << GT << 1 << "b" << LT << 200));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
+    plannerData.plannerParams = makePlannerParams({.indices = indices});
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
@@ -185,15 +180,9 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
     auto [cq, plannerData] =
         createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << 10));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
+    plannerData.plannerParams = makePlannerParams({.indices = indices});
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
@@ -223,17 +212,13 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     auto [cq, plannerData] =
         createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
-    params.mainCollectionInfo.collStats =
-        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
+    plannerData.plannerParams =
+        makePlannerParams({.indices = indices,
+                           .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
+                               static_cast<double>(5001), kNss)});
+
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
@@ -272,17 +257,13 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
                                BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1),
                                [](FindCommandRequest& findCmd) { findCmd.setReturnKey(true); });
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
-    params.mainCollectionInfo.collStats =
-        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
+    plannerData.plannerParams =
+        makePlannerParams({.indices = indices,
+                           .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
+                               static_cast<double>(5001), kNss)});
+
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
@@ -321,17 +302,12 @@ TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {
             findCmd.setSort(BSON("a" << 1));
         });
 
-    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
-    params.mainCollectionInfo.indexes = indices;
-    params.mainCollectionInfo.collStats =
-        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
+    plannerData.plannerParams =
+        makePlannerParams({.indices = indices,
+                           .collStats = std::make_unique<stats::CollectionStatisticsImpl>(
+                               static_cast<double>(5001), kNss)});
     CBRForNoMPResultsStrategySpy strategy;
-    auto status = strategy.rankPlans(*cq,
-                                     params,
-                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                     colls,
-                                     operationContext(),
-                                     std::move(plannerData));
+    auto status = planAndRank(strategy, plannerData);
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();

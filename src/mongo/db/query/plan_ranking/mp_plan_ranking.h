@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,34 +29,17 @@
 
 #pragma once
 
-
-#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
-#include "mongo/db/exec/runtime_planners/planner_interface.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
-#include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/util/modules.h"
 
-namespace mongo {
-namespace plan_ranking {
-class CBRForNoMPResultsStrategy : public PlanRankingStrategy {
+namespace mongo::plan_ranking {
+
+// TODO SERVER-117118: Investigate having strategies *always* complete ranking, with the output
+// being one solution or an error, not falling back to MultiPlanning.
+// In that case, this strategy will explicitly multiplan, rather than return
+// all solutions.
+class MPPlanRankingStrategy : public PlanRankingStrategy {
 public:
     StatusWith<plan_ranking::PlanRankingResult> rankPlans(PlannerData& pd) override;
-
-protected:
-    // TODO SERVER-115496. Once solutions are received as argument, this no longer needs to be
-    // optional.
-    boost::optional<classic_runtime_planner::MultiPlanner> _multiPlanner;
-
-private:
-    /**
-     * Resumes the multi-planner and picks the best plan from it.
-     * @param trialsConfig The trials configuration to use when resuming the multi-planner.
-     */
-    StatusWith<PlanRankingResult> resumeMultiPlannerAndPickBestPlan(
-        const trial_period::TrialPhaseConfig& trialsConfig);
 };
-}  // namespace plan_ranking
-}  // namespace mongo
+
+}  // namespace mongo::plan_ranking

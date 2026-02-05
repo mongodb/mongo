@@ -29,83 +29,46 @@
 
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 
-#include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 #include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
+#include "mongo/db/query/plan_ranking/mp_plan_ranking.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 
+#include <memory>
 #include <utility>
 
 namespace mongo {
 namespace plan_ranking {
-StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
-                                                    CanonicalQuery& query,
-                                                    QueryPlannerParams& plannerParams,
-                                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                                    const MultipleCollectionAccessor& collections,
-                                                    PlannerData plannerData,
-                                                    bool isClassic) {
-    auto rankerMode = plannerParams.planRankerMode;
-    // TODO SERVER-115496. Enumerate solutions here and pass them to the right ranking strategy.
 
-    if (!plannerParams.cbrEnabled || !isClassic) {
-        /**
-         * This is a special plan ranking strategy in that it does not actually rank plans, but
-         * rather returns all enumerated plans. This will result in multi-planning being used
-         * to select a winning plan at runtime.
-         */
-        // TODO SERVER-115496 enumerate solutions once
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-        if (!statusWithMultiPlanSolns.isOK()) {
-            return statusWithMultiPlanSolns.getStatus();
-        }
-        return PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
-    }
-
+std::unique_ptr<PlanRankingStrategy> makeStrategy(
+    QueryPlanRankerModeEnum rankerMode,
+    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy) {
+    // Shorter aliases for readability.
+    using RankerMode = QueryPlanRankerModeEnum;
+    using AutoStrategy = QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum;
     switch (rankerMode) {
-        case QueryPlanRankerModeEnum::kSamplingCE:
-        case QueryPlanRankerModeEnum::kExactCE:
-        case QueryPlanRankerModeEnum::kHeuristicCE:
-        case QueryPlanRankerModeEnum::kHistogramCE: {
-            return CBRPlanRankingStrategy().rankPlans(
-                opCtx, query, plannerParams, yieldPolicy, collections);
+        case RankerMode::kSamplingCE:
+        case RankerMode::kExactCE:
+        case RankerMode::kHeuristicCE:
+        case RankerMode::kHistogramCE: {
+            return std::make_unique<CBRPlanRankingStrategy>();
         }
-        case QueryPlanRankerModeEnum::kAutomaticCE: {
+        case RankerMode::kAutomaticCE: {
             // TODO SERVER-111770. Finalise values and names.
-            switch (query.getExpCtx()
-                        ->getQueryKnobConfiguration()
-                        .getPlanRankingStrategyForAutomaticQueryPlanRankerMode()) {
-                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-                    kCBRForNoMultiplanningResults: {
-                    CBRForNoMPResultsStrategy ranker;
-                    auto statusWithSolns = ranker.rankPlans(query,
-                                                            plannerParams,
-                                                            yieldPolicy,
-                                                            collections,
-                                                            opCtx,
-                                                            std::move(plannerData));
-                    return statusWithSolns;
+            switch (autoStrategy) {
+                case AutoStrategy::kCBRForNoMultiplanningResults: {
+                    return std::make_unique<CBRForNoMPResultsStrategy>();
                 }
-                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-                    kCBRCostBasedRankerChoice: {
-                    CostBasedPlanRankingStrategy ranker;
-                    auto statusWithSolns = ranker.rankPlans(opCtx,
-                                                            query,
-                                                            plannerParams,
-                                                            yieldPolicy,
-                                                            collections,
-                                                            std::move(plannerData));
-                    return statusWithSolns;
+                case AutoStrategy::kCBRCostBasedRankerChoice: {
+                    return std::make_unique<CostBasedPlanRankingStrategy>();
                 }
-                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-                    kHistogramCEWithHeuristicFallback: {
-                    return CBRPlanRankingStrategy().rankPlans(
-                        opCtx, query, plannerParams, yieldPolicy, collections);
+                case AutoStrategy::kHistogramCEWithHeuristicFallback: {
+                    return std::make_unique<CBRPlanRankingStrategy>();
                 }
                 default:
                     MONGO_UNREACHABLE;
@@ -114,6 +77,31 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
+                                                    CanonicalQuery& query,
+                                                    QueryPlannerParams& plannerParams,
+                                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                                    const MultipleCollectionAccessor& collections,
+                                                    PlannerData plannerData,
+                                                    bool isClassic) {
+    auto rankerMode = plannerParams.planRankerMode;
+
+    const bool canUseCBR = plannerParams.cbrEnabled && isClassic;
+    std::unique_ptr<PlanRankingStrategy> strategy;
+    if (!canUseCBR) {
+        strategy = std::make_unique<MPPlanRankingStrategy>();
+    } else {
+        strategy = makeStrategy(rankerMode,
+                                query.getExpCtx()
+                                    ->getQueryKnobConfiguration()
+                                    .getPlanRankingStrategyForAutomaticQueryPlanRankerMode());
+    }
+
+    // TODO SERVER-115496. Enumerate solutions here and pass them to the ranking strategy.
+    auto swRankingResult = strategy->rankPlans(plannerData);
+    return swRankingResult;
 }
 
 bool delayOrSkipSubplanner(const CanonicalQuery& query,

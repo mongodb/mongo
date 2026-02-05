@@ -41,7 +41,6 @@
 namespace mongo {
 namespace plan_ranking {
 
-
 struct PlanRankingResult {
     std::vector<std::unique_ptr<QuerySolution>> solutions;
     boost::optional<PlanExplainerData> maybeExplainData;
@@ -57,6 +56,17 @@ struct PlanRankingResult {
     // If none, the caller should consume the provided solution(s) as-is.
     boost::optional<mongo::classic_runtime_planner::SavedExecState> execState;
 };
+
+class PlanRankingStrategy {
+public:
+    virtual StatusWith<plan_ranking::PlanRankingResult> rankPlans(PlannerData& pd) = 0;
+
+    virtual ~PlanRankingStrategy() = default;
+};
+
+std::unique_ptr<PlanRankingStrategy> makeStrategy(
+    QueryPlanRankerModeEnum rankerMode,
+    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy);
 
 /**
  * Maximum number of plans of $or queries for which the automatic ranking strategy uses whole query

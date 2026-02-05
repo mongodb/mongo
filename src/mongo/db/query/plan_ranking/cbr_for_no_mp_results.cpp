@@ -43,13 +43,13 @@ namespace mongo {
 namespace plan_ranking {
 
 
-StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
-    CanonicalQuery& query,
-    QueryPlannerParams& plannerParams,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const MultipleCollectionAccessor& collections,
-    OperationContext* opCtx,
-    PlannerData plannerData) {
+StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& plannerData) {
+    OperationContext* opCtx = plannerData.opCtx;
+    CanonicalQuery& query = *plannerData.cq;
+    QueryPlannerParams& plannerParams = const_cast<QueryPlannerParams&>(*plannerData.plannerParams);
+    PlanYieldPolicy::YieldPolicy yieldPolicy = plannerData.yieldPolicy;
+    const MultipleCollectionAccessor& collections = plannerData.collections;
+
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus();

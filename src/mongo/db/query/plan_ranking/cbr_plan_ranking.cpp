@@ -38,6 +38,11 @@
 
 namespace mongo {
 namespace plan_ranking {
+
+StatusWith<plan_ranking::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(PlannerData& pd) {
+    return rankPlans(pd.opCtx, *pd.cq, *pd.plannerParams, pd.yieldPolicy, pd.collections);
+}
+
 StatusWith<plan_ranking::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     OperationContext* opCtx,
     CanonicalQuery& query,
