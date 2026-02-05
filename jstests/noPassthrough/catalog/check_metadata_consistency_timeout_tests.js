@@ -52,12 +52,19 @@ function testCMCCommandWithFailpoint(threadParams, expectedError, failpoint) {
         let asyncCMC = createCMCThread({...threadParams, maxTimeMS});
         const blockCMCPoint = configureFailPoint(st.getPrimaryShard(kDbName), failpoint);
         asyncCMC.start();
-        // Wait 60s for the failpoint to be reached
+        const numRetries = assert.commandWorked(
+            st.s.adminCommand({getParameter: 1, "defaultClientMaxRetryAttempts": 1}),
+        )["defaultClientMaxRetryAttempts"];
+        const initialTimesEntered = blockCMCPoint.timesEntered;
         if (blockCMCPoint.waitWithTimeout(60 * 1000)) {
-            // Wait enough time until the CMC timeout happens.
-            sleep(1000);
-            blockCMCPoint.off();
-            asyncCMC.join();
+            // We need to ensure the router retries for CMC are exhausted, but only for the expecific throw failpoint.
+            if (failpoint === "throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors") {
+                asyncCMC.join();
+                blockCMCPoint.off();
+            } else {
+                blockCMCPoint.off();
+                asyncCMC.join();
+            }
             assert.commandFailedWithCode(asyncCMC.returnData(), expectedError);
             break;
         }
