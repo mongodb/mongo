@@ -88,7 +88,9 @@ function createHistogram(field) {
 
 try {
     for (const mode of ["heuristicCE", "samplingCE"]) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: mode}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: mode}),
+        );
         testNonExistentColl();
         testEmptyColl();
     }
@@ -96,10 +98,10 @@ try {
     {
         createHistogram("a");
         createHistogram("b");
-        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryCBRCEMode: "histogramCE"}));
         testEmptyColl();
     }
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

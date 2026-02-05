@@ -45,15 +45,17 @@ const knobToPossibleValues = {
      * Using the knobs below runs into "Currently index union is a top-level node."
      * {
      * 	"internalQueryPlannerEnableHashIntersection" : true,
-     * 	"planRankerMode" : "automaticCE"
+     * 	"featureFlagCostBasedRanker": true,
+     * 	"internalQueryCBRCEMode" : "automaticCE"
      * }
      */
-    planRankerMode: fc.constantFrom(
-        // 'automaticCE',
-        // 'samplingCE',
-        // 'heuristicCE',
-        "multiPlanning",
-    ),
+    featureFlagCostBasedRanker: fc.constant(false),
+    /* internalQueryCBRCEMode: fc.constantFrom(
+     *    'automaticCE',
+     *    'samplingCE',
+     *    'heuristicCE',
+     *  ),
+     */
     internalQuerySamplingCEMethod: fc.constantFrom("random", "chunk"),
 };
 

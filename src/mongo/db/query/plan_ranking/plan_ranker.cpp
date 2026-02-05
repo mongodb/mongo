@@ -53,7 +53,7 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
     auto rankerMode = plannerParams.planRankerMode;
     // TODO SERVER-115496. Enumerate solutions here and pass them to the right ranking strategy.
 
-    if (rankerMode == QueryPlanRankerModeEnum::kMultiPlanning || !isClassic) {
+    if (!plannerParams.cbrEnabled || !isClassic) {
         /**
          * This is a special plan ranking strategy in that it does not actually rank plans, but
          * rather returns all enumerated plans. This will result in multi-planning being used
@@ -125,7 +125,7 @@ bool delayOrSkipSubplanner(const CanonicalQuery& query,
         return false;
     }
 
-    if (params.planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
+    if (!params.cbrEnabled || params.planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
         return false;
     }
 

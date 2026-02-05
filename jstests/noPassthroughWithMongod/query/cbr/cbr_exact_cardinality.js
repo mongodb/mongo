@@ -264,7 +264,9 @@ function testEof() {
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "exactCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "exactCE"}),
+    );
     // Ensure we calculate the correct cardinality for collection/index scans.
     testCollIdxScan();
     // Ensure we calculate the correct cardinality for fetches on top of index scans.
@@ -290,7 +292,7 @@ try {
     testEof();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));

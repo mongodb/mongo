@@ -235,7 +235,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         const MultipleCollectionAccessor& collections;
         size_t plannerOptions = DEFAULT;
         boost::optional<TraversalPreference> traversalPreference = boost::none;
-        QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kMultiPlanning;
+        bool cbrEnabled = false;
+        QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
     };
 
     /**
@@ -283,6 +284,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     explicit QueryPlannerParams(ArgsForSingleCollectionQuery&& args)
         : providedOptions(args.plannerOptions),
           traversalPreference(std::move(args.traversalPreference)),
+          cbrEnabled(args.cbrEnabled),
           planRankerMode(args.planRankerMode) {
         mainCollectionInfo.options = args.plannerOptions;
         if (!args.collections.hasMainCollection()) {
@@ -292,14 +294,14 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         // histogramCE will cause queries to fail if the query contains a predicate on a field
         // without a histogram. We don't create histograms on internal collections. To prevent such
         // queries from failing, we use multiplanning in this case.
-        if (planRankerMode == QueryPlanRankerModeEnum::kHistogramCE &&
+        if (cbrEnabled && planRankerMode == QueryPlanRankerModeEnum::kHistogramCE &&
             args.canonicalQuery.nss().dbName().isInternalDb()) {
-            planRankerMode = QueryPlanRankerModeEnum::kMultiPlanning;
+            cbrEnabled = false;
         }
         fillOutPlannerParamsForExpressQuery(
             args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
         fillOutMainCollectionPlannerParams(
-            args.opCtx, args.canonicalQuery, args.collections, args.planRankerMode);
+            args.opCtx, args.canonicalQuery, args.collections, args.cbrEnabled);
     }
 
     /**
@@ -407,7 +409,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     // Were query settings applied?
     bool querySettingsApplied{false};
 
-    QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kMultiPlanning;
+    bool cbrEnabled{false};
+    QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
 
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
@@ -439,7 +442,7 @@ private:
     void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
                                             const CanonicalQuery& canonicalQuery,
                                             const MultipleCollectionAccessor& collections,
-                                            QueryPlanRankerModeEnum planRankerMode);
+                                            bool cbrEnabled);
 
     /**
      * Applies query settings to the main collection if applicable. If not, tries to apply index

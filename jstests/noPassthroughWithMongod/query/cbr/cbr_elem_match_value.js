@@ -56,10 +56,12 @@ function testIndexDoesNotAffectEstimate() {
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
     testElemMatchWithDifferentSelectivities();
     testIndexDoesNotAffectEstimate();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

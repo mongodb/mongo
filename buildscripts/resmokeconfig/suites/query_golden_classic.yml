@@ -35,4 +35,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagCostBasedRanker: false
         featureFlagExtendedAutoSpilling: true

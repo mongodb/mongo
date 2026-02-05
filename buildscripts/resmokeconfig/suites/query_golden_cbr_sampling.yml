@@ -21,6 +21,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        planRankerMode: "samplingCE"
-        internalQuerySamplingBySequentialScan: true
-        internalQueryPlannerEnableSortIndexIntersection: true
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "samplingCE"

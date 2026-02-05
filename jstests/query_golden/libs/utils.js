@@ -1,4 +1,5 @@
 import {show} from "jstests/libs/golden_test.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 import {sequentialIds} from "jstests/query_golden/libs/example_data.js";
 
 /**
@@ -115,96 +116,144 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
      * defined as (LOG(nReturned) + 1) * inputStage.nReturned.
      */
 
-    print('{">>>pipelines":[');
-    pipelines.forEach((pipeline, index) => {
-        // JSON does not allow trailing commas.
-        const separator = index === pipelines.length - 1 ? "" : ",";
+    let paramsToRestore;
 
-        // We print the pipeline here so that, even if the test fails,
-        // we have already emitted the failing pipeline.
-        print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
+    // All-feature-flags variants enable CBR even for the
+    // query_golden_classic suite.
+    // Plan stability test running with CBR need the following
+    // knobs. Set them before starting the tests & restore them
+    // after, as the query_golden_classic suite runs other
+    // golden tests, which do not expect these knobs.
+    if (getPlanRankerMode(db) !== "multiPlanning") {
+        // CBR enabled
+        paramsToRestore = assert.commandWorked(
+            db.adminCommand({
+                getParameter: 1,
+                internalQueryPlannerEnableSortIndexIntersection: 1,
+                internalQuerySamplingBySequentialScan: 1,
+            }),
+        );
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQueryPlannerEnableSortIndexIntersection: true,
+                internalQuerySamplingBySequentialScan: true,
+            }),
+        );
+    }
 
-        // We do not use explain() as it loses the errmsg in case of an error.
-        const explain = db.runCommand({
-            explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
-            verbosity: "executionStats",
-        });
+    try {
+        print('{">>>pipelines":[');
+        pipelines.forEach((pipeline, index) => {
+            // JSON does not allow trailing commas.
+            const separator = index === pipelines.length - 1 ? "" : ",";
 
-        const executionStats = explain.executionStats;
+            // We print the pipeline here so that, even if the test fails,
+            // we have already emitted the failing pipeline.
+            print(`{">>>pipeline": ${JSON.stringify(pipeline)},`);
 
-        if (explain.ok !== 1) {
-            let error = "unknown error";
-            if (explain.hasOwnProperty("errmsg")) {
-                error = explain.errmsg;
-            } else if (
-                explain.hasOwnProperty("executionStats") &&
-                explain.executionStats.hasOwnProperty("errorMessage")
-            ) {
-                error = explain.executionStats.errorMessage;
+            // We do not use explain() as it loses the errmsg in case of an error.
+            const explain = db.runCommand({
+                explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
+                verbosity: "executionStats",
+            });
+
+            const executionStats = explain.executionStats;
+
+            if (explain.ok !== 1) {
+                let error = "unknown error";
+                if (explain.hasOwnProperty("errmsg")) {
+                    error = explain.errmsg;
+                } else if (
+                    explain.hasOwnProperty("executionStats") &&
+                    explain.executionStats.hasOwnProperty("errorMessage")
+                ) {
+                    error = explain.executionStats.errorMessage;
+                }
+                print(`    "error": ${JSON.stringify(error)}}${separator}`);
+                totalErrors++;
+                return;
             }
-            print(`    "error": ${JSON.stringify(error)}}${separator}`);
-            totalErrors++;
-            return;
+
+            const winningPlan = trimPlanToStagesAndIndexes(explain.queryPlanner.winningPlan);
+
+            const plans = explain.queryPlanner.rejectedPlans.length + 1;
+            totalPlans += plans;
+
+            const keys = executionStats.totalKeysExamined;
+            totalKeys += keys;
+
+            const docs = executionStats.totalDocsExamined;
+            totalDocs += docs;
+
+            const nReturned = executionStats.nReturned;
+            totalRows += nReturned;
+
+            const sorts = extractSortEffort(executionStats.executionStages);
+            totalSorts += sorts;
+
+            print(`    "winningPlan": ${JSON.stringify(winningPlan)},`);
+            print(`    "keys" : ${padNumber(keys)},`);
+            print(`    "docs" : ${padNumber(docs)},`);
+            print(`    "sorts": ${padNumber(sorts)},`);
+            print(`    "plans": ${padNumber(plans)},`);
+            print(`    "rows" : ${padNumber(nReturned)}}${separator}`);
+            print();
+        });
+        print("],");
+
+        print(
+            '">>>totals": {' +
+                `"pipelines": ${pipelines.length}, ` +
+                `"plans": ${totalPlans}, ` +
+                `"keys": ${padNumber(totalKeys)}, ` +
+                `"docs": ${padNumber(totalDocs)}, ` +
+                `"sorts": ${padNumber(totalSorts)}, ` +
+                `"rows": ${padNumber(totalRows)}, ` +
+                `"errors": ${padNumber(totalErrors)}},`,
+        );
+
+        const parameters = {
+            featureFlagCostBasedRanker: null,
+            internalQueryCBRCEMode: null,
+            samplingMarginOfError: null,
+            samplingConfidenceInterval: null,
+            internalQuerySamplingCEMethod: null,
+            internalQuerySamplingBySequentialScan: null,
+        };
+
+        for (const param in parameters) {
+            const result = db.adminCommand({getParameter: 1, [param]: 1});
+            parameters[param] = result[param];
         }
 
-        const winningPlan = trimPlanToStagesAndIndexes(explain.queryPlanner.winningPlan);
+        if (!(parameters["featureFlagCostBasedRanker"] ?? {})["value"]) {
+            // internalQueryCBRCEMode does not matter unless
+            // CBR is enabled, and is likely to confuse the
+            // reader.
+            delete parameters["internalQueryCBRCEMode"];
+        } else if (parameters["internalQueryCBRCEMode"] === "automaticCE") {
+            const param = "automaticCEPlanRankingStrategy";
+            const result = db.adminCommand({getParameter: 1, [param]: 1});
+            parameters[param] = result[param];
+        }
 
-        const plans = explain.queryPlanner.rejectedPlans.length + 1;
-        totalPlans += plans;
+        print(`">>>parameters": ${JSON.stringify(parameters)}}`);
 
-        const keys = executionStats.totalKeysExamined;
-        totalKeys += keys;
-
-        const docs = executionStats.totalDocsExamined;
-        totalDocs += docs;
-
-        const nReturned = executionStats.nReturned;
-        totalRows += nReturned;
-
-        const sorts = extractSortEffort(executionStats.executionStages);
-        totalSorts += sorts;
-
-        print(`    "winningPlan": ${JSON.stringify(winningPlan)},`);
-        print(`    "keys" : ${padNumber(keys)},`);
-        print(`    "docs" : ${padNumber(docs)},`);
-        print(`    "sorts": ${padNumber(sorts)},`);
-        print(`    "plans": ${padNumber(plans)},`);
-        print(`    "rows" : ${padNumber(nReturned)}}${separator}`);
-        print();
-    });
-    print("],");
-
-    print(
-        '">>>totals": {' +
-            `"pipelines": ${pipelines.length}, ` +
-            `"plans": ${totalPlans}, ` +
-            `"keys": ${padNumber(totalKeys)}, ` +
-            `"docs": ${padNumber(totalDocs)}, ` +
-            `"sorts": ${padNumber(totalSorts)}, ` +
-            `"rows": ${padNumber(totalRows)}, ` +
-            `"errors": ${padNumber(totalErrors)}},`,
-    );
-
-    let parameters = {
-        planRankerMode: null,
-        samplingMarginOfError: null,
-        samplingConfidenceInterval: null,
-        internalQuerySamplingCEMethod: null,
-        internalQuerySamplingBySequentialScan: null,
-    };
-
-    for (const param in parameters) {
-        const result = db.adminCommand({getParameter: 1, [param]: 1});
-        parameters[param] = result[param];
+        jsTest.log.info("See README.plan_stability.md for more information.");
+    } finally {
+        if (paramsToRestore) {
+            // Restore the parameters we changed
+            assert.commandWorked(
+                db.adminCommand(
+                    Object.fromEntries([
+                        ["setParameter", 1],
+                        ...Object.entries(paramsToRestore)
+                            .filter(([k, _]) => k != "ok")
+                            .map(([param, value]) => [param, typeof value === "string" ? value : value["value"]]),
+                    ]),
+                ),
+            );
+        }
     }
-
-    if (parameters["planRankerMode"] === "automaticCE") {
-        const param = "automaticCEPlanRankingStrategy";
-        const result = db.adminCommand({getParameter: 1, [param]: 1});
-        parameters[param] = result[param];
-    }
-
-    print(`">>>parameters": ${JSON.stringify(parameters)}}`);
-
-    jsTest.log.info("See README.plan_stability.md for more information.");
 }

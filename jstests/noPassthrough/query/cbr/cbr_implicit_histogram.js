@@ -6,7 +6,9 @@
 import {runCommandOverride} from "jstests/libs/override_methods/implicit_histograms.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-const conn = MongoRunner.runMongod({setParameter: {planRankerMode: "histogramCE"}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"},
+});
 
 const db = conn.getDB("test");
 const collName = jsTestName();

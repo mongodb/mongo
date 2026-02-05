@@ -208,6 +208,8 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     };
 
     MultipleCollectionAccessor multiCollectionAccessor{collection()};
+    auto cbrEnabled = _query->getExpCtx()->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagCostBasedRanker);
     auto rankerMode = _query->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode();
     // Populating the 'topLevelSampleFieldNames' requires 2 steps:
     //  1. Extract the set of top level fields from the filter, sort and project components of the
@@ -217,20 +219,22 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     StringSet topLevelSampleFieldNames;
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
-    if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        using namespace cost_based_ranker;
-        samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
-            *_query,
-            CardinalityEstimate{
-                CardinalityType{plannerParams.mainCollectionInfo.collStats->getCardinality()},
-                EstimationSource::Metadata},
-            yieldPolicy->getPolicy(),
-            multiCollectionAccessor);
-        topLevelSampleFieldNames =
-            ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
-    } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
-        exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
-            collection(), *_query, expCtx()->getOperationContext());
+    if (cbrEnabled) {
+        if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
+            using namespace cost_based_ranker;
+            samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
+                *_query,
+                CardinalityEstimate{
+                    CardinalityType{plannerParams.mainCollectionInfo.collStats->getCardinality()},
+                    EstimationSource::Metadata},
+                yieldPolicy->getPolicy(),
+                multiCollectionAccessor);
+            topLevelSampleFieldNames =
+                ce::extractTopLevelFieldsFromMatchExpression(_query->getPrimaryMatchExpression());
+        } else if (rankerMode == QueryPlanRankerModeEnum::kExactCE) {
+            exactCardinality = std::make_unique<ce::ExactCardinalityImpl>(
+                collection(), *_query, expCtx()->getOperationContext());
+        }
     }
 
     auto subplanningStatus = samplingEstimator
@@ -252,15 +256,14 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
 
     // If the plan ranking is a CBR strategy, plan each branch of the $or using the respective
-    // cost-based ranking. Multiplanning and automaticCE startegy (>16 plans) plan each branch of
-    // the $or using multiplanning as defined in the multiplanCallback below.
-    bool useMultiplanner = rankerMode == QueryPlanRankerModeEnum::kMultiPlanning ||
-        rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    // cost-based ranking. Multiplanning and automaticCE startegy (>16 plans) plan each branch
+    // of the $or using multiplanning as defined in the multiplanCallback below.
+    bool useMultiplanner = !cbrEnabled || rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
     if (!useMultiplanner && subplanningStatus.isOK()) {
         if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
             // If we do not have any fields that we want to sample then we just include all the
-            // fields in the sample. This can occur if we encounter a find all query with no project
-            // or sort specified.
+            // fields in the sample. This can occur if we encounter a find all query with no
+            // project or sort specified.
             // TODO: SERVER-108819 We can skip generating the sample entirely in this case and
             // instead use collection cardinality.
             samplingEstimator->generateSample(
@@ -350,8 +353,9 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     if (!subplanSelectStat.isOK()) {
         if (subplanSelectStat != ErrorCodes::NoQueryExecutionPlans) {
             // Query planning can continue if we failed to find a solution for one of the
-            // children. Otherwise, it cannot, as it may no longer be safe to access the collection
-            // (and index may have been dropped, we may have exceeded the time limit, etc).
+            // children. Otherwise, it cannot, as it may no longer be safe to access the
+            // collection (and index may have been dropped, we may have exceeded the time limit,
+            // etc).
             return subplanSelectStat.getStatus();
         }
         return choosePlanWholeQuery(

@@ -1204,6 +1204,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 .collections = collections,
                 .plannerOptions = options,
                 .traversalPreference = traversalPreference,
+                .cbrEnabled = canonicalQuery->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagCostBasedRanker),
                 .planRankerMode =
                     canonicalQuery->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
             });
@@ -1545,6 +1547,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             .opCtx = opCtx,
             .canonicalQuery = *cq,
             .collections = collections,
+            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagCostBasedRanker),
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
     ClassicPrepareExecutionHelper helper{
@@ -1721,6 +1725,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             .opCtx = opCtx,
             .canonicalQuery = *cq,
             .collections = collections,
+            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagCostBasedRanker),
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         })};
 
@@ -1828,6 +1834,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
             .canonicalQuery = *cq,
             .collections = collections,
             .plannerOptions = plannerOptions,
+            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagCostBasedRanker),
             .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
         });
     ClassicPrepareExecutionHelper helper{

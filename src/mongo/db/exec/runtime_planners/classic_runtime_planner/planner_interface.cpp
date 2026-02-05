@@ -226,8 +226,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
     invariant(_state == kInitialized);
     if (cq()->getExplain().has_value()) {
         bool isCountQuery = getRoot()->stageType() == STAGE_COUNT;
-        // This loop will not run if pure multiplanning is configured (planRankerMode:
-        // multiPlanning) since rejected solutions in that case live in the multiplanner itself.
+        // This loop will not run if pure multiplanning is configured (featureFlagCostBasedRanker:
+        // false) since rejected solutions in that case live in the multiplanner itself.
         for (auto&& solutionWithPlanStage : _planExplainerData.rejectedPlansWithStages) {
             if (!solutionWithPlanStage.planStage) {
                 // If planStage is not already built, build it. This will be the case for CBR

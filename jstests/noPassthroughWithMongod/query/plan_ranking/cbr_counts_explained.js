@@ -8,6 +8,7 @@ import {
     isIxscan,
     isCountScan,
 } from "jstests/libs/query/analyze_plan.js";
+import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -53,10 +54,11 @@ function runTestFastScan() {
     assert(rejectedPlans.length == 0, {explain});
 }
 
-const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"})).was;
-const prevAutoPlanRankingStrategy = assert.commandWorked(
-    assert.commandWorked(db.adminCommand({getParameter: 1, automaticCEPlanRankingStrategy: 1})),
-).automaticCEPlanRankingStrategy;
+const prevCBRConfig = getCBRConfig(db);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
+);
+
 try {
     const cbrFallbackStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
 
@@ -67,11 +69,5 @@ try {
         runTestFastScan();
     }
 } finally {
-    assert.commandWorked(
-        db.adminCommand({
-            setParameter: 1,
-            planRankerMode: prevPlanRankerMode,
-            automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy,
-        }),
-    );
+    restoreCBRConfig(db, prevCBRConfig);
 }

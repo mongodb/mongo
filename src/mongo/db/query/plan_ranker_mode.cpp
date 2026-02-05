@@ -54,7 +54,7 @@ void QueryPlanRankerMode::append(OperationContext*,
 
 Status QueryPlanRankerMode::setFromString(StringData value, const boost::optional<TenantId>&) {
     QueryPlanRankerModeEnum mode =
-        QueryPlanRankerMode_parse(value, IDLParserContext("planRankerMode"));
+        QueryPlanRankerMode_parse(value, IDLParserContext("internalQueryCBRCEMode"));
     if (mode == QueryPlanRankerModeEnum::kHistogramCE && !getTestCommandsEnabled()) {
         return Status(ErrorCodes::BadValue, "histogramCE not allowed");
     }

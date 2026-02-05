@@ -153,6 +153,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
             .canonicalQuery = *cq,
             .collections = collectionsAccessor,
             .plannerOptions = QueryPlannerParams::DEFAULT,
+            .cbrEnabled = true,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         },
     };

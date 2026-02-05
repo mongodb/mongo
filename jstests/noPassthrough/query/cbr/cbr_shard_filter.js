@@ -6,7 +6,11 @@ import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({shards: 2, mongos: 1, rs: {setParameter: {planRankerMode: "heuristicCE"}}});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    rs: {setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}},
+});
 
 const db = st.getDB("test");
 const collName = jsTestName();

@@ -503,7 +503,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     OperationContext* opCtx,
     const CanonicalQuery& canonicalQuery,
     const MultipleCollectionAccessor& collections,
-    QueryPlanRankerModeEnum planRankerMode) {
+    bool cbrEnabled) {
     const auto& mainColl = collections.getMainCollection();
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
@@ -539,7 +539,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     // appear to be ID-hack eligible as per 'isIdHackEligibleQuery()', but 'buildIdHackPlan()' fails
     // as there is no _id index. In these cases, we will end up invoking the query planner and CBR,
     // so we need this catalog information.
-    if (planRankerMode != QueryPlanRankerModeEnum::kMultiPlanning) {
+    if (cbrEnabled) {
         mainCollectionInfo.collStats = std::make_unique<stats::CollectionStatisticsImpl>(
             static_cast<double>(mainColl->getRecordStore()->numRecords()), canonicalQuery.nss());
     }

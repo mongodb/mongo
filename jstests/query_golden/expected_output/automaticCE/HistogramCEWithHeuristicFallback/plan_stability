@@ -8381,7 +8381,7 @@
 
 ],
 ">>>totals": {"pipelines": 1043, "plans": 10404, "keys": 100163240, "docs": 53369073, "sorts": 72024186, "rows": 38020022, "errors":      0},
-">>>parameters": {"planRankerMode":"automaticCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true,"automaticCEPlanRankingStrategy":"HistogramCEWithHeuristicFallback"}}
+">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"version":"8.3","fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"automaticCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true,"automaticCEPlanRankingStrategy":"HistogramCEWithHeuristicFallback"}}
 
 
 [jsTest] ----

@@ -9,7 +9,7 @@ The plan_stability test is a standard golden test:
 ```bash
 $ buildscripts/resmoke.py run \
   --suites=query_golden_classic \
-  '--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine, planRankerMode: ...}' \
+  '--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: ..., internalQueryCBRCEMode: ...}' \
   jstests/query_golden/plan_stability.js
 ```
 
@@ -85,7 +85,7 @@ In local execution, if your environment is configured as described above, the di
 ```bash
 buildscripts/resmoke.py run \
   --suites=query_golden_classic \
-  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, planRankerMode: samplingCE, internalQuerySamplingBySequentialScan: True}' \
+  --mongodSetParameters='{internalQueryFrameworkControl: forceClassicEngine, featureFlagCostBasedRanker: True, internalQueryCBRCEMode: samplingCE, internalQuerySamplingBySequentialScan: True}' \
    jstests/query_golden/plan_stability.js \
    --pauseAfterPopulate
 ```
@@ -150,9 +150,9 @@ Some plans, such as those involving `$sort` or `$limit` will sometimes change in
 
 ```javascript
 pipeline = [...];
-db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"});
+db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false});
 db.plan_stability.aggregate(pipeline).explain('executionStats').executionStats.executionTimeMillis;
-db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"});
+db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"});
 db.plan_stability.aggregate(pipeline).explain('executionStats').executionStats.executionTimeMillis;
 ```
 
@@ -166,7 +166,7 @@ If you want to run a comparison between estimation methods `X` and `Y`:
 
 2. Temporary remove the expected files for method `Y` from `expected_files/query_golden/expected_files/Y` so that they are not considered;
 
-3. Run the test as described above, specifying `planRankerMode: X`;
+3. Run the test as described above, specifying `featureFlagCostBasedRanker`/`internalQueryCBRCEMethod`;
 
 4. Use the summarization script as described above to produce a report.
 

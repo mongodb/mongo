@@ -9,6 +9,7 @@ import {
     getCachedPlanForQuery,
     assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
+import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -167,17 +168,15 @@ function runReplanningTest(isMultiplanning) {
 
 // TODO SERVER-116353: Add additional tests.
 
+const prevCBRConfig = getCBRConfig(db);
+
 const prevQueryKnobs = assert.commandWorked(
     db.adminCommand({
         getParameter: 1,
-        planRankerMode: 1,
-        automaticCEPlanRankingStrategy: 1,
         internalQuerySamplingBySequentialScan: 1,
     }),
 );
 
-const prevPlanRankerMode = prevQueryKnobs.planRankerMode;
-const prevAutomaticCEPlanRankingStrategy = prevQueryKnobs.automaticCEPlanRankingStrategy;
 const prevSequentialSamplingScan = prevQueryKnobs.internalQuerySamplingBySequentialScan;
 
 // Use deterministic sampling to avoid plan instability.
@@ -185,12 +184,12 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySe
 
 try {
     // 1: Run with only MultiPlanning.
-    db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"});
+    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false});
     runInitialCacheTest(true);
     runReplanningTest(true);
 
     // 2: Run with CBR fallback strategies.
-    db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"});
+    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"});
 
     const cbrFallbackStrategies = [
         "CBRForNoMultiplanningResults",
@@ -208,10 +207,8 @@ try {
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: prevAutomaticCEPlanRankingStrategy}),
-    );
+    restoreCBRConfig(db, prevCBRConfig);
+
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: prevSequentialSamplingScan}),
     );

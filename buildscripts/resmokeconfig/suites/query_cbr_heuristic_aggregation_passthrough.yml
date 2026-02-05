@@ -24,4 +24,5 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        planRankerMode: "heuristicCE"
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "heuristicCE"

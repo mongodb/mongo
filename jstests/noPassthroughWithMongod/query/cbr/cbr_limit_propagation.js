@@ -16,7 +16,12 @@ if (checkSbeFullyEnabled(db)) {
 }
 
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, planRankerMode: "samplingCE", internalQuerySamplingBySequentialScan: true}),
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "samplingCE",
+        internalQuerySamplingBySequentialScan: true,
+    }),
 );
 
 const coll = db[jsTestName()];

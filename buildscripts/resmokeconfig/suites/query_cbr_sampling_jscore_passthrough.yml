@@ -61,5 +61,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        planRankerMode: "samplingCE"
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "samplingCE"
         internalQuerySamplingBySequentialScan: true

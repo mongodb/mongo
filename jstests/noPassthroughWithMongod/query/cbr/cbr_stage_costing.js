@@ -90,8 +90,17 @@ function ixscanCost({predicate, hint}) {
 }
 
 function runTest(planRankerMode) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: planRankerMode}));
-
+    if (planRankerMode === "multiPlanning") {
+        assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
+    } else {
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                featureFlagCostBasedRanker: true,
+                internalQueryCBRCEMode: planRankerMode,
+            }),
+        );
+    }
     /*
      * Cost of COLLSCAN
      */
@@ -457,7 +466,7 @@ for (const planRankerMode of ["samplingCE", "histogramCE", "heuristicCE"]) {
         runTest(planRankerMode);
     } finally {
         // Make sure that we restore the defaults no matter what
-        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
         assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}));
         assert.commandWorked(db.adminCommand({setParameter: 1, samplingConfidenceInterval: "95"}));
         assert.commandWorked(db.adminCommand({setParameter: 1, samplingMarginOfError: 5}));

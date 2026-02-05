@@ -46,7 +46,7 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     });
 
     _planRankerMode = ServerParameterSet::getNodeParameterSet()
-                          ->get<QueryPlanRankerMode>("planRankerMode")
+                          ->get<QueryPlanRankerMode>("internalQueryCBRCEMode")
                           ->_data.get();
 
     _planRankingStrategyForAutomaticQueryPlanRankerMode =

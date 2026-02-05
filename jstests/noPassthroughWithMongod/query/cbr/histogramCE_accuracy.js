@@ -39,7 +39,9 @@ const coll = db[collName];
 
 function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
     try {
-        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+        );
 
         coll.drop();
         assert.commandWorked(coll.insertMany(dataset.docs()));
@@ -91,7 +93,7 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
         }
     } finally {
         // Make sure that we restore the default no matter what
-        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     }
 }
 

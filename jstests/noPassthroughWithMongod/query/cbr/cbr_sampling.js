@@ -59,7 +59,9 @@ function assertAllPlansUseSampling(query, ce) {
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}),
+    );
     assertCollscanUsesSampling({a: {$lt: 100}});
     assertCollscanUsesSampling({b: {$elemMatch: {$gt: 100, $lt: 200}}});
     // Test the chunk-based sampling method.
@@ -118,7 +120,7 @@ try {
     assertAllPlansUseSampling({d: /^e/}, 0);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, samplingMarginOfError: 5.0}));
 }

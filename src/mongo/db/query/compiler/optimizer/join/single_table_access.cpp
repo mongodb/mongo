@@ -100,6 +100,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
             .opCtx = opCtx,
             .canonicalQuery = *node.accessPath,
             .collections = singleMca,
+            .cbrEnabled = true,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         });
 

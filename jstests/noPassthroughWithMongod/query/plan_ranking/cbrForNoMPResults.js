@@ -7,7 +7,7 @@ import {
     getEngine,
     getRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanCosted, assertPlanNotCosted, getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -164,10 +164,17 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     assert.eq(getExecutionStats(cbrExplain)[0].nReturned, 0, toJsonForLog(cbrExplain));
 }
 
-const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"})).was;
-const prevAutoPlanRankingStrategy = assert.commandWorked(
-    db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults"}),
-).was;
+const prevCBRConfig = getCBRConfig(db);
+
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "automaticCE",
+        automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+    }),
+);
+
 const execYieldIterations = db.adminCommand({
     getParameter: 1,
     internalQueryExecYieldIterations: 1,
@@ -185,11 +192,11 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     testReturnKeyIsPlannedWithMultiPlanner();
 } finally {
+    restoreCBRConfig(db, prevCBRConfig);
+
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
-            planRankerMode: prevPlanRankerMode,
-            automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy,
             internalQueryExecYieldIterations: execYieldIterations,
         }),
     );

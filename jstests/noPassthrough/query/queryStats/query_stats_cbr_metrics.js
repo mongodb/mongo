@@ -9,9 +9,15 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {getQueryPlannerMetrics, getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+if (checkSbeFullyEnabled(null)) {
+    jsTest.log.info(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    quit();
+}
 
 const dbName = jsTestName();
 const collName = "testColl";
@@ -162,70 +168,85 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             // query execution time.
             const waitTimeMillis = 100;
 
-            // Configure failpoint on all nodes.
+            let prevCBRConfig;
+
+            // Configure failpoint on all nodes, save the previous CBR config & disable CBR.
             const failPoints = FixtureHelpers.mapOnEachShardNode({
                 db: testDB.getSiblingDB("admin"),
-                func: (db) => configureFailPoint(db, "sleepWhileMultiplanning", {ms: waitTimeMillis}),
+                func: (db) => {
+                    prevCBRConfig = getCBRConfig(db);
+                    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
+                    return configureFailPoint(db, "sleepWhileMultiplanning", {ms: waitTimeMillis});
+                },
                 primaryNodeOnly: true,
             });
 
-            // Use a different filter shape than the previous test to ensure multiplanning.
-            coll.find({b: {$gt: 2}, c: {$lt: 3}}).toArray();
+            try {
+                // Use a different filter shape than the previous test to ensure multiplanning.
+                coll.find({b: {$gt: 2}, c: {$lt: 3}}).toArray();
 
-            const stats = getQueryStats(conn, {collName: collName});
-            assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
+                const stats = getQueryStats(conn, {collName: collName});
+                assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
 
-            const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
+                const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
 
-            // Verify multiplanning was used.
-            assert.gt(
-                Number(queryPlannerSection.fromMultiPlanner?.["true"] || 0),
-                0,
-                `Expected fromMultiPlanner.true > 0: ${tojson(queryPlannerSection)}`,
-            );
+                // Verify multiplanning was used.
+                assert.gt(
+                    Number(queryPlannerSection.fromMultiPlanner?.["true"] || 0),
+                    0,
+                    `Expected fromMultiPlanner.true > 0: ${tojson(queryPlannerSection)}`,
+                );
 
-            // Validate planningTimeMicros is within bounds:
-            // waitTime < planningTime < totalExecutionTime
-            validatePlanningTimeMicros(stats[0].metrics);
+                // Validate planningTimeMicros is within bounds:
+                // waitTime < planningTime < totalExecutionTime
+                validatePlanningTimeMicros(stats[0].metrics);
 
-            // Convert planningTimeMicros to milliseconds for comparison with failpoint delay.
-            const planningTimeMillis = Number(queryPlannerSection.planningTimeMicros.sum) / 1000;
-            assert.gt(
-                planningTimeMillis,
-                waitTimeMillis,
-                `planningTime (${planningTimeMillis}ms) should be >= failpoint delay (${waitTimeMillis}ms)`,
-            );
+                // Convert planningTimeMicros to milliseconds for comparison with failpoint delay.
+                const planningTimeMillis = Number(queryPlannerSection.planningTimeMicros.sum) / 1000;
+                assert.gt(
+                    planningTimeMillis,
+                    waitTimeMillis,
+                    `planningTime (${planningTimeMillis}ms) should be >= failpoint delay (${waitTimeMillis}ms)`,
+                );
 
-            // The costBasedRanker section should be present with 0 nDocsSampled and all-zero
-            // cardinalityEstimationMethods when only multiplanning was used.
-            assert(
-                queryPlannerSection.hasOwnProperty("costBasedRanker"),
-                `costBasedRanker section should be present: ${tojson(queryPlannerSection)}`,
-            );
-            const cbrSection = queryPlannerSection.costBasedRanker;
-            assert(
-                cbrSection.hasOwnProperty("cardinalityEstimationMethods"),
-                `cardinalityEstimationMethods should be present: ${tojson(cbrSection)}`,
-            );
-            assert.eq(
-                cbrSection.cardinalityEstimationMethods,
-                {
-                    Histogram: NumberLong(0),
-                    Sampling: NumberLong(0),
-                    Heuristics: NumberLong(0),
-                    Mixed: NumberLong(0),
-                    Metadata: NumberLong(0),
-                    Code: NumberLong(0),
-                },
-                `cardinalityEstimationMethods should be all zeros when CBR not used: ${tojson(cbrSection)}`,
-            );
-            assert.eq(
-                0,
-                cbrSection.nDocsSampled.sum,
-                `nDocsSampled should be empty when CBR not used: ${tojson(cbrSection)}`,
-            );
-
-            failPoints.forEach((failPoint) => failPoint.off());
+                // The costBasedRanker section should be present with 0 nDocsSampled and all-zero
+                // cardinalityEstimationMethods when only multiplanning was used.
+                assert(
+                    queryPlannerSection.hasOwnProperty("costBasedRanker"),
+                    `costBasedRanker section should be present: ${tojson(queryPlannerSection)}`,
+                );
+                const cbrSection = queryPlannerSection.costBasedRanker;
+                assert(
+                    cbrSection.hasOwnProperty("cardinalityEstimationMethods"),
+                    `cardinalityEstimationMethods should be present: ${tojson(cbrSection)}`,
+                );
+                assert.eq(
+                    cbrSection.cardinalityEstimationMethods,
+                    {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(0),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    },
+                    `cardinalityEstimationMethods should be all zeros when CBR not used: ${tojson(cbrSection)}`,
+                );
+                assert.eq(
+                    0,
+                    cbrSection.nDocsSampled.sum,
+                    `nDocsSampled should be empty when CBR not used: ${tojson(cbrSection)}`,
+                );
+            } finally {
+                FixtureHelpers.mapOnEachShardNode({
+                    db: testDB.getSiblingDB("admin"),
+                    func: (db) => {
+                        restoreCBRConfig(db, prevCBRConfig);
+                    },
+                    primaryNodeOnly: true,
+                });
+                failPoints.forEach((failPoint) => failPoint.off());
+            }
         });
 
         it("should have costBasedRanker section with nDocsSampled when CBR uses sampling to pick the best plan", function () {
@@ -235,7 +256,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
             const confidenceInterval = "95";
             const zScore = 1.96; // Z-score for 95% confidence interval.
 
-            let previousPlanRankerMode;
+            let previousCBRConfig;
             let previousSequentialScanFlag;
             let previousMarginOfError;
             let previousConfidenceInterval;
@@ -243,9 +264,14 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        previousPlanRankerMode = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}),
-                        ).was;
+                        previousCBRConfig = getCBRConfig(db);
+                        assert.commandWorked(
+                            db.adminCommand({
+                                setParameter: 1,
+                                featureFlagCostBasedRanker: true,
+                                internalQueryCBRCEMode: "samplingCE",
+                            }),
+                        );
                         // Use sequential scan to make sampled documents deterministic for the assertion.
                         previousSequentialScanFlag = assert.commandWorked(
                             db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
@@ -292,9 +318,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        assert.commandWorked(
-                            db.adminCommand({setParameter: 1, planRankerMode: previousPlanRankerMode}),
-                        );
+                        restoreCBRConfig(db, previousCBRConfig);
                         assert.commandWorked(
                             db.adminCommand({
                                 setParameter: 1,
@@ -317,14 +341,19 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should have populated CBR metrics with samplingCE", function () {
-            let prevPlanRankerMode;
+            let prevCBRConfig;
             try {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        prevPlanRankerMode = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}),
-                        ).was;
+                        prevCBRConfig = getCBRConfig(db);
+                        assert.commandWorked(
+                            db.adminCommand({
+                                setParameter: 1,
+                                featureFlagCostBasedRanker: true,
+                                internalQueryCBRCEMode: "samplingCE",
+                            }),
+                        );
                     },
                     primaryNodeOnly: true,
                 });
@@ -365,7 +394,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
+                        restoreCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -373,21 +402,20 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should have no CBR metrics with automaticCE+fallback when we do not hit the CBR fallback", function () {
-            let prevPlanRankerMode;
-            let prevAutomaticCEPlanRankingStrategy;
+            let prevCBRConfig;
             try {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        prevPlanRankerMode = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}),
-                        ).was;
-                        prevAutomaticCEPlanRankingStrategy = assert.commandWorked(
+                        prevCBRConfig = getCBRConfig(db);
+                        assert.commandWorked(
                             db.adminCommand({
                                 setParameter: 1,
+                                featureFlagCostBasedRanker: true,
+                                internalQueryCBRCEMode: "automaticCE",
                                 automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
                             }),
-                        ).was;
+                        );
                     },
                     primaryNodeOnly: true,
                 });
@@ -427,13 +455,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
-                        assert.commandWorked(
-                            db.adminCommand({
-                                setParameter: 1,
-                                automaticCEPlanRankingStrategy: prevAutomaticCEPlanRankingStrategy,
-                            }),
-                        );
+                        restoreCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });
@@ -441,21 +463,20 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
         });
 
         it("should have populated CBR metrics with automaticCE+fallback when we do hit the CBR fallback", function () {
-            let prevPlanRankerMode;
-            let prevAutomaticCEPlanRankingStrategy;
+            let prevCBRConfig;
             try {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        prevPlanRankerMode = assert.commandWorked(
-                            db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}),
-                        ).was;
-                        prevAutomaticCEPlanRankingStrategy = assert.commandWorked(
+                        prevCBRConfig = getCBRConfig(db);
+                        assert.commandWorked(
                             db.adminCommand({
                                 setParameter: 1,
+                                featureFlagCostBasedRanker: true,
+                                internalQueryCBRCEMode: "automaticCE",
                                 automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
                             }),
-                        ).was;
+                        );
                     },
                     primaryNodeOnly: true,
                 });
@@ -505,13 +526,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 FixtureHelpers.mapOnEachShardNode({
                     db: testDB.getSiblingDB("admin"),
                     func: (db) => {
-                        assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
-                        assert.commandWorked(
-                            db.adminCommand({
-                                setParameter: 1,
-                                automaticCEPlanRankingStrategy: prevAutomaticCEPlanRankingStrategy,
-                            }),
-                        );
+                        restoreCBRConfig(db, prevCBRConfig);
                     },
                     primaryNodeOnly: true,
                 });

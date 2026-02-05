@@ -14,7 +14,9 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}),
+);
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 2, b: 2}));
 assert.commandWorked(coll.insert({a: 2, b: 1}));
@@ -92,5 +94,5 @@ try {
     runTest({b: {$exists: false}}, {}, 1, {b: ["[null, null]"]}, "forward");
 } finally {
     /** Ensure that query knob doesn't leak into other testcases in the suite. */
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

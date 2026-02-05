@@ -56,7 +56,9 @@ function assertQueryUsesHistograms({query, expectedCE}) {
 
 try {
     // Use histogram CE
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
     const testCases = [
         // IndexScan should use histogram
         {query: {a: 5}, expectedCE: 94},
@@ -88,7 +90,7 @@ try {
     testCases.forEach((tc) => assertQueryUsesHistograms(tc));
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }
 
 try {
@@ -100,7 +102,9 @@ try {
         coll.insertMany([{a: null, b: 0}, {a: null, b: 1}, {a: null, b: 2}, {a: null, b: 3}, {b: 4}, {b: 5}, {b: 6}]),
     );
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
     const explain = coll.find({a: null}).explain();
     [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach((plan) => {
         assert.eq(plan.estimatesMetadata.ceSource, "Histogram", plan);
@@ -108,7 +112,7 @@ try {
     });
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }
 
 try {
@@ -124,7 +128,9 @@ try {
     // scan so we can test CE of MatchExpressions using histogram.
     assert.commandWorked(coll.createIndex({a: 1}));
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
 
     const query = {a: {$gt: 10, $lt: 20}};
     const nonMultikeyEstimate = getWinningPlanFromExplain(
@@ -144,7 +150,7 @@ try {
     assert.lt(nonMultikeyEstimate, multiKeyEstimate);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }
 
 try {
@@ -166,7 +172,9 @@ try {
     );
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
     assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
 
     const testCases = [
         {query: {a: 20}, expectedCE: 1},
@@ -180,5 +188,5 @@ try {
     testCases.forEach((tc) => assertQueryUsesHistograms(tc));
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

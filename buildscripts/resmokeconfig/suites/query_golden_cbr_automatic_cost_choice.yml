@@ -21,8 +21,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        planRankerMode: "automaticCE"
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "automaticCE"
         automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice"
-        # In case automaticCE ever involves samplingCE
-        internalQuerySamplingBySequentialScan: true
-        internalQueryPlannerEnableSortIndexIntersection: true

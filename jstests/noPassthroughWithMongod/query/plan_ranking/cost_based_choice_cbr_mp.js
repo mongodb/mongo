@@ -1,5 +1,11 @@
 import {getWinningPlanFromExplain, getExecutionStats} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted, getMultiplanningBatchSize} from "jstests/libs/query/cbr_utils.js";
+import {
+    assertPlanCosted,
+    assertPlanNotCosted,
+    getCBRConfig,
+    getMultiplanningBatchSize,
+    restoreCBRConfig,
+} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {LcgRandom} from "jstests/libs/lcg_random.js";
 
@@ -118,10 +124,15 @@ function checkRanker({qID = "", cName = "", query = {}, order = {}, limit = 0, m
 populateCollection("100", 100, nFields, compoundIndexes);
 populateCollection("20k", 20000, nFields, compoundIndexes);
 
-const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"})).was;
-const prevAutoPlanRankingStrategy = assert.commandWorked(
-    db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice"}),
-).was;
+const prevCBRConfig = getCBRConfig(db);
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryCBRCEMode: "automaticCE",
+        automaticCEPlanRankingStrategy: "CBRCostBasedRankerChoice",
+    }),
+);
 try {
     // The implementation of AutomaticCE with a cost-based choice of the plan ranker
     // considers 4 different cases. Each of these cases is listed below and tested.
@@ -262,8 +273,5 @@ try {
         ranker: rankerStrategies.kCBR,
     });
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy}),
-    );
+    restoreCBRConfig(db, prevCBRConfig);
 }

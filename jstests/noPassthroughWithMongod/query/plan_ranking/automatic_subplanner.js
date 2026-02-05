@@ -3,7 +3,7 @@
  * The current threshold for switching to Subplanner is 16+ plans.
  */
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanCosted, assertPlanNotCosted, getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -67,7 +67,10 @@ function testAutomaticUsesSubplanner(coll) {
     assert.eq(explain.executionStats.nReturned, 400, toJsonForLog(explain));
 }
 
-const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"})).was;
+const prevCBRConfig = getCBRConfig(db);
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
+);
 
 const maxOrSolutionsLow = 10;
 const maxOrSolutionsHigh = 20;
@@ -76,9 +79,6 @@ const prevMaxOrSolutions = assert.commandWorked(
 ).internalQueryEnumerationMaxOrSolutions;
 
 const autoPlanRankingStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
-const prevAutoStrategy = assert.commandWorked(
-    db.adminCommand({getParameter: 1, automaticCEPlanRankingStrategy: 1}),
-).automaticCEPlanRankingStrategy;
 
 try {
     for (let autoStrategy of autoPlanRankingStrategies) {
@@ -112,9 +112,8 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsLow}));
     testAutomaticUsesSubplanner(coll);
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
+    restoreCBRConfig(db, prevCBRConfig);
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: prevMaxOrSolutions}),
     );
-    assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: prevAutoStrategy}));
 }

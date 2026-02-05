@@ -8,7 +8,7 @@ const mongo = MongoRunner.runMongod();
 assert.commandFailedWithCode(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        planRankerMode: "histogramCE",
+        internalQueryCBRCEMode: "histogramCE",
     }),
     ErrorCodes.BadValue,
 );
@@ -24,7 +24,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     mongo.getDB("admin").adminCommand({
         setParameter: 1,
-        planRankerMode: "automaticCE",
+        internalQueryCBRCEMode: "automaticCE",
     }),
 );
 

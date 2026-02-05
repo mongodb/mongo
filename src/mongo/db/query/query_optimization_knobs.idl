@@ -40,7 +40,7 @@ global:
 
 enums:
     QueryPlanRankerMode:
-        description: "Enum for possible values for planRankerMode."
+        description: "Enum for possible values for internalQueryCBRCEMode."
         type: string
         values:
             kAutomaticCE: "automaticCE"
@@ -49,7 +49,6 @@ enums:
             kHistogramCE: "histogramCE"
             kSamplingCE: "samplingCE"
             kHeuristicCE: "heuristicCE"
-            kMultiPlanning: "multiPlanning"
 
     # TODO SERVER-111770. Finalise values and names.
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode:
@@ -698,25 +697,25 @@ server_parameters:
         default: true
         redact: false
 
-    planRankerMode:
-        description: "Control ranking method of query plans."
+    internalQueryCBRCEMode:
+        description: "Cardinality estimation mode for the cost-based ranker."
         set_at: [startup, runtime]
         cpp_class:
             name: QueryPlanRankerMode
             data: synchronized_value<QueryPlanRankerModeEnum>
         default:
-            expr: QueryPlanRankerModeEnum::kMultiPlanning
+            expr: QueryPlanRankerModeEnum::kAutomaticCE
         redact: false
 
     # TODO SERVER-111770. Finalise names.
     automaticCEPlanRankingStrategy:
-        description: "Controls the plan ranking strategy to use when automaticCE is selected as planRankerMode"
+        description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
         set_at: [startup, runtime]
         cpp_class:
             name: QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode
             data: synchronized_value<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>
         default:
-            expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kHistogramCEWithHeuristicFallback
+            expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRForNoMultiplanningResults
         redact: false
 
     samplingConfidenceInterval:

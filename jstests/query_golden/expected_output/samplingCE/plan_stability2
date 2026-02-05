@@ -8269,7 +8269,7 @@
 
 ],
 ">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 27665598, "docs": 26943285, "sorts": 9788519, "rows": 10011323, "errors":      0},
-">>>parameters": {"planRankerMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
+">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"version":"8.3","fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 
 [jsTest] ----

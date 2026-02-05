@@ -5,7 +5,7 @@
 "use strict";
 
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {isPlanCosted} from "jstests/libs/query/cbr_utils.js";
+import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {getParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Test initialization.
@@ -290,7 +290,7 @@ function multiIndexScan() {
     assertIndexScan(false, filter, [{a: 1, b: 1}, {d: 1}]);
 
     if (
-        getParameter(conn, "planRankerMode") == "automaticCE" &&
+        getPlanRankerMode(db) == "automaticCE" &&
         getParameter(conn, "automaticCEPlanRankingStrategy") == "CBRForNoMultiplanningResults"
     ) {
         // When automaticCE is enabled, even if we don't fall back to CBR we do not call the subplanner in this case. This yields a different result.

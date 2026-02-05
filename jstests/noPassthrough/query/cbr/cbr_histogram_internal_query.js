@@ -3,7 +3,9 @@
  * test for SERVER-107736.
  */
 
-const conn = MongoRunner.runMongod({setParameter: {planRankerMode: "histogramCE"}});
+const conn = MongoRunner.runMongod({
+    setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"},
+});
 
 const db = conn.getDB("admin");
 assert.commandWorked(db.adminCommand({createUser: "testUser", pwd: "pwd", roles: []}));

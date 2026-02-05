@@ -27,7 +27,9 @@ assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
 
 function runTest({query, sort, skip, limit, expectedCard}) {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
     let cmd = coll.find(query);
     if (sort !== undefined) {
         cmd = cmd.sort(sort);
@@ -72,7 +74,7 @@ try {
     runTest({query: {}, sort: {a: 1}, skip: 10, limit: 42, expectedCard: 42});
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }
 
 try {
@@ -85,7 +87,9 @@ try {
     coll.createIndexes([{a: 1}]);
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
 
     const query = {a: 1};
     const skip = 10;
@@ -105,5 +109,5 @@ try {
     assert.gt(largeCardSkipCost, smallCardSkipCost);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

@@ -226,7 +226,9 @@ function testDistictScan() {
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+    );
 
     testHashedIndex();
     testPartialIndex();
@@ -244,6 +246,6 @@ try {
     testDistictScan();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
 }

@@ -13,9 +13,21 @@ for (let i = 0; i < 1000; i++) {
 }
 
 const samplingConfigs = [
-    {setParameter: {planRankerMode: "samplingCE"}},
-    {setParameter: {planRankerMode: "samplingCE", internalQuerySamplingCEMethod: "chunk"}},
-    {setParameter: {planRankerMode: "samplingCE", internalQuerySamplingBySequentialScan: true}},
+    {setParameter: {featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}},
+    {
+        setParameter: {
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "samplingCE",
+            internalQuerySamplingCEMethod: "chunk",
+        },
+    },
+    {
+        setParameter: {
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "samplingCE",
+            internalQuerySamplingBySequentialScan: true,
+        },
+    },
 ];
 
 for (const config of samplingConfigs) {

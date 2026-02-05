@@ -9,6 +9,9 @@ executor:
       crashOnInvalidBSONError: ""
       objcheck: ""
       eval: |
+        // histogramCE is banned except if test commands are enabled,
+        // so we cannot set is in mongod_options.set_parameters
+        db.adminCommand({setParameter:1, automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback"});
         // Keep in sync with query_golden_*.yml.
         await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
         await import("jstests/libs/override_methods/golden_overrides.js");
@@ -21,7 +24,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        planRankerMode: "automaticCE"
-        # In case automaticCE ever involves samplingCE
-        internalQuerySamplingBySequentialScan: true
-        internalQueryPlannerEnableSortIndexIntersection: true
+        featureFlagCostBasedRanker: true
+        internalQueryCBRCEMode: "automaticCE"
+        # We also have automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
+        # see above.

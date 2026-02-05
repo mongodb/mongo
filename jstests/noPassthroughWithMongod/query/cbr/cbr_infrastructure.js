@@ -206,7 +206,7 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     const isRootedOr = Object.keys(query).length == 1 && Object.keys(query)[0] === "$or";
 
     // Classic plan via multiplanning
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
     const e0 = coll.find(query, project).sort(order).explain("executionStats");
     const w0 = getWinningPlanFromExplain(e0);
     const r0 = getRejectedPlans(e0);
@@ -215,7 +215,8 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
-            planRankerMode: "automaticCE",
+            featureFlagCostBasedRanker: true,
+            internalQueryCBRCEMode: "automaticCE",
             automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
         }),
     );
@@ -284,7 +285,9 @@ function verifyCollectionCardinalityEstimate() {
     const card = 1234;
     coll.drop();
     assert.commandWorked(coll.insertMany(Array.from({length: card}, () => ({a: 1}))));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
+    );
     // This query should not have any predicates, as they are taken into account
     // by CE, and estimated cardinality will be less than the total.
     const e1 = coll.find({}).explain();
@@ -298,7 +301,9 @@ function verifyHeuristicEstimateSource() {
     coll.drop();
     assert.commandWorked(coll.insert({a: 1}));
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+    );
     const e1 = coll.find({a: 1}).explain();
     const w1 = getWinningPlanFromExplain(e1);
     assertCbrExplain(w1);
@@ -310,7 +315,9 @@ function verifyFetchOverFetchDoesNotAssert() {
     assert.commandWorked(coll.insert({_id: 1}));
     assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "heuristicCE"}),
+    );
 
     const explain = coll.find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]}).explain();
     // At least one plan should contain a FETCH over FETCH stages and that should not raise an
@@ -364,7 +371,9 @@ try {
 
     assert.commandWorked(coll1.insertOne({a: 1}));
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
 
     // Request histogam CE while the collection has no histogram
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);
@@ -385,5 +394,5 @@ try {
     assert.throwsWithCode(() => coll1.find({b: {$gte: {foo: 1}}}).explain(), ErrorCodes.HistogramCEFailure);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

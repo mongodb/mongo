@@ -35,7 +35,9 @@ const experimentColl = db[jsTestName()];
 
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "samplingCE"}),
+    );
     testProperty(
         createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
         {experimentColl},
@@ -45,5 +47,5 @@ try {
 } finally {
     // Reset the plan ranker mode to its default value.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: false}));
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

@@ -61,7 +61,9 @@ function winningIndexFromCursor(cursor) {
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
 
     /*
      * Plan selection for find()
@@ -239,5 +241,5 @@ try {
         "b_1",
     );
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

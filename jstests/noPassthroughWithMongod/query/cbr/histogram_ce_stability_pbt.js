@@ -51,9 +51,11 @@ function histogramPlanStabilityProperty(getQuery, testHelpers, {numberBuckets}) 
 }
 
 try {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "histogramCE"}),
+    );
     testProperty(histogramPlanStabilityProperty, {experimentColl}, createStabilityWorkload(numQueriesPerRun), numRuns);
 } finally {
     // Reset the plan ranker mode to its default value.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));
 }

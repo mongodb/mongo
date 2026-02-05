@@ -49,10 +49,11 @@ export function getPlanRankerMode(db) {
     if (db !== null) {
         const getParam = db.adminCommand({
             getParameter: 1,
-            planRankerMode: 1,
+            featureFlagCostBasedRanker: 1,
+            internalQueryCBRCEMode: 1,
         });
 
-        return getParam.hasOwnProperty("planRankerMode") ? getParam.planRankerMode : "multiPlanning";
+        return !getParam.featureFlagCostBasedRanker?.value ? "multiPlanning" : getParam.internalQueryCBRCEMode;
     } else {
         return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode : "multiPlanning";
     }
@@ -86,4 +87,32 @@ export function getMultiplanningBatchSize() {
     } else {
         throw new Error("Failed to retrieve multiplanning batch size: " + JSON.stringify(result));
     }
+}
+
+export function getCBRConfig(db) {
+    const config = assert.commandWorked(
+        db.adminCommand({
+            getParameter: 1,
+            featureFlagCostBasedRanker: 1,
+            internalQueryCBRCEMode: 1,
+            automaticCEPlanRankingStrategy: 1,
+        }),
+    );
+
+    return {
+        featureFlagCostBasedRanker: config.featureFlagCostBasedRanker.value,
+        internalQueryCBRCEMode: config.internalQueryCBRCEMode,
+        automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+    };
+}
+
+export function restoreCBRConfig(db, config) {
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            featureFlagCostBasedRanker: config.featureFlagCostBasedRanker,
+            internalQueryCBRCEMode: config.internalQueryCBRCEMode,
+            automaticCEPlanRankingStrategy: config.automaticCEPlanRankingStrategy,
+        }),
+    );
 }
