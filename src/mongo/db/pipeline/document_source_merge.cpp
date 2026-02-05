@@ -303,18 +303,23 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             fmt::format("{} cannot be used in a transaction", kStageName),
             !expCtx->getOperationContext()->inMultiDocumentTransaction());
 
-    uassert(31319,
-            fmt::format("Cannot {} to special collection: {}", kStageName, outputNs.coll()),
-            !outputNs.isSystem() ||
-                (outputNs.isSystemStatsCollection() &&
-                 isInternalClient(expCtx->getOperationContext()->getClient())));
+    // We should only do validation that depends on the client running the query when we are
+    // actually going to run the query. Other lifecycle stages like query shape re-parsing can skip
+    // it.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        uassert(31319,
+                fmt::format("Cannot {} to special collection: {}", kStageName, outputNs.coll()),
+                !outputNs.isSystem() ||
+                    (outputNs.isSystemStatsCollection() &&
+                     isInternalClient(expCtx->getOperationContext()->getClient())));
 
-    uassert(31320,
-            fmt::format("Cannot {} to internal database: {}",
-                        kStageName,
-                        outputNs.dbName().toStringForErrorMsg()),
-            !outputNs.isOnInternalDb() ||
-                isInternalClient(expCtx->getOperationContext()->getClient()));
+        uassert(31320,
+                fmt::format("Cannot {} to internal database: {}",
+                            kStageName,
+                            outputNs.dbName().toStringForErrorMsg()),
+                !outputNs.isOnInternalDb() ||
+                    isInternalClient(expCtx->getOperationContext()->getClient()));
+    }
 
     if (whenMatched == WhenMatched::kPipeline) {
         // If unspecified, 'letVariables' defaults to {new: "$$ROOT"}.
