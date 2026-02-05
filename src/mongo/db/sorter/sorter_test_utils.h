@@ -300,7 +300,7 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter,
         auto pair = inputIter->next();
         writer->addAlreadySorted(pair.first, pair.second);
     }
-    return sorterStorage.makeIterator(std::move(writer));
+    return writer->done();
 }
 
 template <typename IteratorPtr, int N>

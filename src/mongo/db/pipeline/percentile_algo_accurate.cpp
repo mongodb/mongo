@@ -96,7 +96,7 @@ void AccuratePercentile::spill() {
     }
 
     // Store a pointer to the start of this run of sorted data.
-    _spilledSortedSegments.emplace_back(sorterStorage.makeIterator(std::move(writer)));
+    _spilledSortedSegments.emplace_back(writer->done());
 
     emptyMemory();
 }

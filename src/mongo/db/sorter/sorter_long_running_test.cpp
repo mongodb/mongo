@@ -95,9 +95,8 @@ private:
                 currentBufSize = 0;
             }
         }
-        ASSERT_ITERATORS_EQUIVALENT(sorterStorage.makeIterator(std::move(sorter)),
-                                    std::make_unique<IntIterator>(0, range));
-        // Anything left in-memory is spilled to disk when we call makeIterator().
+        ASSERT_ITERATORS_EQUIVALENT(sorter->done(), std::make_unique<IntIterator>(0, range));
+        // Anything left in-memory is spilled to disk when we call done().
         currentFileSize += currentBufSize + sizeof(uint32_t);
         return currentFileSize;
     }

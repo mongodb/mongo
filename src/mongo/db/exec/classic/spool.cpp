@@ -115,7 +115,7 @@ void SpoolStage::spill() {
     for (size_t i = _nextIndex + 1; i < _buffer.size(); ++i) {
         writer->addAlreadySorted(_buffer[i], NullValue());
     }
-    _spillFileIters.emplace_back(sorterStorage.makeIterator(std::move(writer)));
+    _spillFileIters.emplace_back(writer->done());
 
     _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
                                                      _memTracker.inUseTrackedMemoryBytes(),

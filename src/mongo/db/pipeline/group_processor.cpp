@@ -270,7 +270,7 @@ void GroupProcessor::spill() {
             }
             break;
     }
-    _sortedFiles.emplace_back(sorterStorage.makeIterator(std::move(writer)));
+    _sortedFiles.emplace_back(writer->done());
 
     auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
         1, _memoryTracker.inUseTrackedMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());

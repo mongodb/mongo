@@ -434,12 +434,6 @@ public:
     virtual std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
         const SortOptions& opts, const Settings& settings = Settings()) = 0;
 
-    virtual std::shared_ptr<sorter::Iterator<Key, Value>> makeIterator(
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
-
-    virtual std::unique_ptr<sorter::Iterator<Key, Value>> makeIteratorUnique(
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
-
     virtual size_t getIteratorSize() = 0;
     /**
      * Reconstructs a sorter when resuming an index build, following persistFromShutdown.
@@ -602,16 +596,14 @@ public:
                                     const Settings& settings,
                                     std::span<std::pair<Key, Value>> data,
                                     uint32_t idx) override {
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
-        return _storage->makeIterator(std::move(writer));
+        return _spill(opts, settings, data, idx)->done();
     }
 
     std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
                                           const Settings& settings,
                                           std::span<std::pair<Key, Value>> data,
                                           uint32_t idx) override {
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
-        return _storage->makeIteratorUnique(std::move(writer));
+        return _spill(opts, settings, data, idx)->doneUnique();
     }
 
     std::shared_ptr<Iterator> spillWithHeap(
@@ -622,7 +614,7 @@ public:
             writer->addAlreadySorted(heap.top().first, heap.top().second);
             heap.pop();
         }
-        return _storage->makeIterator(std::move(writer));
+        return writer->done();
     }
 
     SorterStorage<Key, Value>& getStorage() override {
