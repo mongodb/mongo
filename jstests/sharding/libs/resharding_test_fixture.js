@@ -9,6 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 /**
  * Test fixture for resharding a sharded collection once.
@@ -102,6 +103,8 @@ export var ReshardingTest = class {
         this._primaryShardName = undefined;
         /** @private */
         this._underlyingSourceNs = undefined;
+        /** @private */
+        this._timeseriesMetaField = undefined;
 
         // Properties set by startReshardingInBackground() and withReshardingInBackground().
         /** @private */
@@ -325,22 +328,7 @@ export var ReshardingTest = class {
 
         this._primaryShardName = primaryShardName;
 
-        let tempCollNamePrefix = "system.resharding";
-        // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
-        if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
-            let bucketUUID = getUUIDFromListCollections(sourceDB, getTimeseriesBucketsColl(sourceCollection.getName()));
-
-            assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
-
-            this._sourceCollectionUUID = bucketUUID;
-
-            tempCollNamePrefix = getTimeseriesBucketsColl("resharding");
-            this._underlyingSourceNs = `${sourceDB.getName()}.${getTimeseriesBucketsColl(sourceCollection.getName())}`;
-        } else {
-            this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, collName);
-            this._underlyingSourceNs = this._ns;
-        }
-
+        const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, collName, collOptions);
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
@@ -378,24 +366,8 @@ export var ReshardingTest = class {
 
         CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, shardKeyPattern, chunks, collOptions);
 
-        let tempCollNamePrefix = "system.resharding";
-        // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
-        if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
-            let bucketUUID = getUUIDFromListCollections(sourceDB, getTimeseriesBucketsColl(sourceCollection.getName()));
-
-            assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
-
-            this._sourceCollectionUUID = bucketUUID;
-
-            tempCollNamePrefix = getTimeseriesBucketsColl("resharding");
-            this._underlyingSourceNs = `${sourceDB.getName()}.${getTimeseriesBucketsColl(sourceCollection.getName())}`;
-        } else {
-            this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, sourceCollection.getName());
-            this._underlyingSourceNs = this._ns;
-        }
-
+        const tempCollNamePrefix = this._setupTimeseriesState(sourceDB, sourceCollection.getName(), collOptions);
         const sourceCollectionUUIDString = extractUUIDFromObject(this._sourceCollectionUUID);
-
         this._tempNs = `${sourceDB.getName()}.${tempCollNamePrefix}.${sourceCollectionUUIDString}`;
 
         return sourceCollection;
@@ -874,13 +846,15 @@ export var ReshardingTest = class {
             (completionFailpoint) => completionFailpoint.conn.host === fp.conn.host,
         );
 
+        const fpWaitTimeout = isSlowBuild(fp.conn) ? 30000 : 1000;
+
         assert.soon(
             () => {
-                if (this._commandDoneSignal.getCount() === 0 || fp.waitWithTimeout(1000)) {
+                if (this._commandDoneSignal.getCount() === 0 || fp.waitWithTimeout(fpWaitTimeout)) {
                     return true;
                 }
 
-                if (completionFailpoint !== fp && completionFailpoint.waitWithTimeout(1000)) {
+                if (completionFailpoint !== fp && completionFailpoint.waitWithTimeout(fpWaitTimeout)) {
                     completionFailpoint.off();
                 }
 
@@ -1074,6 +1048,62 @@ export var ReshardingTest = class {
         }
     }
 
+    /**
+     * Sets up internal state for timeseries collections, including UUID, namespace, and metaField.
+     * Handles both viewless and non-viewless timeseries collections.
+     * @private
+     * @returns {string} The temp collection name prefix to use.
+     */
+    _setupTimeseriesState(sourceDB, collName, collOptions) {
+        let tempCollNamePrefix = "system.resharding";
+
+        // TODO SERVER-101784 simplify once only viewless timeseries collections exist.
+        if (collOptions.timeseries !== undefined && !areViewlessTimeseriesEnabled(this._st.s)) {
+            let bucketUUID = getUUIDFromListCollections(sourceDB, getTimeseriesBucketsColl(collName));
+
+            assert.neq(bucketUUID, null, `can't find ns: ${this._ns} after creating chunks`);
+
+            this._sourceCollectionUUID = bucketUUID;
+            this._timeseriesMetaField = collOptions.timeseries.metaField;
+
+            tempCollNamePrefix = getTimeseriesBucketsColl("resharding");
+            this._underlyingSourceNs = `${sourceDB.getName()}.${getTimeseriesBucketsColl(collName)}`;
+        } else {
+            this._sourceCollectionUUID = getUUIDFromListCollections(sourceDB, collName);
+            this._underlyingSourceNs = this._ns;
+            // For viewless timeseries, still store metaField for shard key translation.
+            if (collOptions.timeseries !== undefined) {
+                this._timeseriesMetaField = collOptions.timeseries.metaField;
+            }
+        }
+
+        return tempCollNamePrefix;
+    }
+
+    /**
+     * Translates a user-provided shard key to the internal format for timeseries collections.
+     * For timeseries collections, the metaField name (e.g., "metadata") is replaced with "meta".
+     * For non-timeseries collections, returns the shard key unchanged.
+     * @private
+     */
+    _translateTimeseriesShardKey(shardKey) {
+        if (this._timeseriesMetaField === undefined) {
+            return shardKey;
+        }
+
+        const translatedKey = {};
+        for (const [field, value] of Object.entries(shardKey)) {
+            if (field === this._timeseriesMetaField) {
+                translatedKey["meta"] = value;
+            } else if (field.startsWith(this._timeseriesMetaField + ".")) {
+                translatedKey["meta" + field.substring(this._timeseriesMetaField.length)] = value;
+            } else {
+                translatedKey[field] = value;
+            }
+        }
+        return translatedKey;
+    }
+
     /** @private */
     _checkCoordinatorPostState(expectedErrorCode) {
         assert.eq(
@@ -1112,8 +1142,9 @@ export var ReshardingTest = class {
         assert.neq(null, collEntry, `didn't find config.collections entry for ${this._underlyingSourceNs}`);
 
         if (expectedErrorCode === ErrorCodes.OK) {
+            const expectedShardKey = this._translateTimeseriesShardKey(this._newShardKey);
             assert.eq(
-                this._newShardKey,
+                expectedShardKey,
                 collEntry.key,
                 "shard key pattern didn't change despite resharding having succeeded",
             );

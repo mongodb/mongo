@@ -154,12 +154,21 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         _doc.getKey());
             }
 
+            BSONObj translatedKey;
+            if (cmOld.isTimeseriesCollection() &&
+                resharding::isOrdinaryReshardCollection(provenance)) {
+                auto tsOptions = cmOld.getTimeseriesFields().get().getTimeseriesOptions();
+                translatedKey =
+                    shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, *_doc.getKey());
+            }
+
             StateDoc newDoc(_doc);
             newDoc.setOldShardKey(currentShardKey);
             newDoc.setOldCollectionUUID(cmOld.getUUID());
             _updateStateDocument(opCtx, std::move(newDoc));
 
-            ConfigsvrReshardCollection configsvrReshardCollection(nss(), *(_doc.getKey()));
+            auto finalShardKey = translatedKey.isEmpty() ? *_doc.getKey() : translatedKey;
+            ConfigsvrReshardCollection configsvrReshardCollection(nss(), finalShardKey);
             configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
             configsvrReshardCollection.setCollation(_doc.getCollation());
@@ -226,7 +235,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                    "when using the forceRedistribution option. The "
                                    "forceRedistribution option is meant for redistributing the "
                                    "collection to a different set of shards.",
-                            cmOld.getShardKeyPattern().isShardKey(*(_doc.getKey())));
+                            cmOld.getShardKeyPattern().isShardKey(finalShardKey));
                 }
             }
 

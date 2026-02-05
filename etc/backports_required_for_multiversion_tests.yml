@@ -135,6 +135,8 @@ last-continuous:
       ticket: SERVER-117009
     - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
       ticket: SERVER-117009
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
+      ticket: SERVER-111411
   suites: null
 last-lts:
   all:
@@ -768,4 +770,6 @@ last-lts:
       ticket: SERVER-117009
     - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
       ticket: SERVER-117009
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
+      ticket: SERVER-111411
   suites: null

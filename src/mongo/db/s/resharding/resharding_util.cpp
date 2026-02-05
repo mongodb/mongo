@@ -521,6 +521,10 @@ bool isRewriteCollection(const boost::optional<ReshardingProvenanceEnum>& proven
     return provenance && provenance.get() == ReshardingProvenanceEnum::kRewriteCollection;
 }
 
+bool isOrdinaryReshardCollection(const boost::optional<ReshardingProvenanceEnum>& provenance) {
+    return provenance && provenance.get() == ReshardingProvenanceEnum::kReshardCollection;
+}
+
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName) {
     return std::make_shared<ThreadPool>([&] {
         ThreadPool::Options options;
@@ -562,16 +566,6 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto reshardingUUID = UUID::gen();
     auto existingUUID = collEntry.getUuid();
     auto shardKeySpec = request.getKey();
-
-    // moveCollection/unshardCollection are called with _id as the new shard key since
-    // that's an acceptable value for tracked unsharded collections so we can skip this.
-    if (collEntry.getTimeseriesFields() &&
-        (!setProvenance ||
-         (*request.getProvenance() == ReshardingProvenanceEnum::kReshardCollection))) {
-        auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
-        shardKeySpec =
-            shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, request.getKey());
-    }
 
     auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());
 
