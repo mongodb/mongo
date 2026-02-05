@@ -188,7 +188,8 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : txnOps) {
         try {
-            if (op.getOpType() == repl::OpTypeEnum::kNoop) {
+            if (op.getOpType() == repl::OpTypeEnum::kNoop ||
+                op.getOpType() == repl::OpTypeEnum::kKeyMaterial) {
                 continue;
             }
 
@@ -628,7 +629,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // index build, but the index build can't re-acquire its X lock because of the
     // transaction.
     for (const auto& op : txnOps) {
-        if (op.getOpType() == repl::OpTypeEnum::kNoop) {
+        if (op.getOpType() == repl::OpTypeEnum::kNoop ||
+            op.getOpType() == repl::OpTypeEnum::kKeyMaterial) {
             continue;
         }
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);

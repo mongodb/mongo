@@ -464,8 +464,8 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
         uuids.insert(opUUID.get());
     }
 
-    // No namespaces for a no-op.
-    if (opType == OpTypeEnum::kNoop) {
+    // No namespaces for a no-op or keyMaterial.
+    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial) {
         return std::make_pair(std::set<NamespaceString>(), std::set<UUID>());
     }
 
@@ -978,7 +978,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
     }
 
     // No information to record for a no-op.
-    if (opType == OpTypeEnum::kNoop) {
+    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial) {
         return Status::OK();
     }
 

@@ -819,6 +819,7 @@ mongo_cc_library(
         ":set_multikey_metadata_oplog_entry_idl",
         ":timestamp_block",
         ":truncate_range_oplog_entry_idl",
+        "//src/mongo/crypto:oplog_key_entry_handler",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:dbhelpers",

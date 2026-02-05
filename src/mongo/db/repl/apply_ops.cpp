@@ -236,9 +236,10 @@ Status _applyOps(OperationContext* opCtx,
                                                                oplogApplicationMode,
                                                                isDataConsistent);
                         }
-
                         case OpTypeEnum::kNoop:
+                        case OpTypeEnum::kKeyMaterial: {
                             return Status::OK();
+                        }
                     }
                     MONGO_UNREACHABLE;
                 },

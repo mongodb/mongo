@@ -38,6 +38,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/shell/bench.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -441,6 +442,7 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
+        case OpTypeEnum::kKeyMaterial:
             return false;
     }
     MONGO_UNREACHABLE;
@@ -465,6 +467,7 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
         case OpTypeEnum::kContainerInsert:
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kNoop:
+        case OpTypeEnum::kKeyMaterial:
             return false;
     }
     MONGO_UNREACHABLE;

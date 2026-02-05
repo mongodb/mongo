@@ -57,6 +57,7 @@ enums:
             kContainerInsert: "ci"
             kContainerDelete: "cd"
             kNoop: "n"
+            kKeyMaterial: "km"
     RetryImage:
         description:
             "Dictates whether a pre-image or post-image is to be stored on behalf of this

@@ -562,7 +562,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::setUpPostTransportLayer,
                                        &startupTimeElapsedBuilder);
-        setUpPostTransportLayer(serviceContext);
+        auto postTransportOpCtx = serviceContext->makeOperationContext(&cc());
+        setUpPostTransportLayer(serviceContext, postTransportOpCtx.get());
     }
 
     auto& rss = rss::ReplicatedStorageService::get(serviceContext);

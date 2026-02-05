@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/crypto/oplog_key_entry_handler.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
@@ -527,7 +528,8 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
     invariant(oplogEntry->getUuid() || oplogEntry->getOpType() == OpTypeEnum::kNoop ||
-                  oplogEntry->getOpType() == OpTypeEnum::kCommand,
+                  oplogEntry->getOpType() == OpTypeEnum::kCommand ||
+                  oplogEntry->getOpType() == OpTypeEnum::kKeyMaterial,
               str::stream() << "Expected uuid for logOp with oplog entry: "
                             << redact(oplogEntry->toBSON()));
 
@@ -542,8 +544,9 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         return {};
     }
 
-    // TODO SERVER-51301 to remove this block.
-    if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop) {
+    // TODO SERVER-51301 to remove this block for kNoop, not kKeyMaterial.
+    if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop ||
+        oplogEntry->getOpType() == repl::OpTypeEnum::kKeyMaterial) {
         shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
     }
 
@@ -1697,12 +1700,33 @@ Status applyOperation_inlock(OperationContext* opCtx,
         shouldUseGlobalOpCounters ? &serviceOpCounters(ClusterRole::ShardServer) : &replOpCounters;
 
     auto opType = op.getOpType();
+
     if (opType == OpTypeEnum::kNoop) {
         // no op
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }
 
+        return Status::OK();
+    } else if (opType == OpTypeEnum::kKeyMaterial) {
+        if (mode == OplogApplication::Mode::kSecondary ||
+            mode == OplogApplication::Mode::kInitialSync || OplogApplication::inRecovering(mode)) {
+            auto handler = OplogKeyEntryHandler::get(opCtx->getServiceContext());
+
+            // We should always have a handler here, this check is to handle any shutdown ordering
+            // issues We also do not expect the KeyMaterial oplog entry to have any bearing on
+            // initial sync.
+            if (handler) {
+                auto status = handler->applyOplogEntry(opCtx, op);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        }
+
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
         return Status::OK();
     }
 

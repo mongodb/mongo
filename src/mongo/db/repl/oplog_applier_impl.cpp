@@ -48,6 +48,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/replication_metrics.h"
@@ -1112,10 +1113,21 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                                                            &replOpCounters);
 
     auto op = entryOrGroupedInserts.getOp();
+    if (op->getOpType() == OpTypeEnum::kKeyMaterial) {
+        if (!status.isOK()) {
+            // We were unable to apply a key material oplog, we should log and shutdown server.
+            LOGV2_ERROR(11722319, "Unable to apply KeyMaterial oplog entry", "error"_attr = status);
+            return status;
+        }
+    }
+
     if (op->getOpType() == OpTypeEnum::kNoop) {
         // No-ops should never fail application, since there's nothing to do.
+        // If keyMaterial has failed, it should be caught above
         invariant(status);
+    }
 
+    if (op->getOpType() == OpTypeEnum::kNoop || op->getOpType() == OpTypeEnum::kKeyMaterial) {
         if (op->isNewPrimaryNoop()) {
             ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op->getWallClockTime(),
                                                                       applyStartTime);

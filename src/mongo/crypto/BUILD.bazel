@@ -34,6 +34,18 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "oplog_key_entry_handler",
+    srcs = [
+        "oplog_key_entry_handler.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
+mongo_cc_library(
     name = "encrypted_field_config",
     srcs = [
         "encryption_fields_gen",
