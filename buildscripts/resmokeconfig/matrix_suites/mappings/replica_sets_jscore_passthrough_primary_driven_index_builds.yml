@@ -9,3 +9,5 @@ overrides:
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"
+  # TODO (SERVER-119064): Re-enable core time-series tests.
+  - "primary_driven_index_builds.exclude_core_timeseries_tests"
