@@ -4,9 +4,8 @@
 
 "use strict";
 
-import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
-import {getParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 // Test initialization.
 
@@ -287,16 +286,41 @@ function multiIndexScan() {
     const filter = {$or: [{a: 10, b: {$in: [5, 6]}, c: {$gt: 3}}, {d: 1}]};
     assert.commandWorked(coll.createIndexes(indexes));
 
+    // Test with tie breaking heuristics disabled
     assertIndexScan(false, filter, [{a: 1, b: 1}, {d: 1}]);
 
-    if (
-        getPlanRankerMode(db) == "automaticCE" &&
-        getParameter(conn, "automaticCEPlanRankingStrategy") == "CBRForNoMultiplanningResults"
-    ) {
-        // When automaticCE is enabled, even if we don't fall back to CBR we do not call the subplanner in this case. This yields a different result.
-        assertIndexScan(true, filter, [{a: 1, b: 1}, {d: 1}]);
+    // Test with tie breaking heuristics enabled
+    // There are 3 cases now handled by this test:
+
+    // SBE (delayOrSkipSubplanning() returns false if the engine is SBE, so essentially we are running in multiPlanning
+    // mode here regardless of whether automaticCE is enabled or not)
+    // - Subplanner runs
+    // - Chooses plan with {a, b, c} index
+    // - 0 rejected plans
+
+    // Classic engine in multiPlanning mode
+    // - Subplanner runs
+    // - Chooses plan with {a, b, c} index (same plan as when using SBE)
+    // - 0 rejected plans
+
+    // Classic engine in automaticCE mode
+    // - Subplanner does not run, planner does not fall back to CBR. Multiplanner chooses.
+    // - Chooses plan with {a, b} index
+    // - Does not fall back to CBR, subplanner does not run
+    // - 1 rejected plan (this is the plan chosen in multiPlanning mode/when running on SBE)
+
+    // When the multiplanner runs, the tie breaking heuristics are identical between the two plans because they are being
+    // calculated for the plan as a whole. When the subplanner runs, these calculations are done only for the relevant
+    // index scans and so the longer index {a, b, c} wins.
+    const explain = setParamsAndRunCommand(true, filter);
+    if (getEngine(explain) == "classic" && getPlanRankerMode(db) == "automaticCE") {
+        // When automaticCE ranking mode is enabled and the classic engine is used, even if we don't fall back to CBR we do not
+        // call the subplanner in this case. This yields a different result.
+        assertIndexScan(true, filter, [{a: 1, b: 1}, {d: 1}], explain);
     } else {
-        assertIndexScan(true, filter, [{a: 1, b: 1, c: 1}, {d: 1}]);
+        // If the SBE engine (which will behave as if ranking mode is multiPlanning) is used or plan ranking mode is set to
+        // multiPlanning, the subplanner will run.
+        assertIndexScan(true, filter, [{a: 1, b: 1, c: 1}, {d: 1}], explain);
     }
 
     for (const index of indexes) {
