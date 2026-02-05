@@ -47,16 +47,16 @@
 
 namespace mongo::sbe {
 /**
- * Performs a traditional hash join. All rows from the 'outer' side are used to construct a hash
- * table. Keys from the 'inner' side are used to probe the hash table and produce output rows.  This
+ * Performs a traditional hash join. All rows from the 'inner' side are used to construct a hash
+ * table. Keys from the 'outer' side are used to probe the hash table and produce output rows.  This
  * is an equality join where the join is defined by equality between the 'outerCond' slot vector on
  * the outer side and the 'innerCond' slot vector on the inner side. These two slot vectors must
  * have the same length. Each side can define additional slots which appear in each of the rows
  * produced by the join, 'outerProjects' and 'innerProjects'.
  *
- * This is a binding reflector for the outer/build side; since the data is materialized in a hash
- * table, stages higher in the tree cannot see any slots lower in the tree on the outer side. This
- * is _not_ the case for the inner side, since it can stream data as it probes the hash table.
+ * This is a binding reflector for the inner/build side; since the data is materialized in a hash
+ * table, stages higher in the tree cannot see any slots lower in the tree on the inner side. This
+ * is _not_ the case for the outer side, since it can stream data as it probes the hash table.
  *
  * The optional 'collatorSlot' can be provided to make the join predicate use a special definition
  * for string equality. For example, this can be used to perform a case-insensitive join on string
@@ -115,23 +115,21 @@ private:
     const value::SlotVector _innerProjects;
     const boost::optional<value::SlotId> _collatorSlot;
 
-    // All defined values from the outer side (i.e. they come from the hash table).
-    value::SlotAccessorMap _outOuterAccessors;
-
-    // Accessors of input condition values (keys) that are being inserted into the hash table.
+    // Accessors of input condition values (keys) that are being used for probing he hash table.
     std::vector<value::SlotAccessor*> _inOuterKeyAccessors;
-
-    // Accessors of output keys.
-    std::vector<std::unique_ptr<HashKeyAccessor>> _outOuterKeyAccessors;
-
-    // Accessors of input projection values that are build inserted into the hash table.
-    std::vector<value::SlotAccessor*> _inOuterProjectAccessors;
-
-    // Accessors of output projections.
-    std::vector<std::unique_ptr<HashProjectAccessor>> _outOuterProjectAccessors;
 
     // Accessors of input condition values (keys) that are being inserted into the hash table.
     std::vector<value::SlotAccessor*> _inInnerKeyAccessors;
+    // Accessors of input projection values that are being inserted into the hash table.
+    std::vector<value::SlotAccessor*> _inInnerProjectAccessors;
+
+    // Accessors of output keys that are read from the hash table.
+    std::vector<std::unique_ptr<HashKeyAccessor>> _outInnerKeyAccessors;
+    // Accessors of output projections that are read from the hash table.
+    std::vector<std::unique_ptr<HashProjectAccessor>> _outInnerProjectAccessors;
+
+    // All defined values from the inner side (i.e. they come from the hash table).
+    value::SlotAccessorMap _outInnerAccessors;
 
     // Accessor for collator. Only set if collatorSlot provided during construction.
     value::SlotAccessor* _collatorAccessor = nullptr;
@@ -142,5 +140,12 @@ private:
     boost::optional<TableType> _ht;
     TableType::iterator _htIt;
     TableType::iterator _htItEnd;
+
+    PlanStage* outerChild() const {
+        return _children[0].get();
+    }
+    PlanStage* innerChild() const {
+        return _children[1].get();
+    }
 };
 }  // namespace mongo::sbe

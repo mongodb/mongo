@@ -66,8 +66,8 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
 }
 
 std::unique_ptr<PlanStage> HashJoinStage::clone() const {
-    return std::make_unique<HashJoinStage>(_children[0]->clone(),
-                                           _children[1]->clone(),
+    return std::make_unique<HashJoinStage>(outerChild()->clone(),
+                                           innerChild()->clone(),
                                            _outerCond,
                                            _outerProjects,
                                            _innerCond,
@@ -79,8 +79,8 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {
-    _children[0]->prepare(ctx);
-    _children[1]->prepare(ctx);
+    outerChild()->prepare(ctx);
+    innerChild()->prepare(ctx);
 
     if (_collatorSlot) {
         _collatorAccessor = getAccessor(ctx, *_collatorSlot);
@@ -95,9 +95,7 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(4822824, str::stream() << "duplicate field: " << slot, inserted);
 
-        _inOuterKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-        _outOuterKeyAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, counter++));
-        _outOuterAccessors[slot] = _outOuterKeyAccessors.back().get();
+        _inOuterKeyAccessors.emplace_back(outerChild()->getAccessor(ctx, slot));
     }
 
     counter = 0;
@@ -105,28 +103,30 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(4822825, str::stream() << "duplicate field: " << slot, inserted);
 
-        _inInnerKeyAccessors.emplace_back(_children[1]->getAccessor(ctx, slot));
+        _inInnerKeyAccessors.emplace_back(innerChild()->getAccessor(ctx, slot));
+        _outInnerKeyAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, counter++));
+        _outInnerAccessors[slot] = _outInnerKeyAccessors.back().get();
     }
 
     counter = 0;
-    for (auto& slot : _outerProjects) {
+    for (auto& slot : _innerProjects) {
         auto [it, inserted] = dupCheck.emplace(slot);
         uassert(4822826, str::stream() << "duplicate field: " << slot, inserted);
 
-        _inOuterProjectAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-        _outOuterProjectAccessors.emplace_back(
+        _inInnerProjectAccessors.emplace_back(innerChild()->getAccessor(ctx, slot));
+        _outInnerProjectAccessors.emplace_back(
             std::make_unique<HashProjectAccessor>(_htIt, counter++));
-        _outOuterAccessors[slot] = _outOuterProjectAccessors.back().get();
+        _outInnerAccessors[slot] = _outInnerProjectAccessors.back().get();
     }
 
-    _probeKey.resize(_inInnerKeyAccessors.size());
+    _probeKey.resize(_inOuterKeyAccessors.size());
 }
 
 value::SlotAccessor* HashJoinStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (auto it = _outOuterAccessors.find(slot); it != _outOuterAccessors.end()) {
+    if (auto it = _outInnerAccessors.find(slot); it != _outInnerAccessors.end()) {
         return it->second;
     }
-    return _children[1]->getAccessor(ctx, slot);
+    return outerChild()->getAccessor(ctx, slot);
 }
 
 void HashJoinStage::open(bool reOpen) {
@@ -144,30 +144,29 @@ void HashJoinStage::open(bool reOpen) {
     }
 
     _commonStats.opens++;
-    _children[0]->open(reOpen);
-    // Insert the outer side into the hash table.
-    while (_children[0]->getNext() == PlanState::ADVANCED) {
-        value::MaterializedRow key{_inOuterKeyAccessors.size()};
-        value::MaterializedRow project{_inOuterProjectAccessors.size()};
+    innerChild()->open(reOpen);
+    // Insert the inner side into the hash table.
+    while (innerChild()->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow key{_inInnerKeyAccessors.size()};
+        value::MaterializedRow project{_inInnerProjectAccessors.size()};
 
         size_t idx = 0;
         // Copy keys in order to do the lookup.
-        for (auto& p : _inOuterKeyAccessors) {
+        for (auto& p : _inInnerKeyAccessors) {
             key.reset(idx++, p->getCopyOfValue());
         }
 
         idx = 0;
         // Copy projects.
-        for (auto& p : _inOuterProjectAccessors) {
+        for (auto& p : _inInnerProjectAccessors) {
             project.reset(idx++, p->getCopyOfValue());
         }
 
         _ht->emplace(std::move(key), std::move(project));
     }
 
-    _children[0]->close();
-
-    _children[1]->open(reOpen);
+    innerChild()->close();
+    outerChild()->open(reOpen);
 
     _htIt = _ht->end();
     _htItEnd = _ht->end();
@@ -183,7 +182,7 @@ PlanState HashJoinStage::getNext() {
 
     if (_htIt == _htItEnd) {
         while (_htIt == _htItEnd) {
-            auto state = _children[1]->getNext();
+            auto state = outerChild()->getNext();
             if (state == PlanState::IS_EOF) {
                 // LEFT and OUTER joins should enumerate "non-returned" rows here.
                 return trackPlanState(state);
@@ -191,7 +190,7 @@ PlanState HashJoinStage::getNext() {
 
             // Copy keys in order to do the lookup.
             size_t idx = 0;
-            for (auto& p : _inInnerKeyAccessors) {
+            for (auto& p : _inOuterKeyAccessors) {
                 auto [tag, val] = p->getViewOfValue();
                 _probeKey.reset(idx++, false, tag, val);
             }
@@ -211,14 +210,14 @@ void HashJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    _children[1]->close();
+    outerChild()->close();
     _ht = boost::none;
 }
 
 std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
-    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
+    ret->children.emplace_back(outerChild()->getStats(includeDebugInfo));
+    ret->children.emplace_back(innerChild()->getStats(includeDebugInfo));
     return ret;
 }
 
@@ -257,7 +256,7 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+    DebugPrinter::addBlocks(ret, outerChild()->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     DebugPrinter::addKeyword(ret, "right");
@@ -282,7 +281,7 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
-    DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));
+    DebugPrinter::addBlocks(ret, innerChild()->debugPrint(debugPrintInfo));
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
