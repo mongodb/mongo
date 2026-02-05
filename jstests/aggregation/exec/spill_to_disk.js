@@ -52,6 +52,7 @@ function assertSpillingOccurredInSbeExplain(groupStats) {
 }
 
 const sharded = FixtureHelpers.isSharded(coll);
+const isMongos = FixtureHelpers.isMongos(db);
 
 const memoryLimitMB = sharded ? 200 : 100;
 
@@ -439,6 +440,11 @@ function runTest_MultipleLocalForeignRecords({
         },
     ];
     const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
+
+    // Routers must be refreshed to know if the pipeline will be split once execution starts.
+    if (isMongos) {
+        assert.commandWorked(db.adminCommand({flushRouterConfig: 1}));
+    }
     const explain = localColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
     const pipelineWasSplit = !!explain.splitPipeline;
 
