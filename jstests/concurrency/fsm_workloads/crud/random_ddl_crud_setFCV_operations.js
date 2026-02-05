@@ -20,7 +20,6 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
-import {assertSetFCVSoon} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/random_ddl_crud_operations.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
@@ -47,7 +46,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     };
 
     $config.teardown = function (db, collName, cluster) {
-        assertSetFCVSoon(db, latestFCV);
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
 
     return $config;
