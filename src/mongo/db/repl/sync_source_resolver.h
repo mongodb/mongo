@@ -94,7 +94,6 @@ struct SyncSourceResolverResponse {
  */
 class SyncSourceResolver {
 public:
-    static const Seconds kFetcherTimeout;
     static const Seconds kFetcherErrorDenylistDuration;
     static const Seconds kOplogEmptyDenylistDuration;
     static const Seconds kFirstOplogEntryEmptyDenylistDuration;

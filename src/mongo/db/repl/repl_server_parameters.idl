@@ -740,6 +740,17 @@ server_parameters:
         default: false
         redact: false
 
+    syncSourceResolverFindFetcherTimeoutMillis:
+        description: >-
+            The maximum amount of time that the fetcher in the sync source resolver will wait
+            for the find to return. This value is adjustable to allow users to minimize
+            the amount of time the resolver will spend waiting for a sync source candidate to respond.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: syncSourceResolverFindFetcherTimeoutMillis
+        default: 30000
+        redact: false
+
 feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.

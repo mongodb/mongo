@@ -50,6 +50,7 @@
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/classic/projection.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
@@ -160,6 +161,7 @@ namespace {
 Rarely _samplerFunctionJs, _samplerWhereClause;
 
 MONGO_FAIL_POINT_DEFINE(allowExternalReadsForReverseOplogScanRule);
+MONGO_FAIL_POINT_DEFINE(hangBeforeFetcherFindCommandOnOplog);
 
 const auto kTermField = "term"_sd;
 
@@ -667,6 +669,14 @@ public:
             // oplog read request.
             boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
             if (term && isOplogNss) {
+                if (MONGO_unlikely(hangBeforeFetcherFindCommandOnOplog.shouldFail())) {
+                    LOGV2(10616500,
+                          "Hit hangBeforeFetcherFindCommandOnOplog enabled, hanging while set");
+                    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                        &hangBeforeFetcherFindCommandOnOplog,
+                        opCtx,
+                        "hangBeforeFetcherFindCommandOnOplog");
+                }
                 // We do not want to wait to take tickets for internal (replication) oplog reads.
                 // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
                 // depend on data reaching secondaries in order to proceed; and secondaries may get

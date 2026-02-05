@@ -137,6 +137,8 @@ last-continuous:
       ticket: SERVER-117009
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
       ticket: SERVER-111411
+    - test_file: jstests/replsets/configurable_fetcher_timeout.js
+      ticket: SERVER-106165
   suites: null
 last-lts:
   all:
@@ -772,4 +774,6 @@ last-lts:
       ticket: SERVER-117009
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
       ticket: SERVER-111411
+    - test_file: jstests/replsets/configurable_fetcher_timeout.js
+      ticket: SERVER-106165
   suites: null
