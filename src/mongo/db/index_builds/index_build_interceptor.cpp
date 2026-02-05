@@ -90,7 +90,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
           return SkippedRecordTracker(
               opCtx, *indexBuildInfo.skippedRecordsTrackerIdent, /*tableExists=*/resume);
       }()),
-      _skipNumAppliedCheck(true) {
+      _skipNumAppliedCheck(resume) {
     if (entry->descriptor()->unique()) {
         uassert(10709203,
                 "constraintViolationsTrackerIdent is not provided",
