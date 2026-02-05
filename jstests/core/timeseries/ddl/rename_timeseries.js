@@ -169,10 +169,10 @@ function runViewLessTimeseriesTests(targetDbName) {
             jsTest.log("Renaming a sharded viewless timeseries collection to a different db fails");
             assert.commandFailedWithCode(
                 db.adminCommand({
-                    renameCollection: `${dbName}.${bucketsCollName}`,
+                    renameCollection: `${dbName}.${collName}`,
                     to: `${targetDbName}.newColl`,
                 }),
-                ErrorCodes.IllegalOperation,
+                ErrorCodes.CommandFailed,
             );
         }
     }

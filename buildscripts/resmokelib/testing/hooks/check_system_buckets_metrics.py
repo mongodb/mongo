@@ -1,13 +1,18 @@
 """Test hook that verifies no commands directly targeted system.buckets collections."""
 
+import sys
+
 import pymongo
 
+import buildscripts.util.testname as testname_utils
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
 from buildscripts.resmokelib.testing.fixtures.interface import build_client
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import _MongoSFixture
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from buildscripts.resmokelib.testing.hooks import interface
+
+_IS_WINDOWS = sys.platform == "win32"
 
 
 class CheckSystemBucketsMetrics(interface.Hook):
@@ -19,6 +24,38 @@ class CheckSystemBucketsMetrics(interface.Hook):
 
     IS_BACKGROUND = False
 
+    # TODO(SERVER-118887): Investigate tests in this list and decide if they should be excluded or not.
+    # Tests that intentionally target system.buckets collections directly
+    SKIP_TESTS = [
+        # Calls collMod on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_collmod.js",
+        # Calls drop on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_drop.js",
+        "jstests/core/catalog/list_catalog_stage_consistency.js",
+        "jstests/core/timeseries/ddl/timeseries_drop_legacy.js",
+        # Calls multiple commands on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_user_system_buckets.js",
+        "jstests/core/timeseries/ddl/timeseries_list_catalog.js",
+        # Calls rename on system.buckets collection.
+        "jstests/core/timeseries/ddl/rename_timeseries.js",
+        # Calls getPlanCache.list on system.buckets collection.
+        "jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js",
+        # Calls createCollection on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_clustered_index_options.js",
+        # calls TimeseriesTest.bucketsMayHaveMixedSchemaData which
+        # internally calls aggregate on system.buckets collection
+        "jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js",
+        "jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js",
+        "jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js",
+        # Calls compact on system.buckets collection.
+        "jstests/core/timeseries/ddl/timeseries_compact.js",
+        # Calls getMore on system.buckets collection.
+        "jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js",
+    ]
+
+    if _IS_WINDOWS:
+        SKIP_TESTS = [testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS]
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckSystemBucketsMetrics."""
         description = "Check system.buckets metrics"
@@ -28,6 +65,10 @@ class CheckSystemBucketsMetrics(interface.Hook):
 
     def before_test(self, test, test_report):
         """Capture baseline metrics before test execution."""
+        if test.test_name in self.SKIP_TESTS:
+            self.logger.info(f"Skipping CheckSystemBucketsMetrics for {test.test_name}")
+            return
+
         for cluster in self.fixture.get_independent_clusters():
             for node in cluster._all_mongo_d_s_t():
                 if not isinstance(node, (MongoDFixture, ExternalFixture, _MongoSFixture)):
@@ -57,6 +98,9 @@ class CheckSystemBucketsMetrics(interface.Hook):
 
     def after_test(self, test, test_report):
         """Check metrics after each test."""
+        if test.test_name in self.SKIP_TESTS:
+            return
+
         hook_test_case = CheckSystemBucketsMetricsTestCase.create_after_test(
             test.logger, test, self
         )

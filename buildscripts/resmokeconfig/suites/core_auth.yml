@@ -44,6 +44,10 @@ executor:
       eval: jsTest.authenticate(db.getMongo())
       <<: *authOptions
   hooks:
+    # ValidateCollections may issue direct system.buckets commands, so run CheckSystemBucketsMetrics first.
+    - class: CheckSystemBucketsMetrics
+      shell_options:
+        <<: *authOptions
     - class: ValidateCollections
       shell_options:
         global_vars:
