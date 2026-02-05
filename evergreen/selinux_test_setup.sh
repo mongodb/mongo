@@ -31,7 +31,7 @@ if ! sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$
 fi
 
 # install packages needed by check_has_tag.py
-PYTHON=/opt/mongodbtoolchain/v5/bin/python3
+PYTHON=/opt/mongodbtoolchain/v5/bin/python3.13
 if [[ (-f "$PYTHON" || -L "$PYTHON") && -x "$PYTHON" ]]; then
     echo "==== Found python3 in $PYTHON"
     $PYTHON -m pip install pyyaml

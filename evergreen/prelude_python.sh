@@ -5,9 +5,16 @@ elif [ "$(uname)" = "Darwin" ]; then
     python='/Library/Frameworks/Python.Framework/Versions/3.13/bin/python3'
     echo "Executing on mac, setting python to ${python}"
 else
-    if [ -f /opt/mongodbtoolchain/v5/bin/python3 ]; then
-        python="/opt/mongodbtoolchain/v5/bin/python3"
-        echo "Found python in v5 toolchain, setting python to ${python}"
+    # Check if v5 toolchain exists - it requires Python 3.13
+    if [ -d /opt/mongodbtoolchain/v5 ]; then
+        if [ -f /opt/mongodbtoolchain/v5/bin/python3.13 ]; then
+            python="/opt/mongodbtoolchain/v5/bin/python3.13"
+            echo "Found python 3.13 in v5 toolchain, setting python to ${python}"
+        else
+            echo "ERROR: v5 toolchain exists but Python 3.13 is not available at /opt/mongodbtoolchain/v5/bin/python3.13"
+            echo "The v5 toolchain requires Python 3.13. Please ensure python3.13 is installed in the toolchain."
+            return 1
+        fi
     elif [ -f /opt/mongodbtoolchain/v4/bin/python3 ]; then
         python="/opt/mongodbtoolchain/v4/bin/python3"
         echo "Found python in v4 toolchain, setting python to ${python}"

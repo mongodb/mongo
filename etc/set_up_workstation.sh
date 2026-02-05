@@ -56,7 +56,7 @@ setup_mongo_venv() {
     # PYTHON_KEYRING_BACKEND is needed to make poetry install work
     # See guide https://wiki.corp.mongodb.com/display/KERNEL/Virtual+Workstation
     export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-    /opt/mongodbtoolchain/v4/bin/python3 -m venv python3-venv
+    /opt/mongodbtoolchain/v5/bin/python3.13 -m venv python3-venv
 
     source ./python3-venv/bin/activate
     POETRY_VIRTUALENVS_IN_PROJECT=true poetry install --no-root --sync
@@ -86,17 +86,17 @@ setup_pipx() {
     else
         export PATH="$PATH:$HOME/.local/bin"
         local venv_name="tmp-pipx-venv"
-        /opt/mongodbtoolchain/v4/bin/python3 -m venv $venv_name
+        /opt/mongodbtoolchain/v5/bin/python3.13 -m venv $venv_name
 
         # virtualenv doesn't like nounset
         set +o nounset
         source $venv_name/bin/activate
         set -o nounset
 
-        python -m pip install --upgrade "pip<20.3"
+        python -m pip --disable-pip-version-check install "pip==25.3" "wheel==0.45.1"
         python -m pip install pipx
 
-        pipx install pipx --python /opt/mongodbtoolchain/v4/bin/python3 --force
+        pipx install pipx --python /opt/mongodbtoolchain/v5/bin/python3.13 --force
         pipx ensurepath --force
 
         set +o nounset

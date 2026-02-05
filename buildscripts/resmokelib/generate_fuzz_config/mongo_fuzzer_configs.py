@@ -8,14 +8,26 @@ import stat
 from buildscripts.resmokelib import config, utils
 
 
-def generate_normal_wt_parameters(rng, value):
+def safe_randint(rng, min_val, max_val, param_name=None):
+    """Wrapper for randint() that validates integer arguments and provides context on failure."""
+    if not isinstance(min_val, int) or not isinstance(max_val, int):
+        context = f" (parameter: {param_name})" if param_name else ""
+        raise TypeError(
+            f"randint() requires integer arguments{context}. "
+            f"Got min={min_val} (type={type(min_val).__name__}), max={max_val} (type={type(max_val).__name__}). "
+            f"Fix: use int() in config file or add 'isUniform': True for float ranges."
+        )
+    return rng.randint(min_val, max_val)
+
+
+def generate_normal_wt_parameters(rng, value, param_name=None):
     """Returns the value assigned the WiredTiger parameters (both eviction or table) based on the fields of the parameters in the config_fuzzer_wt_limits.py."""
     if "choices" in value:
         ret = rng.choice(value["choices"])
         if "multiplier" in value:
             ret *= value["multiplier"]
     elif "min" in value and "max" in value:
-        ret = rng.randint(value["min"], value["max"])
+        ret = safe_randint(rng, value["min"], value["max"], param_name)
     return ret
 
 
@@ -96,7 +108,7 @@ def generate_eviction_configs(rng):
     ret = generate_special_eviction_configs(rng, ret, params)
     ret.update(
         {
-            key: generate_normal_wt_parameters(rng, value)
+            key: generate_normal_wt_parameters(rng, value, key)
             for key, value in params.items()
             if key not in excluded_normal_params
         }
@@ -165,7 +177,7 @@ def generate_table_configs(rng):
 
     ret.update(
         {
-            key: generate_normal_wt_parameters(rng, value)
+            key: generate_normal_wt_parameters(rng, value, key)
             for key, value in params.items()
             if key not in excluded_normal_params
         }
@@ -222,7 +234,22 @@ def generate_encryption_config(rng: random.Random):
     return ret
 
 
-def generate_normal_mongo_parameters(rng, value):
+def generate_runtime_mongod_parameter(rng, value, param_name):
+    """Generate a runtime mongod parameter value, handling mongod-specific special cases.
+
+    This function is used for runtime fuzzing of mongod parameters and ensures consistent
+    behavior with startup generation for parameters that have special handling.
+    """
+    # Special case: flowControlThresholdLagPercentage uses rng.random() which returns [0.0, 1.0)
+    # This matches the behavior in generate_flow_control_parameters() used at startup.
+    if param_name == "flowControlThresholdLagPercentage":
+        return rng.random()
+
+    # Default to normal generation for all other parameters
+    return generate_normal_mongo_parameters(rng, value, param_name)
+
+
+def generate_normal_mongo_parameters(rng, value, param_name=None):
     """Returns the value assigned the mongod or mongos parameter based on the fields of the parameters in the config_fuzzer_limits.py."""
 
     if "document" in value:
@@ -231,7 +258,7 @@ def generate_normal_mongo_parameters(rng, value):
             if "exclude_prob" in doc_value and rng.random() < doc_value["exclude_prob"]:
                 # Exclude this key from the document
                 continue
-            ret[doc_key] = generate_normal_mongo_parameters(rng, doc_value)
+            ret[doc_key] = generate_normal_mongo_parameters(rng, doc_value, doc_key)
     elif "isUniform" in value:
         ret = rng.uniform(value["min"], value["max"])
     elif "isRandomizedChoice" in value:
@@ -241,7 +268,7 @@ def generate_normal_mongo_parameters(rng, value):
     elif "choices" in value:
         ret = rng.choice(value["choices"])
     elif "min" in value and "max" in value:
-        ret = rng.randint(value["min"], value["max"])
+        ret = safe_randint(rng, value["min"], value["max"], param_name)
         if "multiplier" in value:
             ret *= value["multiplier"]
     elif "default" in value:
@@ -338,10 +365,12 @@ def generate_flow_control_parameters(rng, ret, flow_control_params, params):
     ret["enableFlowControl"] = rng.choice(params["enableFlowControl"]["choices"])
     if ret["enableFlowControl"]:
         for name in flow_control_params:
+            if name == "flowControlThresholdLagPercentage":
+                continue  # Handled specially below with rng.random()
             if "isUniform" in params[name]:
                 ret[name] = rng.uniform(params[name]["min"], params[name]["max"])
             else:
-                ret[name] = rng.randint(params[name]["min"], params[name]["max"])
+                ret[name] = safe_randint(rng, params[name]["min"], params[name]["max"], name)
         ret["flowControlThresholdLagPercentage"] = rng.random()
     return ret
 
@@ -398,7 +427,7 @@ def generate_mongod_parameters(rng):
     # Range through all other parameters and assign the parameters based on the keys that are available or the parameter set lists defined above.
     ret.update(
         {
-            key: generate_normal_mongo_parameters(rng, value)
+            key: generate_normal_mongo_parameters(rng, value, key)
             for key, value in params.items()
             if key not in excluded_normal_params and key not in flow_control_params
         }
@@ -416,7 +445,7 @@ def generate_mongod_extra_configs(rng):
     )
 
     generated_config = {
-        key: generate_normal_mongo_parameters(rng, value)
+        key: generate_normal_mongo_parameters(rng, value, key)
         for key, value in config_fuzzer_extra_configs["mongod"].items()
         if not (value.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
@@ -444,7 +473,7 @@ def generate_mongos_parameters(rng):
         and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
 
-    return {key: generate_normal_mongo_parameters(rng, value) for key, value in params.items()}
+    return {key: generate_normal_mongo_parameters(rng, value, key) for key, value in params.items()}
 
 
 def fuzz_mongod_set_parameters(seed, user_provided_params):

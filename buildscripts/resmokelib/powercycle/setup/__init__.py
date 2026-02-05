@@ -59,7 +59,7 @@ class SetUpEC2Instance(PowercycleCommand):
         # Set up virtualenv on remote.
         venv = powercycle_constants.VIRTUALENV_DIR
         python = (
-            "/opt/mongodbtoolchain/v4/bin/python3"
+            "/opt/mongodbtoolchain/v5/bin/python3.13"
             if "python" not in self.expansions
             else self.expansions["python"]
         )

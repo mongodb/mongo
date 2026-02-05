@@ -933,7 +933,7 @@ class TestCoreAnalyzerFunctions(unittest.TestCase):
         task_name = "test_tast_name"
         execution = "0"
         generated_task_name = get_generated_task_name(task_name, execution)
-        self.assertEquals(matches_generated_task_pattern(task_name, generated_task_name), execution)
+        self.assertEqual(matches_generated_task_pattern(task_name, generated_task_name), execution)
         self.assertIsNone(matches_generated_task_pattern("not_same_task", generated_task_name))
 
 

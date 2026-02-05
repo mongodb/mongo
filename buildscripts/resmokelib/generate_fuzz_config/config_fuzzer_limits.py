@@ -175,7 +175,7 @@ config_fuzzer_params = {
         # batch limit operations.
         "replBatchLimitOperations": {
             "min": 1,
-            "max": 0.2 * 1000 * 1000,
+            "max": int(0.2 * 1000 * 1000),  # Must be int for randint() compatibility
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },

@@ -12,6 +12,7 @@ from pymongo.errors import OperationFailure
 from buildscripts.resmokelib import config, errors
 from buildscripts.resmokelib.generate_fuzz_config.mongo_fuzzer_configs import (
     generate_normal_mongo_parameters,
+    generate_runtime_mongod_parameter,
 )
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster, standalone
@@ -39,7 +40,7 @@ class RuntimeParametersState:
     """Encapsulates the runtime-state of a set of parameters we are fuzzing. Tracks the last time we set a parameter value and holds
     the logic for generating new values."""
 
-    def __init__(self, spec, seed):
+    def __init__(self, spec, seed, generator_func=None):
         # Initialize the runtime state of each parameter in the spec, including the lastSet time at now, so we start setting the parameters
         # at appropriate intervals after the suite begins.
         now = time.time()
@@ -47,6 +48,10 @@ class RuntimeParametersState:
             key: {**copy.deepcopy(value), "lastSet": now} for key, value in spec.items()
         }
         self._rng = random.Random(seed)
+        # Use provided generator function, or default to generate_normal_mongo_parameters for backward compatibility
+        self._generator_func = (
+            generator_func if generator_func is not None else generate_normal_mongo_parameters
+        )
 
     def generate_parameters(self):
         """Returns a dictionary of what parameters should be set now, along with values to set them to, based on the last time the
@@ -55,7 +60,7 @@ class RuntimeParametersState:
         now = time.time()
         for key, value in self._params.items():
             if now - value["lastSet"] >= value["period"]:
-                ret[key] = generate_normal_mongo_parameters(self._rng, value)
+                ret[key] = self._generator_func(self._rng, value, key)
                 value["lastSet"] = now
         return ret
 
@@ -153,7 +158,10 @@ class FuzzRuntimeParameters(interface.Hook):
         validate_runtime_parameter_spec(cluster_params)
         # Construct the runtime state before the suite begins.
         # The initial lastSet time of each parameter is the start time of the suite.
-        self._mongod_param_state = RuntimeParametersState(runtime_mongod_params, self._seed)
+        # Use generate_runtime_mongod_parameter for mongod params to handle special cases.
+        self._mongod_param_state = RuntimeParametersState(
+            runtime_mongod_params, self._seed, generate_runtime_mongod_parameter
+        )
         self._mongos_param_state = RuntimeParametersState(runtime_mongos_params, self._seed)
         self._cluster_param_state = RuntimeParametersState(cluster_params, self._seed)
 

@@ -130,10 +130,10 @@ RUN echo 'export PATH="$HOME/.local/bin:${PATH}"' > /etc/profile.d/03-local-bin.
 USER $USERNAME
 
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
-RUN /opt/mongodbtoolchain/v5/bin/python3 -m venv /tmp/pipx-venv && \
-  /tmp/pipx-venv/bin/python -m pip install --upgrade "pip<20.3" && \
+RUN /opt/mongodbtoolchain/v5/bin/python3.13 -m venv /tmp/pipx-venv && \
+  /tmp/pipx-venv/bin/python -m pip install --upgrade "pip==25.3" && \
   /tmp/pipx-venv/bin/python -m pip install pipx && \
-  /tmp/pipx-venv/bin/pipx install pipx --python /opt/mongodbtoolchain/v5/bin/python3 --force && \
+  /tmp/pipx-venv/bin/pipx install pipx --python /opt/mongodbtoolchain/v5/bin/python3.13 --force && \
   rm -rf /tmp/pipx-venv
 # Note: PATH is configured via /etc/profile.d, not ~/.bashrc, to avoid modifying home volume
 

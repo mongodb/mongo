@@ -138,7 +138,7 @@ echo "Creating Python virtual environment..."
 venv_created=false
 if [ ! -d "${WORKSPACE_FOLDER}/python3-venv/bin" ]; then
     export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
-    /opt/mongodbtoolchain/v5/bin/python3 -m venv "${WORKSPACE_FOLDER}/python3-venv"
+    /opt/mongodbtoolchain/v5/bin/python3.13 -m venv "${WORKSPACE_FOLDER}/python3-venv"
     venv_created=true
 
     # Install dependencies in the newly created venv

@@ -2079,7 +2079,7 @@ class RunPlugin(PluginInterface):
             dest="fuzz_mongod_configs",
             help="Randomly chooses mongod parameters that were not specified.",
             metavar="MODE",
-            choices=("normal"),
+            choices=("normal",),
         )
 
         mongodb_server_options.add_argument(

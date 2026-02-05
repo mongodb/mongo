@@ -421,7 +421,7 @@ For additional VS Code-specific troubleshooting, see:
 
    ```bash
    rm -rf python3-venv
-   /opt/mongodbtoolchain/v5/bin/python3 -m venv python3-venv
+   /opt/mongodbtoolchain/v5/bin/python3.13 -m venv python3-venv
    source python3-venv/bin/activate
    poetry install --no-root --sync
    ```
