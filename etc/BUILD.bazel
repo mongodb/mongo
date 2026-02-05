@@ -5,7 +5,6 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "lsan.suppressions",
     "tsan.suppressions",
-    "extensions.yml",
     "burn_in_tests.yml",
 ])
 

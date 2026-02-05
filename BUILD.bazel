@@ -226,25 +226,6 @@ mongo_install(
         "//bazel/config:bolt_profile_use_enabled": ["//:bolt_optimized_mongod"],
         "//conditions:default": ["//src/mongo/db:mongod"],
     }),
-    include_files = select({
-        "//bazel/config:al2023_x86_64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-x86_64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-x86_64.so.sig": "lib/libmongot_extension.so.sig",
-        },
-        "//bazel/config:al2023_aarch64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-aarch64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-aarch64.so.sig": "lib/libmongot_extension.so.sig",
-        },
-        "//bazel/config:al2_x86_64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so.sig": "lib/libmongot_extension.so.sig",
-        },
-        "//bazel/config:al2_aarch64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so.sig": "lib/libmongot_extension.so.sig",
-        },
-        "//conditions:default": {},
-    }),
     package_extract_name = select({
         "//bazel/config:build_enterprise_linux_enabled": "mongodb-linux-{MONGO_ARCH}-enterprise-{MONGO_DISTMOD}-{MONGO_VERSION}",
         "//bazel/config:build_enterprise_linux_disabled": "mongodb-linux-{MONGO_ARCH}-{MONGO_DISTMOD}-{MONGO_VERSION}",
@@ -322,33 +303,6 @@ mongo_install(
     }) + select({
         "//bazel/config:bolt_profile_use_enabled": ["//:bolt_optimized_mongod"],
         "//conditions:default": ["//src/mongo/db:mongod"],
-    }),
-    include_files = select({
-        "//bazel/config:al2023_x86_64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-x86_64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-x86_64.so.sig": "lib/libmongot_extension.so.sig",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-x86_64.so": "lib/librerank_extension.so",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-x86_64.so.sig": "lib/librerank_extension.so.sig",
-        },
-        "//bazel/config:al2023_aarch64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-aarch64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2023-aarch64.so.sig": "lib/libmongot_extension.so.sig",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-aarch64.so": "lib/librerank_extension.so",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2023-aarch64.so.sig": "lib/librerank_extension.so.sig",
-        },
-        "//bazel/config:al2_x86_64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-x86_64.so.sig": "lib/libmongot_extension.so.sig",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-x86_64.so": "lib/librerank_extension.so",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-x86_64.so.sig": "lib/librerank_extension.so.sig",
-        },
-        "//bazel/config:al2_aarch64": {
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so": "lib/libmongot_extension.so",
-            "//src/mongo/db/extension/extensions:mongot_extension_amazon2-aarch64.so.sig": "lib/libmongot_extension.so.sig",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-aarch64.so": "lib/librerank_extension.so",
-            "//src/mongo/db/extension/extensions:rerank_extension_amazon2-aarch64.so.sig": "lib/librerank_extension.so.sig",
-        },
-        "//conditions:default": {},
     }),
     pretty_printer_tests = {
         "//src/mongo/util:pretty_printer_test.py": "//src/mongo/util:pretty_printer_test_program",

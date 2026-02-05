@@ -219,7 +219,6 @@ def mongo_install_rule_impl(ctx):
         "dynamic_libs_debug": {},
         "dynamic_libs": {},
         "root_files": {},
-        "include_files": {},
     }
     test_files = []
     outputs = []
@@ -239,10 +238,6 @@ def mongo_install_rule_impl(ctx):
     for input_label, output_folder in ctx.attr.root_files.items():
         for file in input_label.files.to_list():
             file_map["root_files"][file.path] = declare_output(ctx, install_dir + "/" + output_folder + "/" + file.basename, file.is_directory)
-
-    for input_label, output_path in ctx.attr.include_files.items():
-        file = input_label.files.to_list()[0]
-        file_map["include_files"][file.path] = declare_output(ctx, install_dir + "/" + output_path, False)
 
     # sort dependency install files
     for dep in ctx.attr.deps:
@@ -277,7 +272,6 @@ def mongo_install_rule_impl(ctx):
         bins = [bin for bin in file_map["binaries"]] + [bin for bin in file_map["binaries_debug"]]
         libs = [lib for lib in file_map["dynamic_libs"]] + [lib for lib in file_map["dynamic_libs_debug"]]
     root_files = [root_file for root_file in file_map["root_files"]]
-    include_files = [include_file for include_file in file_map["include_files"]]
 
     unittest_bin = None
     if len(bins) == 1 and ctx.attr.debug != "debug" and file_map["binaries"][bins[0]].basename.endswith("_test") and len(root_files) == 0:
@@ -318,16 +312,8 @@ def mongo_install_rule_impl(ctx):
         folder_index_start = path.find(install_dir) + len(install_dir) + 1
         folder_index_end = path.rfind("/")
         roots[file] = path[folder_index_start:folder_index_end]
-
-    includes = {}
-    for file in include_files:
-        path = file_map["include_files"][file].short_path
-        folder_index_start = path.find(install_dir) + len(install_dir) + 1
-        includes[file] = path[folder_index_start:]
-
     json_out = struct(
         roots = roots,
-        includes = includes,
         bins = bins,
         libs = libs,
     )
@@ -351,9 +337,6 @@ def mongo_install_rule_impl(ctx):
     for root_file in root_files:
         pkg_dict[flat_map[root_file].basename] = flat_map[root_file]
         outputs.append(flat_map[root_file])
-    for include_file in include_files:
-        pkg_dict[flat_map[include_file].basename] = flat_map[include_file]
-        outputs.append(flat_map[include_file])
     if len(installed_tests) > 0:
         real_test_list_output_location = ctx.actions.declare_file(install_dir + "/" + installed_test_list_file.basename)
         pkg_dict[real_test_list_output_location.basename] = real_test_list_output_location
@@ -370,7 +353,7 @@ def mongo_install_rule_impl(ctx):
     inputs = depset(direct = input_deps, transitive = [
         ctx.attr._install_script.files,
         python.files,
-    ] + [f.files for f in ctx.attr.srcs] + [r.files for r in ctx.attr.root_files.keys()] + [i.files for i in ctx.attr.include_files.keys()] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps] + [depset(dwps)])
+    ] + [f.files for f in ctx.attr.srcs] + [r.files for r in ctx.attr.root_files.keys()] + [dep[MongoInstallInfo].deps_files for dep in ctx.attr.deps] + [dep[DefaultInfo].files for dep in ctx.attr.deps] + [depset(dwps)])
 
     if outputs:
         ctx.actions.run(
@@ -423,7 +406,6 @@ mongo_install_rule = rule(
         "deps": attr.label_list(providers = [PackageFilesInfo], aspects = [test_binary_aspect]),
         "debug": attr.string(),
         "root_files": attr.label_keyed_string_dict(allow_files = True),
-        "include_files": attr.label_keyed_string_dict(allow_files = True),
         "publish_debug_in_stripped": attr.bool(),
         "create_dwp": attr.bool(),
         "_install_script": attr.label(allow_single_file = True, default = "//bazel/install_rules:install_rules.py"),
@@ -440,7 +422,6 @@ def mongo_install(
         srcs,
         deps = [],
         root_files = {},
-        include_files = {},
         target_compatible_with = [],
         testonly = False,
         pretty_printer_tests = {},
@@ -530,7 +511,6 @@ def mongo_install(
             name = install_target,
             srcs = modified_srcs,
             root_files = root_files,
-            include_files = include_files,
             debug = debug,
             create_dwp = select({
                 "//bazel/config:dwp_supported": True,
