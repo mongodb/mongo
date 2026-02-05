@@ -128,8 +128,14 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         tassert(11540201,
                 "Expected to have estimation data for single table access plan",
                 cbrResult.maybeExplainData.has_value());
-        estimates.insert(cbrResult.maybeExplainData->estimates.begin(),
-                         cbrResult.maybeExplainData->estimates.end());
+        for (auto& [k, v] : cbrResult.maybeExplainData->estimates) {
+            // Take care to use 'insert_or_assign' which will override existing entries in
+            // estimates. It is possible that a QSN for a rejected plan of a previous table which
+            // has been destroyed contains an entry in this map. The allocator may reuse the same
+            // address for a QSN for the current table. In that case, we want to override the value
+            // in the map.
+            estimates.insert_or_assign(k, std::move(v));
+        }
     }
 
     return SingleTableAccessPlansResult{
