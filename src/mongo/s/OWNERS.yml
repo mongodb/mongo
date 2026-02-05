@@ -72,6 +72,3 @@ filters:
   - "sharding_task_executor_pool*":
     approvers:
       - 10gen/server-networking-and-observability
-  - "cluster_umc_error_with_write_concern_error_info*":
-    approvers:
-      - 10gen/server-security

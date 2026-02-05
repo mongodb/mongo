@@ -253,7 +253,6 @@ mongo_cc_library(
     name = "common_s",
     srcs = [
         "analyze_shard_key_cmd_gen",
-        "cluster_umc_error_with_write_concern_error_info.cpp",
         "configure_query_analyzer_cmd_gen",
         "refresh_query_analyzer_configuration_cmd_gen",
         "transaction_participant_failed_unyield_exception.cpp",
@@ -344,6 +343,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:cluster_umc_error_with_write_concern_error_info",
         "//src/mongo/db/commands:create_command",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_types_idl",
         "//src/mongo/db/matcher:path",

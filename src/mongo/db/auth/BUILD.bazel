@@ -320,6 +320,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "cluster_umc_error_with_write_concern_error_info",
+    srcs = [
+        "cluster_umc_error_with_write_concern_error_info.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/rpc:command_status",
+    ],
+)
+
+mongo_cc_library(
     name = "oidc_protocol",
     srcs = [
         "oauth_authorization_server_metadata_gen",

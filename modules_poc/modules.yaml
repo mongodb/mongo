@@ -406,7 +406,6 @@ access_control:
     - src/mongo/db/modules/enterprise/src/util/gssapi*
     - src/mongo/db/modules/enterprise/src/util/report.*
     - src/mongo/s/commands/cluster_user_management_commands.cpp
-    - src/mongo/s/cluster_umc_error_with_write_concern_error_info*
 
 admission:
   meta:

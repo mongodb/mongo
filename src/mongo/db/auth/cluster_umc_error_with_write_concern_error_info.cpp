@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/cluster_umc_error_with_write_concern_error_info.h"
+#include "mongo/db/auth/cluster_umc_error_with_write_concern_error_info.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
