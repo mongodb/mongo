@@ -30,6 +30,9 @@ filters:
   - "linting.md":
     approvers:
       - 10gen/devprod-build
+  - "modularity.md":
+    approvers:
+      - 10gen/server-programmability
   - "owners/**":
     approvers:
       - 10gen/devprod-correctness
