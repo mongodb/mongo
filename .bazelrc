@@ -590,6 +590,9 @@ common:public-release --stamp
 common --@rules_rust//rust/toolchain/channel=nightly
 common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true
 
+# Experimental flag to collect system network usage metrics during build
+common --experimental_collect_system_network_usage
+
 --config=fission
 common:fission --fission=yes
 common:fission --remote_download_regex=.*\.dwo$
