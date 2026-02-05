@@ -36,10 +36,12 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/search/internal_search_cluster_parameters_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/server_options.h"
@@ -61,6 +63,47 @@
 
 
 namespace mongo {
+
+// TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+template <typename T>
+Status checkUnknownFieldsOnParameter(BSONObj obj) {
+    for (auto&& elem : obj) {
+        auto fieldName = elem.fieldNameStringData();
+        bool fieldIsValid = std::any_of(T::fieldNames.begin(),
+                                        T::fieldNames.end(),
+                                        [fieldName](const auto& fn) { return fn == fieldName; });
+        if (!fieldIsValid) {
+            return Status{ErrorCodes::IDLUnknownField,
+                          str::stream() << "Unknown field name: '" << fieldName << "'"};
+        }
+    }
+    return Status::OK();
+}
+
+// Ensure there are no unknown fields in cluster parameters that:
+//   - Use a non-strict IDL parser.
+//   - Have an object type.
+// This temporary check is needed while we migrate the remaining non-strict cluster parameters
+// to strict parsing; we cannot flip them all at once for backward compatibility reasons.
+// TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+void checkUnknownFields(const BSONObj& command) {
+    StringData name = command.firstElement().fieldName();
+
+    if (name == kFleCompactionOptionsName) {
+        uassertStatusOK(
+            checkUnknownFieldsOnParameter<FLECompactionOptions>(command.firstElement().Obj()));
+    } else if (name == kFleAllowTotalTagOverheadToExceedBSONLimitName) {
+        uassertStatusOK(checkUnknownFieldsOnParameter<FLEOverrideTagOverheadData>(
+            command.firstElement().Obj()));
+    } else if (name == kFleDisableSubstringPreviewParameterLimitsName) {
+        uassertStatusOK(checkUnknownFieldsOnParameter<FLEOverrideSubstringPreviewLimits>(
+            command.firstElement().Obj()));
+    } else if (name == kInternalSearchOptionsName) {
+        uassertStatusOK(
+            checkUnknownFieldsOnParameter<InternalSearchOptions>(command.firstElement().Obj()));
+    }
+}
+
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> clusterParameterTime,
@@ -130,6 +173,9 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
             skipValidation || sp->isEnabled(VersionContext::getDecoration(opCtx)));
+
+    // TODO (SERVER-118758): Remove once all cluster parameters use strict parsing.
+    checkUnknownFields(cmdParamObj);
 
     Timestamp clusterTime =
         clusterParameterTime ? *clusterParameterTime : _dbService.getUpdateClusterTime(opCtx);

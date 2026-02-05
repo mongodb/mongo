@@ -131,6 +131,10 @@ last-continuous:
       ticket: SERVER-102165
     - test_file: jstests/sharding/unshard_collection_with_failover_during_commit.js
       ticket: SERVER-117340
+    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+      ticket: SERVER-117009
+    - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+      ticket: SERVER-117009
   suites: null
 last-lts:
   all:
@@ -762,4 +766,8 @@ last-lts:
       ticket: SERVER-102165
     - test_file: jstests/sharding/unshard_collection_with_failover_during_commit.js
       ticket: SERVER-117340
+    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+      ticket: SERVER-117009
+    - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+      ticket: SERVER-117009
   suites: null

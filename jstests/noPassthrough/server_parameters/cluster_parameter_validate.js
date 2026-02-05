@@ -1,8 +1,5 @@
 /**
  * Checks that cluster server parameters are valid for storage in update/upsert
- *
- * @tags: [
- *  ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -15,7 +12,7 @@ function runTest(conn) {
         db.adminCommand({
             setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}},
         }),
-        ErrorCodes.DollarPrefixedFieldName,
+        [ErrorCodes.IDLUnknownField],
     );
 
     assert.commandWorked(
@@ -26,7 +23,7 @@ function runTest(conn) {
         db.adminCommand({
             setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}},
         }),
-        ErrorCodes.DollarPrefixedFieldName,
+        [ErrorCodes.IDLUnknownField],
     );
 }
 
