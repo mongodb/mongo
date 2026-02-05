@@ -1,30 +1,16 @@
 /**
  * Test error conditions for the `$vectorSearch` aggregation pipeline stage.
+ * E2E version of with_mongot/vector_search_mocked/vector_search_error_cases.js
+ *
  * @tags: [
- *  requires_fcv_71,
+ *   requires_mongot,
+ *   requires_fcv_71,
  * ]
  */
 
-// TODO SERVER-118445 Delete this test.
-
-import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-
-// Start mock mongot.
-const mongotMock = new MongotMock();
-mongotMock.start();
-const mockConn = mongotMock.getConnection();
-
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {mongotHost: mockConn.host}}});
-rst.startSet();
-rst.initiate();
-
-const dbName = jsTestName();
 const collName = jsTestName();
-const testDB = rst.getPrimary().getDB(dbName);
-testDB.dropDatabase();
 
-const coll = testDB.getCollection(collName);
+const coll = db.getCollection(collName);
 coll.insert({_id: 0});
 coll.insert({_id: 1});
 coll.insert({_id: 2});
@@ -34,10 +20,10 @@ function makeVectorSearchStage() {
 }
 
 function runPipeline(pipeline) {
-    return testDB.runCommand({aggregate: collName, pipeline, cursor: {}});
+    return db.runCommand({aggregate: collName, pipeline, cursor: {}});
 }
 
-// $match cannot proceed $vectorSearch.
+// $match cannot precede $vectorSearch.
 assert.commandFailedWithCode(runPipeline([{$match: {}}, makeVectorSearchStage()]), 40602);
 
 // $search and $vectorSearch are not allowed in the same pipeline.
@@ -47,7 +33,7 @@ assert.commandFailedWithCode(runPipeline([makeVectorSearchStage(), {$search: {}}
 // $vectorSearch must have a non-negative limit.
 assert.commandFailedWithCode(
     runPipeline([{$vectorSearch: {queryVector: [], path: "x", numCandidates: 1, limit: -1}}]),
-    7912700,
+    [7912700, 65137 /** Extension error code */],
 );
 
 // $vectorSearch is not allowed in a sub-pipeline.
@@ -64,9 +50,8 @@ assert.commandFailedWithCode(
 );
 
 // $vectorSearch cannot be used inside a transaction.
-let session = testDB.getMongo().startSession({readConcern: {level: "local"}});
-let sessionDb = session.getDatabase(dbName);
-
+let session = db.getMongo().startSession({readConcern: {level: "local"}});
+let sessionDb = session.getDatabase(jsTestName());
 session.startTransaction();
 assert.commandFailedWithCode(
     sessionDb.runCommand({aggregate: collName, pipeline: [makeVectorSearchStage()], cursor: {}}),
@@ -74,11 +59,17 @@ assert.commandFailedWithCode(
 );
 session.endSession();
 
-// $search is not allowed in an update pipeline.
+// $vectorSearch is not allowed in an update pipeline.
 assert.commandFailedWithCode(
-    testDB.runCommand({"findandmodify": collName, "update": [makeVectorSearchStage()]}),
+    db.runCommand({
+        "findandmodify": collName,
+        // Need a shardkey equality predicate to avoid having the command be implemented as a
+        // transaction in sharded scenarios.
+        "query": {_id: 0},
+        "update": [makeVectorSearchStage()],
+    }),
     ErrorCodes.InvalidOptions,
 );
 
-mongotMock.stop();
-rst.stopSet();
+// Cleanup
+coll.drop();
