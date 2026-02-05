@@ -218,11 +218,9 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     jsTest.log("Executing testMisplacedCollectionOnConfigServer");
 
     const db = getNewDb();
-    const session = st.configRS.getPrimary().startSession({retryWrites: true});
-    const sessionDB = session.getDatabase(db.getName());
     assert.commandWorked(mongos.adminCommand({enableSharding: db.getName()}));
 
-    assert.commandWorked(sessionDB.coll.insert({_id: "foo"}));
+    assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).coll.insert({_id: "foo"}));
 
     // Database level mode command
     let inconsistencies = db.checkMetadataConsistency().toArray();
@@ -236,20 +234,9 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     assert.eq("MisplacedCollection", collInconsistencies[0].type, tojson(inconsistencies[0]));
     assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
-    session.endSession();
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
-    assert.soon(() => {
-        try {
-            assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
-            return true;
-        } catch (e) {
-            if (ErrorCodes.isRetriableError(e.code)) {
-                return false;
-            }
-            throw e;
-        }
-    });
+    assert.commandWorked(st.configRS.getPrimary().getDB(db.getName()).runCommand({dropDatabase: 1}));
     assertNoInconsistencies();
 })();
 
@@ -441,7 +428,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     st.shardColl(coll2, {skey: 1});
 
     // Save db1 and db2 configuration to restore it later
-    const configDatabasesColl = configDB.databases;
+    const configDatabasesColl = mongos.getDB("config").databases;
     const db1ConfigEntry = configDatabasesColl.findOne({_id: db1.getName()});
     const db2ConfigEntry = configDatabasesColl.findOne({_id: db2.getName()});
 
@@ -986,7 +973,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
         assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
@@ -1023,7 +1010,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
         assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
@@ -1107,7 +1094,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
 
     // Move all chunks out of the primary shard.
-    const chunks = configDB.chunks.find({uuid: uuid}).toArray();
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
     assert(chunks.length > 0);
     chunks.forEach((chunk) => {
         assert.commandWorked(st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));

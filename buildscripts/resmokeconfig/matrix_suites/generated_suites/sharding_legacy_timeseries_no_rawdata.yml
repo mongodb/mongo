@@ -21,7 +21,6 @@ selector:
   roots:
     - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     - jstests/sharding/balancer_should_return_random_migrations_failpoint.js
-    - jstests/sharding/check_metadata_consistency.js
     - jstests/sharding/create_unsplittable_collection.js
     - jstests/sharding/list_cluster_catalog.js
     - jstests/sharding/remove_shard_with_unsharded.js
