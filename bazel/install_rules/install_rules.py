@@ -35,9 +35,14 @@ install_link = args.install_dir + "/../install"
 os.makedirs(install_link, exist_ok=True)
 
 
-def install(src, install_type):
-    install_dst = os.path.join(args.install_dir, install_type, os.path.basename(src))
-    link_dst = os.path.join(install_link, install_type, os.path.basename(src))
+def install(src, install_type, is_rename=False):
+    if is_rename:
+        install_dst = os.path.join(args.install_dir, install_type)
+        link_dst = os.path.join(install_link, install_type)
+    else:
+        install_dst = os.path.join(args.install_dir, install_type, os.path.basename(src))
+        link_dst = os.path.join(install_link, install_type, os.path.basename(src))
+
     if src.endswith(".dwp"):
         # Due to us creating our binaries using the _with_debug name
         # the dwp files also contain it. Strip the _with_debug from the name
@@ -122,3 +127,5 @@ for depfile in args.depfile:
             install(lib, "lib")
         for file, folder in content["roots"].items():
             install(file, folder)
+        for file, folder in content["includes"].items():
+            install(file, folder, is_rename=True)

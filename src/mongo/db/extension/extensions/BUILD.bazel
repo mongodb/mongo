@@ -1,0 +1,60 @@
+load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
+load("@poetry//:dependencies.bzl", "dependency")
+load("//bazel/config:python_genrule.bzl", "python_genrule")
+
+package(default_visibility = ["//visibility:public"])
+
+# mongot-extension
+[
+    python_genrule(
+        name = "download_" + extension_name + "_" + variant,
+        srcs = [
+            ":download_external_extension.py",
+            "//etc:extensions.yml",
+        ],
+        cmd = [
+            "$(location :download_external_extension.py)",
+            "--extension-name",
+            extension_name,
+            "--conf-file",
+            "$(location //etc:extensions.yml)",
+            "--variant",
+            variant,
+            "--archive-files",
+            extension_name.replace("_", "-") + ".so",
+            extension_name.replace("_", "-") + ".so.sig",
+            "--outputs",
+            "$(location " + extension_name + "_" + variant + ".so)",
+            "$(location " + extension_name + "_" + variant + ".so.sig)",
+        ],
+        outputs = [
+            extension_name + "_" + variant + ".so",
+            extension_name + "_" + variant + ".so.sig",
+        ],
+        python_libs = [
+            dependency(
+                "pyyaml",
+                group = "core",
+            ),
+            dependency(
+                "requests",
+                group = "core",
+            ),
+            dependency(
+                "retry",
+                group = "testing",
+            ),
+        ],
+    )
+    for extension_name in [
+        "mongot_extension",
+        "rerank_extension",
+    ]
+    for variant in [
+        "amazon2-x86_64",
+        "amazon2-aarch64",
+        "amazon2023-x86_64",
+        "amazon2023-aarch64",
+    ]
+]

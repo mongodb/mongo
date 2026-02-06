@@ -75,7 +75,7 @@ class EnterpriseSpec(packager.Spec):
             "MPL-2",
         ):
             os.rename("%s/%s" % (release_dir, release_file), release_file)
-        os.rmdir(release_dir)
+        shutil.rmtree(release_dir)
 
 
 class EnterpriseCryptSpec(EnterpriseSpec):

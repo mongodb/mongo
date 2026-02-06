@@ -591,7 +591,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
         for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
-        os.rmdir(release_dir)
+        shutil.rmtree(release_dir)
     except Exception:
         exc = sys.exc_info()[1]
         os.chdir(rootdir)
