@@ -259,9 +259,10 @@ private:
             //
             // In scenarios like (2) or (3), preserve the existing (v8.0) behavior of returning
             // empty results on queries over dropped or incomplete viewful timeseries collections.
-            auto originalNssColl = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, _aggExState.getOriginalNss(), boost::none /* readTimestamp */);
-            if (originalNssColl && originalNssColl->isTimeseriesCollection()) {
+            auto timeseriesMainNss = executionNss.getTimeseriesViewNamespace();
+            auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
+                opCtx, timeseriesMainNss, boost::none /* readTimestamp */);
+            if (coll && coll->isTimeseriesCollection()) {
                 uasserted(ErrorCodes::CollectionBecameView,
                           "Timeseries collection upgraded to viewless format while resolving view");
             }
