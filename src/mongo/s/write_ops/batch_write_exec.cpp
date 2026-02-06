@@ -780,6 +780,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     "numCompletedOps"_attr = numCompletedOps,
                     "numRoundsWithoutProgress"_attr = numRoundsWithoutProgress);
 
+        CurOp::get(opCtx)->maybeLogSlowQuery();
         TargetedBatchMap childBatches;
 
         // If we've already had a targeting error, we've refreshed the metadata once and can

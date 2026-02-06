@@ -61,6 +61,8 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
             break;
         }
 
+        CurOp::get(opCtx)->maybeLogSlowQuery();
+
         // If no progress was made during the previous round, do exponential backoff before
         // starting this round.
         if (numRoundsWithoutProgress > 0) {

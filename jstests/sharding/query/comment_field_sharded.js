@@ -43,7 +43,12 @@ function verifyLogContains(connections, inputArray, expectedNumOccurrences) {
         for (let logMsg of logs) {
             let numMatches = 0;
             for (let input of inputArray) {
-                numMatches += logMsg.includes(input) && !logMsg.includes("StaleConfig") ? 1 : 0;
+                numMatches +=
+                    logMsg.includes(input) &&
+                    !logMsg.includes("StaleConfig") &&
+                    !logMsg.includes("Slow in-progress query")
+                        ? 1
+                        : 0;
             }
             numOccurrences += numMatches == inputArray.length ? 1 : 0;
         }
