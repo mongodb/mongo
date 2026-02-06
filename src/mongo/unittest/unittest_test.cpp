@@ -34,6 +34,8 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -292,6 +294,41 @@ TEST(UnitTestSelfTest, GtestFilter) {
     ASSERT_EQ(gtestFilterForSelection({{"A", "X", 0}, {"A", "Y", 0}}), "");
     ASSERT_EQ(gtestFilterForSelection({{"A", "X", 1}, {"A", "Y", 1}, {"A", "Z", 1}}),
               "A.X:A.Y:A.Z");
+}
+
+class UnitTestPrintingTest : public mongo::unittest::Test {
+public:
+    static std::string pr(const auto& v) {
+        std::ostringstream oss;
+        mongo::unittest::universalPrint(v, oss);
+        return oss.str();
+    }
+};
+
+TEST_F(UnitTestPrintingTest, String) {
+    using namespace mongo;
+    ASSERT_EQ(pr(StringData{"hi"}), "\"hi\"");
+    ASSERT_EQ(pr(std::string_view{"hi"}), "\"hi\"");
+}
+
+TEST_F(UnitTestPrintingTest, Optional) {
+    ASSERT_EQ(pr(boost::none), "(none)");
+    ASSERT_EQ(pr(boost::optional<int>(123)), "(123)");
+    ASSERT_EQ(pr(boost::optional<std::string>("hi")), "(\"hi\")");
+
+    ASSERT_EQ(pr(std::nullopt), "(nullopt)");
+    ASSERT_EQ(pr(std::optional<int>(123)), "(123)");
+    ASSERT_EQ(pr(std::optional<std::string>("hi")), "(\"hi\")");
+}
+
+TEST_F(UnitTestPrintingTest, Status) {
+    using namespace mongo;
+    ASSERT_EQ(pr(Status::OK()), "OK");
+    ASSERT_EQ(pr(Status{ErrorCodes::UnknownError, ""}), "UnknownError \"\"");
+    ASSERT_EQ(pr(Status{ErrorCodes::UnknownError, "reason"}), "UnknownError \"reason\"");
+    ASSERT_EQ(pr(StatusWith<int>{ErrorCodes::UnknownError, "reason"}), "UnknownError \"reason\"");
+    ASSERT_EQ(pr(StatusWith<int>{123}), "123");
+    ASSERT_EQ(pr(StatusWith<std::string>{"hi"}), "\"hi\"");
 }
 
 ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckDeclval, typename Char = char, *std::declval<Char>());

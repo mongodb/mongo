@@ -332,15 +332,19 @@ inline void PrintTo(StringData s, std::ostream* os) {
 }
 
 inline void PrintTo(const Status& s, std::ostream* os) {
-    *os << s.toString();
+    unittest::universalPrint(s.code(), *os);
+    if (s.isOK())
+        return;
+    *os << " ";
+    unittest::universalPrint(s.reason(), *os);
 }
 
 template <typename T>
 inline void PrintTo(const StatusWith<T>& s, std::ostream* os) {
     if (s.isOK()) {
-        *os << ::testing::PrintToString(s.getValue());
+        unittest::universalPrint(s.getValue(), *os);
     } else {
-        *os << ::testing::PrintToString(s.getStatus());
+        unittest::universalPrint(s.getStatus(), *os);
     }
 }
 }  // namespace mongo
@@ -352,16 +356,16 @@ inline void PrintTo(const StatusWith<T>& s, std::ostream* os) {
  */
 namespace boost {
 template <typename T>
-void PrintTo(const boost::optional<T>& value, std::ostream* os) {
-    *os << '(';
-    if (!value) {
-        *os << "none";
-    } else {
-        *os << ::testing::PrintToString(*value);
-    }
-    *os << ')';
+void PrintTo(const optional<T>& value, std::ostream* os) {
+    *os << "(";
+    if (!value)
+        mongo::unittest::universalPrint(none, *os);
+    else
+        mongo::unittest::universalPrint(*value, *os);
+    *os << ")";
 }
-inline void PrintTo(decltype(boost::none), std::ostream* os) {
+
+inline void PrintTo(none_t, std::ostream* os) {
     *os << "(none)";
 }
 }  // namespace boost

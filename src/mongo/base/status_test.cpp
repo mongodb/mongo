@@ -306,11 +306,6 @@ TEST(Status, ExceptionToStatus) {
     ASSERT_TRUE(fromUnknownExceptionType.reason().find("unknown type") != std::string::npos);
 }
 
-TEST(Status, GtestPrintTo) {
-    Status status(ErrorCodes::MaxError, "error");
-    ASSERT_EQUALS(status.toString(), testing::PrintToString(status));
-}
-
 DEATH_TEST_REGEX(ErrorExtraInfoDeathTest, InvariantAllRegistered, "Invariant failure.*parsers::") {
     ErrorExtraInfo::invariantHaveAllParsers();
 }
