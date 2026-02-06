@@ -369,6 +369,9 @@
           replset_config_options:
             settings:
               catchUpTimeoutMillis: 0
+        mongos_options:
+          set_parameters:
+            defaultFindReplicaSetHostTimeoutMS: 120000
 
 ###
 # Overrides for suites based on ShardedClusterFixture

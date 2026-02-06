@@ -60,6 +60,7 @@ executor:
       syncdelay: 5
     mongos_options:
       set_parameters:
+        defaultFindReplicaSetHostTimeoutMS: 120000
         enableTestCommands: 1
     num_mongos: 2
     num_rs_nodes_per_shard: 3

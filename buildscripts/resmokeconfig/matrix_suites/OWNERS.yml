@@ -54,3 +54,6 @@ filters:
   - "generated_suites/vector_search_extension*":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "generated_suites/sharding*kill_primaries*":
+    approvers:
+      - 10gen/server-catalog-and-routing
