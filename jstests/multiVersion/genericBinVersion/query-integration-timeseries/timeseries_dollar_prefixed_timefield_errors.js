@@ -137,7 +137,7 @@ function assertCollectionsQueryable(db) {
 
 testPerformReplSetRollingRestart({
     // support for $-prefixed timeField/metaField was removed in 8.3
-    startingVersion: {binVersion: "8.2"},
+    startingVersion: {binVersion: "last-lts"},
     setupFn: setUp,
     beforeRestart: () => {},
     afterSecondariesHaveRestarted: (primaryConnection) => {
