@@ -609,6 +609,24 @@ task_groups:
           permissions: private
           visibility: signed
           content_type: application/json
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        display_name: "collect bazel debug logs"
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/collect_bazel_debug_logs.sh"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-debug-logs.zip
+          remote_file: ${project}/${version_id}/${build_variant}/${task_name}/bazel-debug-logs-${execution}.zip
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/zip
       - func: "debug full disk"
       - func: "attach bazel invocation"
       - func: "save failed tests"

@@ -228,6 +228,28 @@ bazel_evergreen_shutils::print_bazel_server_pid() {
     fi
 }
 
+bazel_evergreen_shutils::jstack_bazel() {
+    # Find all bazel processes (Java processes with "bazel" in command line)
+    local pids
+    pids=$(pgrep -f "java.*bazel" || true)
+    if [[ -z "$pids" ]]; then
+        return 1
+    fi
+
+    # Skip if jstack is not available
+    if ! command -v jstack >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+
+    for pid in $pids; do
+        local output_file="bazel_jstack_${timestamp}_pid${pid}.txt"
+        jstack "$pid" >"$output_file" 2>&1
+    done
+}
+
 # Starts server (if needed) and prints PID. Safe to call multiple times.
 bazel_evergreen_shutils::ensure_server_and_print_pid() {
     local BAZEL_BINARY="$1"
@@ -300,18 +322,45 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
             cmd+=" ${OOM_GUARD_FLAG}"
         fi
 
+        local jstack_dumper_pid=""
+
         # Prefix timeout, if any.
         if [[ -n "$timeout_str" ]]; then
             cmd="${timeout_str} ${cmd}"
+
+            # Start a background monitor to run jstack 5 seconds before the timeout will expire.
+            # This is useful information for debugging a rare hang in bazel where the build gets
+            # stuck.
+            local timeout_duration
+            timeout_duration=$(echo "$timeout_str" | awk '{print $NF}')
+            if [[ $timeout_duration -gt 5 ]]; then
+                set -m # Enable job control to create a process group
+                (
+                    sleep $((timeout_duration - 5))
+                    bazel_evergreen_shutils::jstack_bazel "$BAZEL_BINARY" || true
+                ) &
+                jstack_dumper_pid=$!
+                set +m # Disable job control
+            fi
         fi
 
         # Run it.
         # NOTE: We *do not* add any redirections here; caller controls logging completely.
         if eval $env "$cmd"; then
             RET=0
+            # Kill the jstack dumper if still running
+            if [[ -n "$jstack_dumper_pid" ]]; then
+                kill -- -$jstack_dumper_pid 2>/dev/null || true
+                wait $jstack_dumper_pid 2>/dev/null || true
+            fi
             break
         else
             RET=$?
+            # Kill the jstack dumper if still running
+            if [[ -n "$jstack_dumper_pid" ]]; then
+                kill -- -$jstack_dumper_pid 2>/dev/null || true
+                wait $jstack_dumper_pid 2>/dev/null || true
+            fi
         fi
 
         if ! bazel_evergreen_shutils::is_bazel_server_running "$BAZEL_BINARY"; then
