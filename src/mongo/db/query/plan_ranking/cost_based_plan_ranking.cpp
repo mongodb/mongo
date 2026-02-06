@@ -115,10 +115,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     PlanYieldPolicy::YieldPolicy yieldPolicy = plannerData.yieldPolicy;
     const MultipleCollectionAccessor& collections = plannerData.collections;
     // TODO SERVER-115496 refactor and move to plan_ranking
-    auto topLevelSampleFieldNames =
-        ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::plan(query, plannerParams, topLevelSampleFieldNames);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << query.toStringForErrorMsg()
