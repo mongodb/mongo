@@ -79,6 +79,7 @@ void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBu
         // Check that lockerInfo is sorted on resource type
         invariant(i == 0 || lockType >= lockerInfo.locks[i - 1].resourceId.getType());
 
+        static const auto resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kLocal);
         if (lock.resourceId == resourceIdLocalDB) {
             locks.append("local", legacyModeName(lock.mode));
             continue;

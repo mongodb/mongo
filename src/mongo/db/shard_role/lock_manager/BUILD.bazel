@@ -52,6 +52,7 @@ mongo_cc_library(
         "//src/mongo/util:background_job",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:ticketholder",
+        "//src/third_party/siphash",
     ],
 )
 

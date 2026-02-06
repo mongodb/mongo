@@ -3439,6 +3439,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/SafeInt @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/sasl @10gen/server-security @svc-auto-approve-bot
 /src/third_party/**/schemastore.org @10gen/query-optimization @svc-auto-approve-bot
+/src/third_party/**/siphash @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/third_party/**/snappy @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/tcmalloc @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/third_party/**/timelib @10gen/query-execution @svc-auto-approve-bot

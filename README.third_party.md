@@ -73,6 +73,7 @@ a notice will be included in
 | [yaml-cpp]                                           | MIT                                            | 0.6.3                                    |                      | ✗                               |
 | [zlib]                                               | Zlib                                           | 1.3.1                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only                   | 1.5.5                                    | ✗                    | ✗                               |
+| [siphash]                                            | MIT                                            | f26d35e964c6290ffe23d9043475ad3129f409e0 |                      | ✗                               |
 
 [AWS SDK for C++]: https://github.com/aws/aws-sdk-cpp.git
 [Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git
@@ -124,6 +125,7 @@ a notice will be included in
 [valgrind.h]: https://sourceware.org/git/valgrind.git
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp.git
 [zlib]: https://zlib.net/fossils/
+[siphash]: https://github.com/veorq/SipHash
 
 ## Dynamically Linked Libraries
 

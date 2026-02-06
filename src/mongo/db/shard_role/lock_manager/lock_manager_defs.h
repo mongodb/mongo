@@ -239,12 +239,8 @@ MONGO_MOD_PRIVATE constexpr const char* resourceGlobalIdName(ResourceGlobalId id
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
-MONGO_MOD_FILE_PRIVATE inline static uint64_t hashStringDataForResourceId(StringData str,
-                                                                          uint64_t salt) {
-    // We salt the hash with a given random value to generate randomness in ResourceId selection on
-    // every restart. This aids in testing for detecting lock ordering issues.
-    return absl::hash_internal::CityHash64WithSeed(str.data(), str.size(), salt);
-}
+MONGO_MOD_FILE_PRIVATE uint64_t hashStringDataForResourceId(StringData str,
+                                                            const std::array<std::byte, 16>& salt);
 
 /**
  * Uniquely identifies a lockable resource.
@@ -255,26 +251,12 @@ public:
     static constexpr size_t resourceTypeBits = 4;
     MONGO_STATIC_ASSERT(ResourceTypesCount <= (1 << resourceTypeBits));
 
-    ResourceId(ResourceType type, const NamespaceString& nss)
-        : _fullHash(fullHash(type,
-                             hashStringDataForResourceId(nss.toStringForResourceId(),
-                                                         kHashingSaltForResourceId))) {
-        verifyNoResourceMutex(type);
-    }
-    ResourceId(ResourceType type, const DatabaseName& dbName)
-        : _fullHash(fullHash(type,
-                             hashStringDataForResourceId(dbName.toStringForResourceId(),
-                                                         kHashingSaltForResourceId))) {
-        verifyNoResourceMutex(type);
-    }
+    ResourceId(ResourceType type, const NamespaceString& nss);
+    ResourceId(ResourceType type, const DatabaseName& dbName);
     ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {
         verifyNoResourceMutex(type);
     }
-    ResourceId(ResourceType type, const TenantId& tenantId)
-        : _fullHash{fullHash(
-              type, hashStringDataForResourceId(tenantId.toString(), kHashingSaltForResourceId))} {
-        verifyNoResourceMutex(type);
-    }
+    ResourceId(ResourceType type, const TenantId& tenantId);
     constexpr ResourceId() : _fullHash(0) {}
 
     bool isValid() const {
@@ -329,14 +311,6 @@ private:
         return (static_cast<uint64_t>(type) << (64 - resourceTypeBits)) +
             (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
     }
-
-    static inline const uint64_t kHashingSaltForResourceId = [] {
-        SecureUrbg entropy;
-        const auto result = entropy();
-        static_assert(std::is_same_v<std::remove_const_t<decltype(result)>, uint64_t>,
-                      "salting hash entropy must be a uint64");
-        return result;
-    }();
 };
 
 MONGO_MOD_PUBLIC std::string toStringForLogging(const ResourceId&);
@@ -349,14 +323,6 @@ MONGO_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 
 // Type to uniquely identify a given locker object
 typedef uint64_t LockerId;
-
-// Hardcoded resource id for the oplog collection, which is special-cased both for resource
-// acquisition purposes and for statistics reporting.
-MONGO_MOD_NEEDS_REPLACEMENT extern const ResourceId resourceIdLocalDB;
-
-// Hardcoded resource id for admin db. This is to ensure direct writes to auth collections
-// are serialized (see SERVER-16092)
-MONGO_MOD_PRIVATE extern const ResourceId resourceIdAdminDB;
 
 // Global lock. Every server operation, which uses the Locker must acquire this lock at least
 // once. See comments in the header file (begin/endTransaction) for more information.

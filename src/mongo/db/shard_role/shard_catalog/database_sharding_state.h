@@ -31,6 +31,7 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/util/modules.h"
 

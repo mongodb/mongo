@@ -80,9 +80,6 @@ struct MONGO_MOD_PUBLIC LockStatCounters {
     CounterType combinedWaitTimeMicros{0};
 };
 
-MONGO_MOD_FILE_PRIVATE const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION,
-                                                          NamespaceString::kRsOplogNamespace);
-
 /**
  * Templatized lock statistics management class, which can be specialized with atomic integers
  * for the global stats and with regular integers for the per-locker stats.
@@ -128,6 +125,8 @@ public:
             return _resourceGlobalStats[resId.getHashId()].modeStats[mode];
         }
 
+        static const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION,
+                                                  NamespaceString::kRsOplogNamespace);
         if (resId == resourceIdRsOplog) {
             return _oplogStats.modeStats[mode];
         }

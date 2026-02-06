@@ -35,11 +35,18 @@
 
 #include <boost/optional/optional.hpp>
 
+// Note, we need to wrap siphash in an extern C block as it's compiled under C symbol rules and this
+// file is compiled under C++ symbol rules. As a result, the linker has to know that the symbol here
+// is not a C++ one since otherwise it will fail to find it and cause linking issues.
+namespace {
+extern "C" {
+#include <siphash.h>
+}
+}  // namespace
+
 namespace mongo {
 
 // Hardcoded resource IDs.
-const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kLocal);
-const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin);
 const ResourceId resourceIdGlobal =
     ResourceId(RESOURCE_GLOBAL, static_cast<uint8_t>(ResourceGlobalId::kGlobal));
 const ResourceId resourceIdMultiDocumentTransactionsBarrier = ResourceId(
@@ -89,6 +96,45 @@ std::string ResourceId::toStringForErrorMessage() const {
 
     return ss.str();
 }
+
+namespace {
+static const std::array<std::byte, 16> kHashingSaltForResourceId = [] {
+    SecureRandom entropy;
+    std::array<std::byte, 16> result;
+    entropy.fill(result.data(), result.size());
+    return result;
+}();
+
+}  // namespace
+
+uint64_t hashStringDataForResourceId(StringData str, const std::array<std::byte, 16>& salt) {
+    // We salt the hash with a given random value to generate randomness in ResourceId selection on
+    // every restart. This aids in testing for detecting lock ordering issues.
+    uint8_t result[8];
+    (void)siphash(str.data(), str.size(), salt.data(), result, sizeof(result));
+    return ConstDataView(reinterpret_cast<char*>(result)).read<uint64_t>();
+}
+
+ResourceId::ResourceId(ResourceType type, const NamespaceString& nss)
+    : _fullHash(fullHash(
+          type,
+          hashStringDataForResourceId(nss.toStringForResourceId(), kHashingSaltForResourceId))) {
+    verifyNoResourceMutex(type);
+}
+
+ResourceId::ResourceId(ResourceType type, const DatabaseName& dbName)
+    : _fullHash(fullHash(
+          type,
+          hashStringDataForResourceId(dbName.toStringForResourceId(), kHashingSaltForResourceId))) {
+    verifyNoResourceMutex(type);
+}
+
+ResourceId::ResourceId(ResourceType type, const TenantId& tenantId)
+    : _fullHash{fullHash(
+          type, hashStringDataForResourceId(tenantId.toString(), kHashingSaltForResourceId))} {
+    verifyNoResourceMutex(type);
+}
+
 
 void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
     this->locker = locker;

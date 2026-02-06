@@ -115,6 +115,9 @@ filters:
   - "schemastore.org":
     approvers:
       - 10gen/query-optimization
+  - "siphash":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "snappy":
     approvers:
       - 10gen/server-networking-and-observability

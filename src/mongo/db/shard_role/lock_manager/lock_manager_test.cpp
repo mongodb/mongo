@@ -91,8 +91,10 @@ TEST(ResourceIdTest, Masking) {
 TEST(ResourceIdTest, SaltingWorks) {
     const std::string collAName = "db1.collA";
 
-    const uint64_t salt1 = 0;
-    const uint64_t salt2 = 1;
+    std::array<std::byte, 16> salt1;
+    salt1.fill(std::byte{0});
+    std::array<std::byte, 16> salt2;
+    salt2.fill(std::byte{1});
 
     const auto id1Salt1 = hashStringDataForResourceId(collAName, salt1);
     const auto id1Salt2 = hashStringDataForResourceId(collAName, salt2);

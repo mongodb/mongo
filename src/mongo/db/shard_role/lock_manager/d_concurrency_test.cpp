@@ -1091,28 +1091,32 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesISForAdminIS) {
     auto opCtx = makeOperationContext();
     Lock::DBLock dbRead(opCtx.get(), DatabaseName::kAdmin, MODE_IS);
 
-    ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_IS);
+    ASSERT(shard_role_details::getLocker(opCtx.get())
+               ->getLockMode(ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin)) == MODE_IS);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesSForAdminS) {
     auto opCtx = makeOperationContext();
     Lock::DBLock dbRead(opCtx.get(), DatabaseName::kAdmin, MODE_S);
 
-    ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_S);
+    ASSERT(shard_role_details::getLocker(opCtx.get())
+               ->getLockMode(ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin)) == MODE_S);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesIXForAdminIX) {
     auto opCtx = makeOperationContext();
     Lock::DBLock dbWrite(opCtx.get(), DatabaseName::kAdmin, MODE_IX);
 
-    ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_IX);
+    ASSERT(shard_role_details::getLocker(opCtx.get())
+               ->getLockMode(ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin)) == MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminX) {
     auto opCtx = makeOperationContext();
     Lock::DBLock dbWrite(opCtx.get(), DatabaseName::kAdmin, MODE_X);
 
-    ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_X);
+    ASSERT(shard_role_details::getLocker(opCtx.get())
+               ->getLockMode(ResourceId(RESOURCE_DATABASE, DatabaseName::kAdmin)) == MODE_X);
 }
 
 TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {

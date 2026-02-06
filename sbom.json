@@ -2453,6 +2453,58 @@
         ]
       },
       "scope": "excluded"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/veorq/siphash@f26d35e964c6290ffe23d9043475ad3129f409e0",
+      "author": "Jean-Philippe Aumasson, Daniel J. Bernstein",
+      "group": "veorq",
+      "name": "siphash",
+      "version": "f26d35e964c6290ffe23d9043475ad3129f409e0",
+      "description": "High-speed secure pseudorandom function for short messages",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC0-1.0"
+          }
+        },
+        {
+          "license": {
+            "id": "MIT"
+          }
+        },
+        {
+          "license": {
+            "name": "Apache 2.0 with LLVM exception"
+          }
+        }
+      ],
+      "copyright": "This code is copyright (c) 2014-2023 Jean-Philippe Aumasson, Daniel J. Bernstein.",
+      "purl": "pkg:github/veorq/siphash@f26d35e964c6290ffe23d9043475ad3129f409e0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/veorq/siphash/blob/f26d35e/",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Catalog and Routing"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/siphash"
+          }
+        ]
+      },
+      "scope": "required"
     }
   ],
   "dependencies": [

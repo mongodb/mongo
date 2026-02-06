@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
