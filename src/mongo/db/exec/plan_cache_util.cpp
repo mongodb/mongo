@@ -125,11 +125,45 @@ bool shouldCacheBasedOnQueryAndPlan(const CanonicalQuery& query, const QuerySolu
     return false;
 }
 
-void updateClassicPlanCacheFromClassicCandidatesImpl(
+void updateSbePlanCache(OperationContext* opCtx,
+                        const MultipleCollectionAccessor& collections,
+                        const CanonicalQuery& query,
+                        PlanCacheDecisionMetrics planCacheDecisionMetrics,
+                        const QuerySolution* soln,
+                        std::unique_ptr<sbe::CachedSbePlan> cachedPlan) {
+    auto buildDebugInfoFn = [soln, nss = query.nss()]() -> plan_cache_debug_info::DebugInfoSBE {
+        return buildDebugInfo(nss, soln);
+    };
+    auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
+        sbe::DebugPrinter p;
+        sbe::DebugPrintInfo debugPrintInfo{};
+        return p.print(*plan.root.get(), debugPrintInfo);
+    };
+    PlanCacheCallbacksImpl<sbe::PlanCacheKey,
+                           sbe::CachedSbePlan,
+                           plan_cache_debug_info::DebugInfoSBE>
+        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collections.getMainCollection()};
+
+    auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+
+    size_t evictedCount = uassertStatusOK(sbe::getPlanCache(opCtx).set(
+        plan_cache_key_factory::make(query, collections),
+        std::move(cachedPlan),
+        planCacheDecisionMetrics,
+        opCtx->getServiceContext()->getPreciseClockSource()->now(),
+        &callbacks,
+        isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
+        boost::none /* worksGrowthCoefficient */));
+    planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
+}
+
+}  // namespace
+
+void updateClassicPlanCacheFromClassicCandidates(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     const CanonicalQuery& query,
-    ReadsOrWorks readsOrWorks,
+    PlanCacheDecisionMetrics planCacheDecisionMetrics,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
     auto winnerIdx = ranking->candidateOrder[0];
@@ -159,7 +193,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
             .getPlanCache()
             ->set(std::move(key),
                   winningPlan.solution->cacheData->clone(),
-                  readsOrWorks,
+                  planCacheDecisionMetrics,
                   opCtx->getServiceContext()->getPreciseClockSource()->now(),
                   &callbacks,
                   isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
@@ -167,69 +201,11 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
     planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
 }
 
-void updateSbePlanCache(OperationContext* opCtx,
-                        const MultipleCollectionAccessor& collections,
-                        const CanonicalQuery& query,
-                        NumReads nReads,
-                        const QuerySolution* soln,
-                        std::unique_ptr<sbe::CachedSbePlan> cachedPlan) {
-    auto buildDebugInfoFn = [soln, nss = query.nss()]() -> plan_cache_debug_info::DebugInfoSBE {
-        return buildDebugInfo(nss, soln);
-    };
-    auto printCachedPlanFn = [](const sbe::CachedSbePlan& plan) {
-        sbe::DebugPrinter p;
-        sbe::DebugPrintInfo debugPrintInfo{};
-        return p.print(*plan.root.get(), debugPrintInfo);
-    };
-    PlanCacheCallbacksImpl<sbe::PlanCacheKey,
-                           sbe::CachedSbePlan,
-                           plan_cache_debug_info::DebugInfoSBE>
-        callbacks{query, buildDebugInfoFn, printCachedPlanFn, collections.getMainCollection()};
-
-    auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
-
-    size_t evictedCount = uassertStatusOK(sbe::getPlanCache(opCtx).set(
-        plan_cache_key_factory::make(query, collections),
-        std::move(cachedPlan),
-        nReads,
-        opCtx->getServiceContext()->getPreciseClockSource()->now(),
-        &callbacks,
-        isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
-        boost::none /* worksGrowthCoefficient */));
-    planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
-}
-
-}  // namespace
-
-void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
-    OperationContext* opCtx,
-    const CollectionAcquisition& collection,
-    const CanonicalQuery& query,
-    NumReads reads,
-    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    std::vector<plan_ranker::CandidatePlan>& candidates) {
-    invariant(query.isSbeCompatible());
-
-    updateClassicPlanCacheFromClassicCandidatesImpl(
-        opCtx, collection, query, reads, std::move(ranking), candidates);
-}
-
-void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
-    OperationContext* opCtx,
-    const CollectionAcquisition& collection,
-    const CanonicalQuery& query,
-    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    std::vector<plan_ranker::CandidatePlan>& candidates) {
-    ReadsOrWorks nWorks = NumWorks{ranking->stats.candidatePlanStats[0]->common.works};
-    updateClassicPlanCacheFromClassicCandidatesImpl(
-        opCtx, collection, query, nWorks, std::move(ranking), candidates);
-}
-
-void updateSbePlanCacheWithNumReads(
+void updateSbePlanCacheWithPlanCacheDecisionMetrics(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery& query,
-    NumReads nReads,
+    PlanCacheDecisionMetrics planCacheDecisionMetrics,
     const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
     const QuerySolution* winningSolution) {
     if (!shouldCacheBasedOnQueryAndPlan(query, winningSolution)) {
@@ -241,7 +217,12 @@ void updateSbePlanCacheWithNumReads(
         sbePlanAndData.first->clone(), sbePlanAndData.second, winningSolution->hash());
     cachedPlan->indexFilterApplied = winningSolution->indexFilterApplied;
 
-    updateSbePlanCache(opCtx, collections, query, nReads, winningSolution, std::move(cachedPlan));
+    updateSbePlanCache(opCtx,
+                       collections,
+                       query,
+                       planCacheDecisionMetrics,
+                       winningSolution,
+                       std::move(cachedPlan));
 }
 
 void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
@@ -407,19 +388,11 @@ void ClassicPlanCacheWriter::operator()(const CanonicalQuery& cq,
                                         MultiPlanStage& mps,
                                         std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
                                         std::vector<plan_ranker::CandidatePlan>& candidates) const {
-    // Note this function is also called by ConditionalClassicPlanCacheWriter.
-
-    if (_executeInSbe) {
-        auto stats = mps.getStats();
-        auto nReads = computeNumReadsFromStats(*stats, *ranking);
-
-        updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
-            _opCtx, _collection, cq, nReads, std::move(ranking), candidates);
-    } else {
-        // We've been asked to write a works value, for classic execution.
-        updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
-            _opCtx, _collection, cq, std::move(ranking), candidates);
-    }
+    auto stats = mps.getStats();
+    auto nReads = computeNumReadsFromStats(*stats, *ranking);
+    auto nWorks = computeNumWorksFromStats(*ranking);
+    updateClassicPlanCacheFromClassicCandidates(
+        _opCtx, _collection, cq, {nReads, nWorks}, std::move(ranking), candidates);
 }
 
 void ConditionalClassicPlanCacheWriter::operator()(
@@ -496,6 +469,10 @@ NumReads computeNumReadsFromStats(const PlanStageStats& stats,
     // classic" and "CRP SBE" multiplanners to coexist, this function makes sure to always return
     // a positive "reads" value.
     return NumReads{std::max<size_t>(summary.totalKeysExamined + summary.totalDocsExamined, 1)};
+}
+
+NumWorks computeNumWorksFromStats(const plan_ranker::PlanRankingDecision& ranking) {
+    return NumWorks{ranking.stats.candidatePlanStats[0]->common.works};
 }
 
 }  // namespace plan_cache_util

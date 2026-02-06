@@ -329,10 +329,13 @@ void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder*
     out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
     out->append("isActive", entry.isActive);
     out->append("works",
-                static_cast<long long>(entry.readsOrWorks ? entry.readsOrWorks->rawValue() : 0));
-    if (entry.readsOrWorks) {
-        out->append("worksType", entry.readsOrWorks->type());
-    }
+                static_cast<long long>(entry.planCacheDecisionMetrics
+                                           ? entry.planCacheDecisionMetrics->works.value
+                                           : 0));
+    out->append("reads",
+                static_cast<long long>(entry.planCacheDecisionMetrics
+                                           ? entry.planCacheDecisionMetrics->reads.value
+                                           : 0));
     out->append("timeOfCreation", entry.timeOfCreation);
 
     if (entry.securityLevel == PlanSecurityLevel::kSensitive) {

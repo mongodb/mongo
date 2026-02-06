@@ -67,17 +67,6 @@ export function assertCacheUsage({
 
     const explain = queryColl.explain().aggregate(pipeline, aggOptions);
 
-    if (entry.version === "2") {
-        // SBE plan cache always tracks "reads."
-        assert.eq(entry.worksType, "reads");
-    } else if (entry.version == "1") {
-        if (getEngine(explain) == "sbe") {
-            assert.eq(entry.worksType, "reads");
-        } else {
-            assert.eq(entry.worksType, "works");
-        }
-    }
-
     // If the entry is active, we should have a plan cache key.
     if (entry.isActive) {
         assert(entry.planCacheKey);

@@ -145,20 +145,22 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
     // in a query separately, and invoke this callback with each branch as if it were an
     // independent top-level query.
 
-    boost::optional<NumReads> numReads;
+    boost::optional<PlanCacheDecisionMetrics> planCacheDecisionMetrics;
     if (_shouldWriteToPlanCache) {
         auto stats = _multiPlanStage->getStats();
-        numReads = plan_cache_util::computeNumReadsFromStats(*stats, *ranking);
+        planCacheDecisionMetrics.emplace(
+            plan_cache_util::computeNumReadsFromStats(*stats, *ranking),
+            plan_cache_util::computeNumWorksFromStats(*ranking));
     }
 
     // If classic plan cache is enabled, write to it. We need to do this before we extend the
     // QSN tree with the agg pipeline, since the agg portion does not get cached in classic.
     if (_shouldWriteToPlanCache && !useSbePlanCache()) {
-        plan_cache_util::updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
+        plan_cache_util::updateClassicPlanCacheFromClassicCandidates(
             opCtx(),
             collections().getMainCollectionAcquisition(),
             queryToCache,
-            *numReads,
+            *planCacheDecisionMetrics,
             std::move(ranking),
             candidates);
     }
@@ -183,8 +185,12 @@ void MultiPlanner::_buildSbePlanAndMaybeCache(
 
     _sbePlanAndData = prepareSbePlanAndData(*solnToCache, std::move(_replanReason));
     if (_shouldWriteToPlanCache && useSbePlanCache()) {
-        plan_cache_util::updateSbePlanCacheWithNumReads(
-            opCtx(), collections(), queryToCache, *numReads, *_sbePlanAndData, solnToCache);
+        plan_cache_util::updateSbePlanCacheWithPlanCacheDecisionMetrics(opCtx(),
+                                                                        collections(),
+                                                                        queryToCache,
+                                                                        *planCacheDecisionMetrics,
+                                                                        *_sbePlanAndData,
+                                                                        solnToCache);
     }
 }
 

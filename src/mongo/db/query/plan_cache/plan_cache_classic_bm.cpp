@@ -414,7 +414,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     // Add the entry into the cache, which at first sets it to be "inactive".
     ASSERT_OK(planCache->set(planCacheKey,
                              soln->cacheData->clone(),
-                             NumWorks{nWorks},
+                             {NumReads{nWorks * 2}, NumWorks{nWorks}},
                              Date_t{},
                              &callbacks,
                              PlanSecurityLevel::kNotSensitive));
@@ -423,7 +423,7 @@ void BM_PlanCacheClassic(benchmark::State& state) {
     // We need to add the entry once more to activate it so that it would be used.
     ASSERT_OK(planCache->set(planCacheKey,
                              soln->cacheData->clone(),
-                             NumWorks{nWorks},
+                             {NumReads{nWorks * 2}, NumWorks{nWorks}},
                              Date_t{},
                              &callbacks,
                              PlanSecurityLevel::kNotSensitive));

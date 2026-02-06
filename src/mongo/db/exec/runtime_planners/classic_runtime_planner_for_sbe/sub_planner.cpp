@@ -97,12 +97,7 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
         plan_cache_util::ConditionalClassicPlanCacheWriter perBranchWriter{
             plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
             opCtx(),
-            collections().getMainCollectionPtrOrAcquisition(),
-            false /* executeInSbe. We set this to false because the cache entry created by this
-                     callback is only used by the SubPlanner. It is not used for constructing a
-                     final execution plan.  This is marked by a special byte in the plan cache key
-                     which indicates that the entry is used for subplanning only.
-                   */};
+            collections().getMainCollectionPtrOrAcquisition()};
 
         // Wrap the conditional classic plan cache writer function object so that we can count the
         // number of times that multi-planning gets invoked for an $or branch.
@@ -121,9 +116,7 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
             .onPickPlanForBranch = std::move(perBranchCallback),
             .onPickPlanWholeQuery =
                 plan_cache_util::ClassicPlanCacheWriter{
-                    opCtx(),
-                    collections().getMainCollectionPtrOrAcquisition(),
-                    true /* executeInSbe */},
+                    opCtx(), collections().getMainCollectionPtrOrAcquisition()},
         };
     }
 }

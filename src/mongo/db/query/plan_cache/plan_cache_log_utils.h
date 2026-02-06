@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/plan_cache/plan_cache_decision_metrics.h"
 #include "mongo/util/modules.h"
 
 // The logging facility enforces the rule that logging should not be done in a header file. Since
@@ -42,27 +43,27 @@ void logCacheEviction(NamespaceString nss, std::string&& evictedEntry);
 void logCreateInactiveCacheEntry(std::string&& query,
                                  std::string&& planCacheShapeHash,
                                  std::string&& planCacheKey,
-                                 size_t newWorks);
+                                 PlanCacheDecisionMetrics newPlanCacheDecisionMetrics);
 void logReplaceActiveCacheEntry(std::string&& query,
                                 std::string&& planCacheShapeHash,
                                 std::string&& planCacheKey,
-                                size_t works,
-                                size_t newWorks);
+                                PlanCacheDecisionMetrics plancachedecisionmetrics,
+                                PlanCacheDecisionMetrics newPlanCacheDecisionMetrics);
 void logNoop(std::string&& query,
              std::string&& planCacheShapeHash,
              std::string&& planCacheKey,
-             size_t works,
-             size_t newWorks);
+             PlanCacheDecisionMetrics plancachedecisionmetrics,
+             PlanCacheDecisionMetrics newPlanCacheDecisionMetrics);
 void logIncreasingWorkValue(std::string&& query,
                             std::string&& planCacheShapeHash,
                             std::string&& planCacheKey,
-                            size_t works,
-                            size_t increasedWorks);
+                            PlanCacheDecisionMetrics plancachedecisionmetrics,
+                            PlanCacheDecisionMetrics increasedWorks);
 void logPromoteCacheEntry(std::string&& query,
                           std::string&& planCacheShapeHash,
                           std::string&& planCacheKey,
-                          size_t works,
-                          size_t newWorks);
+                          PlanCacheDecisionMetrics plancachedecisionmetrics,
+                          PlanCacheDecisionMetrics newPlanCacheDecisionMetrics);
 void logUnexpectedPinnedCacheEntry(std::string&& query,
                                    std::string&& planCacheShapeHash,
                                    std::string&& planCacheKey,
@@ -70,5 +71,5 @@ void logUnexpectedPinnedCacheEntry(std::string&& query,
                                    std::string&& newEntry,
                                    std::string&& oldSbePlan,
                                    std::string&& newSbePlan,
-                                   size_t newWorks);
+                                   PlanCacheDecisionMetrics newPlanCacheDecisionMetrics);
 }  // namespace mongo::log_detail

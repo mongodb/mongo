@@ -29,10 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/query/plan_cache/plan_cache_decision_metrics.h"
 #include "mongo/util/modules.h"
-
-#include <cstddef>
-#include <cstdint>
 
 namespace mongo {
 
@@ -52,29 +50,29 @@ public:
     virtual void onCreateInactiveCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual void onReplaceActiveCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual void onNoopActiveCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual void onIncreasingWorkValue(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual void onPromoteCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         const CachedPlanType& newPlan,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual void onUnexpectedPinnedCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         const CachedPlanType& newPlan,
-        size_t newWorks) const = 0;
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const = 0;
     virtual DebugInfoType buildDebugInfo() const = 0;
     virtual uint32_t getPlanCacheCommandKeyHash() const = 0;
 };

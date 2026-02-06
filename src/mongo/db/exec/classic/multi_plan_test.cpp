@@ -267,8 +267,7 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
         expCtx,
         coll,
         cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{
-            expCtx->getOperationContext(), coll, false /* executeInSbe */});
+        plan_cache_util::ClassicPlanCacheWriter{expCtx->getOperationContext(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -322,10 +321,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -385,8 +381,8 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     auto entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
     const size_t firstQueryWorks = getBestPlanWorks(mps.get());
-    ASSERT(entry->readsOrWorks);
-    ASSERT_EQ(firstQueryWorks, entry->readsOrWorks->rawValue());
+    ASSERT(entry->planCacheDecisionMetrics);
+    ASSERT_EQ(firstQueryWorks, entry->planCacheDecisionMetrics->works.value);
 
     // Run the multi-planner again. The index scan will again win, but the number of works
     // will be greater, since {foo: 5} appears more frequently in the collection.
@@ -397,8 +393,8 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
-    ASSERT(entry->readsOrWorks);
-    ASSERT_EQ(firstQueryWorks * 2, entry->readsOrWorks->rawValue());
+    ASSERT(entry->planCacheDecisionMetrics);
+    ASSERT_EQ(firstQueryWorks * 2, entry->planCacheDecisionMetrics->works.value);
 
     // Run the exact same query again. This will still take more works than 'works', and
     // should cause the cache entry's 'works' to be doubled again.
@@ -406,14 +402,14 @@ TEST_F(QueryStageMultiPlanTest, MPSDoesNotCreateActiveCacheEntryImmediately) {
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_FALSE(entry->isActive);
-    ASSERT_EQ(firstQueryWorks * 2 * 2, entry->readsOrWorks->rawValue());
+    ASSERT_EQ(firstQueryWorks * 2 * 2, entry->planCacheDecisionMetrics->works.value);
 
     // Run the query yet again. This time, an active cache entry should be created.
     mps = runMultiPlanner(expCtx.get(), nss, coll, 5);
     ASSERT_EQ(cache->size(), 1U);
     entry = assertGet(cache->getEntry(key));
     ASSERT_TRUE(entry->isActive);
-    ASSERT_EQ(getBestPlanWorks(mps.get()), entry->readsOrWorks->rawValue());
+    ASSERT_EQ(getBestPlanWorks(mps.get()), entry->planCacheDecisionMetrics->works.value);
 }
 
 TEST_F(QueryStageMultiPlanTest, MPSDoesCreatesActiveEntryWhenInactiveEntriesDisabled) {
@@ -483,13 +479,11 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     ASSERT_EQUALS(solutions.size(), 3U);
 
     // Fill out the MultiPlanStage.
-    auto mps =
-        std::make_unique<MultiPlanStage>(expCtx.get(),
-                                         collection,
-                                         cq.get(),
-                                         plan_cache_util::ClassicPlanCacheWriter{
-                                             opCtx.get(), collection, false /* executeInSbe */
-                                         });
+    auto mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        collection,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), collection});
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -579,13 +573,8 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
         .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
-    unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(expCtx.get(),
-                                         coll,
-                                         cq.get(),
-                                         plan_cache_util::ClassicPlanCacheWriter{
-                                             opCtx.get(), coll, false /* executeInSbe */
-                                         });
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
@@ -845,10 +834,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCanRunTrialsInBatches) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -929,10 +915,7 @@ TEST_F(QueryStageMultiPlanTest, MPSRunTrialsEarlyExit) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -1012,10 +995,7 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -1060,10 +1040,7 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -1097,10 +1074,7 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false /* executeInSbe */});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -1142,10 +1116,7 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansSimple) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
@@ -1205,12 +1176,8 @@ TEST_F(QueryStageMultiPlanTest, NoRejectedPlansExtractedWhenBackupPlanIsLast) {
     ASSERT_EQUALS(solutions.size(), 2U);
 
     // Fill out the MultiPlanStage.
-    auto mps = std::make_unique<MultiPlanStage>(expCtx.get(),
-                                                coll,
-                                                cq.get(),
-                                                plan_cache_util::ClassicPlanCacheWriter{
-                                                    opCtx.get(), coll, false /* executeInSbe */
-                                                });
+    auto mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPS.
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -1273,12 +1240,8 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
     ASSERT_EQUALS(solutions.size(), 3U);
 
     // Fill out the MultiPlanStage.
-    auto mps = std::make_unique<MultiPlanStage>(expCtx.get(),
-                                                coll,
-                                                cq.get(),
-                                                plan_cache_util::ClassicPlanCacheWriter{
-                                                    opCtx.get(), coll, false /* executeInSbe */
-                                                });
+    auto mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPS.
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -1343,10 +1306,7 @@ TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
@@ -1397,10 +1357,7 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
@@ -1423,10 +1380,7 @@ TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
                                                   nss,
@@ -1448,10 +1402,7 @@ TEST_F(QueryStageMultiPlanTest, ManagesStateAroundPickingBestPlan) {
     auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
 
     unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
-        expCtx.get(),
-        coll,
-        cq.get(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+        expCtx.get(), coll, cq.get(), plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll});
 
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
     mps->addPlan(createQuerySolution(),

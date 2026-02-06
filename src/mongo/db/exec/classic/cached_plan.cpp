@@ -269,8 +269,7 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
         plan_cache_util::ConditionalClassicPlanCacheWriter{
             plan_cache_util::ConditionalClassicPlanCacheWriter::alwaysOrNeverCacheMode(shouldCache),
             opCtx(),
-            collection(),
-            false /* executeInSbe */},
+            collection()},
         _specificStats.replanReason));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 

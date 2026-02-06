@@ -95,7 +95,6 @@ function assertOneResult(cursor) {
         assert.eq(entry.isActive, true, entry);
         assert.eq(entry.version, "2", entry);
         assert.eq(entry.works, 0);
-        assert(!("worksType" in entry));
         assert.eq(entry.isPinned, true);
     } else {
         // No version:2 entries should have been written.
@@ -116,8 +115,6 @@ function assertOneResult(cursor) {
 
         // Both entries should be inactive.
         assert.eq(planCacheEntries.filter((entry) => entry.isActive).length, 0);
-        // Both entries store 'works'.
-        assert.eq(planCacheEntries.filter((entry) => entry.worksType == "works").length, 2);
     }
 }
 
@@ -158,7 +155,6 @@ function assertOneResult(cursor) {
         assert.eq(entry.isActive, true, entry);
         assert.eq(entry.version, 2, entry);
         assert.eq(entry.works, 0);
-        assert(!("worksType" in entry));
         assert.eq(entry.isPinned, true);
     } else {
         // What we want to show here is that the query used the two cache entries that were written
@@ -175,8 +171,6 @@ function assertOneResult(cursor) {
         // Now both entries should be active, because they were used to answer the query
         // successfully.
         assert.eq(planCacheEntries.filter((entry) => entry.isActive).length, 2);
-        // Both entries store 'works'.
-        assert.eq(planCacheEntries.filter((entry) => entry.worksType == "works").length, 2);
     }
 });
 
@@ -234,7 +228,7 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
     assert.commandWorked(coll.createIndex({b: 1}));
     assert.commandWorked(coll.createIndex({x: 1}));
 
-    function checkProfilerAndCache({runQuery, isActive, isPinned, fromPlanCache, worksType}) {
+    function checkProfilerAndCache({runQuery, isActive, isPinned, fromPlanCache}) {
         let profileObj;
 
         // USing 'assert.soon()' here to skip over transient situations in which a query
@@ -274,9 +268,9 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
 
             // It must be tracking reads if the query ran in SBE.
             if (isPinned) {
-                assert(!("worksType" in cacheEntry));
+                assert.eq(cacheEntry.reads, 0);
             } else {
-                assert.eq(cacheEntry.worksType, "reads");
+                assert.gt(cacheEntry.reads, 0);
             }
 
             if (sbePlanCacheEnabled) {
@@ -287,7 +281,11 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
         } else {
             // There should be a cache entry tracking 'works'.
             assert.eq(cacheEntry.version, "1");
-            assert.eq(cacheEntry.worksType, "works");
+            if (isPinned) {
+                assert.eq(cacheEntry.works, 0);
+            } else {
+                assert.gt(cacheEntry.works, 0);
+            }
         }
     }
 

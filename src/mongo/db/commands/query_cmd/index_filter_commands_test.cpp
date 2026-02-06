@@ -317,7 +317,7 @@ private:
         ASSERT_OK(_classicPlanCache->set(
             makeClassicKey(*cq),
             std::move(cacheData),
-            NumWorks{nWorks},
+            {NumReads{nWorks}, NumWorks{nWorks}},
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,
@@ -364,7 +364,7 @@ private:
         ASSERT_OK(_sbePlanCache->set(
             makeSbeKey(*cq),
             std::move(cacheData),
-            NumWorks{nWorks},
+            {NumReads{nWorks}, NumWorks{nWorks}},
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,

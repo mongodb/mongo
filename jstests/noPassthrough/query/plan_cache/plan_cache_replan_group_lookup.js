@@ -431,15 +431,13 @@ function testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(singleSolut
         if (sbePlanCacheEnabled) {
             assert.eq(entries[0].version, "2", entries[0]);
             if (singleSolution) {
-                // Single solution plans do not have a 'worksType' field.
-                assert(!("worksType" in entries[0]));
+                assert.eq(entries[0].reads, 0, entries[0]);
             } else {
-                assert.eq(entries[0].worksType, "reads", entries[0]);
+                assert.gt(entries[0].reads, 0, entries[0]);
             }
             hasHashLookup = entries[0].cachedPlan.stages.includes("hash_lookup");
         } else {
             assert.eq(entries[0].version, "1", entries[0]);
-            assert.eq(entries[0].worksType, sbeEnabled ? "reads" : "works");
             // As a sanity check, we look for EQ_LOOKUP in the cached plan. The classic cache
             // should never contain nodes from pipeline stages, so we should never expect to find
             // it.

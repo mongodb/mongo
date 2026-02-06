@@ -43,8 +43,8 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
-        plan_cache_util::ClassicPlanCacheWriter{
-            opCtx(), collections().getMainCollectionPtrOrAcquisition(), false /* executeInSbe */});
+        plan_cache_util::ClassicPlanCacheWriter{opCtx(),
+                                                collections().getMainCollectionPtrOrAcquisition()});
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;
         auto executableTree = buildExecutableTree(*solution);

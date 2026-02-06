@@ -126,13 +126,8 @@ public:
                 plan_cache_util::ConditionalClassicPlanCacheWriter{
                     plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
                     opCtx(),
-                    coll,
-                    false /* executeInSbe */
-                },
-            .onPickPlanWholeQuery =
-                plan_cache_util::ClassicPlanCacheWriter{
-                    opCtx(), coll, false /* executeInSbe */
-                },
+                    coll},
+            .onPickPlanWholeQuery = plan_cache_util::ClassicPlanCacheWriter{opCtx(), coll},
         };
 
         return std::make_unique<SubplanStage>(_expCtx.get(), coll, &ws, cq, std::move(callbacks));

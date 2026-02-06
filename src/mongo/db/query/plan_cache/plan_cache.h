@@ -51,6 +51,7 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_decision_metrics.h"
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
@@ -66,7 +67,6 @@
 #include <string>
 #include <tuple>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace mongo {
@@ -96,76 +96,6 @@ enum class PlanSecurityLevel {
 };
 
 /**
- * Each cache entry stores a value indicating how much "work" the plan required. This is used
- * for evaluating whether re-planning is necessary. This value is sometimes measured in 'works' and
- * other times measured in total storage engine reads.
- */
-struct NumReads {
-    constexpr static StringData kName = "reads"_sd;
-    size_t value;
-};
-struct NumWorks {
-    constexpr static StringData kName = "works"_sd;
-    size_t value;
-};
-
-/**
- * Sum type representing a decision cost value in units of either works or reads.
- */
-struct ReadsOrWorks {
-    ReadsOrWorks(NumReads reads) : data(reads) {}
-    ReadsOrWorks(NumWorks works) : data(works) {}
-
-    size_t numReads() const {
-        tassert(
-            8908810, "Expected variant to hold numReads", std::holds_alternative<NumReads>(data));
-        return std::get<NumReads>(data).value;
-    }
-
-    size_t numWorks() const {
-        tassert(
-            8908811, "Expected variant to hold numWorks", std::holds_alternative<NumWorks>(data));
-        return std::get<NumWorks>(data).value;
-    }
-
-    /**
-     * Creates a ReadsOrWorks of the same unit/type but with a new raw value.
-     */
-    ReadsOrWorks createFrom(size_t val) const {
-        return visit(OverloadedVisitor{
-                         [&](const NumWorks&) { return ReadsOrWorks{NumWorks{val}}; },
-                         [&](const NumReads&) { return ReadsOrWorks{NumReads{val}}; },
-                     },
-                     data);
-    }
-
-    /**
-     * Returns the numeric value associated with this ReadsOrWorks.
-     */
-    size_t rawValue() const {
-        return visit(
-            OverloadedVisitor{
-                [&](const auto& numX) { return numX.value; },
-            },
-            data);
-    }
-
-    /**
-     * Returns the unit used as a string, which can be used for human-readable output.
-     */
-    StringData type() const {
-        return visit(
-            OverloadedVisitor{
-                [&](const auto& numX) { return std::decay_t<decltype(numX)>::kName; },
-            },
-            data);
-    }
-
-    std::variant<NumReads, NumWorks> data;
-};
-
-
-/**
  * Information returned from a get(...) query.
  */
 template <class CachedPlanType, class DebugInfoType>
@@ -177,14 +107,14 @@ private:
 public:
     CachedPlanHolder(const PlanCacheEntryBase<CachedPlanType, DebugInfoType>& entry)
         : cachedPlan(entry.cachedPlan->clone()),
-          decisionReadsOrWorks(entry.readsOrWorks),
+          decisionPlanCacheDecisionMetrics(entry.planCacheDecisionMetrics),
           debugInfo(entry.debugInfo) {}
 
     /**
      * Indicates whether or not the cached plan is pinned to cache.
      */
     bool isPinned() const {
-        return !decisionReadsOrWorks;
+        return !decisionPlanCacheDecisionMetrics;
     }
 
     /**
@@ -192,8 +122,7 @@ public:
      * applicable.
      */
     boost::optional<size_t> decisionReads() const {
-        return decisionReadsOrWorks ? boost::optional<size_t>(decisionReadsOrWorks->numReads())
-                                    : boost::none;
+        return decisionPlanCacheDecisionMetrics.map([](const auto& v) { return v.reads.value; });
     }
 
     /**
@@ -201,8 +130,7 @@ public:
      * applicable.
      */
     boost::optional<size_t> decisionWorks() const {
-        return decisionReadsOrWorks ? boost::optional<size_t>(decisionReadsOrWorks->numWorks())
-                                    : boost::none;
+        return decisionPlanCacheDecisionMetrics.map([](const auto& v) { return v.works.value; });
     }
 
     // A cached plan that can be used to reconstitute the complete execution plan from cache.
@@ -211,7 +139,7 @@ public:
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached. The value of boost::none indicates that the plan is pinned to the cache and
     // is not subject to replanning.
-    const boost::optional<ReadsOrWorks> decisionReadsOrWorks;
+    const boost::optional<PlanCacheDecisionMetrics> decisionPlanCacheDecisionMetrics;
 
     // Per-plan cache entry information that is used for debugging purpose. Shared across all plans
     // recovered from the same cached entry.
@@ -234,7 +162,7 @@ public:
                                          Date_t timeOfCreation,
                                          bool isActive,
                                          PlanSecurityLevel securityLevel,
-                                         ReadsOrWorks readsOrWorks,
+                                         PlanCacheDecisionMetrics planCacheDecisionMetrics,
                                          DebugInfoType debugInfo) {
         // If the cumulative size of the plan caches is estimated to remain within a predefined
         // threshold, then include additional debug info which is not strictly necessary for
@@ -262,7 +190,7 @@ public:
                                                 planCacheCommandKey,
                                                 isActive,
                                                 securityLevel,
-                                                readsOrWorks,
+                                                planCacheDecisionMetrics,
                                                 std::move(debugInfoOpt)));
     }
 
@@ -300,7 +228,7 @@ public:
      * and are not subject to replanning.
      */
     bool isPinned() const {
-        return !readsOrWorks;
+        return !planCacheDecisionMetrics;
     }
 
     /**
@@ -315,7 +243,7 @@ public:
                                                 planCacheCommandKey,
                                                 isActive,
                                                 securityLevel,
-                                                readsOrWorks,
+                                                planCacheDecisionMetrics,
                                                 debugInfo));
     }
 
@@ -364,7 +292,7 @@ public:
     //
     // If boost::none the cached entry is pinned to cached. Pinned entries are always active
     // and are not subject to replanning.
-    const boost::optional<ReadsOrWorks> readsOrWorks;
+    const boost::optional<PlanCacheDecisionMetrics> planCacheDecisionMetrics;
 
     // Optional debug info containing plan cache entry information that is used strictly as
     // debug information. Read-only and shared between all plans recovered from this entry.
@@ -386,7 +314,7 @@ private:
                        uint32_t planCacheCommandKey,
                        bool isActive,
                        PlanSecurityLevel securityLevel,
-                       boost::optional<ReadsOrWorks> works,
+                       boost::optional<PlanCacheDecisionMetrics> works,
                        std::shared_ptr<const DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
@@ -395,7 +323,7 @@ private:
           planCacheCommandKey(planCacheCommandKey),
           isActive(isActive),
           securityLevel(securityLevel),
-          readsOrWorks(works),
+          planCacheDecisionMetrics(works),
           debugInfo(std::move(debugInfo)),
           estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
         tassert(6108300, "A plan cache entry should never be empty", this->cachedPlan);
@@ -516,7 +444,7 @@ public:
     StatusWith<size_t> set(
         const KeyType& key,
         std::unique_ptr<CachedPlanType> cachedPlan,
-        ReadsOrWorks newReadsOrWorks,
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics,
         Date_t now,
         const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
         PlanSecurityLevel securityLevel,
@@ -532,14 +460,14 @@ public:
               planCacheKey,
               isNewEntryActive,
               shouldBeCreated,
-              increasedReadsOrWorks] = [&]() {
+              increasedPlanCacheDecisionMetrics] = [&]() {
             if (internalQueryCacheDisableInactiveEntries.load()) {
                 // All entries are always active.
                 return std::make_tuple(key.planCacheShapeHash(),
                                        key.planCacheKeyHash(),
                                        true /* isNewEntryActive  */,
                                        true /* shouldBeCreated  */,
-                                       boost::optional<ReadsOrWorks>(boost::none));
+                                       boost::optional<PlanCacheDecisionMetrics>(boost::none));
             } else {
                 tassert(6007020,
                         "LRU store must get value or NoSuchKey error code",
@@ -551,7 +479,7 @@ public:
                     key,
                     // Deference the pointer, then the shared_ptr, and then back to a raw pointer.
                     hasOldEntry ? &**oldEntryWithStatus.getValue() : nullptr,
-                    newReadsOrWorks,
+                    newPlanCacheDecisionMetrics,
                     *cachedPlan.get(),
                     worksGrowthCoefficient.get_value_or(
                         internalQueryCacheWorksGrowthCoefficient.load()),
@@ -570,7 +498,7 @@ public:
                                        planCacheKey,
                                        newState.shouldBeActive,
                                        newState.shouldBeCreated,
-                                       newState.increasedReadsOrWorks);
+                                       newState.increasedPlanCacheDecisionMetrics);
             }
         }();
 
@@ -584,7 +512,7 @@ public:
         // Most of the time when either creating a new cache entry or replacing an old cache entry,
         // the 'works' value is based on the latest trial run. However, if the cache entry was
         // inactive and the latest trial required a higher works value, then we follow a special
-        // formula for computing an 'increasedReadsOrWorks' value.
+        // formula for computing an 'increasedPlanCacheDecisionMetrics' value.
         std::shared_ptr<Entry> newEntry =
             Entry::create(std::move(cachedPlan),
                           planCacheShapeHash,
@@ -593,7 +521,8 @@ public:
                           now,
                           isNewEntryActive,
                           securityLevel,
-                          increasedReadsOrWorks ? *increasedReadsOrWorks : newReadsOrWorks,
+                          increasedPlanCacheDecisionMetrics ? *increasedPlanCacheDecisionMetrics
+                                                            : newPlanCacheDecisionMetrics,
                           callbacks->buildDebugInfo());
 
         return this->put(key, std::move(newEntry), partitionLock);
@@ -759,7 +688,7 @@ private:
     struct NewEntryState {
         bool shouldBeCreated = false;
         bool shouldBeActive = false;
-        boost::optional<ReadsOrWorks> increasedReadsOrWorks = boost::none;
+        boost::optional<PlanCacheDecisionMetrics> increasedPlanCacheDecisionMetrics = boost::none;
     };
 
     /**
@@ -767,52 +696,59 @@ private:
      * whether:
      * - We should create a new entry
      * - The new entry should be marked 'active'
-     * - The new entry should update 'works' to the new value returned as 'increasedReadsWorks'.
+     * - The new entry should update decision metrics to the new values returned as
+     * 'increasedPlanCacheDecisionMetrics'.
      */
     NewEntryState getNewEntryState(
         const KeyType& key,
         const Entry* oldEntry,
-        ReadsOrWorks newWorks,
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics,
         const CachedPlanType& newPlan,
         double growthCoefficient,
         const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks) {
         NewEntryState res;
         if (!oldEntry) {
             if (callbacks) {
-                callbacks->onCreateInactiveCacheEntry(key, oldEntry, newWorks.rawValue());
+                callbacks->onCreateInactiveCacheEntry(key, oldEntry, newPlanCacheDecisionMetrics);
             }
             res.shouldBeCreated = true;
             res.shouldBeActive = false;
             return res;
         }
 
-        if (!oldEntry->readsOrWorks) {
+        if (!oldEntry->planCacheDecisionMetrics) {
             if (callbacks) {
                 callbacks->onUnexpectedPinnedCacheEntry(
-                    key, oldEntry, newPlan, newWorks.rawValue());
+                    key, oldEntry, newPlan, newPlanCacheDecisionMetrics);
             }
             tasserted(6108302,
                       "Works value is not present in the old cache entry (is it a pinned entry?)");
         }
-        const size_t newWorksRaw = newWorks.rawValue();
-        const size_t oldWorksRaw = oldEntry->readsOrWorks->rawValue();
 
-        if (oldEntry->isActive && newWorksRaw <= oldWorksRaw) {
+        const auto oldPlanCacheDecisionMetrics = *oldEntry->planCacheDecisionMetrics;
+
+        // Planning is always done in Classic and uses the number of works as a measure of
+        // efficiency, while reads are only used for trial runs and replanning. This is why we only
+        // compare NumWorks here.
+        const bool newWorksGreater =
+            newPlanCacheDecisionMetrics.works.value > oldPlanCacheDecisionMetrics.works.value;
+
+        if (oldEntry->isActive && !newWorksGreater) {
             // The new plan did better than the currently stored active plan. This case may
             // occur if many MultiPlanners are run simultaneously.
             if (callbacks) {
-                callbacks->onReplaceActiveCacheEntry(key, oldEntry, newWorksRaw);
+                callbacks->onReplaceActiveCacheEntry(key, oldEntry, newPlanCacheDecisionMetrics);
             }
             res.shouldBeCreated = true;
             res.shouldBeActive = true;
         } else if (oldEntry->isActive) {
             if (callbacks) {
-                callbacks->onNoopActiveCacheEntry(key, oldEntry, newWorksRaw);
+                callbacks->onNoopActiveCacheEntry(key, oldEntry, newPlanCacheDecisionMetrics);
             }
             // There is already an active cache entry with a lower works value.
             // We do nothing.
             res.shouldBeCreated = false;
-        } else if (newWorksRaw > oldWorksRaw) {
+        } else if (newWorksGreater) {
             // The cached plan performed worse than expected. Rather than immediately overwriting
             // the cache, lower the bar to what is considered good performance and keep the entry
             // inactive.
@@ -821,23 +757,28 @@ private:
             // value and 'internalQueryCacheWorksGrowthCoefficient' are low enough that
             // the old works * new works cast to size_t is the same as the previous value of
             // 'works'.
-            const double increasedRawWorks =
-                std::max(oldWorksRaw + 1u, static_cast<size_t>(oldWorksRaw * growthCoefficient));
+            const size_t increasedRawWorks = std::max(
+                oldPlanCacheDecisionMetrics.works.value + 1u,
+                static_cast<size_t>(oldPlanCacheDecisionMetrics.works.value * growthCoefficient));
+            const size_t increasedRawReads = std::max(
+                oldPlanCacheDecisionMetrics.reads.value + 1u,
+                static_cast<size_t>(oldPlanCacheDecisionMetrics.reads.value * growthCoefficient));
+            PlanCacheDecisionMetrics increasedPlanCacheDecisionMetrics{NumReads{increasedRawReads},
+                                                                       NumWorks{increasedRawWorks}};
 
             if (callbacks) {
-                callbacks->onIncreasingWorkValue(key, oldEntry, increasedRawWorks);
+                callbacks->onIncreasingWorkValue(key, oldEntry, increasedPlanCacheDecisionMetrics);
             }
 
             // Create a new inactive cache entry with 'increasedWorks'.
             res.shouldBeCreated = true;
-            res.increasedReadsOrWorks.emplace(
-                oldEntry->readsOrWorks->createFrom(increasedRawWorks));
+            res.increasedPlanCacheDecisionMetrics.emplace(increasedPlanCacheDecisionMetrics);
         } else {
             // This cached plan performed just as well or better than we expected, based on the
             // inactive entry's works. We use this as an indicator that it's safe to
             // cache (as an active entry) the plan this query used for the future.
             if (callbacks) {
-                callbacks->onPromoteCacheEntry(key, oldEntry, newPlan, newWorksRaw);
+                callbacks->onPromoteCacheEntry(key, oldEntry, newPlan, newPlanCacheDecisionMetrics);
             }
             // We'll replace the old inactive entry with an active entry.
             res.shouldBeCreated = true;

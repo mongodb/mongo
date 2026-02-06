@@ -93,9 +93,7 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
     ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
-    auto temp = plan_cache_util::ClassicPlanCacheWriter{
-        &opCtx, collection, false /*executeInSbe*/
-    };
+    auto temp = plan_cache_util::ClassicPlanCacheWriter{&opCtx, collection};
     mps = std::make_unique<MultiPlanStage>(expCtx.get(), collection, cq, temp);
     std::unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the 'MultiPlanStage'.

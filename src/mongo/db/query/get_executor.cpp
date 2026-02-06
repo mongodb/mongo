@@ -787,16 +787,7 @@ private:
         }
 
         auto cachedSolutionPair = retrievePlanFromCache(planCacheKey);
-
-        const bool noCachedPlan = !cachedSolutionPair.has_value();
-        const bool cachedPlanIsNotForClassic = !noCachedPlan &&
-            cachedSolutionPair->first->decisionReadsOrWorks &&
-            !std::holds_alternative<NumWorks>(
-                cachedSolutionPair->first->decisionReadsOrWorks->data);
-
-        // If cachedSolutionPair is empty or the stored entry uses NumReads instead of NumWorks, we
-        // cannot use it.
-        if (noCachedPlan || cachedPlanIsNotForClassic) {
+        if (!cachedSolutionPair.has_value()) {
             planCacheCounters.incrementClassicMissesCounter();
             return nullptr;
         }

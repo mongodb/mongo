@@ -63,58 +63,68 @@ public:
     void onCreateInactiveCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const final {
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
-        log_detail::logCreateInactiveCacheEntry(
-            _cq.toStringShort(), std::move(planCacheShapeHash), std::move(planCacheKey), newWorks);
+        log_detail::logCreateInactiveCacheEntry(_cq.toStringShort(),
+                                                std::move(planCacheShapeHash),
+                                                std::move(planCacheKey),
+                                                newPlanCacheDecisionMetrics);
     }
 
     void onReplaceActiveCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-        size_t newWorks) const final {
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         tassert(1003130, "Expected oldEntry to not be null", oldEntry);
-        tassert(1003131, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
+        tassert(1003131,
+                "oldEntry is expected to have non zero works",
+                oldEntry->planCacheDecisionMetrics);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logReplaceActiveCacheEntry(_cq.toStringShort(),
                                                std::move(planCacheShapeHash),
                                                std::move(planCacheKey),
-                                               oldEntry->readsOrWorks->rawValue(),
-                                               newWorks);
+                                               *oldEntry->planCacheDecisionMetrics,
+                                               newPlanCacheDecisionMetrics);
     }
 
     void onNoopActiveCacheEntry(const KeyType& key,
                                 const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-                                size_t newWorks) const final {
+                                PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         tassert(1003132, "Expected oldEntry to not be null", oldEntry);
-        tassert(1003133, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
+        tassert(1003133,
+                "oldEntry is expected to have non zero works",
+                oldEntry->planCacheDecisionMetrics);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logNoop(_cq.toStringShort(),
                             std::move(planCacheShapeHash),
                             std::move(planCacheKey),
-                            oldEntry->readsOrWorks->rawValue(),
-                            newWorks);
+                            *oldEntry->planCacheDecisionMetrics,
+                            newPlanCacheDecisionMetrics);
     }
 
     void onIncreasingWorkValue(const KeyType& key,
                                const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
-                               size_t newWorks) const final {
+                               PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         tassert(1003134, "Expected oldEntry to not be null", oldEntry);
-        tassert(1003135, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
+        tassert(1003135,
+                "oldEntry is expected to have non zero works",
+                oldEntry->planCacheDecisionMetrics);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logIncreasingWorkValue(_cq.toStringShort(),
                                            std::move(planCacheShapeHash),
                                            std::move(planCacheKey),
-                                           oldEntry->readsOrWorks->rawValue(),
-                                           newWorks);
+                                           *oldEntry->planCacheDecisionMetrics,
+                                           newPlanCacheDecisionMetrics);
     }
 
     void onPromoteCacheEntry(const KeyType& key,
                              const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                              const CachedPlanType& newPlan,
-                             size_t newWorks) const final {
+                             PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         tassert(1003136, "Expected oldEntry to not be null", oldEntry);
-        tassert(1003137, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
+        tassert(1003137,
+                "oldEntry is expected to have non zero works",
+                oldEntry->planCacheDecisionMetrics);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
 
         auto* serviceContext = getCurrentServiceContext();
@@ -140,17 +150,17 @@ public:
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),
                                          std::move(planCacheShapeHash),
                                          std::move(planCacheKey),
-                                         oldEntry->readsOrWorks->rawValue(),
-                                         newWorks);
+                                         *oldEntry->planCacheDecisionMetrics,
+                                         newPlanCacheDecisionMetrics);
     }
 
     void onUnexpectedPinnedCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         const CachedPlanType& newPlan,
-        size_t newWorks) const final {
+        PlanCacheDecisionMetrics newPlanCacheDecisionMetrics) const final {
         tassert(8983101, "Expected oldEntry to not be null", oldEntry);
-        tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->readsOrWorks);
+        tassert(8983102, "Expected oldEntry to be pinned", !oldEntry->planCacheDecisionMetrics);
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
         auto newEntryDebugInfo = buildDebugInfo();
         log_detail::logUnexpectedPinnedCacheEntry(_cq.toStringShort(),
@@ -160,7 +170,7 @@ public:
                                                   newEntryDebugInfo.debugString(),
                                                   printCachedPlan(*oldEntry->cachedPlan.get()),
                                                   printCachedPlan(newPlan),
-                                                  newWorks);
+                                                  newPlanCacheDecisionMetrics);
     }
 
     DebugInfoType buildDebugInfo() const final {

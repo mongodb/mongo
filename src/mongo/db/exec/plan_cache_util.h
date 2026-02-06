@@ -73,28 +73,16 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const NamespaceString& nss,
                                                    const QuerySolution* solution);
 
 /**
- * Updates the classic plan cache from candidates generated using classic planning, but with the
- * intent of executing the query in SBE. If the query is not a type that can be cached, does
- * nothing. It is the caller's responsibility to compute a 'numReads' value to be stored in the
- * cache entry indicating the expected number of reads the SBE plan requires.
- */
-void updateClassicPlanCacheFromClassicCandidatesForSbeExecution(
-    OperationContext* opCtx,
-    const CollectionAcquisition& collection,
-    const CanonicalQuery& query,
-    NumReads numReads,
-    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    std::vector<plan_ranker::CandidatePlan>& candidates);
-
-/**
  * Updates the classic plan cache from candidates generated using classic planning, with the intent
- * of executing it in classic. If the query is not a type that can be cached, does nothing. This
- * uses the 'works' value provided in 'ranking' as the works value to store in the cache.
+ * of executing it in classic. If the query is not a type that can be cached, does nothing.
+ * Requires both reads and works so that a cached plan can be later trialed using both Classic
+ * and SBE.
  */
-void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
+void updateClassicPlanCacheFromClassicCandidates(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
     const CanonicalQuery& query,
+    PlanCacheDecisionMetrics planCacheDecisionMetrics,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates);
 
@@ -108,11 +96,11 @@ void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
  *    * Never cached.
  *    * Cached, except in certain special cases.
  */
-void updateSbePlanCacheWithNumReads(
+void updateSbePlanCacheWithPlanCacheDecisionMetrics(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery& query,
-    NumReads nReads,
+    PlanCacheDecisionMetrics planCacheDecisionMetrics,
     const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
     const QuerySolution* winningSolution);
 
@@ -149,10 +137,8 @@ struct NoopPlanCacheWriter {
  * Does nothing if the query is not eligible for caching or the winning plan is illegal to cache.
  */
 struct ClassicPlanCacheWriter {
-    ClassicPlanCacheWriter(OperationContext* opCtx,
-                           const CollectionAcquisition& collection,
-                           bool executeInSbe)
-        : _opCtx(opCtx), _collection(collection), _executeInSbe(executeInSbe) {}
+    ClassicPlanCacheWriter(OperationContext* opCtx, const CollectionAcquisition& collection)
+        : _opCtx(opCtx), _collection(collection) {}
 
     void operator()(const CanonicalQuery& cq,
                     MultiPlanStage& mps,
@@ -162,7 +148,6 @@ struct ClassicPlanCacheWriter {
 protected:
     OperationContext* _opCtx;
     CollectionAcquisition _collection;
-    bool _executeInSbe;
 };
 
 /**
@@ -196,10 +181,8 @@ public:
 
     ConditionalClassicPlanCacheWriter(Mode planCachingMode,
                                       OperationContext* opCtx,
-                                      const CollectionAcquisition& collection,
-                                      bool executeInSbe)
-        : ClassicPlanCacheWriter(opCtx, collection, executeInSbe),
-          _planCachingMode{planCachingMode} {}
+                                      const CollectionAcquisition& collection)
+        : ClassicPlanCacheWriter(opCtx, collection), _planCachingMode{planCachingMode} {}
 
     void operator()(const CanonicalQuery& cq,
                     MultiPlanStage& mps,
@@ -215,8 +198,11 @@ protected:
     const Mode _planCachingMode;
 };
 
-// This function computes the value of the "reads" metric for the winning plan using the specified
-// 'stats'. This function will always return a positive value.
+// This functions compute the values of the "reads" and "works" metric for the winning plan using
+// the specified stats. This function will always return a positive value.
 NumReads computeNumReadsFromStats(const PlanStageStats& stats,
                                   const plan_ranker::PlanRankingDecision& ranking);
+
+NumWorks computeNumWorksFromStats(const plan_ranker::PlanRankingDecision& ranking);
+
 }  // namespace mongo::plan_cache_util

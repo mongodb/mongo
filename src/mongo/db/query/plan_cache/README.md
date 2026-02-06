@@ -104,9 +104,9 @@ When a query is planned for the first time and a winning solution is selected, t
 >
 > An _inactive_ cache entry exists but cannot be used (yet). Inactive cache entries can be [promoted to active](#updating-the-plan-cache) when a query of the same shape runs and exhibits similar or better trial period performance, as measured by the entry's number of ["works"](#aside-plan-cache-works). This behavior prevents situations where a plan cache entry is created with an unreasonably high works value. When this happens, the plan can get stuck in the cache since [replanning](#aside-replanning) will never kick in.
 
-> ### Aside: Plan Cache "Works"
+> ### Aside: Plan Cache Decision Metrics
 >
-> The plan cache stores a [`ReadsOrWorks`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L112) value for each entry, equivalent to the amount of ["work"](../../exec/runtime_planners/classic_runtime_planner/README.md#aside-works) associated with the plan at the time of caching.
+> The plan cache stores a [`PlanCacheDecisionMetrics`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L112) values for each entry. They contain the amount of ["works"](../../exec/runtime_planners/classic_runtime_planner/README.md#aside-works) and "reads" associated with the plan at the time of caching.
 >
 > - For Classic, this is the number of calls to `PlanStage::work()`
 > - For SBE, this is the number of individual _reads_ done from storage-level cursors.
