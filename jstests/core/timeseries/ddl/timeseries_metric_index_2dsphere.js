@@ -19,6 +19,8 @@
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB(jsTestName() + "_db");
@@ -51,17 +53,38 @@ TimeseriesTest.run((insert) => {
     // Create a 2dsphere index on the time-series collection.
     const twoDSphereTimeseriesIndexSpec = {"location": "2dsphere"};
     const twoDSphereTimeseriesIndexName = "location_2dsphere";
+    const options = {
+        name: twoDSphereTimeseriesIndexName,
+    };
+    // TODO SERVER-118561 Remove this and use the default server-selected version when 9.0 is last LTS.
+    if (TestData.isRunningFCVUpgradeDowngradeSuite) {
+        // Pin the index version to v3 when upgrading/downgrading FCV during the test run,
+        // such that we don't need to drop v4 indexes to downgrade the FCV.
+        // Otherwise, use the default version.
+        options["2dsphereIndexVersion"] = 3;
+    }
     assert.commandWorked(
-        timeseriescoll.createIndex(twoDSphereTimeseriesIndexSpec, {
-            name: twoDSphereTimeseriesIndexName,
-            "2dsphereIndexVersion": 3,
-        }),
+        timeseriescoll.createIndex(twoDSphereTimeseriesIndexSpec, options),
         "Failed to create a 2dsphere index with: " + tojson(twoDSphereTimeseriesIndexSpec),
     );
 
     // Verify that the 2dsphereIndexVersion field is visible on the collection.
     const created = timeseriescoll.getIndexes().filter((idx) => idx.name === twoDSphereTimeseriesIndexName)[0];
-    assert.eq(created["2dsphereIndexVersion"], 3, "Created index does not have version field.");
+
+    // Build set of allowed versions. Skip v3 if feature flag is enabled and we're in a stable FCV suite.
+    const allowedVersions = new Set([4]);
+    const shouldSkipV3 = FeatureFlagUtil.isPresentAndEnabled(testdb, "2dsphereIndexVersion4") && isStableFCVSuite();
+    if (!shouldSkipV3) {
+        // TODO SERVER-118561 We can remove this when 9.0 becomes last LTS.
+        allowedVersions.add(3);
+    }
+    assert(
+        allowedVersions.has(created["2dsphereIndexVersion"]),
+        "Created index does not have valid version field. Expected one of: " +
+            Array.from(allowedVersions).join(", ") +
+            ", got: " +
+            created["2dsphereIndexVersion"],
+    );
     // Insert a 2dsphere index usable document.
     const twoDSphereDocs = [
         {

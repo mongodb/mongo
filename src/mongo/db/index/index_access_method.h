@@ -549,6 +549,36 @@ public:
                                            const MultikeyPaths& multikeyPaths) const;
 
     /**
+     * Checks if this access method implements alternative explanations for a missing index entry.
+     * This allows access methods to return false early before seeking the record from the record
+     * store, avoiding expensive operations.
+     *
+     * Implementations should override this if checkMissingIndexEntryAlternative is overriden.
+     */
+    virtual bool shouldCheckMissingIndexEntryAlternative(OperationContext* opCtx,
+                                                         const IndexCatalogEntry& entry) const {
+        return false;
+    }
+
+    /**
+     * Checks if a missing index entry has an alternative explanation (e.g., version mismatch).
+     * This allows access methods to handle validation-specific logic without exposing it to
+     * generic validation code.
+     *
+     * Returns boost::none if there's no alternative explanation (normal missing entry error).
+     * Otherwise returns a pair of (error message, warning message) to be added to validation
+     * results.
+     */
+    virtual boost::optional<std::pair<std::string, std::string>> checkMissingIndexEntryAlternative(
+        OperationContext* opCtx,
+        const IndexCatalogEntry& entry,
+        const key_string::Value& missingKey,
+        const RecordId& recordId,
+        const BSONObj& document) const {
+        return boost::none;
+    }
+
+    /**
      * Provides direct access to the SortedDataInterface. This should not be used to insert
      * documents into an index, except for testing purposes.
      */

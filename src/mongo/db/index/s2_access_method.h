@@ -46,6 +46,7 @@
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <memory>
+#include <set>
 
 #include <boost/optional/optional.hpp>
 
@@ -60,12 +61,13 @@ public:
 
     /**
      * Helper for 'fixSpec' which validates the index and returns a copy tweaked to conform to the
-     * expected format. If expectedVersion is specified, the index version must match.
+     * expected format. If allowedVersions is specified, the index version (or default version if
+     * not specified) must be in the allowed set.
      *
      * Returns a non-OK status if 'specObj' is invalid.
      */
     static StatusWith<BSONObj> _fixSpecHelper(
-        const BSONObj& specObj, boost::optional<long long> expectedVersion = boost::none);
+        const BSONObj& specObj, boost::optional<std::set<long long>> allowedVersions = boost::none);
 
     /**
      * Takes an index spec object for this index and returns a copy tweaked to conform to the
@@ -76,6 +78,39 @@ public:
      * Returns a non-OK status if 'specObj' is invalid.
      */
     static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
+
+    /**
+     * Public API for generating S2 index keys for validation purposes.
+     */
+    static KeyStringSet generateKeysForValidation(const BSONObj& indexSpec,
+                                                  const CollatorInterface* collator,
+                                                  const BSONObj& document,
+                                                  Ordering ordering,
+                                                  const boost::optional<RecordId>& recordId,
+                                                  key_string::Version keyStringVersion);
+
+    /**
+     * Public API for checking if an S2 index is version 3.
+     */
+    static bool isVersion3(const BSONObj& indexSpec);
+
+    /**
+     * For S2 indexes, this only returns true for version 3 indexes that may need to be checked for
+     * version 4 upgrade scenarios.
+     */
+    bool shouldCheckMissingIndexEntryAlternative(OperationContext* opCtx,
+                                                 const IndexCatalogEntry& entry) const override;
+
+    /**
+     * Checks if a missing index entry is actually present when using version 4 key generation,
+     * indicating the index needs to be upgraded from version 3 to version 4.
+     */
+    boost::optional<std::pair<std::string, std::string>> checkMissingIndexEntryAlternative(
+        OperationContext* opCtx,
+        const IndexCatalogEntry& entry,
+        const key_string::Value& missingKey,
+        const RecordId& recordId,
+        const BSONObj& document) const override;
 
 protected:
     S2AccessMethod(IndexCatalogEntry* btreeState,

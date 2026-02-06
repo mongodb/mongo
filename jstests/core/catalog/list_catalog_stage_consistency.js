@@ -16,6 +16,8 @@ import {
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertCatalogListOperationsConsistencyForCollection} from "jstests/libs/catalog_list_operations_consistency_validator.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
 // Validate catalog list operations consistency after each command,
 // so that if an inconsistency is introduced, we fail immediately.
@@ -130,13 +132,19 @@ createIndexAndCheckConsistency(db.collection_simple, {f2dNonIntBits: "2d"}, {bit
 createIndexAndCheckConsistency(db.collection_simple, {f2dSphere: "2dsphere"});
 createIndexAndCheckConsistency(db.timeseries_simple, {"timestamp": 1});
 
+var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3;
+if (!isStableFCVSuite()) {
+    // If we are upgrading/downgrading the FCV, avoid having to drop any v4 indexes by pinning the version to 3
+    // TODO SERVER-118561 Remove this when 9.0 is last LTS.
+    twoDSphereIndexVersion = 3;
+}
 // TODO(SERVER-97084): Remove when options for index plugins are denied in basic indexes.
 createIndexAndCheckConsistency(
     db.collection_simple,
     {fUnrelatedIndexPluginOptions: 1},
     {
         textIndexVersion: 3,
-        "2dsphereIndexVersion": 3,
+        "2dsphereIndexVersion": FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3,
         bits: 26,
         min: -180,
         max: 180,

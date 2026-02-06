@@ -22,6 +22,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/geo:geometry",
         "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/collation:collator_interface",
         "//src/mongo/db/storage/key_string",
         "//src/third_party/s2",

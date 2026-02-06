@@ -8,6 +8,8 @@
  * ]
  */
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -112,7 +114,17 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     testCreateIndexAndDropIndex({f: "2d"}, options);
 
     // Test createIndex() for a 2dsphere index with various options, followed by dropIndex().
-    options = {name: "2dsphere", "2dsphereIndexVersion": 3};
+    // The 2dsphere index version depends on whether featureFlag2dsphereIndexVersion4 is enabled:
+    // - If enabled: defaults to version 4, which is included in change stream events.
+    // - If disabled: defaults to version 3, which is included in change stream events.
+    options = {name: "2dsphere"};
+    var twoDSphereIndexVersion = FeatureFlagUtil.isPresentAndEnabled(db, "2dsphereIndexVersion4") ? 4 : 3;
+    if (!isStableFCVSuite()) {
+        // If we are upgrading/downgrading the FCV, avoid having to drop any v4 indexes by pinning the version to 3
+        // TODO SERVER-118561 Remove this when 9.0 is last LTS.
+        twoDSphereIndexVersion = 3;
+    }
+    options["2dsphereIndexVersion"] = twoDSphereIndexVersion;
     testCreateIndexAndDropIndex({f: "2dsphere"}, options);
 
     // Test createIndexes() to create two sparse indexes (with one index being a compound index),
