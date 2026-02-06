@@ -9,6 +9,8 @@
  *   does_not_support_stepdowns,
  *   # Explain cannot run within a multi-document transaction.
  *   does_not_support_transactions,
+ *   # featureFlagCostBasedRanker does not exist in prior versions
+ *   requires_fcv_83
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -56,20 +58,9 @@ function confirmSubplanningBehavior(filter, expected) {
     assert(getPlanStage(winningPlan, "OR"), explain);
     if (!checkSbeFullyEnabled(db)) {
         const planRankerMode = getPlanRankerMode(db);
-        const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        const automaticCEPlanRankingStrategy =
-            // FCV < 8.3 does not have the automaticCEPlanRankingStrategy knob
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.3") < 0
-                ? null
-                : assert.commandWorked(
-                      db.adminCommand({
-                          getParameter: 1,
-                          automaticCEPlanRankingStrategy: 1,
-                      }),
-                  )["automaticCEPlanRankingStrategy"];
 
         // If SBE is not fully enabled, confirm we subplan the distinct query when the CBR feature flag is not enabled.
-        if (planRankerMode === "automaticCE" && automaticCEPlanRankingStrategy === "CBRForNoMultiplanningResults") {
+        if (planRankerMode === "automaticCE") {
             assert(getPlanStage(winningPlan, "OR"), explain);
         } else {
             assert(getPlanStage(winningPlan, "SUBPLAN"), explain);
