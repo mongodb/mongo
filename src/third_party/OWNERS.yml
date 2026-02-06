@@ -154,3 +154,6 @@ filters:
   - "zstandard":
     approvers:
       - 10gen/server-networking-and-observability
+  - "fuzztest":
+    approvers:
+      - 10gen/platsec-server

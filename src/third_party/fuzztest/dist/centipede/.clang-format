@@ -1,0 +1,5 @@
+BasedOnStyle: Google
+Language: Cpp
+# Force int* foo spacing style:
+DerivePointerAlignment: false
+PointerAlignment: Left

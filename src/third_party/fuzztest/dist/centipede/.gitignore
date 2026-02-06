@@ -1,0 +1,6 @@
+# Ignore the Google-only sources.
+/copybara
+/google
+/production
+/puzzles
+/testing

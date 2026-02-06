@@ -1,0 +1,317 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// LINT: ALLOW_GROUPS
+
+syntax = "proto2";
+
+package fuzztest.internal;
+
+enum BareEnum {
+  LABEL_DEFAULT = 0;
+  LABEL_OTHER = 10;
+}
+
+message SingleBytesField {
+  optional bytes data = 1;
+}
+
+message SingleInt32Field {
+  optional int32 i32 = 1;
+}
+
+message TestSubProtobuf {
+  optional int32 subproto_i32 = 1;
+  repeated int32 subproto_rep_i32 = 2 [packed = true];
+}
+
+message TestProtobuf {
+  enum Enum {
+    Label1 = 0;
+    Label2 = 1;
+    Label3 = 2;
+    Label4 = 3;
+    Label5 = 4;
+  }
+
+  optional bool b = 1;
+  optional int32 i32 = 2;
+  optional uint32 u32 = 3;
+  optional int64 i64 = 4;
+  optional uint64 u64 = 5;
+  optional float f = 6;
+  optional double d = 7;
+  optional string str = 8;
+  optional Enum e = 9;
+  optional TestSubProtobuf subproto = 10;
+
+  repeated bool rep_b = 11;
+  repeated int32 rep_i32 = 12;
+  repeated uint32 rep_u32 = 13;
+  repeated int64 rep_i64 = 14;
+  repeated uint64 rep_u64 = 15;
+  repeated float rep_f = 16;
+  repeated double rep_d = 17;
+  repeated string rep_str = 18;
+  repeated Enum rep_e = 19;
+  repeated TestSubProtobuf rep_subproto = 20;
+
+  oneof oneof_field {
+    int32 oneof_i32 = 21;
+    int64 oneof_i64 = 22;
+    uint32 oneof_u32 = 24;
+  }
+
+  map<int32, int32> map_field = 25;
+
+  // Special cases
+  enum EnumOneLabel {
+    OnlyLabel = 17;
+  }
+  optional EnumOneLabel enum_one_label = 100;
+  message EmptyMessage {}
+  optional EmptyMessage empty_message = 101;
+}
+
+message TestProtobufWithRequired {
+  optional int32 i32 = 1;
+
+  required int32 req_i32 = 200;
+  required TestProtobuf.Enum req_e = 201;
+  required TestSubProtobuf req_sub = 202;
+  optional TestProtobufWithRequired sub_req = 203;
+  map<int32, TestProtobufWithRequired> map_sub_req = 204;
+}
+
+message IRObjectTestProto {
+  oneof value {
+    uint64 i = 1;
+    double d = 2;
+    bytes s = 3;
+  }
+  repeated IRObjectTestProto sub = 4;
+}
+
+message TestProtobufWithExtension {
+  optional int32 non_ext = 1;
+  extensions 1000 to max;
+}
+
+message ProtoExtender {
+  extend TestProtobufWithExtension {
+    optional string ext = 1001;
+    repeated string rep_ext = 1002;
+  }
+}
+
+message RecursiveExtender {
+  extend TestProtobufWithExtension {
+    optional TestProtobufWithRecursion parent = 2001;
+  }
+}
+
+message TestProtobufWithRecursion {
+  message ChildProto {
+    optional TestProtobufWithRecursion parent1 = 1;
+    optional TestProtobufWithRecursion parent2 = 2;
+    optional TestProtobufWithRecursion parent3 = 3;
+    optional string id = 4;
+  }
+  optional int32 id = 1;
+  oneof type {
+    ChildProto child = 2;
+    int32 child_id = 3;
+  }
+  optional TestProtobufWithExtension ext = 4;
+}
+
+message TestProtobufWithRepeatedRecursion {
+  repeated TestProtobufWithRepeatedRecursion items = 1;
+}
+
+message TestProtobufWithRepeatedRecursionSubproto {
+  optional TestProtobufWithRepeatedRecursion list = 1;
+}
+
+message MessageWithGroup {
+  optional group GroupField = 1 {
+    optional int64 field1 = 2;
+    optional int64 field2 = 3;
+  }
+}
+
+// Represents transitions through a food creation machine.
+message FoodMachineProcedure {
+  message Action {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      WARMUP = 1;
+      INSERT_RAW_MATERIALS = 3;
+      PREPARE_RAW_MATERIALS = 4;
+      COOK = 5;
+      PLATE = 6;
+      EMERGENCY_STOP = 7;
+    }
+    // The type of the action to perform. Determines the interpretation of
+    // fields within this message.
+    optional Type type = 1;
+    // The type of materials being added, for materials related `Type`s.
+    repeated string materials = 2;
+  }
+  // Actions for the food machine to take.
+  repeated Action actions = 1;
+}
+
+// Represents an expression entered into a 4 function calculator
+message CalculatorExpression {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    ADD = 1;
+    SUB = 2;
+    MUL = 3;
+    DIV = 4;
+    VALUE = 5;
+  }
+  optional Type type = 1;
+  // Valid for non-VALUE operands.
+  optional CalculatorExpression left = 2;
+  // Valid for non-VALUE operands.
+  optional CalculatorExpression right = 3;
+  // Value only for VALUE types.
+  optional int32 value = 4;
+}
+
+// Input to starting run of the (imaginary) Courier Robot CR-560.
+message RoboCourier560Plan {
+  message ExtraAction {
+    enum Type {
+      TYPE_UNSPECIFIED = 0;
+      CHANGE_NAME = 1;
+      POST_NOTICE = 2;
+    }
+    optional Type type = 1;
+    // The contents of the ExtraAction. Interpretation depends on the `type`.
+    optional string content = 2;
+  }
+  message Mail {
+    // The recipient's name
+    optional string name = 1;
+    // The recipient's address
+    optional string address = 2;
+    // Content of the mail.
+    optional string content = 3;
+  }
+  // Mail to deliver.
+  repeated Mail mail = 1;
+  // Any non-mail related actions to take at a address.
+  map<string, ExtraAction> extra_actions = 2;
+}
+
+message WebSearchResult {
+  // Number of URLs in the search result.
+  optional int64 count = 1;
+  optional string query = 2;
+  // A list of size `count` containing valid URLs.
+  repeated string urls = 3;
+}
+
+message MazePath {
+  enum Direction {
+    UNSPECIFIED = 0;
+    UP = 1;
+    DOWN = 2;
+    LEFT = 3;
+    RIGHT = 4;
+  }
+  repeated Direction direction = 1 [packed = true];
+}
+
+// Represents a sequence of numbered keys that open the doors along a maze path.
+message MazeKeys {
+  repeated int32 key = 1 [packed = true];
+}
+
+// Represents a directed graph of nodes, alongside a specially designated start
+// node.
+message NodeGraph {
+  // A node in the graph.
+  message Node {
+    // The name of the node. Must be non-empty and unique among all nodes.
+    optional string name = 1;
+
+    // The names of zero or more successors of the node. Each successor must
+    // refer to an existing node in the graph (including the current node).
+    repeated string successor = 2;
+  }
+
+  // All nodes in the graph.
+  repeated Node node = 1;
+
+  // The name of the start node in the graph.
+  optional string start = 2;
+}
+
+message DataColumnFilter {
+  message AndFilter {
+    repeated DataColumnFilter filters = 1;  // must have length > 1
+  }
+  message OrFilter {
+    repeated DataColumnFilter filters = 1;  // must have length > 1
+  }
+  message NotFilter {
+    optional DataColumnFilter filter = 1;
+  }
+  oneof filter {
+    AndFilter and_filter = 1;
+    OrFilter or_filter = 2;
+    NotFilter not_filter = 3;
+  }
+}
+
+message Person {
+  optional string name = 1;
+  optional uint32 zipcode = 2;
+  optional uint32 age = 3;
+  repeated Person emergency_contacts = 5;
+}
+
+message Vector {
+  repeated uint32 rows = 1 [packed = true];
+}
+message Matrix {
+  repeated Vector columns = 1;
+}
+
+// A partial TCP state machine, modeling connection establishment
+message TcpStateMachine {
+  enum State {
+    INVALID_STATE = 0;
+    CLOSED = 1;
+    LISTEN = 2;
+    SYN_RCVD = 3;
+    SYN_SENT = 4;
+    ESTABLISHED = 5;
+  }
+
+  enum Event {
+    INVALID_EVENT = 0;
+    USER_LISTEN = 1;
+    USER_CONNECT = 2;
+    RCV_SYN = 3;
+    RCV_SYN_ACK = 4;
+    RCV_ACK = 5;
+  }
+  repeated Event event = 1 [packed = true];
+  optional State start_state = 2;
+}

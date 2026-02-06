@@ -1,0 +1,75 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+module(
+    name = "fuzztest",
+    version = "head",
+# TODO(lszekeres): Remove and use default name.
+    repo_name = "com_google_fuzztest",
+)
+
+bazel_dep(
+    name = "abseil-cpp",
+    version = "20250512.0",
+)
+bazel_dep(
+    name = "re2",
+    version = "2024-07-02.bcr.1",
+)
+bazel_dep(
+    name = "bazel_skylib",
+    version = "1.7.1",
+)
+bazel_dep(
+    name = "platforms",
+    version = "0.0.10",
+)
+
+# GoogleTest is not a dev dependency, because it's needed when FuzzTest is used
+# with GoogleTest integration (e.g., googletest_adaptor). Note that the FuzzTest
+# framework can be used without GoogleTest integration as well.
+bazel_dep(
+    name = "googletest",
+    version = "1.16.0"
+)
+# TODO(lszekeres): Make this a dev dependency, as the protobuf library is only
+# required for testing.
+bazel_dep(
+    name = "protobuf",
+    version = "31.1",
+)
+bazel_dep(
+    name = "rules_proto",
+    version = "7.1.0",
+)
+bazel_dep(
+    name = "riegeli",
+    version = "0.0.0-20250706-c4d1f27",
+    repo_name = "com_google_riegeli",
+)
+
+# Dev dependencies.
+# These dependencies will be ignored if the current module is not the root
+# module (https://bazel.build/rules/lib/globals/module#bazel_dep).
+bazel_dep(
+    name = "nlohmann_json",
+    version = "3.11.3",
+    dev_dependency = True,
+)
+bazel_dep(
+    name = "antlr4-cpp-runtime",
+    version = "4.12.0",
+    dev_dependency = True,
+    repo_name = "antlr_cpp",
+)

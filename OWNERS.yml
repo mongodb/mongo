@@ -104,3 +104,6 @@ filters:
   - ".tmp/*":
     approvers:
       - 10gen/devprod-build
+  - ".bazelrc.fuzztest":
+    approvers:
+      - 10gen/platsec-server

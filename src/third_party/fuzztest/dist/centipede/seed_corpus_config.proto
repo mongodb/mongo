@@ -1,0 +1,72 @@
+// Copyright 2023 The Centipede Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Describes the seed corpus configuration to bootstrap a Centipede run:
+// - Where to get the seed elements from, and how many of them to get.
+// - Where to write the seed corpus to, and how to shard it.
+
+syntax = "proto3";
+
+package fuzztest.internal.proto;
+
+// Describes a seed corpus source as a set of directories matching a glob in
+// combination with a relative shard file glob searched under each of those
+// directories.
+message SeedCorpusSource {
+  // A path or a glob matching one or more dir(s) with source corpus shards.
+  // Required.
+  string dir_glob = 1;
+  // The number of most recent `dir_glob`-matching dirs to use. The dirs are
+  // assumed to have names that are lexicographically sorted in the order from
+  // oldest to newest. Required.
+  uint32 num_recent_dirs = 2;
+  // A relative glob used to find corpus shards in each `dir_glob`-matching dir.
+  // Required.
+  string shard_rel_glob = 3;
+  // An absolute or relative number of corpus elements to sample from all the
+  // corpus shards in all `dir_glob` matching dirs of this source. Optional: the
+  // default is to take all the elements.
+  oneof sample_size {
+    // Sample a fraction of elements. Must be <= 1.0.
+    float sampled_fraction = 4;
+    // A fixed number of elements. If >= the number of elements, use all.
+    uint32 sampled_count = 5;
+  }
+}
+
+// Describes the seed corpus destination location and shard filename format.
+message SeedCorpusDestination {
+  // The output dir to which to write the generated seed corpus shard files.
+  // Required.
+  string dir_path = 1;
+  // A `dir_path`-relative glob used to generate output corpus shard filenames.
+  // Must contain a single '*' placeholder for the shard index, e.g. "corpus.*".
+  // Required.
+  string shard_rel_glob = 3;
+  // The minimum number of digits to use for the shard index in the shard
+  // filenames. The indices will be zero-padded. Optional: the default is to use
+  // Centipede's standard value for corpus shards.
+  uint32 shard_index_digits = 4;
+  // The number of corpus shards to create. Required.
+  uint32 num_shards = 5;
+}
+
+// A complete seed corpus configuration with multiple sources and one
+// destination.
+message SeedCorpusConfig {
+  // A list of the seeding sources. Required.
+  repeated SeedCorpusSource sources = 1;
+  // The seeding destination. Required.
+  SeedCorpusDestination destination = 2;
+}

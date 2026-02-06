@@ -2505,6 +2505,64 @@
         ]
       },
       "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/google/fuzztest@v2025.07.28",
+      "supplier": {
+        "name": "Google LLC",
+        "url": [
+          "https://opensource.google/"
+        ]
+      },
+      "author": "The Google Test and Google Mock Communities",
+      "group": "google.opensource",
+      "name": "fuzztest",
+      "version": "2025.07.28",
+      "description": "FuzzTest",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        },
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "copyright": "Copyright 2008, Google Inc. All rights reserved.",
+      "cpe": "cpe:2.3:a:google:fuzztest:2025.07.28:*:*:*:*:*:*:*",
+      "purl": "pkg:github/google/fuzztest@v2025.07.28",
+      "externalReferences": [
+        {
+          "url": "https://github.com/google/fuzztest.git",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Product Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/fuzztest/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/fuzztest"
+          }
+        ]
+      },
+      "scope": "excluded"
     }
   ],
   "dependencies": [
@@ -2525,6 +2583,7 @@
         "pkg:github/google/re2@2025-08-05",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
+        "pkg:github/google/fuzztest@v2025.07.28",
         "pkg:github/google/googletest@v1.17.0",
         "pkg:github/gperftools/gperftools@2.9.1",
         "pkg:github/grpc/grpc@v1.74.1",
@@ -2634,6 +2693,10 @@
     },
     {
       "ref": "pkg:github/google/benchmark@v1.5.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/google/fuzztest@v2025.07.28",
       "dependsOn": []
     },
     {

@@ -181,6 +181,14 @@ local_path_override(
     path = "src/third_party/zlib",
 )
 
+# When updating fuzztest run the following command
+# bazel run @fuzztest//bazel:setup_configs > bazelrc.fuzztest
+bazel_dep(name = "fuzztest", version = "20250805.0")
+local_path_override(
+    module_name = "fuzztest",
+    path = "src/third_party/fuzztest/dist",
+)
+
 # This is just here because 1.5.1 has a bug in it and our current version of re2 will pull in 1.5.1
 # If re2 is ever upgraded past 2025-08-12 this can be unpinned
 bazel_dep(name = "rules_python", version = "1.5.2")

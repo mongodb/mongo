@@ -597,6 +597,9 @@ common --experimental_collect_system_network_usage
 common:fission --fission=yes
 common:fission --remote_download_regex=.*\.dwo$
 
+--config=fuzztest
+common:fuzztest --@fuzztest//fuzztest:centipede_integration=True
+
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async
 
@@ -642,6 +645,9 @@ try-import %workspace%/.bazelrc.sync
 
 # Engflow auth credentials
 try-import %workspace%/.bazelrc.engflow_creds
+
+# Flags for fuzztest
+try-import %workspace%/.bazelrc.fuzztest
 
 # Repository root absolute path to set --execution_log_compact_file
 #try-import %workspace%/.bazelrc.exec_log_file

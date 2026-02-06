@@ -1876,6 +1876,8 @@ def _impl(ctx):
                     "-Wno-sign-compare",
                     "-Wno-implicit-fallthrough",
                     "-Wno-shorten-64-to-32",
+                    "-Wno-unused-but-set-variable",
+                    "-Wno-nullability-completeness",
                 ])],
             ),
         ],
