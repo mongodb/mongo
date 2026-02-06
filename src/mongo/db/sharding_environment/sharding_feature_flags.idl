@@ -257,3 +257,10 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagCheckVersioningCorrectness
         default: false
         fcv_gated: true
+    featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
+        description:
+            "Feature flag to make shardCollection and reshardCollection not require a hashed
+            shard key to have a supporting index."
+        cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
+        default: false
+        fcv_gated: true

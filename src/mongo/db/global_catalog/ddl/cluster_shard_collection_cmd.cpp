@@ -126,6 +126,8 @@ public:
         serverRequest.setTimeseries(clusterRequest.getTimeseries());
         serverRequest.setCollectionUUID(clusterRequest.getCollectionUUID());
         serverRequest.setImplicitlyCreateIndex(clusterRequest.getImplicitlyCreateIndex());
+        serverRequest.setSkipHashedShardKeyIndexCreation(
+            clusterRequest.getSkipHashedShardKeyIndexCreation());
         serverRequest.setEnforceUniquenessCheck(clusterRequest.getEnforceUniquenessCheck());
 
         ShardsvrCreateCollection shardsvrCreateCommand(nss);

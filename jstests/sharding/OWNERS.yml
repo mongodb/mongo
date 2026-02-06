@@ -160,3 +160,6 @@ filters:
   - "set_fcv*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "hashed_shard_key_index_optional_shard_collection.js":
+    approvers:
+      - 10gen/server-cluster-scalability

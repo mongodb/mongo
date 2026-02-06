@@ -1066,6 +1066,31 @@ void checkCommandArguments(OperationContext* opCtx,
             "dataShard and registerExistingCollectionInGlobalCatalog cannot be specified in the "
             "same request",
             !(request.getDataShard() && request.getRegisterExistingCollectionInGlobalCatalog()));
+
+    if (request.getSkipHashedShardKeyIndexCreation()) {
+        uassert(
+            ErrorCodes::InvalidOptions,
+            fmt::format("Cannot specify both '{}' and '{}'",
+                        ShardsvrCreateCollectionRequest::kSkipHashedShardKeyIndexCreationFieldName,
+                        ShardsvrCreateCollectionRequest::kImplicitlyCreateIndexFieldName),
+            !request.getImplicitlyCreateIndex().has_value());
+
+        const ShardKeyPattern shardKeyPattern{*request.getShardKey()};
+        uassert(
+            ErrorCodes::InvalidOptions,
+            fmt::format("Can only specify '{}' when sharding on a hashed shard key",
+                        ShardsvrCreateCollectionRequest::kSkipHashedShardKeyIndexCreationFieldName),
+            shardKeyPattern.isHashedPattern());
+
+        uassert(
+            ErrorCodes::InvalidOptions,
+            fmt::format("Can only specify '{}' when "
+                        "featureFlagHashedShardKeyIndexOptionalUponShardingCollection is enabled",
+                        ShardsvrCreateCollectionRequest::kSkipHashedShardKeyIndexCreationFieldName),
+            feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    }
 }
 
 /**
@@ -1313,7 +1338,11 @@ boost::optional<UUID> createCollectionAndIndexes(
         return *sharding_ddl_util::getCollectionUUID(opCtx, translatedNss);
     }
     auto indexCreated = false;
-    if (request.getImplicitlyCreateIndex().value_or(true)) {
+    if (request.getSkipHashedShardKeyIndexCreation().value_or(false)) {
+        LOGV2(9974501,
+              "Skip checking for the shard key index and implicitly creating it per the settings"
+              "in the create collection request");
+    } else if (request.getImplicitlyCreateIndex().value_or(true)) {
         indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
             opCtx,
             translatedNss,

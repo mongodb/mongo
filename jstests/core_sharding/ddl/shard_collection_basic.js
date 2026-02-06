@@ -6,6 +6,9 @@
  * ]
  */
 
+import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 let kDbName = db.getName();
 
 db.dropDatabase();
@@ -143,6 +146,22 @@ assert.commandFailedWithCode(
     db.adminCommand({shardCollection: kDbName + ".foo", key: {x: 1}, implicitlyCreateIndex: false}),
     6373200,
 );
+
+if (
+    isStableFCVSuite() &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "featureFlagHashedShardKeyIndexOptionalUponShardingCollection")
+) {
+    jsTestLog("Cannot specify both implicitlyCreateIndex and skipHashedShardKeyIndexCreation.");
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            shardCollection: kDbName + ".foo",
+            key: {x: "hashed"},
+            implicitlyCreateIndex: false,
+            skipHashedShardKeyIndexCreation: true,
+        }),
+        ErrorCodes.InvalidOptions,
+    );
+}
 
 //
 // Test shardCollection's idempotency

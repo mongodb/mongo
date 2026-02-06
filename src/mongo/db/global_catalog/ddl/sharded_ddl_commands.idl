@@ -192,6 +192,14 @@ structs:
             implicitlyCreateIndex:
                 description: "Creates an index on the shard key pattern if the collection is empty."
                 type: optionalBool
+            skipHashedShardKeyIndexCreation:
+                type: bool
+                description:
+                    "This setting determines whether to skip creating an index on the shard
+                    key pattern if the shard key lacks an existing supporting index. This
+                    applies regardless of whether the collection is empty or non-existent.
+                    Note that this option can only be set when using a hashed shard key."
+                optional: true
             enforceUniquenessCheck:
                 description: >-
                     Controls whether this command verifies that any unique indexes are prefixed by
