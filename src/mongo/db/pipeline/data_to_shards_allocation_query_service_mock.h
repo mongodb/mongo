@@ -30,13 +30,16 @@
 #pragma once
 
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
 #include <deque>
+#include <memory>
 #include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -83,6 +86,54 @@ private:
 
     // If set to true, allows any cluster time for the 'getAllocationToShardsStatus' calls.
     bool _allowAnyClusterTime = false;
+};
+
+/**
+ * RAII scopeguard for creating a 'DataToShardsAllocationQueryService' mock instance in the global
+ * service context. This will create a new 'DataToShardsAllocationQueryServiceMock' instance and
+ * register it in the global service context upon creation. Upon destruction, it will unregister the
+ * instance from the global service context, so that there will be no more instance registered.
+ */
+struct ScopedDataToShardsAllocationQueryServiceMock {
+    ScopedDataToShardsAllocationQueryServiceMock(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+    ScopedDataToShardsAllocationQueryServiceMock& operator=(
+        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
+
+    ScopedDataToShardsAllocationQueryServiceMock(std::nullptr_t) {
+        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
+    }
+
+    /**
+     * Registers a 'DataToShardsAllocationQueryService' mock instance for a single call that will be
+     * valid for the specified cluster time. The mocked call will return the provided status.
+     */
+    ScopedDataToShardsAllocationQueryServiceMock(Timestamp clusterTime,
+                                                 AllocationToShardsStatus status) {
+        std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
+        responses.emplace_back(clusterTime, status);
+
+        auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
+        queryService->bufferResponses(std::move(responses));
+
+        DataToShardsAllocationQueryService::set(getGlobalServiceContext(), std::move(queryService));
+    }
+
+    /**
+     * Registers a 'DataToShardsAllocationQueryService' mock instance for a single call that will be
+     * valid for an arbitrary cluster time. The mocked call will return the 'kContinue' status.
+     */
+    ScopedDataToShardsAllocationQueryServiceMock()
+        : ScopedDataToShardsAllocationQueryServiceMock(Timestamp(42, 0),
+                                                       AllocationToShardsStatus::kOk) {
+        static_cast<DataToShardsAllocationQueryServiceMock*>(
+            DataToShardsAllocationQueryService::get(getGlobalServiceContext()))
+            ->allowAnyClusterTime();
+    }
+
+    ~ScopedDataToShardsAllocationQueryServiceMock() {
+        DataToShardsAllocationQueryService::set(getGlobalServiceContext(), nullptr);
+    }
 };
 
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/change_streams/control_events.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
@@ -40,6 +41,17 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+namespace {
+DataToShardsAllocationQueryService* getDataToShardsAllocationQueryService(OperationContext* opCtx) {
+    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService =
+        DataToShardsAllocationQueryService::get(opCtx);
+    tassert(11901800,
+            "expecting DataToShardsAllocationQueryService to be available",
+            dataToShardsAllocationQueryService);
+    return dataToShardsAllocationQueryService;
+}
+}  // namespace
 
 ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handleEvent(
     OperationContext* opCtx,
@@ -80,6 +92,22 @@ ChangeStreamShardTargeterDbPresentStateEventHandler::handleEventInDegradedMode(
             "DatabaseCreatedControlEvent can not be processed in DbPresent state",
             !std::holds_alternative<DatabaseCreatedControlEvent>(event));
 
+    // For 'NamespacePlacementChanged' events, check if the placement history can provide
+    // information for the oplog time embedded in the event. If this is not the case, this was
+    // likely due to an FCV downgrade, which clears the placement history information. In this case,
+    // the change stream reader needs to downgrade to v1.
+    if (std::holds_alternative<NamespacePlacementChangedControlEvent>(event)) {
+        const NamespacePlacementChangedControlEvent& placementChangedEvent =
+            std::get<NamespacePlacementChangedControlEvent>(event);
+        if (placementChangedEvent.nss.isEmpty() &&
+            getDataToShardsAllocationQueryService(opCtx)->getAllocationToShardsStatus(
+                opCtx, placementChangedEvent.clusterTime) ==
+                AllocationToShardsStatus::kNotAvailable) {
+            // No shard placement information is available. Use v1 change stream reader.
+            return ShardTargeterDecision::kSwitchToV1;
+        }
+    }
+
     // In degraded mode, requests to open and/or close cursors cannot be made - the set of tracked
     // shards for a bounded change stream segment is fixed.
     // We also cannot assume that a specific event type is fed in here, as we may have missed
@@ -95,12 +123,6 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     Timestamp clusterTime,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    // The placement history query here uses ignoreRemovedShards=false. This should work because the
-    // set of cursors will ultimately be opened by the 'ChangeStreamHandleTopologyChangeV2' stage in
-    // normal fetching mode state, and this state will catch any 'ShardRemoved' exceptions. In case
-    // a cursor is opened on a shard that has been removed, the v2 stage will start a new change
-    // stream segment.
-    // TODO SERVER-115212: verify that this is sensible.
     auto placement =
         ctx.getHistoricalPlacementFetcher().fetch(opCtx,
                                                   readerCtx.getChangeStream().getNamespace(),

@@ -93,8 +93,6 @@
 #include <set>
 #include <vector>
 
-// #include <boost/cstdint.hpp>
-
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -129,37 +127,6 @@ struct ScopedChangeStreamReaderBuilderMock {
 
     ~ScopedChangeStreamReaderBuilderMock() {
         ChangeStreamReaderBuilder::set(getGlobalServiceContext(), nullptr);
-    }
-};
-
-// RAII scopeguard for creating a 'DataToShardsAllocationQueryService' mock instance.
-struct ScopedDataToShardsAllocationQueryServiceMock {
-    ScopedDataToShardsAllocationQueryServiceMock(
-        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
-    ScopedDataToShardsAllocationQueryServiceMock& operator=(
-        const ScopedDataToShardsAllocationQueryServiceMock&) = delete;
-
-    ScopedDataToShardsAllocationQueryServiceMock(std::nullptr_t) {
-        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
-    }
-
-    ScopedDataToShardsAllocationQueryServiceMock() {
-        std::vector<DataToShardsAllocationQueryServiceMock::Response> responses;
-
-        // The actual cluster time used here does not matter, as we are using
-        // 'allowAnyClusterTime()' later.
-        responses.emplace_back(Timestamp(42, 0), AllocationToShardsStatus::kOk);
-
-        auto queryService = std::make_unique<DataToShardsAllocationQueryServiceMock>();
-        queryService->allowAnyClusterTime();
-        queryService->bufferResponses(std::move(responses));
-
-        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(),
-                                                    std::move(queryService));
-    }
-
-    ~ScopedDataToShardsAllocationQueryServiceMock() {
-        DataToShardsAllocationQueryServiceMock::set(getGlobalServiceContext(), nullptr);
     }
 };
 

@@ -30,6 +30,7 @@
 #include "mongo/s/change_streams/database_change_stream_db_present_state_event_handler.h"
 
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
+#include "mongo/db/pipeline/data_to_shards_allocation_query_service_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
@@ -602,13 +603,51 @@ TEST_F(DatabaseDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
 
 TEST_F(
     DatabaseDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
-    When_HandleEventInDegradedModeIsCalledForNamespacePlacementChanged_Then_DoesNotModifyCursors) {
+    When_HandleEventInDegradedModeIsCalledForNamespacePlacementChangedWithNonEmptyNamespace_Then_DoesNotModifyCursors) {
     Timestamp clusterTime(60, 10);
     NamespacePlacementChangedControlEvent event{clusterTime, makeTestNss()};
 
     readerCtx().setDegradedMode(true);
     auto result = handler().handleEventInDegradedMode(opCtx(), event, ctx(), readerCtx());
     ASSERT_EQ(result, ShardTargeterDecision::kContinue);
+
+    assertNoCursorOperations();
+
+    ASSERT_EQ(ctx().setHandlerCalls.size(), 0);
+}
+
+TEST_F(
+    DatabaseDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
+    When_HandleEventInDegradedModeIsCalledForNamespacePlacementChangedWithEmptyNamespace_Then_QueriesShardAllocationAndReturnsContinue) {
+    Timestamp clusterTime(60, 10);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(clusterTime,
+                                                                  AllocationToShardsStatus::kOk);
+
+    NamespacePlacementChangedControlEvent event{clusterTime,
+                                                NamespaceString::createNamespaceString_forTest("")};
+
+    readerCtx().setDegradedMode(true);
+    auto result = handler().handleEventInDegradedMode(opCtx(), event, ctx(), readerCtx());
+    ASSERT_EQ(result, ShardTargeterDecision::kContinue);
+
+    assertNoCursorOperations();
+
+    ASSERT_EQ(ctx().setHandlerCalls.size(), 0);
+}
+
+TEST_F(
+    DatabaseDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
+    When_HandleEventInDegradedModeIsCalledForNamespacePlacementChangedWithEmptyNamespaceAndNoAllocationAvailable_Then_ReturnsSwitchToV1) {
+    Timestamp clusterTime(60, 10);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock(
+        clusterTime, AllocationToShardsStatus::kNotAvailable);
+
+    NamespacePlacementChangedControlEvent event{clusterTime,
+                                                NamespaceString::createNamespaceString_forTest("")};
+
+    readerCtx().setDegradedMode(true);
+    auto result = handler().handleEventInDegradedMode(opCtx(), event, ctx(), readerCtx());
+    ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
 
     assertNoCursorOperations();
 
