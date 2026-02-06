@@ -41,6 +41,11 @@ namespace mongo::otel::metrics {
  */
 class MetricName {
 public:
+    // TODO(SERVER-119070): Make this private again when we have module-specific metric names.
+    // This should not be used outside of the module-specific use cases that have been discussed
+    // with N&O.
+    constexpr MetricName(StringData name) : _name(name) {};
+
     constexpr StringData getName() const {
         return _name;
     };
@@ -50,8 +55,6 @@ public:
     }
 
 private:
-    friend class MetricNames;
-    constexpr MetricName(StringData name) : _name(name) {};
     StringData _name;
 };
 
