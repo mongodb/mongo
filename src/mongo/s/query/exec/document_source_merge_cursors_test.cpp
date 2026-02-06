@@ -598,24 +598,51 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
         R"({
             "$mergeCursors": {
                 "compareWholeSortKey": "?bool",
+                "nss": "HASH<test.mergeCursors>",
+                "allowPartialResults": false,
+                "recordRemoteOpWaitTime": false,
+                "requestQueryStatsFromRemotes": false,
+                "remotes": []
+            }
+        })",
+        redact(*stage));
+}
+
+TEST_F(DocumentSourceMergeCursorsShapeTest, RepresentativeShapeIsReparseable) {
+    auto spec = fromjson(R"({
+            "$mergeCursors": {
+                "compareWholeSortKey": true,
                 "remotes": [
                     {
-                        "shardId": "HASH<FakeShard1>",
-                        "hostAndPort": "HASH<FakeShard1Host:12345>",
-                        "cursorResponse": "?object"
-                    },
-                    {
-                        "shardId": "HASH<FakeShard2>",
-                        "hostAndPort": "HASH<FakeShard2Host:12345>",
-                        "cursorResponse": "?object"
+                        "shardId": "FakeShard1",
+                        "hostAndPort": "FakeShard1Host:12345",
+                        "cursorResponse": {ok: 1, cursor: {id: NumberLong(11111), ns: "test.mergeCursors", firstBatch: []}}
                     }
                 ],
-                "nss": "HASH<test.mergeCursors>",
+                "nss": "test.mergeCursors",
                 "allowPartialResults": false,
                 "recordRemoteOpWaitTime": false,
                 "requestQueryStatsFromRemotes": false
             }
-        })",
-        redact(*stage));
+        })");
+    auto stage = DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx());
+
+    // There is no need for closing remote cursors within this unit-test.
+    dynamic_cast<DocumentSourceMergeCursors*>(stage.get())->dismissCursorOwnership();
+
+    auto opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
+
+    std::vector<Value> serialization;
+    stage->serializeToArray(serialization, opts);
+    auto representativeShape = serialization[0].getDocument().toBson();
+
+    auto reparsedStage =
+        DocumentSourceMergeCursors::createFromBson(representativeShape.firstElement(), getExpCtx());
+    dynamic_cast<DocumentSourceMergeCursors*>(reparsedStage.get())->dismissCursorOwnership();
+
+    std::vector<Value> newSerialization;
+    reparsedStage->serializeToArray(newSerialization, opts);
+    auto newRepresentativeShape = newSerialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(representativeShape, newRepresentativeShape);
 }
 }  // namespace mongo

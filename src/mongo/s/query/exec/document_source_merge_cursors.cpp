@@ -128,12 +128,27 @@ Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) co
     // This method is the only reason 'DocumentSourceMergeCursors' needs '_blockingResultsMerger'.
     // We cannot cache '_armParams->toBSON()', because remotes can change during the execution in
     // case of change streams.
-    if (_blockingResultsMerger) {
+
+    auto stageDefinition = [&] {
+        if (_blockingResultsMerger) {
+            return _blockingResultsMerger->asyncResultsMergerParams().toBSON(opts);
+        }
+        tassert(9535004, "_armParams must be set", _armParams);
+        return _armParams->toBSON(opts);
+    }();
+
+    if (!opts.isKeepingLiteralsUnchanged()) {
+        // The 'remotes' array contains objects with a complex structure, including a cursor command
+        // response, which must follow a strict schema to be reparsed. We simplify the query shape
+        // by serializing 'remotes' as an empty array to avoid having to define a complex custom
+        // representative value for its contents.
         return Value(Document{
-            {kStageName, _blockingResultsMerger->asyncResultsMergerParams().toBSON(opts)}});
+            {kStageName,
+             stageDefinition.removeField(AsyncResultsMergerParams::kRemotesFieldName)
+                 .addFields(BSON(AsyncResultsMergerParams::kRemotesFieldName << BSONArray()))}});
     }
-    tassert(9535004, "_armParams must be set", _armParams);
-    return Value(Document{{kStageName, _armParams->toBSON(opts)}});
+
+    return Value(Document{{kStageName, stageDefinition}});
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
