@@ -108,8 +108,9 @@ function checkConfigAndShardsFCV(expectedFCV) {
 
 function checkClusterBeforeUpgrade(fcv) {
     checkConfigAndShardsFCV(fcv);
-    // before the FCV upgrade, we expect exactly 2 documents to have the state attribute
-    validateNumberOfDocumentsWithStateAttributeInShardsCollection(st, 2);
+    // we don't validate the number of documents before the upgrade,
+    // because it forces us to depend on the specific version; what we
+    // are really interested is the number after the upgrade
 }
 
 function checkClusterAfterFCVUpgrade(fcv) {
