@@ -1,11 +1,6 @@
 /**
  * Test error conditions for the `$vectorSearch` aggregation pipeline stage.
  * E2E version of with_mongot/vector_search_mocked/vector_search_error_cases.js
- *
- * @tags: [
- *   requires_mongot,
- *   requires_fcv_71,
- * ]
  */
 
 const collName = jsTestName();

@@ -3,9 +3,6 @@
  *
  * Uses an empty collection so query stats are collected without needing actual search results.
  *
- * @tags: [
- *   requires_fcv_71,
- * ]
  */
 
 import {before, describe, it} from "jstests/libs/mochalite.js";

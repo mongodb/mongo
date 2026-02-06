@@ -6,7 +6,6 @@
  * Sharded-specific explain tests are in sharding_no_passthrough/vector_search_explain_sharded.js
  *
  * @tags: [
- *   requires_fcv_71,
  *   assumes_unsharded_collection,
  * ]
  */

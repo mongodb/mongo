@@ -1,9 +1,5 @@
 /**
  * Tests for the `$vectorSearch` aggregation pipeline stage with real mongot.
- *
- * @tags: [
- *   requires_fcv_71,
- * ]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

@@ -5,7 +5,6 @@
  * E2E version of with_mongot/vector_search_mocked/sharded_vector_search_no_passthrough_stage.js
  *
  * @tags: [
- *   requires_fcv_71,
  *   requires_sharding,
  *   assumes_unsharded_collection,
  * ]

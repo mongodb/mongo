@@ -13,6 +13,9 @@
  * ]
  */
 
+// To avoid a namespace not found error (note that the collection has not been created), force the queries to go through a single router so that the db lookups (with retries) happen on a single router.
+TestData.pinToSingleMongos = true;
+
 const collName = jsTestName();
 const coll = db[collName];
 
