@@ -200,11 +200,17 @@ function shardedTest() {
         },
     });
 
+    // In sharded clusters, the number of sessions used during startup is not well defined and can
+    // change depending on whether shard addition hits any errors, other background operations, etc.
+    // Therefore, we get the initial session count here to give some leeway to the sharding test setup.
+    assert.commandWorked(st.s.adminCommand(refreshCommand), "failed sharding startup refresh");
+    const initialSessions = st.s.getDB("config").system.sessions.count();
+
     let fp, fp2;
 
     runTest(
         st.s,
-        2,
+        initialSessions,
         () => {
             const shard0Primary = st.rs0.getPrimary();
             fp = configureFailPoint(shard0Primary, "failCommand", {

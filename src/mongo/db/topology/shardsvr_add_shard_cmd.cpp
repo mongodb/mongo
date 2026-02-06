@@ -41,6 +41,7 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/add_shard_gen.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/topology_change_helpers.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -151,6 +153,27 @@ public:
             } else {
                 waitForMajority(opCtx);
             }
+
+            // With 8.0 binaries, we may still be executing the old add shard path in which the
+            // balancer configuration check from prior versions was ensuring that the shard could
+            // contact the config server. To preserve this behavior, we have the shard send a hello
+            // to the config server here to ensure connectivity. In the coordinator version of add
+            // shard, this should be a noop since we previously have run
+            // shardsvrCheckCanConnectToConfigServer. There is a small race condition here in which
+            // the ShardingState is recovered but the Grid is not set as initialized in which this
+            // may throw and fail the addShard command.
+            // TODO (SERVER-97816): Remove once 9.0 becomes lastLTS
+            ShardingState::get(opCtx)->awaitClusterRoleRecovery().get(opCtx);
+            HelloCommand helloCmd;
+            helloCmd.setDbName(DatabaseName::kAdmin);
+            const auto cmdResponseWithStatus =
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+                    DatabaseName::kAdmin,
+                    helloCmd.toBSON(),
+                    Shard::RetryPolicy::kIdempotent);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponseWithStatus));
 
             // Since we know that some above write (either the shard identity or the noop write) was
             // done with the session info, there is no need to do another noop write here (in fact,
