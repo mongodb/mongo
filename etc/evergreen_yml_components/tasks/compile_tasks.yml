@@ -1229,6 +1229,11 @@ tasks:
       - command: subprocess.exec
         params:
           binary: bash
+          env:
+            JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+            JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+            JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+            JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
           include_expansions_in_env:
             - MONGO_PR_BOT_APP_ID
             - MONGO_PR_BOT_PRIVATE_KEY

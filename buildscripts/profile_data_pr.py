@@ -17,10 +17,17 @@ import tempfile
 import requests
 from github.GithubException import GithubException
 from github.GithubIntegration import GithubIntegration
+from jira import JIRAError
+
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from buildscripts.client.jiraclient import JiraAuth, JiraClient
 
 OWNER_NAME = "10gen"
 REPO_NAME = "mongo"
 PROFILE_DATA_FILE_PATH = "bazel/repository_rules/profiling_data.bzl"
+JIRA_SERVER = "https://jira.mongodb.org"
+PROFILE_DATA_OWNING_TEAM = "Product Performance"
 
 
 def get_mongo_repository(app_id, private_key):
@@ -100,6 +107,41 @@ def update_gcc_pgo_info(file_content: str, new_url: str, new_checksum: str) -> s
     return replace_quoted_text_in_tagged_line(updated_text, gcc_pgo_checksum_tag, new_checksum)
 
 
+def create_backport_ticket(version: str):
+    jira = JiraClient(JIRA_SERVER, JiraAuth(), dry_run=False)
+    jira = jira._jira
+    server_issue_dict = {
+        "project": {"key": "SERVER"},
+        "issuetype": {"name": "Task"},
+        "summary": "Update PGO profiles",
+        "description": "Updated PGO profile numbers for performance.",
+        "customfield_12751": [{"value": PROFILE_DATA_OWNING_TEAM}],
+    }
+    backport_issue_dict = {
+        "project": {"key": "BACKPORT"},
+        "issuetype": {"name": "Backport"},
+        "summary": f"[{version}] Update PGO profiles",
+        # Branch
+        "customfield_14166": {"value": version},
+        # Backport Justification
+        "customfield_25156": "Updated PGO profile numbers for performance.",
+    }
+    for attempt in range(3):
+        try:
+            server_issue = jira.create_issue(fields=server_issue_dict)
+            backport_issue = jira.create_issue(fields=backport_issue_dict)
+            # For some reason you cant assign a team on creation for backport tickets
+            backport_issue.update({"customfield_12751": [{"value": PROFILE_DATA_OWNING_TEAM}]})
+            jira.create_issue_link(
+                type="backported by", inwardIssue=server_issue.key, outwardIssue=backport_issue.key
+            )
+            break
+        except JIRAError as err:
+            print(err)
+            return None
+    return server_issue
+
+
 def create_pr(target_branch: str, new_branch: str, original_file, new_content: str):
     """
     Opens up a pr for a single file with new contents
@@ -115,6 +157,17 @@ def create_pr(target_branch: str, new_branch: str, original_file, new_content: s
         else:
             raise
 
+    jira_ticket = "SERVER-110427"
+    # This is a versioned backport branch if it stats with v
+    if target_branch != "master" and target_branch[0] == "v":
+        # get v8.0 from either v8.0 or v8.0-staging
+        version = target_branch.split("-")[0]
+        new_ticket = create_backport_ticket(version)
+        if new_ticket:
+            jira_ticket = new_ticket.key
+        else:
+            jira_ticket = "[Jira Ticket Creation Broken]"
+
     repo.update_file(
         path=PROFILE_DATA_FILE_PATH,
         content=new_content,
@@ -125,7 +178,7 @@ def create_pr(target_branch: str, new_branch: str, original_file, new_content: s
     repo.create_pull(
         base=target_branch,
         head=new_branch,
-        title="SERVER-110427 Update profiling data",
+        title=f"{jira_ticket} Update profiling data",
         body="Automated PR updating the profiling data.",
     )
 
