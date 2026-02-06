@@ -99,7 +99,7 @@ public:
      * Static helper to determine if an index is suitable for tracking array pathness.
      * We generally skip:
      * 1. Wildcard indexes: Unbounded size of multikey paths. We read later once we have
-     * materialized 'CanonicalQuery'. (TODO: SERVER-113445)
+     * materialized 'CanonicalQuery'.
      * 2. Partial indexes: Don't cover the full document set.
      * 3. Hidden indexes: Intended to be invisible to the query optimizer.
      */
@@ -159,7 +159,6 @@ private:
         /**
          * Child nodes representing further segments of the path.
          */
-        // TODO SERVER-115824: Investigate replacing with stdx::unordered_map
         // NOLINT is included to permit usage of std:: instead of stdx::. This is necessary due to
         // stricter compilation requirements on Windows variants.
         std::unordered_map<std::string, TrieNode> _children;  // NOLINT
