@@ -306,7 +306,7 @@ builds](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/stora
 
 - An [index build with a
   UUID](https://github.com/mongodb/mongo/blob/r8.0.15/src/mongo/db/storage/storage_engine_impl.cpp#L801-L804) is an unfinished two-phase build and must be restarted, unless we are [resuming
-  it](#resumable-index-builds). This resume information is stored in an internal ident written at
+  it](/src/mongo/db/index_builds/README.md#resumable-index-builds). This resume information is stored in an internal ident written at
   (clean) shutdown. If we fail to resume the index build, we will clean up the internal ident and
   restart the index build in the background.
 - An [unfinished index build on
