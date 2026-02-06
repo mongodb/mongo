@@ -93,7 +93,8 @@ public:
                         const auto coll = catalogClient->getCollection(opCtx, nss);
                         _runChecksForCollection(opCtx, coll, inconsistenciesMerged);
                     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        // If we don't find the nss, it means that the collection is not sharded.
+                        // If we don't find the nss, it means that the collection is not
+                        // sharded.
                     }
                     break;
                 }
@@ -140,8 +141,8 @@ public:
             OperationContext* opCtx,
             const CollectionType& coll,
             std::vector<MetadataInconsistencyItem>& inconsistenciesMerged) {
-            auto chunksInconsistencies = metadata_consistency_util::checkChunksInconsistencies(
-                opCtx, coll, _getCollectionChunks(opCtx, coll));
+            auto chunksInconsistencies =
+                metadata_consistency_util::checkChunksConsistency(opCtx, coll);
 
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
                                          std::make_move_iterator(chunksInconsistencies.begin()),
@@ -153,29 +154,6 @@ public:
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
                                          std::make_move_iterator(zonesInconsistencies.begin()),
                                          std::make_move_iterator(zonesInconsistencies.end()));
-        }
-
-        std::vector<ChunkType> _getCollectionChunks(OperationContext* opCtx,
-                                                    const CollectionType& coll) {
-            auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID() << coll.getUuid()));
-            static const auto sortStage = BSON("$sort" << BSON(ChunkType::min() << 1));
-
-            AggregateCommandRequest aggRequest{ChunkType::ConfigNS,
-                                               {std::move(matchStage), sortStage}};
-            auto aggResponse =
-                ShardingCatalogManager::get(opCtx)->localCatalogClient()->runCatalogAggregation(
-                    opCtx,
-                    aggRequest,
-                    {repl::ReadConcernLevel::kSnapshotReadConcern},
-                    Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
-
-            std::vector<ChunkType> chunks;
-            chunks.reserve(aggResponse.size());
-            for (auto&& responseEntry : aggResponse) {
-                chunks.emplace_back(uassertStatusOK(ChunkType::parseFromConfigBSON(
-                    responseEntry, coll.getEpoch(), coll.getTimestamp())));
-            }
-            return chunks;
         }
 
         std::vector<TagsType> _getCollectionZones(OperationContext* opCtx,

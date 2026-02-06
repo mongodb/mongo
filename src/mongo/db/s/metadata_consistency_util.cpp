@@ -41,6 +41,8 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -115,11 +117,12 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     const auto performChecks = [&](const CollectionPtr& localColl,
                                    std::vector<MetadataInconsistencyItem>& inconsistencies) {
         // Check that the collection has an index that supports the shard key. If so, check that
-        // exists an index that supports the shard key and is not multikey. We allow users to drop
-        // hashed shard key indexes, and therefore we don't require hashed shard keys to have a
-        // supporting index. (Ignore FCV check) Note that the feature flag ignores FCV. If this node
-        // is the primary of the replica set shard, it will handle the missing hashed shard key
-        // index regardless of FCV, so we skip reporting it as an inconsistency.
+        // exists an index that supports the shard key and is not multikey. We allow users to
+        // drop hashed shard key indexes, and therefore we don't require hashed shard keys to
+        // have a supporting index. (Ignore FCV check) Note that the feature flag ignores FCV.
+        // If this node is the primary of the replica set shard, it will handle the missing
+        // hashed shard key index regardless of FCV, so we skip reporting it as an
+        // inconsistency.
         const bool skipHashedShardKeyCheck =
             gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabledAndIgnoreFCVUnsafe() &&
             ShardKeyPattern(shardKey).isHashedPattern();
@@ -133,11 +136,11 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
 
     std::vector<MetadataInconsistencyItem> tmpInconsistencies;
 
-    // Shards that do not own any chunks do not partecipate in the creation of new indexes, so they
-    // could potentially miss any indexes created after they no longer own chunks. Thus we first
-    // perform a check optimistically without taking collection lock, if missing indexes are found
-    // we check under the collection lock if this shard currently own any chunk and re-execute again
-    // the checks under the lock to ensure stability of the ShardVersion.
+    // Shards that do not own any chunks do not partecipate in the creation of new indexes, so
+    // they could potentially miss any indexes created after they no longer own chunks. Thus we
+    // first perform a check optimistically without taking collection lock, if missing indexes
+    // are found we check under the collection lock if this shard currently own any chunk and
+    // re-execute again the checks under the lock to ensure stability of the ShardVersion.
     performChecks(localColl, tmpInconsistencies);
 
     if (!tmpInconsistencies.size()) {
@@ -183,6 +186,27 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     tmpInconsistencies.clear();
     performChecks(*ac, inconsistencies);
 }
+
+std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* client,
+                                                           const CollectionType& coll) {
+    // Running the following pipeline against 'config.chunks':
+    //    db.chunks.aggregate([{ $match: { 'uuid': <UUID> }},{ $sort: { 'min': 1 }}])
+    return uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        client,
+        std::invoke([&coll] {
+            AggregateCommandRequest aggRequest{
+                ChunkType::ConfigNS,
+                std::vector<mongo::BSONObj>{
+                    BSON("$match" << BSON(ChunkType::collectionUUID() << coll.getUuid())),
+                    BSON("$sort" << BSON(ChunkType::min() << 1))}};
+            aggRequest.setReadConcern(
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern).toBSONInner());
+            return aggRequest;
+        }),
+        false /* secondaryOK */,
+        false /* useExhaust */));
+}
+
 }  // namespace
 
 
@@ -371,23 +395,30 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     return inconsistencies;
 }
 
-std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
-    OperationContext* opCtx,
-    const CollectionType& collection,
-    const std::vector<ChunkType>& chunks) {
+
+std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* opCtx,
+                                                              const CollectionType& collection) {
+    tassert(9996600,
+            "This method must run on the 'config' server.",
+            ShardingState::get(opCtx)->shardId() == ShardId::kConfigServerId);
+
+    DBDirectClient client{opCtx};
+    // We need to read at snapshot readConcern, set it in the opCtx for DBDirectClient.
+    ScopedReadConcern scopedReadConcern(
+        opCtx, repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
+    const auto chunksCursor = _getCollectionChunksCursor(&client, collection);
+
     const auto& uuid = collection.getUuid();
     const auto& nss = collection.getNss();
     const auto shardKeyPattern = ShardKeyPattern{collection.getKeyPattern()};
-
     std::vector<MetadataInconsistencyItem> inconsistencies;
-    auto previousChunk = chunks.begin();
-    for (auto it = chunks.begin(); it != chunks.end(); it++) {
-        const auto& chunk = *it;
+    size_t totalChunks = 0;
+    ChunkType previousChunk, firstChunk;
 
-        // Skip the first iteration as we need to compare the current chunk with the previous one.
-        if (it == chunks.begin()) {
-            continue;
-        }
+    while (chunksCursor->more()) {
+        const auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+            chunksCursor->nextSafe(), collection.getEpoch(), collection.getTimestamp()));
+        totalChunks++;
 
         if (!shardKeyPattern.isShardKey(chunk.getMin()) ||
             !shardKeyPattern.isShardKey(chunk.getMax())) {
@@ -397,29 +428,39 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
                                       nss, uuid, chunk.toConfigBSON(), shardKeyPattern.toBSON()}));
         }
 
-        auto cmp = previousChunk->getMax().woCompare(chunk.getMin());
+        // Skip the first iteration as we need to compare the current chunk with the previous
+        // one.
+        if (totalChunks == 1) {
+            firstChunk = chunk;
+            previousChunk = chunk;
+            continue;
+        }
+
+        auto cmp = previousChunk.getMax().woCompare(chunk.getMin());
         if (cmp < 0) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kRoutingTableRangeGap,
                 RoutingTableRangeGapDetails{
-                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
+                    nss, uuid, previousChunk.toConfigBSON(), chunk.toConfigBSON()}));
         } else if (cmp > 0) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap,
                 RoutingTableRangeOverlapDetails{
-                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
+                    nss, uuid, previousChunk.toConfigBSON(), chunk.toConfigBSON()}));
         }
 
-        previousChunk = it;
+        previousChunk = std::move(chunk);
     }
 
+    const ChunkType lastChunk = previousChunk;
+
     // Check if the first and last chunk have MinKey and MaxKey respectively
-    if (chunks.empty()) {
+    if (!totalChunks) {
         inconsistencies.emplace_back(
             makeInconsistency(MetadataInconsistencyTypeEnum::kMissingRoutingTable,
                               MissingRoutingTableDetails{nss, uuid}));
     } else {
-        const BSONObj& minKeyObj = chunks.front().getMin();
+        const BSONObj& minKeyObj = firstChunk.getMin();
         const auto globalMin = shardKeyPattern.getKeyPattern().globalMin();
         if (minKeyObj.woCompare(shardKeyPattern.getKeyPattern().globalMin()) != 0) {
             inconsistencies.emplace_back(makeInconsistency(
@@ -427,7 +468,7 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
                 RoutingTableMissingMinKeyDetails{nss, uuid, minKeyObj, globalMin}));
         }
 
-        const BSONObj& maxKeyObj = chunks.back().getMax();
+        const BSONObj& maxKeyObj = lastChunk.getMax();
         const auto globalMax = shardKeyPattern.getKeyPattern().globalMax();
         if (maxKeyObj.woCompare(globalMax) != 0) {
             inconsistencies.emplace_back(makeInconsistency(
@@ -450,7 +491,8 @@ std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
     for (auto it = zones.begin(); it != zones.end(); it++) {
         const auto& zone = *it;
 
-        // Skip the first iteration as we need to compare the current zone with the previous one.
+        // Skip the first iteration as we need to compare the current zone with the previous
+        // one.
         if (it == zones.begin()) {
             continue;
         }
@@ -462,8 +504,8 @@ std::vector<MetadataInconsistencyItem> checkZonesInconsistencies(
                 CorruptedZoneShardKeyDetails{nss, uuid, zone.toBSON(), shardKeyPattern.toBSON()}));
         }
 
-        // As the zones are sorted by minKey, we can check if the previous zone maxKey is less than
-        // the current zone minKey.
+        // As the zones are sorted by minKey, we can check if the previous zone maxKey is less
+        // than the current zone minKey.
         const auto& minKey = zone.getMinKey();
         auto cmp = previousZone->getMaxKey().woCompare(minKey);
         if (cmp > 0) {

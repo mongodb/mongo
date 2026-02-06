@@ -89,15 +89,16 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     const std::vector<CollectionPtr>& localCollections);
 
 /**
- * Check different types of inconsistencies from a given set of chunks owned by a collection.
+ * Check different types of inconsistencies from the chunks persisted in 'config.chunks' of the
+ * given collection.
  *
  * The list of inconsistencies is returned as a vector of MetadataInconsistencies objects. If
  * there is no inconsistency, it is returned an empty vector.
+ *
+ * This method can only be called from the config server.
  */
-std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
-    OperationContext* opCtx,
-    const CollectionType& collection,
-    const std::vector<ChunkType>& chunks);
+std::vector<MetadataInconsistencyItem> checkChunksConsistency(OperationContext* opCtx,
+                                                              const CollectionType& collection);
 
 /**
  * Check different types of inconsistencies from a given set of zones owned by a collection.
