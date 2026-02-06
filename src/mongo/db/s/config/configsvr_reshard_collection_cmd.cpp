@@ -125,18 +125,13 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            const auto collEntry = catalogClient->getCollection(opCtx, nss);
             if (!mongo::resharding::gFeatureFlagReshardingForTimeseries.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                try {
-                    const auto collEntry = catalogClient->getCollection(opCtx, nss);
-                    uassert(ErrorCodes::NotImplemented,
-                            "reshardCollection command of a sharded time-series collection is not "
-                            "supported",
-                            !collEntry.getTimeseriesFields());
-                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    // collection doesn't exist or not sharded, skip check for time-series
-                    // collection.
-                }
+                uassert(ErrorCodes::NotImplemented,
+                        "reshardCollection command of a sharded time-series collection is not "
+                        "supported",
+                        !collEntry.getTimeseriesFields());
             }
 
             uassert(ErrorCodes::BadValue,
@@ -240,10 +235,6 @@ public:
                         ->catalogCache()
                         ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 
-                auto tempReshardingNss =
-                    resharding::constructTemporaryReshardingNss(nss, cm.getUUID());
-
-
                 if (auto zones = request().getZones()) {
                     resharding::checkForOverlappingZones(*zones);
 
@@ -256,55 +247,8 @@ public:
                     }
                 }
 
-                auto coordinatorDoc =
-                    ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                  {} /* donorShards */,
-                                                  {} /* recipientShards */);
-
-                // Generate the resharding metadata for the ReshardingCoordinatorDocument.
-                auto reshardingUUID = UUID::gen();
-                auto existingUUID = cm.getUUID();
-                auto shardKeySpec = request().getKey();
-
-                const auto collEntry = catalogClient->getCollection(opCtx, nss);
-                // moveCollection/unshardCollection are called with _id as the new shard key since
-                // that's an acceptable value for tracked unsharded collections so we can skip this.
-                if (collEntry.getTimeseriesFields() &&
-                    (!setProvenance ||
-                     (*request().getProvenance() == ProvenanceEnum::kReshardCollection))) {
-                    auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
-                    shardkeyutil::validateTimeseriesShardKey(
-                        tsOptions.getTimeField(), tsOptions.getMetaField(), request().getKey());
-                    shardKeySpec = uassertStatusOK(
-                        timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                            tsOptions, request().getKey()));
-                }
-
-                auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
-                                                               ns(),
-                                                               std::move(existingUUID),
-                                                               std::move(tempReshardingNss),
-                                                               shardKeySpec);
-                commonMetadata.setStartTime(
-                    opCtx->getServiceContext()->getFastClockSource()->now());
-                if (request().getReshardingUUID()) {
-                    commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
-                }
-                if (setProvenance && request().getProvenance()) {
-                    commonMetadata.setProvenance(*request().getProvenance());
-                }
-
-                coordinatorDoc.setSourceKey(cm.getShardKeyPattern().getKeyPattern().toBSON());
-                coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-                coordinatorDoc.setZones(request().getZones());
-                coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
-                coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
-                coordinatorDoc.setShardDistribution(request().getShardDistribution());
-                coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
-                coordinatorDoc.setUnique(request().getUnique());
-                coordinatorDoc.setCollation(request().getCollation());
-                coordinatorDoc.setRecipientOplogBatchTaskCount(
-                    request().getRecipientOplogBatchTaskCount());
+                auto coordinatorDoc = resharding::createReshardingCoordinatorDoc(
+                    opCtx, request(), collEntry, nss, setProvenance);
 
                 auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);

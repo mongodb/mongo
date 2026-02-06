@@ -422,6 +422,10 @@ structs:
                     gte: 1
                     lte: 256
                 optional: true
+            numSamplesPerChunk:
+                type: safeInt64
+                description: "The number of documents to sample on new chunks"
+                optional: true
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"

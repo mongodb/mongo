@@ -224,6 +224,15 @@ reshardCmdTest.assertReshardCollOk({
 },
                                    1);
 
+const featureFlagReshardingNumSamplesPerChunkEnabled =
+    FeatureFlagUtil.isPresentAndEnabled(mongos, "ReshardingNumSamplesPerChunk");
+if (featureFlagReshardingNumSamplesPerChunkEnabled) {
+    jsTest.log("Succeed if small numInitialChunks and large numSamplesPerChunk are provided.");
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, numSamplesPerChunk: 10}, 1);
+}
+
 jsTest.log("Succeed if zones are not empty.");
 assert.commandWorked(
     mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));

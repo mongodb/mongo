@@ -59,11 +59,15 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
@@ -407,6 +411,13 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
  * primary and the last majority committed optime.
  */
 Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
+
+ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
+    OperationContext* opCtx,
+    const ConfigsvrReshardCollection& request,
+    const CollectionType& collEntry,
+    const NamespaceString& nss,
+    const bool& setProvenance);
 
 }  // namespace resharding
 }  // namespace mongo

@@ -122,6 +122,11 @@ public:
                 reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
             }
 
+            if (resharding::gfeatureFlagReshardingNumSamplesPerChunk.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                reshardCollectionRequest.setNumSamplesPerChunk(request().getNumSamplesPerChunk());
+            }
+
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));
 
