@@ -20,7 +20,16 @@ def make_workflow(workflow_name, destination_url, branch):
             push = branch,
         ),
         # Change path to the folder you want to publish publicly
-        origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**", "buildscripts/modules/**", ".github/workflows/**", "src/third_party/private/**", ".augment/**", ".cursor/**", "AGENTS.md"]),
+        origin_files = glob(["**"], exclude = [
+            "src/mongo/db/modules/**",
+            "buildscripts/modules/**",
+            ".github/workflows/**",
+            "src/third_party/private/**",
+            ".augment/**",
+            ".cursor/**",
+            "AGENTS.md",
+            ".github/CODEOWNERS",
+        ]),
         authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
         mode = "ITERATIVE",
         transformations = [
