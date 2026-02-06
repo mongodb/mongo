@@ -1281,9 +1281,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggExpMovingAvg(
     value::ValueGuard stateGuard{stateTag, stateVal};
 
     auto [fieldOwned, fieldTag, fieldVal] = getFromStack(1);
-    // CSA: NewDeleteLeaks false positive – state ownership is returned to the caller via return
-    // tuple.
-    if (!value::isNumber(fieldTag)) {  // NOLINT
+    if (!value::isNumber(fieldTag)) {
         stateGuard.reset();
         return {true, stateTag, stateVal};
     }
