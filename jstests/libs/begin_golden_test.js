@@ -3,6 +3,7 @@ import {
     checkSbeStatus,
     checkJoinOptimizationStatus,
     checkSbeNonLeadingMatchEnabled,
+    checkSbeEqLookupUnwindEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -31,9 +32,13 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(typeof db === "undefined" ? null : db);
     const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
     const sbeNonLeadingMatchEnabled = checkSbeNonLeadingMatchEnabled(typeof db === "undefined" ? null : db);
+    const sbeEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(typeof db === "undefined" ? null : db);
 
     const sbeNonLeadingMatchExpectedExists = fileExists(
         relativePathToExpectedOutput + "/featureFlagSbeNonLeadingMatch/" + outputName,
+    );
+    const sbeEqLookupUnwindExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/featureFlagSbeEqLookupUnwind/" + outputName,
     );
     const sbeExpectedExists = fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
 
@@ -49,6 +54,8 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
 
     if (sbeNonLeadingMatchEnabled && sbeNonLeadingMatchExpectedExists) {
         relativePathToExpectedOutput += "/featureFlagSbeNonLeadingMatch";
+    } else if (sbeEqLookupUnwindEnabled && sbeEqLookupUnwindExpectedExists) {
+        relativePathToExpectedOutput += "/featureFlagSbeEqLookupUnwind";
     } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {

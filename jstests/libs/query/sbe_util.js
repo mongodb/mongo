@@ -157,6 +157,21 @@ export function checkSbeNonLeadingMatchEnabled(theDB) {
     }
 }
 
+export function checkSbeEqLookupUnwindEnabled(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            return FeatureFlagUtil.isPresentAndEnabled(conn, "SbeEqLookupUnwind");
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        return (
+            TestData.setParameters.featureFlagSbeEqLookupUnwind &&
+            TestData.setParameters.featureFlagSbeEqLookupUnwind === "true"
+        );
+    }
+}
+
 /**
  * Check if featureFlagSbeFull is enabled in the cluster.
  *

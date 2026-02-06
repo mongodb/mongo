@@ -455,6 +455,15 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalQuerySlotBasedExecutionDisableLookupUnwindPushdown:
+        description: "If true, the system will not push down $lookup with absorbed $unwind to the SBE execution engine."
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySlotBasedExecutionDisableLookupUnwindPushdown"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        on_update: plan_cache_util::clearSbeCacheOnParameterChange
+        redact: false
+
     internalQuerySlotBasedExecutionDisableGroupPushdown:
         description: "If true, the system will not push down $group to the SBE execution engine."
         set_at: [startup, runtime]

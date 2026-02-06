@@ -458,7 +458,9 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *   - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
  *   - The foreign collection is fully local to this node, is not a view, and is not timeseries,
  *     since timeseries collections always require a pipeline.
- *   - There is no absorbed $unwind stage ('_unwindSrc') or 'trySbeEngine' is enabled.
+ *   - Either there is no absorbed $unwind stage ('_unwindSrc' is null), or SBE $lookup-$unwind
+ *     pushdown is enabled ('featureFlagSbeEqLookupUnwind' or 'trySbeEngine' is on and
+ *     'internalQuerySlotBasedExecutionDisableLookupUnwindPushdown' is false).
  *   - There is no absorbed $match stage ('_matchSrc').
  *
  * $project via 'DocumentSourceInternalProjection':

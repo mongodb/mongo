@@ -21,10 +21,15 @@
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getQueryInfoAtTopLevelOrFirstStage, getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
-import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled,
+    checkSbeEqLookupUnwindEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 const isSBEFullyEnabled = checkSbeFullyEnabled(db);
 const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
+const isSBEEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(db);
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -112,7 +117,7 @@ let getCurrentQueryExecutorStats = function () {
 
 let checkExplainOutputForVerLevel = function (explainOutput, expected, verbosityLevel, expectedQueryPlan, withUnwind) {
     // Only make SBE specific assertions when we know that our $lookup has been pushed down.
-    if (isSBEFullyEnabled || (isSBELookupEnabled && !withUnwind)) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !withUnwind))) {
         // If the SBE lookup is enabled, the "$lookup" stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
         // "EQ_LOOKUP" or "EQ_LOOKUP_UNWIND".
@@ -280,7 +285,7 @@ let testQueryExecutorStatsWithCollectionScan = function (params) {
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
 
-    if (isSBEFullyEnabled || (isSBELookupEnabled && !params.withUnwind)) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -390,7 +395,7 @@ let testQueryExecutorStatsWithIndexScan = function (params) {
     // match with the local collection
     assert.eq(foreignDocMatchIndex, curScannedKeys);
 
-    if (isSBEFullyEnabled || (isSBELookupEnabled && !params.withUnwind)) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -466,7 +471,7 @@ let testQueryExecutorStatsWithDynamicIndexedLoopJoin = function (params) {
     // collection that are match using an index
     assert.eq(foreignDocMatchIndex, curScannedKeys);
 
-    if (isSBEFullyEnabled || (isSBELookupEnabled && !params.withUnwind)) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && (isSBEEqLookupUnwindEnabled || !params.withUnwind))) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,

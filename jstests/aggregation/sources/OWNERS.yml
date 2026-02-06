@@ -25,3 +25,6 @@ filters:
   - "sort_by_count_validation.js":
     approvers:
       - 10gen/query-optimization
+  - "lookup_unwind_sbe_pushdown.js":
+    approvers:
+      - 10gen/query-execution

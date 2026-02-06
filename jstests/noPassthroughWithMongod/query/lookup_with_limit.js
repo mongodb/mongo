@@ -6,11 +6,13 @@ import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
+    checkSbeEqLookupUnwindEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
+const isSbeEqLookupUnwind = checkSbeEqLookupUnwindEnabled(db);
 
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
@@ -98,6 +100,9 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
+} else if (isSbeEqLookupUnwind) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
@@ -144,6 +149,9 @@ if (isFeatureFlagSbeFullEnabled) {
 } else if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
+} else if (isSbeEqLookupUnwind) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "$sort"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);

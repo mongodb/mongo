@@ -395,3 +395,10 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+
+    featureFlagSbeEqLookupUnwind:
+        description: "Feature flag to enable $lookup-$unwind in SBE."
+        cpp_varname: gFeatureFlagSbeEqLookupUnwind
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development

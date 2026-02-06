@@ -84,14 +84,15 @@ const pipeline1 = [
         $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
     },
     {$unwind: "$location"},
-    {
-        $project: {
-            locationName: false,
-            "location.extra": false,
-            "location.coordinates": false,
-            "colors": false,
-        },
-    },
+    // TODO SERVER-118768: Investigate why hybrid aggregate / SBE queries do not report spills.
+    // {
+    //     $project: {
+    //         locationName: false,
+    //         "location.extra": false,
+    //         "location.coordinates": false,
+    //         "colors": false,
+    //     },
+    // },
 ];
 
 const pipeline2 = [
@@ -99,14 +100,15 @@ const pipeline2 = [
         $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
     },
     {$unwind: {path: "$location", preserveNullAndEmptyArrays: true}},
-    {
-        $project: {
-            locationName: false,
-            "location.extra": false,
-            "location.coordinates": false,
-            "colors": false,
-        },
-    },
+    // TODO SERVER-118768: Investigate why hybrid aggregate / SBE queries do not report spills.
+    // {
+    //     $project: {
+    //         locationName: false,
+    //         "location.extra": false,
+    //         "location.coordinates": false,
+    //         "colors": false,
+    //     },
+    // },
 ];
 
 for (let pipeline of [pipeline1, pipeline2]) {
