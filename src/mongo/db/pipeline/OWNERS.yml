@@ -73,6 +73,9 @@ filters:
   - "common_sort_key_optimization_test.cpp":
     approvers:
       - 10gen/query-optimization
+  - "data_to_shards_allocation_query_service*":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "dependencies*":
     approvers:
       - 10gen/query-optimization
@@ -202,6 +205,9 @@ filters:
   - "group_processor*":
     approvers:
       - 10gen/query-execution-classic
+  - "historical_placement_fetcher*":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "lite_parsed*":
     approvers:
       - 10gen/query-optimization

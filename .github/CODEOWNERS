@@ -2479,6 +2479,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/catalog_resource_handle.h @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/common_sort_key_optimization_test.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/data_to_shards_allocation_query_service* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/dependencies* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/dispatch_shard_pipeline_test.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_check_resume_token_test.cpp @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -2522,6 +2523,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/make_js_function* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*_processor* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/group_processor* @10gen/query-execution-classic @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/historical_placement_fetcher* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/lite_parsed* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/partition_key_comparator* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/pipeline_d* @10gen/query-optimization @svc-auto-approve-bot
