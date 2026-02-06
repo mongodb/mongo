@@ -127,9 +127,11 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
 
 }  // namespace
 
-TransactionHistoryIterator::TransactionHistoryIterator(repl::OpTime startingOpTime,
-                                                       bool permitYield)
-    : _permitYield(permitYield), _nextOpTime(std::move(startingOpTime)) {}
+TransactionHistoryIterator::TransactionHistoryIterator(
+    repl::OpTime startingOpTime, bool permitYield, IncludeCommitTimestamp includeCommitTimestamp)
+    : _permitYield(permitYield),
+      _includeCommitTimestamp(includeCommitTimestamp),
+      _nextOpTime(std::move(startingOpTime)) {}
 
 bool TransactionHistoryIterator::hasNext() const {
     return !_nextOpTime.isNull();
@@ -145,6 +147,24 @@ repl::OplogEntry TransactionHistoryIterator::next(OperationContext* opCtx) {
                 << "Missing prevOpTime field on oplog entry of previous write in transaction: "
                 << redact(oplogBSON),
             oplogPrevTsOption);
+
+    if (_includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+        uassert(11910611,
+                "Requested the commit timestamp but this is not a transaction",
+                oplogEntry.isInTransaction());
+        uassert(11910612,
+                "Requested the commit timestamp but this is an aborted transaction",
+                !oplogEntry.isPreparedAbort());
+
+        if (oplogEntry.isTerminalApplyOps() || oplogEntry.isPreparedCommit()) {
+            _commitTimestamp = uassertStatusOK(oplogEntry.extractCommitTransactionTimestamp());
+        }
+
+        uassert(11910613,
+                "Requested the commit timestamp but this transaction has not committed",
+                !_commitTimestamp.isNull());
+        oplogEntry.setCommitTransactionTimestamp(_commitTimestamp);
+    }
 
     _nextOpTime = oplogPrevTsOption.value();
 

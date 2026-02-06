@@ -41,9 +41,12 @@
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -55,9 +58,12 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 
 using SessionHistoryIteratorTest = MockReplCoordServerFixture;
+using IncludeCommitTimestamp = TransactionHistoryIterator::IncludeCommitTimestamp;
 
 namespace {
 
@@ -184,6 +190,649 @@ TEST_F(SessionHistoryIteratorTest, OplogInWriteHistoryChainWithMissingPrevTSShou
     TransactionHistoryIterator iter(repl::OpTime(Timestamp(67, 54801), 2), true);
     ASSERT_TRUE(iter.hasNext());
     ASSERT_THROWS_CODE(iter.next(opCtx()), AssertionException, ErrorCodes::FailedToParse);
+}
+
+TEST_F(SessionHistoryIteratorTest, CommittedUnpreparedTransactionSingleApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops;
+    auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops.push_back(insertOp);
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry = repl::makeApplyOpsOplogEntry(applyOpsOpTime,
+                                                      ops,
+                                                      sessionInfo,
+                                                      Date_t::now(),
+                                                      {},              // stmtIds
+                                                      repl::OpTime(),  // prevWriteOpTime
+                                                      boost::none,     // multiOpType
+                                                      repl::ApplyOpsType::kTerminal);
+    insertOplogEntry(applyOpsEntry);
+    auto commitTimestamp = applyOpsOpTime.getTimestamp();
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910601,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry = iter.next(opCtx());
+        ASSERT_EQ(entry.getOpTime(), applyOpsOpTime);
+        ASSERT_TRUE(entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, CommittedUnpreparedTransactionMultiApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime0 = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry0 = repl::makeApplyOpsOplogEntry(applyOpsOpTime0,
+                                                       ops0,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},              // stmtIds
+                                                       repl::OpTime(),  // prevWriteOpTime
+                                                       boost::none,     // multiOpType
+                                                       repl::ApplyOpsType::kPartial);
+    insertOplogEntry(applyOpsEntry0);
+
+    std::vector<repl::ReplOperation> ops1;
+    auto insertOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 2 << "x" << 20), BSON("_id" << 2));
+    ops1.push_back(insertOp1);
+
+    auto applyOpsOpTime1 = repl::OpTime(Timestamp(100, 1), 1);
+    auto applyOpsEntry1 = repl::makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                                       ops1,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},               // stmtIds
+                                                       applyOpsOpTime0,  // prevWriteOpTime
+                                                       boost::none,      // multiOpType
+                                                       repl::ApplyOpsType::kTerminal);
+    insertOplogEntry(applyOpsEntry1);
+    auto commitTimestamp = applyOpsOpTime1.getTimestamp();
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910602,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), applyOpsOpTime1);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry1.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime0);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry0.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, CommittedPreparedTransactionSingleApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops;
+    auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops.push_back(insertOp);
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry = repl::makeApplyOpsOplogEntry(applyOpsOpTime,
+                                                      ops,
+                                                      sessionInfo,
+                                                      Date_t::now(),
+                                                      {},              // stmtIds
+                                                      repl::OpTime(),  // prevWriteOpTime
+                                                      boost::none,     // multiOpType
+                                                      repl::ApplyOpsType::kPrepare);
+    insertOplogEntry(applyOpsEntry);
+
+    auto commitTimestamp = Timestamp(100, 1);
+    auto commitTxnOpTime = repl::OpTime(Timestamp(100, 2), 1);
+    auto commitTxnEntry = repl::makeCommitTransactionOplogEntry(
+        commitTxnOpTime, sessionInfo, commitTimestamp, applyOpsOpTime);
+    insertOplogEntry(commitTxnEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910603,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            commitTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), commitTxnOpTime);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry1.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry0.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, CommittedPreparedTransactionMultiApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime0 = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry0 = repl::makeApplyOpsOplogEntry(applyOpsOpTime0,
+                                                       ops0,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},              // stmtIds
+                                                       repl::OpTime(),  // prevWriteOpTime
+                                                       boost::none,     // multiOpType
+                                                       repl::ApplyOpsType::kPartial);
+    insertOplogEntry(applyOpsEntry0);
+
+    std::vector<repl::ReplOperation> ops1;
+    auto insertOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 2 << "x" << 20), BSON("_id" << 2));
+    ops1.push_back(insertOp1);
+
+    auto applyOpsOpTime1 = repl::OpTime(Timestamp(100, 1), 1);
+    auto applyOpsEntry1 = repl::makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                                       ops1,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},               // stmtIds
+                                                       applyOpsOpTime0,  // prevWriteOpTime
+                                                       boost::none,      // multiOpType
+                                                       repl::ApplyOpsType::kPrepare);
+    insertOplogEntry(applyOpsEntry1);
+
+    auto commitTimestamp = Timestamp(100, 2);
+    auto commitTxnOpTime = repl::OpTime(Timestamp(100, 3), 1);
+    auto commitTxnEntry = repl::makeCommitTransactionOplogEntry(
+        commitTxnOpTime, sessionInfo, commitTimestamp, applyOpsOpTime1);
+    insertOplogEntry(commitTxnEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910604,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            commitTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry2 = iter.next(opCtx());
+        ASSERT_EQ(entry2.getOpTime(), commitTxnOpTime);
+        ASSERT_TRUE(entry2.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry2.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry2.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), applyOpsOpTime1);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry1.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime0);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_EQ(entry0.getCommitTransactionTimestamp(), commitTimestamp);
+        } else {
+            ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+        }
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, AbortedPreparedTransaction) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops;
+    auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops.push_back(insertOp);
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry = repl::makeApplyOpsOplogEntry(applyOpsOpTime,
+                                                      ops,
+                                                      sessionInfo,
+                                                      Date_t::now(),
+                                                      {},              // stmtIds
+                                                      repl::OpTime(),  // prevWriteOpTime
+                                                      boost::none,     // multiOpType
+                                                      repl::ApplyOpsType::kPrepare);
+    insertOplogEntry(applyOpsEntry);
+
+    auto abortTxnOpTime = repl::OpTime(Timestamp(100, 1), 1);
+    auto abortTxnEntry =
+        repl::makeAbortTransactionOplogEntry(abortTxnOpTime, sessionInfo, applyOpsOpTime);
+    insertOplogEntry(abortTxnEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910605,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            abortTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910612);
+            continue;
+        }
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), abortTxnOpTime);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction);
+        ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, UncommittedPreparedTransaction) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry = repl::makeApplyOpsOplogEntry(applyOpsOpTime,
+                                                      ops0,
+                                                      sessionInfo,
+                                                      Date_t::now(),
+                                                      {},              // stmtIds
+                                                      repl::OpTime(),  // prevWriteOpTime
+                                                      boost::none,     // multiOpType
+                                                      repl::ApplyOpsType::kPrepare);
+    insertOplogEntry(applyOpsEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910606,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910613);
+            continue;
+        }
+
+        auto entry = iter.next(opCtx());
+        ASSERT_EQ(entry.getOpTime(), applyOpsOpTime);
+        ASSERT_TRUE(entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, UncommittedPartialTransactionSingleApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry = repl::makeApplyOpsOplogEntry(applyOpsOpTime,
+                                                      ops0,
+                                                      sessionInfo,
+                                                      Date_t::now(),
+                                                      {},              // stmtIds
+                                                      repl::OpTime(),  // prevWriteOpTime
+                                                      boost::none,     // multiOpType
+                                                      repl::ApplyOpsType::kPartial);
+    insertOplogEntry(applyOpsEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910607,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910613);
+            continue;
+        }
+
+        auto entry = iter.next(opCtx());
+        ASSERT_EQ(entry.getOpTime(), applyOpsOpTime);
+        ASSERT_TRUE(entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, UncommittedPartialTransactionMultiApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime0 = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry0 = repl::makeApplyOpsOplogEntry(applyOpsOpTime0,
+                                                       ops0,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},              // stmtIds
+                                                       repl::OpTime(),  // prevWriteOpTime
+                                                       boost::none,     // multiOpType
+                                                       repl::ApplyOpsType::kPartial);
+    insertOplogEntry(applyOpsEntry0);
+
+    std::vector<repl::ReplOperation> ops1;
+    auto insertOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 2 << "x" << 20), BSON("_id" << 2));
+    ops1.push_back(insertOp1);
+
+    auto applyOpsOpTime1 = repl::OpTime(Timestamp(100, 1), 1);
+    auto applyOpsEntry1 = repl::makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                                       ops1,
+                                                       sessionInfo,
+                                                       Date_t::now(),
+                                                       {},               // stmtIds
+                                                       applyOpsOpTime0,  // prevWriteOpTime
+                                                       boost::none,      // multiOpType
+                                                       repl::ApplyOpsType::kPartial);
+    insertOplogEntry(applyOpsEntry1);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910608,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910613);
+            continue;
+        }
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), applyOpsOpTime1);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime0);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, RetryableWritesNotApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+
+    auto stmtId = 1;
+    auto insertOpTime = repl::OpTime(Timestamp(100, 1), 1);
+    auto insertEntry = repl::makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
+        insertOpTime,
+        nss,
+        uuid,
+        BSON("_id" << 1 << "x" << 10),
+        lsid,
+        txnNumber,
+        {stmtId},         // stmtIds
+        repl::OpTime());  // prevWriteOpTime
+    insertOplogEntry(insertEntry);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910609,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            insertOpTime, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910611);
+            continue;
+        }
+
+        auto entry = iter.next(opCtx());
+        ASSERT_EQ(entry.getOpTime(), insertOpTime);
+        ASSERT_TRUE(entry.getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT_FALSE(entry.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
+}
+
+TEST_F(SessionHistoryIteratorTest, RetryableWritesApplyOps) {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto txnNumber = 1LL;
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto uuid = UUID::gen();
+    std::vector<repl::ReplOperation> ops0;
+    auto insertOp0 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 1 << "x" << 10), BSON("_id" << 1));
+    ops0.push_back(insertOp0);
+
+    auto applyOpsOpTime0 = repl::OpTime(Timestamp(100, 0), 1);
+    auto applyOpsEntry0 =
+        repl::makeApplyOpsOplogEntry(applyOpsOpTime0,
+                                     ops0,
+                                     sessionInfo,
+                                     Date_t::now(),
+                                     {},              // stmtIds
+                                     repl::OpTime(),  // prevWriteOpTime
+                                     repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    insertOplogEntry(applyOpsEntry0);
+
+    std::vector<repl::ReplOperation> ops1;
+    auto insertOp1 = repl::MutableOplogEntry::makeInsertOperation(
+        nss, uuid, BSON("_id" << 2 << "x" << 20), BSON("_id" << 2));
+    ops1.push_back(insertOp1);
+
+    auto applyOpsOpTime1 = repl::OpTime(Timestamp(100, 1), 1);
+    auto applyOpsEntry1 =
+        repl::makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                     ops1,
+                                     sessionInfo,
+                                     Date_t::now(),
+                                     {},               // stmtIds
+                                     applyOpsOpTime0,  // prevWriteOpTime
+                                     repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    insertOplogEntry(applyOpsEntry1);
+
+    for (auto includeCommitTimestamp :
+         {IncludeCommitTimestamp::kYes, IncludeCommitTimestamp::kNo}) {
+        LOGV2(11910610,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "includeCommitTimestamp"_attr = includeCommitTimestamp);
+
+        TransactionHistoryIterator iter(
+            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+        ASSERT_TRUE(iter.hasNext());
+
+        if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
+            ASSERT_THROWS_CODE(iter.next(opCtx()), DBException, 11910611);
+            continue;
+        }
+
+        auto entry1 = iter.next(opCtx());
+        ASSERT_EQ(entry1.getOpTime(), applyOpsOpTime1);
+        ASSERT_TRUE(entry1.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry1.getCommitTransactionTimestamp());
+
+        ASSERT_TRUE(iter.hasNext());
+
+        auto entry0 = iter.next(opCtx());
+        ASSERT_EQ(entry0.getOpTime(), applyOpsOpTime0);
+        ASSERT_TRUE(entry0.getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
+        ASSERT_FALSE(entry0.getCommitTransactionTimestamp());
+
+        ASSERT_FALSE(iter.hasNext());
+    }
 }
 
 }  // namespace mongo

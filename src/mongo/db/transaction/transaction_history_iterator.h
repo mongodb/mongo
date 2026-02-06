@@ -66,11 +66,17 @@ public:
 
 class TransactionHistoryIterator : public TransactionHistoryIteratorBase {
 public:
+    enum class IncludeCommitTimestamp { kYes, kNo };
+
     /**
      * Creates a new iterator starting with an oplog entry with the given start opTime.
      * TODO SERVER-104970: If permitYield can't be deleted, change the default to 'false'.
      */
-    TransactionHistoryIterator(repl::OpTime startingOpTime, bool permitYield = true);
+    TransactionHistoryIterator(
+        repl::OpTime startingOpTime,
+        bool permitYield = true,
+        IncludeCommitTimestamp includeCommitTimestamp = IncludeCommitTimestamp::kNo);
+
     ~TransactionHistoryIterator() override = default;
 
     bool hasNext() const override;
@@ -89,7 +95,14 @@ private:
     // TODO SERVER-104970: Determine whether this can be removed.
     bool _permitYield;
 
+    // Whether the iterator should attach the commit timestamp to the oplog entries. Throws an error
+    // if the commit timestamp is requested but this is not a committed transaction.
+    IncludeCommitTimestamp _includeCommitTimestamp;
+
     repl::OpTime _nextOpTime;
+
+    // The commit timestamp if this is the oplog chain for a committed transaction.
+    Timestamp _commitTimestamp;
 };
 
 }  // namespace MONGO_MOD_PUB mongo
