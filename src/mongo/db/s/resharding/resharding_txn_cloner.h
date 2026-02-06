@@ -31,6 +31,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -91,7 +92,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory factory,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest = nullptr);
 
     /**

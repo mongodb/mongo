@@ -44,6 +44,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/index_builds/index_builds_coordinator_mock.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -164,7 +165,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
         const mongo::Date_t& startConfigTxnCloneTime) override {
         return makeReadyFutureWith([] {}).semi();
     };

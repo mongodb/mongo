@@ -43,6 +43,7 @@
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_tags.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -530,7 +531,7 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
 
 // Waits for majority replication of the latest opTime unless token is cancelled.
 SemiFuture<void> waitForMajority(const CancellationToken& token,
-                                 const CancelableOperationContextFactory& factory);
+                                 const HierarchicalCancelableOperationContextFactory& factory);
 
 /**
  * Waits for the replication lag across all voting members to be below the given threshold.
@@ -538,7 +539,7 @@ SemiFuture<void> waitForMajority(const CancellationToken& token,
 ExecutorFuture<void> waitForReplicationOnVotingMembers(
     std::shared_ptr<executor::TaskExecutor> executor,
     const CancellationToken& cancelToken,
-    const CancelableOperationContextFactory& factory,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     std::function<unsigned()> getMaxLagSecs);
 
 /**

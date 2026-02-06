@@ -40,6 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface_factory.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_pipeline.h"
@@ -225,7 +226,7 @@ public:
         return executor;
     }
 
-    CancelableOperationContextFactory makeCancelableOpCtx() {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> makeCancelableOpCtx() {
         auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
             ThreadPool::Options options;
             options.poolName = "TestReshardOplogFetcherCancelableOpCtxPool";
@@ -234,8 +235,8 @@ public:
             return options;
         }());
 
-        return CancelableOperationContextFactory(operationContext()->getCancellationToken(),
-                                                 cancelableOpCtxExecutor);
+        return std::make_shared<HierarchicalCancelableOperationContextFactory>(
+            operationContext()->getCancellationToken(), cancelableOpCtxExecutor);
     }
 
     std::unique_ptr<ReshardingDonorOplogPipeline> makePipeline() {
@@ -245,7 +246,7 @@ public:
 
     auto getNextBatch(ReshardingDonorOplogIterator* iter,
                       std::shared_ptr<executor::TaskExecutor> executor,
-                      CancelableOperationContextFactory factory,
+                      std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
                       CancellationToken cancelToken) {
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .get() returns. We schedule a trivial task on the task executor to ensure the callback's
@@ -261,7 +262,7 @@ public:
 
     auto getNextBatch(ReshardingDonorOplogIterator* iter,
                       std::shared_ptr<executor::TaskExecutor> executor,
-                      CancelableOperationContextFactory factory) {
+                      std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
         return getNextBatch(iter, std::move(executor), factory, CancellationToken::uncancelable());
     }
 

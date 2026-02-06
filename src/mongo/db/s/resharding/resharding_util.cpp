@@ -651,7 +651,7 @@ ReshardingCoordinatorDocument getCoordinatorDoc(OperationContext* opCtx,
 }
 
 SemiFuture<void> waitForMajority(const CancellationToken& token,
-                                 const CancelableOperationContextFactory& factory) {
+                                 const HierarchicalCancelableOperationContextFactory& factory) {
     auto opCtx = factory.makeOperationContext(&cc());
     auto client = opCtx->getClient();
     repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
@@ -663,10 +663,10 @@ SemiFuture<void> waitForMajority(const CancellationToken& token,
 ExecutorFuture<void> waitForReplicationOnVotingMembers(
     std::shared_ptr<executor::TaskExecutor> executor,
     const CancellationToken& cancelToken,
-    const CancelableOperationContextFactory& factory,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     std::function<unsigned()> getMaxLagSecs) {
-    return AsyncTry([&factory, getMaxLagSecs] {
-               auto opCtx = factory.makeOperationContext(&cc());
+    return AsyncTry([factory, getMaxLagSecs] {
+               auto opCtx = factory->makeOperationContext(&cc());
 
                auto& replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
                replClientInfo.setLastOpToSystemLastOpTime(opCtx.get());

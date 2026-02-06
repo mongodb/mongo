@@ -46,6 +46,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -271,7 +272,8 @@ public:
         return executor;
     }
 
-    CancelableOperationContextFactory makeCancelableOpCtxForApplier(CancellationToken cancelToken) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> makeCancelableOpCtxForApplier(
+        CancellationToken cancelToken) {
         auto executor = std::make_shared<ThreadPool>([] {
             ThreadPool::Options options;
             options.poolName = "TestReshardOplogBatchApplierCancelableOpCtxPool";
@@ -280,7 +282,8 @@ public:
             return options;
         }());
 
-        return CancelableOperationContextFactory(cancelToken, executor);
+        return std::make_shared<HierarchicalCancelableOperationContextFactory>(cancelToken,
+                                                                               executor);
     }
 
     repl::OpTime makePreparedTxn(OperationContext* opCtx,

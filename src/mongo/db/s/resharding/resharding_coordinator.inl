@@ -268,8 +268,9 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                    .then([this] {
                        // Ensure the flushes to create participant state machines don't get
                        // interrupted upon abort.
-                       _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(),
-                                                       _markKilledExecutor);
+                       _cancelableOpCtxFactory =
+                           std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                               _ctHolder->getStepdownToken(), _markKilledExecutor);
                    })
                    .then([this] {
                        return resharding::waitForMajority(_ctHolder->getStepdownToken(),
@@ -283,8 +284,9 @@ ExecutorFuture<void> ReshardingCoordinator::_tellAllParticipantsReshardingStarte
                    .onCompletion([this](Status status) {
                        // Swap back to using operation contexts canceled upon abort until ready to
                        // persist the decision or unrecoverable error.
-                       _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(),
-                                                       _markKilledExecutor);
+                       _cancelableOpCtxFactory =
+                           std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                               _ctHolder->getAbortToken(), _markKilledExecutor);
 
                        return status;
                    });
@@ -359,7 +361,9 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                   "error"_attr = _originalReshardingStatus ? *_originalReshardingStatus : status);
 
             // Allow abort to continue except when stepped down.
-            _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+            _cancelableOpCtxFactory =
+                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                    _ctHolder->getStepdownToken(), _markKilledExecutor);
 
             // If we're already quiesced here it means we failed over and need to preserve the
             // original abort reason.
@@ -463,7 +467,9 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
         .onUnrecoverableError([](const Status& status) {})
         .runOn(**executor, _ctHolder->getAbortToken())
         .onCompletion([this](auto passthroughFuture) {
-            _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+            _cancelableOpCtxFactory =
+                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                    _ctHolder->getStepdownToken(), _markKilledExecutor);
             return passthroughFuture;
         })
         .onError([this, executor](Status status) -> ExecutorFuture<ReshardingCoordinatorDocument> {
@@ -647,7 +653,8 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     _abortIfCoordinatorInAbortingOrQuiescingOrRequested(abortRequest);
 
     _markKilledExecutor->startup();
-    _cancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
+    _cancelableOpCtxFactory = std::make_unique<HierarchicalCancelableOperationContextFactory>(
+        _ctHolder->getAbortToken(), _markKilledExecutor);
 
     return _isReshardingOpRedundant(executor)
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
@@ -672,7 +679,9 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
                 return _runReshardingOp(executor, std::move(telemetryCtx));
             })
         .onCompletion([this, self = shared_from_this(), executor](Status status) {
-            _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+            _cancelableOpCtxFactory =
+                std::make_unique<HierarchicalCancelableOperationContextFactory>(
+                    _ctHolder->getStepdownToken(), _markKilledExecutor);
             return _quiesce(executor, std::move(status));
         })
         .semi();

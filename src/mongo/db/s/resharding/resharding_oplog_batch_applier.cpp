@@ -75,7 +75,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     OplogBatch batch,
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) const {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
     struct ChainContext {
         OplogBatch batch;
         size_t nextToApply = 0;
@@ -90,7 +90,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                    // chainCtx->nextToApply on each loop iteration.
                    for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
                        const auto& oplogEntry = *chainCtx->batch[i];
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
 
                        boost::optional<rss::consensus::WriteIntentGuard> writeGuard;
                        if (gFeatureFlagIntentRegistration.isEnabled()) {
@@ -155,12 +155,12 @@ template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<false>(
     OplogBatch batch,
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) const;
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
 
 template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<true>(
     OplogBatch batch,
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) const;
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
 
 }  // namespace mongo

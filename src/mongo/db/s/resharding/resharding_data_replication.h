@@ -32,6 +32,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
@@ -115,7 +116,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
         const mongo::Date_t& startConfigTxnCloneTime) = 0;
 
     /**
@@ -191,7 +192,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
         const mongo::Date_t& startConfigTxnCloneTime) override;
 
     void startOplogApplication() override;
@@ -262,25 +263,25 @@ private:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory);
 
     std::vector<SharedSemiFuture<void>> _runTxnCloners(
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
         const mongo::Date_t& startConfigTxnCloneTime);
 
     std::vector<SharedSemiFuture<void>> _runOplogFetchers(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory);
 
     std::vector<SharedSemiFuture<void>> _runOplogAppliers(
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory);
 
     // _collectionCloner is left as nullptr when make() is called with cloningDone=true.
     const std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;

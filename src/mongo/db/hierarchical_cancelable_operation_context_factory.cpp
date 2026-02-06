@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,36 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
-#include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/util/cancellation.h"
-#include "mongo/util/future.h"
-#include "mongo/util/modules.h"
-
-#include <memory>
 
 namespace mongo {
 
-class ReshardingOplogApplicationRules;
+HierarchicalCancelableOperationContextFactory::HierarchicalCancelableOperationContextFactory(
+    CancellationToken parentCancelToken, ExecutorPtr executor)
+    : _cancelSource{parentCancelToken},
+      _cancelToken{_cancelSource.token()},
+      _executor{std::move(executor)},
+      _hierarchyDepth{0} {}
 
-class ReshardingOplogSessionApplication;
+HierarchicalCancelableOperationContextFactory::HierarchicalCancelableOperationContextFactory(
+    CancellationToken parentCancelToken, ExecutorPtr executor, int hierarchyDepth)
+    : _cancelSource{parentCancelToken},
+      _cancelToken{_cancelSource.token()},
+      _executor{std::move(executor)},
+      _hierarchyDepth{hierarchyDepth} {}
 
-/**
- * Updates this shard's data based on oplog entries that already executed on some donor shard.
- *
- * Instances of this class are thread-safe.
- */
-class ReshardingOplogBatchApplier {
-public:
-    using OplogBatch = ReshardingOplogBatchPreparer::OplogBatchToApply;
+std::unique_ptr<HierarchicalCancelableOperationContextFactory>
+HierarchicalCancelableOperationContextFactory::createChild() {
+    return std::unique_ptr<HierarchicalCancelableOperationContextFactory>(
+        new HierarchicalCancelableOperationContextFactory(
+            _cancelToken, _executor, _hierarchyDepth + 1));
+}
 
-    ReshardingOplogBatchApplier(const ReshardingOplogApplicationRules& crudApplication,
-                                const ReshardingOplogSessionApplication& sessionApplication);
-
-    template <bool IsForSessionApplication>
-    SemiFuture<void> applyBatch(
-        OplogBatch batch,
-        std::shared_ptr<executor::TaskExecutor> executor,
-        CancellationToken cancelToken,
-        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const;
-
-private:
-    const ReshardingOplogApplicationRules& _crudApplication;
-    const ReshardingOplogSessionApplication& _sessionApplication;
-};
+std::shared_ptr<HierarchicalCancelableOperationContextFactory>
+HierarchicalCancelableOperationContextFactory::createSharedChild() {
+    return std::shared_ptr<HierarchicalCancelableOperationContextFactory>(
+        new HierarchicalCancelableOperationContextFactory(
+            _cancelToken, _executor, _hierarchyDepth + 1));
+}
 
 }  // namespace mongo

@@ -142,8 +142,8 @@ public:
                 .run(executor,
                      executor,
                      opCtx->getCancellationToken(),
-                     CancelableOperationContextFactory(opCtx->getCancellationToken(),
-                                                       cancelableOperationContextPool))
+                     std::make_shared<HierarchicalCancelableOperationContextFactory>(
+                         opCtx->getCancellationToken(), executor))
                 .get(opCtx);
         }
 

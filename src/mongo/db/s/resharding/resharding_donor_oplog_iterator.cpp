@@ -70,7 +70,7 @@ void ReshardingDonorOplogIterator::dispose(OperationContext* opCtx) {
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getNextBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     return resharding::WithAutomaticRetry([this, executor, cancelToken, factory]() {
                return _getNextBatch(executor, cancelToken, factory);
            })
@@ -92,13 +92,13 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::_getNextBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_hasSeenFinalOplogEntry) {
         return ExecutorFuture(std::move(executor), std::vector<repl::OplogEntry>{});
     }
 
     auto batch = [&] {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         auto scopedPipeline = _pipeline->initWithOperationContext(opCtx.get(), _resumeToken);
         auto batch = scopedPipeline.getNextBatch(
             std::size_t(resharding::gReshardingOplogBatchLimitOperations.load()));

@@ -129,7 +129,7 @@ SemiFuture<void> ReshardingChangeStreamsMonitor::startMonitoring(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_finalEventPromise) {
         return SemiFuture<void>::makeReady(
             Status{ErrorCodes::Error{1006687}, "Cannot start monitoring more than once"});
@@ -340,11 +340,11 @@ std::unique_ptr<mongo::DBClientCursor> ReshardingChangeStreamsMonitor::_makeDBCl
 ExecutorFuture<void> ReshardingChangeStreamsMonitor::_consumeChangeEvents(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     return AsyncTry([this, factory] {
                EventBatch batch(_role);
 
-               auto opCtx = factory.makeOperationContext(&cc());
+               auto opCtx = factory->makeOperationContext(&cc());
                DBDirectClient client(opCtx.get());
                auto cursor = _makeDBClientCursor(&client);
 

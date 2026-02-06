@@ -51,6 +51,7 @@
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
@@ -124,10 +125,10 @@ public:
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory factory) override {
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) override {
         // This operation context is unused by the function but confirms that the Client calling
         // getNextBatch() doesn't already have an operation context.
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
 
         return ExecutorFuture(std::move(executor)).then([this] {
             std::vector<repl::OplogEntry> ret;
@@ -553,7 +554,8 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 }
@@ -592,7 +594,8 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
@@ -641,7 +644,8 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
     auto abortSource = CancellationSource();
     abortSource.cancel();
     auto cancelToken = abortSource.token();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
 
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
@@ -672,7 +676,8 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
@@ -715,7 +720,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
@@ -760,7 +766,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
@@ -803,7 +810,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
@@ -841,7 +849,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
@@ -885,7 +894,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
@@ -928,7 +938,8 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
     getExecutor()->shutdown();
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::ShutdownInProgress);
 
@@ -970,7 +981,8 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
@@ -1008,7 +1020,8 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
@@ -1049,7 +1062,8 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     ASSERT_EQ(metricsAppliedCount(), 0);
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier.run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
@@ -1156,7 +1170,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
                             std::move(iterator));
 
             auto cancelToken = operationContext()->getCancellationToken();
-            CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+            auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+                cancelToken, getCancelableOpCtxExecutor());
             auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
             ASSERT_OK(future.getNoThrow());
 
@@ -1213,7 +1228,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
@@ -1248,7 +1264,8 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
                     std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
-    CancelableOperationContextFactory factory(cancelToken, getCancelableOpCtxExecutor());
+    auto factory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+        cancelToken, getCancelableOpCtxExecutor());
     auto future = applier->run(getExecutor(), getExecutor(), cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 

@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -223,7 +224,7 @@ private:
     void _transitionToPreparingToDonate();
 
     void _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * If verification is enabled, waits for the coordinator to notify this recipient to start the
@@ -231,18 +232,18 @@ private:
      */
     ExecutorFuture<void> _createAndStartChangeStreamsMonitor(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _writeTransactionOplogEntryThenTransitionToBlockingWrites(
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * If verification is enabled, waits for the the change streams monitor to complete.
@@ -253,45 +254,49 @@ private:
     // Drops the original collection and throws if the returned status is not either Status::OK()
     // or NamespaceNotFound.
     void _dropOriginalCollectionThenTransitionToDone(
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(DonorStateEnum newState,
-                          const CancelableOperationContextFactory& factory);
+                          std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _transitionState(DonorShardContext&& newDonorCtx,
-                          const CancelableOperationContextFactory& factory);
+                          std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to DonorStateEnum::kDonatingInitialData.
-    void _transitionToDonatingInitialData(Timestamp minFetchTimestamp,
-                                          int64_t bytesToClone,
-                                          int64_t documentsToClone,
-                                          int64_t indexCount,
-                                          const CancelableOperationContextFactory& factory);
+    void _transitionToDonatingInitialData(
+        Timestamp minFetchTimestamp,
+        int64_t bytesToClone,
+        int64_t documentsToClone,
+        int64_t indexCount,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
-    void _transitionToError(Status abortReason, const CancelableOperationContextFactory& factory);
+    void _transitionToError(Status abortReason,
+                            std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to DonorStateEnum::kDone.
-    void _transitionToDone(const CancelableOperationContextFactory& factory);
+    void _transitionToDone(std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, DonorStateEnum newState);
 
     ExecutorFuture<void> _updateCoordinator(
         OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Updates the mutable portion of the on-disk and in-memory donor document with 'newDonorCtx'
     // and 'newChangeStreamsMonitorCtx'.
-    void _updateDonorDocument(DonorShardContext&& newDonorCtx,
-                              const CancelableOperationContextFactory& factory);
+    void _updateDonorDocument(
+        DonorShardContext&& newDonorCtx,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
     void _updateDonorDocument(OperationContext* opCtx,
                               ChangeStreamsMonitorContext&& newChangeStreamsMonitorCtx);
     void _updateDonorDocument(OperationContext* opCtx, const BSONObj& updateMod);
 
     // Removes the local donor document from disk.
-    void _removeDonorDocument(const CancelableOperationContextFactory& factory);
+    void _removeDonorDocument(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Initializes the _cancelState and generates an abort token. If an
     // abort was reported prior to the initialization, automatically cancels the _cancelState before

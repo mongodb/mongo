@@ -251,7 +251,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_doBlockMigrationsPhase() {
         if (_getCurrentPhase() > Phase::kBlockMigrations) {
             return;
         }
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
 
         // Pre-create the collection if it does not already exist. This is done to prevent a
         // deadlock between a multi update with upsert: true and the MultiUpdateCoordinator when
@@ -304,7 +304,7 @@ Message MultiUpdateCoordinatorInstance::getUpdateAsClusterCommand() const {
 
 ExecutorFuture<void> MultiUpdateCoordinatorInstance::_sendUpdateRequest() {
     return _retry->untilAbortOrSuccess("_sendUpdateRequest", [this](const auto& factory) {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         {
             auto lk = stdx::lock_guard(*opCtx->getClient());
             opCtx->setLogicalSessionId(_getSessionId());
@@ -326,7 +326,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_waitForPendingUpdates() {
         ->untilAbortOrSuccess(
             "_waitForPendingUpdates",
             [this](const auto& factory) {
-                auto opCtx = factory.makeOperationContext(&cc());
+                auto opCtx = factory->makeOperationContext(&cc());
                 auto nss = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
                 auto request = makeAggregationToCheckForPendingUpdates(nss, _getSessionId());
                 auto updatesPending = _externalState->isUpdatePending(opCtx.get(), nss, request);
@@ -347,7 +347,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_stopBlockingMigrationsIfNe
             if (!_shouldUnblockMigrations()) {
                 return;
             }
-            auto opCtx = factory.makeOperationContext(&cc());
+            auto opCtx = factory->makeOperationContext(&cc());
             _externalState->stopBlockingMigrations(opCtx.get(), _metadata);
             LOGV2(9554706,
                   "MultiUpdateCoordinator ended request for migrations to be blocked",
@@ -471,7 +471,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
             if (oldPhase >= newPhase) {
                 return;
             }
-            auto opCtx = factory.makeOperationContext(&cc());
+            auto opCtx = factory->makeOperationContext(&cc());
             auto newDocument = _buildCurrentStateDocument();
             newDocument.getMutableFields().setPhase(newPhase);
             if (newPhase == Phase::kSuccess) {

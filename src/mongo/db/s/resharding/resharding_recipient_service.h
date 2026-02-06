@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -294,82 +295,91 @@ private:
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _createTemporaryReshardingCollectionThenTransitionToCloning(
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _cloneThenTransitionToBuildingIndex(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _buildIndexThenTransitionToApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _writeStrictConsistencyOplog(const CancelableOperationContextFactory& factory);
+    void _writeStrictConsistencyOplog(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _renameTemporaryReshardingCollection(const CancelableOperationContextFactory& factory);
+    void _renameTemporaryReshardingCollection(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _cleanupReshardingCollections(const CancelableOperationContextFactory& factory);
+    void _cleanupReshardingCollections(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(RecipientStateEnum newState,
-                          const CancelableOperationContextFactory& factory);
+                          std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Transitions the on-disk and in-memory state to the state defined in 'newRecipientCtx'.
     void _transitionState(RecipientShardContext&& newRecipientCtx,
                           boost::optional<CloneDetails>&& cloneDetails,
                           boost::optional<mongo::Date_t> configStartTime,
-                          const CancelableOperationContextFactory& factory);
+                          std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // The following functions transition the on-disk and in-memory state to the named state.
-    void _transitionToCreatingCollection(CloneDetails cloneDetails,
-                                         boost::optional<mongo::Date_t> startConfigTxnCloneTime,
-                                         const CancelableOperationContextFactory& factory);
+    void _transitionToCreatingCollection(
+        CloneDetails cloneDetails,
+        boost::optional<mongo::Date_t> startConfigTxnCloneTime,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _transitionToApplying(const CancelableOperationContextFactory& factory);
+    void _transitionToApplying(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _transitionToError(Status abortReason, const CancelableOperationContextFactory& factory);
+    void _transitionToError(Status abortReason,
+                            std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _transitionToDone(const CancelableOperationContextFactory& factory);
+    void _transitionToDone(std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, RecipientStateEnum newState);
 
     ExecutorFuture<void> _updateCoordinator(
         OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Updates the mutable portion of the on-disk and in-memory recipient document with
     // 'newRecipientCtx', 'fetchTimestamp and 'donorShards'.
-    void _updateRecipientDocument(RecipientShardContext&& newRecipientCtx,
-                                  boost::optional<CloneDetails>&& cloneDetails,
-                                  boost::optional<mongo::Date_t> configStartTime,
-                                  const CancelableOperationContextFactory& factory);
+    void _updateRecipientDocument(
+        RecipientShardContext&& newRecipientCtx,
+        boost::optional<CloneDetails>&& cloneDetails,
+        boost::optional<mongo::Date_t> configStartTime,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
-    void _updateRecipientDocument(ChangeStreamsMonitorContext newChangeStreamsCtx,
-                                  const CancelableOperationContextFactory& factory);
+    void _updateRecipientDocument(
+        ChangeStreamsMonitorContext newChangeStreamsCtx,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Removes the local recipient document from disk.
-    void _removeRecipientDocument(const CancelableOperationContextFactory& factory);
+    void _removeRecipientDocument(
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _ensureDataReplicationStarted(
         OperationContext* opCtx,
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _createAndStartChangeStreamsMonitor(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _awaitChangeStreamsMonitorCompleted(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _startMetrics(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -377,7 +387,7 @@ private:
     // Restore metrics using the persisted metrics after stepping up.
     ExecutorFuture<void> _restoreMetricsWithRetry(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-    void _restoreMetrics(const CancelableOperationContextFactory& factory);
+    void _restoreMetrics(std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     void _initializeShardApplierMetrics(
         const boost::optional<ShardApplierProgress>& existingProgress);
@@ -455,6 +465,7 @@ private:
     const std::shared_ptr<ThreadPool> _markKilledExecutor;
     boost::optional<resharding::RetryingCancelableOperationContextFactory>
         _retryingCancelableOpCtxFactory;
+    boost::optional<resharding::RetryingCancelableOperationContextFactory> _finishOperationFactory;
 
     SharedSemiFuture<void> _dataReplicationQuiesced;
 

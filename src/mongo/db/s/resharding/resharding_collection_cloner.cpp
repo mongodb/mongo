@@ -427,7 +427,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     struct ChainContext {
         bool moreToCome = true;
         TxnNumber batchTxnNumber = TxnNumber(0);
@@ -438,7 +438,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
     return resharding::WithAutomaticRetry(
                [this, chainCtx, factory, executor, cleanupExecutor, cancelToken] {
                    reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
-                   auto opCtx = factory.makeOperationContext(&cc());
+                   auto opCtx = factory->makeOperationContext(&cc());
                    _runOnceWithNaturalOrder(opCtx.get(),
                                             MongoProcessInterface::create(opCtx.get()),
                                             executor,

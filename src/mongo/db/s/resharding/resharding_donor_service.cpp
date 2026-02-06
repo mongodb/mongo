@@ -328,10 +328,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor, telemetryCtx = telemetryCtx->clone()](
-                                 const auto& factory) {
+        ->withAutomaticRetry([this, executor, telemetryCtx = telemetryCtx->clone()](auto factory) {
             return ExecutorFuture(**executor)
-                .then([this, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingDonorService::_"
@@ -339,7 +338,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(
                         factory);
                 })
-                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingDonorService::_"
@@ -347,13 +346,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                     return _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
                         executor, factory);
                 })
-                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
                         _startSpan(telemetryCtx,
                                    "ReshardingDonorService::_createAndStartChangeStreamsMonitor");
                     return _createAndStartChangeStreamsMonitor(executor, factory);
                 })
-                .then([this, executor, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span = _startSpan(
                         telemetryCtx,
                         "ReshardingDonorService::_"
@@ -361,7 +360,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                     return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
                         executor, factory);
                 })
-                .then([this, &factory, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
                         _startSpan(telemetryCtx,
                                    "ReshardingDonorService::_"
@@ -406,7 +405,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
             }
 
             return _retryingCancelableOpCtxFactory
-                ->withAutomaticRetry([this, status](const auto& factory) {
+                ->withAutomaticRetry([this, status](auto factory) {
                     // It is illegal to transition into kError if the state is in or has already
                     // surpassed kBlockingWrites.
                     invariant(_donorCtx.getState() < DonorStateEnum::kBlockingWrites);
@@ -457,8 +456,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
     }
 
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor](const auto& factory) {
-            auto opCtx = factory.makeOperationContext(&cc());
+        ->withAutomaticRetry([this, executor](auto factory) {
+            auto opCtx = factory->makeOperationContext(&cc());
             return _updateCoordinator(opCtx.get(), executor, factory);
         })
         .onTransientError([](const Status& status) {
@@ -482,7 +481,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardingOperation(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, executor](const auto& factory) {
+        ->withAutomaticRetry([this, executor](auto factory) {
             if (!_cancelState->isAbortedOrSteppingDown()) {
                 // If a failover occured after the donor transitioned to done locally, but
                 // before it notified the coordinator, it will already be in state done here.
@@ -507,7 +506,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             }
 
             {
-                auto opCtx = factory.makeOperationContext(&cc());
+                auto opCtx = factory->makeOperationContext(&cc());
 
                 // Clear filtering metadata for the temp resharding namespace;
                 // We force a refresh to make sure that the placement information is updated
@@ -548,10 +547,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 }
             }
 
-            auto opCtx = factory.makeOperationContext(&cc());
-            return _updateCoordinator(opCtx.get(), executor, factory).then([this, &factory] {
+            auto opCtx = factory->makeOperationContext(&cc());
+            return _updateCoordinator(opCtx.get(), executor, factory).then([this, factory] {
                 {
-                    auto opCtx = factory.makeOperationContext(&cc());
+                    auto opCtx = factory->makeOperationContext(&cc());
                     removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
                 }
                 _removeDonorDocument(factory);
@@ -730,7 +729,7 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitCriticalS
 
 void ReshardingDonorService::DonorStateMachine::
     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(
-        const CancelableOperationContextFactory& factory) {
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kPreparingToDonate) {
         if (!inPotentialAbortScenario(_donorCtx.getState())) {
             // The invariants won't hold if an unrecoverable error is encountered before the donor
@@ -748,7 +747,7 @@ void ReshardingDonorService::DonorStateMachine::
     int64_t indexCount = 0;
 
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
         const auto coll = acquireCollection(
@@ -776,7 +775,7 @@ void ReshardingDonorService::DonorStateMachine::
     // the {atClusterTime: <fetchTimestamp>} read on the config.cache.chunks namespace would fail
     // with a SnapshotUnavailable error response.
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         reshardingPauseDonorBeforeCatalogCacheRefresh.pauseWhileSet(opCtx.get());
 
         _externalState->refreshCollectionPlacementInfo(opCtx.get(),
@@ -790,13 +789,13 @@ void ReshardingDonorService::DonorStateMachine::
         uasserted(ErrorCodes::InternalError, errmsg);
     });
 
-    Timestamp minFetchTimestamp = [this, &factory] {
-        auto opCtx = factory.makeOperationContext(&cc());
+    Timestamp minFetchTimestamp = [this, factory] {
+        auto opCtx = factory->makeOperationContext(&cc());
         return generateMinFetchTimestamp(opCtx.get(), _metadata.getSourceNss());
     }();
 
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&]() {
@@ -848,14 +847,14 @@ void ReshardingDonorService::DonorStateMachine::
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory) {
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kDonatingInitialData) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    auto opCtx = factory.makeOperationContext(&cc());
+    auto opCtx = factory->makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor, factory)
-        .then([this, executor, &factory] {
+        .then([this, executor, factory] {
             return _createAndStartChangeStreamsMonitor(executor, factory);
         })
         .then([this] {
@@ -863,9 +862,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
                                                  _cancelState->getAbortOrStepdownToken());
         })
         .thenRunOn(**executor)
-        .then([this, &factory]() {
-            _transitionState(DonorStateEnum::kDonatingOplogEntries, factory);
-        })
+        .then(
+            [this, factory]() { _transitionState(DonorStateEnum::kDonatingOplogEntries, factory); })
         .onCompletion([=, this](Status status) {
             if (!status.isOK()) {
                 LOGV2_ERROR(8639700,
@@ -889,7 +887,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelableOperationContextFactory& factory) {
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kDonatingOplogEntries) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -903,14 +901,14 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     return future_util::withCancellation(std::move(allRecipientsDoneApplyingFuture),
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
-        .then([this, &factory] {
+        .then([this, factory] {
             _transitionState(DonorStateEnum::kPreparingToBlockWrites, factory);
         });
 }
 
 void ReshardingDonorService::DonorStateMachine::
     _writeTransactionOplogEntryThenTransitionToBlockingWrites(
-        const CancelableOperationContextFactory& factory) {
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kPreparingToBlockWrites) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
@@ -918,7 +916,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         _externalState->abortUnpreparedTransactionIfNecessary(opCtx.get());
 
         ShardingRecoveryService::get(opCtx.get())
@@ -938,7 +936,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&](ShardId destinedRecipient) {
@@ -1008,7 +1006,7 @@ void ReshardingDonorService::DonorStateMachine::
 }
 
 void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTransitionToDone(
-    const CancelableOperationContextFactory& factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (_donorCtx.getState() > DonorStateEnum::kBlockingWrites) {
         {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -1017,7 +1015,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         return;
     }
     {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         ShardingRecoveryService::get(opCtx.get())
             ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                 opCtx.get(),
@@ -1033,13 +1031,13 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     }
 
     if (_isAlsoRecipient) {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
         resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
     } else {
-        auto opCtx = factory.makeOperationContext(&cc());
+        auto opCtx = factory->makeOperationContext(&cc());
         // Allow bypassing user write blocking. The check has already been performed on the
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
@@ -1090,7 +1088,7 @@ ReshardingDonorService::DonorStateMachine::awaitChangeStreamsMonitorCompleted() 
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartChangeStreamsMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancelableOperationContextFactory& factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (!_metadata.getPerformVerification() || _changeStreamsMonitorStarted.getFuture().isReady()) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -1105,13 +1103,13 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
     return future_util::withCancellation(std::move(changeStreamMonitorStartTimeSelectedFuture),
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
-        .then([this, executor, &factory](const Timestamp& startAtOperationTime) {
+        .then([this, executor, factory](const Timestamp& startAtOperationTime) {
             if (!_changeStreamsMonitorCtx) {
                 LOGV2(9858400,
                       "Initializing the change streams monitor",
                       "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                       "startAtOperationTime"_attr = startAtOperationTime);
-                auto opCtx = factory.makeOperationContext(&cc());
+                auto opCtx = factory->makeOperationContext(&cc());
 
                 ChangeStreamsMonitorContext changeStreamsMonitorCtx(startAtOperationTime,
                                                                     0 /* documentsDelta */);
@@ -1130,7 +1128,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
 
             return ExecutorFuture<void>(**executor, Status::OK());
         })
-        .then([this, executor, &factory] {
+        .then([this, executor, factory] {
             auto batchCallback = [this, factory = factory, anchor = shared_from_this()](
                                      const auto& batch) {
                 LOGV2(9858404,
@@ -1152,7 +1150,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                               "changeStreamsMonitor callback");
                 }
 
-                auto opCtx = factory.makeOperationContext(&cc());
+                auto opCtx = factory->makeOperationContext(&cc());
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
             };
 
@@ -1206,7 +1204,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(
-    DonorStateEnum newState, const CancelableOperationContextFactory& factory) {
+    DonorStateEnum newState,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     invariant(newState != DonorStateEnum::kDonatingInitialData &&
               newState != DonorStateEnum::kError && newState != DonorStateEnum::kDone);
 
@@ -1216,7 +1215,8 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(
-    DonorShardContext&& newDonorCtx, const CancelableOperationContextFactory& factory) {
+    DonorShardContext&& newDonorCtx,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     // For logging purposes.
     auto oldState = _donorCtx.getState();
     auto newState = newDonorCtx.getState();
@@ -1243,7 +1243,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData
     int64_t bytesToClone,
     int64_t documentsToClone,
     int64_t indexCount,
-    const CancelableOperationContextFactory& factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kDonatingInitialData);
     newDonorCtx.setMinFetchTimestamp(minFetchTimestamp);
@@ -1254,7 +1254,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDonatingInitialData
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionToError(
-    Status abortReason, const CancelableOperationContextFactory& factory) {
+    Status abortReason, std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kError);
     resharding::emplaceTruncatedAbortReasonIfExists(newDonorCtx, abortReason);
@@ -1262,7 +1262,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionToError(
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionToDone(
-    const CancelableOperationContextFactory& factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     auto newDonorCtx = _donorCtx;
     newDonorCtx.setState(DonorStateEnum::kDone);
     if (_cancelState->isAbortedOrSteppingDown() && !_cancelState->isSteppingDown()) {
@@ -1340,14 +1340,14 @@ BSONObj ReshardingDonorService::DonorStateMachine::_makeQueryForCoordinatorUpdat
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinator(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancelableOperationContextFactory& factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
         .waitUntilMajorityForWrite(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
-        .then([this, &factory] {
-            auto localOpCtx = factory.makeOperationContext(&cc());
+        .then([this, factory] {
+            auto localOpCtx = factory->makeOperationContext(&cc());
             auto shardId = _externalState->myShardId(localOpCtx->getServiceContext());
             _metrics->updateDonorCtx(_donorCtx);
 
@@ -1416,8 +1416,9 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(OperationCo
 }
 
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
-    DonorShardContext&& newDonorCtx, const CancelableOperationContextFactory& factory) {
-    auto opCtx = factory.makeOperationContext(&cc());
+    DonorShardContext&& newDonorCtx,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    auto opCtx = factory->makeOperationContext(&cc());
     _updateDonorDocument(opCtx.get(),
                          BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
                                              << newDonorCtx.toBSON())));
@@ -1435,8 +1436,8 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
 }
 
 void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
-    const CancelableOperationContextFactory& factory) {
-    auto opCtx = factory.makeOperationContext(&cc());
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    auto opCtx = factory->makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_removeDonorDocument", nss, [&] {

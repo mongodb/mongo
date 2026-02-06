@@ -53,6 +53,7 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_shard.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
@@ -422,7 +423,8 @@ protected:
             ? customCancelToken.value()
             : operationContext()->getCancellationToken();
 
-        CancelableOperationContextFactory opCtxFactory(cancelToken, _threadPool);
+        auto opCtxFactory = std::make_shared<HierarchicalCancelableOperationContextFactory>(
+            cancelToken, _threadPool);
 
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's

@@ -63,11 +63,14 @@ public:
     template <typename Function>
     auto untilSuccessOrCancel(const std::string& operationName, Function&& operation) {
         static_assert(
-            std::is_invocable_v<Function, const CancelableOperationContextFactory&>,
-            "Operation function must accept const reference to CancelableOperationContextFactory "
+            std::is_invocable_v<Function,
+                                std::shared_ptr<HierarchicalCancelableOperationContextFactory>>,
+            "Operation function must accept "
+            "shared_ptr<HierarchicalCancelableOperationContextFactory> "
             "as parameter.");
-        using FuturizedResultType =
-            FutureContinuationResult<Function, const CancelableOperationContextFactory&>;
+        using FuturizedResultType = FutureContinuationResult<
+            Function,
+            std::shared_ptr<HierarchicalCancelableOperationContextFactory>>;
         using StatusifiedResultType =
             decltype(std::declval<Future<FuturizedResultType>>().getNoThrow());
         return _retryFactory.withAutomaticRetry(std::forward<Function>(operation))

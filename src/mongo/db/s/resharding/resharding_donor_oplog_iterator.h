@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -75,7 +76,7 @@ public:
     virtual ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory factory) = 0;
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) = 0;
 
     /**
      * Releases any resources held by this oplog iterator such as Pipelines, PlanExecutors, or
@@ -104,7 +105,7 @@ public:
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory factory) override;
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) override;
 
     void dispose(OperationContext* opCtx) override;
 
@@ -114,7 +115,7 @@ private:
     ExecutorFuture<std::vector<repl::OplogEntry>> _getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
-        CancelableOperationContextFactory factory);
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     const NamespaceString _oplogBufferNss;
 

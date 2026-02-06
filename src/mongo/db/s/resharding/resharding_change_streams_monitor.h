@@ -30,6 +30,7 @@
 
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/executor/task_executor.h"
@@ -117,10 +118,11 @@ public:
     /**
      * Schedules work to open a local change streams and track the events.
      */
-    SemiFuture<void> startMonitoring(std::shared_ptr<executor::TaskExecutor> executor,
-                                     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
-                                     CancellationToken cancelToken,
-                                     CancelableOperationContextFactory factory);
+    SemiFuture<void> startMonitoring(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+        CancellationToken cancelToken,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * Waits until the monitor has consumed the final change event or the 'executor' has been
@@ -180,9 +182,10 @@ private:
      * consumed the final change event or the 'executor' has been shut down or the cancellation
      * source for 'factory' has been cancelled.
      */
-    ExecutorFuture<void> _consumeChangeEvents(std::shared_ptr<executor::TaskExecutor> executor,
-                                              CancellationToken cancelToken,
-                                              CancelableOperationContextFactory factory);
+    ExecutorFuture<void> _consumeChangeEvents(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     const UUID _reshardingUUID;
     const NamespaceString _monitorNss;

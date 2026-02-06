@@ -31,6 +31,7 @@
 
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -117,7 +118,7 @@ public:
     SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
                          std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                          CancellationToken cancelToken,
-                         CancelableOperationContextFactory factory);
+                         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
         OperationContext* opCtx, const ReshardingSourceId& id);
@@ -134,9 +135,10 @@ private:
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all
      * worker threads to finish (even when some of them finished early due to an error).
      */
-    SemiFuture<void> _applyBatch(std::shared_ptr<executor::TaskExecutor> executor,
-                                 CancellationToken cancelToken,
-                                 CancelableOperationContextFactory factory);
+    SemiFuture<void> _applyBatch(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * Records the progress made by this applier to storage.

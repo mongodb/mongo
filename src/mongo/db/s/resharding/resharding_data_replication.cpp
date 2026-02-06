@@ -365,7 +365,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory opCtxFactory,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
     const mongo::Date_t& startConfigTxnCloneTime) {
     CancellationSource errorSource(cancelToken);
 
@@ -428,7 +428,7 @@ SharedSemiFuture<void> ReshardingDataReplication::_runCollectionCloner(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory opCtxFactory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory) {
     return _collectionCloner ? _collectionCloner
                                    ->run(std::move(executor),
                                          std::move(cleanupExecutor),
@@ -442,7 +442,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory opCtxFactory,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory,
     const mongo::Date_t& startConfigTxnCloneTime) {
     std::vector<SharedSemiFuture<void>> txnClonerFutures;
     txnClonerFutures.reserve(_txnCloners.size());
@@ -468,7 +468,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
 std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogFetchers(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory opCtxFactory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogFetcherFutures;
     oplogFetcherFutures.reserve(_oplogFetchers.size());
 
@@ -484,7 +484,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogAppliers
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory opCtxFactory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogApplierFutures;
     oplogApplierFutures.reserve(_oplogAppliers.size());
 

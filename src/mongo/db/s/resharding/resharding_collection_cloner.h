@@ -34,6 +34,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -99,7 +100,7 @@ public:
     SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
                          std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                          CancellationToken cancelToken,
-                         CancelableOperationContextFactory factory);
+                         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * Inserts a single batch of documents and its resume information if provided.

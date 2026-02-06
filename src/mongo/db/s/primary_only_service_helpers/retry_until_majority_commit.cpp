@@ -73,8 +73,8 @@ ExecutorFuture<void> RetryUntilMajorityCommit::_waitForMajorityOrStepdown(
     const std::string& operationName) {
     auto cancelToken = _cancelState->getStepdownToken();
     return _retryUntilStepdown.untilSuccessOrCancel(
-        operationName, [cancelToken, this](const auto& factory) {
-            auto opCtx = factory.makeOperationContext(&cc());
+        operationName, [cancelToken, this](auto factory) {
+            auto opCtx = factory->makeOperationContext(&cc());
             auto client = opCtx->getClient();
             repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
             auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();

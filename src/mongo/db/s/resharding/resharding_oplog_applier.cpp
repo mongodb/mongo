@@ -121,7 +121,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     Timer latencyTimer;
     auto crudWriterVectors = _batchPreparer.makeCrudOpWriterVectors(
         _currentBatchToApply, _currentDerivedOpsForCrudWriters);
@@ -176,7 +176,7 @@ SemiFuture<void> ReshardingOplogApplier::run(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory) {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     struct ChainContext {
         std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIter;
         Timer fetchTimer;
@@ -220,7 +220,7 @@ SemiFuture<void> ReshardingOplogApplier::run(
                            return false;
                        }
 
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
                        _clearAppliedOpsAndStoreProgress(opCtx.get());
                        return true;
                    });

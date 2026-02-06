@@ -343,6 +343,9 @@ filters:
   - "partitioned*":
     approvers:
       - 10gen/server-programmability
+  - "hierarchical_cancelable_operation_context_factory*":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "logical_session_cache_factory_mongod*":
     approvers:
       - 10gen/server-transactions

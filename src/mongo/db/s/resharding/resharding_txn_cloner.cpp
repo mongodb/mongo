@@ -244,7 +244,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
     struct ChainContext {
         std::unique_ptr<Pipeline> pipeline;
@@ -259,7 +259,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
     return resharding::WithAutomaticRetry(
                [this, chainCtx, cancelToken, factory, mongoProcessInterface_forTest] {
                    if (!chainCtx->pipeline) {
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
                        chainCtx->pipeline =
                            _restartPipeline(opCtx.get(),
                                             MONGO_unlikely(mongoProcessInterface_forTest)
@@ -275,7 +275,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    // A donor record will have been stashed on the ChainContext if we are resuming
                    // due to a prepared transaction having been in progress.
                    if (!chainCtx->donorRecord) {
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
                        ScopeGuard guard([&] {
                            chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
                            chainCtx->execPipeline->dispose();
@@ -293,7 +293,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    }
 
                    {
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
                        if (auto conflictingTxnCompletionFuture =
                                doOneRecord(opCtx.get(), *chainCtx->donorRecord)) {
                            return future_util::withCancellation(
@@ -305,7 +305,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                        resharding::gReshardingTxnClonerProgressBatchSize.load();
 
                    if (chainCtx->progressCounter == 0) {
-                       auto opCtx = factory.makeOperationContext(&cc());
+                       auto opCtx = factory->makeOperationContext(&cc());
                        _updateProgressDocument(opCtx.get(), chainCtx->donorRecord->getSessionId());
                    }
 
@@ -319,7 +319,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                   "readTimestamp"_attr = _fetchTimestamp,
                   "error"_attr = redact(status));
             if (chainCtx->pipeline) {
-                auto opCtx = factory.makeOperationContext(&cc());
+                auto opCtx = factory->makeOperationContext(&cc());
                 chainCtx->execPipeline->reattachToOperationContext(opCtx.get());
                 chainCtx->execPipeline->dispose();
                 chainCtx->pipeline.reset();

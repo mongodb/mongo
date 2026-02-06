@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 #include "mongo/util/modules.h"
 
@@ -37,8 +37,10 @@ namespace MONGO_MOD_PUB mongo {
 namespace primary_only_service_helpers {
 
 /**
- * Wrapper class around CancelableOperationContextFactory which by default uses WithAutomaticRetry
- * to ensure all cancelable operations will be retried if able upon failure.
+ * Wrapper class around HierarchicalCancelableOperationContextFactory which creates a new
+ * child factory for each withAutomaticRetry invocation. This ensures that listeners attached
+ * during the retry scope are cleaned up when the scope completes, addressing memory accumulation
+ * issues with long-lived cancellation tokens (SERVER-103945).
  */
 class RetryingCancelableOperationContextFactory {
 public:
@@ -47,17 +49,24 @@ public:
         ExecutorPtr executor,
         RetryabilityPredicate isRetryable = kDefaultRetryabilityPredicate)
         : _isRetryable{std::move(isRetryable)},
-          _factory{std::move(cancelToken), std::move(executor)} {}
+          _factory{std::make_unique<HierarchicalCancelableOperationContextFactory>(
+              std::move(cancelToken), std::move(executor))} {}
 
     template <typename BodyCallable>
     decltype(auto) withAutomaticRetry(BodyCallable&& body) const {
-        return WithAutomaticRetry([this, body]() { return body(_factory); }, _isRetryable);
+        // Create a NEW child for each retry scope. Using shared_ptr allows the child
+        // to be captured by value in multiple lambdas within the future chain.
+        auto child = _factory->createSharedChild();
+        return WithAutomaticRetry(
+            [child, body = std::forward<BodyCallable>(body)]() { return body(child); },
+            _isRetryable);
     }
 
 private:
     RetryabilityPredicate _isRetryable;
-    const CancelableOperationContextFactory _factory;
+    std::unique_ptr<HierarchicalCancelableOperationContextFactory> _factory;
 };
 
 }  // namespace primary_only_service_helpers
 }  // namespace MONGO_MOD_PUB mongo
+
