@@ -930,7 +930,7 @@ Status performAtomicTimeseriesWrites(
     auto originalNss =
         !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
 
-    DisableDocumentValidation disableDocumentValidation{opCtx};
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
 
     write_ops_exec::LastOpFixer lastOpFixer(opCtx);
     lastOpFixer.startingOp(originalNss);

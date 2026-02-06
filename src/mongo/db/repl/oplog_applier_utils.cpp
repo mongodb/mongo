@@ -426,7 +426,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     const bool isDataConsistent,
     IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
     OpCounters* opCounters) {
-    invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
+    invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp());
 
     const auto& op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes.
@@ -632,7 +632,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
     // We cannot do document validation, because document validation could have been disabled when
     // these oplog entries were generated.
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
     // Group the operations by namespace in order to get larger groups for bulk inserts, but do not
     // mix up the current order of oplog entries within the same namespace (thus *stable* sort).
     stableSortByNamespace(ops);

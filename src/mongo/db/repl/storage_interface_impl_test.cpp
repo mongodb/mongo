@@ -242,12 +242,12 @@ private:
         _opCtx = cc().makeOperationContext();
         // We are not replicating nor validating these writes.
         _uwb = std::make_unique<UnreplicatedWritesBlock>(_opCtx.get());
-        _ddv = std::make_unique<DisableDocumentValidation>(_opCtx.get());
+        _ddv = std::make_unique<DisableDocumentValidationForInternalOp>(_opCtx.get());
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<UnreplicatedWritesBlock> _uwb;
-    std::unique_ptr<DisableDocumentValidation> _ddv;
+    std::unique_ptr<DisableDocumentValidationForInternalOp> _ddv;
     ReplicationCoordinatorMock* _replicationCoordinatorMock = nullptr;
 };
 

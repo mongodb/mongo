@@ -167,6 +167,7 @@ mongo_cc_library(
     name = "document_validation",
     srcs = [
         "document_validation.cpp",
+        "document_validation_helpers.cpp",
     ],
     deps = [
         "//src/mongo/db:service_context",

@@ -88,7 +88,7 @@ void cloneDatabase(OperationContext* opCtx,
               unsplittableCollections.end(),
               std::back_inserter(trackedColls));
 
-    DisableDocumentValidation disableValidation(opCtx);
+    DisableDocumentValidationForInternalOp disableValidation(opCtx);
 
     // Clone the non-ignored collections.
     std::set<std::string> clonedColls;

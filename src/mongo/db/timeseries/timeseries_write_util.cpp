@@ -198,7 +198,7 @@ void performAtomicWrites(
         7655102, "must specify at least one type of write", modificationOp || !insertOps.empty());
     NamespaceString ns = coll->ns();
 
-    DisableDocumentValidation disableDocumentValidation{opCtx};
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
 
     write_ops_exec::LastOpFixer lastOpFixer{opCtx};
     lastOpFixer.startingOp(ns);

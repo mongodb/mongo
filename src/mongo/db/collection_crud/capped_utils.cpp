@@ -151,7 +151,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     BSONObj objToClone;
     RecordId loc;
 
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool isOplogDisabledForCappedCollection = replCoord->isOplogDisabledFor(opCtx, toNss);

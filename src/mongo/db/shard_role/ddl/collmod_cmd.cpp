@@ -165,14 +165,23 @@ public:
                         str::stream() << "Document validators not allowed on system collection "
                                       << nss.toStringForErrorMsg(),
                         nss != NamespaceString::kConfigSettingsNamespace);
-            }
-            if (cmd.getValidationAction() == ValidationActionEnum::errorAndLog) {
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Validation action 'errorAndLog' is not supported with current FCV",
-                    gFeatureFlagErrorAndLogValidationAction.isEnabledUseLastLTSFCVWhenUninitialized(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+                const auto fcvSnapshot =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                if (cmd.getValidationAction() == ValidationActionEnum::errorAndLog) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Validation action 'errorAndLog' is not supported with current FCV",
+                            gFeatureFlagErrorAndLogValidationAction
+                                .isEnabledUseLastLTSFCVWhenUninitialized(
+                                    VersionContext::getDecoration(opCtx), fcvSnapshot));
+                }
+                if (cmd.getValidationLevel() == ValidationLevelEnum::validated) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Validation level 'validated' is not supported with current FCV",
+                            gFeatureFlagValidatedValidationLevel
+                                .isEnabledUseLastLTSFCVWhenUninitialized(
+                                    VersionContext::getDecoration(opCtx), fcvSnapshot));
+                }
             }
 
             // We do not use the serialization context for reply object serialization as the reply

@@ -659,7 +659,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
             while (true) {
                 DisableDocumentValidation documentValidationDisabler(
                     applicationOpCtx.get(),
-                    DocumentValidationSettings::kDisableSchemaValidation |
+                    DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
                         DocumentValidationSettings::kDisableInternalValidation);
                 auto nextBatch = batches.pop(applicationOpCtx.get());
                 if (!applyBatchFn(applicationOpCtx.get(), nextBatch)) {

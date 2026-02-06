@@ -881,7 +881,7 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
     // In order for oplog application to assign timestamps, we must be in non-replicated mode
     // and disable document validation.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
-    DisableDocumentValidation validationDisabler(_opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(_opCtx);
 
     // Create a new collection.
     NamespaceString nss =
@@ -2789,7 +2789,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
     // In order for oplog application to assign timestamps, we must be in non-replicated mode
     // and disable document validation.
     repl::UnreplicatedWritesBlock uwb(_opCtx);
-    DisableDocumentValidation validationDisabler(_opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(_opCtx);
 
     std::string dbName = "unittest";
     NamespaceString nss =

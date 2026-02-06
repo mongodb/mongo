@@ -1875,8 +1875,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     }
 
     const auto& bypassDocumentValidation = req.getBypassDocumentValidation();
-    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
-                                                                      bypassDocumentValidation);
+    DisableDocumentSchemaValidationRequestedByUserIfTrue docSchemaValidationDisabler(
+        opCtx, bypassDocumentValidation);
 
     const auto& firstNsInfo = req.getNsInfo()[0];
     const bool fleCrudProcessed = write_ops_exec::getFleCrudProcessed(

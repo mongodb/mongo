@@ -118,6 +118,11 @@ feature_flags:
         default: true
         version: 8.1
         fcv_gated: true
+    featureFlagValidatedValidationLevel:
+        description: "Enables the use of the validated schema validation level."
+        cpp_varname: gFeatureFlagValidatedValidationLevel
+        default: false
+        fcv_gated: true
     featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:
         description: "Feature flag to distinguish ChunkMetadataInconsistency from ConflictingOperationInProgress error"
         cpp_varname: gDistinguishMetadataInconsistencyFromConflictingOperation

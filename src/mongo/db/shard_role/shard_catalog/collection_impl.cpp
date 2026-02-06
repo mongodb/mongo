@@ -87,6 +87,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_stats.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
+#include "mongo/db/shard_role/shard_catalog/document_validation_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_impl.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -125,26 +126,6 @@ MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // Only set the legacy time-series mixed-schema flag at the top level of the catalog,
 // and clear the new durable flag which is stored inside the collection options.
 MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
-
-Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
-                                       boost::optional<ValidationLevelEnum> newLevel,
-                                       boost::optional<ValidationActionEnum> newAction) {
-    if (!opts.encryptedFieldConfig) {
-        return Status::OK();
-    }
-    if (validationLevelOrDefault(newLevel) != ValidationLevelEnum::strict) {
-        return Status(
-            ErrorCodes::BadValue,
-            "Validation levels other than 'strict' are not allowed on encrypted collections");
-    }
-    auto action = validationActionOrDefault(newAction);
-    if (action == ValidationActionEnum::warn || action == ValidationActionEnum::errorAndLog) {
-        return Status(ErrorCodes::BadValue,
-                      "Validation action of 'warn' and 'errorAndLog' are not allowed on encrypted "
-                      "collections");
-    }
-    return Status::OK();
-}
 
 /**
  * Returns true if we are running retryable write or retryable internal multi-document transaction.
@@ -435,8 +416,8 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
     uassertStatusOK(_checkValidatorCanBeUsed(validatorDoc));
 
     // Make sure validationAction and validationLevel are allowed on this collection
-    uassertStatusOK(checkValidationOptionsCanBeUsed(
-        collectionOptions, collectionOptions.validationLevel, collectionOptions.validationAction));
+    uassertStatusOK(
+        checkValidationOptionsCanBeUsed(collectionOptions, boost::none, boost::none, boost::none));
 
     // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
@@ -594,8 +575,19 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     if (validationLevelOrDefault(_metadata->options.validationLevel) == ValidationLevelEnum::off)
         return {SchemaValidationResult::kPass, Status::OK()};
 
-    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled())
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp()) {
         return {SchemaValidationResult::kPass, Status::OK()};
+    }
+
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
+        if (_metadata->options.validationLevel == ValidationLevelEnum::validated) {
+            return {SchemaValidationResult::kError,
+                    Status(ErrorCodes::BadValue,
+                           "bypassDocumentValidation is not permitted on 'validated' collections")};
+        } else {
+            return {SchemaValidationResult::kPass, Status::OK()};
+        }
+    }
 
     if (ns().isTemporaryReshardingCollection()) {
         // In resharding, the donor shard primary is responsible for performing document validation
@@ -623,6 +615,11 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
 
     switch (validationActionOrDefault(_metadata->options.validationAction)) {
         case ValidationActionEnum::warn:
+            if (validationLevelOrDefault(_metadata->options.validationLevel) ==
+                ValidationLevelEnum::validated) {
+                // Warn is prohibited for validated collections
+                return {SchemaValidationResult::kError, status};
+            }
             return {SchemaValidationResult::kWarn, status};
         case ValidationActionEnum::error:
             return {SchemaValidationResult::kError, status};
@@ -1210,20 +1207,37 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void CollectionImpl::setValidator(OperationContext* opCtx, Validator validator) {
+Status CollectionImpl::setValidationOptions(OperationContext* opCtx,
+                                            boost::optional<ValidationLevelEnum> newLevel,
+                                            boost::optional<ValidationActionEnum> newAction,
+                                            boost::optional<Validator> newValidator) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
+    auto status =
+        checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction, newValidator);
+    if (!status.isOK()) {
+        return status;
+    }
 
-    auto validatorDoc = validator.validatorDoc.getOwned();
-    auto validationLevel = validationLevelOrDefault(_metadata->options.validationLevel);
-    auto validationAction = validationActionOrDefault(_metadata->options.validationAction);
+    auto validationLevel = validationLevelOrCurrent(_metadata->options, newLevel);
+    auto validationAction = validationActionOrCurrent(_metadata->options, newAction);
+    if (newValidator) {
+        _validator = std::move(*newValidator);
+    }
+
+    if (auto [mustReparse, allowedFeatures] = mustReparseValidator(newLevel, newAction);
+        mustReparse) {
+        _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
+        if (!_validator.isOK()) {
+            return _validator.getStatus();
+        }
+    }
 
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        md.options.validator = validatorDoc;
+        md.options.validator = _validator.validatorDoc;
         md.options.validationLevel = validationLevel;
         md.options.validationAction = validationAction;
     });
-
-    _validator = std::move(validator);
+    return Status::OK();
 }
 
 boost::optional<ValidationLevelEnum> CollectionImpl::getValidationLevel() const {
@@ -1234,74 +1248,17 @@ boost::optional<ValidationActionEnum> CollectionImpl::getValidationAction() cons
     return _metadata->options.validationAction;
 }
 
-Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) {
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
-
-    auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, boost::none);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto storedValidationLevel = validationLevelOrDefault(newLevel);
-
-    // Reparse the validator as there are some features which are only supported with certain
-    // validation levels.
-    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (storedValidationLevel == ValidationLevelEnum::moderate)
-        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
-
-    _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
-    if (!_validator.isOK()) {
-        return _validator.getStatus();
-    }
-
-    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        md.options.validator = _validator.validatorDoc;
-        md.options.validationLevel = storedValidationLevel;
-        md.options.validationAction = validationActionOrDefault(md.options.validationAction);
-    });
-
-    return Status::OK();
-}
-
-Status CollectionImpl::setValidationAction(OperationContext* opCtx,
-                                           ValidationActionEnum newAction) {
-    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
-
-    auto status = checkValidationOptionsCanBeUsed(_metadata->options, boost::none, newAction);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    auto storedValidationAction = validationActionOrDefault(newAction);
-
-    // Reparse the validator as there are some features which are only supported with certain
-    // validation actions.
-    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
-    if (storedValidationAction == ValidationActionEnum::warn ||
-        storedValidationAction == ValidationActionEnum::errorAndLog)
-        allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
-
-    _validator = parseValidator(opCtx, _validator.validatorDoc, allowedFeatures);
-    if (!_validator.isOK()) {
-        return _validator.getStatus();
-    }
-
-    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        md.options.validator = _validator.validatorDoc;
-        md.options.validationLevel = validationLevelOrDefault(md.options.validationLevel);
-        md.options.validationAction = storedValidationAction;
-    });
-
-    return Status::OK();
-}
-
 Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        BSONObj newValidatorDoc,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
 
+    auto validationLevel = validationLevelOrCurrent(_metadata->options, newLevel);
+    if (validationLevel == ValidationLevelEnum::validated) {
+        return Status(ErrorCodes::BadValue,
+                      "Validator can not be changed on 'validated' collections");
+    }
     tassert(11738200,
             fmt::format("Illegal attempt to set a non-empty validator on viewless timeseries "
                         "collection '{}'",
@@ -1309,15 +1266,16 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
             !isTimeseriesCollection() || !isNewTimeseriesWithoutView() ||
                 (newValidatorDoc.isEmpty() && !newLevel.has_value() && !newAction.has_value()));
 
-    auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction);
-    if (!status.isOK()) {
-        return status;
-    }
-
     auto newValidator =
         parseValidator(opCtx, newValidatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!newValidator.isOK()) {
         return newValidator.getStatus();
+    }
+
+    if (auto status =
+            checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction, newValidator);
+        !status.isOK()) {
+        return status;
     }
 
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {

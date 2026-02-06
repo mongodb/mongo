@@ -212,16 +212,11 @@ public:
         return Validator();
     }
 
-    void setValidator(OperationContext* opCtx, Validator validator) final {
-        unimplementedTasserted();
-    }
 
-    Status setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) final {
-        unimplementedTasserted();
-        return Status(ErrorCodes::UnknownError, "unknown");
-    }
-
-    Status setValidationAction(OperationContext* opCtx, ValidationActionEnum newAction) final {
+    Status setValidationOptions(OperationContext* opCtx,
+                                boost::optional<ValidationLevelEnum> newLevel,
+                                boost::optional<ValidationActionEnum> newAction,
+                                boost::optional<Validator> newValidator) final {
         unimplementedTasserted();
         return Status(ErrorCodes::UnknownError, "unknown");
     }

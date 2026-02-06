@@ -258,7 +258,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     // But, it's logically ok to disable internal validation as this function gets called
     // only during initial sync.
     DocumentValidationSettings::get(opCtx.get())
-        .setFlags(DocumentValidationSettings::kDisableSchemaValidation |
+        .setFlags(DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
                   DocumentValidationSettings::kDisableInternalValidation);
 
     // Retry if WCE.

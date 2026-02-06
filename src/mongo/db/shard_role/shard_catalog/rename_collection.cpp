@@ -347,7 +347,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
                                 const NamespaceString& target,
                                 RenameCollectionOptions options) {
     invariant(source.isEqualDb(target));
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     CollectionOrViewAcquisitionRequests acquisitionRequests = {
         CollectionOrViewAcquisitionRequest::fromOpCtx(
@@ -516,7 +516,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                            repl::OpTime renameOpTimeFromApplyOps,
                                            const RenameCollectionOptions& options) {
     invariant(source.isEqualDb(target));
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     AutoGetDb autoDb(opCtx, source.dbName(), MODE_IX);
     auto acqStatus =
@@ -874,7 +874,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return acqStatus.getStatus();
     auto& [sourceColl, tmpName, tempCollLock] = acqStatus.getValue();
 
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     if (!sourceDB.getDb())
         return Status(ErrorCodes::NamespaceNotFound, "source namespace does not exist");

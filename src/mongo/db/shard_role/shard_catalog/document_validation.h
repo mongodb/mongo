@@ -67,23 +67,29 @@ public:
          */
         kEnableValidation = 0x00,
         /*
-         * Disables the schema validation during document inserts and updates.
-         * This flag should be enabled if WriteCommandRequestBase::_bypassDocumentValidation
-         * is set to true.
+         * Disables the schema validation during document inserts and updates for user-initiated
+         * operations. This flag should be enabled if
+         * WriteCommandRequestBase::_bypassDocumentValidation is set to true.
          */
-        kDisableSchemaValidation = 0x01,
+        kDisableSchemaValidationRequestedByUser = 0x01,
+        /*
+         * Disables the schema validation during all document inserts and updates including internal
+         * operations such as oplog application and initial sync. This flag should only be set for
+         * internal operations.
+         */
+        kDisableSchemaValidationForInternalOp = 0x02,
         /*
          * Disables any internal validation (like fixDocumentForInsert()). This flag
          * should be enabled only for trusted internal writes or internal writes that
          * doesn't comply with internal validation rules.
          */
-        kDisableInternalValidation = 0x02,
+        kDisableInternalValidation = 0x04,
         /*
          * If set, modifications to the safeContent array are allowed. This flag is only
          * enabled when bypass document validation is enabled or if crudProcessed is true
          * in the query.
          */
-        kDisableSafeContentValidation = 0x04,
+        kDisableSafeContentValidation = 0x08,
     };
 
     using Flags = std::uint8_t;
@@ -102,7 +108,12 @@ public:
     }
 
     bool isSchemaValidationDisabled() const {
-        return _flags & kDisableSchemaValidation;
+        return _flags &
+            (kDisableSchemaValidationRequestedByUser | kDisableSchemaValidationForInternalOp);
+    }
+
+    bool isSchemaValidationDisabledForInternalOp() const {
+        return _flags & kDisableSchemaValidationForInternalOp;
     }
 
     bool isInternalValidationDisabled() const {
@@ -130,9 +141,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentValidation {
     DisableDocumentValidation& operator=(const DisableDocumentValidation&) = delete;
 
 public:
-    DisableDocumentValidation(OperationContext* opCtx,
-                              DocumentValidationSettings::Flags flags =
-                                  DocumentValidationSettings::kDisableSchemaValidation)
+    DisableDocumentValidation(OperationContext* opCtx, DocumentValidationSettings::Flags flags)
         : _opCtx(opCtx) {
         auto& documentValidationSettings = DocumentValidationSettings::get(_opCtx);
         _initialState = documentValidationSettings;
@@ -148,16 +157,27 @@ private:
     DocumentValidationSettings _initialState;
 };
 
-/**
- * Disables document schema validation while in scope if the constructor is passed true.
- */
-class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentSchemaValidationIfTrue {
+class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentValidationForInternalOp {
 public:
-    DisableDocumentSchemaValidationIfTrue(OperationContext* opCtx,
-                                          bool shouldDisableSchemaValidation) {
+    DisableDocumentValidationForInternalOp(OperationContext* opCtx)
+        : _documentSchemaValidationDisabler(
+              opCtx, DocumentValidationSettings::kDisableSchemaValidationForInternalOp) {}
+
+private:
+    DisableDocumentValidation _documentSchemaValidationDisabler;
+};
+
+/**
+ * Disables document schema validation for user requests while in scope if the constructor is passed
+ * true.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT DisableDocumentSchemaValidationRequestedByUserIfTrue {
+public:
+    DisableDocumentSchemaValidationRequestedByUserIfTrue(OperationContext* opCtx,
+                                                         bool shouldDisableSchemaValidation) {
         if (shouldDisableSchemaValidation) {
             _documentSchemaValidationDisabler.emplace(
-                opCtx, DocumentValidationSettings::kDisableSchemaValidation);
+                opCtx, DocumentValidationSettings::kDisableSchemaValidationRequestedByUser);
         }
     }
 

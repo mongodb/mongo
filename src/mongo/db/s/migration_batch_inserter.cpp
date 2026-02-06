@@ -189,7 +189,7 @@ void MigrationBatchInserter::run(Status status) const try {
             // and any internal validation for opCtx for performInserts()
             DisableDocumentValidation documentValidationDisabler(
                 opCtx,
-                DocumentValidationSettings::kDisableSchemaValidation |
+                DocumentValidationSettings::kDisableSchemaValidationForInternalOp |
                     DocumentValidationSettings::kDisableInternalValidation);
             const auto reply = write_ops_exec::performInserts(
                 opCtx, insertOp, /*preConditions=*/boost::none, OperationSource::kFromMigrate);

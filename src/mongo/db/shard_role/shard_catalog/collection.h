@@ -367,15 +367,15 @@ public:
         MatchExpressionParser::AllowedFeatureSet allowedFeatures) const = 0;
 
     /**
-     * Sets the validator for this collection.
+     * Sets the validation options for this collection.
      *
-     * An empty validator removes all validation.
-     * Requires an exclusive lock on the collection.
+     * A boost::none parameter means that it should not be changed or that the default will be
+     * used.
      */
-    virtual void setValidator(OperationContext* opCtx, Validator validator) = 0;
-
-    virtual Status setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) = 0;
-    virtual Status setValidationAction(OperationContext* opCtx, ValidationActionEnum newAction) = 0;
+    virtual Status setValidationOptions(OperationContext* opCtx,
+                                        boost::optional<ValidationLevelEnum> newLevel,
+                                        boost::optional<ValidationActionEnum> newAction,
+                                        boost::optional<Validator> newValidator) = 0;
 
     virtual boost::optional<ValidationLevelEnum> getValidationLevel() const = 0;
     virtual boost::optional<ValidationActionEnum> getValidationAction() const = 0;
@@ -987,8 +987,29 @@ inline ValidationActionEnum validationActionOrDefault(
 }
 
 MONGO_MOD_PUBLIC
+inline ValidationActionEnum validationActionOrCurrent(
+    const CollectionOptions& opts, boost::optional<ValidationActionEnum> action) {
+    return action.value_or(validationActionOrDefault(opts.validationAction));
+}
+
+MONGO_MOD_PUBLIC
 inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
     return level.value_or(ValidationLevelEnum::strict);
+}
+
+MONGO_MOD_PUBLIC
+inline ValidationLevelEnum validationLevelOrCurrent(const CollectionOptions& opts,
+                                                    boost::optional<ValidationLevelEnum> level) {
+    return level.value_or(validationLevelOrDefault(opts.validationLevel));
+}
+
+/**
+ * Mandatory level means that the schema validator is strictly enforced on all inserts and updates.
+ * 'validated' and 'strict' both forbid inserting/updating non-conforming documents.
+ */
+MONGO_MOD_PUBLIC
+inline bool validationLevelIsMandatory(ValidationLevelEnum level) {
+    return level == ValidationLevelEnum::strict || level == ValidationLevelEnum::validated;
 }
 
 /**

@@ -191,13 +191,15 @@ public:
     /**
      * Sets the validator for this collection.
      *
-     * An empty validator removes all validation.
+     * A boost::empty parameter means that it should not be changed or that the default will be
+     * used.
      * Requires an exclusive lock on the collection.
      */
-    void setValidator(OperationContext* opCtx, Validator validator) final;
+    Status setValidationOptions(OperationContext* opCtx,
+                                boost::optional<ValidationLevelEnum> newLevel,
+                                boost::optional<ValidationActionEnum> newAction,
+                                boost::optional<Validator> newValidator) final;
 
-    Status setValidationLevel(OperationContext* opCtx, ValidationLevelEnum newLevel) final;
-    Status setValidationAction(OperationContext* opCtx, ValidationActionEnum newAction) final;
 
     boost::optional<ValidationLevelEnum> getValidationLevel() const final;
     boost::optional<ValidationActionEnum> getValidationAction() const final;

@@ -648,8 +648,8 @@ void updateDocument(OperationContext* opCtx,
     {
         auto status = collection->checkValidationAndParseResult(opCtx, newDoc);
         if (!status.isOK()) {
-            if (validationLevelOrDefault(collection->getCollectionOptions().validationLevel) ==
-                ValidationLevelEnum::strict) {
+            if (validationLevelIsMandatory(
+                    validationLevelOrDefault(collection->getCollectionOptions().validationLevel))) {
                 uassertStatusOK(status);
             }
             // moderate means we have to check the old doc

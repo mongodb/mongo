@@ -104,7 +104,7 @@ structs:
                 description:
                     "Determines how strictly to apply the validation rules to existing
                     documents during an update.
-                    Can be one of following values: 'off', 'strict' or 'moderate'."
+                    Can be one of following values: 'off', 'strict', 'moderate' or 'validated'."
                 type: ValidationLevel
                 optional: true
                 stability: stable

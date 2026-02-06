@@ -749,7 +749,7 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
                                      repl::OplogApplication::Mode mode) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
     // The transaction may have been prepared originally with document validation bypassed.
-    DisableDocumentValidation validationDisabler(opCtx);
+    DisableDocumentValidationForInternalOp validationDisabler(opCtx);
 
     // The operations here are reconstructed at their prepare time. However, that time
     // will be ignored because there is an outer write unit of work during their

@@ -1011,17 +1011,13 @@ Status _collModInternal(OperationContext* opCtx,
         processCollModIndexRequest(
             opCtx, writableColl, cmrNew.indexRequest, &indexCollModInfo, result, mode);
 
-        if (cmrNew.collValidator) {
-            writableColl->setValidator(opCtx, *cmrNew.collValidator);
-        }
-        if (cmrNew.collValidationAction)
+        if (cmrNew.collValidationLevel || cmrNew.collValidationAction || cmrNew.collValidator) {
             uassertStatusOKWithContext(
-                writableColl->setValidationAction(opCtx, *cmrNew.collValidationAction),
-                "Failed to set validationAction");
-        if (cmrNew.collValidationLevel) {
-            uassertStatusOKWithContext(
-                writableColl->setValidationLevel(opCtx, *cmrNew.collValidationLevel),
-                "Failed to set validationLevel");
+                writableColl->setValidationOptions(opCtx,
+                                                   cmrNew.collValidationLevel,
+                                                   cmrNew.collValidationAction,
+                                                   cmrNew.collValidator),
+                "Failed to set validation options");
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&

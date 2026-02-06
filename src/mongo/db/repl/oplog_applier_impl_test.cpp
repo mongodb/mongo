@@ -887,7 +887,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
     // Apply the oplog entry.
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&invalidateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -964,7 +964,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateNonModPreImages) {
     // Apply the oplog entry.
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_NOT_OK(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&updateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -1039,7 +1039,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
     // Apply the first oplog entry which should lead us to write an invalidate entry.
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&invalidateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -1071,7 +1071,7 @@ TEST_F(OplogApplierImplTest, ImageCollectionInvalidationInInitialSyncHandlesConf
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx.get());
-        DisableDocumentValidation validationDisabler(_opCtx.get());
+        DisableDocumentValidationForInternalOp validationDisabler(_opCtx.get());
         ASSERT_THROWS(applyOplogEntryOrGroupedInserts(_opCtx.get(),
                                                       ApplierOperation{&earlierInvalidateOp},
                                                       OplogApplication::Mode::kInitialSync,
@@ -3933,7 +3933,8 @@ TEST_F(OplogApplierImplTest,
         [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
             onInsertsCalled = true;
             ASSERT_FALSE(opCtx->writesAreReplicated());
-            ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
+            ASSERT_TRUE(
+                DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp());
         };
     createCollectionWithUuid(_opCtx.get(), nss);
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
