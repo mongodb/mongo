@@ -1,0 +1,9 @@
+description: Runs mongot e2e tests with the $vectorSearch extension loaded
+  and enabled via the featureFlagVectorSearchExtension IFR flag; this
+  suite also enables the featureFlagExtensionViewsAndUnionWith flag.
+
+base_suite: mongot_community_e2e_sharded_collections
+overrides:
+  - vector_search_extension.exclude_fully_enabled_incompatible_tests
+  - vector_search_extension.load_extension_sharded
+  - vector_search_extension.extension_fully_enabled_sharded

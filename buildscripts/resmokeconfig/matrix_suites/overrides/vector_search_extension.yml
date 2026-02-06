@@ -32,6 +32,30 @@
         - jstests/with_mongot/e2e/skip_limit.js
         - jstests/with_mongot/e2e/views/search_with_view_injected.js
 
+- name: exclude_fully_enabled_incompatible_tests
+  value:
+    selector:
+      exclude_files:
+        # Risks leaving FCV stuck at 8.0, breaking all subsequent FCV-gated tests.
+        # Extension is unsupported on FCV < 8.3.
+        - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
+
+        # Tests that fail due to unimplemented behavior in ~/mongot-extension.
+        - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
+        - jstests/with_mongot/e2e/skip_limit.js
+        - jstests/with_mongot/e2e/views/search_with_view_injected.js
+
+        # TODO SERVER-118709 Remove these exclusions.
+        - jstests/with_mongot/e2e/views/vector_search/undefined_or_underlying_index.js
+        - jstests/with_mongot/e2e/views/vector_search/addFields_base_case.js
+        - jstests/with_mongot/e2e/views/vector_search/match_base_case.js
+        - jstests/with_mongot/e2e/views/vector_search/unionWith.js
+        - jstests/with_mongot/e2e/views/vector_search/unionWith_nested.js
+        - jstests/with_mongot/e2e/views/vector_search/nested_view.js
+        - jstests/with_mongot/e2e/hybridSearch/score_fusion_on_search_view.js
+        - jstests/with_mongot/e2e/hybridSearch/ranked_fusion_on_search_view.js
+        - jstests/with_mongot/e2e/views/mongot_stage_in_view_definition.js
+
 - name: load_extension
   value:
     executor:
@@ -48,6 +72,16 @@
             featureFlagExtensionsAPI: true
             featureFlagVectorSearchExtension: true
             featureFlagExtensionViewsAndUnionWith: false
+
+- name: extension_fully_enabled
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagExtensionViewsAndUnionWith: true
 
 - name: extension_disabled
   value:
@@ -159,6 +193,27 @@
             featureFlagExtensionsAPI: true
             featureFlagVectorSearchExtension: true
             featureFlagExtensionViewsAndUnionWith: false
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+
+- name: extension_fully_enabled_sharded
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagExtensionViewsAndUnionWith: true
+            featureFlagEgressGrpcForSearch: true
+            skipAuthenticationToMongot: true
+            useGrpcForSearch: 1
+        mongos_options:
+          set_parameters:
+            featureFlagExtensionsAPI: true
+            featureFlagVectorSearchExtension: true
+            featureFlagExtensionViewsAndUnionWith: true
             featureFlagEgressGrpcForSearch: true
             skipAuthenticationToMongot: true
             useGrpcForSearch: 1
