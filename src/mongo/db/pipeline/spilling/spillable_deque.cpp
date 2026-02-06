@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-bool SpillableDeque::isIdInCache(int id) {
+bool SpillableDeque::isIdInCache(int id) const {
     tassert(5643005,
             str::stream() << "Requested expired document from SpillableDeque. Expected range was "
                           << _nextFreedIndex << "-" << _nextIndex - 1 << " but got " << id,
@@ -54,7 +54,7 @@ bool SpillableDeque::isIdInCache(int id) {
     return id < _nextIndex;
 }
 
-void SpillableDeque::verifyInCache(int id) {
+void SpillableDeque::verifyInCache(int id) const {
     tassert(5643004,
             str::stream() << "Requested document not in SpillableDeque. Expected range was "
                           << _nextFreedIndex << "-" << _nextIndex - 1 << " but got " << id,
@@ -74,7 +74,7 @@ void SpillableDeque::addDocument(Document input) {
             _memTracker.withinMemoryLimit());
     ++_nextIndex;
 }
-Document SpillableDeque::getDocumentById(int id) {
+Document SpillableDeque::getDocumentById(int id) const {
     verifyInCache(id);
     if (id < _diskWrittenIndex) {
         return readDocumentFromDiskById(id);
@@ -155,7 +155,7 @@ void SpillableDeque::updateStorageSizeStat() {
     _stats.updateSpilledDataStorageSize(_diskCache->storageSize());
 }
 
-Document SpillableDeque::readDocumentFromDiskById(int desired) {
+Document SpillableDeque::readDocumentFromDiskById(int desired) const {
     tassert(5643006,
             str::stream() << "Attempted to read id " << desired
                           << "from disk in SpillableDeque before writing",
@@ -163,7 +163,7 @@ Document SpillableDeque::readDocumentFromDiskById(int desired) {
     return _expCtx->getMongoProcessInterface()->readRecordFromSpillTable(
         _expCtx, *_diskCache, RecordId(desired + 1));
 }
-Document SpillableDeque::readDocumentFromMemCacheById(int desired) {
+Document SpillableDeque::readDocumentFromMemCacheById(int desired) const {
     // If we have only freed documents from disk, the index into '_memCache' is off by the number of
     // documents we've ever written to disk. If we have freed documents from the cache, the index
     // into '_memCache' is off by how many documents we've ever freed. In this case what we've

@@ -68,10 +68,10 @@ public:
      * Access a specific document. Calling 'getDocumentById' on a document not in the cache will
      * throw.
      */
-    bool isIdInCache(int id);
-    Document getDocumentById(int id);
+    bool isIdInCache(int id) const;
+    Document getDocumentById(int id) const;
 
-    Document peekFront() {
+    Document peekFront() const {
         return getDocumentById(getLowestIndex());
     }
 
@@ -149,9 +149,9 @@ public:
     }
 
 private:
-    Document readDocumentFromDiskById(int desired);
-    Document readDocumentFromMemCacheById(int desired);
-    void verifyInCache(int desired);
+    Document readDocumentFromDiskById(int desired) const;
+    Document readDocumentFromMemCacheById(int desired) const;
+    void verifyInCache(int desired) const;
 
     void updateStorageSizeStat();
 
