@@ -4,6 +4,7 @@ import * as FindWorkloads from "jstests/product_limits/libs/find.js";
 import * as GroupingWorkloads from "jstests/product_limits/libs/grouping.js";
 import * as LongPipelineWorkloads from "jstests/product_limits/libs/long_pipelines.js";
 import * as MatchWorkloads from "jstests/product_limits/libs/match.js";
+import * as NonLeadingMatchWorkloads from "jstests/product_limits/libs/non_leading_match.js";
 import * as OperatorWorkloads from "jstests/product_limits/libs/operators.js";
 import * as StageWorkloads from "jstests/product_limits/libs/stages.js";
 import * as TextSearchWorkloads from "jstests/product_limits/libs/text_search.js";
@@ -71,6 +72,15 @@ export class DatasetOneField extends Dataset {
             MatchWorkloads.WorkloadNin,
             MatchWorkloads.WorkloadOrOverSingleField,
             MatchWorkloads.WorkloadOrPlusAndOverSingleField,
+            NonLeadingMatchWorkloads.WorkloadAndOverSingleField,
+            NonLeadingMatchWorkloads.WorkloadAndPlusOrOverSingleField,
+            NonLeadingMatchWorkloads.WorkloadIn,
+            NonLeadingMatchWorkloads.WorkloadManyIns,
+            NonLeadingMatchWorkloads.WorkloadNin,
+            NonLeadingMatchWorkloads.WorkloadOrOverSingleField,
+            NonLeadingMatchWorkloads.WorkloadOrPlusAndOverSingleField,
+            NonLeadingMatchWorkloads.WorkloadBucketAutoManyBuckets,
+            NonLeadingMatchWorkloads.WorkloadTopK,
             StageWorkloads.WorkloadLongFieldName,
             StageWorkloads.WorkloadManyDocuments,
             StageWorkloads.WorkloadReplaceRoot,
@@ -91,7 +101,12 @@ export class DatasetOneField extends Dataset {
 }
 export class DatasetOneStringField extends Dataset {
     workloads() {
-        return [MatchWorkloads.WorkloadRegex, MatchWorkloads.WorkloadRegexInIn];
+        return [
+            MatchWorkloads.WorkloadRegex,
+            MatchWorkloads.WorkloadRegexInIn,
+            NonLeadingMatchWorkloads.WorkloadRegex,
+            NonLeadingMatchWorkloads.WorkloadRegexInIn,
+        ];
     }
 
     populate(db) {
@@ -217,6 +232,13 @@ export class DatasetManyFields extends Dataset {
             MatchWorkloads.WorkloadMatchOverManyFields,
             MatchWorkloads.WorkloadOrOverManyFields,
             MatchWorkloads.WorkloadOrPlusAndOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadAndOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadAndPlusOrOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadExists,
+            NonLeadingMatchWorkloads.WorkloadMatchOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadOrOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadOrPlusAndOverManyFields,
+            NonLeadingMatchWorkloads.WorkloadManyAccumulatorsManyFields,
             OperatorWorkloads.WorkloadConcat,
             OperatorWorkloads.WorkloadCond,
             OperatorWorkloads.WorkloadSwitch,
@@ -318,7 +340,7 @@ export class DatasetNestedJSON extends Dataset {
         return 100;
     }
     workloads() {
-        return [MatchWorkloads.WorkloadMatchLongPath];
+        return [MatchWorkloads.WorkloadMatchLongPath, NonLeadingMatchWorkloads.WorkloadMatchLongPath];
     }
     populate(db) {
         const collName = this.collection();
@@ -349,7 +371,7 @@ export class DatasetLongValue extends Dataset {
     }
 
     workloads() {
-        return [MatchWorkloads.WorkloadLongValue];
+        return [MatchWorkloads.WorkloadLongValue, NonLeadingMatchWorkloads.WorkloadLongValue];
     }
 
     populate(db) {
