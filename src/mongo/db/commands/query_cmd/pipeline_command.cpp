@@ -177,31 +177,10 @@ public:
               _aggregationRequest(std::move(aggregationRequest)),
               _ifrContext([&]() {
                   const auto& requestFlagValues = _aggregationRequest.getIfrFlags();
-                  auto ifrContext = requestFlagValues.has_value()
+                  return requestFlagValues.has_value()
                       ? std::make_shared<IncrementalFeatureRolloutContext>(
                             requestFlagValues.value())
                       : std::make_shared<IncrementalFeatureRolloutContext>();
-
-                  // If there is no value for the feature flag passed on the request, that either
-                  // means we have a direct user request (so we should check the node's flag value),
-                  // or it means we have a request from a router where the value of the flag is
-                  // false (so we should also commit to flag value false).
-                  // TODO SERVER-116472 Remove this when the router sends all IFRContext flags,
-                  // regardless of flag value.
-                  const auto& vectorSearchFlagName =
-                      feature_flags::gFeatureFlagVectorSearchExtension.getName();
-                  bool hasVectorSearchFlag = requestFlagValues.has_value() &&
-                      std::any_of(requestFlagValues->begin(),
-                                  requestFlagValues->end(),
-                                  [&](const BSONObj& obj) {
-                                      return obj["name"].valueStringData() == vectorSearchFlagName;
-                                  });
-                  const bool isComingFromRouter =
-                      aggregation_request_helper::getFromRouter(_aggregationRequest);
-                  if (!hasVectorSearchFlag && isComingFromRouter) {
-                      ifrContext->disableFlag(feature_flags::gFeatureFlagVectorSearchExtension);
-                  }
-                  return ifrContext;
               }()),
               _extensionMetrics(
                   static_cast<const PipelineCommand*>(cmd)->getExtensionMetricsAllocation()),

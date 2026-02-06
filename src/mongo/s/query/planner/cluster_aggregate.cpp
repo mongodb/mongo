@@ -183,21 +183,7 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
         }
     }
 
-    // If the featureFlagVectorSearchExtension IFR flag is enabled, all nodes are upgraded and can
-    // parse IFR flags.
-    // TODO SERVER-117721: Remove FCV gate once multiversion testing can handle IFR flags.
-    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
-        // TODO SERVER-116219: Expand IFR flag serialization beyond $vectorSearch.
-        auto ifrCtx = expCtx->getIfrContext();
-        tassert(11565104, "IFRContext cannot be null", ifrCtx);
-        // TODO SERVER-116472 Send all feature flags on the IFRContext regardless of feature flag
-        // value.
-        if (ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension)) {
-            req.setIfrFlags(
-                ifrCtx->serializeFlagValues({&feature_flags::gFeatureFlagVectorSearchExtension}));
-        }
-    }
+    aggregation_request_helper::addIfrFlagsToRequest(req, expCtx->getIfrContext());
 
     auto cmdObj =
         isRawDataOperation(expCtx->getOperationContext()) && req.getNamespace() != executionNs

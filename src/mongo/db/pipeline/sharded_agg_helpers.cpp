@@ -669,6 +669,7 @@ std::set<ShardId> getTargetedShardsForChangeStream(
 
     return getTargetedShardsForAllShardsRequest(expCtx->getOperationContext());
 }
+
 }  // namespace
 
 std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -1615,19 +1616,9 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
             }
 
             // Generate the command object for the targeted shards with the finalized pipeline.
-            auto rawStages = [&pipelineToTarget]() {
-                auto serialization = pipelineToTarget->serialize();
-                std::vector<BSONObj> stages;
-                stages.reserve(serialization.size());
-
-                for (const auto& stageObj : serialization) {
-                    invariant(stageObj.getType() == BSONType::object);
-                    stages.push_back(stageObj.getDocument().toBson());
-                }
-
-                return stages;
-            }();
-            AggregateCommandRequest aggRequest(expCtx->getNamespaceString(), rawStages);
+            AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
+                                               pipelineToTarget->serializeToBson());
+            aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
             LiteParsedPipeline liteParsedPipeline(aggRequest);
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
@@ -1943,21 +1934,9 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                         "Preparing pipeline for execution",
                         "pipeline"_attr = pipelineToTarget->serializeForLogging());
 
-            auto aggRequest = AggregateCommandRequest(expCtx->getNamespaceString(),
-                                                      pipelineToTarget->serializeToBson());
-
-            // Propagate IFR flags from the pipeline to the agg request. This is necessary
-            // because we are executing an entire pipeline here, so it will not be treated as a
-            // command coming from a router.
-            // We gate this behavior on cluster FCV in order to avoid sending a field from a new
-            // version shard to an old version shard that doesn't understand it.
-            if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
-                    multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
-                if (auto ifrCtx = pipelineToTarget->getContext()->getIfrContext()) {
-                    aggRequest.setIfrFlags(ifrCtx->serializeFlagValues(
-                        {&feature_flags::gFeatureFlagVectorSearchExtension}));
-                }
-            }
+            AggregateCommandRequest aggRequest(expCtx->getNamespaceString(),
+                                               pipelineToTarget->serializeToBson());
+            aggregation_request_helper::addIfrFlagsToRequest(aggRequest, expCtx->getIfrContext());
 
             return targetShardsAndAddMergeCursorsWithRoutingCtx(
                 expCtx,
