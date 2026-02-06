@@ -70,6 +70,18 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+# --------------------------------------
+# WASI / WebAssembly builds
+# --------------------------------------
+
+config_setting(
+    name = "wasi",
+    constraint_values = [
+        "@platforms//os:wasi",
+        "@platforms//cpu:wasm32",
+    ],
+)
+
 # Expose script for external usage through bazel.
 exports_files([
     "generate_config_header.py",
@@ -312,6 +324,7 @@ selects.config_setting_group(
     match_any = [
         "@platforms//os:macos",
         "@platforms//os:linux",
+        "@platforms//os:wasi",
     ],
 )
 
@@ -334,6 +347,27 @@ selects.config_setting_group(
 selects.config_setting_group(
     name = "ppc_or_s390x",
     match_any = [
+        "@platforms//cpu:ppc",
+        "@platforms//cpu:s390x",
+    ],
+)
+
+# --------------------------------------
+# WASM configuration
+# --------------------------------------
+
+config_setting(
+    name = "wasm32",
+    constraint_values = [
+        "@platforms//cpu:wasm32",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_wasm32",
+    match_any = [
+        "@platforms//cpu:aarch64",
+        "@platforms//cpu:x86_64",
         "@platforms//cpu:ppc",
         "@platforms//cpu:s390x",
     ],
@@ -1342,6 +1376,14 @@ selects.config_setting_group(
     match_all = [
         ":linkstatic_disabled",
         ":not_windows",
+    ],
+)
+
+selects.config_setting_group(
+    name = "linkstatic_disabled_not_wasm32",
+    match_all = [
+        ":linkstatic_disabled",
+        ":not_wasm32",
     ],
 )
 

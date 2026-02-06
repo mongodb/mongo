@@ -52,6 +52,7 @@ SYMBOL_ORDER_LINKFLAGS = select({
 # Hack to throw an error if the user isn't running bazel through bazelisk,
 # since we want to make sure the hook inside of tools/bazel gets run.
 RUNNING_THROUGH_BAZELISK_CHECK = select({
+    "//bazel/config:wasm32": [],
     "//bazel/config:running_through_bazelisk_x86_64_or_arm64": [],
     "@platforms//cpu:s390x": [],
     "@platforms//cpu:ppc": [],

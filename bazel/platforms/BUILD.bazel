@@ -149,6 +149,15 @@ platform(
     ],
 )
 
+# WASM platform for WebAssembly compilation
+platform(
+    name = "wasm32",
+    constraint_values = [
+        "@platforms//os:wasi",
+        "@platforms//cpu:wasm32",
+    ],
+)
+
 py_binary(
     name = "remote_execution_containers_generator",
     srcs = ["remote_execution_containers_generator.py"],

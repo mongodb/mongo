@@ -1,0 +1,49 @@
+load(":cc_toolchain_config_wasip2.bzl", "wasi_cc_toolchain_config_wasip2")
+
+package(default_visibility = ["//visibility:public"])
+
+# --- WASI Preview2 (wasm32-wasip2) toolchain/platform ---
+
+wasi_cc_toolchain_config_wasip2(name = "wasi_cc_toolchain_config_wasip2")
+
+cc_toolchain(
+    name = "wasi_cc_toolchain_wasip2_impl",
+    all_files = ":wasi_files",
+    ar_files = ":wasi_files",
+    as_files = ":wasi_files",
+    compiler_files = ":wasi_files",
+    dwp_files = ":empty",
+    linker_files = ":wasi_files",
+    objcopy_files = ":empty",
+    strip_files = ":empty",
+    supports_param_files = 1,
+    toolchain_config = ":wasi_cc_toolchain_config_wasip2",
+    toolchain_identifier = "wasi_sdk_cc_wasip2",
+)
+
+toolchain(
+    name = "wasi_cc_toolchain_wasip2",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+    ],
+    target_compatible_with = [
+        "@platforms//os:wasi",
+        "@platforms//cpu:wasm32",
+    ],
+    toolchain = ":wasi_cc_toolchain_wasip2_impl",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+# Empty group to satisfy cc_toolchain’s file sets we don’t use.
+filegroup(name = "empty")
+
+# Files the toolchain “has”; pointing at the repo we fetched.
+filegroup(
+    name = "wasi_files",
+    srcs = [
+        "@wasi_sdk//:bin",
+        "@wasi_sdk//:include",
+        "@wasi_sdk//:lib",
+        "@wasi_sdk//:share",
+    ],
+)

@@ -638,6 +638,7 @@ def _mongo_cc_binary_and_test(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
         "//bazel/config:macos_x86_64": macos_rpath_flags,
         "//bazel/config:windows_x86_64": [],
+        "//bazel/config:wasm32": [],
     })
 
     exec_properties |= select({

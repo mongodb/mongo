@@ -220,6 +220,7 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
         unsupported_features = ctx.disabled_features,
     )
 
+    # Collect transitive (already stripped) shared libraries
     # Loop through all dependencies to include their resulting (shared/debug decorator stripped) shared library files
     # as inputs.
     # TODO(SERVER-85819): Investigate to see if it's possible to merge the depset without looping over all transitive
@@ -230,6 +231,7 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
             for library in input.libraries:
                 dep_libraries.append(library)
 
+    # Merge user_link_flags with duplicate suppression
     # CcInfo's linkopts are ignored by cc_shared_library by default. To support both transitive and nontransitive
     # dynamic linkopts use:
     #   cc_library's linkopts field for both static and dynamic transitive link opts
@@ -555,6 +557,59 @@ def windows_extraction(ctx, cc_toolchain, inputs):
 
     return provided_info
 
+def wasi_extraction(ctx, cc_toolchain, inputs):
+    """
+    WASI (wasm32) extraction:
+    - Typically no dynamic linking; treat libraries as static (.a) only.
+    - Avoid objcopy/strip; just relabel/symlink outputs (acts like enabled=False path).
+    - Programs are often .wasm; we keep bytes identical and just rename to drop WITH_DEBUG_SUFFIX.
+    """
+    outputs = []
+    unstripped_static_bin = None
+
+    # Use ".so" for shared_ext (there usually isn't one) so get_inputs_and_outputs won't find a shared lib.
+    # Static libs are ".a"; if type == "program", output likely ends up as basename without suffix, which will be .wasm if input had it.
+    input_bin, output_bin, _debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
+    input_file = ctx.attr.binary_with_debug.files.to_list()
+
+    # For programs (e.g., .wasm), just symlink/rename; no separate debug file generation.
+    if input_bin:
+        ctx.actions.symlink(
+            output = output_bin,
+            target_file = input_bin,
+        )
+        outputs.append(output_bin)
+
+    # For static libraries, propagate the archive with new name.
+    if len(input_file):
+        if static_lib:
+            unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
+            outputs.append(unstripped_static_bin)
+
+            # Shared archives don't make sense for WASI; ignore if present.
+            # noop
+
+    provided_info = [
+        DefaultInfo(
+            files = depset(outputs),
+            executable = output_bin if ctx.attr.type == "program" else None,
+            runfiles = ctx.attr.binary_with_debug[DefaultInfo].data_runfiles if ctx.attr.type == "program" else ctx.runfiles(),
+        ),
+        create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
+    ]
+
+    if ctx.attr.type == "program":
+        provided_info += [
+            RunEnvironmentInfo(
+                environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].environment,
+                inherited_environment = ctx.attr.binary_with_debug[RunEnvironmentInfo].inherited_environment,
+            ),
+        ]
+
+    # No cc_shared_library path for WASI by default (no dynamic linking), so we skip appending CcSharedLibraryInfo.
+
+    return provided_info
+
 def extract_debuginfo_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
     inputs = depset(transitive = [
@@ -566,6 +621,7 @@ def extract_debuginfo_impl(ctx):
     linux_constraint = ctx.attr._linux_constraint[platform_common.ConstraintValueInfo]
     macos_constraint = ctx.attr._macos_constraint[platform_common.ConstraintValueInfo]
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
+    wasi_constraint = ctx.attr._wasi_constraint[platform_common.ConstraintValueInfo]
 
     dynamic_libraries = 0
     if "dynamic_library" in ctx.attr.binary_with_debug[OutputGroupInfo]:
@@ -583,6 +639,8 @@ def extract_debuginfo_impl(ctx):
         return_info = linux_extraction(ctx, cc_toolchain, inputs)
     elif ctx.target_platform_has_constraint(macos_constraint):
         return_info = macos_extraction(ctx, cc_toolchain, inputs)
+    elif ctx.target_platform_has_constraint(wasi_constraint):
+        return_info = wasi_extraction(ctx, cc_toolchain, inputs)
 
     tag_provider = TagInfo(tags = ctx.attr.tags)
     return_info.append(tag_provider)
@@ -615,6 +673,7 @@ extract_debuginfo = rule(
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+        "_wasi_constraint": attr.label(default = "@platforms//cpu:wasm32"),
     },
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
@@ -648,6 +707,7 @@ extract_debuginfo_binary = rule(
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+        "_wasi_constraint": attr.label(default = "@platforms//cpu:wasm32"),
     },
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
@@ -681,6 +741,7 @@ extract_debuginfo_test = rule(
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+        "_wasi_constraint": attr.label(default = "@platforms//cpu:wasm32"),
     },
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],

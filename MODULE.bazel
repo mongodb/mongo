@@ -350,3 +350,10 @@ crate.annotation_select(
 crate.from_specs()
 use_repo(crate, "crates")
 #################### END RUST DEPS ####################
+
+wasi_deps = use_repo_rule(
+    "//bazel/toolchains/cc/mongo_wasm/toolchain:wasi_repo.bzl",
+    "setup_wasi_deps",
+)
+
+wasi_deps(name = "wasi_sdk")

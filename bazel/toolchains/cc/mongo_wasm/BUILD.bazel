@@ -1,0 +1,64 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+selects.config_setting_group(
+    name = "not_amazon_linux_2",
+    match_any = [
+        "//bazel/platforms:ubuntu18",
+        "//bazel/platforms:ubuntu20",
+        "//bazel/platforms:ubuntu22",
+        "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:amazon_linux_2023",
+        "//bazel/platforms:debian10",
+        "//bazel/platforms:debian12",
+        "//bazel/platforms:rhel8",
+        "//bazel/platforms:rhel9",
+        "//bazel/platforms:suse12",
+        "//bazel/platforms:suse15",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_rhel8",
+    match_any = [
+        "//bazel/platforms:ubuntu18",
+        "//bazel/platforms:ubuntu20",
+        "//bazel/platforms:ubuntu22",
+        "//bazel/platforms:ubuntu24",
+        "//bazel/platforms:amazon_linux_2",
+        "//bazel/platforms:amazon_linux_2023",
+        "//bazel/platforms:debian10",
+        "//bazel/platforms:debian12",
+        "//bazel/platforms:rhel9",
+        "//bazel/platforms:suse12",
+        "//bazel/platforms:suse15",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_rhel8_or_amazon_linux_2",
+    match_all = [
+        ":not_rhel8",
+        ":not_amazon_linux_2",
+    ],
+)
+
+selects.config_setting_group(
+    name = "x86_or_aarch64",
+    match_any = [
+        "@platforms//cpu:x86_64",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+# WASI SDK requires a more modern version of glibc than these distros have (in our images).
+selects.config_setting_group(
+    name = "wasi_compatible",
+    match_all = [
+        ":not_rhel8_or_amazon_linux_2",
+        ":x86_or_aarch64",
+    ],
+)
