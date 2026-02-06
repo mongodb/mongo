@@ -297,13 +297,20 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         }
     }
 
+    // Selects a random mongo from the connection pool
+    this._getNextMongo = function () {
+        let normalizedRandValue = Math.random();
+        let randomIndex = Math.floor(normalizedRandValue * this._mongoConnections.length);
+        return this._mongoConnections[randomIndex];
+    };
+
     // The primary mongo is a pinned connection that the proxy falls back on when
     // the workload should not be distributed. This is useful for:
     // - Tests that require dispatching to be disabled
     // - Executing getters or setters on options
     // - Executing getters or setters on the cluster logicalTime
     // The primary mongo acts as the holder of shared state among the connection pool.
-    this.primaryMongo = this._mongoConnections[0];
+    this.primaryMongo = this._getNextMongo();
     this.isMultiRouter = true;
     this.hosts = mongoURI.servers.map((s) => s.server).join(",");
 
@@ -356,13 +363,6 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // ============================================================================
     // Command routing (core routing logic)
     // ============================================================================
-
-    // Selects a random mongo from the connection pool
-    this._getNextMongo = function () {
-        let normalizedRandValue = Math.random();
-        let randomIndex = Math.floor(normalizedRandValue * this._mongoConnections.length);
-        return this._mongoConnections[randomIndex];
-    };
 
     // Broadcast the command to all mongoses and returns error if any returns error.
     this.broadcast = function (dbName, cmd) {
