@@ -183,13 +183,15 @@ protected:
 
 
     ReshardingDonorOplogId getOplogId(const repl::MutableOplogEntry& oplog) {
-        return ReshardingDonorOplogId::parse(oplog.get_id()->getDocument().toBson(),
-                                             IDLParserContext("ReshardingAggTest::getOplogId"));
+        return ReshardingDonorOplogId::parse(
+            oplog.get_id()->getDocument().toBson(),
+            IDLParserContext("ReshardingDonorOplogPipelineTest::getOplogId"));
     }
 
     ReshardingDonorOplogId getOplogId(const repl::OplogEntry& oplog) {
-        return ReshardingDonorOplogId::parse(oplog.getEntry().get_id()->getDocument().toBson(),
-                                             IDLParserContext("ReshardingAggTest::getOplogId"));
+        return ReshardingDonorOplogId::parse(
+            oplog.getEntry().get_id()->getDocument().toBson(),
+            IDLParserContext("ReshardingDonorOplogPipelineTest::getOplogId"));
     }
 
     const NamespaceString _crudNss = NamespaceString::createNamespaceString_forTest("test.foo");
