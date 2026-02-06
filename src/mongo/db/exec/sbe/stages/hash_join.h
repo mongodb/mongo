@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/hybrid_hash_join.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
@@ -55,8 +56,9 @@ namespace mongo::sbe {
  * produced by the join, 'outerProjects' and 'innerProjects'.
  *
  * This is a binding reflector for the inner/build side; since the data is materialized in a hash
- * table, stages higher in the tree cannot see any slots lower in the tree on the inner side. This
- * is _not_ the case for the outer side, since it can stream data as it probes the hash table.
+ * table, stages higher in the tree cannot see any slots lower in the tree on the inner side. The
+ * same applies to the outer/probe side if the hash join spills. However, if the join does not
+ * spill, the outer side can stream data as it probes.
  *
  * The optional 'collatorSlot' can be provided to make the join predicate use a special definition
  * for string equality. For example, this can be used to perform a case-insensitive join on string
@@ -96,27 +98,32 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
+    void doSaveState() final;
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;
     }
 
 private:
-    using TableType = std::unordered_multimap<value::MaterializedRow,  // NOLINT
-                                              value::MaterializedRow,
-                                              value::MaterializedRowHasher,
-                                              value::MaterializedRowEq>;
+    using HashElementAccessor = value::SingleRowPointerAccessor<const value::MaterializedRow*>;
 
-    using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
-    using HashProjectAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
-
-    const value::SlotVector _outerCond;
+    const value::SlotVector _outerKey;
     const value::SlotVector _outerProjects;
-    const value::SlotVector _innerCond;
+    const value::SlotVector _innerKey;
     const value::SlotVector _innerProjects;
     const boost::optional<value::SlotId> _collatorSlot;
 
-    // Accessors of input condition values (keys) that are being used for probing he hash table.
+    // All defined values from the inner/outer sides.
+    value::SlotAccessorMap _outAccessorMap;
+
+    // Accessors of input condition values (keys) that are being used for probing the hash table.
     std::vector<value::SlotAccessor*> _inOuterKeyAccessors;
+    // Accessors of input outer projection values
+    std::vector<value::SlotAccessor*> _inOuterProjectAccessors;
+
+    // Accessors of output outer keys.
+    std::vector<std::unique_ptr<HashElementAccessor>> _outOuterKeyAccessors;
+    // Accessors of output outer projections.
+    std::vector<std::unique_ptr<HashElementAccessor>> _outOuterProjectAccessors;
 
     // Accessors of input condition values (keys) that are being inserted into the hash table.
     std::vector<value::SlotAccessor*> _inInnerKeyAccessors;
@@ -124,22 +131,53 @@ private:
     std::vector<value::SlotAccessor*> _inInnerProjectAccessors;
 
     // Accessors of output keys that are read from the hash table.
-    std::vector<std::unique_ptr<HashKeyAccessor>> _outInnerKeyAccessors;
+    std::vector<std::unique_ptr<HashElementAccessor>> _outInnerKeyAccessors;
     // Accessors of output projections that are read from the hash table.
-    std::vector<std::unique_ptr<HashProjectAccessor>> _outInnerProjectAccessors;
+    std::vector<std::unique_ptr<HashElementAccessor>> _outInnerProjectAccessors;
 
-    // All defined values from the inner side (i.e. they come from the hash table).
-    value::SlotAccessorMap _outInnerAccessors;
+    // Output rows of keys and projects containing the join result produced by _joinImpl
+    const value::MaterializedRow* _outOuterKeyRow = nullptr;
+    const value::MaterializedRow* _outOuterProjectRow = nullptr;
+    const value::MaterializedRow* _outInnerKeyRow = nullptr;
+    const value::MaterializedRow* _outInnerProjectRow = nullptr;
 
     // Accessor for collator. Only set if collatorSlot provided during construction.
     value::SlotAccessor* _collatorAccessor = nullptr;
 
-    // Key used to probe inside the hash table.
-    value::MaterializedRow _probeKey;
+    HashJoinStats _stats;
 
-    boost::optional<TableType> _ht;
-    TableType::iterator _htIt;
-    TableType::iterator _htItEnd;
+    boost::optional<HybridHashJoin> _joinImpl;
+
+    /**
+     * Cursor Lifecycle in HashJoinStage::getNext():
+     *
+     * 1. PROBING PHASE (_joinPhase == kProbing):
+     *    - For each probe row from inner child, create a cursor via probe()
+     *    - Cursor iterates over all matches in hash table
+     *    - When cursor exhausted, get next probe row
+     *    - When probe child exhausted, move to SPILL_PROCESSING
+     *
+     * 2. SPILL PROCESSING PHASE (_joinPhase == kSpillProcessing):
+     *    - Process spilled partition pairs one at a time
+     *    - Each nextSpilledJoinCursor() loads a partition and returns cursor
+     *    - Cursor iterates over all matches in that partition
+     *    - When cursor exhausted, get next spilled partition
+     *    - When no more spilled partitions, move to COMPLETE
+     *
+     * 3. COMPLETE PHASE (_joinPhase == kComplete):
+     *    - Return IS_EOF
+     *
+     * Note: _cursor is reassigned when transitioning between cursors,
+     * and reset when explicitly transitioning between phases.
+     */
+    enum class JoinPhase {
+        kProbing,          // Processing probe side
+        kSpillProcessing,  // Processing spilled partitions
+        kComplete          // All done
+    };
+
+    JoinPhase _joinPhase{JoinPhase::kProbing};
+    JoinCursor _cursor = JoinCursor::empty();
 
     PlanStage* outerChild() const {
         return _children[0].get();

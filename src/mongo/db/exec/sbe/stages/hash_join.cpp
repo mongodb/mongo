@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -42,22 +43,21 @@ namespace mongo {
 namespace sbe {
 HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<PlanStage> inner,
-                             value::SlotVector outerCond,
+                             value::SlotVector outerKey,
                              value::SlotVector outerProjects,
-                             value::SlotVector innerCond,
+                             value::SlotVector innerKey,
                              value::SlotVector innerProjects,
                              boost::optional<value::SlotId> collatorSlot,
                              PlanYieldPolicy* yieldPolicy,
                              PlanNodeId planNodeId,
                              bool participateInTrialRunTracking)
     : PlanStage("hj"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
-      _outerCond(std::move(outerCond)),
+      _outerKey(std::move(outerKey)),
       _outerProjects(std::move(outerProjects)),
-      _innerCond(std::move(innerCond)),
+      _innerKey(std::move(innerKey)),
       _innerProjects(std::move(innerProjects)),
-      _collatorSlot(collatorSlot),
-      _probeKey(0) {
-    if (_outerCond.size() != _innerCond.size()) {
+      _collatorSlot(collatorSlot) {
+    if (_outerKey.size() != _innerKey.size()) {
         uasserted(4822823, "left and right size do not match");
     }
 
@@ -68,9 +68,9 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
 std::unique_ptr<PlanStage> HashJoinStage::clone() const {
     return std::make_unique<HashJoinStage>(outerChild()->clone(),
                                            innerChild()->clone(),
-                                           _outerCond,
+                                           _outerKey,
                                            _outerProjects,
-                                           _innerCond,
+                                           _innerKey,
                                            _innerProjects,
                                            _collatorSlot,
                                            _yieldPolicy,
@@ -82,69 +82,70 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
     outerChild()->prepare(ctx);
     innerChild()->prepare(ctx);
 
+    CollatorInterface* collator = nullptr;
     if (_collatorSlot) {
-        _collatorAccessor = getAccessor(ctx, *_collatorSlot);
+        _collatorAccessor = ctx.getAccessor(*_collatorSlot);
         tassert(5402502,
                 "collator accessor should exist if collator slot provided to HashJoinStage",
                 _collatorAccessor != nullptr);
+        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
+        uassert(5402504, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
+        collator = value::getCollatorView(collatorVal);
     }
 
-    size_t counter = 0;
     value::SlotSet dupCheck;
-    for (auto& slot : _outerCond) {
-        auto [it, inserted] = dupCheck.emplace(slot);
-        uassert(4822824, str::stream() << "duplicate field: " << slot, inserted);
+    auto setupAccessors = [&](const value::SlotVector& slots,
+                              std::vector<value::SlotAccessor*>& inAccessors,
+                              std::vector<std::unique_ptr<HashElementAccessor>>& outAccessors,
+                              const value::MaterializedRow*& outRow,
+                              PlanStage* child) {
+        size_t counter = 0;
+        for (auto slot : slots) {
+            auto [it, inserted] = dupCheck.emplace(slot);
+            uassert(4822824, str::stream() << "duplicate field: " << slot, inserted);
 
-        _inOuterKeyAccessors.emplace_back(outerChild()->getAccessor(ctx, slot));
-    }
+            inAccessors.emplace_back(child->getAccessor(ctx, slot));
+            outAccessors.emplace_back(std::make_unique<HashElementAccessor>(outRow, counter++));
+            _outAccessorMap[slot] = outAccessors.back().get();
+        }
+    };
 
-    counter = 0;
-    for (auto& slot : _innerCond) {
-        auto [it, inserted] = dupCheck.emplace(slot);
-        uassert(4822825, str::stream() << "duplicate field: " << slot, inserted);
+    setupAccessors(
+        _outerKey, _inOuterKeyAccessors, _outOuterKeyAccessors, _outOuterKeyRow, outerChild());
+    setupAccessors(
+        _innerKey, _inInnerKeyAccessors, _outInnerKeyAccessors, _outInnerKeyRow, innerChild());
+    setupAccessors(_outerProjects,
+                   _inOuterProjectAccessors,
+                   _outOuterProjectAccessors,
+                   _outOuterProjectRow,
+                   outerChild());
+    setupAccessors(_innerProjects,
+                   _inInnerProjectAccessors,
+                   _outInnerProjectAccessors,
+                   _outInnerProjectRow,
+                   innerChild());
 
-        _inInnerKeyAccessors.emplace_back(innerChild()->getAccessor(ctx, slot));
-        _outInnerKeyAccessors.emplace_back(std::make_unique<HashKeyAccessor>(_htIt, counter++));
-        _outInnerAccessors[slot] = _outInnerKeyAccessors.back().get();
-    }
-
-    counter = 0;
-    for (auto& slot : _innerProjects) {
-        auto [it, inserted] = dupCheck.emplace(slot);
-        uassert(4822826, str::stream() << "duplicate field: " << slot, inserted);
-
-        _inInnerProjectAccessors.emplace_back(innerChild()->getAccessor(ctx, slot));
-        _outInnerProjectAccessors.emplace_back(
-            std::make_unique<HashProjectAccessor>(_htIt, counter++));
-        _outInnerAccessors[slot] = _outInnerProjectAccessors.back().get();
-    }
-
-    _probeKey.resize(_inOuterKeyAccessors.size());
+    _joinImpl.emplace(
+        loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill),
+        collator,
+        _stats);
 }
 
 value::SlotAccessor* HashJoinStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (auto it = _outInnerAccessors.find(slot); it != _outInnerAccessors.end()) {
+    if (auto it = _outAccessorMap.find(slot); it != _outAccessorMap.end()) {
         return it->second;
     }
-    return outerChild()->getAccessor(ctx, slot);
+    return ctx.getAccessor(slot);
 }
 
 void HashJoinStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_collatorAccessor) {
-        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
-        uassert(5402504, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
-        auto collatorView = value::getCollatorView(collatorVal);
-        const value::MaterializedRowHasher hasher(collatorView);
-        const value::MaterializedRowEq equator(collatorView);
-        _ht.emplace(0, hasher, equator);
-    } else {
-        _ht.emplace();
-    }
-
     _commonStats.opens++;
     innerChild()->open(reOpen);
+
+    _joinImpl->reset();
+
     // Insert the inner side into the hash table.
     while (innerChild()->getNext() == PlanState::ADVANCED) {
         value::MaterializedRow key{_inInnerKeyAccessors.size()};
@@ -162,67 +163,120 @@ void HashJoinStage::open(bool reOpen) {
             project.reset(idx++, p->getCopyOfValue());
         }
 
-        _ht->emplace(std::move(key), std::move(project));
+        _joinImpl->addBuild(std::move(key), std::move(project));
     }
+    _joinImpl->finishBuild();
 
     innerChild()->close();
     outerChild()->open(reOpen);
 
-    _htIt = _ht->end();
-    _htItEnd = _ht->end();
+    _joinPhase = JoinPhase::kProbing;  // Set initial phase
+    _cursor.reset();
 }
 
 PlanState HashJoinStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
     checkForInterruptAndYield(_opCtx);
 
-    if (_htIt != _htItEnd) {
-        ++_htIt;
-    }
+    while (true) {
+        if (auto matchResult = _cursor.next(); matchResult) {
+            _outInnerKeyRow = matchResult->buildKeyRow;
+            _outInnerProjectRow = matchResult->buildProjectRow;
+            _outOuterKeyRow = matchResult->probeKeyRow;
+            _outOuterProjectRow = matchResult->probeProjectRow;
 
-    if (_htIt == _htItEnd) {
-        while (_htIt == _htItEnd) {
-            auto state = outerChild()->getNext();
-            if (state == PlanState::IS_EOF) {
-                // LEFT and OUTER joins should enumerate "non-returned" rows here.
-                return trackPlanState(state);
-            }
+            return trackPlanState(PlanState::ADVANCED);
+        }
 
-            // Copy keys in order to do the lookup.
-            size_t idx = 0;
-            for (auto& p : _inOuterKeyAccessors) {
-                auto [tag, val] = p->getViewOfValue();
-                _probeKey.reset(idx++, false, tag, val);
-            }
+        switch (_joinPhase) {
+            case JoinPhase::kProbing:
+                if (auto state = outerChild()->getNext(); state == PlanState::ADVANCED) {
+                    value::MaterializedRow probeKey{_inOuterKeyAccessors.size()};
+                    value::MaterializedRow probeProject{_inOuterProjectAccessors.size()};
 
-            auto [low, hi] = _ht->equal_range(_probeKey);
-            _htIt = low;
-            _htItEnd = hi;
-            // If _htIt == _htItEnd (i.e. no match) then RIGHT and OUTER joins
-            // should enumerate "non-returned" rows here.
+                    size_t idx = 0;
+                    for (auto& p : _inOuterKeyAccessors) {
+                        auto [tag, val] = p->getViewOfValue();
+                        probeKey.reset(idx++, false, tag, val);
+                    }
+
+                    idx = 0;
+                    for (auto& p : _inOuterProjectAccessors) {
+                        auto [tag, val] = p->getViewOfValue();
+                        probeProject.reset(idx++, false, tag, val);
+                    }
+
+                    _cursor = _joinImpl->probe(std::move(probeKey), std::move(probeProject));
+                    continue;
+                }
+
+                // Probe side exhausted, transition to spill processing
+                _joinImpl->finishProbe();
+                _joinPhase = JoinPhase::kSpillProcessing;
+                _cursor.reset();
+                [[fallthrough]];
+            case JoinPhase::kSpillProcessing:
+                if (auto joinCursorOpt = _joinImpl->nextSpilledJoinCursor()) {
+                    _cursor = std::move(*joinCursorOpt);
+                    continue;
+                }
+                // No more spilled partitions
+                _cursor.reset();
+                _joinPhase = JoinPhase::kComplete;
+                return trackPlanState(PlanState::IS_EOF);
+            case JoinPhase::kComplete:
+                return trackPlanState(PlanState::IS_EOF);
+            default:
+                MONGO_UNREACHABLE;
         }
     }
-
-    return trackPlanState(PlanState::ADVANCED);
 }
 
 void HashJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
+    _cursor.reset();
+    _joinPhase = JoinPhase::kComplete;
+    if (_joinImpl) {
+        _joinImpl->reset();
+    }
+
     trackClose();
     outerChild()->close();
-    _ht = boost::none;
 }
 
 std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->children.emplace_back(outerChild()->getStats(includeDebugInfo));
     ret->children.emplace_back(innerChild()->getStats(includeDebugInfo));
+
+    const HashJoinStats* specificStats = static_cast<const HashJoinStats*>(getSpecificStats());
+    ret->specific = std::make_unique<HashJoinStats>(*specificStats);
+    if (includeDebugInfo) {
+        BSONObjBuilder bob(StorageAccessStatsVisitor::collectStats(*this, *ret).toBSON());
+        // Spilling stats.
+        auto& spillingStats = specificStats->spillingStats;
+        bob.appendBool("usedDisk", specificStats->usedDisk)
+            .appendNumber("numPartitionsSpilled", specificStats->numPartitionsSpilled)
+            .appendNumber("numPartitionSwaps", specificStats->numPartitionSwaps)
+            .appendNumber("recursionDepthMax", specificStats->recursionDepthMax)
+            .appendNumber("spills", static_cast<long long>(spillingStats.getSpills()))
+            .appendNumber("spilledRecords",
+                          static_cast<long long>(spillingStats.getSpilledRecords()))
+            .appendNumber("spilledBytes", static_cast<long long>(spillingStats.getSpilledBytes()))
+            .appendNumber("spilledDataStorageSize",
+                          static_cast<long long>(spillingStats.getSpilledDataStorageSize()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(specificStats->peakTrackedMemBytes));
+        }
+        ret->debugInfo = bob.obj();
+    }
     return ret;
 }
 
 const SpecificStats* HashJoinStage::getSpecificStats() const {
-    return nullptr;
+    return &_stats;
 }
 
 void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
@@ -236,12 +290,12 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     DebugPrinter::addKeyword(ret, "left");
 
     ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _outerCond.size(); ++idx) {
+    for (size_t idx = 0; idx < _outerKey.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
-        DebugPrinter::addIdentifier(ret, _outerCond[idx]);
+        DebugPrinter::addIdentifier(ret, _outerKey[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
@@ -261,12 +315,12 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     DebugPrinter::addKeyword(ret, "right");
     ret.emplace_back(DebugPrinter::Block("[`"));
-    for (size_t idx = 0; idx < _innerCond.size(); ++idx) {
+    for (size_t idx = 0; idx < _innerKey.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
 
-        DebugPrinter::addIdentifier(ret, _innerCond[idx]);
+        DebugPrinter::addIdentifier(ret, _innerKey[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
@@ -290,11 +344,15 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 size_t HashJoinStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
-    size += size_estimator::estimate(_outerCond);
+    size += size_estimator::estimate(_outerKey);
     size += size_estimator::estimate(_outerProjects);
-    size += size_estimator::estimate(_innerCond);
+    size += size_estimator::estimate(_innerKey);
     size += size_estimator::estimate(_innerProjects);
     return size;
+}
+
+void HashJoinStage::doSaveState() {
+    _cursor.saveState();
 }
 }  // namespace sbe
 }  // namespace mongo

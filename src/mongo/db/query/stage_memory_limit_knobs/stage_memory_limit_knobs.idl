@@ -254,3 +254,16 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+
+    internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill:
+        description: >-
+            The max size in bytes that the hash table in a HashJoin stage can be estimated to
+            be before we spill to disk.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill"
+        cpp_vartype: AtomicWord<long long>
+        default:
+            expr: 100 * 1024 * 1024
+        validator:
+            gt: 0
+        redact: false

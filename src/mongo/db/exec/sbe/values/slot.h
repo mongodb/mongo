@@ -459,6 +459,38 @@ private:
 typedef SingleRowAccessor<MaterializedRow> MaterializedSingleRowAccessor;
 typedef SingleRowAccessor<FixedSizeRow<1 /*N*/>> FixedSizeSingleRowAccessor;
 
+
+/**
+ * Provides a view of a slot inside a single MaterializedRow pointed to by pointer T
+ */
+template <typename T>
+requires std::is_pointer_v<T>
+class SingleRowPointerAccessor : public SlotAccessor {
+public:
+    /**
+     * Constructs an accessor that gives a view of the value at the given 'slot' of a
+     * given single row pointed to by T.
+     */
+    SingleRowPointerAccessor(T& ptr, size_t slot) : _ptr(ptr), _slot(slot) {}
+
+    TagValueView getViewOfValue() const override {
+        return _ptr->getViewOfValue(_slot);
+    }
+    TagValueOwned copyOrMoveValue() override {
+        using PointedType = std::remove_pointer_t<T>;
+        if constexpr (std::is_const_v<PointedType>) {
+            auto [tag, val] = getViewOfValue();
+            return copyValue(tag, val);
+        } else {
+            return _ptr->copyOrMoveValue();
+        }
+    }
+
+private:
+    T& _ptr;
+    const size_t _slot;
+};
+
 /**
  * Read the components of the 'keyString' value and populate 'accessors' with those components. Some
  * components are appended into the 'valueBufferBuilder' object's internal buffer, and the accessors

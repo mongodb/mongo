@@ -52,6 +52,7 @@ enum class StageMemoryLimit {
     MergeSortStageMaxMemoryBytes,
     IndexScanStageMaxMemoryBytes,
     SBEUniqueStageMaxMemoryBytes,
+    QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill,
 };
 
 /**

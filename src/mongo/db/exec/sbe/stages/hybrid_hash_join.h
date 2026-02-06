@@ -61,7 +61,7 @@ using FileValue = value::MaterializedRow;
 using SpillIterator = sorter::Iterator<FileKey, FileValue>;
 
 // Represents a single match between a build row and probe row.
-// Pointers are valid only until the next MatchCursor::next() call.
+// Pointers are valid only until the next JoinCursor::next() call.
 struct MatchResult {
     const value::MaterializedRow* buildKeyRow;
     const value::MaterializedRow* buildProjectRow;
@@ -75,19 +75,21 @@ struct MatchResult {
     }
 };
 
-class MatchCursor {
+class JoinCursor {
 public:
     class Impl;
-    explicit MatchCursor(std::unique_ptr<Impl> impl);
+    explicit JoinCursor(std::unique_ptr<Impl> impl);
 
-    ~MatchCursor();
+    ~JoinCursor();
 
-    MatchCursor(MatchCursor&&) noexcept;
-    MatchCursor& operator=(MatchCursor&&) noexcept;
+    JoinCursor(JoinCursor&&) noexcept;
+    JoinCursor& operator=(JoinCursor&&) noexcept;
 
-    static MatchCursor empty();
+    static JoinCursor empty();
 
     [[nodiscard]] boost::optional<MatchResult> next();
+
+    void saveState();
 
     void reset();
 
@@ -108,11 +110,11 @@ private:
  *
  * 2. PROBE PHASE: After finishBuild(), probe rows are processed via probe(). For each
  *    probe row, if its partition is in memory, matches are returned immediately via a
- *    MatchCursor. If its partition was spilled, the probe row is written to a corresponding
+ *    JoinCursor. If its partition was spilled, the probe row is written to a corresponding
  *    probe spill file for later processing.
  *
  * 3. SPILL PROCESSING PHASE: After finishProbe(), spilled partition pairs are processed
- *    one at a time via nextSpilledMatchCursor(). Each spilled build partition is loaded
+ *    one at a time via nextSpilledJoinCursor(). Each spilled build partition is loaded
  *    into memory, and matches are produced by scanning the corresponding probe spill file.
  *    If a spilled partition is still too large to fit in memory, recursive partitioning is
  *    applied (up to kMaxRecursionDepth levels).
@@ -126,7 +128,7 @@ private:
  *       auto cursor = hhj.probe(key, project);
  *       // drain cursor
  *   hhj.finishProbe();
- *   while (auto cursor = hhj.nextSpilledMatchCursor()) {
+ *   while (auto cursor = hhj.nextSpilledJoinCursor()) {
  *       // drain cursor
  *   }
  */
@@ -152,12 +154,12 @@ public:
 
     // Probe phase
     // Returns a cursor over matches for this probe row (may be empty; may spill the probe row)
-    [[nodiscard]] MatchCursor probe(value::MaterializedRow key, value::MaterializedRow project);
+    [[nodiscard]] JoinCursor probe(value::MaterializedRow key, value::MaterializedRow project);
     void finishProbe();
 
     // Spill processing phase
     // Processes spilled partition pairs one-by-one; caller pulls match streams
-    [[nodiscard]] boost::optional<MatchCursor> nextSpilledMatchCursor();
+    [[nodiscard]] boost::optional<JoinCursor> nextSpilledJoinCursor();
 
     // Utilities
     int64_t getMemUsage() const {
@@ -235,11 +237,11 @@ private:
     size_t findNextSpilledPartitionIdx();
 
     // File stats for tracking spill file operations
-    std::unique_ptr<SorterFileStats> _fileStats;
+    std::shared_ptr<SorterFileStats> _fileStats;
 
     // Partition metadata. Uses Struct-of-Array pattern for better cache efficiency
     std::vector<BuildBuffer> _partitionBuffers;
-    std::vector<int64_t> _partitionMemUsage;
+    std::vector<int32_t> _partitionMemUsage;
     std::vector<bool> _isSpilled;
     std::vector<std::unique_ptr<SpilledPartition>> _partitionSpills;
 

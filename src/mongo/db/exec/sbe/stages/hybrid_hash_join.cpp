@@ -48,53 +48,56 @@ constexpr int kMaxRecursionDepth = 2;
 constexpr uint32_t kPartitionMask = (kNumPartitions - 1);
 constexpr int kNumBitsInPartitionMask = std::countr_one(kPartitionMask);
 
-// ==================== MatchCursor ====================
+// ==================== JoinCursor ====================
 
-class MatchCursor::Impl {
+class JoinCursor::Impl {
 public:
     virtual ~Impl() = default;
     virtual boost::optional<MatchResult> next() = 0;
+    virtual void saveState() {}
 };
 
-MatchCursor::~MatchCursor() = default;
-MatchCursor::MatchCursor(MatchCursor&&) noexcept = default;
-MatchCursor& MatchCursor::operator=(MatchCursor&&) noexcept = default;
+JoinCursor::~JoinCursor() = default;
+JoinCursor::JoinCursor(JoinCursor&&) noexcept = default;
+JoinCursor& JoinCursor::operator=(JoinCursor&&) noexcept = default;
 
-MatchCursor::MatchCursor(std::unique_ptr<Impl> impl) : _impl(std::move(impl)) {}
+JoinCursor::JoinCursor(std::unique_ptr<Impl> impl) : _impl(std::move(impl)) {}
 
-boost::optional<MatchResult> MatchCursor::next() {
+boost::optional<MatchResult> JoinCursor::next() {
     return _impl ? _impl->next() : boost::none;
 }
 
-void MatchCursor::reset() {
+void JoinCursor::saveState() {
+    if (_impl) {
+        _impl->saveState();
+    }
+}
+
+void JoinCursor::reset() {
     _impl = nullptr;
 }
 
-MatchCursor MatchCursor::empty() {
-    return MatchCursor{nullptr};
+JoinCursor JoinCursor::empty() {
+    return JoinCursor{nullptr};
 }
 
 // Iterates over matches from the in-memory hash table for a single probe key.
-class InMemoryMatchCursor final : public MatchCursor::Impl {
+class InMemoryJoinCursor final : public JoinCursor::Impl {
 public:
-    InMemoryMatchCursor(HHJTableType& ht,
-                        value::MaterializedRow probeKey,
-                        value::MaterializedRow probeProject) {
-        // Probe the hash table for matches and return a cursor to stream them.
-        std::tie(_htIt, _htItEnd) = ht.equal_range(probeKey);
-
-        if (_htIt != _htItEnd) {
-            // Take ownership of the rows since they need to outlive this function
-            // (the cursor will return pointers to them on subsequent next() calls).
-            probeKey.makeOwned();
-            probeProject.makeOwned();
-
-            _probeKey = std::move(probeKey);
-            _probeProject = std::move(probeProject);
-        }
+    InMemoryJoinCursor(HHJTableType& ht,
+                       value::MaterializedRow probeKey,
+                       value::MaterializedRow probeProject)
+        : _probeKey(std::move(probeKey)), _probeProject(std::move(probeProject)) {
+        // Probe the hash table for matches into the cursor to stream them.
+        std::tie(_htIt, _htItEnd) = ht.equal_range(_probeKey);
     }
 
     boost::optional<MatchResult> next() override;
+
+    void saveState() override {
+        _probeKey.makeOwned();
+        _probeProject.makeOwned();
+    }
 
 private:
     HHJTableType::iterator _htIt{};
@@ -103,7 +106,7 @@ private:
     value::MaterializedRow _probeProject{};
 };
 
-boost::optional<MatchResult> InMemoryMatchCursor::next() {
+boost::optional<MatchResult> InMemoryJoinCursor::next() {
     if (_htIt == _htItEnd) {
         return boost::none;
     }
@@ -121,12 +124,12 @@ boost::optional<MatchResult> InMemoryMatchCursor::next() {
 
 // Iterates over matches for a spilled partition by scanning the probe spill file
 // and looking up each probe key in the rebuilt hash table.
-class SpilledPartitionMatchCursor final : public MatchCursor::Impl {
+class SpilledPartitionJoinCursor final : public JoinCursor::Impl {
 public:
-    SpilledPartitionMatchCursor(HHJTableType& ht,
-                                std::unique_ptr<SpillIterator> buildIterator,
-                                std::unique_ptr<SpillIterator> probeIterator,
-                                bool swapped)
+    SpilledPartitionJoinCursor(HHJTableType& ht,
+                               std::unique_ptr<SpillIterator> buildIterator,
+                               std::unique_ptr<SpillIterator> probeIterator,
+                               bool swapped)
         : _ht(ht), _probeIterator(std::move(probeIterator)), _swapped(swapped) {
         // Load the build side into the hash table.
         while (buildIterator->more()) {
@@ -147,7 +150,7 @@ private:
     value::MaterializedRow _probeProject{};
 };
 
-boost::optional<MatchResult> SpilledPartitionMatchCursor::next() {
+boost::optional<MatchResult> SpilledPartitionJoinCursor::next() {
     while (true) {
         if (_htIt != _htItEnd) {
             // Continue yielding matches for the current probe row.
@@ -176,18 +179,17 @@ boost::optional<MatchResult> SpilledPartitionMatchCursor::next() {
 
         std::tie(_htIt, _htItEnd) = _ht.equal_range(_probeKey);
     }
-    return boost::none;
 }
 
 // Handles recursive partitioning when a spilled partition exceeds memory limit.
 // Creates a nested HybridHashJoin to process the oversized partition.
-class RecursiveJoinMatchCursor final : public MatchCursor::Impl {
+class RecursiveJoinJoinCursor final : public JoinCursor::Impl {
 public:
-    RecursiveJoinMatchCursor(std::unique_ptr<HybridHashJoin> join,
-                             std::unique_ptr<SpillIterator> buildIterator,
-                             std::unique_ptr<SpillIterator> probeIterator,
-                             bool swapped,
-                             HashJoinStats& stats)
+    RecursiveJoinJoinCursor(std::unique_ptr<HybridHashJoin> join,
+                            std::unique_ptr<SpillIterator> buildIterator,
+                            std::unique_ptr<SpillIterator> probeIterator,
+                            bool swapped,
+                            HashJoinStats& stats)
         : _join(std::move(join)),
           _probeIterator(std::move(probeIterator)),
           _swapped(swapped),
@@ -211,7 +213,7 @@ private:
     std::unique_ptr<SpillIterator> _probeIterator;
     bool _swapped;
     HashJoinStats& _stats;
-    MatchCursor _cursor{nullptr};
+    JoinCursor _cursor{nullptr};
     JoinPhase _joinPhase{JoinPhase::kProbing};
 };
 
@@ -221,7 +223,7 @@ private:
  * - kSpillProcessing: Processing any spilled partitions from the nested join.
  * - kComplete: All matches have been yielded.
  */
-boost::optional<MatchResult> RecursiveJoinMatchCursor::next() {
+boost::optional<MatchResult> RecursiveJoinJoinCursor::next() {
     while (true) {
         if (auto matchResult = _cursor.next()) {
             if (_swapped) {
@@ -241,7 +243,7 @@ boost::optional<MatchResult> RecursiveJoinMatchCursor::next() {
                 _cursor.reset();
                 [[fallthrough]];
             case JoinPhase::kSpillProcessing:
-                if (auto cursorOpt = _join->nextSpilledMatchCursor()) {
+                if (auto cursorOpt = _join->nextSpilledJoinCursor()) {
                     _cursor = std::move(*cursorOpt);
                     continue;
                 }
@@ -363,9 +365,8 @@ void HybridHashJoin::buildHashTableFromInMemPartitions() {
  * Returns the partition index, or kNumPartitions if no partitions remain in memory.
  */
 int HybridHashJoin::selectVictimPartition() const {
-    // Should be sufficient to do a linear search.
     int bestIdx = kNumPartitions;
-    int64_t maxSize = 0;
+    int32_t maxSize = 0;
     for (size_t pIdx = 0; pIdx < kNumPartitions; ++pIdx) {
         if (!_isSpilled[pIdx]) {
             auto partitionSize = _partitionMemUsage[pIdx];
@@ -410,7 +411,7 @@ void HybridHashJoin::spillPartition(int pIdx) {
 
 std::unique_ptr<HybridHashJoin::SpilledPartition> HybridHashJoin::createSpilledPartition() {
     if (!_fileStats) {
-        _fileStats = std::make_unique<SorterFileStats>(nullptr);
+        _fileStats = std::make_shared<SorterFileStats>(nullptr);
     }
 
     return std::make_unique<SpilledPartition>(getTempDir(), _fileStats.get());
@@ -445,7 +446,7 @@ void HybridHashJoin::finishBuild() {
 
 // ==================== Probe Phase ====================
 
-MatchCursor HybridHashJoin::probe(value::MaterializedRow key, value::MaterializedRow project) {
+JoinCursor HybridHashJoin::probe(value::MaterializedRow key, value::MaterializedRow project) {
     tassert(11538804, "called probe() outside of kProbe phase", _phase == Phase::kProbe);
 
     if (_isPartitioned) {
@@ -459,12 +460,12 @@ MatchCursor HybridHashJoin::probe(value::MaterializedRow key, value::Materialize
             _partitionSpills[pIdx]->probeSpill.writer->addAlreadySorted(key, project);
             _partitionSpills[pIdx]->probeSpill.size += memUsage;
             _recordsAddedToWriter++;
-            return MatchCursor::empty();
+            return JoinCursor::empty();
         }
     }
 
-    return MatchCursor(
-        std::make_unique<InMemoryMatchCursor>(*_ht, std::move(key), std::move(project)));
+    return JoinCursor(
+        std::make_unique<InMemoryJoinCursor>(*_ht, std::move(key), std::move(project)));
 }
 
 void HybridHashJoin::finishProbe() {
@@ -497,9 +498,9 @@ void HybridHashJoin::finishProbe() {
 
 // ==================== Spill Processing Phase ====================
 
-boost::optional<MatchCursor> HybridHashJoin::nextSpilledMatchCursor() {
+boost::optional<JoinCursor> HybridHashJoin::nextSpilledJoinCursor() {
     tassert(11538806,
-            "called nextSpilledMatchCursor() outside of kProcessSpilled phase",
+            "called nextSpilledJoinCursor() outside of kProcessSpilled phase",
             _phase == Phase::kProcessSpilled);
     if (!_isPartitioned) {
         return boost::none;
@@ -536,25 +537,26 @@ boost::optional<MatchCursor> HybridHashJoin::nextSpilledMatchCursor() {
         std::unique_ptr<HybridHashJoin> join =
             std::make_unique<HybridHashJoin>(_memLimit, _collator, _stats);
         join->_recursionLevel = _recursionLevel + 1;
+        join->_fileStats = _fileStats;
         _stats.recursionDepthMax = std::max(_stats.recursionDepthMax, 1 + _recursionLevel);
 
-        return MatchCursor(
-            std::make_unique<RecursiveJoinMatchCursor>(std::move(join),
-                                                       std::move(spill.buildSpill.iterator),
-                                                       std::move(spill.probeSpill.iterator),
-                                                       swappedPartition,
-                                                       _stats));
+        return JoinCursor(
+            std::make_unique<RecursiveJoinJoinCursor>(std::move(join),
+                                                      std::move(spill.buildSpill.iterator),
+                                                      std::move(spill.probeSpill.iterator),
+                                                      swappedPartition,
+                                                      _stats));
     }
 
     // Update peakTrackedMemBytes to the partition size that will be loaded to memory.
     _stats.peakTrackedMemBytes =
         std::max(_stats.peakTrackedMemBytes, static_cast<uint64_t>(partitionSize));
 
-    return MatchCursor(
-        std::make_unique<SpilledPartitionMatchCursor>(*_ht,
-                                                      std::move(spill.buildSpill.iterator),
-                                                      std::move(spill.probeSpill.iterator),
-                                                      swappedPartition));
+    return JoinCursor(
+        std::make_unique<SpilledPartitionJoinCursor>(*_ht,
+                                                     std::move(spill.buildSpill.iterator),
+                                                     std::move(spill.probeSpill.iterator),
+                                                     swappedPartition));
 }
 
 // ==================== Helpers ====================
@@ -579,7 +581,7 @@ void HybridHashJoin::updateSpillingStats(uint64_t nRecords) {
         1,
         spillToDiskBytes,
         nRecords,
-        _fileStats->bytesSpilled() - spillingStats.getSpilledDataStorageSize());
+        _fileStats->bytesSpilled() - (int64_t)spillingStats.getSpilledDataStorageSize());
 
     hashJoinCounters.incrementPerSpilling(
         1, spillToDiskBytes, nRecords, spilledDataStorageIncrease);
@@ -609,8 +611,13 @@ void HybridHashJoin::reset() {
     _partitionSpills.clear();
     _partitionSpills.shrink_to_fit();
 
+    _fileStats.reset();
     _memUsage = 0;
     _isPartitioned = false;
+
+    _currentSpilledPartitionIdx = 0;
+    _recordsAddedToWriter = 0;
+    _htBucketCountBeforePartitioning = 0;
     _phase = Phase::kBuild;
 }
 }  // namespace sbe

@@ -79,7 +79,7 @@ int64_t getKeyValue(const value::MaterializedRow* row) {
 /**
  * Consume all matches from a cursor into a vector of key values.
  */
-std::vector<int64_t> drainCursor(MatchCursor& cursor) {
+std::vector<int64_t> drainCursor(JoinCursor& cursor) {
     std::vector<int64_t> results;
     while (auto matchOpt = cursor.next()) {
         results.push_back(getKeyValue(matchOpt->buildKeyRow));
@@ -117,7 +117,7 @@ struct MatchTuple {
     boost::optional<std::string> probeProject;
 };
 
-std::vector<MatchTuple> drainCursorWithProjects(MatchCursor& cursor) {
+std::vector<MatchTuple> drainCursorWithProjects(JoinCursor& cursor) {
     std::vector<MatchTuple> results;
     while (auto matchOpt = cursor.next()) {
         MatchTuple tuple;
@@ -228,15 +228,15 @@ DEATH_TEST_F(HybridHashJoinDeathTest,
 
 DEATH_TEST_F(HybridHashJoinDeathTest,
              PhaseGuardSpillBeforeFinishProb,
-             "called nextSpilledMatchCursor() outside of kProcessSpilled phase") {
+             "called nextSpilledJoinCursor() outside of kProcessSpilled phase") {
     auto hhj = makeHHJ();
 
     hhj->addBuild(makeKeyRow(1), makeProjectRow("proj_1"));
     hhj->finishBuild();
     (void)hhj->probe(makeKeyRow(1), makeProjectRow("probe_1"));
 
-    // nextSpilledMatchCursor before finishProbe should fail (tassert)
-    (void)hhj->nextSpilledMatchCursor();
+    // nextSpilledJoinCursor before finishProbe should fail (tassert)
+    (void)hhj->nextSpilledJoinCursor();
 }
 
 TEST_F(HybridHashJoinTestFixture, EmptyBuildSide) {
@@ -258,7 +258,7 @@ TEST_F(HybridHashJoinTestFixture, EmptyProbeSide) {
     hhj->finishProbe();
 
     // No spilled partitions to process since nothing triggered spilling
-    auto cursorOpt = hhj->nextSpilledMatchCursor();
+    auto cursorOpt = hhj->nextSpilledJoinCursor();
     ASSERT_FALSE(cursorOpt.has_value());
 }
 
@@ -369,14 +369,13 @@ TEST_F(HybridHashJoinTestFixture, SpilledPartitionsProcessedCorrectly) {
         auto probePayload = "probe_" + std::to_string(i);
         auto cursor = hhj->probe(makeKeyRow(i), makeProjectRow(probePayload));
         while (auto matchOpt = cursor.next()) {
-            ASSERT_EQ(getKeyValue(matchOpt->buildKeyRow), getKeyValue(matchOpt->probeKeyRow));
             matchedKeys.insert(getKeyValue(matchOpt->buildKeyRow));
         }
     }
     hhj->finishProbe();
 
     // Process all spilled partitions and collect matched keys
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             ASSERT_EQ(getKeyValue(matchOpt->buildKeyRow), getKeyValue(matchOpt->probeKeyRow));
             matchedKeys.insert(getKeyValue(matchOpt->buildKeyRow));
@@ -407,14 +406,13 @@ TEST_F(HybridHashJoinTestFixture, HandlesRecursivePartitions) {
         auto probePayload = "probe_payload_" + std::to_string(i);
         auto cursor = hhj->probe(makeKeyRow(i), makeProjectRow(probePayload));
         while (auto matchOpt = cursor.next()) {
-            ASSERT_EQ(getKeyValue(matchOpt->buildKeyRow), getKeyValue(matchOpt->probeKeyRow));
             matchedKeys.insert(getKeyValue(matchOpt->buildKeyRow));
         }
     }
     hhj->finishProbe();
 
     // Process spilled partitions - this should trigger recursive processing
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             ASSERT_EQ(getKeyValue(matchOpt->buildKeyRow), getKeyValue(matchOpt->probeKeyRow));
             matchedKeys.insert(getKeyValue(matchOpt->buildKeyRow));
@@ -468,8 +466,8 @@ TEST_F(HybridHashJoinTestFixture, SpilledPartitionsPreserveProjectValues) {
 
     ASSERT_TRUE(stats.usedDisk);
 
-    // Probe and collect matches (some immediate, some spilled)
-    std::map<std::string, std::pair<std::string, std::string>> actualMatches;
+    // Probe and collect matches
+    std::map<std::string, std::string> probeMatches;
     for (int i = 0; i < 50; ++i) {
         std::string key = "key_" + std::to_string(i);
         std::string probeProj = "probe_proj_" + std::to_string(i);
@@ -477,29 +475,27 @@ TEST_F(HybridHashJoinTestFixture, SpilledPartitionsPreserveProjectValues) {
         while (auto matchOpt = cursor.next()) {
             std::string buildKey = getStringValue(matchOpt->buildKeyRow);
             std::string buildProj = getStringValue(matchOpt->buildProjectRow);
-            std::string probeKey = getStringValue(matchOpt->probeKeyRow);
-            std::string probeProject = getStringValue(matchOpt->probeProjectRow);
-            ASSERT_EQ(buildKey, probeKey);
-            actualMatches[buildKey] = {buildProj, probeProject};
+            probeMatches[buildKey] = buildProj;
         }
     }
     hhj->finishProbe();
 
+    std::map<std::string, std::pair<std::string, std::string>> spilledMatches;
     // Process spilled partitions
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             std::string buildKey = getStringValue(matchOpt->buildKeyRow);
             std::string buildProj = getStringValue(matchOpt->buildProjectRow);
             std::string probeKey = getStringValue(matchOpt->probeKeyRow);
             std::string probeProject = getStringValue(matchOpt->probeProjectRow);
             ASSERT_EQ(buildKey, probeKey);
-            actualMatches[buildKey] = {buildProj, probeProject};
+            spilledMatches[buildKey] = {buildProj, probeProject};
         }
     }
 
-    // Verify all matches have correct project values
-    ASSERT_EQ(actualMatches.size(), 50u);
-    for (const auto& [key, projPair] : actualMatches) {
+    ASSERT_EQ(spilledMatches.size() + probeMatches.size(), 50u);
+    // Verify all spilled matches have correct project values
+    for (const auto& [key, projPair] : spilledMatches) {
         const auto& [actualBuildProj, actualProbeProj] = projPair;
         ASSERT_EQ(actualBuildProj, expectedBuildProjects[key]);
         // Extract the key number and verify probe project
@@ -664,7 +660,7 @@ TEST_F(HybridHashJoinTestFixture, ResetAfterSpillAllowsReuse) {
     hhj->finishProbe();
 
     // Drain spilled partitions
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (cursorOpt->next()) {
         }
     }
@@ -711,7 +707,7 @@ TEST_F(HybridHashJoinTestFixture, ProbeOnlyNonMatchingKeysToSpilledPartition) {
 
     // Process spilled partitions - should return no matches
     size_t spilledMatches = 0;
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             spilledMatches++;
         }
@@ -765,7 +761,7 @@ TEST_F(HybridHashJoinTestFixture, ProbeIsSmallerThanBuild) {
 
     // Process spilled partitions and verify key-project mappings are correct
     std::set<int64_t> matchedKeys;
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             int64_t buildKey = getKeyValue(matchOpt->buildKeyRow);
             int64_t probeKey = getKeyValue(matchOpt->probeKeyRow);
@@ -816,16 +812,12 @@ TEST_F(HybridHashJoinTestFixture, ProbeIsSmallerThanBuildWithRecursion) {
         auto cursor = hhj->probe(makeKeyRow(i), makeProjectRow(proj));
         if (auto matchOpt = cursor.next()) {
             int64_t buildKey = getKeyValue(matchOpt->buildKeyRow);
-            int64_t probeKey = getKeyValue(matchOpt->probeKeyRow);
-            ASSERT_EQ(buildKey, probeKey);
 
             std::string actualBuildProj = getStringValue(matchOpt->buildProjectRow);
-            std::string actualProbeProj = getStringValue(matchOpt->probeProjectRow);
 
             // Verify the project values match what we inserted
             ASSERT_EQ(actualBuildProj, buildProjects[buildKey])
                 << "Build project mismatch for key " << buildKey;
-            ASSERT_EQ(actualProbeProj, proj) << "Probe project mismatch for key " << probeKey;
 
             ASSERT_EQ(cursor.next(), boost::none);
             inmemMatches++;
@@ -838,7 +830,7 @@ TEST_F(HybridHashJoinTestFixture, ProbeIsSmallerThanBuildWithRecursion) {
 
     // Process spilled partitions and verify key-project mappings are correct
     std::set<int64_t> matchedKeys;
-    while (auto cursorOpt = hhj->nextSpilledMatchCursor()) {
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
         while (auto matchOpt = cursorOpt->next()) {
             int64_t buildKey = getKeyValue(matchOpt->buildKeyRow);
             int64_t probeKey = getKeyValue(matchOpt->probeKeyRow);
