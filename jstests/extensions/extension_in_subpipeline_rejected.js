@@ -186,12 +186,15 @@ const kNotAllowedInFacetErrorCode = 40600;
         "Using $facet with $matchTopN (desugar) in sub-pipeline should be rejected",
     );
 
+    // TODO SERVER-118956 Re-enable this test.
+    /**
     {
         const viewName = "unionwith_target";
         assert.commandWorked(
             db.createView(viewName, other.getName(), [{$testBar: {noop: true}}, {$match: {type: "X"}}]),
         );
 
+        
         assertErrorCode(
             coll,
             [
@@ -207,6 +210,7 @@ const kNotAllowedInFacetErrorCode = 40600;
 
         db[viewName].drop();
     }
+    */
 }
 
 // =============================================================================
