@@ -50,12 +50,14 @@
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
@@ -67,6 +69,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -136,6 +139,18 @@ protected:
     void testRestoreFailsIfCollectionNoLongerExists(
         AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionBecomesCreated(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsIfCollectionBecomesCreatedTimeseries(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsNss(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsOnTimeseriesCollectionDowngradeThroughBucketsNss(
+        AcquisitionPrerequisites::OperationType operationType);
+    void testRestoreFailsOnTimeseriesCollectionDowngrade(
         AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::OperationType operationType);
     void testRestoreFailsIfCollectionDroppedAndRecreated(
@@ -1926,6 +1941,255 @@ TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionBecomesCreated) {
 }
 TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionBecomesCreated) {
     testRestoreFailsIfCollectionBecomesCreated(AcquisitionPrerequisites::kWrite);
+}
+
+TimeseriesOptions createTimeseriesOptions() {
+    TimeseriesOptions tsOpts{};
+    tsOpts.setTimeField("timeField");
+    tsOpts.setMetaField("metaField"_sd);
+    return tsOpts;
+}
+
+void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreatedTimeseries(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "NonExistentCollectionWhichWillBeCreatedAsTimeseries"));
+
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(operationContext(), nss, operationType),
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Create timeseries collection
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            newOpCtx, nss);
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(createTimeseriesOptions());
+        ASSERT_OK(createCollection(newOpCtx, cmd));
+    });
+
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::CommandNotSupportedOnView);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionBecomesCreatedTimeseries) {
+    testRestoreFailsIfCollectionBecomesCreatedTimeseries(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionBecomesCreatedTimeseries) {
+    testRestoreFailsIfCollectionBecomesCreatedTimeseries(AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
+
+    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+
+    {
+        // Create legacy (viewful) timeseries collection.
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", false);
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext(), nss);
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(createTimeseriesOptions());
+        ASSERT_OK(createCollection(operationContext(), cmd));
+    }
+
+    const auto acquisition = acquireCollectionOrView(
+        operationContext(),
+        CollectionOrViewAcquisitionRequest::fromOpCtx(operationContext(), nss, operationType),
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Create timeseries collection
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", true);
+        timeseries::upgradeToViewlessTimeseries(newOpCtx, nss);
+    });
+
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadFailsOnTimeseriesCollectionUpgradeThroghMainNss) {
+    testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsOnTimeseriesCollectionUpgradeThroughMainNss) {
+    testRestoreFailsOnTimeseriesCollectionUpgradeThroughMainNss(AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsNss(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "TimeseriesCollectionThatWillBeUpgraded"));
+
+    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+
+    {
+        // Create legacy (viewful) timeseries collection.
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", false);
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext(), nss);
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(createTimeseriesOptions());
+        ASSERT_OK(createCollection(operationContext(), cmd));
+    }
+
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            operationContext(), nss.makeTimeseriesBucketsNamespace(), operationType),
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Create timeseries collection
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", true);
+        timeseries::upgradeToViewlessTimeseries(newOpCtx, nss);
+    });
+
+    // Try to restore the resources should fail because the collection showed-up after a restore
+    // where it didn't exist before that.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadFailsOnTimeseriesCollectionUpgradeThroughBucketsNss) {
+    testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsNss(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForWriteFailsOnTimeseriesCollectionUpgradeThroughBucketsNss) {
+    testRestoreFailsOnTimeseriesCollectionUpgradeThroughBucketsNss(
+        AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
+
+    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+
+    {
+        // Create viewless timeseries collection.
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", true);
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext(), nss);
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(createTimeseriesOptions());
+        ASSERT_OK(createCollection(operationContext(), cmd));
+    }
+
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(operationContext(), nss, operationType),
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Create timeseries collection
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", false);
+        timeseries::downgradeFromViewlessTimeseries(newOpCtx, nss);
+    });
+
+    // Try to restore the resources should fail because the collection showed-up after a restore
+    // where it didn't exist before that.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadFailsOnTimeseriesCollectionDowngradeThroughMainNss) {
+    testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForRightFailsOnTimeseriesCollectionDowngradeThroughMainNss) {
+    testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(AcquisitionPrerequisites::kWrite);
+}
+
+void ShardRoleTest::testRestoreFailsOnTimeseriesCollectionDowngradeThroughBucketsNss(
+    AcquisitionPrerequisites::OperationType operationType) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "TimeseriesCollectionThatWillBeDowngraded"));
+
+    RAIIServerParameterControllerForTest throwsTimeseriesUpgradeDowngradeEnable(
+        "featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError", true);
+
+    {
+        // Create viewless timeseries collection.
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", true);
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext(), nss);
+        CreateCommand cmd(nss);
+        cmd.getCreateCollectionRequest().setTimeseries(createTimeseriesOptions());
+        ASSERT_OK(createCollection(operationContext(), cmd));
+    }
+
+    const auto acquisition = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            operationContext(), nss.makeTimeseriesBucketsNamespace(), operationType),
+        MODE_IX);
+
+    // Yield the resources
+    auto yieldedTransactionResources =
+        yieldTransactionResourcesFromOperationContext(operationContext());
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    // Create timeseries collection
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        RAIIServerParameterControllerForTest featureFlagController(
+            "featureFlagCreateViewlessTimeseriesCollections", false);
+        timeseries::downgradeFromViewlessTimeseries(newOpCtx, nss);
+    });
+
+    // Try to restore the resources should fail because the collection showed-up after a restore
+    // where it didn't exist before that.
+    ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
+                           operationContext(), std::move(yieldedTransactionResources)),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST_F(ShardRoleTest, RestoreForReadFailsOnTimeseriesCollectionDowngradeThroughBucketsNss) {
+    testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(AcquisitionPrerequisites::kRead);
+}
+TEST_F(ShardRoleTest, RestoreForRightFailsOnTimeseriesCollectionDowngradeThroughBucketsNss) {
+    testRestoreFailsOnTimeseriesCollectionDowngradeThroughMainNss(AcquisitionPrerequisites::kWrite);
 }
 
 void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
