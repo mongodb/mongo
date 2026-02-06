@@ -83,12 +83,13 @@ class TestParseBazelTarget(unittest.TestCase):
 class TestCreateBurnInTarget(unittest.TestCase):
     """Unit tests for create_burn_in_target function."""
 
+    @patch(ns("buildozer.bd_move"))
     @patch(ns("buildozer.bd_set"))
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_basic(
-        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_move
     ):
         """Test basic burn-in target creation."""
         # Setup
@@ -127,12 +128,13 @@ class TestCreateBurnInTarget(unittest.TestCase):
         self.assertIn("--repeatTestsMin=2", resmoke_args_value)
         self.assertIn("--repeatTestsSecs=600.0", resmoke_args_value)
 
+    @patch(ns("buildozer.bd_move"))
     @patch(ns("buildozer.bd_set"))
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_with_existing_resmoke_args(
-        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_move
     ):
         """Test burn-in target creation preserves existing resmoke args."""
         # Setup
@@ -163,12 +165,13 @@ class TestCreateBurnInTarget(unittest.TestCase):
         self.assertIn("--storageEngine=wiredTiger", resmoke_args_value)
         self.assertIn("--repeatTestsMax=1000", resmoke_args_value)
 
+    @patch(ns("buildozer.bd_move"))
     @patch(ns("buildozer.bd_set"))
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_with_missing_resmoke_args(
-        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_move
     ):
         """Test burn-in target handles missing resmoke_args."""
         # Setup
@@ -195,12 +198,13 @@ class TestCreateBurnInTarget(unittest.TestCase):
         self.assertNotIn("(missing)", resmoke_args_value)
         self.assertIn("--repeatTestsMax=1000", resmoke_args_value)
 
+    @patch(ns("buildozer.bd_move"))
     @patch(ns("buildozer.bd_set"))
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_sets_correct_attributes(
-        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_move
     ):
         """Test that bd_set is called with correct attributes."""
         # Setup
@@ -217,6 +221,9 @@ class TestCreateBurnInTarget(unittest.TestCase):
 
         # Execute
         under_test.create_burn_in_target(target_original, target_burn_in, test)
+
+        # Assert - bd_move called to move existing srcs to data
+        mock_bd_move.assert_called_once_with([target_burn_in], "srcs", "data")
 
         # Assert - bd_set called 3 times for srcs, shard_count, and resmoke_args
         self.assertEqual(mock_bd_set.call_count, 3)

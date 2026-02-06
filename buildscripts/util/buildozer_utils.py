@@ -54,3 +54,7 @@ def bd_fix(fixes: List[str]) -> None:
 
 def bd_copy(labels: List[str], attr: str, from_rule: str) -> None:
     _bd_command(f"copy {attr} {from_rule}", labels)
+
+
+def bd_move(labels: List[str], old_attr: str, new_attr: str) -> None:
+    _bd_command(f"move {old_attr} {new_attr} *", labels)

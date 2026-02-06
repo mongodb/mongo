@@ -98,6 +98,9 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
         f.write(rule_new)
 
     # Set the suite to only run the burn-in test, with only one shard.
+    # All existing 'srcs' are kept as 'data', since it is common for jstests
+    # to import each other.
+    buildozer.bd_move([target_burn_in], "srcs", "data")
     buildozer.bd_set([target_burn_in], "srcs", test_label)
     buildozer.bd_set([target_burn_in], "shard_count", "1")
 
