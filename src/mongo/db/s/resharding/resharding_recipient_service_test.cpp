@@ -877,16 +877,20 @@ public:
             opCtx, recipientDoc.getTempReshardingNss(), options);
     }
 
-    SemiFuture<void> notifyToStartCloningUsingCmd(const CancellationToken& cancelToken,
-                                                  RecipientStateMachine& recipient,
+    SemiFuture<void> notifyToStartCloningUsingCmd(RecipientStateMachine& recipient,
                                                   const ReshardingRecipientDocument& recipientDoc) {
-        auto recipientFields = _makeRecipientFields(recipientDoc);
-        return recipient.fulfillAllDonorsPreparedToDonate(
-            {recipientFields.getCloneTimestamp().get(),
-             recipientFields.getApproxDocumentsToCopy().get(),
-             recipientFields.getApproxBytesToCopy().get(),
-             recipientFields.getDonorShards()},
-            cancelToken);
+        while (true) {
+            try {
+                auto recipientFields = _makeRecipientFields(recipientDoc);
+                return recipient.fulfillAllDonorsPreparedToDonate(
+                    {recipientFields.getCloneTimestamp().get(),
+                     recipientFields.getApproxDocumentsToCopy().get(),
+                     recipientFields.getApproxBytesToCopy().get(),
+                     recipientFields.getDonorShards()});
+            } catch (const ExceptionFor<ErrorCodes::PrimaryOnlyServiceInitializing>&) {
+                sleepmillis(100);
+            }
+        }
     }
 
     void notifyToStartCloning(OperationContext* opCtx,
@@ -896,15 +900,7 @@ public:
             resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabledAndIgnoreFCVUnsafe();
 
         if (driveCloneNoRefresh) {
-            CancellationSource cancelSource;
-            SemiFuture<void> future =
-                notifyToStartCloningUsingCmd(cancelSource.token(), recipient, recipientDoc);
-            // There is a race here where the recipient can fulfill the future before cancelSource
-            // is canceled. Due to this we need to check for Status::OK() as well as
-            // CallbackCanceled.
-            cancelSource.cancel();
-            auto status = future.getNoThrow();
-            ASSERT_TRUE(status == ErrorCodes::CallbackCanceled || status == Status::OK()) << status;
+            auto ignore = notifyToStartCloningUsingCmd(recipient, recipientDoc);
         } else {
             _onReshardingFieldsChanges(
                 opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);

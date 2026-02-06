@@ -1171,5 +1171,11 @@ error_codes:
   # Internal error used to trigger the lazy initialization of config.placementHistory
   - {code: 487, name: PlacementHistoryInitializationMissing}
 
+  - {
+      code: 488,
+      name: PrimaryOnlyServiceInitializing,
+      categories: [RetriableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

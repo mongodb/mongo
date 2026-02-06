@@ -100,8 +100,7 @@ public:
                         {request().getCloneTimestamp(),
                          request().getApproxCopySize().getApproxDocumentsToCopy().get_value_or(0),
                          request().getApproxCopySize().getApproxBytesToCopy().get_value_or(0),
-                         request().getDonorShards()},
-                        opCtx->getCancellationToken())
+                         request().getDonorShards()})
                     .get();
             } else {
                 // If state machine does not exist, either this message was delayed and the

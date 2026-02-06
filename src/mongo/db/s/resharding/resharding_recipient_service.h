@@ -263,8 +263,7 @@ public:
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
 
-    SemiFuture<void> fulfillAllDonorsPreparedToDonate(CloneDetails cloneDetails,
-                                                      const CancellationToken& cancelToken);
+    SemiFuture<void> fulfillAllDonorsPreparedToDonate(CloneDetails cloneDetails);
 
 private:
     class CloningMetrics {
@@ -389,6 +388,8 @@ private:
 
     // Initializes the _cancelState. Note: Should only be called once per lifetime.
     void _initCancelState(const CancellationToken& stepdownToken);
+
+    void _assertRecipientInitialized(WithLock) const;
 
     // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
     void _tryFetchBuildIndexMetrics(OperationContext* opCtx);
