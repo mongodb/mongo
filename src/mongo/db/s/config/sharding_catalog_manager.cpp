@@ -194,6 +194,8 @@ void startTransactionWithNoopFind(OperationContext* opCtx,
     FindCommandRequest findCommand(nss);
     findCommand.setBatchSize(0);
     findCommand.setSingleBatch(true);
+    findCommand.setReadConcern(
+        ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern().toBSONInner());
 
     auto res = runCommandInLocalTxn(opCtx,
                                     nss.dbName(),

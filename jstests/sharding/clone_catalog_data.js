@@ -163,6 +163,7 @@ TestData.skipCheckOrphans = true;
     assert.commandFailedWithCode(toShard.adminCommand({
         _shardsvrCloneCatalogData: 'test',
         from: fromShard.host,
+        writeConcern: {w: 1},
     }),
                                  ErrorCodes.InvalidOptions);
 

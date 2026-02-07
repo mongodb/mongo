@@ -141,6 +141,8 @@ void ConfigServerTestFixture::setUp() {
                                    std::move(specialExec),
                                    std::move(shardLocal),
                                    std::move(localCatalogClient));
+
+    ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 }
 
 void ConfigServerTestFixture::tearDown() {
