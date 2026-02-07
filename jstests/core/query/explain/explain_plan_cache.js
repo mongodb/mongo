@@ -9,8 +9,9 @@
  *   does_not_support_stepdowns,
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
- *   # Exercises a bug in distinct scan hashing that was fixed in 8.2.
- *   requires_fcv_82,
+ *   # FCV<8.3 does not have CBR, so mixing them with CBR nodes
+ *   # breaks this test's expectations.
+ *   requires_fcv_83,
  *   # Does not support multiplanning, because it caches more plans
  *   does_not_support_multiplanning_single_solutions,
  *   # The test examines the SBE plan cache, which initial sync may change the contents of.
@@ -21,6 +22,7 @@
  */
 import {
     getAggPlanStage,
+    getEngine,
     getQueryPlanner,
     getRejectedPlan,
     getRejectedPlans,
@@ -112,15 +114,19 @@ function predicateTest(explainMode) {
     for (let i = 0; i < 5; i++) {
         coll.find({$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}).toArray();
     }
+
     // When the query uses sub-planning the top-level query doesn't hit the plan cache.
-    // This is not the case when SBE is enabled, or if CBR is used to plan the query,
-    // except when the collection is clustered.
-    const usingCBR = getPlanRankerMode(db) === "automaticCE";
-    const canPlanBeCached = isUsingSbePlanCache || (usingCBR && !ClusteredCollectionUtil.isCollectionClustered(coll));
-    assertWinningPlanCacheStatus(
-        coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode),
-        canPlanBeCached,
-    );
+    // This is not the case when the SBE plan cache is enabled, or if CBR is used to plan the query,
+    // except when the collection is clustered. If the SBE engine is enabled but not the SBE plan cache,
+    // we do not cache the plan regardless of whether CBR is enabled or not.
+    const explain = coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode);
+    const cbrEnabled = getPlanRankerMode(db) == "automaticCE";
+    const usingSbeEngine = getEngine(explain) != "classic";
+    const canPlanBeCached =
+        (isUsingSbePlanCache || (cbrEnabled && !ClusteredCollectionUtil.isCollectionClustered(coll))) &&
+        !(usingSbeEngine && !isUsingSbePlanCache);
+
+    assertWinningPlanCacheStatus(explain, canPlanBeCached);
 
     // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the
     // cache.
