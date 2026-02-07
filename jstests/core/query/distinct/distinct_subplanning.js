@@ -9,8 +9,9 @@
  *   does_not_support_stepdowns,
  *   # Explain cannot run within a multi-document transaction.
  *   does_not_support_transactions,
- *   # featureFlagCostBasedRanker does not exist in prior versions
- *   requires_fcv_83
+ *   # FCV<8.3 does not have CBR, so mixing them with CBR nodes
+ *   # breaks this test's expectations.
+ *   requires_fcv_83,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
