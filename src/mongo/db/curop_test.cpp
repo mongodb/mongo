@@ -38,6 +38,7 @@
 #include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_stats/mock_key.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -1260,11 +1261,23 @@ TEST(CurOpTest, OpDebugAllowsMultipleQueryStatsInfos) {
 
     // Create a new set of metrics for an operation at index 10.
     const size_t opIndex = 10;
-    OpDebug::QueryStatsInfo& qsi = opDebug.setQueryStatsInfoAtOpIndex(opIndex);
+    auto key = std::make_unique<query_stats::MockKey>(opCtx.get());
+    auto keyPtr = key.get();
+    opDebug.setQueryStatsInfoAtOpIndex(opIndex,
+                                       {
+                                           .key = std::move(key),
+                                           .keyHash = 42,
+                                           .willNeverExhaust = true,
+                                           .metricsRequested = true,
+                                       });
 
-    // If we fetch the info with the getter, it should be the same object.
-    OpDebug::QueryStatsInfo& qsi2 = opDebug.getQueryStatsInfo(opIndex);
-    ASSERT_EQ(&qsi, &qsi2);
+    // If we fetch the info with the getter, it should contain the values we have passed in.
+    OpDebug::QueryStatsInfo& qsi = opDebug.getQueryStatsInfo(opIndex);
+    ASSERT_EQ(qsi.key.get(), keyPtr);
+    ASSERT_TRUE(qsi.keyHash.has_value());
+    ASSERT_EQ(qsi.keyHash.value(), 42);
+    ASSERT_EQ(qsi.metricsRequested, true);
+    ASSERT_EQ(qsi.willNeverExhaust, true);
 
     // The new set of metrics should be distinct from the one for the main operation.
     OpDebug::QueryStatsInfo& mainQsi = opDebug.getQueryStatsInfo();
@@ -1279,8 +1292,8 @@ TEST(CurOpTest, OpDebugAllowsMultipleAdditiveMetrics) {
 
     // Create a new set of metrics for an operation at index 10.
     const size_t opIndex = 10;
-    OpDebug::QueryStatsInfo& qsi = opDebug.setQueryStatsInfoAtOpIndex(opIndex);
-    OpDebug::AdditiveMetrics& am = qsi.additiveMetrics;
+    opDebug.setQueryStatsInfoAtOpIndex(opIndex, {});
+    OpDebug::AdditiveMetrics& am = opDebug.getQueryStatsInfo(opIndex).additiveMetrics;
 
     // If we fetch the metrics with the getter, it whould be the same object.
     OpDebug::AdditiveMetrics& am2 = opDebug.getAdditiveMetrics(opIndex);

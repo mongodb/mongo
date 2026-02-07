@@ -484,6 +484,29 @@ public:
         AdditiveMetrics additiveMetrics;
     };
 
+    // Return true if the query stats info for batch writes has been created.
+    MONGO_MOD_PRIVATE bool queryStatsInfoForBatchWritesExists() const {
+        return _queryStatsInfoForBatchWrites != nullptr;
+    }
+
+    // Initialize the query stats info map for batch writes if it does not exist.
+    MONGO_MOD_PRIVATE void ensureQueryStatsInfoForBatchWrites() const {
+        if (!_queryStatsInfoForBatchWrites) {
+            _queryStatsInfoForBatchWrites =
+                std::make_unique<absl::flat_hash_map<size_t, QueryStatsInfo>>();
+        }
+    }
+
+    // Return true if the entry for 'opIndex' has been created.
+    MONGO_MOD_PRIVATE bool hasQueryStatsInfo(size_t opIndex = kCurrentOpIndex) const {
+        if (opIndex == kCurrentOpIndex) {
+            return true;
+        }
+        return queryStatsInfoForBatchWritesExists() &&
+            _queryStatsInfoForBatchWrites->contains(opIndex);
+    }
+
+
     // Return the QueryStatsInfo for the given operation. By default, return the current operation.
     MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
         return _getQueryStatsInfoHelper(this, opIndex);
@@ -498,7 +521,8 @@ public:
 
     // Create a new default-constructed QueryStatsInfo for the given opIndex, and return a reference
     // to it.
-    MONGO_MOD_PRIVATE QueryStatsInfo& setQueryStatsInfoAtOpIndex(size_t opIndex) {
+    MONGO_MOD_PRIVATE void setQueryStatsInfoAtOpIndex(size_t opIndex,
+                                                      QueryStatsInfo queryStatsInfo) {
         uassert(11487700,
                 "cannot create QueryStatsInfo for current operation",
                 opIndex != kCurrentOpIndex);
@@ -508,8 +532,7 @@ public:
                 fmt::format("QueryStatsInfo for opIndex {} already exists", opIndex),
                 !_queryStatsInfoForBatchWrites->contains(opIndex));
 
-        auto [it, _] = _queryStatsInfoForBatchWrites->emplace(opIndex, QueryStatsInfo{});
-        return it->second;
+        _queryStatsInfoForBatchWrites->emplace(opIndex, std::move(queryStatsInfo));
     }
 
     // The query framework that this operation used. Will be unknown for non query operations.
@@ -670,13 +693,6 @@ private:
     mutable std::unique_ptr<absl::flat_hash_map<size_t, QueryStatsInfo>>
         _queryStatsInfoForBatchWrites = nullptr;
     static constexpr size_t kCurrentOpIndex = std::numeric_limits<size_t>::max();
-
-    void ensureQueryStatsInfoForBatchWrites() const {
-        if (!_queryStatsInfoForBatchWrites) {
-            _queryStatsInfoForBatchWrites =
-                std::make_unique<absl::flat_hash_map<size_t, QueryStatsInfo>>();
-        }
-    }
 
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
