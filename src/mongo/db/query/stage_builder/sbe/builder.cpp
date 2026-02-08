@@ -1229,6 +1229,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
                               .clear(kRecordId)
                               .clearAllFields()
                               .clearAllSortKeys()
+                              .clearAllPathExprs()
                               .setSortKeys(std::move(sortKeys));
 
     auto childReqs = forwardingReqs.copyForChild()

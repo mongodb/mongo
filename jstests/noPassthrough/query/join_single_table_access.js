@@ -59,4 +59,24 @@ assert.docEq(res[0], {_id: 1, a: 1, b: 1, c: 1, coll2: {_id: 1, a: 1, b: 1, c: 1
 const explain = coll1.explain().aggregate(pipeline);
 assert(joinOptUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));
 
+// verify that reading a nested field from an indexed source is properly handled (regression test for SERVER-118888)
+const pipeline2 = [
+    {
+        $match: {a: 1, b: 1},
+    },
+    {
+        $lookup: {
+            from: coll2.getName(),
+            localField: "xxx.b",
+            foreignField: "b",
+            as: "coll2",
+        },
+    },
+    {
+        $unwind: "$coll2",
+    },
+];
+const res2 = coll1.aggregate(pipeline2).toArray();
+assert.eq(res2.length, 0);
+
 MongoRunner.stopMongod(conn);

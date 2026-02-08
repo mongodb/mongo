@@ -693,6 +693,11 @@ public:
         return clearAllOfType(kSortKey);
     }
 
+    // Clears any requirements of the form '{kPathExpr, name}' that this PlanStageReqs may have.
+    PlanStageReqs& clearAllPathExprs() {
+        return clearAllOfType(kPathExpr);
+    }
+
     // This method will clear all field reqs whose names are conflict with 'path' (i.e. either the
     // name equals 'path', or the name is a prefix of 'path', or 'path' is a prefix of the name).
     PlanStageReqs& clearAffectedFields(StringData path) {
