@@ -706,6 +706,8 @@ int WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                       << versionStatus.reason() << " Index: {name: "
                                       << config.indexName << ", ns: " << _collectionUUID
                                       << "} - version either too old or too new for this mongod.");
+
+        WiredTigerUtil::logMetadata(*wtRu.getSessionNoTxn(), uri);
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
     uassertStatusOK(version);

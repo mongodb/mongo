@@ -1493,6 +1493,21 @@ long long WiredTigerUtil::getCancelledCacheMetric_forTest() {
     return cancelledCacheMetric.get();
 }
 
+void WiredTigerUtil::logMetadata(WiredTigerSession& session, StringData uri) {
+    WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
+    ScopeGuard releaser = [&] {
+        session.releaseCursor(kMetadataTableId, cursor, "");
+    };
+
+    const char* key = nullptr;
+    const char* value = nullptr;
+    while ((cursor->next(cursor) == 0) && (cursor->get_key(cursor, &key) == 0) &&
+           (cursor->get_value(cursor, &value) == 0)) {
+        LOGV2_INFO(
+            11504300, "Contents of WT metadata table.", "key"_attr = key, "value"_attr = value);
+    }
+}
+
 void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, StringData uri) {
     invariantWTOK(WT_OP_CHECK(ru.getSession()->truncate(uri.data(), nullptr, nullptr, nullptr)),
                   *ru.getSession());

@@ -650,6 +650,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
         if (versionStatus.code() == ErrorCodes::FailedToParse) {
             uasserted(28548, versionStatus.reason());
         } else {
+            WiredTigerUtil::logMetadata(*ru.getSessionNoTxn(), getURI());
             fassertFailedNoTrace(34433);
         }
     }
