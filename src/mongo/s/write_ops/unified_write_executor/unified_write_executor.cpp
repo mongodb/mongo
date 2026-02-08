@@ -34,7 +34,6 @@
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
@@ -77,9 +76,6 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
     tassert(11123700, "OperationContext must not be null", opCtx);
 
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
-
-    // Register query stats key
-    WriteBatchQueryStatsRegistrar::registerRequest(opCtx, cmdRef);
 
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);

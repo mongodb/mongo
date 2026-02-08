@@ -81,10 +81,8 @@ ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool bypassEmp
             unsigned long long timestamp = timestampView.read<unsigned long long>();
             if (timestamp == 0) {
                 ServiceContext* service = getGlobalServiceContext();
-                if (auto vectorClock = VectorClockMutable::get(service); vectorClock) {
-                    auto ts = vectorClock->tickClusterTime(1).asTimestamp();
-                    timestampView.write(tagLittleEndian(ts.asULL()));
-                }
+                auto ts = VectorClockMutable::get(service)->tickClusterTime(1).asTimestamp();
+                timestampView.write(tagLittleEndian(ts.asULL()));
             }
         }
     }

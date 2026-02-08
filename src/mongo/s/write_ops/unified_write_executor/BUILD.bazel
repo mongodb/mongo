@@ -15,7 +15,6 @@ mongo_cc_library(
         "stats.cpp",
         "unified_write_executor.cpp",
         "write_batch_executor.cpp",
-        "write_batch_query_stats_registrar.cpp",
         "write_batch_response_processor.cpp",
         "write_batch_scheduler.cpp",
         "write_op_analyzer.cpp",
@@ -24,7 +23,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
-        "//src/mongo/db/query/query_stats:update_key",
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s:sharding_write_without_shard_key_api",
@@ -42,7 +40,6 @@ mongo_cc_unit_test(
     srcs = [
         "unified_write_executor_test.cpp",
         "write_batch_executor_test.cpp",
-        "write_batch_query_stats_registrar_test.cpp",
         "write_batch_response_processor_test.cpp",
         "write_op_analyzer_test.cpp",
         "write_op_batcher_test.cpp",

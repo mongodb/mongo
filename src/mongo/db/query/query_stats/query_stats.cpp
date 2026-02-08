@@ -362,11 +362,10 @@ void insertQueryStatsEntry(
 
 }  // namespace
 
-void registerRequest(const OperationContext* opCtx,
+void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                     OpDebug::QueryStatsInfo& queryStatsInfo,
-                     bool willNeverExhaust = false) {
+                     bool willNeverExhaust) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8473000,
                     5,
@@ -390,7 +389,9 @@ void registerRequest(const OperationContext* opCtx,
         return;
     }
 
-    if (queryStatsInfo.disableForSubqueryExecution) {
+    auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (opDebug.getQueryStatsInfo().disableForSubqueryExecution) {
         LOGV2_DEBUG(
             9219800,
             4,
@@ -399,11 +400,11 @@ void registerRequest(const OperationContext* opCtx,
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        queryStatsInfo.disableForSubqueryExecution = true;
+        opDebug.getQueryStatsInfo().disableForSubqueryExecution = true;
         return;
     }
 
-    if (queryStatsInfo.key) {
+    if (opDebug.getQueryStatsInfo().key) {
         // A find() or distinct() request may have already registered the shapifier. Ie, it's
         // a find or distinct command over a non-physical collection, eg view, which is
         // implemented by generating an agg pipeline.
@@ -414,15 +415,15 @@ void registerRequest(const OperationContext* opCtx,
         return;
     }
 
-    queryStatsInfo.willNeverExhaust = willNeverExhaust;
+    opDebug.getQueryStatsInfo().willNeverExhaust = willNeverExhaust;
     // There are a few cases where a query shape can be larger than the original query. For example,
     // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
     // an input query has thousands of clauses, the cumulative bloat that shapification adds results
     // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
     // original query from queryStats metrics collection and let it execute normally.
     try {
-        queryStatsInfo.key = makeKey();
-        queryStatsInfo.keyHash = absl::HashOf(*queryStatsInfo.key);
+        opDebug.getQueryStatsInfo().key = makeKey();
+        opDebug.getQueryStatsInfo().keyHash = absl::HashOf(*opDebug.getQueryStatsInfo().key);
         if (MONGO_unlikely(queryStatsFailToSerializeKey.shouldFail())) {
             uasserted(ErrorCodes::FailPointEnabled,
                       "queryStatsFailToSerializeKey fail point is enabled");
@@ -464,14 +465,6 @@ void registerRequest(const OperationContext* opCtx,
     }
 }
 
-void registerRequest(OperationContext* opCtx,
-                     const NamespaceString& collection,
-                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                     bool willNeverExhaust) {
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    registerRequest(opCtx, collection, makeKey, opDebug.getQueryStatsInfo(), willNeverExhaust);
-}
-
 void registerWriteRequest(OperationContext* opCtx,
                           const NamespaceString& collection,
                           const std::function<std::unique_ptr<Key>(void)>& makeKey,
@@ -482,38 +475,14 @@ void registerWriteRequest(OperationContext* opCtx,
     }
 }
 
-void registerWriteRequest(OperationContext* opCtx,
-                          const NamespaceString& collection,
-                          size_t writeOpIndex,
-                          const std::function<std::unique_ptr<Key>(void)>& makeKey) {
-    // Check if collecting write commands is enabled.
-    if (internalQueryStatsWriteCmdSampleRate.load() != 0.0) {
-        OpDebug::QueryStatsInfo queryStatsInfo;
-        registerRequest(opCtx, collection, makeKey, queryStatsInfo);
-        // Create and set queryStatsInfo if it is not empty.
-        if (queryStatsInfo.key != nullptr || queryStatsInfo.keyHash != boost::none) {
-            CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(writeOpIndex,
-                                                                  std::move(queryStatsInfo));
-        }
-    }
-}
-
-bool shouldRequestRemoteMetrics(const OpDebug::QueryStatsInfo& queryStatsInfo) {
+bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
     // If the key is non-null, we expect that query stats should be collected at this level of
     // execution. If the keyHash is non-null, then we expect we should forward remote query stats
     // metrics to a higher level of execution, such as running an aggregation for a view, or there
     // are multiple cursors open in a single operation context, such as in $search.
-    return queryStatsInfo.metricsRequested || queryStatsInfo.key != nullptr ||
-        queryStatsInfo.keyHash != boost::none;
-}
-
-bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
-    return shouldRequestRemoteMetrics(opDebug.getQueryStatsInfo());
-}
-
-bool shouldRequestRemoteMetrics(const OpDebug& opDebug, size_t opIndex) {
-    return opDebug.hasQueryStatsInfo(opIndex) &&
-        shouldRequestRemoteMetrics(opDebug.getQueryStatsInfo(opIndex));
+    return opDebug.getQueryStatsInfo().metricsRequested ||
+        opDebug.getQueryStatsInfo().key != nullptr ||
+        opDebug.getQueryStatsInfo().keyHash != boost::none;
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {

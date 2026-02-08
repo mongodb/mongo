@@ -198,23 +198,12 @@ void registerWriteRequest(OperationContext* opCtx,
                           bool willNeverExhaust = false);
 
 /**
- * Register the write op at 'writeOpIndex' for a batched write command (e.g., update) on mongos.
- * This differs from registerWriteRequest() above in that it stores the query stats key inside the
- * hash map '_queryStatsInfoForBatchWrites' in OpDebug using 'writeOpIndex' as the key.
- */
-void registerWriteRequest(OperationContext* opCtx,
-                          const NamespaceString& collection,
-                          size_t writeOpIndex,
-                          const std::function<std::unique_ptr<Key>(void)>& makeKey);
-
-/**
  * Returns whether or not the current operation should request metrics from remote hosts. This
  * can be either because this query was chosen for query stats collection, the user explicitly
  * requested query stats collection for this query, or this query is an internal query generated
  * by a user query that met one of the first two conditions.
  */
 bool shouldRequestRemoteMetrics(const OpDebug& opDebug);
-bool shouldRequestRemoteMetrics(const OpDebug& opDebug, size_t opIndex);
 
 /**
  * Convert an optional Duration to a count of Microseconds uint64_t.
