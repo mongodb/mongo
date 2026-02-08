@@ -1866,6 +1866,8 @@ extern void __wt_fill_hex(
   const uint8_t *src, size_t src_max, uint8_t *dest, size_t dest_max, size_t *lenp);
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
+extern void __wt_free_obsolete_updates(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *visible_all_upd);
 extern void __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages);
 extern void __wt_free_ref_index(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages);

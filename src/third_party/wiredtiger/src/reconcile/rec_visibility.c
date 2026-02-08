@@ -242,9 +242,10 @@ static int
 __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
   WT_ROW *rip, WT_UPDATE_SELECT *upd_select)
 {
-    WT_UPDATE *delete_tombstone, *delete_upd;
+    WT_UPDATE *delete_tombstone, *delete_upd, *visible_all_upd;
 
     delete_tombstone = NULL;
+    visible_all_upd = NULL;
 
     for (delete_upd = upd_select->tombstone != NULL ? upd_select->tombstone : upd_select->upd;
          delete_upd != NULL; delete_upd = delete_upd->next) {
@@ -261,9 +262,21 @@ __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_
             else {
                 WT_RET(
                   __rec_delete_hs_upd_save(session, r, ins, rip, delete_upd, delete_tombstone));
+                visible_all_upd = NULL;
                 break;
             }
         }
+
+        /* Track the first self-contained value that is globally visible. */
+        if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
+          (__wt_txn_upd_visible_all(session, delete_upd)) && WT_UPDATE_DATA_VALUE(delete_upd))
+            visible_all_upd = delete_upd;
+    }
+
+    /* Free obsolete updates, excluding the on-page tombstone if exist. */
+    if (visible_all_upd != NULL && visible_all_upd != upd_select->tombstone) {
+        __wt_free_obsolete_updates(session, r->page, visible_all_upd);
+        WT_STAT_CONN_DATA_INCR(session, cache_obsolete_updates_removed);
     }
 
     WT_ASSERT_ALWAYS(session, delete_tombstone == NULL || delete_upd != NULL,
