@@ -375,7 +375,8 @@ transactions:
     - src/mongo/db/commands/*session*
     - src/mongo/dbtests/logical_sessions_tests.cpp
     - src/mongo/s/client_transport_observer_mongos*
-    - src/mongo/db/stats/read_preference_metrics.idl
+    - src/mongo/db/stats/read_preference_metrics*
+    - src/mongo/db/stats/single_transaction_stats*
 
 fcv:
   meta:

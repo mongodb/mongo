@@ -33,8 +33,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/read_preference_metrics_gen.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Contains server-wide metrics on read preference usage. Metrics are first split into two
@@ -93,4 +94,4 @@ private:
     Counters secondaryCounters;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

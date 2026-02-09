@@ -41,6 +41,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/concurrency/ticketholder_queue_stats.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
@@ -51,7 +52,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Tracks metrics for a single multi-document transaction.
@@ -346,4 +347,4 @@ private:
     TicketHolderQueueStats _queueStats;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
