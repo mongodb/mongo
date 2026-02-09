@@ -3,7 +3,7 @@
  * feature compatibility version is older than the latest version.
  *
  * We restart mongod during the test and expect it to have the same data after restarting.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, future_git_tag_incompatible]
  */
 
 const testName = "view_definition_feature_compatibility_version_multiversion";
