@@ -392,9 +392,9 @@ feature_flags:
     featureFlagCostBasedRanker:
         description: "Feature flag to enable the cost-based ranker for query plans."
         cpp_varname: gFeatureFlagCostBasedRanker
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeEqLookupUnwind:
         description: "Feature flag to enable $lookup-$unwind in SBE."
