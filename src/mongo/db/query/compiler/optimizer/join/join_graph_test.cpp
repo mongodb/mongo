@@ -419,4 +419,73 @@ TEST(JoinGraph, BuildParams) {
     // Validate that the predicates creation status was correctly reported.
     ASSERT_EQ(numPredicates, buildParams.maxPredicatesInJoin);
 }
+
+TEST(JoinGraphTests, IsConnected) {
+    {
+        // Two nodes with an edge is connected: a -- b.
+        MutableJoinGraph mgraph{};
+        auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_TRUE(graph.isConnected());
+    }
+    {
+        // Two nodes without an edge is not connected: a   b.
+        MutableJoinGraph mgraph{};
+        mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_FALSE(graph.isConnected());
+    }
+    {
+        // Three nodes in a line is connected: a -- b -- c.
+        MutableJoinGraph mgraph{};
+        auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        auto c = *mgraph.addNode(makeNSS("c"), nullptr, boost::none);
+        mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+        mgraph.addSimpleEqualityEdge(b, c, 2, 3);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_TRUE(graph.isConnected());
+    }
+    {
+        // Three nodes with one disconnected is not connected: a -- b   c.
+        MutableJoinGraph mgraph{};
+        auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        mgraph.addNode(makeNSS("c"), nullptr, boost::none);
+        mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_FALSE(graph.isConnected());
+    }
+    {
+        // Four nodes with a cycle is connected: a -- b -- c -- d and a -- d.
+        MutableJoinGraph mgraph{};
+        auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        auto c = *mgraph.addNode(makeNSS("c"), nullptr, boost::none);
+        auto d = *mgraph.addNode(makeNSS("d"), nullptr, boost::none);
+        mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+        mgraph.addSimpleEqualityEdge(b, c, 2, 3);
+        mgraph.addSimpleEqualityEdge(c, d, 4, 5);
+        mgraph.addSimpleEqualityEdge(d, a, 6, 7);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_TRUE(graph.isConnected());
+    }
+    {
+        // Four nodes with a cycle and one disconnected node is not connected, even though the
+        // it could be with this number of edges: a -- b -- c   d and a -- c.
+        MutableJoinGraph mgraph{};
+        auto a = *mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        auto b = *mgraph.addNode(makeNSS("b"), nullptr, boost::none);
+        auto c = *mgraph.addNode(makeNSS("c"), nullptr, boost::none);
+        mgraph.addNode(makeNSS("d"), nullptr, boost::none);
+        mgraph.addSimpleEqualityEdge(a, b, 0, 1);
+        mgraph.addSimpleEqualityEdge(b, c, 2, 3);
+        mgraph.addSimpleEqualityEdge(c, a, 4, 5);
+        JoinGraph graph(std::move(mgraph));
+        ASSERT_FALSE(graph.isConnected());
+    }
+}
 }  // namespace mongo::join_ordering

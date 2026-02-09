@@ -124,7 +124,7 @@ runTestCase({
     expectedJoinOptimizer: false,
 });
 
-// Prefix eligible and suffix is cross-product $lookup
+// Prefix eligible and suffix is cross-product $lookup is not accepted by the join optimizer.
 runTestCase({
     pipeline: [
         {
@@ -140,6 +140,32 @@ runTestCase({
             $lookup: {
                 from: coll13.getName(),
                 pipeline: [{$match: {a: {$gt: 0}}}],
+                as: "coll13",
+            },
+        },
+        {$unwind: "$coll13"},
+    ],
+    expectedCount: 1,
+    expectedJoinOptimizer: false,
+});
+
+// $lookup with no join predicate can still be optimized if the rest of the pipeline establishes
+// a connected join graph.
+runTestCase({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                as: "coll12",
+                pipeline: [],
+            },
+        },
+        {$unwind: "$coll12"},
+        {
+            $lookup: {
+                from: coll13.getName(),
+                let: {a: "$a", a12: "$coll12.a"},
+                pipeline: [{$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}}],
                 as: "coll13",
             },
         },

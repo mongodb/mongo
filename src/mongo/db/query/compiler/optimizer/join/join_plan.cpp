@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/util/disjoint_set.h"
 #include "mongo/util/str.h"
 
 namespace mongo::join_ordering {
@@ -188,6 +189,26 @@ BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
                           }},
         get(nodeId));
     return bob.obj();
+}
+
+bool JoinGraph::isConnected() const {
+    if (_edges.size() < _nodes.size() - 1) {
+        return false;
+    }
+
+    // We could implement the following with DFS. However, getting the neighbors of a node requires
+    // iterating over all edges, which is inefficient. Instead, we use union-find.
+    DisjointSet ds{_nodes.size()};
+    for (const auto& edge : _edges) {
+        ds.unite(edge.left, edge.right);
+    }
+    auto root = ds.find(0);
+    for (size_t i = 1; i < _nodes.size(); ++i) {
+        if (ds.find(i) != root) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace mongo::join_ordering

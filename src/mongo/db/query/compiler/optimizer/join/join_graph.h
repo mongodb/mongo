@@ -367,6 +367,13 @@ public:
         return _edges;
     }
 
+    /**
+     * Return true if each node in this graph is reachable from every other node by the edges in the
+     * graph. If a join graph is connected, then a plan can be constructed that satisfies the query
+     * without using any cross products. Once we support cross products, we may remove this method.
+     */
+    bool isConnected() const;
+
 private:
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;

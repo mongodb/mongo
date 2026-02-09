@@ -57,7 +57,6 @@ TEST_F(PipelineAnalyzerTest,
 }
 
 TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForeignFields) {
-    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -72,10 +71,7 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
 
     // TODO SERVER-116034: Support cross-products.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_OK(swJoinModel);
-
-    auto& joinModel = swJoinModel.getValue();
-    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+    ASSERT_NOT_OK(swJoinModel);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelineEligibleForJoinReorderingSingleLookupUnwind) {
