@@ -266,6 +266,8 @@ export const $config = (function () {
                 // Handles the case where another resharding operation is in progress
                 ErrorCodes.ConflictingOperationInProgress,
                 ErrorCodes.ReshardCollectionInProgress,
+                // Handles the case where the collection is already unsharded
+                ErrorCodes.NamespaceNotSharded,
             ]);
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
