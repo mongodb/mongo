@@ -3,7 +3,7 @@
  * The current threshold for switching to Subplanner is 16+ plans.
  */
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted, getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanNotCosted, getCBRConfig, restoreCBRConfig} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -31,7 +31,17 @@ clusteredColl.drop();
 assert.commandWorked(db.createCollection(clusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
 assert.commandWorked(clusteredColl.insertMany(docs));
 
-const pipeline = [
+const pipeline1 = [
+    {
+        "$match": {
+            "$or": [{"a": {"$lt": 500}, "b": {"$in": [25, 65, 75]}}, {"a": {"$gte": 2000, $lte: 3000}}],
+        },
+    },
+    {"$sort": {"c": 1}},
+    {"$skip": 120},
+    {"$limit": 400},
+];
+const pipeline2 = [
     {
         "$match": {
             "$or": [
@@ -46,19 +56,22 @@ const pipeline = [
     {"$limit": 400},
 ];
 
-function testAutomaticUsesNoSubplanner(maxEnumeratedPlans) {
+function testAutomaticUsesNoSubplanner(coll, pipeline, autoStrategy, maxOrSolutions) {
     jsTest.log.info("Running testAutomaticUsesNoSubplanner");
+    assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: autoStrategy}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutions}));
     const explain = coll.explain("executionStats").aggregate(pipeline);
-    const winningPlan = getWinningPlanFromExplain(explain);
-    assertPlanCosted(winningPlan);
-    assert.eq(explain.queryPlanner.rejectedPlans.length, maxEnumeratedPlans - 1, toJsonForLog(explain)); // -1 for the winning plan
+    // Total number of query plans should be smaller than the maxOrSolutions.
+    assert.lt(explain.queryPlanner.rejectedPlans.length + 1, maxOrSolutions, toJsonForLog(explain));
     const subplan = getPlanStage(explain, "SUBPLAN");
     assert.eq(null, subplan, toJsonForLog(explain));
     assert.eq(explain.executionStats.nReturned, 400, toJsonForLog(explain));
 }
 
-function testAutomaticUsesSubplanner(coll) {
+function testAutomaticUsesSubplanner(coll, pipeline, autoStrategy, maxOrSolutions) {
     jsTest.log.info("Running testAutomaticUsesSublanner");
+    assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: autoStrategy}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutions}));
     const explain = coll.explain("executionStats").aggregate(pipeline);
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
@@ -67,50 +80,35 @@ function testAutomaticUsesSubplanner(coll) {
     assert.eq(explain.executionStats.nReturned, 400, toJsonForLog(explain));
 }
 
+const maxOrSolutionsLow = 10;
+const maxOrSolutionsHigh = 20;
+const autoPlanRankingStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
+const allAutoPlanRankingStrategies = [...autoPlanRankingStrategies, "HistogramCEWithHeuristicFallback"];
+
 const prevCBRConfig = getCBRConfig(db);
 assert.commandWorked(
     db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"}),
 );
 
-const maxOrSolutionsLow = 10;
-const maxOrSolutionsHigh = 20;
 const prevMaxOrSolutions = assert.commandWorked(
     db.adminCommand({getParameter: 1, internalQueryEnumerationMaxOrSolutions: 1}),
 ).internalQueryEnumerationMaxOrSolutions;
 
-const autoPlanRankingStrategies = ["CBRForNoMultiplanningResults", "CBRCostBasedRankerChoice"];
-
 try {
     for (let autoStrategy of autoPlanRankingStrategies) {
-        assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: autoStrategy}));
+        testAutomaticUsesNoSubplanner(coll, pipeline1, autoStrategy, maxOrSolutionsLow);
+        testAutomaticUsesSubplanner(coll, pipeline2, autoStrategy, maxOrSolutionsHigh);
+    }
 
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsLow}),
-        );
-        if (autoStrategy === "CBRCostBasedRankerChoice") {
-            // TODO SERVER-117372. Explain multiplanner plans when cost based choice is active.
-            testAutomaticUsesNoSubplanner(maxOrSolutionsLow + 1);
-        } else {
-            testAutomaticUsesNoSubplanner(2 * (maxOrSolutionsLow + 1)); // Every strategy (MP + CBR) generates maxOrSolutionsLow plans plus one since there's an index that could be used to satisfy the sorting.
-        }
-
-        // AutomaticCE strategies always use the subplanner for clustered collections.
+    for (let autoStrategy of allAutoPlanRankingStrategies) {
+        // All automaticCE strategies use the subplanner for clustered collections.
         // TODO SERVER-117766: Avoid subplanner for $or queries over clustered collections.
-        testAutomaticUsesSubplanner(clusteredColl);
-
-        // AutomaticCE strategies always use the subplanner for more than kMaxNumberOfOrPlans(16).
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsHigh}),
-        );
-        testAutomaticUsesSubplanner(coll);
+        testAutomaticUsesSubplanner(clusteredColl, pipeline1, autoStrategy, maxOrSolutionsLow);
     }
 
     // The default AutomaticCE strategy always uses the subplanner.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback"}),
-    );
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsLow}));
-    testAutomaticUsesSubplanner(coll);
+    testAutomaticUsesSubplanner(coll, pipeline1, "HistogramCEWithHeuristicFallback", maxOrSolutionsLow);
+    testAutomaticUsesSubplanner(coll, pipeline2, "HistogramCEWithHeuristicFallback", maxOrSolutionsHigh);
 } finally {
     restoreCBRConfig(db, prevCBRConfig);
     assert.commandWorked(

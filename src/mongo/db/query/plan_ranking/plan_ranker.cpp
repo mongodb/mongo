@@ -104,6 +104,14 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
     return swRankingResult;
 }
 
+size_t maxNumberOfOrPlans() {
+    // Use as an upper bound the value of internalQueryEnumerationMaxOrSolutions reduced by 1. If
+    // the enumerator produces exactly maxOrSolutions, the total number of possible plans is likely
+    // higher, which means that some plans are cut out.
+    auto maxOrSolutions = static_cast<size_t>(internalQueryEnumerationMaxOrSolutions.load());
+    return maxOrSolutions > 0 ? std::min(maxOrSolutions - 1, kMaxNumberOfOrPlans) : 0;
+}
+
 bool delayOrSkipSubplanner(const CanonicalQuery& query,
                            const QueryPlannerParams& params,
                            bool isClassic) {
