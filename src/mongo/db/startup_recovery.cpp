@@ -114,6 +114,11 @@ MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
 // Exit after repairing data, but before the replica set configuration is invalidated.
 MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
 
+struct OfflineValidateResults {
+    bool allValidationComplete = true;
+    bool allResultsValid = true;
+};
+
 // Returns true if storage engine is writable.
 bool isWriteableStorageEngine() {
     return storageGlobalParams.engine != "devnull";
@@ -707,10 +712,11 @@ void startupRepair(OperationContext* opCtx,
     }
 }
 
-// Perform collection validation for singular collection
-bool offlineValidateCollection(OperationContext* opCtx,
-                               NamespaceString nss,
-                               bool skipAtClusterTime = false) {
+// Performs collection validation for a singular collection.
+// Returns if the collection is valid, or the validation didn't complete correctly.
+StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
+                                           NamespaceString nss,
+                                           bool skipAtClusterTime = false) {
     auto collectionValidateOptionsParam =
         ServerParameterSet::getNodeParameterSet()->get<CollectionValidateOptionsServerParameter>(
             "collectionValidateOptions");
@@ -722,51 +728,73 @@ bool offlineValidateCollection(OperationContext* opCtx,
               CollectionValidation::RepairMode::kNone,
               /*logDiagnostics=*/false);
     ValidateResults validateResults;
-    Status status = CollectionValidation::validate(opCtx, nss, parsedOptions, &validateResults);
+    try {
+        Status status = CollectionValidation::validate(opCtx, nss, parsedOptions, &validateResults);
 
-    if (!status.isOK()) {
-        uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
-                         str::stream() << "Validation of collection " << nss.toStringForErrorMsg()
-                                       << " failed with error " << status.toString()
-                                       << ", see logs for more details"});
-    } else {
-        BSONObjBuilder results;
-        validateResults.appendToResultObj(&results, /*debug=*/false);
-        LOGV2_OPTIONS(9437301,
-                      {logv2::LogTruncation::Disabled},
-                      "Offline validation result",
-                      "results"_attr = results.done());
+        if (!status.isOK()) {
+            LOGV2_ERROR(11790200,
+                        "Collection validation failed to complete, see logs for more details",
+                        "nss"_attr = nss.toStringForErrorMsg(),
+                        "error"_attr = status.toString());
+            return status;
+        } else {
+            BSONObjBuilder results;
+            validateResults.appendToResultObj(&results, /*debug=*/false);
+            LOGV2_OPTIONS(9437301,
+                          {logv2::LogTruncation::Disabled},
+                          "Offline validation result",
+                          "results"_attr = results.done());
+            return validateResults.isValid();
+        }
+    } catch (const DBException& e) {
+        LOGV2_ERROR(11790201,
+                    "Collection validation failed to complete, see logs for more details",
+                    "nss"_attr = nss.toStringForErrorMsg(),
+                    "error"_attr = e.toString());
+        return e.toStatus();
     }
-    return validateResults.isValid();
 }
 
-// Perform collection validation for all collections on a databases
-bool offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
+// Performs collection validation for all collections or one collection in a database.
+// Returns if all collections complete validation and if all collections are valid.
+OfflineValidateResults offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->openDb(opCtx, dbName);
-    bool allResultsValid = true;
+    OfflineValidateResults offlineValidateResults;
     if (!gValidateCollectionName.empty()) {
         NamespaceString userNss = NamespaceStringUtil::deserialize(dbName, gValidateCollectionName);
-        allResultsValid &= offlineValidateCollection(opCtx, userNss);
+        if (auto swValidateResult = offlineValidateCollection(opCtx, userNss);
+            swValidateResult.isOK()) {
+            offlineValidateResults.allResultsValid = swValidateResult.getValue();
+        } else {
+            offlineValidateResults.allValidationComplete = false;
+        }
     } else {
         for (const auto& nss :
              CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
             opCtx->checkForInterrupt();
 
-            allResultsValid &= offlineValidateCollection(opCtx, nss, !nss.isReplicated());
+            if (auto swValidateResult = offlineValidateCollection(opCtx, nss, !nss.isReplicated());
+                swValidateResult.isOK()) {
+                offlineValidateResults.allResultsValid =
+                    offlineValidateResults.allResultsValid && swValidateResult.getValue();
+            } else {
+                offlineValidateResults.allValidationComplete = false;
+            }
         }
     }
-    return allResultsValid;
+    return offlineValidateResults;
 }
 
-// Perform collection validation for all collections in all databases
-void offlineValidate(OperationContext* opCtx) {
+// Performs collection validation for all collections in one or all databases.
+// Returns if all databases complete validation and if all databases are valid.
+OfflineValidateResults offlineValidate(OperationContext* opCtx) {
     invariant(!storageGlobalParams.queryableBackupMode);
 
     auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
     serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
 
-    bool allResultsValid = true;
+    OfflineValidateResults offlineValidateResults;
 
     if (!gValidateDbName.empty()) {
         const boost::optional<TenantId>& tenantId = boost::none;
@@ -774,19 +802,25 @@ void offlineValidate(OperationContext* opCtx) {
             tenantId,
             gValidateDbName.data(),
             SerializationContext(SerializationContext::Source::Catalog));
-        allResultsValid &= offlineValidateDb(opCtx, userDbName);
+        offlineValidateResults = offlineValidateDb(opCtx, userDbName);
 
     } else {
         for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
-            allResultsValid &= offlineValidateDb(opCtx, dbName);
+            const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
+            offlineValidateResults.allValidationComplete =
+                offlineValidateResults.allValidationComplete && isComplete;
+            offlineValidateResults.allResultsValid =
+                offlineValidateResults.allResultsValid && isValid;
         }
     }
 
-    if (allResultsValid) {
-        LOGV2(9437303, "Offline validation successfully validated all collections");
+    if (offlineValidateResults.allResultsValid) {
+        LOGV2(9437303, "Offline validation detected no issues");
     } else {
         LOGV2(9437304, "Offline validation found issues in some collections, see logs for details");
     }
+
+    return offlineValidateResults;
 }
 
 // Perform routine startup recovery procedure.
@@ -899,7 +933,11 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
     } else if (storageGlobalParams.validate) {
-        offlineValidate(opCtx);
+        const auto offlineValidateResults = offlineValidate(opCtx);
+        if (!offlineValidateResults.allValidationComplete) {
+            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                             "Offline validation didn't complete for some collections"});
+        }
     } else {
         startupRecovery(opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);
     }
