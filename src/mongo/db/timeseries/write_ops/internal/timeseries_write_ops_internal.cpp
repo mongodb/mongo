@@ -960,7 +960,13 @@ Status performAtomicTimeseriesWrites(
 
     std::vector<repl::OpTime> oplogSlots;
     boost::optional<std::vector<repl::OpTime>::iterator> slot;
-    if (!updateOps.empty()) {
+    if (!updateOps.empty() &&
+        // When primary-driven index builds are enabled, we should avoid allocating op times
+        // ourselves because the WriteUnitOfWork will do it for us.
+        !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds
+             .isEnabledUseLastLTSFCVWhenUninitialized(
+                 VersionContext::getDecoration(opCtx),
+                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
             oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
             slot = oplogSlots.begin();
