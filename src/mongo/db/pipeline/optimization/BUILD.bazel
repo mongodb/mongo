@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "pipeline_optimization",
     srcs = [
         "cr_rules_to_move.cpp",
+        "lookup_rules.cpp",
         "match_rules.cpp",
         "qe_rules_to_move.cpp",
         "qi_rules_to_move.cpp",

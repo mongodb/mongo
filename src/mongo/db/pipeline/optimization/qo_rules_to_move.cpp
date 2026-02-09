@@ -51,7 +51,6 @@ REGISTER_RULES(DocumentSourceLimit, OPTIMIZE_AT_RULE(DocumentSourceLimit));
 REGISTER_RULES(DocumentSourceGroup,
                OPTIMIZE_AT_RULE(DocumentSourceGroup),
                OPTIMIZE_IN_PLACE_RULE(DocumentSourceGroup));
-REGISTER_RULES(DocumentSourceLookUp, OPTIMIZE_AT_RULE(DocumentSourceLookUp));
 REGISTER_RULES(DocumentSourceUnionWith,
                OPTIMIZE_AT_RULE(DocumentSourceUnionWith),
                OPTIMIZE_IN_PLACE_RULE(DocumentSourceUnionWith));

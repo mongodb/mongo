@@ -125,6 +125,20 @@ function runBasicJoinTest(pipeline) {
 }
 
 joinTestWrapper(() => {
+    section("Basic example where $lookup subpipeline contains multiple $match stages");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}, {$match: {c: "blah"}}, {$match: {_id: {$gt: 0}}}],
+            },
+        },
+        {$unwind: "$x"},
+    ]);
+
     section("Basic example with two joins");
     runBasicJoinTest([
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},

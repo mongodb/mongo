@@ -1,4 +1,320 @@
-## 1. Basic example with two joins
+## 1. Basic example where $lookup subpipeline contains multiple $match stages
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a",
+			"pipeline" : [
+				{
+					"$match" : {
+						"d" : {
+							"$lt" : 3
+						}
+					}
+				},
+				{
+					"$match" : {
+						"c" : "blah"
+					}
+				},
+				{
+					"$match" : {
+						"_id" : {
+							"$gt" : 0
+						}
+					}
+				}
+			]
+		}
+	},
+	{
+		"$unwind" : "$x"
+	}
+]
+```
+### Results
+```json
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
+### Summarized explain
+Execution Engine: classic
+```json
+{
+	"queryShapeHash" : "C83C261C5CC0CDF468EEA042E2461C969FE0B89048C8FEBBA76784D0123788D7",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"direction" : "forward",
+					"nss" : "test.basic_joins_md",
+					"stage" : "COLLSCAN"
+				}
+			}
+		},
+		{
+			"$lookup" : {
+				"as" : "x",
+				"foreignField" : "a",
+				"from" : "basic_joins_md_foreign1",
+				"let" : { },
+				"localField" : "a",
+				"pipeline" : [
+					{
+						"$match" : {
+							"d" : {
+								"$lt" : 3
+							}
+						}
+					},
+					{
+						"$match" : {
+							"c" : "blah"
+						}
+					},
+					{
+						"$match" : {
+							"_id" : {
+								"$gt" : 0
+							}
+						}
+					}
+				],
+				"unwinding" : {
+					"preserveNullAndEmptyArrays" : false
+				}
+			}
+		}
+	]
+}
+```
+
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With random order, seed 44, nested loop joins
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  FETCH [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |  |
+  |  IXSCAN [test.basic_joins_md_foreign1]
+  |  keyPattern: { "_id" : 1 }
+  |  indexName: "_id_"
+  |  isMultiKey: false
+  |  isUnique: true
+  |  isSparse: false
+  |  isPartial: false
+  |  direction: "forward"
+  |  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 44, hash join enabled
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  FETCH [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |  |
+  |  IXSCAN [test.basic_joins_md_foreign1]
+  |  keyPattern: { "_id" : 1 }
+  |  indexName: "_id_"
+  |  isMultiKey: false
+  |  isUnique: true
+  |  isSparse: false
+  |  isPartial: false
+  |  direction: "forward"
+  |  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 45, nested loop joins
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With random order, seed 45, hash join enabled
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With fixed order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  FETCH [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
+  |
+  IXSCAN [test.basic_joins_md_foreign1]
+  keyPattern: { "_id" : 1 }
+  indexName: "_id_"
+  isMultiKey: false
+  isUnique: true
+  isSparse: false
+  isPartial: false
+  direction: "forward"
+  indexBounds: { "_id" : [ "(0.0, inf]" ] }
+```
+## 2. Basic example with two joins
 ### No join opt
 ### Pipeline
 ```json
@@ -278,7 +594,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 2. Basic example with two joins and suffix
+## 3. Basic example with two joins and suffix
 ### No join opt
 ### Pipeline
 ```json
@@ -599,7 +915,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 3. Example with two joins, suffix, and sub-pipeline with un-correlated $match
+## 4. Example with two joins, suffix, and sub-pipeline with un-correlated $match
 ### No join opt
 ### Pipeline
 ```json
@@ -1007,7 +1323,7 @@ rightEmbeddingField: "y"
   filter: { "d" : { "$lt" : 3 } }
   direction: "forward"
 ```
-## 4. Example with two joins and sub-pipeline with un-correlated $match
+## 5. Example with two joins and sub-pipeline with un-correlated $match
 ### No join opt
 ### Pipeline
 ```json
@@ -1361,7 +1677,7 @@ rightEmbeddingField: "y"
   filter: { "d" : { "$lt" : 3 } }
   direction: "forward"
 ```
-## 5. Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix
+## 6. Example with two joins, suffix, and sub-pipeline with un-correlated $match and $match prefix
 ### No join opt
 ### Pipeline
 ```json
@@ -1786,7 +2102,7 @@ rightEmbeddingField: "y"
   filter: { "a" : { "$gt" : 1 } }
   direction: "forward"
 ```
-## 6. Example with two joins and sub-pipeline with un-correlated $match and $match prefix
+## 7. Example with two joins and sub-pipeline with un-correlated $match and $match prefix
 ### No join opt
 ### Pipeline
 ```json
@@ -2156,7 +2472,7 @@ rightEmbeddingField: "y"
   filter: { "a" : { "$gt" : 1 } }
   direction: "forward"
 ```
-## 7. Basic example with referencing field from previous lookup
+## 8. Basic example with referencing field from previous lookup
 ### No join opt
 ### Pipeline
 ```json
@@ -2422,7 +2738,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 8. Basic example with 3 joins & subsequent join referencing fields from previous lookups
+## 9. Basic example with 3 joins & subsequent join referencing fields from previous lookups
 ### No join opt
 ### Pipeline
 ```json
@@ -2785,7 +3101,7 @@ rightEmbeddingField: "z"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 9. Basic example with 3 joins & subsequent join referencing nested paths
+## 10. Basic example with 3 joins & subsequent join referencing nested paths
 ### No join opt
 ### Pipeline
 ```json
@@ -3127,7 +3443,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 10. Basic example with a $project excluding a field from the base collection
+## 11. Basic example with a $project excluding a field from the base collection
 ### No join opt
 ### Pipeline
 ```json
@@ -3445,7 +3761,7 @@ rightEmbeddingField: "x"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
-## 11. Basic example with a $project reducing the documents of the base collection to a single field
+## 12. Basic example with a $project reducing the documents of the base collection to a single field
 ### No join opt
 ### Pipeline
 ```json
@@ -3750,7 +4066,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 12. Basic example with a $project adding synthetic fields
+## 13. Basic example with a $project adding synthetic fields
 ### No join opt
 ### Pipeline
 ```json
@@ -4057,7 +4373,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign3]
   direction: "forward"
 ```
-## 13. Example with a cycle in the join graph
+## 14. Example with a cycle in the join graph
 ### No join opt
 ### Pipeline
 ```json
@@ -4489,7 +4805,7 @@ rightEmbeddingField: "x"
   filter: { "b" : { "$eq" : "foo" } }
   direction: "forward"
 ```
-## 14. Basic example with $expr predicates
+## 15. Basic example with $expr predicates
 ### No join opt
 ### Pipeline
 ```json

@@ -945,6 +945,10 @@ public:
         return _queryKnobConfiguration.get(getQuerySettings());
     }
 
+    bool queryKnobIsInitialized() const {
+        return _queryKnobConfiguration.isInitialized();
+    }
+
     void setIgnoreCollator() {
         _collator.setIgnore();
     }
