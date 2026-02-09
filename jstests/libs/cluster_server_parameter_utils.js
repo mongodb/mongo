@@ -58,6 +58,7 @@ export const kNonTestOnlyClusterParameters = {
         default: {enabled: false},
         testValues: [{enabled: true}, {enabled: false}],
         isSetInternally: true,
+        featureFlag: "PauseMigrationsDuringMultiUpdatesAvailable",
     },
     internalQueryCutoffForSampleFromRandomCursor: {
         default: {sampleCutoff: 0.05},

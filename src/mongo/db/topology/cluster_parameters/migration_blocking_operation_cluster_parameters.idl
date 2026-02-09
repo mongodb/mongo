@@ -30,6 +30,8 @@ imports:
 
 global:
     cpp_namespace: mongo::migration_blocking_operation
+    cpp_includes:
+        - "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
     mod_visibility: needs_replacement
 
 structs:
@@ -56,6 +58,6 @@ server_parameters:
         cpp_vartype: PauseMigrationsDuringMultiUpdatesParam
         cpp_varname: pauseMigrationsDuringMultiUpdates
         condition:
-            min_fcv: 7.2
+            feature_flag: gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
         redact: false
         omit_in_ftdc: false

@@ -58,7 +58,6 @@
 #include "mongo/db/topology/cluster_parameters/set_cluster_parameter_invocation.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/str.h"
@@ -75,22 +74,6 @@
 namespace mongo {
 
 namespace {
-StringData getParameterName(const BSONObj& command) {
-    return command.firstElement().fieldName();
-}
-
-Status allowedToEnable(const BSONObj& command) {
-    auto name = getParameterName(command);
-    if (name == "pauseMigrationsDuringMultiUpdates" &&
-        !migration_blocking_operation::gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
-             .isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return Status{
-            ErrorCodes::IllegalOperation,
-            "Unable to enable pauseMigrationsDuringMultiUpdates cluster parameter because "
-            "pauseMigrationsDuringMultiUpdatesAvailable feature flag is not enabled."};
-    }
-    return Status::OK();
-}
 
 std::shared_ptr<SetClusterParameterCoordinator> makeSetClusterParameterCoordinator(
     OperationContext* opCtx, const ConfigsvrSetClusterParameter& request) {
@@ -102,10 +85,8 @@ std::shared_ptr<SetClusterParameterCoordinator> makeSetClusterParameterCoordinat
     DBDirectClient dbClient(opCtx);
     ClusterParameterDBClientService dbService(dbClient);
     BSONObj cmdParamObj = request.getCommandParameter();
-    StringData parameterName = getParameterName(cmdParamObj);
+    StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = sps->get(parameterName);
-
-    uassertStatusOK(allowedToEnable(cmdParamObj));
 
     SetClusterParameterInvocation invocation{std::move(sps), dbService};
 
