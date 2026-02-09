@@ -310,7 +310,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
     : DocumentSource(kStageName, expCtx),
       _params(std::move(params)),
-      _unwind(unwindSrc),
+      _unwind(std::move(unwindSrc)),
       _variables(expCtx->variables),
       _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (!getFromNs().isOnInternalDb()) {
@@ -326,10 +326,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     // stage we'll eventually construct from the input document.
     if (!isRawDataOperation(expCtx->getOperationContext()) ||
         !resolvedNamespace.ns.isTimeseriesBucketsCollection()) {
-        _fromPipeline.reserve(resolvedNamespace.pipeline.size() + 1);
         _fromPipeline = resolvedNamespace.pipeline;
-    } else {
-        _fromPipeline.reserve(1);
     }
     _fromPipeline.push_back(BSON("$match" << BSONObj()));
 }
@@ -363,19 +360,17 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc) {
-    intrusive_ptr<DocumentSourceGraphLookUp> source(
-        new DocumentSourceGraphLookUp(expCtx,
-                                      GraphLookUpParams(std::move(fromNs),
-                                                        std::move(asField),
-                                                        std::move(connectFromField),
-                                                        std::move(connectToField),
-                                                        std::move(startWith),
-                                                        additionalFilter,
-                                                        depthField,
-                                                        maxDepth),
+    return new DocumentSourceGraphLookUp(expCtx,
+                                         GraphLookUpParams(std::move(fromNs),
+                                                           std::move(asField),
+                                                           std::move(connectFromField),
+                                                           std::move(connectToField),
+                                                           std::move(startWith),
+                                                           std::move(additionalFilter),
+                                                           depthField,
+                                                           maxDepth),
 
-                                      unwindSrc));
-    return source;
+                                         std::move(unwindSrc));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
@@ -463,19 +458,16 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
                           << "and 'connectToField' to be specified.",
             !isMissingRequiredField);
 
-    intrusive_ptr<DocumentSourceGraphLookUp> newSource(
-        new DocumentSourceGraphLookUp(expCtx,
-                                      GraphLookUpParams(std::move(from),
-                                                        std::move(as),
-                                                        std::move(connectFromField),
-                                                        std::move(connectToField),
-                                                        std::move(startWith),
-                                                        additionalFilter,
-                                                        depthField,
-                                                        maxDepth),
-                                      boost::none));
-
-    return newSource;
+    return new DocumentSourceGraphLookUp(expCtx,
+                                         GraphLookUpParams(std::move(from),
+                                                           std::move(as),
+                                                           std::move(connectFromField),
+                                                           std::move(connectToField),
+                                                           std::move(startWith),
+                                                           std::move(additionalFilter),
+                                                           depthField,
+                                                           maxDepth),
+                                         boost::none);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::clone(

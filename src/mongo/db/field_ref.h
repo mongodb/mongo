@@ -45,13 +45,13 @@
 #include <iosfwd>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
-
 
 /**
  * For performance reasons, we need to reduce the size of FieldRef::StringView. Since we have a cap
@@ -150,7 +150,7 @@ public:
     void removeLastPart();
 
     /**
-     * Removes the first part from the path, decreasing its size by 1. Has no effect on a FielRef
+     * Removes the first part from the path, decreasing its size by 1. Has no effect on a FieldRef
      * with size 0.
      */
     void removeFirstPart();
@@ -292,6 +292,10 @@ private:
         std::string _value;
     };
 
+    // 'ValidatedPathString' is used in vectors, so it should be noexcept-movable.
+    static_assert(std::is_nothrow_move_constructible_v<ValidatedPathString>);
+    static_assert(std::is_nothrow_move_assignable_v<ValidatedPathString>);
+
     // Dotted fields are most often not longer than four parts. We use a mixed structure
     // here that will not require any extra memory allocation when that is the case. And
     // handle larger dotted fields if it is. The idea is not to penalize the common case
@@ -299,7 +303,7 @@ private:
     static constexpr size_t kFewDottedFieldParts = 4;
 
     // In order to make FieldRef copyable, we use a StringData-like type that stores an offset and
-    // length into the backing string. StringData, in constrast, holds const char* pointers that
+    // length into the backing string. StringData, in contrast, holds const char* pointers that
     // would have to be updated to point into the new string on copy.
     struct StringView {
         // Constructs an empty StringView.

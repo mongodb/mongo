@@ -155,14 +155,22 @@ private:
      * Prepares the query to execute on the 'from' collection wrapped in a $match by using the
      * contents of '_queue'. Consumes from the _queue until it is empty or the match stage reached
      * BSONObjMaxUserSize.
+     *
+     * The 'Query' struct contains references to containers managed by the graph lookup stage, so it
+     * must not outlive the graph lookup stage.
      */
     struct Query {
         // Valid $match stage that we have to query, or boost::none if no query is needed.
         boost::optional<BSONObj> match;
-        // Documents that are returned from in-memory cache.
-        DocumentUnorderedSet cached;
-        // Values from _queue that are processed by this query.
-        ValueFlatUnorderedSet queried;
+
+        // Documents that are returned from in-memory cache. This is a reference to the
+        // '_queryState.cached' instance variable of the graph lookup stage.
+        DocumentUnorderedSet& cached;
+
+        // Values from _queue that are processed by this query. This is a reference to the
+        // '_queryState.queried' instance variable of the graph lookup stage.
+        ValueFlatUnorderedSet& queried;
+
         // Depth of the documents, returned by the given query.
         long long depth;
     };
@@ -230,5 +238,27 @@ private:
     // If we absorbed a $unwind that specified 'includeArrayIndex', this is used to populate that
     // field, tracking how many results we've returned so far for the current input document.
     long long _outputIndex = 0;
+
+    // An internal struct for sharing container state between multiple queries that can be executed
+    // by the graph lookup stage. The containers used in here are referenced by the 'Query'
+    // instances created by the graph lookup stage.
+    struct ReusableQueryState {
+        // Documents that are returned from in-memory cache. Not spillable.
+        DocumentUnorderedSet cached;
+
+        // Values from _queue that are processed by this query. Not spillable.
+        ValueFlatUnorderedSet queried;
+
+        // Clear the containers.
+        void clear() {
+            cached.clear();
+            queried.clear();
+        }
+    };
+
+    // Reusable container state for all queries executed by this stage.
+    // The purpose of this member is to recycle the existing containers for multiple queries, so
+    // that the number of memory allocations, deallocations and memmoves is reduced.
+    boost::optional<ReusableQueryState> _queryState;
 };
 }  // namespace mongo::exec::agg

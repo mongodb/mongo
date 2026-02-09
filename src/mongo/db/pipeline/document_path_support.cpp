@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_path_support.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -41,7 +40,6 @@
 
 #include <cstddef>
 
-
 namespace mongo {
 namespace document_path_support {
 
@@ -51,7 +49,8 @@ namespace {
  * If 'value' is an array, invokes 'callback' once on each element of 'value'. Otherwise, if 'value'
  * is not missing, invokes 'callback' on 'value' itself.
  */
-void invokeCallbackOnTrailingValue(const Value& value, std::function<void(const Value&)> callback) {
+void invokeCallbackOnTrailingValue(const Value& value,
+                                   const std::function<void(const Value&)>& callback) {
     if (value.isArray()) {
         for (auto&& finalValue : value.getArray()) {
             if (!finalValue.missing()) {
@@ -67,16 +66,18 @@ void visitAllValuesAtPathHelper(const Document& doc,
                                 const FieldPath& path,
                                 size_t fieldPathIndex,
                                 std::function<void(const Value&)> callback) {
+    auto pathLength = path.getPathLength();
+
     tassert(11294814,
-            str::stream() << "Expect path index to be in range (0, " << path.getPathLength()
-                          << "), got " << fieldPathIndex,
-            path.getPathLength() > 0 && fieldPathIndex < path.getPathLength());
+            str::stream() << "Expect path index to be in range (0, " << pathLength << "), got "
+                          << fieldPathIndex,
+            pathLength > 0 && fieldPathIndex < pathLength);
 
     // The first field in the path must be treated as a field name, even if it is numeric as in
     // "0.a.1.b".
     auto nextValue = doc.getField(path.getFieldName(fieldPathIndex));
     ++fieldPathIndex;
-    if (path.getPathLength() == fieldPathIndex) {
+    if (pathLength == fieldPathIndex) {
         invokeCallbackOnTrailingValue(nextValue, callback);
         return;
     }
@@ -84,7 +85,7 @@ void visitAllValuesAtPathHelper(const Document& doc,
     // Follow numeric field names as positions in array values. This loop consumes all consecutive
     // positional specifications, if applicable. For example, it will consume "0" and "1" from the
     // path "a.0.1.b" if the value at "a" is an array with arrays inside it.
-    while (fieldPathIndex < path.getPathLength() && nextValue.isArray()) {
+    while (fieldPathIndex < pathLength && nextValue.isArray()) {
         const StringData field = path.getFieldName(fieldPathIndex);
         // Check for a numeric component that is not prefixed by 0 (for example "1" rather than
         // "01"). These should act as field names, not as an index into an array.
@@ -97,7 +98,7 @@ void visitAllValuesAtPathHelper(const Document& doc,
         }
     }
 
-    if (fieldPathIndex == path.getPathLength()) {
+    if (fieldPathIndex == pathLength) {
         // The path ended in a positional traversal of arrays (e.g. "a.0").
         invokeCallbackOnTrailingValue(nextValue, callback);
         return;
