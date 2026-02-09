@@ -141,7 +141,7 @@ void RemoveShardCommitCoordinator::_joinMigrationsAndCheckRangeDeletions(Operati
     // orphanCleanupDelaySecs as a best effort since creation of latest non pending range deletion
     // task. Any ongoing queries on primary or secondary from older chunk metadata will throw with
     // QueryPlanKilled error and can be retried by the user.
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+    auto task = topology_change_helpers::getLatestNonProcessingRangeDeletionTask(opCtx);
     if (task) {
         topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
     }

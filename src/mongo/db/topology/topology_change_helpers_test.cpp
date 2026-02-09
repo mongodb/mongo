@@ -83,23 +83,25 @@ protected:
 };
 
 TEST_F(TopologyChangeHelpersTest, NoRangeDeletionTasks) {
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_FALSE(result.has_value());
 }
 
 TEST_F(TopologyChangeHelpersTest, OnlyPendingTasks) {
+    Timestamp expectedTimestamp(100, 1);
     insertRangeDeletionTask(UUID::gen(),
                             kTestNss,
                             UUID::gen(),
                             kTestRange,
                             CleanWhenEnum::kDelayed,
-                            Timestamp(100, 1),
+                            expectedTimestamp,
                             true /* pending */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
-    ASSERT_FALSE(result.has_value());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }
 
 TEST_F(TopologyChangeHelpersTest, OnlyProcessingTasks) {
@@ -112,8 +114,8 @@ TEST_F(TopologyChangeHelpersTest, OnlyProcessingTasks) {
                             boost::none /* pending not set */,
                             true /* processing */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_FALSE(result.has_value());
 }
 
@@ -127,8 +129,8 @@ TEST_F(TopologyChangeHelpersTest, SingleNonPendingTask) {
                             expectedTimestamp,
                             false /* pending */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }
@@ -143,8 +145,8 @@ TEST_F(TopologyChangeHelpersTest, TaskWithNoPendingField) {
                             expectedTimestamp,
                             boost::none /* pending not set */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }
@@ -175,19 +177,20 @@ TEST_F(TopologyChangeHelpersTest, MultipleTasksReturnsLatest) {
                             Timestamp(200, 1),
                             false /* pending */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), latestTimestamp);
 }
 
 TEST_F(TopologyChangeHelpersTest, MixedTasksFiltersCorrectly) {
+    Timestamp expectedTimestamp(500, 1);
     insertRangeDeletionTask(UUID::gen(),
                             kTestNss,
                             UUID::gen(),
                             ChunkRange{BSON("_id" << 0), BSON("_id" << 10)},
                             CleanWhenEnum::kDelayed,
-                            Timestamp(500, 1),
+                            expectedTimestamp,
                             true /* pending */);
 
     insertRangeDeletionTask(UUID::gen(),
@@ -199,13 +202,12 @@ TEST_F(TopologyChangeHelpersTest, MixedTasksFiltersCorrectly) {
                             boost::none /* pending not set */,
                             true /* processing */);
 
-    Timestamp expectedTimestamp(350, 1);
     insertRangeDeletionTask(UUID::gen(),
                             kTestNss,
                             UUID::gen(),
                             ChunkRange{BSON("_id" << 30), BSON("_id" << 40)},
                             CleanWhenEnum::kDelayed,
-                            expectedTimestamp,
+                            Timestamp(350, 1),
                             false /* pending */);
 
     insertRangeDeletionTask(UUID::gen(),
@@ -216,8 +218,8 @@ TEST_F(TopologyChangeHelpersTest, MixedTasksFiltersCorrectly) {
                             Timestamp(200, 1),
                             false /* pending */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }
@@ -232,8 +234,8 @@ TEST_F(TopologyChangeHelpersTest, PendingFalseExplicitlySet) {
                             expectedTimestamp,
                             false /* pending explicitly false */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }
@@ -249,8 +251,8 @@ TEST_F(TopologyChangeHelpersTest, ProcessingFalseExplicitlySet) {
                             false /* pending */,
                             false /* processing */);
 
-    auto result = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto result =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(*result->getTimestamp(), expectedTimestamp);
 }

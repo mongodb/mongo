@@ -103,8 +103,8 @@ protected:
 TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckNoTasks) {
     orphanCleanupDelaySecs.store(60);
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_FALSE(task.has_value());
 }
 
@@ -123,8 +123,8 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckElapsed) {
 
     clockSource()->advance(Seconds(100));
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
     ASSERT_DOES_NOT_THROW(
         topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task));
@@ -145,8 +145,8 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckNotElapsed) {
 
     clockSource()->advance(Seconds(30));
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
     ASSERT_THROWS_CODE(
         topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task),
@@ -176,8 +176,8 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckUsesLatestTimest
 
     clockSource()->advance(Seconds(30));
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
     ASSERT_THROWS_CODE(
         topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task),
@@ -187,8 +187,7 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckUsesLatestTimest
     clockSource()->advance(Seconds(40));
 
     // Re-fetch task since we need the same task reference
-    task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    task = topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
     ASSERT_DOES_NOT_THROW(
         topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task));
@@ -207,14 +206,14 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckSmallDelay) {
                             taskTimestamp,
                             false /* pending */);
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
     ASSERT_DOES_NOT_THROW(
         topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task));
 }
 
-TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckIgnoresPendingTasks) {
+TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckIncludesPendingTasks) {
     orphanCleanupDelaySecs.store(60);
 
     auto currentTimeSecs = getCurrentTimeSecs();
@@ -226,9 +225,13 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckIgnoresPendingTa
                             Timestamp(currentTimeSecs, 1),
                             true /* pending */);
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
-    ASSERT_FALSE(task.has_value());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
+    ASSERT_TRUE(task.has_value());
+    ASSERT_THROWS_CODE(
+        topology_change_helpers::checkOrphanCleanupDelayElapsed(operationContext(), *task),
+        DBException,
+        ErrorCodes::RemoveShardDrainingInProgress);
 }
 
 TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckIgnoresProcessingTasks) {
@@ -244,8 +247,8 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayCheckIgnoresProcessin
                             boost::none /* pending not set */,
                             true /* processing */);
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_FALSE(task.has_value());
 }
 
@@ -271,8 +274,8 @@ TEST_F(RemoveShardCommitCoordinatorTest, OrphanCleanupDelayThrowsWithPendingData
                             Timestamp(currentTimeSecs, 1),
                             false /* pending */);
 
-    auto task = topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(
-        operationContext());
+    auto task =
+        topology_change_helpers::getLatestNonProcessingRangeDeletionTask(operationContext());
     ASSERT_TRUE(task.has_value());
 
     try {

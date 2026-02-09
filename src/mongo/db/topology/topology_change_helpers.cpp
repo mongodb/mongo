@@ -704,25 +704,24 @@ long long getRangeDeletionCount(OperationContext* opCtx) {
     return static_cast<long long>(store.count(opCtx, BSONObj()));
 }
 
-boost::optional<RangeDeletionTask> getLatestNonPendingNonProcessingRangeDeletionTask(
+boost::optional<RangeDeletionTask> getLatestNonProcessingRangeDeletionTask(
     OperationContext* opCtx) {
     AutoGetCollection collRangeDeletionLock(
         opCtx, NamespaceString::kRangeDeletionNamespace, MODE_S);
     DBDirectClient client(opCtx);
 
-    // Get latest non pending and non processing range deletion task scheduled for future cleanup
-    // We do not expect to find any pending tasks because we join migrations before this.
+    // Get latest non processing range deletion task scheduled for future cleanup
+    // We include pending tasks to avoid a race condition where moveChunk commits
+    // before marking the range deletion task as non-pending (SERVER-119117).
     FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
-    findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName
-                               << BSON("$ne" << true) << RangeDeletionTask::kPendingFieldName
-                               << BSON("$ne" << true)));
+    findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName << BSON("$ne" << true)));
     findCommand.setSort(BSON(RangeDeletionTask::kTimestampFieldName << -1));
     auto bsonDoc = client.findOne(std::move(findCommand));
     if (bsonDoc.isEmpty()) {
         return boost::none;
     }
-    return RangeDeletionTask::parse(
-        bsonDoc, IDLParserContext("getLatestNonPendingNonProcessingRangeDeletionTask"));
+    return RangeDeletionTask::parse(bsonDoc,
+                                    IDLParserContext("getLatestNonProcessingRangeDeletionTask"));
 }
 
 void checkOrphanCleanupDelayElapsed(OperationContext* opCtx, const RangeDeletionTask& task) {

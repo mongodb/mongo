@@ -77,12 +77,11 @@ namespace topology_change_helpers {
 long long getRangeDeletionCount(OperationContext* opCtx);
 
 /**
- * Gets the latest non pending and non processing range deletion task scheduled for
+ * Gets the latest non processing range deletion task scheduled for
  * future deletion. Used during transitionToDedicatedConfigServer to check for any pending delayed
  * range deletion tasks.
  */
-boost::optional<RangeDeletionTask> getLatestNonPendingNonProcessingRangeDeletionTask(
-    OperationContext* opCtx);
+boost::optional<RangeDeletionTask> getLatestNonProcessingRangeDeletionTask(OperationContext* opCtx);
 
 /**
  * Checks if the orphan cleanup delay has elapsed. If not, throws a RemoveShardDrainingInfo

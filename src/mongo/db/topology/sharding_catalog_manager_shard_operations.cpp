@@ -808,8 +808,7 @@ RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationConte
     }
 
     if (shardId == ShardId::kConfigServerId) {
-        auto task =
-            topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+        auto task = topology_change_helpers::getLatestNonProcessingRangeDeletionTask(opCtx);
         if (task) {
             try {
                 topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
@@ -861,8 +860,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         // sharded collections to enable that without user intervention. We wait for
         // orphanCleanupDelaySecs as a best effort since creation of latest non pending range
         // deletion task.
-        auto task =
-            topology_change_helpers::getLatestNonPendingNonProcessingRangeDeletionTask(opCtx);
+        auto task = topology_change_helpers::getLatestNonProcessingRangeDeletionTask(opCtx);
         if (task) {
             try {
                 topology_change_helpers::checkOrphanCleanupDelayElapsed(opCtx, *task);
