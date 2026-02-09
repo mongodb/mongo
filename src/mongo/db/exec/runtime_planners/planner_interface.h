@@ -45,7 +45,7 @@ struct PlannerData {
                 CanonicalQuery* cq,
                 std::unique_ptr<WorkingSet> workingSet,
                 const MultipleCollectionAccessor& collections,
-                std::shared_ptr<const QueryPlannerParams> plannerParams,
+                std::shared_ptr<QueryPlannerParams> plannerParams,
                 PlanYieldPolicy::YieldPolicy yieldPolicy,
                 boost::optional<size_t> cachedPlanHash)
         : opCtx(opCtx),
@@ -69,7 +69,7 @@ struct PlannerData {
     const MultipleCollectionAccessor& collections;
     // Shared pointer since this is shared across all instances of this type and also
     // prepare helper functions that indeed create this objects.
-    std::shared_ptr<const QueryPlannerParams> plannerParams;
+    std::shared_ptr<QueryPlannerParams> plannerParams;
     PlanYieldPolicy::YieldPolicy yieldPolicy;
     boost::optional<size_t> cachedPlanHash;
 };
@@ -84,8 +84,10 @@ public:
     /**
      * Function that creates a PlanExecutor for the selected plan. Can be called only once, as it
      * may transfer ownership of some data to returned PlanExecutor.
+     * When get_executor_deferred_engine_choice is used, the `pipeline` argument may be mutated in
+     * case document source stages are pushed down to SBE.
      */
     virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) = 0;
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) = 0;
 };
 }  // namespace mongo

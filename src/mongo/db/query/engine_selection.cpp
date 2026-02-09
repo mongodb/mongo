@@ -173,45 +173,89 @@ bool isQuerySbeCompatible(const CollectionPtr& collection, const CanonicalQuery&
     return !sortPattern || isSortSbeCompatible(*sortPattern);
 }
 
+
+bool hasNodeOfType(const QuerySolutionNode* node, StageType type) {
+    if (node->getType() == type) {
+        return true;
+    }
+    for (auto&& child : node->children) {
+        if (hasNodeOfType(child.get(), type)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isPlanSbeEligible(const QuerySolution* solution) {
+    // Distinct scan plans not supported in SBE.
+    return !hasNodeOfType(solution->root(), StageType::STAGE_DISTINCT_SCAN);
+}
+
+EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
+    // TODO SERVER-117448 implement engine selection based on winning plan.
+    return EngineChoice::kClassic;
+}
+
 /**
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
  * 'featureFlagSbeFull' being set; false otherwise.
  */
-bool shouldUseRegularSbe(OperationContext* opCtx,
-                         const CanonicalQuery& cq,
-                         const CollectionPtr& mainCollection,
-                         const bool sbeFull) {
+EngineChoice shouldUseRegularSbe(OperationContext* opCtx,
+                                 const CanonicalQuery& cq,
+                                 const CollectionPtr& mainCollection,
+                                 const bool sbeFull,
+                                 const QuerySolution* solution) {
     // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
     // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
     auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
     if (!queryKnob.canPushDownFullyCompatibleStages() && cq.cqPipeline().empty()) {
-        return false;
+        return EngineChoice::kClassic;
     }
 
     if (mainCollection && mainCollection->isTimeseriesCollection() && cq.cqPipeline().empty()) {
         // TS queries only use SBE when there's a pipeline.
-        return false;
+        return EngineChoice::kClassic;
     }
 
     // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
     // compatible.
     SbeCompatibility minRequiredCompatibility =
         getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp(), sbeFull);
-    return cq.getExpCtx()->getSbeCompatibility() >= minRequiredCompatibility;
+    if (cq.getExpCtx()->getSbeCompatibility() >= minRequiredCompatibility) {
+        return EngineChoice::kSbe;
+    }
+
+    // If we're given a QuerySolution, evaluate the plan to see if qualifies for SBE enablement.
+    if (solution && engineSelectionForPlan(solution) == EngineChoice::kSbe) {
+        return EngineChoice::kSbe;
+    }
+
+    return EngineChoice::kClassic;
 }
 }  // namespace
 
-bool useSbe(OperationContext* opCtx,
-            const MultipleCollectionAccessor& collections,
-            CanonicalQuery* cq,
-            Pipeline* pipeline,
-            bool needsMerge,
-            std::unique_ptr<QueryPlannerParams> plannerParams) {
+EngineChoice chooseEngine(OperationContext* opCtx,
+                          const MultipleCollectionAccessor& collections,
+                          CanonicalQuery* cq,
+                          Pipeline* pipeline,
+                          bool needsMerge,
+                          std::unique_ptr<QueryPlannerParams> plannerParams,
+                          const QuerySolution* solution) {
+    if (solution) {
+        tassert(11742301,
+                "Expected to choose engine based on solution only if "
+                "featureFlagGetExecutorDeferredEngineChoice is "
+                "enabled.",
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+        if (!isPlanSbeEligible(solution)) {
+            return EngineChoice::kClassic;
+        }
+    }
     const auto& mainColl = collections.getMainCollection();
     const bool forceClassic =
         cq->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
     if (forceClassic || !isQuerySbeCompatible(mainColl, *cq)) {
-        return false;
+        return EngineChoice::kClassic;
     }
 
     // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
@@ -220,7 +264,11 @@ bool useSbe(OperationContext* opCtx,
     attachPipelineStages(collections, pipeline, needsMerge, cq, std::move(plannerParams));
 
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
-    return sbeFull || shouldUseRegularSbe(opCtx, *cq, mainColl, sbeFull);
+    if (sbeFull ||
+        shouldUseRegularSbe(opCtx, *cq, mainColl, sbeFull, solution) == EngineChoice::kSbe) {
+        return EngineChoice::kSbe;
+    }
+    return EngineChoice::kClassic;
 }
 
 }  // namespace mongo

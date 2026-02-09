@@ -216,3 +216,6 @@ filters:
   - "sharding_api_version_jscore_passthrough.yml":
     approvers:
       - 10gen/server-replication-reviewers
+  - "*get_exec_deferred_engine_choice*":
+    approvers:
+      - 10gen/query-execution

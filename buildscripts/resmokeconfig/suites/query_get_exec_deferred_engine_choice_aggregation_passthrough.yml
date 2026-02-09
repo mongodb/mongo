@@ -1,0 +1,49 @@
+test_kind: js_test
+description: |
+  Suite for `featureFlagGetExecutorDeferredEngineChoice` coverage, which involves rewriting query executor creation logic.
+
+selector:
+  roots:
+    - jstests/aggregation/**/*.js
+  exclude_files:
+    - jstests/aggregation/extras/*.js
+    - jstests/aggregation/data/*.js
+
+    # TODO SERVER-119038 implement EOF fast-path for non-existent collections
+    - jstests/aggregation/sources/lookup/lookup_non_existent_collection.js
+
+    # TODO SERVER-119037 implement replanning in new get_executor
+    - jstests/aggregation/sbe/sbe_pushdown_replan_reason.js
+
+    # TODO SERVER-117566 implement caching in new get_executor
+    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
+
+    # TODO SERVER-117453 Implement subplanning in new get_executor
+    - jstests/aggregation/exec/query_limits_test.js
+    - jstests/aggregation/optimization/expression_swap_limit.js
+    - jstests/aggregation/optimization/is_count_like.js
+    - jstests/aggregation/plan_cache/sbe_plan_cache_key_encode_partial_index.js
+    - jstests/aggregation/sources/addFields/add_fields_pbt.js
+    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
+    - jstests/aggregation/sources/match/expr_match.js
+    - jstests/aggregation/sources/match/match.js
+    - jstests/aggregation/sources/match/match_pbt.js
+    - jstests/aggregation/sources/replaceRoot/replace_root_match.js
+    - jstests/aggregation/sources/sort/sort_via_index_pbt.js
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagGetExecutorDeferredEngineChoice: true

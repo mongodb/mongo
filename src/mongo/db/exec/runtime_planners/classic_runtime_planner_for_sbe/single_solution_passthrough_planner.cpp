@@ -53,7 +53,7 @@ SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
       _isFromPlanCache(true) {}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline) {
     LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
     if (!_isFromPlanCache && useSbePlanCache()) {
         // Create a pinned plan cache entry.

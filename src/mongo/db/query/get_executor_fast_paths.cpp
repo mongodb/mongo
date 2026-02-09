@@ -95,12 +95,11 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
 
 }  // namespace
 
-ExpressResult tryExpress(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    std::unique_ptr<CanonicalQuery>& canonicalQuery,
-    std::size_t plannerOptions,
-    const std::function<std::unique_ptr<QueryPlannerParams>(size_t)>& makePlannerParams) {
+ExpressResult tryExpress(OperationContext* opCtx,
+                         const MultipleCollectionAccessor& collections,
+                         std::unique_ptr<CanonicalQuery>& canonicalQuery,
+                         std::size_t plannerOptions,
+                         const MakePlannerParamsFn& makePlannerParams) {
     // First try to use the express id point query fast path.
     const auto& mainColl = collections.getMainCollection();
     const auto expressEligibility = isExpressEligible(opCtx, mainColl, *canonicalQuery);
@@ -135,7 +134,7 @@ ExpressResult tryExpress(
     // However, that requires the full set of planner parameters for the main collection to be
     // available and creating those now allows them to be reused for subsequent strategies if
     // the express index equality one fails.
-    auto paramsForSingleCollectionQuery = makePlannerParams(plannerOptions);
+    auto paramsForSingleCollectionQuery = makePlannerParams(*canonicalQuery, plannerOptions);
     if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
         if (auto indexEntry =
                 getIndexForExpressEquality(*canonicalQuery, *paramsForSingleCollectionQuery)) {

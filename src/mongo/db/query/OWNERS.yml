@@ -76,9 +76,21 @@ filters:
   - "framework_control.cpp":
     approvers:
       - 10gen/query-optimization
-  - "get_executor*":
+  - "get_executor.*":
     approvers:
       - 10gen/query-optimization
+      - 10gen/query-execution
+  - "get_executor_fast_paths.*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "get_executor_helpers.*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  # TODO SERVER-119034 change ownership to be shared with QO.
+  - "get_executor_deferred_engine_choice.*":
+    approvers:
       - 10gen/query-execution
   - "getmore_request_test.cpp":
     approvers:

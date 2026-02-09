@@ -2152,6 +2152,24 @@ tasks:
           suite: query_correctness_query_shape_hash_stability_generated_test
           should_shuffle: false
 
+  - <<: *task_template
+    name: query_get_exec_deferred_engine_choice_jscore_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_get_exec_deferred_engine_choice_jscore_passthrough
+
+  - <<: *task_template
+    name: query_get_exec_deferred_engine_choice_aggregation_passthrough
+    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: query_get_exec_deferred_engine_choice_aggregation_passthrough
+
   ################################################
   #           Query Optimization tasks           #
   ################################################

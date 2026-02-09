@@ -101,7 +101,7 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
                 // Stages still need to be finalized for SBE since classic was used previously.
                 finalizePipelineStages(pipeline, canonicalQuery);
             }
-            return makePlanner(makeQueryPlannerParams(plannerOptions));
+            return makePlanner(makeQueryPlannerParams(*canonicalQuery, plannerOptions));
         } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
             // The planner failed to generate a viable plan. Remove the query settings and
             // retry if any are present. Otherwise just propagate the exception.
@@ -124,10 +124,10 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
 
             plannerOptions |= QueryPlannerParams::IGNORE_QUERY_SETTINGS;
             // Propagate the params to the next iteration.
-            plannerParams = makeQueryPlannerParams(plannerOptions);
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions);
         } catch (const ExceptionFor<ErrorCodes::RetryMultiPlanning>&) {
             // Propagate the params to the next iteration.
-            plannerParams = makeQueryPlannerParams(plannerOptions);
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions);
             canonicalQuery->getExpCtx()->setWasRateLimited(true);
         }
     }

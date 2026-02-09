@@ -31,3 +31,5 @@
 - featureFlagDisallowFindAndModifyImageCollection
 # TODO (SERVER-117924): Re-enable testing coverage for arbitrary updates on timeseries
 - featureFlagTimeseriesUpdatesSupport
+# TODO SERVER-112823 Enable featureFlagGetExecutorDeferredEngineChoice feature flag when fully compatible.
+- featureFlagGetExecutorDeferredEngineChoice

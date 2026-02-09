@@ -51,7 +51,7 @@ public:
         : PlannerBase(std::move(plannerData)), _candidate(std::move(candidate)) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override {
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline) override {
         auto nss = cq()->nss();
         auto remoteCursors = cq()->getExpCtx()->getExplain()
             ? nullptr

@@ -87,7 +87,7 @@ Status MultiPlanner::runTrials(trial_period::TrialPhaseConfig trialConfig) {
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline) {
     // We should have already constructed the full SBE plan in order to write it to the SBE plan
     // cache.
     invariant(_sbePlanAndData);

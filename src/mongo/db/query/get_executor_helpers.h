@@ -73,7 +73,8 @@ struct PlanCacheInfo {
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo);
 
 
-using MakePlannerParamsFn = std::function<std::unique_ptr<QueryPlannerParams>(size_t)>;
+using MakePlannerParamsFn =
+    std::function<std::unique_ptr<QueryPlannerParams>(const CanonicalQuery&, size_t)>;
 using MakePlannerFn =
     std::function<std::unique_ptr<PlannerInterface>(std::unique_ptr<QueryPlannerParams>)>;
 

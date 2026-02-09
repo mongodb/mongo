@@ -55,7 +55,7 @@ struct PlannerDataForSBE final : public PlannerData {
         std::unique_ptr<WorkingSet> workingSet,
         const MultipleCollectionAccessor& collections,
         // To be shared between all instances of this type and the prepare helper creating them.
-        std::shared_ptr<const QueryPlannerParams> plannerParams,
+        std::shared_ptr<QueryPlannerParams> plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         boost::optional<size_t> cachedPlanHash,
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
@@ -190,7 +190,7 @@ public:
      * Builds and caches SBE plan for the given solution and returns PlanExecutor for it.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) override;
 
 private:
     std::unique_ptr<QuerySolution> extendSolutionWithPipelineIfNeeded(
@@ -216,7 +216,7 @@ public:
      * and exit, otherwise we pick the best plan and return the SBE plan executor.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) override;
 
 
     /**
@@ -287,7 +287,7 @@ public:
      * plan, and returns a plan executor.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) override;
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) override;
 
     /**
      * Returns the number of times that an individual $or branch was multi-planned during the

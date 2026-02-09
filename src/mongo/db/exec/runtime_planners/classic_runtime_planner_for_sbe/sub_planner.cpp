@@ -56,7 +56,7 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData) : PlannerBase(std::move(pl
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline) {
     auto sbePlanAndData = prepareSbePlanAndData(*_solution);
 
     if (useSbePlanCache()) {

@@ -102,7 +102,7 @@ public:
      * may transfer ownership of some data to returned PlanExecutor.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery) final;
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) final;
 
     /**
      * Extracts the WorkingSet and the root of the executable plan used by this planner.

@@ -222,7 +222,7 @@ Status ClassicPlannerInterface::plan() {
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::makeExecutor(
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline) {
     invariant(_state == kInitialized);
     if (cq()->getExplain().has_value()) {
         bool isCountQuery = getRoot()->stageType() == STAGE_COUNT;
