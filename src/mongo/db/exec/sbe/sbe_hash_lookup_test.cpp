@@ -478,7 +478,7 @@ TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
     std::vector<std::string> outerKeys;
     innerKeys.reserve(kStringCount);
     outerKeys.reserve(kStringCount);
-    for (char i = 0; i < kStringCount; ++i) {
+    for (size_t i = 0; i < kStringCount; ++i) {
         const std::array<char, 2> chars{static_cast<char>('a' + i), static_cast<char>('A' + i)};
         std::string inner, outer;
         inner.reserve(kStringLength);
