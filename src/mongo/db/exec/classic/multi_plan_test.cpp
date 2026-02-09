@@ -633,8 +633,6 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     RAIIServerParameterControllerForTest controller("internalQueryFrameworkControl",
                                                     "forceClassicEngine");
-    // Ensure running the test with multiplanner.
-    RAIIServerParameterControllerForTest cbrController("featureFlagCostBasedRanker", false);
 
     const int N = 5000;
     for (int i = 0; i < N; ++i) {
