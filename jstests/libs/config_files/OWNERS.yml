@@ -3,3 +3,6 @@ filters:
   - "set_profiling*":
     approvers:
       - 10gen/query-integration-observability
+  - "*auth*":
+    approvers:
+      - 10gen/server-security

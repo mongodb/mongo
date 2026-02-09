@@ -1,10 +1,10 @@
 import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
+import {testGetCmdLineOptsMongodFailed} from "jstests/libs/command_line/test_parsed_options.js";
 
 let baseName = "jstests_auth_auth_options";
 
 jsTest.log('Testing "auth" command line option');
 let expectedResult = {"parsed": {"security": {"authorization": "enabled"}}};
-
 testGetCmdLineOptsMongod({auth: ""}, expectedResult);
 
 jsTest.log('Testing "noauth" command line option');
@@ -46,5 +46,9 @@ expectedResult = {
     },
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_noauth.ini"}, expectedResult);
+
+// Test that we exit when authentication is enabled, but no auth mechanisms are set.  See SERVER-7942.
+jsTest.log("Testing authentication enabled, but no auth mechanisms set");
+testGetCmdLineOptsMongodFailed({config: "jstests/libs/config_files/auth_conflict.json"});
 
 print(baseName + " succeeded.");

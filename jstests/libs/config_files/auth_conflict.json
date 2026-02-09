@@ -1,0 +1,6 @@
+{
+    "security" : {
+        "authorization" : "enabled",
+        "authenticationMechanisms" : [ ],
+    }
+}
