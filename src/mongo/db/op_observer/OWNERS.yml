@@ -6,9 +6,9 @@ filters:
   - "op_observer*":
     approvers:
       - 10gen/server-oplog
-  - "fallback_op_observer.h":
+  - "fallback_op_observer*":
     approvers:
-      - 10gen/server-oplog
+      - 10gen/server-transactions
   - "fcv_op_observer*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
