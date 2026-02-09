@@ -442,7 +442,7 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
                                                      const Status& status) {
     if (status == ErrorCodes::CannotImplicitlyCreateCollection) {
         LOGV2_DEBUG(11182203,
-                    0,
+                    4,
                     "Noting cannotImplicitlyCreateCollection response",
                     "status"_attr = status);
     } else if (status == ErrorCodes::StaleDbVersion ||
