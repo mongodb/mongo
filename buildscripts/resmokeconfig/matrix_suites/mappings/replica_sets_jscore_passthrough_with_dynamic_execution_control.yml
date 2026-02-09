@@ -1,4 +1,4 @@
-base_suite: replica_sets_jscore_passthrough
+base_suite: replica_sets_jscore_passthrough_base
 overrides:
   - "execution_control_params.replica_sets_reconfig_hooks_with_dynamic_execution_control"
   - "execution_control_params.replica_sets_reconfig_archive_hooks_with_dynamic_execution_control"

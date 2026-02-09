@@ -117,7 +117,7 @@ resmoke_suite_test(
         "//jstests/replsets:sized_zero_capped.js",
         "//jstests/replsets:ttl_index_with_capped_collection.js",
     ],
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough.yml",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
     data = [
         "//buildscripts/resmokeconfig:common_jstest_data",
         "//jstests/replsets:rslib.js",

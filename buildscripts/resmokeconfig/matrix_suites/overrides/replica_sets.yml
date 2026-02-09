@@ -19,3 +19,19 @@
           set_parameters:
             enableTestCommands: 1
           shardsvr: ""
+
+# TODO SERVER-118900: Remove this override once 9.0 becomes last LTS
+- name: jscore_passthrough_with_system_buckets_hook
+  value:
+    executor:
+      hooks:
+        # CheckSystemBucketsMetrics must run before ValidateCollections
+        - class: CheckSystemBucketsMetrics
+        - class: RunDBCheckInBackground
+        - class: CheckReplDBHashInBackground
+        - class: ValidateCollectionsInBackground
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20

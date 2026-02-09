@@ -80,7 +80,7 @@ resmoke_suite_test(
         "//jstests/core/catalog:list_collections.js",
         "//jstests/core/ddl:clone_collection_as_capped.js",
     ],
-    config = "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough.yml",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_jscore_passthrough_base.yml",
     data = [
         "//buildscripts/resmokeconfig:common_jstest_data",
         "//jstests/core/catalog/libs:all_javascript_files",

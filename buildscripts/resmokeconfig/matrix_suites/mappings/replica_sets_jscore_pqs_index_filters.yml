@@ -1,4 +1,4 @@
-base_suite: replica_sets_jscore_passthrough
+base_suite: replica_sets_jscore_passthrough_base
 description: >-
   Test the correctness of query settings application by replacing index filter commands with query settings ones. This suite runs a select subset of jscore tests on a replica set fixture.
   For testing purposes, SetQuerySettingsCommand and RemoveQuerySettingsCommand clear the plan cache

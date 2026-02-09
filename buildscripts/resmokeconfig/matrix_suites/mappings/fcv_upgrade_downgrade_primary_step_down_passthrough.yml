@@ -1,4 +1,4 @@
-base_suite: replica_sets_jscore_passthrough
+base_suite: replica_sets_jscore_passthrough_base
 overrides:
   - "fcv_upgrade_downgrade.overrides_shell_options"
   - "kill_primary.replica_sets_shell_options"

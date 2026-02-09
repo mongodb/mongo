@@ -1,0 +1,3 @@
+base_suite: replica_sets_jscore_passthrough_base
+overrides:
+  - "replica_sets.jscore_passthrough_with_system_buckets_hook"
