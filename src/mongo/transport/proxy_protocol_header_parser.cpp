@@ -195,7 +195,7 @@ T extract(StringData& data) {
 
 // Parses buffer to extract TLV vectors into tlvs. This function assumes that buffer only contains
 // TLV vectors.
-void parseTLVVectors(StringData& buffer, ProxiedSupplementaryData& tlvs) {
+void parseTLVVectors(StringData buffer, ProxiedSupplementaryData& tlvs) {
     while (buffer.size()) {
         static constexpr size_t kTLVHeaderSize = 3;
         uassert(ErrorCodes::FailedToParse,
@@ -321,7 +321,7 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
 // Since this string contains a null, it's critical we use a literal here.
 constexpr StringData kV2Start = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"_sd;
 
-bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) {
+bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isProxyUnixSock) {
     auto& endpoints = results.endpoints;
     buffer = buffer.substr(kV2Start.size());
     if (buffer.empty())
@@ -391,6 +391,7 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
         // Prepare an output buffer that skips past the end of the header.
         // We'll assign this to the buffer if we fully succeed in parsing the header.
         const auto resultBuffer = buffer.substr(length);
+        auto remainingBytes = length;
 
         switch (aFamily) {
             case AF_UNSPEC:
@@ -413,6 +414,7 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
                 dst_addr.sin_addr = extract<in_addr>(buffer);
                 src_addr.sin_port = extract<uint16_t>(buffer);
                 dst_addr.sin_port = extract<uint16_t>(buffer);
+                remainingBytes -= kIPv4ProxyProtocolSize;
                 endpoints = ProxiedEndpoints{SockAddr((sockaddr*)&src_addr, sizeof(sockaddr_in)),
                                              SockAddr((sockaddr*)&dst_addr, sizeof(sockaddr_in))};
                 break;
@@ -435,6 +437,7 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
                 dst_addr.sin6_addr = extract<in6_addr>(buffer);
                 src_addr.sin6_port = extract<uint16_t>(buffer);
                 dst_addr.sin6_port = extract<uint16_t>(buffer);
+                remainingBytes -= kIPv6ProxyProtocolSize;
                 endpoints = ProxiedEndpoints{SockAddr((sockaddr*)&src_addr, sizeof(sockaddr_in6)),
                                              SockAddr((sockaddr*)&dst_addr, sizeof(sockaddr_in6))};
                 break;
@@ -452,6 +455,7 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
                 const auto dst_addr = proxy_protocol_details::parseSockAddrUn(
                     buffer.substr(proxy_protocol_details::kMaxUnixPathLength,
                                   proxy_protocol_details::kMaxUnixPathLength));
+                remainingBytes -= kUnixProxyProtocolSize;
 
                 endpoints = ProxiedEndpoints{SockAddr((sockaddr*)&src_addr, sizeof(sockaddr_un)),
                                              SockAddr((sockaddr*)&dst_addr, sizeof(sockaddr_un))};
@@ -462,9 +466,9 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
             default:
                 MONGO_UNREACHABLE;
         }
-        // Only parse TLV vectors for server connections over a unix domain socket.
-        if (isUnixSock) {
-            parseTLVVectors(buffer, results.tlvs);
+        // Only parse TLV vectors for server connections over the proxy unix domain socket.
+        if (isProxyUnixSock && remainingBytes) {
+            parseTLVVectors(buffer.substr(0, remainingBytes), results.tlvs);
         }
 
         buffer = resultBuffer;
@@ -476,7 +480,7 @@ bool parseV2Buffer(StringData& buffer, ParserResults& results, bool isUnixSock) 
 
 }  // namespace
 
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isUnixSock) {
+boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isProxyUnixSock) {
     // Check if the buffer presented is V1, V2, or neither.
     const size_t originalBufferSize = buffer.size();
 
@@ -485,7 +489,7 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool 
     if (buffer.startsWith(kV1Start)) {
         complete = parseV1Buffer(buffer, results.endpoints);
     } else if (buffer.startsWith(kV2Start)) {
-        complete = parseV2Buffer(buffer, results, isUnixSock);
+        complete = parseV2Buffer(buffer, results, isProxyUnixSock);
     } else {
         uassert(ErrorCodes::FailedToParse,
                 "Initial Proxy Protocol header bytes invalid: {}"
