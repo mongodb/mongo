@@ -466,4 +466,100 @@ TEST_F(HashLookupStageTest, DuplicateDocumentKeyCausesSpillTest) {
               std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)));
 }
 
+TEST_F(HashLookupStageTest, SpillLargeStringWithCollationTest) {
+    constexpr size_t kStringLength = 64;
+    constexpr size_t kStringCount = 26;
+
+    RAIIServerParameterControllerForTest maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        static_cast<long long>(kStringCount * kStringLength / 2));
+
+    std::vector<std::string> innerKeys;
+    std::vector<std::string> outerKeys;
+    innerKeys.reserve(kStringCount);
+    outerKeys.reserve(kStringCount);
+    for (char i = 0; i < kStringCount; ++i) {
+        const std::array<char, 2> chars{static_cast<char>('a' + i), static_cast<char>('A' + i)};
+        std::string inner, outer;
+        inner.reserve(kStringLength);
+        outer.reserve(kStringLength);
+        for (size_t j = 0; j < kStringLength; ++j) {
+            inner.push_back(chars[j % 2]);
+            outer.push_back(chars[1 - j % 2]);
+        }
+        innerKeys.push_back(std::move(inner));
+        outerKeys.push_back(std::move(outer));
+    }
+
+    BSONArrayBuilder innerJoin;
+    BSONArrayBuilder outerJoin;
+    for (size_t i = 0; i < kStringCount; ++i) {
+        BSONObj obj = BSON("_id" << static_cast<long long>(i));
+        innerJoin.append(BSON_ARRAY(obj << innerKeys[i]));
+        outerJoin.append(BSON_ARRAY(obj << outerKeys[i]));
+    }
+
+    auto [innerScanSlots, innerScanStage] = generateVirtualScanMulti(2, innerJoin.arr());
+    auto [outerScanSlots, outerScanStage] = generateVirtualScanMulti(2, outerJoin.arr());
+
+    auto ctx = makeCompileCtx();
+
+    auto collatorSlot = generateSlotId();
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString);
+    value::OwnedValueAccessor collatorAccessor;
+    ctx->pushCorrelated(collatorSlot, &collatorAccessor);
+    collatorAccessor.reset(value::TypeTags::collator,
+                           value::bitcastFrom<CollatorInterface*>(collator.release()));
+
+    value::SlotId lookupStageOutputSlot = generateSlotId();
+    SlotExprPair agg = std::make_pair(
+        lookupStageOutputSlot, makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
+    auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
+                                              std::move(innerScanStage),
+                                              outerScanSlots[1],
+                                              innerScanSlots[1],
+                                              innerScanSlots[0],
+                                              std::move(agg),
+                                              collatorSlot,
+                                              kEmptyPlanNodeId);
+
+    value::SlotVector lookupSlots;
+    lookupSlots.reserve(2);
+    lookupSlots.push_back(outerScanSlots[0]);
+    lookupSlots.push_back(lookupStageOutputSlot);
+    auto resultAccessors = prepareTree(ctx.get(), lookupStage.get(), lookupSlots);
+
+    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> actualResultView;
+    std::vector<std::pair<value::TypeTags, value::Value>> ownedValues;
+    while (lookupStage->getNext() == PlanState::ADVANCED) {
+        std::vector<std::pair<value::TypeTags, value::Value>> results{};
+        results.reserve(resultAccessors.size());
+        for (size_t i = 0; i < resultAccessors.size(); ++i) {
+            ownedValues.emplace_back(resultAccessors[i]->getCopyOfValue().releaseToRaw());
+            results.emplace_back(ownedValues.back());
+        }
+        actualResultView.emplace_back(std::move(results));
+    }
+
+    ValueVectorGuard resultsGuard{ownedValues};
+    lookupStage->close();
+
+    ASSERT_EQ(actualResultView.size(), kStringCount);
+    for (size_t i = 0; i < kStringCount; ++i) {
+        const auto& result = actualResultView[i];
+        ASSERT_EQ(result.size(), 2);
+        const BSONObj input = BSON("_id" << static_cast<long long>(i));
+        assertValuesEqual(result[0].first,
+                          result[0].second,
+                          value::TypeTags::bsonObject,
+                          value::bitcastFrom<const char*>(input.objdata()));
+        const BSONArray output = BSON_ARRAY(input);
+        assertValuesEqual(result[1].first,
+                          result[1].second,
+                          value::TypeTags::bsonArray,
+                          value::bitcastFrom<const char*>(output.objdata()));
+    }
+}
+
 }  // namespace mongo::sbe
