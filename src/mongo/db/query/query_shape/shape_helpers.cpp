@@ -105,14 +105,15 @@ void appendNamespaceShape(BSONObjBuilder& bob,
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const query_shape::DeferredQueryShape& deferredShape,
-    const NamespaceString& nss) {
+    const NamespaceString& nss,
+    bool skipInternalClientCheck) {
     // QueryShapeHash is not computed for:
     // - intenal clients, i.e. queries coming from mongos
     // and
     // - queries executed via DBDirectClient.
     auto* opCtx = expCtx->getOperationContext();
     auto* client = opCtx->getClient();
-    if (client->isInternalClient() || client->isInDirectClient()) {
+    if ((!skipInternalClientCheck && client->isInternalClient()) || client->isInDirectClient()) {
         return boost::none;
     }
 

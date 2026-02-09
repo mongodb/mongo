@@ -1449,8 +1449,10 @@ void registerRequestForQueryStats(OperationContext* opCtx,
             if (!parsedUpdate.hasParsedFindCommand()) {
                 return boost::none;
             }
+            // We want to compute queryShapeHash for updates even for internal queries so slow
+            // query logs will contain the hash value.
             return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, wholeOp.getNamespace());
+                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
         });
 
 
