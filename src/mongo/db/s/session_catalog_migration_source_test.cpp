@@ -53,6 +53,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -75,7 +76,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 namespace {
 
@@ -86,6 +88,22 @@ const ChunkRange kChunkRange(BSON("x" << 0), BSON("x" << 100));
 const KeyPattern kNestedShardKey(BSON("x.y" << 1));
 const ChunkRange kNestedChunkRange(BSON("x.y" << 0), BSON("x.y" << 100));
 const LogicalSessionId kMigrationLsid;
+
+enum class TransactionType { kUnprepared, kPrepared };
+
+struct PrePostImageTestCase {
+    repl::RetryImageEnum imageType;
+    boost::optional<TransactionType> txnType;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder b;
+        b.append("imageType", repl::RetryImage_serializer(imageType));
+        if (txnType) {
+            b.append("txnType", *txnType == TransactionType::kPrepared ? "prepared" : "unprepared");
+        }
+        return b.obj();
+    }
+};
 
 class SessionCatalogMigrationSourceTest : public MockReplCoordServerFixture {};
 
@@ -1289,10 +1307,18 @@ TEST_F(SessionCatalogMigrationSourceTest,
     int numOps = 0;
     int numExpectedOps = 0;
 
-    std::vector<repl::RetryImageEnum> cases{repl::RetryImageEnum::kPreImage,
-                                            repl::RetryImageEnum::kPostImage};
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        testCases.emplace_back(imageType);
+    }
+
     auto opTimeSecs = 150;
-    for (auto imageType : cases) {
+    for (const auto& testCase : testCases) {
+        LOGV2(11924801,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNumber = TxnNumber{1};
 
@@ -1304,7 +1330,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                      BSON("$set" << BSON("_id" << 1)),
                                      BSON("x" << 2),
                                      {2},
-                                     imageType /* needsRetryImage */);
+                                     testCase.imageType /* needsRetryImage */);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
         // op for a different ns.
@@ -1340,7 +1366,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
         imageEntryForOp2.set_id(sessionId);
         imageEntryForOp2.setTxnNumber(txnNumber);
         imageEntryForOp2.setTs(applyOpsOpTime2.getTimestamp());
-        imageEntryForOp2.setImageKind(imageType);
+        imageEntryForOp2.setImageKind(testCase.imageType);
         imageEntryForOp2.setImage(*op2.getObject2());
 
         DBDirectClient client(opCtx());
@@ -2056,113 +2082,711 @@ TEST_F(
     DeriveOplogEntriesForCommittedUnpreparedInternalTransactionForRetryableWriteForgePrePostImage) {
     auto opTimeSecs = 230;
 
-    std::vector<repl::RetryImageEnum> cases{repl::RetryImageEnum::kPreImage,
-                                            repl::RetryImageEnum::kPostImage};
-    auto runTest = [&](bool isPrepared) {
-        for (auto imageType : cases) {
-            const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
-            const auto txnNumber = TxnNumber{1};
-
-            auto op1 =
-                makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
-            auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
-                                         kNs,
-                                         BSON("$set" << BSON("_id" << 2)),
-                                         BSON("x" << 2),
-                                         {2},
-                                         imageType /* needsRetryImage */);
-            auto op3 =
-                makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
-
-            auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
-            auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
-                                                 {},  // prevOpTime
-                                                 {op1},
-                                                 sessionId,
-                                                 txnNumber,
-                                                 false,  // isPrepare
-                                                 true);  // isPartial
-            insertOplogEntry(entry1);
-
-            auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
-            auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
-                                                 entry1.getOpTime(),  // prevOpTime
-                                                 {op2, op3},
-                                                 sessionId,
-                                                 txnNumber,
-                                                 false,   // isPrepare
-                                                 false);  // isPartial
-            insertOplogEntry(entry2);
-
-            repl::OpTime lastWriteOpTime;
-            if (isPrepared) {
-                auto commitOpTime = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
-                auto entry3 = makeCommandOplogEntry(commitOpTime,
-                                                    entry2.getOpTime(),
-                                                    BSON("commitTransaction" << 1),
-                                                    sessionId,
-                                                    txnNumber);
-                insertOplogEntry(entry3);
-                lastWriteOpTime = commitOpTime;
-            } else {
-                lastWriteOpTime = applyOpsOpTime2;
-            }
-
-            DBDirectClient client(opCtx());
-
-            SessionTxnRecord txnRecord;
-            txnRecord.setSessionId(sessionId);
-            txnRecord.setTxnNum(txnNumber);
-            txnRecord.setLastWriteOpTime(lastWriteOpTime);
-            txnRecord.setLastWriteDate(Date_t::now());
-            txnRecord.setState(DurableTxnStateEnum::kCommitted);
-
-            client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
-
-            repl::ImageEntry imageEntryForOp2;
-            imageEntryForOp2.set_id(sessionId);
-            imageEntryForOp2.setTxnNumber(txnNumber);
-            imageEntryForOp2.setTs(applyOpsOpTime2.getTimestamp());
-            imageEntryForOp2.setImageKind(imageType);
-            imageEntryForOp2.setImage(*op2.getObject2());
-
-            client.insert(NamespaceString::kConfigImagesNamespace, imageEntryForOp2.toBSON());
-
-            SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
-            migrationSource.init(opCtx(), kMigrationLsid);
-
-            const auto expectedSessionId = *getParentSessionId(sessionId);
-            const auto expectedTxnNumber = *sessionId.getTxnNumber();
-            const auto expectedImageOpForOp2 = makeDurableReplOp(repl::OpTypeEnum::kNoop,
-                                                                 kNs,
-                                                                 imageEntryForOp2.getImage(),
-                                                                 boost::none,
-                                                                 op2.getStatementIds());
-            const std::vector<repl::DurableReplOperation> expectedOps{
-                op3, expectedImageOpForOp2, op2, op1};
-
-            for (const auto& op : expectedOps) {
-                ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
-                ASSERT_TRUE(migrationSource.hasMoreOplog());
-                auto nextOplogResult = migrationSource.getLastFetchedOplog();
-                ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
-                ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
-                ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
-                ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
-                                  op.toBSON());
-            }
-
-            ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
-            ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 4);
-            ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
-
-            opTimeSecs++;
-            client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        for (auto txnType : {TransactionType::kUnprepared, TransactionType::kPrepared}) {
+            testCases.emplace_back(imageType, txnType);
         }
-    };
+    }
 
-    runTest(false /*isPrepared */);
-    runTest(true /*isPrepared */);
+    for (const auto& testCase : testCases) {
+        LOGV2(11924802,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        const auto txnNumber = TxnNumber{1};
+
+        auto op1 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
+        auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
+                                     kNs,
+                                     BSON("$set" << BSON("_id" << 2)),
+                                     BSON("x" << 2),
+                                     {2},
+                                     testCase.imageType /* needsRetryImage */);
+        auto op3 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+
+        auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
+        auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                             {},  // prevOpTime
+                                             {op1},
+                                             sessionId,
+                                             txnNumber,
+                                             false,  // isPrepare
+                                             true);  // isPartial
+        insertOplogEntry(entry1);
+
+        auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
+        auto entry2 =
+            makeApplyOpsOplogEntry(applyOpsOpTime2,
+                                   entry1.getOpTime(),  // prevOpTime
+                                   {op2, op3},
+                                   sessionId,
+                                   txnNumber,
+                                   testCase.txnType == TransactionType::kPrepared,  // isPrepare
+                                   false);                                          // isPartial
+        insertOplogEntry(entry2);
+
+        repl::OpTime lastWriteOpTime;
+        if (testCase.txnType == TransactionType::kPrepared) {
+            auto commitOpTime = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+            auto entry3 = makeCommandOplogEntry(commitOpTime,
+                                                entry2.getOpTime(),
+                                                BSON("commitTransaction" << 1),
+                                                sessionId,
+                                                txnNumber);
+            insertOplogEntry(entry3);
+            lastWriteOpTime = commitOpTime;
+        } else {
+            lastWriteOpTime = applyOpsOpTime2;
+        }
+
+        DBDirectClient client(opCtx());
+
+        SessionTxnRecord txnRecord;
+        txnRecord.setSessionId(sessionId);
+        txnRecord.setTxnNum(txnNumber);
+        txnRecord.setLastWriteOpTime(lastWriteOpTime);
+        txnRecord.setLastWriteDate(Date_t::now());
+        txnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+
+        repl::ImageEntry imageEntryForOp2;
+        imageEntryForOp2.set_id(sessionId);
+        imageEntryForOp2.setTxnNumber(txnNumber);
+        imageEntryForOp2.setTs(applyOpsOpTime2.getTimestamp());
+        imageEntryForOp2.setImageKind(testCase.imageType);
+        imageEntryForOp2.setImage(*op2.getObject2());
+
+        client.insert(NamespaceString::kConfigImagesNamespace, imageEntryForOp2.toBSON());
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+
+        const auto expectedSessionId = *getParentSessionId(sessionId);
+        const auto expectedTxnNumber = *sessionId.getTxnNumber();
+        const auto expectedImageOpForOp2 = makeDurableReplOp(repl::OpTypeEnum::kNoop,
+                                                             kNs,
+                                                             imageEntryForOp2.getImage(),
+                                                             boost::none,
+                                                             op2.getStatementIds());
+        const std::vector<repl::DurableReplOperation> expectedOps{
+            op3, expectedImageOpForOp2, op2, op1};
+
+        for (const auto& op : expectedOps) {
+            ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+            ASSERT_TRUE(migrationSource.hasMoreOplog());
+            auto nextOplogResult = migrationSource.getLastFetchedOplog();
+            ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+            ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
+            ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
+            ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
+                              op.toBSON());
+        }
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 4);
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+
+        opTimeSecs++;
+        client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, MissingImageDocumentForRetryableWrite) {
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        testCases.emplace_back(imageType);
+    }
+
+    for (const auto& testCase : testCases) {
+        LOGV2(11924803,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdForTest();
+        const auto txnNumber = TxnNumber{1};
+
+        auto entry = makeOplogEntry(
+            repl::OpTime(Timestamp(52, 346), 2),
+            repl::OpTypeEnum::kDelete,
+            BSON("_id" << 1 << "x" << 1),
+            boost::none,
+            Date_t::now(),  // wall clock time,
+            sessionId,
+            txnNumber,
+            {1},                               // statement id
+            repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+            boost::none,                       // pre-image optime
+            boost::none,                       // post-image optime
+            testCase.imageType);               // needsRetryImage
+        insertOplogEntry(entry);
+
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(sessionId);
+        sessionRecord.setTxnNum(txnNumber);
+        sessionRecord.setLastWriteOpTime(entry.getOpTime());
+        sessionRecord.setLastWriteDate(entry.getWallClockTime());
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+
+        // The corresponding oplog entry should not have the "needsRetryImage" field and there
+        // should be no forged pre/post image oplog entry.
+        ASSERT_FALSE(nextOplogResult.oplog->getNeedsRetryImage());
+
+        ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), sessionId);
+        ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), txnNumber);
+        ASSERT_EQ(nextOplogResult.oplog->getOpType(), repl::OpTypeEnum::kDelete);
+        ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getObject(), entry.getObject());
+        ASSERT_FALSE(nextOplogResult.oplog->getObject2());
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 1);
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+
+        client.remove(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, MissingImageDocumentForNewCommittedInternalTransaction) {
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        testCases.emplace_back(imageType);
+    }
+
+    auto opTimeSecs = 250;
+    for (const auto& testCase : testCases) {
+        LOGV2(11924804,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        const auto txnNumber = TxnNumber{1};
+        int numOps = 0;
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+        auto op1 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
+        auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
+                                     kNs,
+                                     BSON("$set" << BSON("y" << 1)),
+                                     BSON("_id" << 1 << "x" << 2),
+                                     {2},
+                                     testCase.imageType /* needsRetryImage */);
+        auto op3 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+
+        auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
+        auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                             {},  // prevOpTime
+                                             {op1},
+                                             sessionId,
+                                             txnNumber,
+                                             false,  // isPrepare
+                                             true);  // isPartial
+        insertOplogEntry(entry1);
+        numOps += 1;
+
+        auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
+        auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
+                                             entry1.getOpTime(),  // prevOpTime
+                                             {op2, op3},
+                                             sessionId,
+                                             txnNumber,
+                                             false,   // isPrepare
+                                             false);  // isPartial
+        insertOplogEntry(entry2);
+        numOps += 2;
+
+        auto op4 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 4), BSONObj(), {4});
+        auto op5 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -5), BSONObj(), {5});
+        auto applyOpsOpTime3 = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+        auto entry3 = makeApplyOpsOplogEntry(applyOpsOpTime3,
+                                             entry2.getOpTime(),  // prevOpTime
+                                             {op4, op5},
+                                             sessionId,
+                                             txnNumber,
+                                             false,   // isPrepare
+                                             false);  // isPartial
+        insertOplogEntry(entry3);
+        numOps += 2;
+
+        migrationSource.notifyNewWriteOpTime(
+            entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+
+        const auto expectedSessionId = *getParentSessionId(sessionId);
+        const auto expectedTxnNumber = *sessionId.getTxnNumber();
+
+        // The corresponding oplog entry for 'op2' should not have the "needsRetryImage" field and
+        // there should be no forged pre/post image oplog entry.
+        auto op2WithoutNeedsRetryImage = op2;
+        op2WithoutNeedsRetryImage.setNeedsRetryImage(boost::none);
+        const std::vector<repl::DurableReplOperation> expectedOps{
+            op3, op2WithoutNeedsRetryImage, op1};
+
+        for (const auto& op : expectedOps) {
+            ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+            ASSERT_TRUE(migrationSource.hasMoreOplog());
+            auto nextOplogResult = migrationSource.getLastFetchedOplog();
+            ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
+            ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
+            ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
+            ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
+                              op.toBSON());
+        }
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), expectedOps.size());
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(),
+                  numOps - expectedOps.size());
+
+        opTimeSecs++;
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, MissingImageDocumentForCommittedInternalTransaction) {
+    auto opTimeSecs = 260;
+
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        for (auto txnType : {TransactionType::kUnprepared, TransactionType::kPrepared}) {
+            testCases.emplace_back(imageType, txnType);
+        }
+    }
+
+    for (const auto& testCase : testCases) {
+        LOGV2(11924805,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        const auto txnNumber = TxnNumber{1};
+
+        auto op1 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
+        auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
+                                     kNs,
+                                     BSON("$set" << BSON("y" << 2)),
+                                     BSON("_id" << 2 << "x" << 2),
+                                     {2},
+                                     testCase.imageType /* needsRetryImage */);
+        auto op3 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+
+        auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
+        auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                             {},  // prevOpTime
+                                             {op1},
+                                             sessionId,
+                                             txnNumber,
+                                             false,  // isPrepare
+                                             true);  // isPartial
+        insertOplogEntry(entry1);
+
+        auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
+        auto entry2 =
+            makeApplyOpsOplogEntry(applyOpsOpTime2,
+                                   entry1.getOpTime(),  // prevOpTime
+                                   {op2, op3},
+                                   sessionId,
+                                   txnNumber,
+                                   testCase.txnType == TransactionType::kPrepared,  // isPrepare
+                                   false);                                          // isPartial
+        insertOplogEntry(entry2);
+
+        repl::OpTime lastWriteOpTime;
+        if (testCase.txnType == TransactionType::kPrepared) {
+            auto commitOpTime = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+            CommitTransactionOplogObject commandObj;
+            commandObj.setCommitTimestamp(commitOpTime.getTimestamp());
+            auto entry3 = makeCommandOplogEntry(
+                commitOpTime, entry2.getOpTime(), commandObj.toBSON(), sessionId, txnNumber);
+
+            insertOplogEntry(entry3);
+            lastWriteOpTime = commitOpTime;
+        } else {
+            lastWriteOpTime = applyOpsOpTime2;
+        }
+
+        DBDirectClient client(opCtx());
+
+        SessionTxnRecord txnRecord;
+        txnRecord.setSessionId(sessionId);
+        txnRecord.setTxnNum(txnNumber);
+        txnRecord.setLastWriteOpTime(lastWriteOpTime);
+        txnRecord.setLastWriteDate(Date_t::now());
+        txnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+
+        const auto expectedSessionId = *getParentSessionId(sessionId);
+        const auto expectedTxnNumber = *sessionId.getTxnNumber();
+
+        // The corresponding oplog entry should not have the "needsRetryImage" field and there
+        // should be no forged pre/post image oplog entry.
+        auto op2WithoutNeedsRetryImage = op2;
+        op2WithoutNeedsRetryImage.setNeedsRetryImage(boost::none);
+
+        const std::vector<repl::DurableReplOperation> expectedOps{
+            op3, op2WithoutNeedsRetryImage, op1};
+
+        for (const auto& op : expectedOps) {
+            ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+            ASSERT_TRUE(migrationSource.hasMoreOplog());
+            auto nextOplogResult = migrationSource.getLastFetchedOplog();
+            ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+            ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
+            ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
+            ASSERT_FALSE(nextOplogResult.oplog->getDurableReplOperation().getNeedsRetryImage());
+            ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
+                              op.toBSON());
+        }
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), expectedOps.size());
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+
+        opTimeSecs++;
+        client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ImageDocumentWithMismatchedTransactionNumberForRetryableWrite) {
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        testCases.emplace_back(imageType);
+    }
+
+    for (const auto& testCase : testCases) {
+        LOGV2(11924806,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdForTest();
+        const auto txnNumber = TxnNumber{1};
+        const auto mismatchedTxnNumber = TxnNumber{2};
+
+        repl::ImageEntry imageEntry;
+        const auto image = BSON("_id" << 1 << "x" << 1);
+        imageEntry.set_id(sessionId);
+        imageEntry.setTxnNumber(mismatchedTxnNumber);
+        imageEntry.setTs(repl::OpTime(Timestamp(52, 346), 2).getTimestamp());
+        imageEntry.setImageKind(testCase.imageType);
+        imageEntry.setImage(image);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
+
+        auto entry = makeOplogEntry(
+            repl::OpTime(Timestamp(52, 346), 2),
+            repl::OpTypeEnum::kDelete,
+            BSON("x" << 50),
+            boost::none,
+            Date_t::now(),
+            sessionId,
+            txnNumber,
+            {1},
+            repl::OpTime(Timestamp(0, 0), 0),  // optime of previous write within same transaction
+            boost::none,                       // pre-image optime
+            boost::none,                       // post-image optime
+            testCase.imageType);               // needsRetryImage
+        insertOplogEntry(entry);
+
+        SessionTxnRecord sessionRecord;
+        sessionRecord.setSessionId(sessionId);
+        sessionRecord.setTxnNum(txnNumber);
+        sessionRecord.setLastWriteOpTime(entry.getOpTime());
+        sessionRecord.setLastWriteDate(entry.getWallClockTime());
+
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+
+        // The corresponding oplog entry should not have the "needsRetryImage" field and there
+        // should be no forged pre/post image oplog entry.
+        ASSERT_FALSE(nextOplogResult.oplog->getNeedsRetryImage());
+
+        ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), sessionId);
+        ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), txnNumber);
+        ASSERT_EQ(nextOplogResult.oplog->getOpType(), repl::OpTypeEnum::kDelete);
+        ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getObject(), entry.getObject());
+        ASSERT_FALSE(nextOplogResult.oplog->getObject2());
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 1);
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+
+        client.remove(NamespaceString::kSessionTransactionsTableNamespace, sessionRecord.toBSON());
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ImageDocumentWithMismatchedTransactionNumberForNewCommittedInternalTransaction) {
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    migrationSource.init(opCtx(), kMigrationLsid);
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        testCases.emplace_back(imageType);
+    }
+
+    auto opTimeSecs = 270;
+    int numOps = 0;
+    int numExpectedOps = 0;
+    for (const auto& testCase : testCases) {
+        LOGV2(11924807,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        const auto txnNumber = TxnNumber{1};
+        const auto mismatchedTxnNumber = TxnNumber{2};
+
+        auto op1 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
+        auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
+                                     kNs,
+                                     BSON("$set" << BSON("y" << 2)),
+                                     BSON("_id" << 2 << "x" << 2),
+                                     {2},
+                                     testCase.imageType /* needsRetryImage */);
+        auto op3 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+        auto op4 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 4), BSONObj(), {4});
+        auto op5 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -5), BSONObj(), {5});
+
+        auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
+        auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                             {},  // prevOpTime
+                                             {op1},
+                                             sessionId,
+                                             txnNumber,
+                                             false,  // isPrepare
+                                             true);  // isPartial
+        insertOplogEntry(entry1);
+        numOps += 1;
+
+        auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
+        auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
+                                             entry1.getOpTime(),  // prevOpTime
+                                             {op2, op3},
+                                             sessionId,
+                                             txnNumber,
+                                             false,   // isPrepare
+                                             false);  // isPartial
+        insertOplogEntry(entry2);
+        numOps += 2;
+
+        repl::ImageEntry imageEntryForOp2;
+        imageEntryForOp2.set_id(sessionId);
+        imageEntryForOp2.setTxnNumber(mismatchedTxnNumber);
+        imageEntryForOp2.setTs(applyOpsOpTime2.getTimestamp());
+        imageEntryForOp2.setImageKind(testCase.imageType);
+        imageEntryForOp2.setImage(*op2.getObject2());
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kConfigImagesNamespace, imageEntryForOp2.toBSON());
+
+        auto applyOpsOpTime3 = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+        auto entry3 = makeApplyOpsOplogEntry(applyOpsOpTime3,
+                                             entry2.getOpTime(),  // prevOpTime
+                                             {op4, op5},
+                                             sessionId,
+                                             txnNumber,
+                                             false,   // isPrepare
+                                             false);  // isPartial
+        insertOplogEntry(entry3);
+        numOps += 2;
+
+        migrationSource.notifyNewWriteOpTime(
+            entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+
+        const auto expectedSessionId = *getParentSessionId(sessionId);
+        const auto expectedTxnNumber = *sessionId.getTxnNumber();
+
+        // The corresponding oplog entry should not have the "needsRetryImage" field and there
+        // should be no forged pre/post image oplog entry.
+        auto op2WithoutNeedsRetryImage = op2;
+        op2WithoutNeedsRetryImage.setNeedsRetryImage(boost::none);
+
+        const std::vector<repl::DurableReplOperation> expectedOps{
+            op3, op2WithoutNeedsRetryImage, op1};
+        numExpectedOps += expectedOps.size();
+
+        for (const auto& op : expectedOps) {
+            ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+            ASSERT_TRUE(migrationSource.hasMoreOplog());
+            auto nextOplogResult = migrationSource.getLastFetchedOplog();
+            ASSERT_TRUE(nextOplogResult.shouldWaitForMajority);
+            ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
+            ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
+            ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
+                              op.toBSON());
+        }
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        opTimeSecs++;
+    }
+
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), numExpectedOps);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(),
+              numOps - numExpectedOps);
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ImageDocumentWithMismatchedTransactionNumberForCommittedInternalTransaction) {
+    auto opTimeSecs = 280;
+
+    std::vector<PrePostImageTestCase> testCases;
+    for (auto imageType : {repl::RetryImageEnum::kPreImage, repl::RetryImageEnum::kPostImage}) {
+        for (auto txnType : {TransactionType::kUnprepared, TransactionType::kPrepared}) {
+            testCases.emplace_back(imageType, txnType);
+        }
+    }
+
+    for (const auto& testCase : testCases) {
+        LOGV2(11924808,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testCase"_attr = testCase.toBSON());
+
+        const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+        const auto txnNumber = TxnNumber{1};
+        const auto mismatchedTxnNumber = TxnNumber{2};
+
+        auto op1 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
+        auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
+                                     kNs,
+                                     BSON("$set" << BSON("y" << 2)),
+                                     BSON("_id" << 2 << "x" << 2),
+                                     {2},
+                                     testCase.imageType /* needsRetryImage */);
+        auto op3 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+
+        auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
+        auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
+                                             {},  // prevOpTime
+                                             {op1},
+                                             sessionId,
+                                             txnNumber,
+                                             false,  // isPrepare
+                                             true);  // isPartial
+        insertOplogEntry(entry1);
+
+        auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
+        auto entry2 =
+            makeApplyOpsOplogEntry(applyOpsOpTime2,
+                                   entry1.getOpTime(),  // prevOpTime
+                                   {op2, op3},
+                                   sessionId,
+                                   txnNumber,
+                                   testCase.txnType == TransactionType::kPrepared,  // isPrepare
+                                   false);                                          // isPartial
+        insertOplogEntry(entry2);
+
+        repl::OpTime lastWriteOpTime;
+        if (testCase.txnType == TransactionType::kPrepared) {
+            auto commitOpTime = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+            CommitTransactionOplogObject commandObj;
+            commandObj.setCommitTimestamp(commitOpTime.getTimestamp());
+            auto entry3 = makeCommandOplogEntry(
+                commitOpTime, entry2.getOpTime(), commandObj.toBSON(), sessionId, txnNumber);
+
+            insertOplogEntry(entry3);
+            lastWriteOpTime = commitOpTime;
+        } else {
+            lastWriteOpTime = applyOpsOpTime2;
+        }
+
+        DBDirectClient client(opCtx());
+
+        SessionTxnRecord txnRecord;
+        txnRecord.setSessionId(sessionId);
+        txnRecord.setTxnNum(txnNumber);
+        txnRecord.setLastWriteOpTime(lastWriteOpTime);
+        txnRecord.setLastWriteDate(Date_t::now());
+        txnRecord.setState(DurableTxnStateEnum::kCommitted);
+
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+
+        repl::ImageEntry imageEntryForOp2;
+        imageEntryForOp2.set_id(sessionId);
+        imageEntryForOp2.setTxnNumber(mismatchedTxnNumber);
+        imageEntryForOp2.setTs(applyOpsOpTime2.getTimestamp());
+        imageEntryForOp2.setImageKind(testCase.imageType);
+        imageEntryForOp2.setImage(*op2.getObject2());
+
+        client.insert(NamespaceString::kConfigImagesNamespace, imageEntryForOp2.toBSON());
+
+        SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+        migrationSource.init(opCtx(), kMigrationLsid);
+
+        const auto expectedSessionId = *getParentSessionId(sessionId);
+        const auto expectedTxnNumber = *sessionId.getTxnNumber();
+
+        // The corresponding oplog entry should not have the "needsRetryImage" field and there
+        // should be no forged pre/post image oplog entry.
+        auto op2WithoutNeedsRetryImage = op2;
+        op2WithoutNeedsRetryImage.setNeedsRetryImage(boost::none);
+
+        const std::vector<repl::DurableReplOperation> expectedOps{
+            op3, op2WithoutNeedsRetryImage, op1};
+
+        for (const auto& op : expectedOps) {
+            ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+            ASSERT_TRUE(migrationSource.hasMoreOplog());
+            auto nextOplogResult = migrationSource.getLastFetchedOplog();
+            ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+            ASSERT_EQ(*nextOplogResult.oplog->getSessionId(), expectedSessionId);
+            ASSERT_EQ(*nextOplogResult.oplog->getTxnNumber(), expectedTxnNumber);
+            ASSERT_FALSE(nextOplogResult.oplog->getDurableReplOperation().getNeedsRetryImage());
+            ASSERT_BSONOBJ_EQ(nextOplogResult.oplog->getDurableReplOperation().toBSON(),
+                              op.toBSON());
+        }
+
+        ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 3);
+        ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+
+        opTimeSecs++;
+        client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
+    }
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,
