@@ -71,7 +71,12 @@ UncommittedFastCountChange& UncommittedFastCountChange::getForWrite(OperationCon
             invariant(fn, "FastCountCommitFn is not set");
 
             fn(opCtx, getUncommittedFastCountChange(opCtx)->_trackedChanges, commitTime);
+            getUncommittedFastCountChange(opCtx).reset();
         });
+
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [](OperationContext* opCtx) { getUncommittedFastCountChange(opCtx).reset(); });
+
     return *ptr;
 }
 

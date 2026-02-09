@@ -93,6 +93,18 @@ public:
      */
     CollectionSizeCount find(const UUID& uuid) const;
 
+    /**
+     * Manually triggers an iteration to write dirty metadata to the internal collection for testing
+     * purposes.
+     */
+    void runIteration_ForTest(OperationContext* opCtx);
+
+    /**
+     * Disables periodic background writes of metadata for testing purposes. Must be called before
+     * startup().
+     */
+    void disablePeriodicWrites_ForTest();
+
 private:
     void _startBackgroundThread(ServiceContext* svcCtx);
     void _runBackgroundThreadOnTimer(OperationContext* opCtx);
@@ -127,20 +139,25 @@ private:
     RecordId _keyForUUID(const UUID& uuid);
     UUID _UUIDForKey(RecordId key);
 
-    AtomicWord<bool> _inShutdown = false;
     StringData _threadName = "sizeCount"_sd;
-
-    mutable stdx::mutex _mutex;
     struct StoredSizeCount {
         CollectionSizeCount sizeCount;
         bool dirty{false};  // indicate if write is needed
         // boost::optional<Timestamp> lastUpdated;
     };
 
+    stdx::thread _backgroundThread;
+
+    bool _writeMetadataPeriodically = true;
+
+    AtomicWord<bool> _inShutdown = false;
+
+    stdx::condition_variable _condVar;
+
+    mutable stdx::mutex _metadataMutex;
+
     // Map of collection UUID to the last committed size and count.
     absl::flat_hash_map<UUID, StoredSizeCount> _metadata;
-
-    stdx::thread _backgroundThread;
 };
 
 }  // namespace mongo

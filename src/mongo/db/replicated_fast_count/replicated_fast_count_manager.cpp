@@ -48,7 +48,19 @@ ReplicatedFastCountManager& ReplicatedFastCountManager::get(ServiceContext* svcC
 
 void ReplicatedFastCountManager::shutdown() {
     LOGV2(11648800, "Shutting down ReplicatedFastCountManager");
-    _inShutdown.storeRelaxed(true);
+
+    {
+        stdx::lock_guard lock(_metadataMutex);
+        _inShutdown.storeRelaxed(true);
+    }
+
+    _condVar.notify_all();
+
+    if (_backgroundThread.joinable()) {
+        _backgroundThread.join();
+    }
+    // TODO SERVER-117515: Once this is being signaled from the checkpoint thread, make sure that we
+    // do not miss writing any dirty metadata here.
 }
 
 void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
@@ -69,7 +81,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
             LOGV2(11648801,
                   "ReplicatedFastCountManager::startup fastcount collection exists, "
                   "initializing sizes and counts");
-            stdx::lock_guard lock(_mutex);
+            stdx::lock_guard lock(_metadataMutex);
 
             auto cursor = acquisition.getCollectionPtr()->getCursor(opCtx);
             while (auto record = cursor->next()) {
@@ -109,15 +121,22 @@ void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) 
                       "error"_attr = ex.toStatus());
     }
 
-    // TODO SERVER-117651 : Shutdown behavior goes here.
     LOGV2(11648804, "ReplicatedFastCountManager exited");
 }
 
 void ReplicatedFastCountManager::_runBackgroundThreadOnTimer(OperationContext* opCtx) {
-    while (!_inShutdown.loadRelaxed()) {
-        // TODO SERVER-117515: should not just be on a timer. We want to signal this from checkpoint
-        // thread somehow.
-        stdx::this_thread::sleep_for(stdx::chrono::seconds(1));
+    while (_writeMetadataPeriodically) {
+        {
+            stdx::unique_lock lock(_metadataMutex);
+            // TODO SERVER-117515: We want to signal this from checkpoint thread
+            _condVar.wait_for(
+                lock, stdx::chrono::seconds(1), [this] { return _inShutdown.loadRelaxed(); });
+
+            if (_inShutdown.loadRelaxed()) {
+                break;
+            }
+        }
+
         _runIteration(opCtx);
     }
 }
@@ -126,7 +145,7 @@ void ReplicatedFastCountManager::_runIteration(OperationContext* opCtx) {
     // TODO SERVER-117652: Make copy so we don't hold locks too long. Should use immutable data
     // structures.
     absl::flat_hash_map<UUID, StoredSizeCount> metadata = [&]() {
-        stdx::lock_guard lock(_mutex);
+        stdx::lock_guard lock(_metadataMutex);
         return _metadata;
     }();
 
@@ -143,7 +162,7 @@ void ReplicatedFastCountManager::_runIteration(OperationContext* opCtx) {
             if (metadataVal.dirty) {
                 _writeMetadata(
                     opCtx, coll, metadataKey, metadataVal.sizeCount, _keyForUUID(metadataKey));
-                stdx::lock_guard lock(_mutex);
+                stdx::lock_guard lock(_metadataMutex);
                 _metadata[metadataKey].dirty = false;
             }
         }
@@ -185,7 +204,7 @@ void ReplicatedFastCountManager::initializeFastCountCommitFn() {
 void ReplicatedFastCountManager::commit(
     const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
     boost::optional<Timestamp> commitTime) {
-    stdx::lock_guard lock(_mutex);
+    stdx::lock_guard lock(_metadataMutex);
     for (const auto& [uuid, metadata] : changes) {
         // TODO SERVER-117656: Investigate why we sometimes get zero changes here.
         if (metadata.count == 0 && metadata.size == 0) {
@@ -200,7 +219,7 @@ void ReplicatedFastCountManager::commit(
 }
 
 CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
-    stdx::lock_guard lock(_mutex);
+    stdx::lock_guard lock(_metadataMutex);
     auto it = _metadata.find(uuid);
     if (it != _metadata.end()) {
         return it->second.sizeCount;
@@ -276,6 +295,16 @@ RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) {
 
 UUID ReplicatedFastCountManager::_UUIDForKey(RecordId key) {
     return UUID::parse(record_id_helpers::toBSONAs(key, "").firstElement()).getValue();
+}
+
+void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
+    invariant(!_backgroundThread.joinable(),
+              "Background thread started running before disabling periodic metadata writes");
+    _writeMetadataPeriodically = false;
+}
+
+void ReplicatedFastCountManager::runIteration_ForTest(OperationContext* opCtx) {
+    _runIteration(opCtx);
 }
 
 }  // namespace mongo
