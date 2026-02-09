@@ -77,6 +77,51 @@ Once the query execution is fully complete, [`writeQueryStats`][write query stat
 will either retrieve the entry for the key from the store if it exists and update it, or create a new one and add it to the store.
 See more details in the [comments][write query stats comments].
 
+### Adding New Metrics
+
+When adding a new metric to Query Stats, follow these steps to ensure the metric is valuable, performant, and maintainable.
+
+#### 1. Define Clear Value Proposition
+
+Before implementing, ask yourself:
+
+- What specific insight does this metric provide that isn't already available?
+- Is this metric actionable for users (user observability, TSEs, and perf engineers)?
+- Does this metric help diagnose performance issues, understand workload patterns, or optimize query planning?
+- Can it be derived from existing metrics through simple calculations? (If yes, reconsider.)
+
+#### 2. Define the Metric in `QueryStatsEntry`
+
+Add the metric to the appropriate section of [`QueryStatsEntry`](query_stats_entry.h) using the appropriate `AggregatedMetric` type (e.g., `AggregatedMetric<uint64_t>` for counters or derived values like rate). Follow the existing patterns for organization if applicable (e.g., cursor stats, query execution stats, planner stats, write stats).
+
+#### 3. Connect new Metric all the way to `OpDebug::AdditiveMetrics`
+
+- Add the metric to [`OpDebug::AdditiveMetrics`](../../op_debug.cpp) and `OpDebug::AdditiveMetrics::add` to capture raw values during execution.
+- Add a corresponding field to [`QueryStatsSnapshot`](query_stats.h) to transport the value.
+- Update [`query_stats::captureMetrics()`](query_stats.cpp) to extract and transform the metric from `OpDebug::AdditiveMetrics` into the snapshot.
+
+If you need to propagate a metric from mongod to mongos, then define:
+
+- In the cursor response [`cursor_response.idl`](../client_cursor/cursor_response.idl), add your metric field to the `CursorMetrics` struct and let IDL codegen generate the serialization/deserialization BSON logic. Ensure the field is optional so older clients/routers can ignore it gracefully.
+- Define the shard aggregation logic for the metric in [`data_bearing_node_metrics.h`](data_bearing_node_metrics.h) under `DataBearingNodeMetrics::add()` and `DataBearingNodeMetrics::aggregateCursorMetrics()`, alongside `OpDebug::AdditiveMetrics::aggregateCursorMetrics()` and `OpDebug::getCursorMetrics()`. Use these aggregation semantics: addition for totals (e.g., `docsExamined`), maximum for maximums (e.g., `maxAcquisitionDelinquency`), OR for boolean flags (e.g., `hasSortStage`), and AND for conjunctions (e.g., `fromPlanCache`).
+
+#### 4. Instrument with the Query Lifecycle
+
+Determine where in the query execution path the metric should be set in `OpDebug::AdditiveMetrics` by getting the `OpDebug` member of `CurOp`:
+
+- Identify the appropriate point where the metric value is available (i.e., during planning, execution, or on cursor operations). Avoid setting it multiple times.
+- Metrics collection occurs in the hot path of query execution and must add negligible CPU and memory cost.
+
+#### 5. Add Regression Tests
+
+- Test collection accuracy in isolation (ensure values are captured correctly)
+- Verify aggregation correctness with edge cases (zero values, overflow, boundary conditions, etc.)
+- Validate metrics appear correctly in `$queryStats` output.
+- Test in sharded clusters to verify proper flow from shards to router and correct aggregation.
+- Determine which benchmarks could be impacted (i.e., query latency, throughput, resource utilization). If the metric is recorded only once during the query's lifetime, the performance impact should be minimal and further validation may not be necessary. Ensure benchmarks are run with query stats sampling enabled.
+
+If you have any questions, feel free to contact `#query-integration-observability` Slack channel.
+
 ### Data-bearing Node Metrics
 
 Some metrics are only known to data-bearing nodes. When a query is selected for query stats
