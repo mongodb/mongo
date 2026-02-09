@@ -225,18 +225,4 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
                 "WiredTigerSizeStorer::flush completed",
                 "duration"_attr = Microseconds{t.micros()});
 }
-
-void WiredTigerSizeStorer::cleanup_forTest() {
-    stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
-    for (auto&& [uri, sizeInfo] : _buffer) {
-        if (sizeInfo) {
-            // Assigning _dirty to false allows the WiredTigerRecordStore::_sizeInfo destructor call
-            // to not hit an invariant.
-            sizeInfo->_dirty.store(false);
-        }
-    }
-    // Clearing the buffer ensures that during shutdown, this class' call to flush() returns early
-    // and does not get a CursorNotFound error.
-    _buffer.clear();
-}
 }  // namespace mongo

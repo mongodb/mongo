@@ -35,6 +35,7 @@
 #include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
@@ -165,6 +166,11 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     storageGlobalParams.dbpath = _tempDir.path();
 
     storageGlobalParams.inMemory = options._inMemory;
+
+    if (options._persistenceProvider) {
+        rss::ReplicatedStorageService::get(serviceContext)
+            .setPersistenceProvider(std::move(options._persistenceProvider));
+    }
 
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.

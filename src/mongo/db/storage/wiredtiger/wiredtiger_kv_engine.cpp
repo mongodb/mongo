@@ -790,17 +790,22 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         minSnapshotHistoryWindowInSeconds.store(0);
     }
 
-    _sizeStorerUri = WiredTigerUtil::buildTableUri(ident::kSizeStorer);
-    WiredTigerSession session(_connection.get());
-    if (repair && _wtHasUri(session, _sizeStorerUri)) {
-        LOGV2(22316, "Repairing size cache");
+    // The WT size storer table is only used if the replicated fastcount collection is disabled.
+    // When the replicated fastcount collection is enabled, _sizeStorer should be null.
+    if (!provider.shouldUseReplicatedFastCount()) {
+        std::string sizeStorerUri = WiredTigerUtil::buildTableUri(ident::kSizeStorer);
+        WiredTigerSession session(_connection.get());
+        if (repair && _wtHasUri(session, sizeStorerUri)) {
+            LOGV2(22316, "Repairing size cache");
 
-        auto status = _salvageIfNeeded(_sizeStorerUri.c_str());
-        if (status.code() != ErrorCodes::DataModifiedByRepair)
-            fassertNoTrace(28577, status);
+            auto status = _salvageIfNeeded(sizeStorerUri.c_str());
+            if (status.code() != ErrorCodes::DataModifiedByRepair)
+                fassertNoTrace(28577, status);
+        }
+        _sizeStorer =
+            std::make_unique<WiredTigerSizeStorer>(_connection.get(), std::move(sizeStorerUri));
     }
 
-    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_connection.get(), _sizeStorerUri);
     auto param = std::make_unique<WiredTigerEngineRuntimeConfigParameter>(
         "wiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly);
     param->_data.second = this;
@@ -2082,7 +2087,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                 str::stream() << "Failed to remove drop-pending ident " << ident};
     }
 
-    if (identHasSizeInfo) {
+    if (identHasSizeInfo && _sizeStorer) {
         _sizeStorer->remove(uri);
     }
 
@@ -2630,7 +2635,10 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(Interruptible
                 str::stream() << "Error rolling back to stable. Err: " << wiredtiger_strerror(ret)};
     }
 
-    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_connection.get(), _sizeStorerUri);
+    if (_sizeStorer) {
+        _sizeStorer = std::make_unique<WiredTigerSizeStorer>(
+            _connection.get(), std::string(_sizeStorer->getStorageUri()));
+    }
 
     // SERVER-85167: restart the cache after resetting the size storer.
     _connection->restart();
@@ -3138,6 +3146,10 @@ BSONObj WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
 }
 
 void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
+    if (!_sizeStorer) {
+        return;
+    }
+
     bool needSyncSizeInfo = false;
     {
         stdx::lock_guard<stdx::mutex> lock(_sizeStorerSyncTrackerMutex);

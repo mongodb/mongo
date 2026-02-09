@@ -32,6 +32,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -138,6 +139,12 @@ public:
             return std::move(*this);
         }
 
+        Options setPersistenceProvider(
+            std::unique_ptr<rss::PersistenceProvider> persistenceProvider) {
+            _persistenceProvider = std::move(persistenceProvider);
+            return std::move(*this);
+        }
+
     private:
         friend class MongoDScopedGlobalServiceContextForTest;
 
@@ -159,6 +166,7 @@ public:
         bool _createShardingState = true;
         std::vector<std::unique_ptr<ServiceContext::ClientObserver>> _clientObservers;
         std::vector<RAIIServerParameterControllerForTest> _parameters;
+        std::unique_ptr<rss::PersistenceProvider> _persistenceProvider;
     };
 
     MongoDScopedGlobalServiceContextForTest(Options options, bool shouldSetupTL);
