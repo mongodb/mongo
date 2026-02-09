@@ -1,4 +1,4 @@
-base_suite: sharding_jscore_passthrough
+base_suite: sharding_jscore_passthrough_base
 
 overrides:
   - "kill_primary.sharding_override_fixture"

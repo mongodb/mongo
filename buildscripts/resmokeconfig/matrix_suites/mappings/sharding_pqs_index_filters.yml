@@ -1,4 +1,4 @@
-base_suite: sharding_jscore_passthrough
+base_suite: sharding_jscore_passthrough_base
 description: >-
   Test the correctness of query settings application by replacing index filter commands with query settings ones. This suite runs a select subset of jscore tests on a sharded cluster fixture.
   For testing purposes, SetQuerySettingsCommand and RemoveQuerySettingsCommand clear the plan cache

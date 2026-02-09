@@ -57,3 +57,6 @@ filters:
   - "vector_search_extension.yml":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "check_system_buckets_hook.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl

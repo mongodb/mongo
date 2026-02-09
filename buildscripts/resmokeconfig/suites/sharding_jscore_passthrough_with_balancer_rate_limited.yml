@@ -1,4 +1,4 @@
-# Based on sharding_jscore_passthrough. This suite tests the js core with a balancer and with a
+# Based on sharding_jscore_passthrough_base. This suite tests the js core with a balancer and with a
 # simulated rate limiter enabled to reject random requests. The purpose of this passthrough is to
 # add coverage on the retryability support in various process internal clients. With a high amount
 # of maximum retries, no errors should bubble up to the driver, even with a balance present.

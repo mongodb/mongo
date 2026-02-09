@@ -1,4 +1,4 @@
-base_suite: sharding_jscore_passthrough
+base_suite: sharding_jscore_passthrough_base
 overrides:
   - "execution_control_params.sharding_reconfig_hooks_with_dynamic_execution_control"
   - "execution_control_params.sharding_reconfig_archive_hooks_with_dynamic_execution_control"

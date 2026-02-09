@@ -207,3 +207,12 @@ filters:
   - "sharding_jscore_passthrough_priority_ports.yml":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "sharding_jscore_passthrough_base.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "sharding_uninitialized_fcv_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers
+  - "sharding_api_version_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-replication-reviewers

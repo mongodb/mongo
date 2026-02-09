@@ -42,7 +42,7 @@ selector:
     # Change stream pre-images are not cloned during initial sync.
     - jstests/core/**/write_change_stream_pit_preimage.js
 
-    ### Tests that are excluded because of sharding (from sharding_jscore_passthrough.yml)
+    ### Tests that are excluded because of sharding (from sharding_jscore_passthrough_base.yml)
     # The following tests fail because a certain command or functionality is not supported on
     # mongos. This command or functionality is placed in a comment next to the failing test.
     - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.

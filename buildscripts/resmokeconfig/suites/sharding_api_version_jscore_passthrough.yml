@@ -16,7 +16,7 @@ selector:
     - jstests/core/txns/kill_op_on_txn_expiry.js
 
     #
-    # Taken from sharding_jscore_passthrough.yml.
+    # Taken from sharding_jscore_passthrough_base.yml.
     #
 
     # The following tests fail because a certain command or functionality is not supported on

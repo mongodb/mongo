@@ -1,4 +1,4 @@
-# Based on the sharding_jscore_passthrough suite. Runs continuous config transitions
+# Based on the sharding_jscore_passthrough_base suite. Runs continuous config transitions
 # from a config shard to a dedicated config server.
 config_variables:
   - &movePrimaryComment continuousConfigShardTransitionMovePrimary

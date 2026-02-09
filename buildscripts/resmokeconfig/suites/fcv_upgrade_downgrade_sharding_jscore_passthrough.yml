@@ -1,6 +1,6 @@
 test_kind: js_test
 
-# Cloned from buildscripts/resmokeconfig/suites/sharding_jscore_passthrough.yml
+# Cloned from buildscripts/resmokeconfig/suites/sharding_jscore_passthrough_base.yml
 # to run FCV upgrade downgrade in the background
 
 selector:

@@ -3,7 +3,7 @@
 # to validate routing of requests to system.buckets collections (no rawData) still works in mongos.
 #
 # TODO SERVER-109519: remove this temporary suite and all its usages.
-base_suite: sharding_jscore_passthrough
+base_suite: sharding_jscore_passthrough_base
 overrides:
   - "legacy_timeseries.all_jscore_timeseries_tests_selector"
   - "legacy_timeseries.do_not_use_rawdata_for_legacy_timeseries"

@@ -1,4 +1,4 @@
-base_suite: sharding_jscore_passthrough
+base_suite: sharding_jscore_passthrough_base
 overrides:
   - "multiversion.sharded_fixture_last_continuous_3_nodes"
   - "kill_primary.sharding_reconfig_hooks"

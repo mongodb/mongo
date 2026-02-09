@@ -1,0 +1,29 @@
+# TODO SERVER-118900: Delete this file once 9.0 becomes last LTS
+- name: replica_sets_jscore_passthrough_with_system_buckets_hook
+  value:
+    executor:
+      hooks:
+        # CheckSystemBucketsMetrics must run before ValidateCollections
+        - class: CheckSystemBucketsMetrics
+        - class: RunDBCheckInBackground
+        - class: CheckReplDBHashInBackground
+        - class: ValidateCollectionsInBackground
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanEveryN
+          n: 20
+
+- name: sharding_jscore_passthrough_with_system_buckets_hook
+  value:
+    executor:
+      hooks:
+        # CheckSystemBucketsMetrics must run before ValidateCollections
+        - class: CheckSystemBucketsMetrics
+        - class: CheckReplDBHash
+        - class: CheckMetadataConsistencyInBackground
+        - class: ValidateCollections
+        - class: CheckShardFilteringMetadata
+        - class: CheckOrphansDeleted
+        - class: CleanEveryN
+          n: 20

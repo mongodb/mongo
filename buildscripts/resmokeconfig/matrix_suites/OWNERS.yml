@@ -57,6 +57,9 @@ filters:
   - "generated_suites/replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-jstest-infra
+  - "generated_suites/sharding_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "generated_suites/sharding*kill_primaries*":
     approvers:
       - 10gen/server-catalog-and-routing
