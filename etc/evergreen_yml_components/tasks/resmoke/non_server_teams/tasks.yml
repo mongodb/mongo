@@ -593,11 +593,6 @@ task_groups:
       - func: "set up credentials"
       - func: "get engflow creds"
     teardown_task:
-      - command: generate.tasks
-        params:
-          optional": true
-          files:
-            - generated_tasks.json
       - command: s3.put
         params:
           optional: true
@@ -632,5 +627,15 @@ task_groups:
       - func: "save failed tests"
       - func: "f_expansions_write"
       - func: "kill processes"
+
+      # generate.tasks should be the last command run. In the event the job Evergreen runs to perform
+      # the actual task generation is significantly delayed and the command times out, this will ensure
+      # that the other teardown actions still are run. When the command times out, the job still exists
+      # and the generate tasks will still be created.
+      - command: generate.tasks
+        params:
+          optional": true
+          files:
+            - generated_tasks.json
     tasks:
       - resmoke_tests
