@@ -77,16 +77,16 @@ structs:
                     callback: collection_options_validation::validateStorageEngineOptions
 
     DefaultIndexesTier:
-        description: "Disaggregated storage default 'hotness' level for indexes belonging to a collection"
+        description: "When using a disaggregated storage engine, default 'hotness' level for indexes belonging to a collection"
         strict: true
         fields:
             defaultTier:
-                description: "Disaggregated storage default 'hotness' for indexes"
+                description: "Default storage tier for indexes"
                 type: StorageTierLevel
                 stability: unstable
 
     CollectionStorageTier:
-        description: "The disaggregated storage configuration for hot/cold collections"
+        description: "Configuration for hot/cold collections when using a disaggregated storage engine"
         strict: true
         fields:
             collection:

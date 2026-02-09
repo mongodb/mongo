@@ -251,6 +251,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setValidator(request.getValidator());
     createRequest.setPipeline(request.getPipeline());
     createRequest.setStorageEngine(request.getStorageEngine());
+    createRequest.setStorageTier(request.getStorageTier());
 
     cmd.setCreateCollectionRequest(createRequest);
     return cmd;

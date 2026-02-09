@@ -311,6 +311,11 @@ structs:
                 description: "Specifies the fields that are encrypted by client-side FLE."
                 type: EncryptedFieldConfig
                 optional: true
+            storageTier:
+                description: "Specific to disaggregated storage to set hot/cold options."
+                type: CollectionStorageTier
+                optional: true
+                stability: unstable
             temp:
                 description: "Internal field that can be used in the $out aggregation code."
                 type: safeBool
