@@ -1062,6 +1062,16 @@ functions:
   "do multiversion setup":
     - *f_expansions_write
     - *set_up_venv
+    - *f_expansions_write
+    - command: expansions.update
+      params:
+        updates:
+          - key: aws_key_remote
+            value: ${aws_key}
+          - key: aws_secret_remote
+            value: ${aws_secret}
+    - *f_expansions_write
+    - *set_up_remote_credentials
     - *get_multiversion_selection_results
     - *get_local_db_contrib_tool_invocation
     - *do_multiversion_setup
