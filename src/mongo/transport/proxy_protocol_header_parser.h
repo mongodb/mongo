@@ -92,13 +92,13 @@ struct ParserResults {
 
 /**
  * Parses a string potentially starting with a proxy protocol header (either V1 or V2). The parsing
- * logic adjusts based on whether the socket being read from is a Unix domain socket (`isUnixSock`).
- * If the string begins with a partial but incomplete header, returns an empty optional;
- * otherwise, returns a ParserResults with the results of the parse.
+ * logic adjusts based on whether the socket being read from is a Unix domain socket
+ * (`isProxyUnixSock`). If the string begins with a partial but incomplete header, returns an empty
+ * optional; otherwise, returns a ParserResults with the results of the parse.
  *
  * Will throw eagerly on a malformed header.
  */
-boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isUnixSock);
+boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isProxyUnixSock);
 
 /**
  * Peek a buffer fo at least 12 bytes to determine if it may be a proxy protocol header.

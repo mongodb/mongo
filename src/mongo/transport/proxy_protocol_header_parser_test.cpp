@@ -296,18 +296,20 @@ struct TestV2Header {
     std::string length;
     std::string firstAddr;
     std::string secondAddr;
+    std::string tlv;
     std::string metadata;
 
     std::pair<sockaddr_un, sockaddr_un> unixAddrs;
 
     std::string toString() const {
-        return fmt::format("{}{}{}{}{}{}{}",
+        return fmt::format("{}{}{}{}{}{}{}{}",
                            header,
                            versionAndCommand,
                            addressFamilyAndProtocol,
                            length,
                            firstAddr,
                            secondAddr,
+                           tlv,
                            metadata);
     }
 };
@@ -339,16 +341,24 @@ std::pair<SockAddrUn, SockAddrUn> createTestSockAddrUn(std::string srcPath, std:
     return addrs;
 }
 
-TestV2Header buildValidPP2Header(AddressFamily type) {
+std::string encodeU16BigEndian(size_t value) {
+    using namespace std::string_literals;
+    const auto v = static_cast<uint16_t>(value);
+    return "\x00\x00"s.replace(0, 1, 1, static_cast<char>((v >> 8) & 0xFF))
+        .replace(1, 1, 1, static_cast<char>(v & 0xFF));
+}
+
+TestV2Header buildValidPP2Header(AddressFamily type, StringData tlv = "") {
     using namespace std::string_literals;
 
     TestV2Header header;
     header.header = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"s;
+    size_t baseAddrLen = 0;
     switch (type) {
         case (AddressFamily::TCP4): {
             header.versionAndCommand = "\x21"s;
             header.addressFamilyAndProtocol = "\x12"s;
-            header.length = "\x00\x0C"s;
+            baseAddrLen = 12;
             header.firstAddr = "\x0C\x22\x38\x4e\xac\x10"s;
             header.secondAddr = "\x00\x01\x04\xd2\x1f\x90"s;
             break;
@@ -356,21 +366,19 @@ TestV2Header buildValidPP2Header(AddressFamily type) {
         case (AddressFamily::TCP6): {
             header.versionAndCommand = "\x21"s;
             header.addressFamilyAndProtocol = "\x21"s;
-            header.length = "\x00\x24"s;
+            baseAddrLen = 36;
             header.firstAddr = "\x20\x1\xd\xb8\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x64"s;
             header.secondAddr = "\xff\x9b\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x4\xd2\x1f\x90"s;
-            header.metadata = "";
             break;
         }
         case (AddressFamily::UNIX): {
             header.versionAndCommand = "\x21"s;
             header.addressFamilyAndProtocol = "\x31"s;
-            header.length = "\x00\xD8"s;
+            baseAddrLen = 216;
             const std::string srcPath(sizeof(sockaddr_un::sun_path) / 2, '\1');
             const std::string dstPath(sizeof(sockaddr_un::sun_path) - 1, '\2');
             header.firstAddr = createTestUnixPathString(srcPath);
             header.secondAddr = createTestUnixPathString(dstPath);
-            header.metadata = "";
             header.unixAddrs = createTestSockAddrUn(srcPath, dstPath);
             break;
         }
@@ -378,6 +386,8 @@ TestV2Header buildValidPP2Header(AddressFamily type) {
             MONGO_UNREACHABLE;
     }
 
+    header.tlv = std::string(tlv.data(), tlv.size());
+    header.length = encodeU16BigEndian(baseAddrLen + tlv.size());
     return header;
 }  // namespace
 
@@ -602,9 +612,8 @@ TEST(ProxyProtocolHeaderParser, MacSockAddrUnParsing) {
 }
 
 boost::optional<ParserResults> parseWithTLV(AddressFamily type, const std::string& tlvData) {
-    auto header = buildValidPP2Header(type).toString();
-    header.append(tlvData);
-    return parseProxyProtocolHeader(header, true /* isUnixSock */);
+    auto header = buildValidPP2Header(type, tlvData);
+    return parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
 }
 
 std::string buildTLV(uint8_t type, const std::string& data) {
@@ -689,6 +698,31 @@ TEST_P(ProxyProtocolParameterizedTestFixture, TLVParsingFails) {
     std::string tlvData5{char(0x01), char(0x00), char(0xC8)};
     tlvData5 += "dummy";
     ASSERT_THROWS_CODE(parseWithTLV(type, tlvData5), DBException, ErrorCodes::FailedToParse);
+}
+
+TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtocolNoTLV) {
+    auto type = GetParam();
+    auto header = buildValidPP2Header(type);
+    header.metadata = "Adding some junk data";
+
+    auto result = parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(result->endpoints);
+    ASSERT_EQ(result->tlvs.size(), 0u);
+}
+
+TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtocolTLV) {
+    auto type = GetParam();
+    auto tlvData = buildTLV(0x01, "alpn");
+    auto header = buildValidPP2Header(type, tlvData);
+    header.metadata = "Adding some junk data";
+
+    auto result = parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    ASSERT_TRUE(result);
+    ASSERT_TRUE(result->endpoints);
+    ASSERT_EQ(result->tlvs.size(), 1u);
+    ASSERT_EQ(result->tlvs[0].type, 0x01);
+    ASSERT_EQ(result->tlvs[0].data, "alpn");
 }
 
 }  // namespace
