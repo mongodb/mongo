@@ -3,7 +3,7 @@ overrides:
   - "fcv_upgrade_downgrade.overrides_shell_options"
   - "kill_primary.replica_sets_shell_options"
   - "kill_primary.replica_sets_archive"
-  - "kill_primary.replica_sets_fixture"
+  - "fcv_upgrade_downgrade_primary_step_down_overrides.replica_sets_fixture"
   - "fcv_upgrade_downgrade_primary_step_down_overrides.stepdown_and_fcv_hooks"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"

@@ -1,7 +1,7 @@
 base_suite: sharding_jscore_passthrough_base
 
 overrides:
-  - "kill_primary.sharding_override_fixture"
+  - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_override_fixture"
   - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_stepdown_and_fcv_hooks"
   - "fcv_upgrade_downgrade_primary_step_down_overrides.sharding_stepdown_and_fcv_shell_options"
 

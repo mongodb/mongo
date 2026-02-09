@@ -48,6 +48,7 @@ executor:
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1
+        failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         logComponentVerbosity:
           replication:
             heartbeats: 2

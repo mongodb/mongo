@@ -144,3 +144,50 @@
     exclude_files:
       # TODO SERVER-117883 Remove this once the test is fixed.
       - jstests/core/catalog/list_collections_correctness.js
+
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+            failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
+        all_nodes_electable: true
+        num_nodes: 3
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: sharding_override_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          set_parameters:
+            enableElectionHandoff: 0
+            enableTestCommands: 1
+            failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
+        configsvr_options:
+          num_nodes: 3
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
+        num_rs_nodes_per_shard: 3
+        shard_options:
+          all_nodes_electable: true
+          replset_config_options:
+            settings:
+              catchUpTimeoutMillis: 0
