@@ -65,7 +65,7 @@ filters:
       - 10gen/server-workload-resilience
   - "fuzz_runtime_parameters.py":
     approvers:
-      - 10gen/server-programmability
+      - 10gen/devprod-correctness
   - "validate.py":
     approvers:
       - 10gen/server-validate

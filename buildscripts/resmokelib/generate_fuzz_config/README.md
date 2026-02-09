@@ -164,6 +164,8 @@ For a parameter fuzzed at runtime, the fuzzer will generate a fuzzed value for t
 The `period` key describes how often the parameter should be changed, in seconds. Every `period` seconds, the fuzzer will select a new random value for the parameter and use the setParameter command to update the value of the
 parameter on every node in the cluster while the suite is running. This is perfomed by the [FuzzRuntimeParameters](../../../buildscripts/resmokelib/testing/hooks/fuzz_runtime_parameters.py) hook.
 
+For parameters with complex fuzzing logic or interdependencies with other parameters, you can set `"custom_fuzz_value_assignment": True` to bypass the standard fuzzing logic. Parameters with this flag must be handled explicitly in the special handling functions (`generate_special_mongod_startup_parameters()` for startup parameters or `generate_special_runtime_parameters()` for runtime parameters). Note that parameter dependency logic is currently only supported for startup fuzzing - runtime fuzzing operates on individual parameters. See the section below on parameters requiring special handling for more details.
+
 Let `choices = [choice1, choice2, ..., choiceN]` be an array of choices that the parameter can have as a value.
 The parameters are added in order of priority chosen in the if-elif-else statement in `generate_normal_mongo_parameters()`
 in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py).
@@ -222,12 +224,13 @@ If you have a parameter that depends on another parameter being generated (see `
 `throughputProbingMinConcurrency` and `throughputProbingMaxConcurrency` as an example in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that
 differs from the above cases, please do the following steps:
 
-1. Add the parameter and the needed information about the parameters here (ensure to correctly add to the `mongod` or `mongos` sub-dictionary)
+1. Add the parameter and the needed information to [config_fuzzer_limits.py](./config_fuzzer_limits.py) (ensure to correctly add to the `mongod` or `mongos` sub-dictionary), including `"custom_fuzz_value_assignment": True` to indicate it requires special handling
 
 In [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py):
 
-2. Add the parameter to `excluded_normal_parameters` in the `generate_mongod_parameters()` or `generate_mongos_parameters()`
-3. Add the parameter's special handling in `generate_special_mongod_parameters()` or `generate_special_mongos_parameters()`
+2. Add the parameter's special handling in `generate_special_mongod_startup_parameters()` or `generate_special_mongos_startup_parameters()` for startup parameters, or `generate_special_runtime_parameters()` for runtime parameters
+
+> Note: Parameter dependencies (where one parameter's value constrains another) are currently only supported for startup fuzzing. Runtime fuzzing handles parameters individually.
 
 If you add a flow control parameter, please add the the parameter's name to `flow_control_params` in `generate_mongod_parameters`.
 
@@ -280,13 +283,13 @@ The parameters are added in order of priority chosen in the if-elif-else stateme
 
 If you have a parameter that depends on another parameter being generated (see `eviction_target` needing to be initialized before
 `eviction_trigger` as an example in [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py)) or behavior that differs from the above cases,
-please do the following step:
+please do the following steps:
 
-1. Add the parameter and the needed information about the parameters here (ensure to correctly add to the wt or wt_table sub-dictionary)
+1. Add the parameter and the needed information to [config_fuzzer_wt_limits.py](./config_fuzzer_wt_limits.py) (ensure to correctly add to the `wt` or `wt_table` sub-dictionary)
 
-In mongo_fuzzer_configs.py:
+In [mongo_fuzzer_configs.py](./mongo_fuzzer_configs.py):
 
-2. Add the parameter to `excluded_normal_parameters` in the `generate_eviction_configs()` or `generate_table_configs()`
+2. Add the parameter to `excluded_normal_params` in `generate_eviction_configs()` or `generate_table_configs()`
 3. Add the parameter's special handling in `generate_special_eviction_configs()` or `generate_special_table_configs()`
 
 > The main distinction between min/max vs. lower-bound/upper_bound is there is some transformation involving the lower and upper bounds,

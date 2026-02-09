@@ -20,7 +20,11 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
-        "disableLogicalSessionCacheRefresh": {"choices": [True, False], "fuzz_at": ["startup"]},
+        "disableLogicalSessionCacheRefresh": {
+            "choices": [True, False],
+            "custom_fuzz_value_assignment": True,
+            "fuzz_at": ["startup"],
+        },
         "enableAutoCompaction": {"choices": [True, False], "fuzz_at": ["startup"]},
         "ingressAdmissionControllerTicketPoolSize": {
             "choices": [100, 1_000, 10_000, 100_000, 1_000_000],
@@ -118,6 +122,7 @@ config_fuzzer_params = {
             "max": 1000,
             "lower_bound": 1,
             "upper_bound": 1000,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "internalQueryExecYieldPeriodMS": {"min": 1, "max": 100, "fuzz_at": ["startup"]},
@@ -133,6 +138,7 @@ config_fuzzer_params = {
             "choices": [100, 1000, 10_000, 100_000],
             "min": 100,
             "max": 100_000,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "maxNumActiveUserIndexBuilds": {
@@ -147,6 +153,7 @@ config_fuzzer_params = {
             "choices": [1, 10, 100],
             "min": 1,
             "max": 1000,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "maxShardStaleMetadataRetryAttempts": {
@@ -250,17 +257,25 @@ config_fuzzer_params = {
         "throughputProbingConcurrencyMovingAverageWeight": {
             "min": 0.0,
             "max": 1.0,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
-        "throughputProbingInitialConcurrency": {"min": 8, "max": 256, "fuzz_at": ["startup"]},
+        "throughputProbingInitialConcurrency": {
+            "min": 8,
+            "max": 256,
+            "custom_fuzz_value_assignment": True,
+            "fuzz_at": ["startup"],
+        },
         "throughputProbingMinConcurrency": {
             "min": 4,
             "max": "throughputProbingInitialConcurrency",
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "throughputProbingMaxConcurrency": {
             "min": "throughputProbingInitialConcurrency",
             "max": 128,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "throughputProbingReadWriteRatio": {
@@ -305,6 +320,7 @@ config_fuzzer_params = {
             "choices": [0, 0.25, 0.50, 0.75, 1.0],
             "min": 0,
             "max": 1,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         # Flow control related parameters
@@ -365,6 +381,7 @@ config_fuzzer_params = {
             "min": 0.0,
             "max": 1.0,
             "period": 5,
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup", "runtime"],
         },
         "flowControlWarnThresholdSeconds": {
@@ -423,10 +440,12 @@ config_fuzzer_params = {
         # potential failure to have inconsistent CollectionCatalog instances with the WT snapshot.
         "failpoint.hangAfterPreCommittingCatalogUpdates": {
             "pauseEntireCommitMillis": {"min": 10, "max": 100},
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         "failpoint.hangBeforePublishingCatalogUpdates": {
             "pauseEntireCommitMillis": {"min": 10, "max": 100},
+            "custom_fuzz_value_assignment": True,
             "fuzz_at": ["startup"],
         },
         # Choose whether to shuffle the list command results or not.

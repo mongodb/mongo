@@ -7,6 +7,20 @@ import stat
 
 from buildscripts.resmokelib import config, utils
 
+# Parameter sets with different behaviors.
+flow_control_params = [
+    "flowControlTicketAdderConstant",
+    "flowControlDecayConstant",
+    "flowControlFudgeFactor",
+    "flowControlMaxSamples",
+    "flowControlMinTicketsPerSecond",
+    "flowControlTicketMultiplierConstant",
+    "flowControlSamplePeriod",
+    "flowControlTargetLagSeconds",
+    "flowControlThresholdLagPercentage",
+    "flowControlWarnThresholdSeconds",
+]
+
 
 def safe_randint(rng, min_val, max_val, param_name=None):
     """Wrapper for randint() that validates integer arguments and provides context on failure."""
@@ -234,21 +248,6 @@ def generate_encryption_config(rng: random.Random):
     return ret
 
 
-def generate_runtime_mongod_parameter(rng, value, param_name):
-    """Generate a runtime mongod parameter value, handling mongod-specific special cases.
-
-    This function is used for runtime fuzzing of mongod parameters and ensures consistent
-    behavior with startup generation for parameters that have special handling.
-    """
-    # Special case: flowControlThresholdLagPercentage uses rng.random() which returns [0.0, 1.0)
-    # This matches the behavior in generate_flow_control_parameters() used at startup.
-    if param_name == "flowControlThresholdLagPercentage":
-        return rng.random()
-
-    # Default to normal generation for all other parameters
-    return generate_normal_mongo_parameters(rng, value, param_name)
-
-
 def generate_normal_mongo_parameters(rng, value, param_name=None):
     """Returns the value assigned the mongod or mongos parameter based on the fields of the parameters in the config_fuzzer_limits.py."""
 
@@ -276,8 +275,20 @@ def generate_normal_mongo_parameters(rng, value, param_name=None):
     return ret
 
 
-def generate_special_mongod_parameters(rng, ret, params):
-    """Returns the value assigned the mongod parameter based on the fields of the parameters in config_fuzzer_limits.py for special parameters (parameters with different assignment behaviors)."""
+def generate_special_runtime_parameters(rng, param_name, value):
+    """Returns the runtime value assigned the mongod or mongos parameter based on the fields of the parameters in config_fuzzer_limits.py for special parameters (parameters with different assignment behaviors)."""
+
+    if param_name == "flowControlThresholdLagPercentage":
+        return rng.random()
+
+    raise ValueError(
+        f"Parameter '{param_name}' has custom_fuzz_value_assignment=True but is not handled in "
+        f"generate_special_runtime_parameters(). Add handling or remove the flag."
+    )
+
+
+def generate_special_mongod_startup_parameters(rng, ret, params):
+    """Returns the runtime value assigned the mongod parameter based on the fields of the parameters in config_fuzzer_limits.py for special parameters (parameters with different assignment behaviors)."""
 
     # throughputProbingConcurrencyMovingAverageWeight is the only parameter that uses rng.random().
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
@@ -296,14 +307,6 @@ def generate_special_mongod_parameters(rng, ret, params):
     ret["throughputProbingMaxConcurrency"] = rng.randint(
         ret["throughputProbingInitialConcurrency"] // 2,
         params["throughputProbingMaxConcurrency"]["max"],
-    )
-    ret["throughputProbingReadWriteRatio"] = rng.uniform(
-        params["throughputProbingReadWriteRatio"]["min"],
-        params["throughputProbingReadWriteRatio"]["max"],
-    )
-    ret["throughputProbingStepMultiple"] = rng.uniform(
-        params["throughputProbingStepMultiple"]["min"],
-        params["throughputProbingStepMultiple"]["max"],
     )
 
     # mirrorReads sets a nested samplingRate field.
@@ -355,23 +358,10 @@ def generate_special_mongod_parameters(rng, ret, params):
             "mode": {"activationProbability": random.uniform(0, 0.5)},
             "data": {"pauseEntireCommitMillis": rng.randint(waitMillisMin, waitMillisMax)},
         }
-    return ret
 
-
-def generate_flow_control_parameters(rng, ret, flow_control_params, params):
-    """Returns an updated dictionary which assigns fuzzed flow control parameters for mongod."""
-
-    # Assigning flow control parameters.
-    ret["enableFlowControl"] = rng.choice(params["enableFlowControl"]["choices"])
     if ret["enableFlowControl"]:
-        for name in flow_control_params:
-            if name == "flowControlThresholdLagPercentage":
-                continue  # Handled specially below with rng.random()
-            if "isUniform" in params[name]:
-                ret[name] = rng.uniform(params[name]["min"], params[name]["max"])
-            else:
-                ret[name] = safe_randint(rng, params[name]["min"], params[name]["max"], name)
         ret["flowControlThresholdLagPercentage"] = rng.random()
+
     return ret
 
 
@@ -389,52 +379,27 @@ def generate_mongod_parameters(rng):
         and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
 
-    # Parameter sets with different behaviors.
-    flow_control_params = [
-        "flowControlTicketAdderConstant",
-        "flowControlDecayConstant",
-        "flowControlFudgeFactor",
-        "flowControlMaxSamples",
-        "flowControlMinTicketsPerSecond",
-        "flowControlTicketMultiplierConstant",
-        "flowControlSamplePeriod",
-        "flowControlTargetLagSeconds",
-        "flowControlThresholdLagPercentage",
-        "flowControlWarnThresholdSeconds",
-    ]
-
-    # excluded_normal_params are params that we want to exclude from the for-loop because they have some different assignment behavior
-    # e.g. depending on other parameters' values, having rounding, having a different distribution.
-    excluded_normal_params = [
-        "disableLogicalSessionCacheRefresh",
-        "internalQueryExecYieldIterations",
-        "logicalSessionRefreshMillis",
-        "maxNumberOfTransactionOperationsInSingleOplogEntry",
-        "mirrorReads",
-        "throughputProbingConcurrencyMovingAverageWeight",
-        "throughputProbingInitialConcurrency",
-        "throughputProbingMinConcurrency",
-        "throughputProbingMaxConcurrency",
-        "throughputProbingReadWriteRatio",
-        "throughputProbingStepMultiple",
-        "failpoint.hangAfterPreCommittingCatalogUpdates",
-        "failpoint.hangBeforePublishingCatalogUpdates",
-    ]
     # TODO (SERVER-75632): Remove/comment out the below line to enable passthrough testing.
-    excluded_normal_params.append("lockCodeSegmentsInMemory")
+    params["lockCodeSegmentsInMemory"]["custom_fuzz_value_assignment"] = True
 
     ret = {}
+
+    ret["enableFlowControl"] = rng.choice(params["enableFlowControl"]["choices"])
+    # Remove all flow control parameters if flow control is disabled
+    if not ret["enableFlowControl"]:
+        for key in flow_control_params:
+            del params[key]
+
     # Range through all other parameters and assign the parameters based on the keys that are available or the parameter set lists defined above.
     ret.update(
         {
             key: generate_normal_mongo_parameters(rng, value, key)
             for key, value in params.items()
-            if key not in excluded_normal_params and key not in flow_control_params
+            if not value.get("custom_fuzz_value_assignment", False)
         }
     )
 
-    ret = generate_special_mongod_parameters(rng, ret, params)
-    ret = generate_flow_control_parameters(rng, ret, flow_control_params, params)
+    ret = generate_special_mongod_startup_parameters(rng, ret, params)
     return ret
 
 
