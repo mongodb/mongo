@@ -5,8 +5,6 @@
  *   # For primary driven index builds, secondaries do not build the index themselves.
  *   primary_driven_index_builds_incompatible,
  *   requires_replication,
- *   # TODO SERVER-116978: Remove this tag once we have a more robust solution for handling crashes on Windows.
- *   incompatible_with_windows_tls,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -7,7 +7,6 @@
  *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
- *   incompatible_with_windows_tls,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+HMODULE hDbgHelp{};
+
 namespace {
 /* create a process dump.
     To use, load up windbg.  Set your symbol and source path.
@@ -192,6 +194,7 @@ LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS* excPointers) {
 LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
 
 void setWindowsUnhandledExceptionFilter() {
+    hDbgHelp = LoadLibraryA("DbgHelp");
     filtLast = SetUnhandledExceptionFilter(exceptionFilter);
 }
 
