@@ -2,6 +2,9 @@
  * Tests combinations of $lookup and $unwind.
  */
 
+import {normalizeArray} from "jstests/libs/golden_test.js";
+import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
+
 const lookups = [{$lookup: {from: "cities", localField: "_id", foreignField: "countryId", as: "cities"}}];
 
 const unwinds = [{$unwind: "$cities"}, {$unwind: {path: "$cities", preserveNullAndEmptyArrays: true}}];
@@ -58,10 +61,14 @@ function setupCollections(countries, cities, indexList) {
 }
 
 let counter = 0;
-countryDocs.forEach((countries, cIdx) => {
-    cityDocs.forEach((cities, cityIdx) => {
+countryDocs.forEach((countries) => {
+    cityDocs.forEach((cities) => {
         indexes.forEach((indexList) => {
             setupCollections(countries, cities, indexList);
+            section(
+                `countries: ${tojsononeline(countries)} - cities: ${tojsononeline(cities)} - Indexes: ${tojsononeline(indexList)}`,
+            );
+            linebreak();
 
             lookups.forEach((lookup) => {
                 unwinds.forEach((unwind) => {
@@ -69,14 +76,17 @@ countryDocs.forEach((countries, cIdx) => {
                         // Set up each pipeline. We use 'null' to indicate that a stage should be
                         // absent.
                         const pipeline = [match, lookup, unwind].filter((x) => x != null);
+                        subSection("Pipeline");
+                        code(tojson(pipeline));
 
                         aggOptions.forEach((options) => {
                             for (let i = 0; i < 3; ++i) {
-                                const result = db.countries.aggregate(pipeline, options).toArray();
-                                printjson(result);
+                                subSection(`Options: ${tojsononeline(options)} - Iteration ${i}`);
+                                code(normalizeArray(db.countries.aggregate(pipeline, options).toArray()));
                                 ++counter;
                             }
                         });
+                        linebreak();
                     });
                 });
             });
