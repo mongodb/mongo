@@ -98,11 +98,6 @@
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
-const NamespaceString kLocalOplogBufferNss = NamespaceString::createNamespaceString_forTest(
-    "config", "{}xxx.yyy"_format(NamespaceString::kReshardingLocalOplogBufferPrefix));
-
 // A mock TransactionHistoryIterator to support DSReshardingIterateTransaction.
 class MockTransactionHistoryIterator : public TransactionHistoryIteratorBase {
 public:
@@ -324,8 +319,7 @@ bool validateOplogId(const Timestamp& clusterTime,
 
 boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(OperationContext* opCtx) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(
-        new ExpressionContextForTest(opCtx, kLocalOplogBufferNss));
-    expCtx->setResolvedNamespace(kLocalOplogBufferNss, {kLocalOplogBufferNss, {}});
+        new ExpressionContextForTest(opCtx, NamespaceString::kRsOplogNamespace));
     expCtx->setResolvedNamespace(NamespaceString::kRsOplogNamespace,
                                  {NamespaceString::kRsOplogNamespace, {}});
     return expCtx;
@@ -333,30 +327,8 @@ boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(Operation
 
 class ReshardingAggTest : public AggregationContextFixture {
 protected:
-    const NamespaceString& localOplogBufferNss() {
-        return kLocalOplogBufferNss;
-    }
-
     boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext() {
         return ::mongo::createExpressionContext(getOpCtx());
-    }
-
-    auto makePipelineForReshardingDonorOplogIterator(
-        std::deque<DocumentSource::GetNextResult> mockResults,
-        ReshardingDonorOplogId resumeToken = {Timestamp::min(), Timestamp::min()}) {
-        ReshardingDonorOplogIterator iterator(
-            localOplogBufferNss(), std::move(resumeToken), nullptr /* insertNotifier */);
-
-        // Mock lookup collection document source.
-        auto pipeline =
-            iterator.makePipeline(getOpCtx(), std::make_shared<MockMongoInterface>(mockResults));
-
-        // Mock non-lookup collection document source.
-        auto mockSource =
-            DocumentSourceMock::createForTest(std::move(mockResults), pipeline->getContext());
-        pipeline->addInitialSource(mockSource);
-
-        return pipeline;
     }
 
     /************************************************************************************
@@ -442,89 +414,6 @@ protected:
     const ShardId _destinedRecipient = {"shard1"};
     const int _term{20};
 };
-
-TEST_F(ReshardingAggTest, OplogPipelineBasicCRUDOnly) {
-    auto insertOplog = makeInsertOplog();
-    auto updateOplog = makeUpdateOplog();
-    auto deleteOplog = makeDeleteOplog();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(updateOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(insertOplog.toBSON(), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Test with 3 oplog: insert -> update -> delete, then resume from point after insert.
- */
-TEST_F(ReshardingAggTest, OplogPipelineWithResumeToken) {
-    auto insertOplog = makeInsertOplog();
-    auto updateOplog = makeUpdateOplog();
-    auto deleteOplog = makeDeleteOplog();
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(updateOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
-                                                                getOplogId(insertOplog));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ((updateOplog.toBSON()), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
-
-/**
- * Test with 3 oplog: insert -> update -> delete, then resume from point after insert.
- */
-TEST_F(ReshardingAggTest, OplogPipelineWithResumeTokenClusterTimeNotEqualTs) {
-    auto modifyClusterTsTo = [&](repl::MutableOplogEntry& oplog, const Timestamp& ts) {
-        auto newId = getOplogId(oplog);
-        newId.setClusterTime(ts);
-        oplog.set_id(Value(newId.toBSON()));
-    };
-
-    auto insertOplog = makeInsertOplog();
-    modifyClusterTsTo(insertOplog, Timestamp(33, 46));
-    auto updateOplog = makeUpdateOplog();
-    modifyClusterTsTo(updateOplog, Timestamp(44, 55));
-    auto deleteOplog = makeDeleteOplog();
-    modifyClusterTsTo(deleteOplog, Timestamp(79, 80));
-
-    std::deque<DocumentSource::GetNextResult> mockResults;
-    mockResults.emplace_back(Document(insertOplog.toBSON()));
-    mockResults.emplace_back(Document(updateOplog.toBSON()));
-    mockResults.emplace_back(Document(deleteOplog.toBSON()));
-
-    auto pipeline = makePipelineForReshardingDonorOplogIterator(std::move(mockResults),
-                                                                getOplogId(insertOplog));
-
-    auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(updateOplog.toBSON(), next->toBson());
-
-    next = pipeline->getNext();
-    ASSERT_BSONOBJ_BINARY_EQ(deleteOplog.toBSON(), next->toBson());
-
-    ASSERT(!pipeline->getNext());
-}
 
 TEST_F(ReshardingAggTest, VerifyPipelineReturnsStartIndexBuildEntry) {
     const auto oplogBSON = fromjson(R"({

@@ -47,6 +47,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface_factory.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
@@ -250,7 +251,10 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
             // in progress_applier. Otherwise, it starts at minFetchTimestamp, which corresponds to
             // {clusterTime: minFetchTimestamp, ts: minFetchTimestamp} as a resume token value.
             std::make_unique<ReshardingDonorOplogIterator>(
-                oplogBufferNss, std::move(idToResumeFrom), oplogFetchers[i].get()),
+                std::make_unique<ReshardingDonorOplogPipeline>(
+                    oplogBufferNss, std::make_unique<MongoProcessInterfaceFactoryImpl>()),
+                std::move(idToResumeFrom),
+                oplogFetchers[i].get()),
             resharding::data_copy::isCollectionCapped(opCtx, metadata.getTempReshardingNss())));
     }
 

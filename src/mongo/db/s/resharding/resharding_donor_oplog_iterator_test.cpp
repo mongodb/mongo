@@ -51,6 +51,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_pipeline.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
@@ -179,6 +180,11 @@ public:
                                                  cancelableOpCtxExecutor);
     }
 
+    std::unique_ptr<ReshardingDonorOplogPipeline> makePipeline() {
+        return std::make_unique<ReshardingDonorOplogPipeline>(
+            oplogNss(), std::make_unique<MongoProcessInterfaceFactoryImpl>());
+    }
+
     auto getNextBatch(ReshardingDonorOplogIterator* iter,
                       std::shared_ptr<executor::TaskExecutor> executor,
                       CancelableOperationContextFactory factory) {
@@ -221,7 +227,7 @@ TEST_F(ReshardingDonorOplogIterTest, BasicExhaust) {
     client.insert(nss, oplog2.toBSON());
     client.insert(nss, finalOplog.toBSON());
 
-    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    ReshardingDonorOplogIterator iter(makePipeline(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
     auto factory = makeCancelableOpCtx();
     auto altClient = makeKillableClient();
@@ -254,7 +260,7 @@ TEST_F(ReshardingDonorOplogIterTest, ResumeFromMiddle) {
     client.insert(nss, finalOplog.toBSON());
 
     ReshardingDonorOplogId resumeToken(Timestamp(2, 4), Timestamp(2, 4));
-    ReshardingDonorOplogIterator iter(oplogNss(), resumeToken, &onInsertAlwaysReady);
+    ReshardingDonorOplogIterator iter(makePipeline(), resumeToken, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
     auto factory = makeCancelableOpCtx();
     auto altClient = makeKillableClient();
@@ -310,7 +316,7 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
                          }
                      }};
 
-    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &insertNotifier);
+    ReshardingDonorOplogIterator iter(makePipeline(), kResumeFromBeginning, &insertNotifier);
     auto executor = makeTaskExecutorForIterator();
     auto factory = makeCancelableOpCtx();
     auto altClient = makeKillableClient();
@@ -344,7 +350,7 @@ TEST_F(ReshardingDonorOplogIterTest, BatchIncludesProgressMarkEntries) {
     client.insert(nss, progressMarkOplog1.toBSON());
     client.insert(nss, finalOplog.toBSON());
 
-    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    ReshardingDonorOplogIterator iter(makePipeline(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
     auto factory = makeCancelableOpCtx();
     auto altClient = makeKillableClient();
@@ -384,7 +390,7 @@ DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTest,
     client.insert(nss, progressMarkOplog3.toBSON());
     client.insert(nss, progressMarkOplog4.toBSON());
 
-    ReshardingDonorOplogIterator iter(oplogNss(), kResumeFromBeginning, &onInsertAlwaysReady);
+    ReshardingDonorOplogIterator iter(makePipeline(), kResumeFromBeginning, &onInsertAlwaysReady);
     auto executor = makeTaskExecutorForIterator();
     auto factory = makeCancelableOpCtx();
     auto altClient = makeKillableClient();
