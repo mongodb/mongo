@@ -111,9 +111,9 @@ namespace {
 
 using namespace mongo;
 /**
- * Make a minimal IndexEntry from just a key pattern. A dummy name will be added.
+ * Make a minimal IndexEntry from just a key pattern. A dummy name will be added if none provided.
  */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, std::string name = "test_foo") {
     return {kp,
             IndexNames::nameToType(IndexNames::findPluginName(kp)),
             IndexConfig::kLatestIndexVersion,
@@ -122,7 +122,7 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             {},
             false,
             false,
-            CoreIndexInfo::Identifier("test_foo"),
+            CoreIndexInfo::Identifier(std::move(name)),
             {},
             nullptr};
 }
@@ -1800,6 +1800,103 @@ TEST(QuerySolutionTest, AssertSameHashes) {
         return qs;
     };
     ASSERT(makeQs()->hash() == makeQs()->hash());
+}
+
+TEST(QuerySolutionTest, AssertSameHashesForIdenticalBinaryJoins) {
+    auto makeHJ = []() {
+        auto root = std::make_unique<HashJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<CollectionScanNode>(),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            boost::none,
+            FieldPath("customer"));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_EQ(makeHJ()->hash(), makeHJ()->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForMirroredBinaryJoins) {
+    auto makeHJ = [](boost::optional<FieldPath> leftEmbed, boost::optional<FieldPath> rightEmbed) {
+        auto root = std::make_unique<HashJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<CollectionScanNode>(),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            std::move(leftEmbed),
+            std::move(rightEmbed));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_NE(makeHJ(FieldPath("a"), boost::none)->hash(),
+              makeHJ(boost::none, FieldPath("a"))->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForDifferentJoinPredicates) {
+    auto makeHJ = [](FieldPath leftKey, FieldPath rightKey) {
+        auto root = std::make_unique<HashJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<CollectionScanNode>(),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, std::move(leftKey), std::move(rightKey)}},
+            boost::none,
+            FieldPath("customer"));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_NE(makeHJ(FieldPath("a"), FieldPath("b"))->hash(),
+              makeHJ(FieldPath("c"), FieldPath("d"))->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForDifferentJoinTypes) {
+    std::vector<QSNJoinPredicate> preds{
+        {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}};
+    FieldPath path = FieldPath("customer");
+
+    auto hjQs = std::make_unique<QuerySolution>();
+    hjQs->setRoot(std::make_unique<HashJoinEmbeddingNode>(std::make_unique<CollectionScanNode>(),
+                                                          std::make_unique<CollectionScanNode>(),
+                                                          preds,
+                                                          boost::none,
+                                                          path));
+
+    auto nljQs = std::make_unique<QuerySolution>();
+    nljQs->setRoot(
+        std::make_unique<NestedLoopJoinEmbeddingNode>(std::make_unique<CollectionScanNode>(),
+                                                      std::make_unique<CollectionScanNode>(),
+                                                      preds,
+                                                      boost::none,
+                                                      path));
+
+    ASSERT_NE(hjQs->hash(), nljQs->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
+    const NamespaceString foreignNss = NamespaceString::createNamespaceString_forTest("db.foreign");
+
+    auto makeInlj = [&](const BSONObj& indexKey, std::string indexName) {
+        auto root = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<IndexProbeNode>(foreignNss,
+                                             buildSimpleIndexEntry(indexKey, indexName)),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            boost::none,
+            FieldPath("customer"));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_NE(makeInlj(BSON("a" << 1), "index_a")->hash(),
+              makeInlj(BSON("b" << 1), "index_b")->hash());
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {

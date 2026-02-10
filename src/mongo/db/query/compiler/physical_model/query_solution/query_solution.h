@@ -2310,6 +2310,12 @@ struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
 
     void appendToString(str::stream* ss, int indent) const override;
 
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(
+            std::move(h), leftEmbeddingField, rightEmbeddingField, joinPredicates);
+        QuerySolutionNode::hash(std::move(h));
+    }
+
     // Set of join predicates that this node satisfies.
     std::vector<QSNJoinPredicate> joinPredicates;
 
@@ -2406,6 +2412,12 @@ struct IndexProbeNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_INDEX_PROBE_NODE;
+    }
+
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(
+            std::move(h), index.identifier.catalogName, index.identifier.disambiguator);
+        QuerySolutionNode::hash(std::move(h));
     }
 
     NamespaceString nss;

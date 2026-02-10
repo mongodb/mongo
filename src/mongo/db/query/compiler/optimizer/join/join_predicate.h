@@ -58,6 +58,11 @@ struct QSNJoinPredicate {
     }
 
     std::string toString() const;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const QSNJoinPredicate& pred) {
+        return H::combine(std::move(h), pred.op, pred.leftField, pred.rightField);
+    }
 };
 
 }  // namespace mongo

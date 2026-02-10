@@ -273,4 +273,11 @@ template <typename H>
 H AbslHashValue(H h, const FieldPath& fieldPath) {
     return H::combine(std::move(h), fieldPath.fullPath());
 }
+
+template <typename H>
+H AbslHashValue(H h, const boost::optional<FieldPath>& fieldPath) {
+    if (fieldPath)
+        h = H::combine(std::move(h), *fieldPath);
+    return H::combine(std::move(h), fieldPath.has_value());
+}
 }  // namespace MONGO_MOD_PUBLIC mongo
