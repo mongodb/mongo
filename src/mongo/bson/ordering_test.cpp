@@ -36,6 +36,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <span>
 #include <string>
 
 #include <fmt/format.h>
@@ -49,13 +51,15 @@ TEST(IndexKeyOrderingTest, OrderingAllAscending) {
     ASSERT_EQ(0, o.getBits());
     // We are even checking 10 more bits than actually defined. These all default to ascending too.
     for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 10; ++i) {
+        SCOPED_TRACE(fmt::format("i = {}", i));
+
         uint32_t mask = i < 32 ? uint32_t{1} << i : 0;
         ASSERT_EQ(o.get(i), 1);
         ASSERT_FALSE(o.descending(mask));
     }
 }
 
-// Verifies that creating an Ordering from BSON behaves as expected.
+// Verifies that creating an Ordering from BSON with less than max keys behaves as expected.
 TEST(IndexKeyOrderingTest, MakeFromBSON) {
     BSONObjBuilder bob;
     for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys / 2; ++i) {
@@ -66,6 +70,8 @@ TEST(IndexKeyOrderingTest, MakeFromBSON) {
     auto o = Ordering::make(obj);
     ASSERT_EQ(o.getBits(), 0x0000aaaaU);
     for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 10; ++i) {
+        SCOPED_TRACE(fmt::format("i = {}", i));
+
         uint32_t mask = i < 32 ? uint32_t{1} << i : 0;
         if (i < Ordering::kMaxCompoundIndexKeys / 2) {
             // These are the actually defined keys.
@@ -84,6 +90,32 @@ TEST(IndexKeyOrderingTest, MakeFromBSON) {
     }
 }
 
+// Verifies that creating an Ordering from BSON with the maximum number of keys behaves as expected.
+TEST(IndexKeyOrderingTest, MakeFromBSONMaximumNumberOfKeys) {
+    auto build = [](int value) {
+        BSONObjBuilder bob;
+        for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys; ++i) {
+            bob.append(fmt::format("test{}", i), value);
+        }
+        return Ordering::make(bob.obj());
+    };
+
+    // All ascending, using value 0.
+    ASSERT_EQ(0, build(0).getBits());
+
+    // All ascending, using value 1.
+    ASSERT_EQ(0, build(1).getBits());
+
+    // All ascending, using value 123.
+    ASSERT_EQ(0, build(123).getBits());
+
+    // All descending, using value -1.
+    ASSERT_EQ(std::numeric_limits<uint32_t>::max(), build(-1).getBits());
+
+    // All descending, using value -123.
+    ASSERT_EQ(std::numeric_limits<uint32_t>::max(), build(-123).getBits());
+}
+
 // Verifies that creating an Ordering from a BSONObj with too many fields throws an exception.
 TEST(IndexKeyOrderingTest, MakeFromBSONTooManyKeys) {
     BSONObjBuilder bob;
@@ -93,6 +125,66 @@ TEST(IndexKeyOrderingTest, MakeFromBSONTooManyKeys) {
     BSONObj obj = bob.obj();
 
     ASSERT_THROWS_CODE(Ordering::make(obj), DBException, 13103);
+}
+
+// Verifies that creating an Ordering from a span with less than max keys behaves as expected.
+TEST(IndexKeyOrderingTest, MakeFromSpan) {
+    std::vector<int8_t> orders;
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys / 2; ++i) {
+        orders.push_back(i % 2 == 0 ? 1 : -1);
+    }
+
+    auto o = Ordering::make(orders);
+    ASSERT_EQ(o.getBits(), 0x0000aaaaU);
+    for (size_t i = 0; i < Ordering::kMaxCompoundIndexKeys + 10; ++i) {
+        SCOPED_TRACE(fmt::format("i = {}", i));
+
+        uint32_t mask = i < 32 ? uint32_t{1} << i : 0;
+        if (i < Ordering::kMaxCompoundIndexKeys / 2) {
+            // These are the actually defined keys.
+            if (i % 2 == 0) {
+                ASSERT_EQ(o.get(i), 1);
+                ASSERT_FALSE(o.descending(mask));
+            } else {
+                ASSERT_EQ(o.get(i), -1);
+                ASSERT_TRUE(o.descending(mask));
+            }
+        } else {
+            // These are the undefined keys. They default to ascending.
+            ASSERT_EQ(o.get(i), 1);
+            ASSERT_FALSE(o.descending(mask));
+        }
+    }
+}
+
+// Verifies that creating an Ordering from a span with the maximum number of keys behaves as
+// expected.
+TEST(IndexKeyOrderingTest, MakeFromSpanMaximumNumberOfKeys) {
+    auto build = [](int value) {
+        std::vector<int8_t> orders(Ordering::kMaxCompoundIndexKeys, value);
+        return Ordering::make(orders);
+    };
+
+    // All ascending, using value 0.
+    ASSERT_EQ(0, build(0).getBits());
+
+    // All ascending, using value 1.
+    ASSERT_EQ(0, build(1).getBits());
+
+    // All ascending, using value 123.
+    ASSERT_EQ(0, build(123).getBits());
+
+    // All descending, using value -1.
+    ASSERT_EQ(std::numeric_limits<uint32_t>::max(), build(-1).getBits());
+
+    // All descending, using value -123.
+    ASSERT_EQ(std::numeric_limits<uint32_t>::max(), build(-123).getBits());
+}
+
+// Verifies that creating an Ordering from a span with too many fields throws an exception.
+TEST(IndexKeyOrderingTest, MakeFromSpanTooManyKeys) {
+    std::vector<int8_t> orders(Ordering::kMaxCompoundIndexKeys + 1, 1);
+    ASSERT_THROWS_CODE(Ordering::make(orders), DBException, 13103);
 }
 
 // Verifies that comparison results are correct.

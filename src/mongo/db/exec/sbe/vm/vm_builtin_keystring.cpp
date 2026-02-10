@@ -27,8 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo {
 namespace sbe {
@@ -53,12 +59,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
     auto ksDiscriminator = static_cast<key_string::Discriminator>(discriminator);
 
     uint32_t orderingBits = value::numericCast<int32_t>(tagOrdering, valOrdering);
-    BSONObjBuilder bb;
+
+    // Maximum number of orderings. An 'Ordering' cannot have more than 32 values at the moment.
+    // Limit the usage to 32 bytes here anyway, because if that definition ever changes, the amount
+    // of stack space used for the inline vector will still be reasonably bounded.
+    constexpr size_t kMaxInlineValues = std::min(size_t(32), Ordering::kMaxCompoundIndexKeys);
+    absl::InlinedVector<int8_t, kMaxInlineValues> orders;
     for (size_t i = 0; orderingBits != 0 && i < arity - 3u; ++i, orderingBits >>= 1) {
-        bb.append(""_sd, (orderingBits & 1) ? -1 : 1);
+        orders.push_back((orderingBits & 1) ? -1 : 1);
     }
 
-    key_string::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
+    key_string::HeapBuilder kb{ksVersion, Ordering::make(orders)};
 
     const auto stringTransformFn = [&](StringData stringData) {
         return collator->getComparisonString(stringData);
@@ -66,9 +77,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
 
     for (size_t idx = 2; idx < arity - 1u; ++idx) {
         auto [_, tag, val] = getFromStack(idx);
-        // This is needed so that we can use 'tag' in the uassert() below without getting a
-        // "Reference to local binding declared in enclosing function" compile error on clang.
-        auto tagCopy = tag;
 
         switch (tag) {
             case value::TypeTags::Boolean:
@@ -211,7 +219,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
                 break;
             }
             default:
-                uasserted(4822802, str::stream() << "Unsuppored key string type: " << tagCopy);
+                uasserted(4822802, str::stream() << "Unsupported key string type: " << tag);
                 break;
         }
     }

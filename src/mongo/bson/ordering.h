@@ -30,7 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/modules.h"
+
+#include <cstdint>
+#include <span>
 
 MONGO_MOD_PUBLIC;
 
@@ -97,12 +101,41 @@ public:
             BSONElement e = k.next();
             if (e.eoo())
                 break;
-            uassert(13103, "too many compound keys", n < kMaxCompoundIndexKeys);
+            verifyCardinality(n + 1);
             if (e.number() < 0)
                 b |= (1u << n);
             n++;
         }
         return Ordering(b);
+    }
+
+    /**
+     * Returns an ordering that contains bits indicating whether index key specs are ascending or
+     * descending. Any values >= 0 in the input are treated as ascending; negative values are
+     * treated as descending.
+     * This method is an similar to the BSONObj variant above, but does not require building a
+     * BSONObj first.
+     */
+    static Ordering make(std::span<const int8_t> orders) {
+        verifyCardinality(orders.size());
+        uint32_t b = 0;
+        uint32_t n = 0;
+        for (auto o : orders) {
+            if (o < 0) {
+                b |= (1u << n);
+            }
+            n++;
+        }
+        return Ordering(b);
+    }
+
+private:
+    /**
+     * Verify that 'actual' is at most 'kMaxCompoundIndexKeys'. This verification is necessary
+     * because an 'Ordering' is backed by a uint32_t, so it cannot hold more bits than that.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE static void verifyCardinality(size_t actual) {
+        uassert(13103, "too many compound keys", actual <= kMaxCompoundIndexKeys);
     }
 };
 }  // namespace mongo
