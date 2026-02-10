@@ -68,7 +68,6 @@ core.bson:
     - src/mongo/db/query/util/jparse_util* # needs to be same module as bson/json.h
     - src/mongo/dbtests/jsobjtests.cpp
     - src/mongo/dbtests/jsontests.cpp
-    - src/mongo/db/hasher* # TODO move to bson/ or at least rename to be less generic
 
 core.idl:
   meta:
@@ -195,6 +194,7 @@ query:
     - src/mongo/db/cursor*
     - src/mongo/db/fts/
     - src/mongo/db/geo/
+    - src/mongo/db/hasher*
     - src/mongo/db/index_names*
     - src/mongo/db/index/ # mostly query, except index_access_method owned by storex
     - src/mongo/db/matcher/

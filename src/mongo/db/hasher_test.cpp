@@ -49,6 +49,8 @@
 namespace mongo {
 namespace {
 
+using HashSeed = BSONElementHasher::HashSeed;
+
 // Helper methods
 long long hashIt(const BSONObj& object, HashSeed seed) {
     return BSONElementHasher::hash64(object.firstElement(), seed);

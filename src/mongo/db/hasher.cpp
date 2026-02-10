@@ -54,6 +54,8 @@ class Hasher {
     Hasher& operator=(const Hasher&) = delete;
 
 public:
+    using HashSeed = BSONElementHasher::HashSeed;
+
     explicit Hasher(HashSeed seed);
     ~Hasher() {};
 

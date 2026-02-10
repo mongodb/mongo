@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/hasher.h"  // For HashSeed.
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"

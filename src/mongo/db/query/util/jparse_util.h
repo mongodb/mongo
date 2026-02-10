@@ -34,11 +34,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-BSONObj fromFuzzerJson(const char* jsonString, int* len = nullptr);
-BSONObj fromFuzzerJson(StringData str);
+MONGO_MOD_PUBLIC BSONObj fromFuzzerJson(const char* jsonString, int* len = nullptr);
+MONGO_MOD_PUBLIC BSONObj fromFuzzerJson(StringData str);
 
 /**
  * An extended JSON parser that takes in fuzzer output and returns a BSONObj. The underlying

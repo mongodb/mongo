@@ -32,7 +32,9 @@
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

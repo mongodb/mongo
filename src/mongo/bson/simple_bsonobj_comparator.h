@@ -34,10 +34,13 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <map>
 #include <set>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

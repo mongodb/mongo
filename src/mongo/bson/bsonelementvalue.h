@@ -38,6 +38,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -54,7 +55,7 @@ struct BSONArray;
  * No type checking is performed on the access methods and it is the callers responsibility to
  * interpret the value as the correct type.
  */
-class BSONElementValue {
+class MONGO_MOD_NEEDS_REPLACEMENT BSONElementValue {
 public:
     BSONElementValue() = default;
     explicit BSONElementValue(const char* value) : _value(value) {}

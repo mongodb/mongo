@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstddef>
 
 namespace mongo {
@@ -40,12 +42,12 @@ class StackBufBuilderBase;
 
 inline constexpr std::size_t StackSizeDefault = 512;
 
-using StackBufBuilder = StackBufBuilderBase<StackSizeDefault>;
+using StackBufBuilder MONGO_MOD_PUBLIC = StackBufBuilderBase<StackSizeDefault>;
 
 template <typename Allocator>
 class StringBuilderImpl;
 
-using StringBuilder = StringBuilderImpl<BufBuilder>;
-using StackStringBuilder = StringBuilderImpl<StackBufBuilder>;
+using StringBuilder MONGO_MOD_PUBLIC = StringBuilderImpl<BufBuilder>;
+using StackStringBuilder MONGO_MOD_PUBLIC = StringBuilderImpl<StackBufBuilder>;
 
 }  // namespace mongo

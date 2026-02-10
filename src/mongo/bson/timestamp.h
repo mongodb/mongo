@@ -36,6 +36,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <compare>
@@ -51,7 +52,7 @@ class BSONObj;
 /**
  * Timestamp: A combination of a count of seconds since the POSIX epoch plus an ordinal value.
  */
-class Timestamp {
+class MONGO_MOD_PUBLIC Timestamp {
 public:
     // Timestamp to signal that the storage engine should take unstable checkpoints.
     static const Timestamp kAllowUnstableCheckpointsSentinel;
@@ -152,6 +153,8 @@ public:
         builder.appendCStr(fieldName);
         builder.appendNum(asULL());
     }
+
+    /// Returns BSON("" << *this)
     BSONObj toBSON() const;
 
 private:

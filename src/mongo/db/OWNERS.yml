@@ -320,6 +320,9 @@ filters:
     approvers:
       - 10gen/server-storage-engine-integration
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "hasher*":
+    approvers:
+      - 10gen/query-execution-write-exec
   - "index_key_validate*":
     approvers:
       - 10gen/server-index-builds

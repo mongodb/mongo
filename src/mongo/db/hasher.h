@@ -35,18 +35,20 @@
 
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
+MONGO_MOD_PUBLIC;
 namespace mongo {
-
-typedef int32_t HashSeed;
 
 class BSONElementHasher {
     BSONElementHasher(const BSONElementHasher&) = delete;
     BSONElementHasher& operator=(const BSONElementHasher&) = delete;
 
 public:
+    using HashSeed = int32_t;
+
     /* The hash function we use can be given a seed, to effectively randomize it
      * by choosing from among a family of hash functions. When it is not specified,
      * use this.

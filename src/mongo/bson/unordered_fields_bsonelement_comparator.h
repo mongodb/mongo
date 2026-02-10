@@ -31,6 +31,9 @@
 
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

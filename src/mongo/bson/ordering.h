@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
