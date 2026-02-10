@@ -188,6 +188,11 @@ private:
      */
     void _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
 
+    /*
+     * Signals the fast count manager's thread to stop.
+     */
+    void _stopReplicatedFastCountThread();
+
     ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads

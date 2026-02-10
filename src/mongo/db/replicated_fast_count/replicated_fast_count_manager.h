@@ -150,7 +150,7 @@ private:
 
     bool _writeMetadataPeriodically = true;
 
-    AtomicWord<bool> _inShutdown = false;
+    AtomicWord<bool> _isDisabled = false;
 
     stdx::condition_variable _condVar;
 

@@ -81,6 +81,8 @@
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -679,6 +681,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         }
     });
 
+    // TODO SERVER-118440: Revisit initializing this in ASC
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        uassertStatusOK(createFastcountCollection(opCtx));
+        ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
+    }
+
     // Create the pre-images collection if it doesn't exist yet.
     ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx);
 
@@ -987,6 +997,7 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 
 void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
     stopNoopWriter();
+    _stopReplicatedFastCountThread();
     _stopAsyncUpdatesOfAndClearOplogTruncateAfterPoint();
 }
 
@@ -1260,5 +1271,13 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     return isCWWCSet;
 }
 
+void ReplicationCoordinatorExternalStateImpl::_stopReplicatedFastCountThread() {
+    auto opCtx = cc().getOperationContext();
+    if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        ReplicatedFastCountManager::get(_service).shutdown();
+    }
+}
 }  // namespace repl
 }  // namespace mongo

@@ -51,7 +51,7 @@ void ReplicatedFastCountManager::shutdown() {
 
     {
         stdx::lock_guard lock(_metadataMutex);
-        _inShutdown.storeRelaxed(true);
+        _isDisabled.storeRelaxed(true);
     }
 
     _condVar.notify_all();
@@ -67,6 +67,10 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
     // TODO SERVER-117650: Read existing collection to populate in-memory metadata. This is
     // currently executed before oplog application, so if there is an create entry for this
     // collection to apply we will currently miss it.
+    uassert(11905700,
+            "ReplicatedFastCountManager background thread already running. It should only be "
+            "started up once.",
+            !_backgroundThread.joinable());
     {
         CollectionOrViewAcquisition acquisition =
             acquireCollectionOrView(opCtx,
@@ -130,14 +134,28 @@ void ReplicatedFastCountManager::_runBackgroundThreadOnTimer(OperationContext* o
             stdx::unique_lock lock(_metadataMutex);
             // TODO SERVER-117515: We want to signal this from checkpoint thread
             _condVar.wait_for(
-                lock, stdx::chrono::seconds(1), [this] { return _inShutdown.loadRelaxed(); });
+                lock, stdx::chrono::seconds(1), [this] { return _isDisabled.loadRelaxed(); });
 
-            if (_inShutdown.loadRelaxed()) {
+            if (_isDisabled.loadRelaxed()) {
                 break;
             }
         }
 
-        _runIteration(opCtx);
+        try {
+            _runIteration(opCtx);
+        } catch (const DBException& ex) {
+            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange &&
+                !_isDisabled.loadRelaxed()) {
+                // Stepdown attempt interrupted us. We can continue here - if the stepdown did not
+                // succeed we will run the next iteration, otherwise we will break out of the loop.
+                LOGV2_DEBUG(11905701,
+                            2,
+                            "ReplicatedFastCountManager iteration interrupted due to "
+                            "replication state change; will retry",
+                            "error"_attr = ex.toStatus());
+                continue;
+            }
+        }
     }
 }
 

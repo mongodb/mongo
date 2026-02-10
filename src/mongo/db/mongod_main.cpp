@@ -135,7 +135,6 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
@@ -1114,15 +1113,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
                                        TimedSectionId::logStartupOptions,
                                        &startupTimeElapsedBuilder);
         audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
-    }
-
-    // TODO SERVER-118440: Revisit initializing this in ASC
-    if (!rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup() &&
-        gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(startupOpCtx.get()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        uassertStatusOK(createFastcountCollection(startupOpCtx.get()));
-        ReplicatedFastCountManager::get(serviceContext).startup(startupOpCtx.get());
     }
 
     if (MONGO_unlikely(hangBeforeFinishingInitAndListen.shouldFail())) {
