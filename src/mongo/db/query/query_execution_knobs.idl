@@ -637,6 +637,18 @@ server_parameters:
             lte: 600
         redact: false
 
+    internalChangeStreamUseTenantIdForTesting:
+        description: >-
+            If true, then change streams will operate upon an internal tenant id for testing
+            purposes if the actual tenant is not provided.
+            This parameter is deprecated, and its value is not used after setting it.
+        set_at: [startup]
+        cpp_varname: "internalChangeStreamUseTenantIdForTesting"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+        is_deprecated: true
+
     enableComputeMode:
         description: >-
             Boolean flag to enable the compute mode in which mongod is used not as a
