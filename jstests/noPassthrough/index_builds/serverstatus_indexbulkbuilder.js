@@ -59,8 +59,7 @@ assert(serverStatus.hasOwnProperty("indexBulkBuilder"), "indexBuildBuilder secti
 let indexBulkBuilderSection = serverStatus.indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
-// TODO(SERVER-107044) The filesOpenedForExternalSort, filesClosedForExternalSort, and spilledRanges
-// metrics are incremented when we use the Sorter, which isn't used in primary-driven index builds.
+// filesOpenedForExternalSort and filesClosedForExternalSort are not used for primary-driven index builds.
 assert.eq(
     indexBulkBuilderSection.filesOpenedForExternalSort,
     1 - FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds"),
@@ -74,7 +73,7 @@ assert.eq(
 // Due to fragmentation in the allocator, which is counted towards mem usage, we can spill earlier
 // than we would expect.
 assert.between(
-    FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds") ? 0 : expectedSpilledRanges,
+    expectedSpilledRanges,
     indexBulkBuilderSection.spilledRanges,
     1 + expectedSpilledRanges,
     tojson(indexBulkBuilderSection),
@@ -95,14 +94,10 @@ assert.between(
     tojson(indexBulkBuilderSection),
     /*inclusive=*/ true,
 );
-// TODO(SERVER-107044) The numSorted and bytesSorted metric are incremented when we use the Sorter,
-// which isn't used in primary-driven index builds.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
-    assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
-    // Expect total bytes sorted to be greater than approxMemoryUsage because of the additional
-    // field in the documents inserted which accounts for more bytes than in the rough calculation.
-    assert.gte(indexBulkBuilderSection.bytesSorted, approxMemoryUsage, tojson(indexBulkBuilderSection));
-}
+assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
+// Expect total bytes sorted to be greater than approxMemoryUsage because of the additional
+// field in the documents inserted which accounts for more bytes than in the rough calculation.
+assert.gte(indexBulkBuilderSection.bytesSorted, approxMemoryUsage, tojson(indexBulkBuilderSection));
 assert.between(
     0,
     indexBulkBuilderSection.memUsage,
