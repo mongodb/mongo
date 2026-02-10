@@ -1,9 +1,14 @@
-// On OSX this test assumes that trusted-ca.pem has been added as a trusted
-// certificate to the login keychain of the evergreen user. See,
-// https://github.com/10gen/buildhost-configuration/blob/f60ba13f506ef035d14e46fb5935f26ba3ca6bed/roles/macos/tasks/keychains.yml#L39-L100
+// On MacOS this test assumes that certificates exist at
+// /opt/x509/macos-trusted-[ca|server|client].pem, and that /opt/x509/macos-trusted-ca.pem has
+// been added as a trusted certificate to the login keychain of the evergreen user. See,
+// https://github.com/10gen/buildhost-configuration/blob/1c1fcb51924cd4f1bc9eaf5db23f6e4365d6ba17/roles/macos/tasks/keychains.yml#L58-L87
 // for details.
-// To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
-//   security add-trusted-cert -d bazel-bin/install-devcore/bin/x509/trusted-ca.pem
+// To install certificates for local testing on OSX, invoke the following at a console:
+//   mkdir /opt/x509
+//   python x509/mkcert.py x509/apple_certs.json -o /opt/x509
+//   security add-trusted-cert -d /opt/x509/macos-trusted-ca.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-server.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-client.pem
 
 import {getPython3Binary} from "jstests/libs/python.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -12,43 +17,50 @@ import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);
 
+let trustedCA = getX509Path("trusted-ca.pem");
+let trustedServer = getX509Path("trusted-server.pem");
+let trustedClient = getX509Path("trusted-client.pem");
+
 if (HOST_TYPE == "macOS") {
-    // Ensure trusted-ca.pem is properly installed on MacOS hosts.
+    trustedCA = "/opt/x509/macos-trusted-ca.pem";
+    trustedServer = "/opt/x509/macos-trusted-server.pem";
+    trustedClient = "/opt/x509/macos-trusted-client.pem";
+    // Ensure trustedCA is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
-    let exitCode = runProgram("security", "verify-cert", "-c", getX509Path("trusted-client.pem"));
+    let exitCode = runProgram("security", "verify-cert", "-c", trustedClient);
     assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
 
     // OpenSSL backed imports Root CA and intermediate CA
-    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", getX509Path("trusted-ca.pem"));
+    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", trustedCA);
 
     // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
     // Current User.
-    runProgram("certutil.exe", "-addstore", "-f", "Root", getX509Path("trusted-ca.pem"));
+    runProgram("certutil.exe", "-addstore", "-f", "Root", trustedCA);
 }
 
 const certDir = MongoRunner.toRealDir("$dataDir/ssl_with_system_ca_test/");
 if (HOST_TYPE == "linux") {
     mkdir(certDir);
     clearRawMongoProgramOutput();
-    assert.eq(0, runProgram("openssl", "x509", "-hash", "-noout", "-in", getX509Path("trusted-ca.pem")));
+    assert.eq(0, runProgram("openssl", "x509", "-hash", "-noout", "-in", trustedCA));
     let hash = rawMongoProgramOutput(".*");
     jsTestLog(hash); // has form: "|sh<pid> <hash>\n"
     hash = hash.trim().split(" ")[1];
-    copyCertificateFile(getX509Path("trusted-ca.pem"), `${certDir}/${hash}.0`);
+    copyCertificateFile(trustedCA, `${certDir}/${hash}.0`);
 }
 
 // Tests server ingress validation works if the server is configured to use system CA.
 function testServerIngress() {
     jsTestLog("Running testServerIngress");
 
-    // Start a mongod configured with sslPEMKeyFile = trusted-server.pem,
-    // and a system CA store containing trusted-ca.pem.
+    // Start a mongod configured with sslPEMKeyFile = trustedServer,
+    // and a system CA store containing trustedCA.
     const serverOpts = {
         tlsMode: "preferTLS",
-        tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
+        tlsCertificateKeyFile: trustedServer,
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
         setParameter: {tlsUseSystemCA: true},
@@ -60,8 +72,8 @@ function testServerIngress() {
     jsTestLog("Testing server ingress validates trusted client certificate");
     let clientOpts = {
         tls: {
-            certificateKeyFile: getX509Path("trusted-client.pem"),
-            CAFile: getX509Path("trusted-ca.pem"),
+            certificateKeyFile: trustedClient,
+            CAFile: trustedCA,
             allowInvalidHostnames: true,
         },
     };
@@ -89,13 +101,13 @@ function testServerIngress() {
 function testServerEgress() {
     jsTest.log("Running testServerEgress");
 
-    // Start a replica set with one mongod configured with sslPEMKeyFile = trusted-server.pem,
-    // and a system CA store containing trusted-ca.pem.
+    // Start a replica set with one mongod configured with sslPEMKeyFile = trustedServer,
+    // and a system CA store containing trustedCA.
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet({
         tlsMode: "preferTLS",
-        tlsCertificateKeyFile: getX509Path("trusted-server.pem"), // used on ingress
-        tlsClusterFile: getX509Path("trusted-client.pem"), // used on egress to node2
+        tlsCertificateKeyFile: trustedServer, // used on ingress
+        tlsClusterFile: trustedClient, // used on egress to node2
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
         setParameter: {tlsUseSystemCA: true},
@@ -109,8 +121,8 @@ function testServerEgress() {
     let badNode = rst.add({
         tlsMode: "preferTLS",
         tlsCertificateKeyFile: getX509Path("server.pem"), // used on ingress, untrusted
-        tlsClusterFile: getX509Path("trusted-client.pem"), // used on egress to node1
-        tlsCAFile: getX509Path("trusted-ca.pem"),
+        tlsClusterFile: trustedClient, // used on egress to node1
+        tlsCAFile: trustedCA,
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
     });
@@ -127,9 +139,9 @@ function testServerEgress() {
     // Add new node that uses a key trusted by the first node.
     let goodNode = rst.add({
         tlsMode: "preferTLS",
-        tlsCertificateKeyFile: getX509Path("trusted-server.pem"), // used on ingress, trusted
-        tlsClusterFile: getX509Path("trusted-client.pem"), // used on egress to node1
-        tlsCAFile: getX509Path("trusted-ca.pem"),
+        tlsCertificateKeyFile: trustedServer, // used on ingress, trusted
+        tlsClusterFile: trustedClient, // used on egress to node1
+        tlsCAFile: trustedCA,
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
     });

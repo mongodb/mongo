@@ -1118,12 +1118,23 @@ tasks:
         "encrypt",
         "ssl",
         "patch_build",
+        "incompatible_mac",
       ]
     commands:
       - func: "do setup"
       - func: "run tests"
         vars:
           suite: ssl_linear
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: ssl_linear_macos
+    tags: ["assigned_to_jira_team_server_security", "experimental"]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: ssl_linear_macos
           resmoke_jobs_max: 1
 
   - <<: *task_template

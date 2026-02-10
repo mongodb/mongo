@@ -219,3 +219,6 @@ filters:
   - "*get_exec_deferred_engine_choice*":
     approvers:
       - 10gen/query-execution
+  - "ssl*.yml":
+    approvers:
+      - 10gen/server-security

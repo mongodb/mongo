@@ -174,4 +174,5 @@ rules:
             "selinux_rhel8_org",
             "selinux_rhel9_org",
             "selinux_rhel8_enterprise",
+            "ssl_linear_macos",
           ]

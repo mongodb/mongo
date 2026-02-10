@@ -1,9 +1,14 @@
-// On OSX this test assumes that trusted-ca.pem has been added as a trusted
-// certificate to the login keychain of the evergreen user. See,
-// https://github.com/10gen/buildslave-cookbooks/commit/af7cabe5b6e0885902ebd4902f7f974b64cc8961
+// On MacOS this test assumes that certificates exist at
+// /opt/x509/macos-trusted-[ca|server|client].pem, and that /opt/x509/macos-trusted-ca.pem has
+// been added as a trusted certificate to the login keychain of the evergreen user. See,
+// https://github.com/10gen/buildhost-configuration/blob/1c1fcb51924cd4f1bc9eaf5db23f6e4365d6ba17/roles/macos/tasks/keychains.yml#L58-L87
 // for details.
-// To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
-//   security add-trusted-cert -d bazel-bin/install-devcore/bin/x509/trusted-ca.pem
+// To install certificates for local testing on OSX, invoke the following at a console:
+//   mkdir /opt/x509
+//   python x509/mkcert.py x509/apple_certs.json -o /opt/x509
+//   security add-trusted-cert -d /opt/x509/macos-trusted-ca.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-server.pem
+//   security add-trusted-cert -d -r trustAsRoot /opt/x509/macos-trusted-client.pem
 
 import {getPython3Binary} from "jstests/libs/python.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -11,21 +16,28 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);
 
+let trustedCA = getX509Path("trusted-ca.pem");
+let trustedServer = getX509Path("trusted-server.pem");
+let trustedClient = getX509Path("trusted-client.pem");
+
 if (HOST_TYPE == "macOS") {
-    // Ensure trusted-ca.pem is properly installed on MacOS hosts.
+    trustedCA = "/opt/x509/macos-trusted-ca.pem";
+    trustedServer = "/opt/x509/macos-trusted-server.pem";
+    trustedClient = "/opt/x509/macos-trusted-client.pem";
+    // Ensure trustedCA is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
-    let exitCode = runProgram("security", "verify-cert", "-c", getX509Path("trusted-client.pem"));
+    let exitCode = runProgram("security", "verify-cert", "-c", trustedClient);
     assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
 
     // OpenSSL backed imports Root CA and intermediate CA
-    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", getX509Path("trusted-ca.pem"));
+    runProgram("certutil.exe", "-addstore", "-user", "-f", "CA", trustedCA);
 
     // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
     // Current User.
-    runProgram("certutil.exe", "-addstore", "-f", "Root", getX509Path("trusted-ca.pem"));
+    runProgram("certutil.exe", "-addstore", "-f", "Root", trustedCA);
 }
 
 try {
@@ -34,7 +46,7 @@ try {
         nodes: 1,
         nodeOptions: {
             tlsMode: "requireTLS",
-            tlsCertificateKeyFile: getX509Path("trusted-server.pem"),
+            tlsCertificateKeyFile: trustedServer,
             setParameter: {tlsUseSystemCA: true},
         },
         host: "localhost",
@@ -43,7 +55,7 @@ try {
 
     replTest.startSet({
         env: {
-            SSL_CERT_FILE: getX509Path("trusted-ca.pem"),
+            SSL_CERT_FILE: trustedCA,
         },
     });
 
@@ -57,13 +69,13 @@ try {
         let argv = ["mongo", url, "--eval", "db.runCommand({replSetGetStatus: 1})"];
 
         if (url.endsWith("&ssl=true")) {
-            argv.push("--tls", "--tlsCertificateKeyFile", getX509Path("trusted-client.pem"));
+            argv.push("--tls", "--tlsCertificateKeyFile", trustedClient);
         }
 
         if (!_isWindows()) {
             // On Linux we override the default path to the system CA store to point to our
             // system CA. On Windows, this CA will have been added to the user's trusted CA list
-            argv.unshift("env", "SSL_CERT_FILE=" + getX509Path("trusted-ca.pem"));
+            argv.unshift("env", "SSL_CERT_FILE=" + trustedCA);
         }
         let ret = runMongoProgram(...argv);
         return ret;
