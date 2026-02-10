@@ -520,8 +520,10 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             chunk.getMin(),
                             boost::none /* max */,
                             chunk.getLastmod(),
-                            // Always force jumbo chunks to be migrated off draining shards
-                            ForceJumbo::kForceBalancer,
+                            // Do not force jumbo chunks to be migrated off draining shards. Jumbo
+                            // chunks need to be moved manually, similar to how they are handled
+                            // during normal balancing.
+                            ForceJumbo::kDoNotForce,
                             collDataSizeInfo.maxChunkSizeBytes);
 
                         if (firstReason == MigrationReason::none) {

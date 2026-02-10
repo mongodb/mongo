@@ -73,3 +73,6 @@ filters:
   - "shard_identity_rollback.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "shard_drain_chunk_size_behavior.js":
+    approvers:
+      - 10gen/server-cluster-scalability
