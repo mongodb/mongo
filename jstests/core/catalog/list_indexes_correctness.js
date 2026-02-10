@@ -158,8 +158,8 @@ describe("ListIndexesCorrectness", function () {
         assert.eq(7200, indexC.expireAfterSeconds, "Index should have expireAfterSeconds = 7200 after collMod");
     });
 
-    // TODO (SERVER-118648): Enable this test once the bug is fixed.
-    it.skip("should list indexes correctly after collMod converts an index to unique", () => {
+    // TODO (SERVER-61182): Enable this test case with the in-memory storage engine.
+    const collModConvertIndexToUnique = () => {
         // Create a regular non-unique index on {e:1}
         assert.commandWorked(coll.createIndex({e: 1}));
 
@@ -196,7 +196,10 @@ describe("ListIndexesCorrectness", function () {
         assert.neq(undefined, indexE);
         assert.eq(true, indexE.unique, "Index should be unique after conversion");
         assert.eq(undefined, indexE.prepareUnique, "Index should no longer have prepareUnique property");
-    });
+    };
+    jsTest.options().storageEngine === "inMemory"
+        ? it.skip
+        : it("should list indexes correctly after collMod converts an index to unique", collModConvertIndexToUnique);
 
     it("should list only _id index after createCollection", () => {
         assert.commandWorked(testDb.createCollection(coll.getName()));
