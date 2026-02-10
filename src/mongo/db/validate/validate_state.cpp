@@ -83,6 +83,21 @@ MONGO_FAIL_POINT_DEFINE(hangDuringValidationInitialization);
 
 namespace CollectionValidation {
 
+StringData toString(FastCountType fastCountType) {
+    switch (fastCountType) {
+        case FastCountType::legacySizeStorer:
+            return "legacySizeStorer";
+        case FastCountType::replicated:
+            return "replicated";
+        case FastCountType::both:
+            return "both";
+        case FastCountType::neither:
+            return "neither";
+    }
+    LOGV2_FATAL(
+        11853100, "Unknown fastCountType value", "value"_attr = static_cast<int>(fastCountType));
+}
+
 Lock::ExclusiveLock obtainExclusiveValidationLock(OperationContext* opCtx) {
     return Lock::ExclusiveLock(opCtx, validateLock);
 }
@@ -115,17 +130,6 @@ ValidateState::ValidateState(OperationContext* opCtx,
     if (adjustMultikey()) {
         invariant(!isBackground());
     }
-
-    // TODO(SERVER-118531): Move this check to the validate() call after this constructor is
-    // invoked, and append the errors to the result output parameter rather than logging.
-    if (enforceFastCountRequested()) {
-        const FastCountType fastCountType = getDetectedFastCountType(opCtx);
-        if (fastCountType == FastCountType::both) {
-            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Both FastCount tables found");
-        } else if (fastCountType == FastCountType::neither) {
-            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
-        }
-    }
 }
 
 Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
@@ -145,10 +149,6 @@ Status ValidateState::_checkUnreplicatedFastCountCollectionExists(OperationConte
     const StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     const bool tableExists = storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(opCtx), ident::kSizeStorer);
-    // CollectionValidation::validate requires that no storage transactions are open during the call
-    // to setPrepareConflictBehavior, so we abandon the snapshot created in hasIdent after checking
-    // if the table exists.
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     if (!tableExists) {
         return Status(ErrorCodes::NonExistentPath, "SizeStorer doesn't exist");
     }

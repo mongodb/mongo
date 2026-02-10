@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/validate/validate_state.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
@@ -249,6 +250,10 @@ public:
         _readTimestamp = std::move(readTimestampOpt);
     }
 
+    void setFastCountType(boost::optional<CollectionValidation::FastCountType> fastCountType) {
+        _fastCountType = fastCountType;
+    }
+
     void setNumInvalidDocuments(long long numInvalidDocuments) {
         _numInvalidDocuments = numInvalidDocuments;
     }
@@ -345,6 +350,8 @@ private:
     std::string _repairMode;
     bool _hasStructuralDamage = false;
     boost::optional<Timestamp> _readTimestamp = boost::none;
+
+    boost::optional<CollectionValidation::FastCountType> _fastCountType = boost::none;
 
     // Collection stats.
     // If validate doesn't progress far enough to determine these, they will remain nullopt.

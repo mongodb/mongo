@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::CollectionValidation {
@@ -96,5 +97,16 @@ TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsReplic
 TEST_F(ValidateStateWithoutSizeStorerTest, GetDetectedFastCountTypeReturnsNeither) {
     ValidateState validateState(operationContext(), kNss, kValidationOptions);
     EXPECT_EQ(validateState.getDetectedFastCountType(operationContext()), FastCountType::neither);
+}
+
+TEST(FastCountTypeToStringTest, Works) {
+    EXPECT_EQ(toString(FastCountType::legacySizeStorer), "legacySizeStorer");
+    EXPECT_EQ(toString(FastCountType::replicated), "replicated");
+    EXPECT_EQ(toString(FastCountType::both), "both");
+    EXPECT_EQ(toString(FastCountType::neither), "neither");
+}
+
+DEATH_TEST(FastCountToStringDeathTest, DiesOnBadFastCountType, "11853100") {
+    toString(static_cast<FastCountType>(-1));
 }
 }  // namespace mongo::CollectionValidation

@@ -37,6 +37,7 @@ mongo_cc_library(
     ],
     deps = [
         ":validate_options",
+        ":validate_state",
     ],
 )
 

@@ -1314,7 +1314,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 
     if (_validateState->shouldEnforceFastCount()) {
-        auto fastCountType = _validateState->getDetectedFastCountType(opCtx);
+        const auto fastCountType = _validateState->getDetectedFastCountType(opCtx);
         switch (fastCountType) {
             case CollectionValidation::FastCountType::legacySizeStorer:
                 if (const auto fastCount = coll->numRecords(opCtx); fastCount != _numRecords) {
@@ -1337,14 +1337,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 }
                 break;
             case CollectionValidation::FastCountType::both:
-                uasserted(ErrorCodes::InvalidOptions, "Both FastCount tables found");
                 break;
             case CollectionValidation::FastCountType::neither:
-                uasserted(ErrorCodes::InvalidOptions, "No FastCount tables found");
                 break;
         }
     }
 
+    // TODO(SERVER-119193): Add condition for the fastCountType being valid.
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
     if (results->isValid() && !_validateState->isBackground()) {

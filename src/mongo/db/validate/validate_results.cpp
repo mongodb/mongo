@@ -130,6 +130,9 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     if (_uuid.has_value()) {
         _uuid->appendToBuilder(resultObj, "uuid");
     }
+    if (_fastCountType.has_value()) {
+        resultObj->append("fastCountType", toString(_fastCountType.value()));
+    }
 
     static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
     auto appendRangeSizeLimited = [&](StringData fieldName, auto valueGetter) {
