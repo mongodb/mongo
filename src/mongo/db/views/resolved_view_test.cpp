@@ -66,11 +66,16 @@ const BSONObj kDefaultCursorOptionDocument = BSON(aggregation_request_helper::kB
                                                   << aggregation_request_helper::kDefaultBatchSize);
 const BSONObj kSimpleCollation;
 
+// These tests do not use $vectorSearch, which is the only stage where we need to consult the
+// ifrContext to determine the best way to resolve the view.
+const auto nullIfrContext = nullptr;
+
 TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmptyPipeline) {
     const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, emptyPipeline};
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnView);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, requestOnView);
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
                          << kDefaultCursorOptionDocument << "collation" << BSONObj());
@@ -82,7 +87,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
     const ResolvedView resolvedView{backingNss, viewPipeline, kSimpleCollation};
     AggregateCommandRequest requestOnView{viewNss, std::vector<BSONObj>{BSON("limit" << 3)}};
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnView);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, requestOnView);
 
     BSONObj expected =
         BSON("aggregate" << backingNss.coll() << "pipeline"
@@ -99,7 +105,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExpla
     aggRequest.setCursor(cursor);
     aggRequest.setExplain(true);
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, aggRequest);
     ASSERT(result.getExplain());
     ASSERT(*result.getExplain());
     ASSERT_EQ(
@@ -114,7 +121,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndNoExplainPreservesCursor)
     cursor.setBatchSize(10);
     aggRequest.setCursor(cursor);
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, aggRequest);
     ASSERT_FALSE(result.getExplain());
     ASSERT_EQ(
         result.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize),
@@ -132,7 +140,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesUnsetFields) {
     aggRequest.setStmtId(123);
     aggRequest.setMaxTimeMS(100u);
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, aggRequest);
 
     // Verify that the namespace, pipeline, and collation were updated correctly.
     ASSERT_EQ(result.getNamespace(), backingNss);
@@ -213,7 +222,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
     aggRequest.setReadConcern(repl::ReadConcernArgs::kLinearizable);
     aggRequest.setUnwrappedReadPref(BSON("$readPreference" << BSON("mode" << "secondary")));
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, aggRequest);
 
     // Verify that the namespace, pipeline, and collation were updated correctly.
     ASSERT_EQ(result.getNamespace(), backingNss);
@@ -261,7 +271,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesDefaultCollationOfView) {
     ASSERT_BSONOBJ_EQ(resolvedView.getDefaultCollation(), BSON("locale" << "fr_CA"));
     AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
 
-    auto result = PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, aggRequest);
+    auto result = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, aggRequest);
     ASSERT_BSONOBJ_EQ(result.getCollation().value_or(BSONObj()), BSON("locale" << "fr_CA"));
 }
 
@@ -270,8 +281,8 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
 
     AggregateCommandRequest requestOnViewDefault{viewNss, emptyPipeline};
 
-    auto resultDefault =
-        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnViewDefault);
+    auto resultDefault = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, requestOnViewDefault);
     ASSERT_TRUE(resultDefault.getSerializationContext() ==
                 SerializationContext::stateCommandRequest());
 
@@ -279,8 +290,8 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
     scCommand.setPrefixState(true);
     AggregateCommandRequest requestOnViewCommand{viewNss, emptyPipeline, scCommand};
 
-    auto resultCommand =
-        PipelineResolver::buildRequestWithResolvedPipeline(resolvedView, requestOnViewCommand);
+    auto resultCommand = PipelineResolver::buildRequestWithResolvedPipeline(
+        nullIfrContext, resolvedView, requestOnViewCommand);
     ASSERT_EQ(resultCommand.getSerializationContext().getSource(),
               SerializationContext::Source::Command);
     ASSERT_EQ(resultCommand.getSerializationContext().getCallerType(),

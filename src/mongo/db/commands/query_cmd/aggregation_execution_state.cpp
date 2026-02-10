@@ -658,7 +658,7 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
           _originalAggReqDerivatives->request.getNamespace(),
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
       _resolvedViewRequest_DO_NOT_USE_DIRECTLY(PipelineResolver::buildRequestWithResolvedPipeline(
-          _resolvedView, _originalAggReqDerivatives->request)),
+          _ifrContext, _resolvedView, _originalAggReqDerivatives->request)),
       _resolvedViewLiteParsedPipeline_DO_NOT_USE_DIRECTLY(_resolvedViewRequest_DO_NOT_USE_DIRECTLY,
                                                           true) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);

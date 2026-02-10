@@ -90,10 +90,10 @@ public:
                std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext)
         : _aggReqDerivatives(new AggregateRequestDerivatives(request, liteParsedPipeline, cmdObj)),
           _opCtx(opCtx),
+          _ifrContext(std::move(ifrContext)),
           _executionNss(request.getNamespace()),
           _privileges(privileges),
-          _verbosity(verbosity),
-          _ifrContext(std::move(ifrContext)) {
+          _verbosity(verbosity) {
         // Create virtual collections and drop them when aggregate command is done.
         // If a cursor is registered, the ExternalDataSourceScopeGuard will be stored in the cursor;
         // when the cursor is later destroyed, the scope guard will also be destroyed, and any
@@ -321,17 +321,20 @@ protected:
     // Set upon construction and never reset. Should never be nullptr.
     OperationContext* _opCtx;
 
+    // _ifrContext is shared among all copies of the ExpressionContext.
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
+
     /**
      * Protected move constructor for derived classes only.
      */
     AggExState(AggExState&& other)
         : _aggReqDerivatives(std::move(other._aggReqDerivatives)),
           _opCtx(other._opCtx),
+          _ifrContext(std::move(other._ifrContext)),
           _executionNss(std::move(other._executionNss)),
           _privileges(other._privileges),
           _externalDataSourceGuard(std::move(other._externalDataSourceGuard)),
-          _verbosity(other._verbosity),
-          _ifrContext(std::move(other._ifrContext)) {
+          _verbosity(other._verbosity) {
         other._opCtx = nullptr;
     }
 
@@ -357,9 +360,6 @@ private:
     // Has a value if the aggregation has explain: true, to be used in
     // AggCatalogState::createExpressionContext to populate verbosity on the expression context.
     boost::optional<ExplainOptions::Verbosity> _verbosity;
-
-    // _ifrContext is shared among all copies of the ExpressionContext.
-    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
 
     /**
      * Upconverts the read concern for a change stream aggregation, if necessary.

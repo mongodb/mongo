@@ -55,7 +55,9 @@ public:
      * and applies the view pipeline to the original aggregation request pipeline.
      */
     static AggregateCommandRequest buildRequestWithResolvedPipeline(
-        const ResolvedView& resolvedView, const AggregateCommandRequest& request);
+        const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+        const ResolvedView& resolvedView,
+        const AggregateCommandRequest& request);
 
     /**
      * Applies the view to a LiteParsedPipeline by constructing a ViewInfo from the resolved view,

@@ -359,8 +359,8 @@ public:
 
                         const ResolvedView& resolvedView = *ex.extraInfo<ResolvedView>();
                         auto resolvedAggRequest =
-                            PipelineResolver::buildRequestWithResolvedPipeline(resolvedView,
-                                                                               aggRequestOnView);
+                            PipelineResolver::buildRequestWithResolvedPipeline(
+                                expCtx->getIfrContext(), resolvedView, aggRequestOnView);
 
                         BSONObj aggResult = CommandHelpers::runCommandDirectly(
                             opCtx,

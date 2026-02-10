@@ -64,11 +64,14 @@ AggregateCommandRequest buildBaseResolvedRequest(const ResolvedView& resolvedVie
  * For mongot pipelines, returns just the user pipeline (view pipeline is applied by
  * $_internalSearchIdLookup). For timeseries views, prepends the view pipeline.
  */
-std::vector<BSONObj> buildResolvedPipelineForSimpleCase(const ResolvedView& resolvedView,
-                                                        const std::vector<BSONObj>& userPipeline) {
+std::vector<BSONObj> buildResolvedPipelineForSimpleCase(
+    const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+    const ResolvedView& resolvedView,
+    const std::vector<BSONObj>& userPipeline) {
     // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
     // For this reason, we do not expand the aggregation request to include the view pipeline.
-    if (search_helper_bson_obj::isMongotPipeline(userPipeline)) {
+    // Caller is expected to use LiteParsedPipeline::handleView() for such cases.
+    if (search_helper_bson_obj::isMongotPipeline(ifrContext, userPipeline)) {
         return userPipeline;
     }
 
@@ -164,12 +167,14 @@ void applyFinalTransformations(AggregateCommandRequest& resolvedRequest,
 }  // namespace
 
 AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
-    const ResolvedView& resolvedView, const AggregateCommandRequest& originalRequest) {
+    const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+    const ResolvedView& resolvedView,
+    const AggregateCommandRequest& originalRequest) {
     AggregateCommandRequest expandedRequest =
         buildBaseResolvedRequest(resolvedView, originalRequest);
 
     std::vector<BSONObj> resolvedPipeline =
-        buildResolvedPipelineForSimpleCase(resolvedView, originalRequest.getPipeline());
+        buildResolvedPipelineForSimpleCase(ifrContext, resolvedView, originalRequest.getPipeline());
 
     applyFinalTransformations(
         expandedRequest, std::move(resolvedPipeline), resolvedView, originalRequest);
@@ -202,9 +207,10 @@ PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosV
     // building logic. Regular views require mongos-specific desugaring and serialization.
     std::vector<BSONObj> resolvedPipeline;
     boost::optional<LiteParsedPipeline> userLPP;
-    if (search_helper_bson_obj::isMongotPipeline(request.getPipeline()) ||
+    if (search_helper_bson_obj::isMongotPipeline(ifrContext, request.getPipeline()) ||
         resolvedView.timeseries()) {
-        resolvedPipeline = buildResolvedPipelineForSimpleCase(resolvedView, request.getPipeline());
+        resolvedPipeline =
+            buildResolvedPipelineForSimpleCase(ifrContext, resolvedView, request.getPipeline());
         userLPP = boost::none;
     } else {
         std::tie(resolvedPipeline, userLPP) = buildResolvedPipelineForRegularView(

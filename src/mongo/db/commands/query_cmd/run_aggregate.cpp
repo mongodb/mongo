@@ -989,6 +989,7 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and
     // handle the view through a custom ViewPolicy.
     if (search_helpers::isMongotLiteParsedPipeline(*desugaredLPP)) {
+        LOGV2_DEBUG(11856001, 4, "Skipping view application because this is a mongot query");
         return currentRequirement;
     }
 

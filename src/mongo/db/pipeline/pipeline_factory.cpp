@@ -210,7 +210,8 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
         return makePipeline(currentPipeline, subPipelineExpCtx, opts);
     }
 
-    if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
+    if (search_helper_bson_obj::isMongotPipeline(subPipelineExpCtx->getIfrContext(),
+                                                 currentPipeline)) {
         return viewPipelineHelperForSearch(
             subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
     }

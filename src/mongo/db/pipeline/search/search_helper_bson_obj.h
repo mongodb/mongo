@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
@@ -43,47 +44,90 @@ namespace mongo {
 
 namespace search_helper_bson_obj {
 
+namespace detail {
+/**
+ * Returns true if 'spec' uses the name of 'DocSourceName' type, false otherwise.
+ */
+template <typename DocSourceName>
+bool is(const BSONObj& spec) {
+    return spec.hasField(DocSourceName::kStageName);
+}
+
+inline bool hasMongotExtension(const auto& extensionNames) {
+    return std::find_if(extensionNames.begin(), extensionNames.end(), [&](const auto& name) {
+               return name == "mongot-extension";
+           }) != extensionNames.end();
+}
+
+}  // namespace detail
+
 /**
  * Checks that the pipeline isn't empty and if the first stage in the pipeline is a mongot stage
- * (either $search, $vectorSearch, $searchMeta, $listSearchIndexes, $rankFusion, or $scoreFusion).
+ * Namely, that includes:
+ * - $search
+ * - $vectorSearch (legacy implementation only, extensions intentionally need to avoid this kind of
+ * special casing)
+ * - $searchMeta
+ * - $listSearchIndexes
+ * - $rankFusion (starting with a search stage)
+ * - $scoreFusion (starting with a search stage).
  */
-inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
-    // Note that the $rankFusion/$scoreFusion stages are syntactic sugar. When desugared, the first
-    // stage in its first pipeline in the $rankFusion/$scoreFusion query (ex: $rankFusion: {
-    //    input: {
-    //        pipelines: {
-    //            searchPipeline: [
-    //                { $search: {...} },
-    //                { $sort: {author: 1} }
-    //            ]
-    //        }
-    //    }
-    //}) will become the first stage in the final desugared ouput. Thus, there is an extra recursive
-    // call to check for this.
-    if (pipeline.size() >= 1 &&
-        (pipeline[0][DocumentSourceSearch::kStageName] ||
-         pipeline[0][DocumentSourceVectorSearch::kStageName] ||
-         pipeline[0][DocumentSourceSearchMeta::kStageName] ||
-         pipeline[0][DocumentSourceListSearchIndexes::kStageName] ||
-         (pipeline[0][DocumentSourceRankFusion::kStageName] &&
-          isMongotPipeline(std::vector<BSONObj>{
-              pipeline[0][DocumentSourceRankFusion::kStageName][RankFusionSpec::kInputFieldName]
-                      [RankFusionInputSpec::kPipelinesFieldName]
-                          .Obj()
-                          .firstElement()
-                          .Array()[0]
-                          .Obj()})) ||
-         (pipeline[0][DocumentSourceScoreFusion::kStageName] &&
-          isMongotPipeline(std::vector<BSONObj>{
-              pipeline[0][DocumentSourceScoreFusion::kStageName][ScoreFusionSpec::kInputFieldName]
-                      [ScoreFusionInputsSpec::kPipelinesFieldName]
-                          .Obj()
-                          .firstElement()
-                          .Array()[0]
-                          .Obj()})))) {
-        return true;
+inline bool isMongotPipeline(const std::shared_ptr<IncrementalFeatureRolloutContext>& ifrContext,
+                             const std::vector<BSONObj>& pipeline) {
+    if (pipeline.empty()) {
+        return false;
     }
-    return false;
+    const auto& firstStageBson = pipeline[0];
+    using detail::is;
+    if (is<DocumentSourceVectorSearch>(firstStageBson)) {
+        // Return true if the $vectorSearch implementation would be the legacy
+        // DocumentSourceVectorSearch-based implementation. Note we don't need to worry
+        // about/consult 'featureFlagExtensionViewsAndUnionWith' because the extension will enforce
+        // this behavior by toggling 'gFeatureFlagVectorSearchExtension' and retrying, so thankfully
+        // this is enough, and we don't need to understand what context this BSON appears in (w.r.t.
+        // views or sub-pipelines).
+        return !detail::hasMongotExtension(serverGlobalParams.extensions) ||
+            !ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension);
+    } else if (is<DocumentSourceRankFusion>(firstStageBson)) {
+        // Note that the $rankFusion/$scoreFusion firstStageBsons are syntactic sugar. When
+        // desugared, the first firstStageBson in its first pipeline in the $rankFusion/$scoreFusion
+        // query (ex: $rankFusion:
+        // {
+        //    input: {
+        //        pipelines: {
+        //            searchPipeline: [
+        //                { $search: {...} },
+        //                { $sort: {author: 1} }
+        //            ]
+        //        }
+        //    }
+        //}) will become the first firstStageBson in the final desugared ouput. Thus, there is an
+        // extra
+        // recursive call to check for this.
+        return isMongotPipeline(
+            ifrContext,
+            std::vector<BSONObj>{firstStageBson[DocumentSourceRankFusion::kStageName]
+                                               [RankFusionSpec::kInputFieldName]
+                                               [RankFusionInputSpec::kPipelinesFieldName]
+                                                   .Obj()
+                                                   .firstElement()
+                                                   .Array()[0]
+                                                   .Obj()});
+    } else if (is<DocumentSourceScoreFusion>(firstStageBson)) {
+        return isMongotPipeline(
+            ifrContext,
+            std::vector<BSONObj>{firstStageBson[DocumentSourceScoreFusion::kStageName]
+                                               [ScoreFusionSpec::kInputFieldName]
+                                               [ScoreFusionInputsSpec::kPipelinesFieldName]
+                                                   .Obj()
+                                                   .firstElement()
+                                                   .Array()[0]
+                                                   .Obj()});
+    } else {
+        return is<DocumentSourceSearch>(firstStageBson) ||
+            is<DocumentSourceSearchMeta>(firstStageBson) ||
+            is<DocumentSourceListSearchIndexes>(firstStageBson);
+    }
 }
 
 inline bool isStoredSource(const std::vector<BSONObj> pipeline) {

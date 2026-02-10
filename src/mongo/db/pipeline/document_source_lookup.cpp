@@ -318,7 +318,8 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
     // Currently, if the pipeline to be run on the joined collection is a
     // mongot pipeline (it starts with $search, $searchMeta), $lookup assumes the view is
     // mongot-indexed.
-    if (_fromNsIsAView && search_helper_bson_obj::isMongotPipeline(pipeline)) {
+    if (_fromNsIsAView &&
+        search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline)) {
         // The user pipeline is a mongot pipeline so we assume the view is a mongot-indexed view. As
         // such, we overwrite the view pipeline. This is because in the case of mongot queries on
         // mongot-indexed views, idLookup applies the view transforms as part of its subpipeline.
