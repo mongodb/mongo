@@ -4,10 +4,12 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2dedupnear;
 t.drop();
 
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 let x = {
     "type": "Polygon",
     "coordinates": [

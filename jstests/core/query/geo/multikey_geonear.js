@@ -5,6 +5,8 @@
 //    incompatible_with_views,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.jstests_multikey_geonear;
 t.drop();
 
@@ -17,7 +19,7 @@ function checkResults(cursor) {
     assert(!cursor.hasNext());
 }
 
-t.createIndex({a: 1, b: "2dsphere"});
+t.createIndex({a: 1, b: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 t.insert({_id: 0, a: 0, b: {type: "Point", coordinates: [0, 0]}});
 t.insert({_id: 1, a: 0, b: {type: "Point", coordinates: [1, 1]}});
@@ -48,7 +50,7 @@ checkResults(cursor);
 
 // The fields in the compound 2dsphere index share a prefix.
 t.drop();
-t.createIndex({"a.b": 1, "a.c": "2dsphere"});
+t.createIndex({"a.b": 1, "a.c": "2dsphere"}, add2dsphereVersionIfNeeded());
 t.insert({_id: 0, a: [{b: 0}, {c: {type: "Point", coordinates: [0, 0]}}]});
 t.insert({_id: 1, a: [{b: 1}, {c: {type: "Point", coordinates: [1, 1]}}]});
 t.insert({_id: 2, a: [{b: 2}, {c: {type: "Point", coordinates: [2, 2]}}]});
@@ -75,7 +77,7 @@ checkResults(cursor);
 
 // Check the case where we create a geo index on a specific array index.
 t.drop();
-t.createIndex({"a.0": "2dsphere"});
+t.createIndex({"a.0": "2dsphere"}, add2dsphereVersionIfNeeded());
 t.insert({_id: 0, a: [{type: "Point", coordinates: [0, 0]}]});
 t.insert({_id: 1, a: [{type: "Point", coordinates: [1, 1]}]});
 t.insert({_id: 2, a: {0: {type: "Point", coordinates: [2, 2]}}});

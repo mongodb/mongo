@@ -7,6 +7,8 @@
  *  requires_getmore,
  *  ]
  */
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -23,7 +25,7 @@ const docs = [
     {"location": {"type": "Point", "coordinates": [90, 45.01]}},
 ];
 assert.commandWorked(coll.insert(docs));
-assert.commandWorked(coll.createIndex({location: "2dsphere"}));
+assert.commandWorked(coll.createIndex({location: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 for (const doc of docs) {
     // We test a distance of 0 to verify that point queries work correctly as well as a small,

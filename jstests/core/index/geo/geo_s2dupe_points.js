@@ -6,9 +6,11 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2dupe_points;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 function testDuplicates(shapeName, shapeWithDupes, shapeWithoutDupes) {
     // insert a doc with dupes

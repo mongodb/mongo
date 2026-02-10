@@ -74,7 +74,9 @@ print(
 //
 // Can't insert a bad polygon or a bad multi-polygon with a 2dsphere index.
 //
-assert.commandWorked(t.createIndex({p: "2dsphere"}));
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
+assert.commandWorked(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.writeError(t.insert({p: poly}));
 assert.writeError(t.insert({p: multiPoly}));
 
@@ -85,12 +87,12 @@ assert.writeError(t.insert({p: multiPoly}));
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.insert({p: poly});
-assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}), 16755);
+assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), 16755);
 
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.insert({p: multiPoly});
-assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}), 16755);
+assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), 16755);
 
 //
 // But with no index we can insert bad polygons and bad multi-polygons.

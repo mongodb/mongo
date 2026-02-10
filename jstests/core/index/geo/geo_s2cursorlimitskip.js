@@ -16,10 +16,12 @@
 //   does_not_support_concurrent_reads
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let testDB = db.getSiblingDB("geo_s2cursorlimitskip");
 let t = testDB.geo_s2getmmm;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 Random.setRandomSeed();
 let random = Random.rand;

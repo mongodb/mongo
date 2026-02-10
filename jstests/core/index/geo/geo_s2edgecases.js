@@ -1,3 +1,5 @@
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2edgecases;
 t.drop();
 
@@ -90,7 +92,7 @@ let penguin2 = {
 };
 t.insert({geo: penguin2});
 
-t.createIndex({geo: "2dsphere", nonGeo: 1});
+t.createIndex({geo: "2dsphere", nonGeo: 1}, add2dsphereVersionIfNeeded());
 
 let res = t.find({"geo": {"$geoIntersects": {"$geometry": roundworldpoint}}});
 assert.eq(res.count(), 2);

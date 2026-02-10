@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_getmore,
 // ]
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 function testGeoWithinCenterSphereLinePolygon(coll) {
     coll.drop();
 
@@ -276,5 +278,5 @@ let coll = db.geo_s2within_line_polygon_sphere;
 testGeoWithinCenterSphereLinePolygon(coll);
 
 // Test $geowithin $centerSphere for LineString and Polygon with 2dsphere index.
-assert.commandWorked(coll.createIndex({geoField: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geoField: "2dsphere"}, add2dsphereVersionIfNeeded()));
 testGeoWithinCenterSphereLinePolygon(coll);

@@ -5,9 +5,11 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2oddshapes;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 let testPoint = {name: "origin", geo: {type: "Point", coordinates: [0.0, 0.0]}};
 
@@ -87,7 +89,7 @@ assert.eq(result.itcount(), 3);
 // Test a poly that is the size of half the earth.
 
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 let insidePoint = {name: "inside", geo: {type: "Point", name: "inside", coordinates: [100.0, 0.0]}};
 
@@ -120,7 +122,7 @@ assert.eq(point.name, "inside");
 // Test a poly that is very small.  A couple meters around.
 
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 insidePoint = {
     name: "inside",

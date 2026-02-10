@@ -1,5 +1,7 @@
 // Make sure that the 2dsphere index can deal with non-GeoJSON points.
 // 2dsphere does not accept legacy shapes, only legacy points.
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2indexoldformat;
 t.drop();
 
@@ -9,7 +11,7 @@ t.insert({geo: [41, 6], nonGeo: ["pointB"]});
 t.insert({geo: [41, 6]});
 t.insert({geo: {x: 40.6, y: 5.4}});
 
-t.createIndex({geo: "2dsphere", nonGeo: 1});
+t.createIndex({geo: "2dsphere", nonGeo: 1}, add2dsphereVersionIfNeeded());
 
 let res = t.find({"geo": {"$geoIntersects": {"$geometry": {x: 40, y: 5}}}});
 assert.eq(res.count(), 1);

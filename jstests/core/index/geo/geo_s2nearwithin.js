@@ -3,10 +3,12 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const t = db.geo_s2nearwithin;
 t.drop();
 
-assert.commandWorked(t.createIndex({geo: "2dsphere"}));
+assert.commandWorked(t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 let docs = [];
 let docId = 0;

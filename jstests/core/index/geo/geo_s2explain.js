@@ -2,6 +2,7 @@
 // the number of inputStages it completes
 
 import {getExecutionStages} from "jstests/libs/query/analyze_plan.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 let t = db.jstests_geo_s2explain;
 t.drop();
@@ -10,7 +11,7 @@ let point1 = {loc: {type: "Point", coordinates: [10, 10]}};
 let point2 = {loc: {type: "Point", coordinates: [10.001, 10]}};
 assert.commandWorked(t.insert([point1, point2]));
 
-assert.commandWorked(t.createIndex({loc: "2dsphere"}));
+assert.commandWorked(t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 let explain = t
     .find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})

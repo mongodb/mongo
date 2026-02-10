@@ -6,6 +6,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 // Test that updates with geo queries which match
 // the same document multiple times only apply
 // the update once
@@ -59,7 +61,7 @@ assert.eq(1, t.findOne().touchCount);
 
 // 2dsphere index with $geoNear
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 let x = {
     "type": "Polygon",
     "coordinates": [
@@ -84,7 +86,7 @@ let locdata = [
     {geo: {type: "Point", coordinates: [50.001, 50.001]}},
 ];
 t.save({locdata: locdata, count: 0});
-t.createIndex({"locdata.geo": "2dsphere"});
+t.createIndex({"locdata.geo": "2dsphere"}, add2dsphereVersionIfNeeded());
 
 res = t.update(
     {"locdata.geo": {$geoNear: {"type": "Point", "coordinates": [50.0, 50.0]}}},

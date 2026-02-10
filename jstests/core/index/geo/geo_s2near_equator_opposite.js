@@ -5,6 +5,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geos2nearequatoropposite;
 
 t.drop();
@@ -12,7 +14,7 @@ t.drop();
 t.insert({loc: {type: "Point", coordinates: [0, 0]}});
 t.insert({loc: {type: "Point", coordinates: [-1, 0]}});
 
-t.createIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 // upper bound for half of earth's circumference in meters
 let dist = 40075000 / 2 + 1;

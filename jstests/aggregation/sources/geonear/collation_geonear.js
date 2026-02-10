@@ -3,6 +3,8 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 // Test that the $geoNear stage's query predicate respects the collation.
 const caseInsensitive = {
     collation: {locale: "en_US", strength: 2},
@@ -10,7 +12,7 @@ const caseInsensitive = {
 
 let coll = db.collation_geonear;
 coll.drop();
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));
 
 // Test that the $geoNear agg stage respects an explicit collation.
@@ -66,7 +68,7 @@ assert.throws(function () {
 
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.insert({loc: [0, 0], str: "A"}));
 
 // Test that the $geoNear agg stage respects an inherited collation.

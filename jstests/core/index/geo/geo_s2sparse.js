@@ -8,6 +8,7 @@
 //   # long enough that they will never succeed: they will always be interrupted by the stepdown.
 //   operations_longer_than_stepdown_interval_in_txns,
 // ]
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const collNamePrefix = "geo_s2sparse_";
 let collCount = 0;
@@ -29,7 +30,7 @@ const indexName = "geo_2dsphere_nonGeo_1";
 
 // Clean up.
 coll.drop();
-coll.createIndex(indexSpec);
+coll.createIndex(indexSpec, add2dsphereVersionIfNeeded());
 
 const bulkInsertDocs = function (coll, numDocs, makeDocFn) {
     print("Bulk inserting " + numDocs + " documents");
@@ -117,7 +118,7 @@ assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 // Clean up.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-coll.createIndex({geo: "2dsphere", otherGeo: "2dsphere"});
+coll.createIndex({geo: "2dsphere", otherGeo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 const indexNameOther = "geo_2dsphere_otherGeo_2dsphere";
 

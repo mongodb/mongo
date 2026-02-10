@@ -1,5 +1,7 @@
 // With invalid geometry, error message should include _id
 // SERVER-8992
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_invalid_polygon;
 t.drop();
 
@@ -19,7 +21,7 @@ let geometry = {
 };
 
 t.insert({_id: 42, geometry: geometry});
-let err = t.createIndex({geometry: "2dsphere"});
+let err = t.createIndex({geometry: "2dsphere"}, add2dsphereVersionIfNeeded());
 assert.commandFailed(err);
 
 // Document's _id should be in error message.

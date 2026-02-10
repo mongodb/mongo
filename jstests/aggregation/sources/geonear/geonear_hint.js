@@ -4,6 +4,7 @@
 // ]
 
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const collName = jsTest.name();
 const coll = db[collName];
@@ -16,11 +17,24 @@ const compoundGeoNearIndexNameLocationLast = "compoundGeoNearIndexLocationLast";
 const nonGeoNearIndexName = "nonGeoNearIndex";
 
 assert.commandWorked(coll.insert({_id: "1", state: "ACTIVE", location: [106, 10], name: "TEST"}));
-assert.commandWorked(coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
 assert.commandWorked(
-    coll.createIndex({_id: 1, state: 1, location: "2dsphere"}, {name: compoundGeoNearIndexNameLocationLast}),
+    coll.createIndex(
+        {_id: 1, location: "2dsphere", state: 1},
+        Object.assign({name: compoundGeoNearIndexName}, add2dsphereVersionIfNeeded()),
+    ),
 );
-assert.commandWorked(coll.createIndex({location: "2dsphere"}, {name: simpleGeoNearIndexName}));
+assert.commandWorked(
+    coll.createIndex(
+        {_id: 1, state: 1, location: "2dsphere"},
+        Object.assign({name: compoundGeoNearIndexNameLocationLast}, add2dsphereVersionIfNeeded()),
+    ),
+);
+assert.commandWorked(
+    coll.createIndex(
+        {location: "2dsphere"},
+        Object.assign({name: simpleGeoNearIndexName}, add2dsphereVersionIfNeeded()),
+    ),
+);
 assert.commandWorked(coll.createIndex({location: 1}, {name: nonGeoNearIndexName}));
 
 function makeGeoNearStage(query = {}) {

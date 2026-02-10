@@ -24,6 +24,7 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 // On a sharded cluster a count command with an invalid query issued against a non-existent db will
 // return an empty result but it will error on a replica set.
@@ -100,7 +101,7 @@ let bigPoly = {
 };
 
 // 2dsphere index required
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}), "2dsphere index");
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "2dsphere index");
 
 // $nearSphere on big polygon should fail
 assert.throws(
@@ -295,7 +296,7 @@ assert.eq(totalDocs, coll.count({geo: {$geoWithin: {$geometry: poly}}}), "crs84C
 assert.eq(totalDocs, coll.count({geo: {$geoIntersects: {$geometry: poly}}}), "crs84CRS or epsg4326CRS intersects");
 
 // Add index and look again for stored point & spherical CRS documents
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}), "2dsphere index");
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "2dsphere index");
 
 assert.eq(
     totalDocs,

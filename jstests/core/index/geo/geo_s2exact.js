@@ -3,13 +3,15 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2exact;
 t.drop();
 
 function test(geometry) {
     t.insert({geo: geometry});
     assert.eq(1, t.find({geo: geometry}).itcount(), tojson(geometry));
-    t.createIndex({geo: "2dsphere"});
+    t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
     assert.eq(1, t.find({geo: geometry}).itcount(), tojson(geometry));
     t.dropIndex({geo: "2dsphere"});
 }

@@ -9,6 +9,8 @@
 //   assumes_balancer_off,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 //
 //  Big Polygon related tests
 //  - Tests the capability for a geo query with a big polygon object (strictCRS)
@@ -783,7 +785,7 @@ const nsidedPolys = [
 ];
 
 // Populate with 2dsphere index
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}), "create 2dsphere index");
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()), "create 2dsphere index");
 
 // Insert objects into collection
 objects.forEach(function (o) {
@@ -796,7 +798,7 @@ objects.forEach(function (o) {
 });
 
 // Try creating other index types
-assert.commandWorked(coll.createIndex({geo: "2dsphere", a: 1}), "compound index, geo");
+assert.commandWorked(coll.createIndex({geo: "2dsphere", a: 1}, add2dsphereVersionIfNeeded()), "compound index, geo");
 // These other index types will fail because of the GeoJSON documents
 assert.commandFailed(coll.createIndex({geo: "2dsphere", a: "text"}), "compound index, geo & text");
 assert.commandFailed(coll.createIndex({geo: "2d"}), "2d index");
@@ -812,7 +814,10 @@ indexes.forEach(function (index) {
 
     if (index != "none") {
         // Create index
-        assert.commandWorked(coll.createIndex({geo: index}), "create " + index + " index");
+        assert.commandWorked(
+            coll.createIndex({geo: index}, add2dsphereVersionIfNeeded()),
+            "create " + index + " index",
+        );
     }
 
     // These polygons should not be queryable

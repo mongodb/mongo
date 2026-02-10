@@ -7,6 +7,8 @@
  * ]
  */
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const collName = jsTest.name();
 const coll = db[collName];
 
@@ -14,7 +16,7 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, location: {type: "Point", coordinates: [10, 20]}}));
 assert.commandWorked(coll.insert({_id: 1, location: {type: "Point", coordinates: [8, 22]}}));
 
-assert.commandWorked(coll.createIndex({location: "2dsphere"}));
+assert.commandWorked(coll.createIndex({location: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 /**
  * Compare pipelines with constant and variable 'near' argument.

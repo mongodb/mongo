@@ -4,6 +4,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 //
 // Test of sample big polygon functionality
 //
@@ -93,7 +95,7 @@ assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20}}}).count(), 4)
 assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).count(), 1);
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count(), 2);
 
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20}}}).count(), 3);
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20}}}).count(), 4);
@@ -130,7 +132,7 @@ assert.commandFailed(coll.createIndex({loc: "2dsphere"}));
 
 // 3. After removing big polygon, index builds successfully
 assert.commandWorked(coll.remove({_id: "bigPoly10"}));
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // 4. With index, insert fails.
 assert.writeError(coll.insert({_id: "bigPoly10", loc: bigPoly10}));

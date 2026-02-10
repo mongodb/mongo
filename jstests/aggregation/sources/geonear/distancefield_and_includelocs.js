@@ -3,6 +3,7 @@
  * (specifically, by specifying nested fields, overriding existing fields, and so on).
  */
 import {customDocumentEq} from "jstests/aggregation/extras/utils.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const coll = db.getCollection("geonear_distancefield_and_includelocs");
 coll.drop();
@@ -63,7 +64,7 @@ const docWithGeoLine = {
 };
 
 // We test with a 2dsphere index, since 2d indexes can't support GeoJSON objects.
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // Populate the collection.
 assert.commandWorked(coll.insert(docWithLegacyPoint));

@@ -3,6 +3,8 @@
  * includes testing that if the 'key' field is omitted, $geoNear appropriately deduces which index
  * to use or throws an error to indicate it cannot deduce which index to use.
  */
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const coll = db.jstests_geonear_key;
 coll.drop();
 
@@ -62,9 +64,9 @@ assertGeoNearFails({near: [0, 0], key: "a"}, ErrorCodes.NoQueryExecutionPlans);
 
 // Create a number of 2d and 2dsphere indexes.
 assert.commandWorked(coll.createIndex({a: "2d"}));
-assert.commandWorked(coll.createIndex({a: "2dsphere"}));
+assert.commandWorked(coll.createIndex({a: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.createIndex({"b.c": "2d"}));
-assert.commandWorked(coll.createIndex({"b.d": "2dsphere"}));
+assert.commandWorked(coll.createIndex({"b.d": "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // Verify that $geoNear fails when the index to use is ambiguous because of the absence of the
 // key field.

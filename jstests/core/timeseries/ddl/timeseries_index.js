@@ -20,6 +20,7 @@ import {
     getTimeseriesCollForDDLOps,
     isShardedTimeseries,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {add2dsphereVersionIfNeededForSpec, has2dsphereIndex} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
 const isMultiversion =
@@ -95,28 +96,11 @@ TimeseriesTest.run((insert) => {
     };
 
     /**
-     * Helper function to check if an index spec contains a 2dsphere index.
-     */
-    const has2dsphereIndex = function (spec) {
-        for (const key in spec) {
-            if (spec[key] === "2dsphere") {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    /**
      * Helper function to add 2dsphereIndexVersion: 3 to options if the spec contains a 2dsphere index.
      * TODO SERVER-118561 Remove this and use the default server-selected version when 9.0 is last LTS.
      */
     const add2dsphereVersionIfNeeded = function (spec, options = {}) {
-        if (has2dsphereIndex(spec) && TestData.isRunningFCVUpgradeDowngradeSuite) {
-            // Pin the index version to v3 when upgrading/downgrading FCV during the test run,
-            // such that we don't need to drop v4 indexes to downgrade the FCV.
-            options["2dsphereIndexVersion"] = 3;
-        }
-        return options;
+        return add2dsphereVersionIfNeededForSpec(spec, options);
     };
 
     /**

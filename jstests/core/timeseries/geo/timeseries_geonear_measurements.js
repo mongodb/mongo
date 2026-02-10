@@ -23,6 +23,7 @@
  * ]
  */
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
@@ -668,7 +669,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 {
     const coll = db.getCollection(jsTestName() + "_baseline");
     coll.drop();
-    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
     // Actually, we also need a '2d' index for the flat examples to succeed.
     assert.commandWorked(coll.createIndex({loc: "2d"}));
@@ -695,7 +696,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     const coll = db.getCollection(jsTestName() + "_indexed");
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
-    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
     // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
     // also see an implicitly created index.)
@@ -721,7 +722,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     const coll = db.getCollection(jsTestName() + "_indexed_nonbatch");
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
-    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
     // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
     // also see an implicitly created index.)

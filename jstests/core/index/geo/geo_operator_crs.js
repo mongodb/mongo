@@ -3,6 +3,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 //
 // Tests that the correct CRSes are used for geo queries (based on input geometry)
 //
@@ -13,7 +15,7 @@ coll.drop();
 // Test 2dsphere index
 //
 
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 let legacyZeroPt = [0, 0];
 let jsonZeroPt = {type: "Point", coordinates: [0, 0]};
@@ -53,6 +55,6 @@ assert.close(result[0].dis, Math.PI / 2);
 // Test with a 2d and 2dsphere index using the aggregation $geoNear stage.
 //
 
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 result = coll.aggregate({$geoNear: {near: jsonZeroPt, distanceField: "dis"}}).toArray();
 assert.close(result[0].dis, (Math.PI / 2) * earthRadiusMeters);

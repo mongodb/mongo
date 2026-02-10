@@ -4,6 +4,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_s2nongeoarray;
 
 let oldPoint = [40, 5];
@@ -25,6 +27,6 @@ assert.eq(t.find({"otherNonGeo.b": 1, geo: {$nearSphere: oldPoint}}).itcount(), 
 
 t.drop();
 t.insert(data);
-t.createIndex({geo: "2dsphere", nonGeo: 1, otherNonGeo: 1});
+t.createIndex({geo: "2dsphere", nonGeo: 1, otherNonGeo: 1}, add2dsphereVersionIfNeeded());
 assert.eq(t.find({nonGeo: 123, geo: {$nearSphere: oldPoint}}).itcount(), 1);
 assert.eq(t.find({"otherNonGeo.b": 1, geo: {$nearSphere: oldPoint}}).itcount(), 1);

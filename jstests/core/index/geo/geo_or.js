@@ -3,6 +3,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geoor;
 
 t.drop();
@@ -15,7 +17,7 @@ t.save({loc: q});
 
 var indexname = "2dsphere";
 
-t.createIndex({loc: indexname});
+t.createIndex({loc: indexname}, add2dsphereVersionIfNeeded());
 
 assert.eq(1, t.find({loc: p}).itcount(), indexname);
 

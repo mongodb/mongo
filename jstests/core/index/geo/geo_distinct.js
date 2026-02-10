@@ -6,6 +6,8 @@
 //   requires_fastcount,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const coll = db.geo_distinct;
 let res;
 
@@ -29,7 +31,7 @@ assert.eq(res.values.sort(bsonWoCompare), [
     {type: "Point", coordinates: [20, 30]},
 ]);
 
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 res = coll.runCommand("distinct", {key: "loc"});
 assert.commandWorked(res);
@@ -85,7 +87,7 @@ res = coll.runCommand("distinct", {
 });
 assert.commandFailed(res);
 // B. Unindexed key, with 2dsphere index on query predicate.
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 res = coll.runCommand("distinct", {
     key: "zone",
     query: {loc: {$nearSphere: {$geometry: originGeoJSON, $maxDistance: 1}}},

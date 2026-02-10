@@ -4,12 +4,14 @@
  *   requires_getmore,
  * ]
  */
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_mindistance_boundaries;
 t.drop();
 t.insert({loc: [1, 0]}); // 1 degree of longitude from origin.
 
 /* $minDistance is supported for 2dsphere index only, not 2d */
-t.createIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 //
 // Useful constants.

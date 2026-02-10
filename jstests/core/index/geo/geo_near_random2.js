@@ -8,6 +8,7 @@
  */
 
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 let test = new GeoNearRandomTest("geo_near_random2");
 
@@ -40,7 +41,7 @@ test.testPt(test.mkPt(0.8), opts);
 
 // Test $nearSphere with 2dsphere index
 assert.commandWorked(db.geo_near_random2.dropIndex({loc: "2d"}));
-assert.commandWorked(db.geo_near_random2.createIndex({loc: "2dsphere"}));
+assert.commandWorked(db.geo_near_random2.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 test.testPt([0, 0], opts);
 test.testPt(test.mkPt(0.8), opts);
 test.testPt(test.mkPt(0.8), opts);

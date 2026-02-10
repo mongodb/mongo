@@ -4,6 +4,7 @@
 //   do_not_wrap_aggregations_in_facets,
 // ]
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const coll = db.coll;
 const from = db.from;
@@ -30,7 +31,7 @@ assert.commandWorked(from.insert({_id: 1, x: 5, geo: [0, 0]}));
 assertErrorCode(from, geonearPipeline, ErrorCodes.IndexNotFound);
 assertErrorCode(coll, geonearWithinLookupPipeline, ErrorCodes.IndexNotFound);
 
-assert.commandWorked(from.createIndex({geo: "2dsphere"}));
+assert.commandWorked(from.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // Run successfully when you have the geospatial index.
 assert.eq(from.aggregate(geonearPipeline).itcount(), 1);
@@ -41,5 +42,5 @@ const geonearThenLookupPipeline = [
     {$geoNear: {near: [0, 1], distanceField: "distance", spherical: true}},
     {$lookup: {from: from.getName(), localField: "x", foreignField: "x", as: "new"}},
 ];
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.eq(coll.aggregate(geonearThenLookupPipeline).itcount(), 1);

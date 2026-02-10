@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_getmore,
 // ]
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geo_allowedcomparisons;
 
 // Any GeoJSON object can intersect with any geojson object.
@@ -116,7 +118,7 @@ t.dropIndex({geo: "2d"});
 runTests();
 
 // 2dsphere index now.
-assert.commandWorked(t.createIndex({geo: "2dsphere"}));
+assert.commandWorked(t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 // 2dsphere does not support arrays of points.
 assert.writeError(t.insert({geo: [geojsonPoint2, geojsonPoint]}));
 runTests();

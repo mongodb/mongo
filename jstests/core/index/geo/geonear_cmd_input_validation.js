@@ -1,9 +1,11 @@
 //
 // Test input validation for geoNear command.
 //
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let t = db.geonear_cmd_input_validation;
 t.drop();
-t.createIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 // The test matrix. Some combinations are not supported:
 //     2d index and GeoJSON.
@@ -17,7 +19,11 @@ let indexTypes = ["2d", "2dsphere"],
 
 indexTypes.forEach(function (indexType) {
     t.drop();
-    t.createIndex({"loc": indexType});
+    if (indexType === "2dsphere") {
+        t.createIndex({"loc": indexType}, add2dsphereVersionIfNeeded());
+    } else {
+        t.createIndex({"loc": indexType});
+    }
 
     pointTypes.forEach(function (pointType) {
         sphericalOptions.forEach(function (spherical) {

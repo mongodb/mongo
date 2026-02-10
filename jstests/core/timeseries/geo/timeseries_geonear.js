@@ -12,6 +12,8 @@
  * ]
  */
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const timeFieldName = "time";
 const metaFieldName = "tags";
 const testDB = db.getSiblingDB(jsTestName());
@@ -23,7 +25,7 @@ assert.commandWorked(
     testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
 );
 
-assert.commandWorked(tsColl.createIndex({"tags.loc": "2dsphere"}));
+assert.commandWorked(tsColl.createIndex({"tags.loc": "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 const nMeasurements = 10;
 

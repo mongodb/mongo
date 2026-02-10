@@ -8,6 +8,8 @@
  * ]
  */
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const coll = db.negated_geo_queries;
 coll.drop();
 
@@ -132,7 +134,7 @@ assert.commandWorked(coll.createIndex({loc: 1}));
 runTest();
 
 // Run test with a simple btree index and a geo index.
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 runTest();
 
 // Run test with just a geo index.

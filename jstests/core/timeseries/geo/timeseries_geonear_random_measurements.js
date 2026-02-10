@@ -9,6 +9,7 @@
  * ]
  */
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 import {randomLongLat} from "jstests/core/timeseries/libs/geo.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
@@ -51,7 +52,7 @@ const coll = db.getCollection(jsTestName() + "_normal");
 const tsColl = db.getCollection(jsTestName() + "_timeseries");
 coll.drop();
 tsColl.drop();
-assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 assert.commandWorked(coll.createIndex({loc: "2d"}));
 assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: "time"}}));
 assert.commandWorked(coll.insert(docs));

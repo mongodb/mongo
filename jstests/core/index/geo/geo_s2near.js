@@ -2,6 +2,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 // Test 2dsphere near search, called via find and $geoNear.
 let t = db.geo_s2near;
 t.drop();
@@ -9,7 +11,7 @@ t.drop();
 // Make sure that geoNear gives us back loc
 let goldenPoint = {type: "Point", coordinates: [31.0, 41.0]};
 t.insert({geo: goldenPoint});
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 let resNear = t
     .aggregate([{$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}}, {$limit: 1}])
     .toArray();
@@ -30,7 +32,7 @@ for (let x = -points; x < points; x += 1) {
 
 let origin = {"type": "Point", "coordinates": [lng, lat]};
 
-t.createIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 // Near only works when the query is a point.
 let someline = {

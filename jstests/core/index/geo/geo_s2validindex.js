@@ -2,15 +2,17 @@
 // Tests valid cases for creation of 2dsphere index
 //
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let coll = db.getCollection("twodspherevalid");
 
 // Valid index
 coll.drop();
-assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1}, add2dsphereVersionIfNeeded()));
 
 // Valid index
 coll.drop();
-assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1, geo2: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1, geo2: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // Invalid index, using hash with 2dsphere
 coll.drop();

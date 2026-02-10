@@ -5,6 +5,7 @@
 // ]
 
 import {deg2rad, metersToRadians} from "jstests/libs/query/geo_math.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 let t = db.geo_mindistance;
 t.drop();
@@ -52,7 +53,7 @@ for (let x = 0; x <= 10; x += 1) {
     }
 }
 
-t.createIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 
 let n_docs = t.count(),
     geoJSONPoint = {type: "Point", coordinates: [0, 0]},

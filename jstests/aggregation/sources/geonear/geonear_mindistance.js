@@ -1,4 +1,6 @@
 // SERVER-14421 minDistance for $geoNear aggregation operator
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 let coll = db.mindistance;
 coll.drop();
 assert.commandWorked(
@@ -7,7 +9,7 @@ assert.commandWorked(
         {_id: 1, loc: {type: "Point", coordinates: [0, 0.01]}},
     ]),
 );
-let response = coll.createIndex({loc: "2dsphere"});
+let response = coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 assert.eq(response.ok, 1, "Could not create 2dsphere index");
 let results = coll.aggregate([
     {

@@ -2,6 +2,8 @@
 //   requires_getmore,
 // ]
 
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
+
 const t = db.geo_s2index;
 t.drop();
 
@@ -22,7 +24,7 @@ const someline = {
     ],
 };
 assert.commandWorked(t.insert({geo: someline, nonGeo: "someline"}));
-assert.commandWorked(t.createIndex({geo: "2dsphere"}));
+assert.commandWorked(t.createIndex({geo: "2dsphere"}, add2dsphereVersionIfNeeded()));
 const results = t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}}).toArray();
 assert.eq(results.length, 1, dumpCollection);
 assert.eq(results[0].geo, someline, dumpCollection);
@@ -78,7 +80,7 @@ const somepoly = {
 t.insert({geo: somepoly, nonGeo: "somepoly"});
 
 {
-    const res = t.createIndex({geo: "2dsphere", nonGeo: 1});
+    const res = t.createIndex({geo: "2dsphere", nonGeo: 1}, add2dsphereVersionIfNeeded());
     // We have a point without any geo data.  Don't error.
     assert.commandWorked(res);
 }
@@ -125,7 +127,7 @@ t.insert({geo: somepoly, nonGeo: "somepoly"});
 
 // Don't crash mongod if we give it bad input.
 t.drop();
-t.createIndex({loc: "2dsphere", x: 1});
+t.createIndex({loc: "2dsphere", x: 1}, add2dsphereVersionIfNeeded());
 assert.commandWorked(t.insert({loc: [0, 0]}));
 assert.throws(function () {
     return t.count({loc: {$foo: [0, 0]}});
@@ -141,7 +143,7 @@ assert.throws(function () {
 
 // If we specify a datum, it has to be valid (WGS84).
 t.drop();
-t.createIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded());
 const failedInsertRes = t.insert({
     loc: {type: "Point", coordinates: [40, 5], crs: {type: "name", properties: {name: "EPSG:2000"}}},
 });
@@ -168,7 +170,12 @@ assert.commandWorked(
 // 0 <= coarsestIndexedLevel <= finestIndexedLevel <= 30.
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
-assert.commandWorked(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 17, coarsestIndexedLevel: 5}));
+assert.commandWorked(
+    t.createIndex(
+        {loc: "2dsphere"},
+        Object.assign({finestIndexedLevel: 17, coarsestIndexedLevel: 5}, add2dsphereVersionIfNeeded()),
+    ),
+);
 // Ensure the index actually works at a basic level
 assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}), dumpCollection);
 
@@ -178,7 +185,12 @@ assert.commandFailed(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, c
 
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
-assert.commandWorked(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: 0}));
+assert.commandWorked(
+    t.createIndex(
+        {loc: "2dsphere"},
+        Object.assign({finestIndexedLevel: 30, coarsestIndexedLevel: 0}, add2dsphereVersionIfNeeded()),
+    ),
+);
 
 // Ensure the index actually works at a basic level
 assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordinates: [0, 0]}}}}), dumpCollection);
@@ -229,4 +241,4 @@ assert.commandWorked(
         },
     }),
 );
-assert.commandWorked(t.createIndex({loc: "2dsphere"}));
+assert.commandWorked(t.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
