@@ -44,7 +44,10 @@ def __lldb_init_module(debugger, *_args):
     )
 
     debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
-    debugger.HandleCommand("type summary add mongo::NamespaceString --summary-string '${var._ns}'")
+    debugger.HandleCommand(
+        "type summary add mongo::NamespaceString -F lldb_printers.ToStringPrinter"
+    )
+    debugger.HandleCommand("type summary add mongo::DatabaseName -F lldb_printers.ToStringPrinter")
 
     debugger.HandleCommand("type summary add mongo::UUID -F lldb_printers.UUIDPrinter")
     debugger.HandleCommand("type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer")
@@ -73,7 +76,7 @@ def __lldb_init_module(debugger, *_args):
     )
 
     debugger.HandleCommand(
-        "type summary add mongo::MatchExpression -F lldb_printers.MatchExpressionPrinter"
+        "type summary add mongo::MatchExpression -F lldb_printers.ToStringPrinter"
     )
 
 
@@ -494,7 +497,7 @@ def dump_value(value):
     print("----------------------------------------")
 
 
-def MatchExpressionPrinter(valobj, *_args):
+def ToStringPrinter(valobj, *_args):
     return (
         valobj.EvaluateExpression("toString()").GetSummary().encode().decode("unicode_escape")[1:-1]
     )
