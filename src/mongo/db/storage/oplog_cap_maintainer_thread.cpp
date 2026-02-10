@@ -227,7 +227,9 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
             LOGV2_DEBUG(4562600, 2, "oplog collection does not exist");
             return false;
         }
-        LOGV2(10621107, "Deleting excess documents", "Oplog size (in bytes)"_attr = rs->dataSize());
+        LOGV2(10621107,
+              "Looking for excess documents to delete",
+              "oplogSizeBytes"_attr = rs->dataSize());
 
         // Create another reference to the oplog truncate markers while holding a lock on
         // the collection to prevent it from being destructed.

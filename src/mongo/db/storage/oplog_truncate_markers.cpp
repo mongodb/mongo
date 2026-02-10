@@ -122,8 +122,7 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::sampleAndUpdate(Oper
           "markersCount"_attr = initialSetOfMarkers.markers.size(),
           "markerCreationMethod"_attr = toString(initialSetOfMarkers.methodUsed),
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
-    LOGV2(
-        10621110, "Initial set of markers created.", "Oplog size (in bytes)"_attr = rs.dataSize());
+    LOGV2(10621110, "Initial set of markers created.", "oplogSizeBytes"_attr = rs.dataSize());
 
     // This value will eventually replace the empty OplogTruncateMarker object with this newly
     // populated object now that initial sampling has finished.
