@@ -537,16 +537,22 @@ On a replica set, the `$changeStream` stage is expanded into the following inter
 - `$_internalChangeStreamOplogMatch`
 - `$_internalChangeStreamUnwindTransaction`
 - `$_internalChangeStreamTransform`
-- `$_internalChangeStreamCheckInvalidate` (only used for collection-level and database-level change
+- `$_internalChangeStreamCheckInvalidate` (only present for collection-level and database-level change
   streams)
 - `$_internalChangeStreamCheckResumability`
-- `$_internalChangeStreamAddPreImage` (only used if `fullDocumentBeforeChange` is not set to `off`)
-- `$_internalChangeStreamAddPostImage` (only used if `fullDocument` is not set to `default`)
-- `$_internalChangeStreamEnsureResumeTokenPresent` (only used if the change stream resume token is
+- `$_internalChangeStreamAddPreImage` (only present if `fullDocumentBeforeChange` is not set to `off`)
+- `$_internalChangeStreamAddPostImage` (only present if `fullDocument` is not set to `default`)
+- `$_internalChangeStreamEnsureResumeTokenPresent` (only present if the change stream resume token is
   not a high water mark token)
+- user-defined `$match` expression (only present if the user's change stream pipeline contains a
+  `$match` stage)
+- user-defined `$project` expression (only present if the user's change stream pipeline contains a
+  `$project` stage)
+- `$_internalChangeStreamSplitLargeEvent` (only present if the change stream is opened with the
+  `$changeStreamSplitLargeEvent` pipeline step)
 
-Additionally, the change stream pipeline on replica sets will contain a final `$match` stage to
-filter out all non-DML change events in case `showExpandedEvents` is not set.
+The change stream pipeline on replica sets will also contain a `$match` stage to filter out all non-DML
+change events in case `showExpandedEvents` is not set.
 
 ### Sharded Cluster Pipelines
 
@@ -556,16 +562,25 @@ following internal stages:
 - `$_internalChangeStreamOplogMatch`
 - `$_internalChangeStreamUnwindTransaction`
 - `$_internalChangeStreamTransform`
-- `$_internalChangeStreamCheckInvalidate` (only used for collection-level and database-level change
+- `$_internalChangeStreamCheckInvalidate` (only present for collection-level and database-level change
   streams)
 - `$_internalChangeStreamCheckResumability`
-- `$_internalChangeStreamAddPreImage` (only used if `fullDocumentBeforeChange` is not set to `off`)
-- `$_internalChangeStreamAddPostImage` (only used if `fullDocument` is not set to `default`)
+- `$_internalChangeStreamAddPreImage` (only present if `fullDocumentBeforeChange` is not set to `off`)
+- `$_internalChangeStreamAddPostImage` (only present if `fullDocument` is not set to `default`)
+- user-defined `$match` expression (only present if the user's change stream pipeline contains a
+  `$match` stage)
+- user-defined `$project` expression (only present if the user's change stream pipeline contains a
+  `$project` stage)
+- `$_internalChangeStreamSplitLargeEvent` (only present if the change stream is opened with the
+  `$changeStreamSplitLargeEvent` pipeline step)
+
+---
+
 - `$_internalChangeStreamHandleTopologyChange`
-- `$_internalChangeStreamEnsureResumeTokenPresent` (only used if the change stream resume token is
+- `$_internalChangeStreamEnsureResumeTokenPresent` (only present if the change stream resume token is
   not a high water mark token)
 
-Additionally, the change stream pipeline on a sharded cluster will contain a final `$match` stage to
+Additionally, the change stream pipeline on a sharded cluster will contain a `$match` stage to
 filter out all non-DML change events in case `showExpandedEvents` is not set.
 
 After building the initial pipeline stages, _mongos_ will split the pipeline into two parts:
@@ -584,19 +599,25 @@ The shard pipeline will look like this:
 - `$_internalChangeStreamOplogMatch`
 - `$_internalChangeStreamUnwindTransaction`
 - `$_internalChangeStreamTransform`
-- `$_internalChangeStreamCheckInvalidate` (only used for collection-level and database-level change
+- `$_internalChangeStreamCheckInvalidate` (only present for collection-level and database-level change
   streams)
 - `$_internalChangeStreamCheckResumability`
-- `$_internalChangeStreamAddPreImage` (only used if `fullDocumentBeforeChange` is not set to `off`)
-- `$_internalChangeStreamAddPostImage` (only used if `fullDocument` is not set to `default`)
+- `$_internalChangeStreamAddPreImage` (only present if `fullDocumentBeforeChange` is not set to `off`)
+- `$_internalChangeStreamAddPostImage` (only present if `fullDocument` is not set to `default`)
+- user-defined `$match` expression (only present if the user's change stream pipeline contains a
+  `$match` stage)
+- user-defined `$project` expression (only present if the change stream pipeline contains a `$project`
+  stage)
+- `$_internalChangeStreamSplitLargeEvent` (only present if the change stream is opened with the
+  `$changeStreamSplitLargeEvent` pipeline step)
 
-#### Mongos Merge Pipeline
+#### mongos Merge Pipeline
 
 The merge pipeline on _mongos_ will look like this:
 
 - `$mergeCursors`
 - `$_internalChangeStreamHandleTopologyChange`
-- `$_internalChangeStreamEnsureResumeTokenPresent` (only used if the change stream resume token is
+- `$_internalChangeStreamEnsureResumeTokenPresent` (only present if the change stream resume token is
   not a high water mark token)
 
 ### Details of individual Pipeline Stages
