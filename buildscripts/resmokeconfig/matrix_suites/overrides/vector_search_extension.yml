@@ -11,25 +11,7 @@
         # Risks leaving FCV stuck at 8.0, breaking all subsequent FCV-gated tests.
         # Extension is unsupported on FCV < 8.3.
         - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
-
         # Tests that fail due to unimplemented behavior in ~/mongot-extension.
-        - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
-        - jstests/with_mongot/e2e/skip_limit.js
-        - jstests/with_mongot/e2e/views/search_with_view_injected.js
-
-# Exclude tests that are incompatible with sharded extension-enabled configuration.
-# This includes all exclusions from exclude_incompatible_tests plus sharded-only failures.
-- name: exclude_sharded_incompatible_tests
-  value:
-    selector:
-      exclude_files:
-        # Risks leaving FCV stuck at 8.0, breaking all subsequent FCV-gated tests.
-        # Extension is unsupported on FCV < 8.3.
-        - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
-
-        # Tests that fail due to unimplemented behavior in ~/mongot-extension.
-        - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
-        - jstests/with_mongot/e2e/skip_limit.js
         - jstests/with_mongot/e2e/views/search_with_view_injected.js
 
 - name: exclude_fully_enabled_incompatible_tests
@@ -39,10 +21,7 @@
         # Risks leaving FCV stuck at 8.0, breaking all subsequent FCV-gated tests.
         # Extension is unsupported on FCV < 8.3.
         - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
-
         # Tests that fail due to unimplemented behavior in ~/mongot-extension.
-        - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
-        - jstests/with_mongot/e2e/skip_limit.js
         - jstests/with_mongot/e2e/views/search_with_view_injected.js
 
         # TODO SERVER-118709 Remove these exclusions.

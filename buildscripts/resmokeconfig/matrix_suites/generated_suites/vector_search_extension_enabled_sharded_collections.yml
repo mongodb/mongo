@@ -66,8 +66,6 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/with_mongot/e2e/views/mongot_indexed_views_upgrade_downgrade.js
-    - jstests/with_mongot/e2e/hybridSearch/vector_search_remove_embeddings.js
-    - jstests/with_mongot/e2e/skip_limit.js
     - jstests/with_mongot/e2e/views/search_with_view_injected.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos

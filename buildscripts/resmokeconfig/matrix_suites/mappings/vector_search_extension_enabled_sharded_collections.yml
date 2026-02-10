@@ -2,6 +2,6 @@ description: Runs mongot e2e sharded collection tests with the $vectorSearch ext
 
 base_suite: mongot_community_e2e_sharded_collections
 overrides:
-  - vector_search_extension.exclude_sharded_incompatible_tests
+  - vector_search_extension.exclude_incompatible_tests
   - vector_search_extension.load_extension_sharded
   - vector_search_extension.extension_enabled_sharded
