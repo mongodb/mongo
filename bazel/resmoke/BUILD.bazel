@@ -1,4 +1,4 @@
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag")
 load("@poetry//:dependencies.bzl", "dependency")
 
 genrule(
@@ -98,6 +98,13 @@ config_setting(
     flag_values = {
         "//bazel/resmoke:installed_dist_test": "True",
     },
+)
+
+int_flag(
+    name = "test_timeout",
+    build_setting_default = 0,  # 0 results in no timeout.
+    make_variable = "RESMOKE_TEST_TIMEOUT",
+    visibility = ["//visibility:public"],
 )
 
 py_binary(

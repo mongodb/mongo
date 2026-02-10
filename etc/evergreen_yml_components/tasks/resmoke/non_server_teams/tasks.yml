@@ -552,19 +552,21 @@ tasks:
         variant: generate-tasks-for-version
       - name: bazel_result_tasks_gen
         variant: generate-tasks-for-version
-    exec_timeout_secs: 1800 # 30 minutes.
+    exec_timeout_secs: 3720 # 62 minutes
     commands:
       - func: "execute resmoke tests via bazel"
         vars:
           targets: ${resmoke_test_targets}
           compiling_for_test: true
+          build_timeout_seconds: 1800 # 30 minutes
           bazel_args: >-
             --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test
-            --test_arg=--testTimeout=960
+            --//bazel/resmoke:test_timeout=960
             --test_timeout=1500
-          # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
-          # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute exec
-          # timeout, so that it will timeout before the task would.
+          # Timeouts are 16 minutes (960s) for individual tests, the same as the default idle timeout.
+          # Each bazel test's timeout is 25 minutes.
+          # The bazel test command is given a timeout of 30 minutes total, including build time.
+          # This entire command block has a timeout just over double that, so that we can retry on hang once completely.
           # The task_compile_flags are taken from what is set for archive_dist_test in bazel_compile.sh
           task_compile_flags: >-
             --keep_going

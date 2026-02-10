@@ -1340,7 +1340,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--testTimeout",
             dest="test_timeout",
-            help="Timeout for execution of a single test, in seconds.",
+            help="Timeout for execution of a single test, in seconds. Zero or empty are treated as no timeout.",
         )
 
         parser.add_argument(

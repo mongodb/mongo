@@ -78,7 +78,7 @@ RET=$?
 
 if [[ "$RET" == "0" ]]; then
     export RETRY_ON_FAIL=0
-    bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
+    bazel_evergreen_shutils::retry_bazel_cmd 2 "$BAZEL_BINARY" \
         test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets}
     RET=$?
 

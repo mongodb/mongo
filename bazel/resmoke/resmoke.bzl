@@ -150,6 +150,7 @@ def resmoke_suite_test(
             "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
             "--archiveMode=directory",
             "--archiveLimitMb=500",
+            "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
         ] + extra_args + resmoke_args,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         timeout = timeout,
@@ -162,5 +163,8 @@ def resmoke_suite_test(
             "//conditions:default": {"DEPS_PATH": deps_path},
         }),
         exec_properties = exec_properties | test_exec_properties(tags),
+        toolchains = [
+            "//bazel/resmoke:test_timeout",
+        ],
         **kwargs
     )
