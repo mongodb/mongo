@@ -447,8 +447,6 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         }
 
         if (this.shouldDisableMultiRouter_TEMPORARY_WORKAROUND(cmd)) {
-            // The latest command is not guaranteed to have run on the pinned mongo. Refresh the primary mongo to ensure it is up to date.
-            this.refreshPrimaryMongo();
             // Self disable the multi-router.
             // Starting from the next runCommand, any command will run against the primary mongo until the end of the test.
             TestData.pinToSingleMongos = true;
@@ -552,10 +550,6 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return "isdbgrid" === res.msg;
     };
 
-    this.refreshPrimaryMongo = function () {
-        assert.commandWorked(this.primaryMongo.adminCommand({flushRouterConfig: 1}));
-    };
-
     // For every logic within this function there must be associated a TODO ticket.
     // Check if the current command is currently unsupported due to a necesserary fix.
     this.shouldDisableMultiRouter_TEMPORARY_WORKAROUND = function (cmd) {
@@ -570,12 +564,25 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return disable;
     };
 
+    // TODO SERVER-116289 Remove this helper
+    this.hasPrimaryMongoRefreshed = false;
+    this.refreshPrimaryMongoIfNeeded = function () {
+        if (!this.hasPrimaryMongoRefreshed) {
+            assert.commandWorked(this.primaryMongo.adminCommand({flushRouterConfig: 1}));
+            this.hasPrimaryMongoRefreshed = true;
+        }
+    };
+
     // ============================================================================
     // Proxy handler
     // ============================================================================
     return new Proxy(this, {
         get(target, prop, proxy) {
+            // If the proxy is disabled by the test, always run the command on the pinned mongos (primary mongo).
+            // TODO (SERVER-116289) This refresh is required because some tests keep failing in spite all commands being routed to a single mongos.
+            // Remove this refresh (if possible) once the underling reason is solved.
             if (jsTest.options().pinToSingleMongos) {
+                target.refreshPrimaryMongoIfNeeded();
                 const value = target.primaryMongo[prop];
                 if (typeof value === "function") {
                     return value.bind(target.primaryMongo);
