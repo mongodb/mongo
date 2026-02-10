@@ -164,7 +164,7 @@ void PacketWriter::serializeHeaderForPacket(DataBuilder& db, const TrafficRecord
 
 void PacketWriter::write(const char* data, size_t len) {
     out.write(data, len);
-    absl::ExtendCrc32c(checksum, {data, len});
+    checksum = absl::ExtendCrc32c(checksum, {data, len});
 }
 
 
@@ -234,6 +234,7 @@ void TrafficRecorder::Recording::start() {
                        "{}\t{:x}\n",
                        recordingFile.string(),
                        static_cast<uint32_t>(writer.getChecksum()));
+            checksumOut.flush();
         };
 
         // This function guarantees to open a new recording file. Force the thread to sleep for
@@ -241,7 +242,6 @@ void TrafficRecorder::Recording::start() {
         // file. This case is rare and only happens when the 'maxFileSize' is too small. The
         // same recording file could be opened twice within 1 millisecond.
         auto openNewRecordingFile = [&] {
-            writeChecksum();
             writer.close();
             recordingFile = boost::filesystem::absolute(_path);
             recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
@@ -270,6 +270,7 @@ void TrafficRecorder::Recording::start() {
 
                 for (const auto& packet : storage) {
                     if (!writer.writePacket(packet)) {
+                        writeChecksum();
                         openNewRecordingFile();
                         uassert(10670200,
                                 "Failed to write packet in new file",

@@ -106,6 +106,10 @@ function runTest(client, restartCommand) {
     shardTest.stop();
 }
 
+function normalize(path) {
+    return path.replace(/\\/g, "/").replace(/^\w:/, "");
+}
+
 // Test that the Recorder can generate a new recording file when the current recording reaches the
 // max file size.
 {
@@ -158,6 +162,36 @@ function runTest(client, restartCommand) {
 
     res = db.runCommand({"stopTrafficRecording": 1});
     assert.eq(res.ok, true);
+
+    // Validate checksums were written to disk.
+    const checksums = cat(`${recordingDir}/checksum.txt`);
+    const fileChecksums = checksums
+        .slice(0, -1) // Strip trailing newline
+        .split("\n") // Split into entries per file
+        .map((line) => line.split("\t")) // Split each entry into [filename, checksum]
+        .map(([fname, checksum]) => [normalize(fname), checksum]); // Normalize paths to unix style
+    // There should be multiple entries
+    assert(fileChecksums.length > 1);
+    // Entries should not all be zero (but in principle 0 is a valid checksum).
+    assert(
+        fileChecksums.some(([fname, checksum]) => parseInt(checksum, 16)),
+        {msg: "Incorrect checksums", fileChecksums},
+    );
+    // Filenames should start with the recordingDir
+    assert(
+        fileChecksums.every(([fname, checksum]) => fname.startsWith(normalize(recordingDir))),
+        {msg: "Incorrect recording filenames in checksum file", fileChecksums, recordingDir},
+    );
+
+    // Filenames should end with .bin
+    assert(
+        fileChecksums.every(([fname, checksum]) => fname.endsWith(".bin")),
+        {
+            msg: "Incorrect recording filenames in checksum file (wrong extension)",
+            fileChecksums,
+            recordingDir,
+        },
+    );
 
     MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
 
