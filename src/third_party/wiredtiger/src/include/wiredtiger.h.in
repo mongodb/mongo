@@ -5711,7 +5711,7 @@ struct __wt_page_log {
      * @param lsn the last materialized LSN
      */
     int (*pl_set_last_materialized_lsn)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t lsn);
-    int (*pl_trim_table)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t table_id, uint64_t start_lsn);
+
     /*!
      * A callback performed when the page log service or reference is closed
      * and will no longer be used.  The initial creation of the page log service
