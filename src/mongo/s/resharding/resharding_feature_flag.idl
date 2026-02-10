@@ -130,6 +130,15 @@ feature_flags:
         default: false
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
+    featureFlagReshardingRegistry:
+        mod_visibility: public
+        description:
+            "Feature flag to enable consulting the LocalReshardingOperationRegistry instead
+            of reshardingFields on config.collections entries."
+        cpp_varname: gFeatureFlagReshardingRegistry
+        default: false
+        fcv_gated: true
+        check_against_fcv: legacy_fcv_snapshot_only
     featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
         mod_visibility: public
         description:
