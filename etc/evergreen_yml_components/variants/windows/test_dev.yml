@@ -46,7 +46,7 @@ variables:
     push_arch: x86_64-enterprise
     mciuploads_binary_permissions_push: public-read
     mciuploads_binary_visibility_push: public
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
     external_auth_jobs_max: 1
 
 buildvariants:
@@ -141,7 +141,7 @@ buildvariants:
       # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
       test_flags: >-
         --runAllFeatureFlagTests
-        --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
       external_auth_jobs_max: 1
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build

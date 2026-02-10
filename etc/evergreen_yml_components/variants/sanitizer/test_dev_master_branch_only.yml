@@ -266,7 +266,7 @@ buildvariants:
       multiversion_edition: enterprise
       large_distro_name: windows-2022-large
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
         --modules=none
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       compile_variant: *windows-debug-suggested
@@ -310,7 +310,7 @@ buildvariants:
       ext: zip
       resmoke_jobs_max: 1
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
     tasks:
       # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
@@ -335,7 +335,7 @@ buildvariants:
     expansions:
       compile_variant: *macos-debug-suggested
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos
+        --excludeWithAnyTags=incompatible_with_macos,requires_otel_build
         --modules=none
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
       resmoke_jobs_max: 6
@@ -365,7 +365,7 @@ buildvariants:
       compile_variant: *enterprise-macos
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, fassertOnLockTimeoutForStepUpDown: 180}"
-        --excludeWithAnyTags=incompatible_with_macos,requires_gcm
+        --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_otel_build
       bazel_compile_flags: >-
         --dbg=True
         --opt=on

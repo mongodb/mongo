@@ -15,12 +15,6 @@ import {
     readJsonlFile,
     findMetric,
 } from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
-
-// OTel Metrics are only enabled on Linux for now.
-if (!isLinux()) {
-    quit();
-}
 
 const testName = jsTestName();
 Random.setRandomSeed(0);

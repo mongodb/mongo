@@ -46,7 +46,7 @@ variables:
     push_arch: x86_64-enterprise
     mciuploads_binary_permissions_push: public-read
     mciuploads_binary_visibility_push: public
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
     external_auth_jobs_max: 1
 
 buildvariants:
@@ -73,7 +73,7 @@ buildvariants:
       multiversion_edition: enterprise
       jstestfuzz_num_generated_files: 35
       large_distro_name: windows-2022-large
-      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
       external_auth_jobs_max: 1
       compile_variant: *windows-compile-query-patch-only
     tasks:
@@ -102,7 +102,7 @@ buildvariants:
       multiversion_edition: enterprise
       jstestfuzz_num_generated_files: 35
       large_distro_name: windows-2022-large
-      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_otel_build
       external_auth_jobs_max: 1
       compile_variant: *enterprise-windows-benchmarks
     tasks:

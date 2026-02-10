@@ -13,7 +13,7 @@ buildvariants:
       - macos-14-arm64
     expansions:
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_otel_build
         --modules=none
       push_path: osx
       push_bucket: downloads.mongodb.org
@@ -39,7 +39,7 @@ buildvariants:
     run_on:
       - macos-14-arm64
     expansions:
-      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_otel_build
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
@@ -67,7 +67,7 @@ buildvariants:
       - macos-14
     expansions:
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_otel_build
         --modules=none
       push_path: osx
       push_bucket: downloads.mongodb.org
@@ -93,7 +93,7 @@ buildvariants:
     run_on:
       - macos-14
     expansions:
-      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source,requires_otel_build
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
