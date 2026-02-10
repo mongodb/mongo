@@ -148,9 +148,9 @@ PlanState UnwindStage::getNext() {
                 _inArray = false;
                 if (_preserveNullAndEmptyArrays) {
                     _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
-                    // -1 array index indicates the unwind field was an array, but it was empty.
-                    _outIndexOutputAccessor->reset(
-                        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-1));
+                    // The array index is set to null if the unwind field is not an array or if the
+                    // unwind field is the empty array.
+                    _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
@@ -159,7 +159,8 @@ PlanState UnwindStage::getNext() {
 
             if (!nullOrNothing || _preserveNullAndEmptyArrays) {
                 _outFieldOutputAccessor->reset(false, tag, val);
-                // Null array index indicates the unwind field was not an array.
+                // The array index is set to null if the unwind field is not an array or if the
+                // unwind field is the empty array.
                 _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
                 return trackPlanState(PlanState::ADVANCED);
             }

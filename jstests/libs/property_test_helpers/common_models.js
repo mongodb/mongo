@@ -18,12 +18,12 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
-    // TODO SERVER-108077 SERVER-106983 when these tickets are complete, remove filters and allow
-    // ORs.
+    // TODO SERVER-108077: when this ticket is complete, remove filters and allow ORs.
+    // TODO SERVER-119019: $elemMatch is not supported by histogramCE (error code 9808601).
     const aggModel = getQueryAndOptionsModel({allowOrs: false, deterministicBag: false}).filter((q) => {
         const asStr = JSON.stringify(q);
         // The query cannot contain any of these strings, as they are linked to the issues above.
-        return ["$not", "$exists", "array"].every((expr) => !asStr.includes(expr));
+        return ["$not", "$exists", "array", "$elemMatch"].every((expr) => !asStr.includes(expr));
     });
 
     return makeWorkloadModel({

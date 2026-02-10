@@ -80,6 +80,25 @@ export function getSortArb(maxNumSortComponents = 1) {
 export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
 export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
 
+export const unwindArb = fc
+    .record({
+        path: dollarFieldArb,
+        preserveNullAndEmptyArrays: fc.boolean(),
+        includeArrayIndex: fc.boolean(),
+        indexFieldName: assignableFieldArb,
+    })
+    .map(({path, preserveNullAndEmptyArrays, includeArrayIndex, indexFieldName}) => {
+        const unwindSpec = {path: path};
+        if (preserveNullAndEmptyArrays) {
+            unwindSpec.preserveNullAndEmptyArrays = true;
+        }
+        if (includeArrayIndex) {
+            // includeArrayIndex specifies the field name to store the array index.
+            unwindSpec.includeArrayIndex = indexFieldName;
+        }
+        return {$unwind: unwindSpec};
+    });
+
 /*
  * Return the arbitraries for agg stages that are allowed given:
  *    - `allowOrs` for whether we allow $or in $match
@@ -98,6 +117,7 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
+            unwindArb,
             getSortArb(),
         ];
     } else {
@@ -110,6 +130,7 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
+            unwindArb,
             getSortArb(),
         ];
     }
@@ -186,21 +207,33 @@ export function getEqLookupUnwindAggPipelineArb(
     const lookupUnwindPairArb = getEqLookupUnwindArb(foreignCollNameArb);
 
     // Manually piece together the pipeline by generating a sparse array of lookup/unwind pairs to insert into a base pipeline.
-    return fc
-        .record({
-            // Generate [1,3] non-lookup/unwind stages.
-            pipeline: fc.array(oneof(...allowedStages), {minLength: 1, maxLength: 3}),
-            // Generate in between 1 and 3 lookup/unwind pairs to insert into the pipeline at the specified positions.
-            lookupUnwindPositionPairs: fc.array(fc.tuple(fc.nat(), lookupUnwindPairArb), {minLength: 1, maxLength: 3}),
-        })
-        .map(({pipeline, lookupUnwindPositionPairs}) => {
-            // Insert the lookup/unwind pairs at the specified positions.
-            for (const [pos, lookupPair] of lookupUnwindPositionPairs) {
-                // Ensure the position is not out of bounds by taking modulo with pipeline length.
-                pipeline.splice(pos % pipeline.length, 0, ...lookupPair);
-            }
-            return pipeline;
-        });
+    return (
+        fc
+            .record({
+                // Generate 1 or 2 non-lookup/unwind stages.
+                pipeline: fc.array(oneof(...allowedStages), {minLength: 1, maxLength: 2}),
+                // Generate in between 1 and 2 lookup/unwind pairs to insert into the pipeline at the specified positions.
+                lookupUnwindPositionPairs: fc.array(fc.tuple(fc.nat(), lookupUnwindPairArb), {
+                    minLength: 1,
+                    maxLength: 2,
+                }),
+            })
+            // PBTs cram the entire result set into a single document, so we need to control the
+            // pipeline size to avoid bson-too-large errors.
+            // Allow at most one standalone $unwind stage to avoid too large result sets.
+            .filter(({pipeline}) => {
+                const unwindStages = pipeline.filter((stage) => stage.hasOwnProperty("$unwind"));
+                return unwindStages.length <= 1;
+            })
+            .map(({pipeline, lookupUnwindPositionPairs}) => {
+                // Insert the lookup/unwind pairs at the specified positions.
+                for (const [pos, lookupPair] of lookupUnwindPositionPairs) {
+                    // Ensure the position is not out of bounds by taking modulo with pipeline length.
+                    pipeline.splice(pos % pipeline.length, 0, ...lookupPair);
+                }
+                return pipeline;
+            })
+    );
 }
 
 /*

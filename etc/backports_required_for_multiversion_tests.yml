@@ -113,6 +113,8 @@ last-continuous:
       ticket: SERVER-115594
     - test_file: jstests/sharding/updateOne_without_shard_key/bulk_write_without_shard_key_errors_only.js
       ticket: SERVER-113344
+    - test_file: jstests/core/query/sbe/sbe_unwind_empty_array_index.js
+      ticket: SERVER-116450
     - test_file: jstests/core/query/collation/collation.js
       ticket: SERVER-115810
     - test_file: jstests/core/query/collation/collation_mismatch_merge.js
@@ -752,6 +754,8 @@ last-lts:
       ticket: SERVER-115594
     - test_file: jstests/sharding/updateOne_without_shard_key/bulk_write_without_shard_key_errors_only.js
       ticket: SERVER-113344
+    - test_file: jstests/core/query/sbe/sbe_unwind_empty_array_index.js
+      ticket: SERVER-116450
     - test_file: jstests/core/query/collation/collation.js
       ticket: SERVER-115810
     - test_file: jstests/core/query/collation/collation_mismatch_merge.js
