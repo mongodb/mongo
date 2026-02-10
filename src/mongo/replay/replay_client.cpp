@@ -172,6 +172,7 @@ private:
 void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfig) {
     std::shared_ptr<FileSet> files;
     try {
+        LOGV2_INFO(10893013, "Replay initializing", "config"_attr = replayConfig);
         files = FileSet::from_directory(replayConfig.recordingPath);
     } catch (const std::exception& e) {
         tasserted(ErrorCodes::FileOpenFailed, e.what());
@@ -237,6 +238,8 @@ void recordingDispatcher(mongo::stop_token stop, const ReplayConfig& replayConfi
 
         // Wait for all the sessions to complete.
         sessionHandler.waitForRunningSessions();
+
+        LOGV2_INFO(10893012, "All sessions exited");
 
         sessionHandler.rethrowIfSessionFailed();
 
