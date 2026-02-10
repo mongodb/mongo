@@ -31,52 +31,35 @@
 
 #include "mongo/db/database_name.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
-namespace {
-bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcvSnapshot)) {
-        return true;
-    }
-    return false;
-}
-}  // namespace
-
 static constexpr StringData kIndexNameFieldName = "name"_sd;
 
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent)
     : spec(std::move(specObj)), indexIdent(idxIdent.value_or("")) {}
 
+IndexBuildInfo::IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine)
+    : spec(std::move(specObj)), indexIdent(idxIdent) {
+    setInternalIdents(storageEngine);
+}
+
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj,
                                StorageEngine& storageEngine,
-                               const DatabaseName& dbName,
-                               const VersionContext& vCtx)
+                               const DatabaseName& dbName)
     : spec(std::move(specObj)), indexIdent(storageEngine.generateNewIndexIdent(dbName)) {
-    setInternalIdents(storageEngine, vCtx);
+    setInternalIdents(storageEngine);
 }
 
 StringData IndexBuildInfo::getIndexName() const {
     return spec.getStringField(kIndexNameFieldName);
 }
 
-void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine, const VersionContext& vCtx) {
-    // TODO SERVER-110289: Check whether index build method is primary driven rather just the
-    // featureFlag
-    if (isPrimaryDrivenIndexBuildEnabled(vCtx)) {
-        setInternalIdents(
-            storageEngine.generateNewInternalIndexBuildIdent("sorter", indexIdent),
-            storageEngine.generateNewInternalIndexBuildIdent("sideWrites", indexIdent),
-            storageEngine.generateNewInternalIndexBuildIdent("skippedRecordsTracker", indexIdent),
-            storageEngine.generateNewInternalIndexBuildIdent("constraintViolations", indexIdent));
-        return;
-    }
-    setInternalIdents(storageEngine.generateNewInternalIdent(),
-                      storageEngine.generateNewInternalIdent(),
-                      storageEngine.generateNewInternalIdent(),
-                      storageEngine.generateNewInternalIdent());
+void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine) {
+    setInternalIdents(
+        storageEngine.generateNewInternalIndexBuildIdent("sorter", indexIdent),
+        storageEngine.generateNewInternalIndexBuildIdent("sideWrites", indexIdent),
+        storageEngine.generateNewInternalIndexBuildIdent("skippedRecordsTracker", indexIdent),
+        storageEngine.generateNewInternalIndexBuildIdent("constraintViolations", indexIdent));
 }
 
 void IndexBuildInfo::setInternalIdents(
@@ -123,12 +106,11 @@ std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& spec
 
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
                                                 StorageEngine& storageEngine,
-                                                const DatabaseName& dbName,
-                                                const VersionContext& vCtx) {
+                                                const DatabaseName& dbName) {
     std::vector<IndexBuildInfo> indexes;
     indexes.reserve(specs.size());
     for (const auto& spec : specs) {
-        indexes.emplace_back(spec, storageEngine, dbName, vCtx);
+        indexes.emplace_back(spec, storageEngine, dbName);
     }
     return indexes;
 }

@@ -82,9 +82,8 @@ std::vector<IndexBuildInfo> IndexBuildsManagerTest::makeSpecs(std::vector<std::s
         const auto& keyName = keys[i];
         IndexBuildInfo indexBuildInfo(
             BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
-            fmt::format("index-{}", i + 1));
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
+            fmt::format("index-{}", i + 1),
+            *storageEngine);
         indexes.push_back(std::move(indexBuildInfo));
     }
     return indexes;

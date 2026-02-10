@@ -448,11 +448,10 @@ protected:
         std::vector<IndexBuildInfo> indexes;
         for (size_t i = 0; i < keys.size(); ++i) {
             const auto& keyName = keys[i];
-            IndexBuildInfo indexBuildInfo(
+            indexes.emplace_back(
                 BSON("v" << 2 << "key" << BSON(keyName << 1) << "name" << (keyName + "_1")),
-                fmt::format("index-{}", i + 1));
-            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(opCtx));
-            indexes.push_back(std::move(indexBuildInfo));
+                fmt::format("index-{}", i + 1),
+                *storageEngine);
         }
         return indexes;
     }

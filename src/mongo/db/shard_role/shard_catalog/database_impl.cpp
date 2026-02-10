@@ -884,9 +884,9 @@ Collection* DatabaseImpl::_createCollection(
                 collectionPtr,
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collectionPtr),
                 boost::none));
-            IndexBuildInfo indexBuildInfo(fullIdIndexSpec, catalogIdentifierForColl->idIndexIdent);
-            indexBuildInfo.setInternalIdents(*opCtx->getServiceContext()->getStorageEngine(),
-                                             VersionContext::getDecoration(opCtx));
+            IndexBuildInfo indexBuildInfo(fullIdIndexSpec,
+                                          *catalogIdentifierForColl->idIndexIdent,
+                                          *opCtx->getServiceContext()->getStorageEngine());
             uassertStatusOK(IndexBuildBlock::buildEmptyIndex(opCtx, collection, indexBuildInfo));
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.

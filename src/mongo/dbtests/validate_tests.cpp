@@ -383,6 +383,19 @@ protected:
             shard_role_details::getLocker(&_opCtx)->isDbLockedForMode(_nss.dbName(), MODE_NONE));
     }
 
+    IndexBuildInterceptor makeIndexBuildInterceptor(BSONObj spec, const IndexCatalogEntry* entry) {
+        // These tests are doing something outside of the normal index build flow by creating index
+        // build interceptors for the same index multiple times after that index build has
+        // completed. Since we aren't resuming an index build, they need fresh side tables, and we
+        // can't guarantee that the previous ones are droppable yet. As a result, generate new
+        // idents for the side tables and then set only the index table ident to the reused one.
+        auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
+        IndexBuildInfo indexBuildInfo(spec, *storageEngine, _autoDb->getDb()->name());
+        indexBuildInfo.indexIdent = entry->getIdent();
+        return IndexBuildInterceptor(
+            &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+    }
+
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
     bool _full;
@@ -2013,15 +2026,10 @@ public:
 
             // Insert the key on _id.
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIdIndex(&_opCtx);
-                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
-                                              entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
                 auto iam = entry->accessMethod()->asSortedData();
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor =
+                    makeIndexBuildInterceptor(indexCatalog->getDefaultIdIndexSpec(coll()), entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2052,7 +2060,7 @@ public:
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2063,7 +2071,7 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             releaseDb();
@@ -2282,15 +2290,10 @@ public:
 
             // Insert the key on _id.
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
-                                              entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor =
+                    makeIndexBuildInterceptor(indexCatalog->getDefaultIdIndexSpec(coll()), entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2315,13 +2318,13 @@ public:
                         *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
-                        {keys.begin(), keys.end()},
+                        keys,
                         {},
                         MultikeyPaths{},
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2332,7 +2335,7 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             releaseDb();
@@ -2608,15 +2611,10 @@ public:
 
             // Insert the key on _id.
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
-                                              entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor =
+                    makeIndexBuildInterceptor(indexCatalog->getDefaultIdIndexSpec(coll()), entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2647,7 +2645,7 @@ public:
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2658,19 +2656,14 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             // Insert the key on b.
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIndexByName(&_opCtx, indexNameB);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexSpecB, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor = makeIndexBuildInterceptor(indexSpecB, entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -2695,13 +2688,13 @@ public:
                         *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
-                        {keys.begin(), keys.end()},
+                        keys,
                         {},
                         MultikeyPaths{},
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2712,7 +2705,7 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             releaseDb();
@@ -3258,15 +3251,10 @@ public:
 
             // Insert the key on _id.
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIdIndex(&_opCtx);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexCatalog->getDefaultIdIndexSpec(coll()),
-                                              entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor =
+                    makeIndexBuildInterceptor(indexCatalog->getDefaultIdIndexSpec(coll()), entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3291,13 +3279,13 @@ public:
                         *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
-                        {keys.begin(), keys.end()},
+                        keys,
                         {},
                         MultikeyPaths{},
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3308,19 +3296,14 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             // Insert the key on "a".
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor = makeIndexBuildInterceptor(indexSpec, entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -3351,7 +3334,7 @@ public:
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3362,7 +3345,7 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_NOT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             releaseDb();
@@ -4632,14 +4615,9 @@ public:
 
             // Insert the key on "a".
             {
-                auto storageEngine = _opCtx.getServiceContext()->getStorageEngine();
                 auto entry = indexCatalog->findIndexByName(&_opCtx, indexName);
                 auto iam = entry->accessMethod()->asSortedData();
-                IndexBuildInfo indexBuildInfo(indexSpec, entry->getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(&_opCtx));
-                auto interceptor = std::make_unique<IndexBuildInterceptor>(
-                    &_opCtx, entry, indexBuildInfo, /*resume=*/false, /*generateTableWrites=*/true);
+                auto interceptor = makeIndexBuildInterceptor(indexSpec, entry);
 
                 KeyStringSet keys;
                 iam->getKeys(&_opCtx,
@@ -4670,7 +4648,7 @@ public:
                         options,
                         [this, &entry, &interceptor](const CollectionPtr& coll,
                                                      const key_string::View& duplicateKey) {
-                            return interceptor->recordDuplicateKey(
+                            return interceptor.recordDuplicateKey(
                                 &_opCtx, coll, entry, duplicateKey);
                         },
                         &numInserted);
@@ -4681,7 +4659,7 @@ public:
                     commitTransaction();
                 }
 
-                ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
+                ASSERT_NOT_OK(interceptor.checkDuplicateKeyConstraints(&_opCtx, coll(), entry));
             }
 
             releaseDb();

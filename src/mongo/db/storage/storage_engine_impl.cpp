@@ -736,6 +736,10 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
             "Cannot use a non-internal ident to create a temporary RecordStore instance",
             ident::isInternalIdent(ident));
 
+    // When restarting an index build, the table from the original index build was added to the
+    // reaper on startup but may not have actually been dropped yet.
+    uassertStatusOK(immediatelyCompletePendingDrop(opCtx, ident));
+
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto createTemporary = [&] {
         return _engine->makeTemporaryRecordStore(ru, ident, keyFormat);

@@ -326,9 +326,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexUsesSpecifiedIdent) {
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
+                           "index-ident",
+                           *storageEngine);
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
                                       indexBuildInfo,
@@ -352,9 +351,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexWithExistingIdentReportsError) {
         auto collection = getCollectionExclusive(operationContext(), nss);
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
+                           "index-ident",
+                           *storageEngine);
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
                                       indexBuildInfo,
@@ -366,9 +364,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexWithExistingIdentReportsError) {
         auto collection = getCollectionExclusive(operationContext(), nss);
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
+                           "index-ident",
+                           *storageEngine);
         indexBuildsCoord->createIndex(operationContext(),
                                       collection.uuid(),
                                       indexBuildInfo,
@@ -380,9 +377,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexWithExistingIdentReportsError) {
         auto collection = getCollectionExclusive(operationContext(), nss);
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
+                           "index-ident",
+                           *storageEngine);
         ASSERT_THROWS_CODE(
             indexBuildsCoord->createIndex(operationContext(),
                                           collection.uuid(),
@@ -405,14 +401,11 @@ TEST_F(IndexBuildsCoordinatorTest, RetryIndexCreation) {
         WriteUnitOfWork wuow(operationContext());
 
         std::vector<IndexBuildInfo> indexes;
-        auto indexBuildInfo =
-            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
-        indexes.push_back(std::move(indexBuildInfo));
+        indexes.emplace_back(BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"),
+                             "index-ident",
+                             *storageEngine);
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            operationContext(), writer, std::span<IndexBuildInfo>{indexes}, false);
+            operationContext(), writer, indexes, false);
     }
 
     // Write wasn't committed so the ident creation should have been rolled back and creating a
@@ -423,14 +416,11 @@ TEST_F(IndexBuildsCoordinatorTest, RetryIndexCreation) {
         CollectionWriter writer(operationContext(), &collection);
         WriteUnitOfWork wuow(operationContext());
         std::vector<IndexBuildInfo> indexes;
-        auto indexBuildInfo =
-            IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
-                           std::string{"index-ident"});
-        indexBuildInfo.setInternalIdents(*storageEngine,
-                                         VersionContext::getDecoration(operationContext()));
-        indexes.push_back(std::move(indexBuildInfo));
+        indexes.emplace_back(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
+                             "index-ident",
+                             *storageEngine);
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
-            operationContext(), writer, std::span<IndexBuildInfo>{indexes}, false);
+            operationContext(), writer, indexes, false);
         wuow.commit();
     }
 }
@@ -445,16 +435,10 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnEmptyCollectionReplicatesAsC
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     std::vector<IndexBuildInfo> indexes;
-    auto indexBuildInfo = IndexBuildInfo(
-        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), std::string{"index-1"});
-    indexBuildInfo.setInternalIdents(*storageEngine,
-                                     VersionContext::getDecoration(operationContext()));
-    indexes.push_back(std::move(indexBuildInfo));
-    indexBuildInfo = IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
-                                    std::string{"index-2"});
-    indexBuildInfo.setInternalIdents(*storageEngine,
-                                     VersionContext::getDecoration(operationContext()));
-    indexes.push_back(std::move(indexBuildInfo));
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), "index-1", *storageEngine);
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"), "index-2", *storageEngine);
 
     {
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
@@ -496,16 +480,10 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     std::vector<IndexBuildInfo> indexes;
-    auto indexBuildInfo = IndexBuildInfo(
-        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), std::string{"index-1"});
-    indexBuildInfo.setInternalIdents(*storageEngine,
-                                     VersionContext::getDecoration(operationContext()));
-    indexes.push_back(std::move(indexBuildInfo));
-    indexBuildInfo = IndexBuildInfo(BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"),
-                                    std::string{"index-2"});
-    indexBuildInfo.setInternalIdents(*storageEngine,
-                                     VersionContext::getDecoration(operationContext()));
-    indexes.push_back(std::move(indexBuildInfo));
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), "index-1", *storageEngine);
+    indexes.emplace_back(
+        BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1"), "index-2", *storageEngine);
 
     auto collUUID = [&] {
         auto collection = getCollectionExclusive(operationContext(), nss);
@@ -592,13 +570,11 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
     auto twoPhaseIndexes = toIndexBuildInfoVec(
         std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
         *storageEngine,
-        twoPhaseNss.dbName(),
-        VersionContext::getDecoration(opCtx));
+        twoPhaseNss.dbName());
     auto singlePhaseIndexes = toIndexBuildInfoVec(
         std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("b" << 1) << "name" << "b_1")},
         *storageEngine,
-        singlePhaseNss.dbName(),
-        VersionContext::getDecoration(opCtx));
+        singlePhaseNss.dbName());
 
     // Create a window to enumerate the index builds while they are running.
     indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);

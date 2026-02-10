@@ -1278,8 +1278,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                            auto indexes =
                                toIndexBuildInfoVec(indexSpecs,
                                                    *storageEngine,
-                                                   _metadata.getTempReshardingNss().dbName(),
-                                                   VersionContext::getDecoration(opCtx.get()));
+                                                   _metadata.getTempReshardingNss().dbName());
                            auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
                            auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                                opCtx.get(),

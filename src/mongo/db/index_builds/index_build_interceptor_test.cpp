@@ -70,8 +70,7 @@ protected:
 
     std::unique_ptr<IndexBuildInterceptor> createIndexBuildInterceptor(BSONObj spec) {
         auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-        IndexBuildInfo indexBuildInfo(
-            spec, *storageEngine, _nss.dbName(), VersionContext::getDecoration(operationContext()));
+        IndexBuildInfo indexBuildInfo(spec, *storageEngine, _nss.dbName());
         return std::make_unique<IndexBuildInterceptor>(operationContext(),
                                                        createIndex(std::move(spec)),
                                                        indexBuildInfo,

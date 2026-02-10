@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/version_context.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -43,16 +42,23 @@ namespace MONGO_MOD_PUBLIC mongo {
  * Encapsulates metadata fields associated with an index build.
  */
 struct IndexBuildInfo {
+    /**
+     * Creates an IndexBuildInfo with the given index spec and index ident, leaving the internal
+     * idents unset. setInternalIdents() must be called prior to using the info to build an index.
+     */
     IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent);
 
     /**
-     * Generates new idents and initializes all ident-related member fields.
-     * TODO SERVER-109578: Remove VersionContext parameter
+     * Creates an IndexBuildInfo with the given index spec and index ident, and generates the
+     * internal idents.
      */
-    IndexBuildInfo(BSONObj specObj,
-                   StorageEngine& storageEngine,
-                   const DatabaseName& dbName,
-                   const VersionContext& vCtx);
+    IndexBuildInfo(BSONObj specObj, StringData idxIdent, StorageEngine& storageEngine);
+
+    /**
+     * Creates an IndexBuildInfo with the index spec and generates both the index ident and the
+     * internal idents.
+     */
+    IndexBuildInfo(BSONObj specObj, StorageEngine& storageEngine, const DatabaseName& dbName);
 
     /**
      * Extracts index name from the spec and returns it.
@@ -61,9 +67,8 @@ struct IndexBuildInfo {
 
     /**
      * Generates new idents and initializes all member fields tracking idents of temporary tables.
-     * TODO SERVER-109578: Remove VersionContext parameter
      */
-    void setInternalIdents(StorageEngine& storageEngine, const VersionContext& vCtx);
+    void setInternalIdents(StorageEngine& storageEngine);
 
     /**
      * Initializes all member fields tracking idents of temporary tables with the given idents.
@@ -88,12 +93,10 @@ struct IndexBuildInfo {
 
 /**
  * Constructs IndexBuildInfo instances from the given index specs.
- * TODO SERVER-109578: Remove VersionContext parameter
  */
 std::vector<IndexBuildInfo> toIndexBuildInfoVec(const std::vector<BSONObj>& specs,
                                                 StorageEngine& storageEngine,
-                                                const DatabaseName& dbName,
-                                                const VersionContext& vCtx);
+                                                const DatabaseName& dbName);
 
 /**
  * Same as above, but does not populate the ident fields in the IndexBuildInfo instances.

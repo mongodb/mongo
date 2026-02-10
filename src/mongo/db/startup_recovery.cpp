@@ -228,8 +228,7 @@ Status buildMissingIdIndex(OperationContext* opCtx, const NamespaceString nss) {
     const auto indexCatalog = collWriter->getIndexCatalog();
     IndexBuildInfo idIndexBuildInfo(indexCatalog->getDefaultIdIndexSpec(collWriter.get()),
                                     *opCtx->getServiceContext()->getStorageEngine(),
-                                    nss.dbName(),
-                                    VersionContext::getDecoration(opCtx));
+                                    nss.dbName());
     auto swSpecs = indexer.init(opCtx,
                                 collWriter,
                                 {std::move(idIndexBuildInfo)},

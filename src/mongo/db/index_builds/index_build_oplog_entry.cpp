@@ -212,7 +212,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
 
             const auto& indexIdent =
                 storageEngine->generateNewIndexIdent(entry.getNss().dbName(), indexIdentUniqueTag);
-            indexesVec[i].indexIdent = std::string{indexIdent};
+            indexesVec[i].indexIdent = indexIdent;
         }
     }
 

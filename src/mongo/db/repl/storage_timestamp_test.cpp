@@ -386,8 +386,7 @@ public:
         auto indexBuildInfo =
             IndexBuildInfo(BSON("v" << 2 << "name" << indexName << "key" << indexKey),
                            *storageEngine,
-                           coll->ns().dbName(),
-                           VersionContext::getDecoration(_opCtx));
+                           coll->ns().dbName());
 
         // Build an index.
         MultiIndexBlock indexer;
@@ -420,9 +419,8 @@ public:
                 [&](const BSONObj& indexSpec,
                     const IndexCatalogEntry& entry,
                     boost::optional<MultikeyPaths> multikey) {
-                    auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
-                    indexBuildInfo.setInternalIdents(*storageEngine,
-                                                     VersionContext::getDecoration(_opCtx));
+                    auto indexBuildInfo =
+                        IndexBuildInfo(indexSpec, entry.getIdent(), *storageEngine);
                     _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                         _opCtx, coll->ns(), coll->uuid(), indexBuildInfo, false);
                 },
@@ -1989,8 +1987,8 @@ public:
             auto indexBuildInfo = IndexBuildInfo(BSON("v" << 2 << "unique" << true << "name"
                                                           << "a_1"
                                                           << "key" << BSON("a" << 1)),
-                                                 indexIdent);
-            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+                                                 indexIdent,
+                                                 *storageEngine);
             auto swIndexInfoObj =
                 indexer.init(_opCtx,
                              coll,
@@ -2024,9 +2022,8 @@ public:
                     if (simulatePrimary) {
                         // The timestamping responsibility for each index is placed
                         // on the caller.
-                        auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
-                        indexBuildInfo.setInternalIdents(*storageEngine,
-                                                         VersionContext::getDecoration(_opCtx));
+                        auto indexBuildInfo =
+                            IndexBuildInfo(indexSpec, entry.getIdent(), *storageEngine);
                         _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                             _opCtx, nss, coll->uuid(), indexBuildInfo, false);
                     } else {
@@ -2129,10 +2126,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
-        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
-        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
-        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo1 = IndexBuildInfo(index1, "index-1", *storageEngine);
+        auto indexBuildInfo2 = IndexBuildInfo(index2, "index-2", *storageEngine);
 
         auto buildUUID = UUID::gen();
         const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
@@ -2243,10 +2238,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
-        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
-        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
-        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo1 = IndexBuildInfo(index1, "index-1", *storageEngine);
+        auto indexBuildInfo2 = IndexBuildInfo(index2, "index-2", *storageEngine);
         auto buildUUID = UUID::gen();
         const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
                                                                        CommitQuorumOptions(1)};
@@ -2382,8 +2375,7 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
                                << "a_1"
                                << "unique" << true);
 
-        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
-        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo1 = IndexBuildInfo(index1, "index-1", *storageEngine);
         auto buildUUID = UUID::gen();
         const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
                                                                        CommitQuorumOptions(1)};
@@ -2667,8 +2659,8 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
                                                           << "a_1_b_1"
                                                           << "ns" << collection->ns().ns_forTest()
                                                           << "key" << BSON("a" << 1 << "b" << 1)),
-                                                 std::string{"index-ident"});
-            indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+                                                 "index-ident",
+                                                 *storageEngine);
             auto swSpecs = indexer.init(
                 _opCtx,
                 collection,
@@ -2754,9 +2746,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
             [&](const BSONObj& indexSpec,
                 const IndexCatalogEntry& entry,
                 boost::optional<MultikeyPaths> multikey) {
-                auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(_opCtx));
+                auto indexBuildInfo = IndexBuildInfo(indexSpec, entry.getIdent(), *storageEngine);
                 _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
                     _opCtx, collection->ns(), collection->uuid(), indexBuildInfo, false);
             },
@@ -2837,9 +2827,8 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         auto spec = BSON("v" << 2 << "name" << "field_1" << "key" << keyPattern);
         auto startBuildOpTime = repl::OpTime(startBuildTs, _presentTerm);
         UUID indexBuildUUID = UUID::gen();
-        const auto indexIdent = "index-ident"_sd;
-        IndexBuildInfo indexBuildInfo(spec, std::string{indexIdent});
-        indexBuildInfo.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        const auto indexIdent = "index-ident";
+        IndexBuildInfo indexBuildInfo(spec, indexIdent, *storageEngine);
 
         // Wait for the index build thread to start the collection scan before proceeding with
         // checking the catalog and applying the commitIndexBuild oplog entry.
@@ -3071,10 +3060,8 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
-        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
-        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
-        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo1 = IndexBuildInfo(index1, "index-1", *storageEngine);
+        auto indexBuildInfo2 = IndexBuildInfo(index2, "index-2", *storageEngine);
 
         auto buildUUID = UUID::gen();
         const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =

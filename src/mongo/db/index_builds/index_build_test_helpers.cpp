@@ -98,8 +98,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
     });
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    IndexBuildInfo indexBuildInfo(
-        spec, *storageEngine, nss.dbName(), VersionContext::getDecoration(opCtx));
+    IndexBuildInfo indexBuildInfo(spec, *storageEngine, nss.dbName());
     {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
@@ -168,8 +167,7 @@ Status initializeMultiIndexBlock(OperationContext* opCtx,
                                  const BSONObj& spec,
                                  MultiIndexBlock::OnInitFn onInit) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexBuildInfo = IndexBuildInfo(
-        spec, *storageEngine, collection->ns().dbName(), VersionContext::getDecoration(opCtx));
+    auto indexBuildInfo = IndexBuildInfo(spec, *storageEngine, collection->ns().dbName());
     return indexer
         .init(opCtx,
               collection,

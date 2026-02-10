@@ -778,8 +778,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             for (auto& indexBuildInfo : indexes) {
                 indexBuildInfo.indexIdent =
                     storageEngine->generateNewIndexIdent(collWriter->ns().dbName());
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(opCtx));
+                indexBuildInfo.setInternalIdents(*storageEngine);
             }
         } else {
             // Unfinished index builds that are not resumable will drop and recreate the index table
@@ -832,8 +831,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                                         << "buildUUID: " << buildUUID);
 
                 indexBuildInfo.indexIdent = writableEntry->getIdent();
-                indexBuildInfo.setInternalIdents(*storageEngine,
-                                                 VersionContext::getDecoration(opCtx));
+                indexBuildInfo.setInternalIdents(*storageEngine);
             }
         }
 
@@ -2388,10 +2386,8 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
     invariant(collection,
               str::stream() << "IndexBuildsCoordinator::createIndexes: " << collectionUUID);
 
-    IndexBuildInfo indexBuildInfo(spec,
-                                  *opCtx->getServiceContext()->getStorageEngine(),
-                                  collection->ns().dbName(),
-                                  VersionContext::getDecoration(opCtx));
+    IndexBuildInfo indexBuildInfo(
+        spec, *opCtx->getServiceContext()->getStorageEngine(), collection->ns().dbName());
     _createIndex(opCtx, collection, indexBuildInfo, indexConstraints, fromMigrate);
 }
 
@@ -2522,8 +2518,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
                                                             const std::vector<BSONObj>& specs,
                                                             bool fromMigrate) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    auto indexes = toIndexBuildInfoVec(
-        specs, *storageEngine, collection->ns().dbName(), VersionContext::getDecoration(opCtx));
+    auto indexes = toIndexBuildInfoVec(specs, *storageEngine, collection->ns().dbName());
     createIndexesOnEmptyCollection(opCtx, collection, indexes, fromMigrate);
 }
 

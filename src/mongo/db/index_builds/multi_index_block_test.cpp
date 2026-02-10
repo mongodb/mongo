@@ -300,9 +300,8 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-1"});
-    indexBuildInfo1.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-1",
+                       *storageEngine);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
@@ -335,9 +334,8 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-1"});
-    indexBuildInfo1.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-1",
+                       *storageEngine);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
@@ -380,9 +378,8 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-1"});
-    indexBuildInfo1.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-1",
+                       *storageEngine);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
@@ -418,8 +415,7 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
                        *storageEngine,
-                       getNSS().dbName(),
-                       VersionContext::getDecoration(operationContext()));
+                       getNSS().dbName());
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -465,16 +461,14 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-1"});
-    indexBuildInfo1.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-1",
+                       *storageEngine);
     auto indexBuildInfo2 =
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-2"});
-    indexBuildInfo2.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-2",
+                       *storageEngine);
 
     // Starting multiple index builds that conflicts with each other fails, but not with
     // IndexBuildAlreadyInProgress
@@ -496,8 +490,6 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Start one index build is OK
     {
         WriteUnitOfWork wuow(operationContext());
-        indexBuildInfo1.setInternalIdents(*storageEngine,
-                                          VersionContext::getDecoration(operationContext()));
         ASSERT_OK(indexer
                       ->init(operationContext(),
                              coll,
@@ -515,8 +507,6 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Trying to start the index build again fails with IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        indexBuildInfo1.setInternalIdents(*storageEngine,
-                                          VersionContext::getDecoration(operationContext()));
         ASSERT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
@@ -533,10 +523,6 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress if there is an existing index build matching any spec
     {
         WriteUnitOfWork wuow(operationContext());
-        indexBuildInfo1.setInternalIdents(*storageEngine,
-                                          VersionContext::getDecoration(operationContext()));
-        indexBuildInfo2.setInternalIdents(*storageEngine,
-                                          VersionContext::getDecoration(operationContext()));
         ASSERT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
@@ -553,16 +539,13 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
         IndexBuildInfo(BSON("key" << BSON("b" << 1) << "name"
                                   << "b_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-2"});
-    indexBuildInfo3.setInternalIdents(*storageEngine,
-                                      VersionContext::getDecoration(operationContext()));
+                       "index-2",
+                       *storageEngine);
 
     // If one of the requested specs are already in progress we fail with
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        indexBuildInfo1.setInternalIdents(*storageEngine,
-                                          VersionContext::getDecoration(operationContext()));
         ASSERT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
@@ -589,9 +572,8 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
         IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
                                   << "a_1"
                                   << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
-                       std::string{"index-1"});
-    indexBuildInfo.setInternalIdents(*storageEngine,
-                                     VersionContext::getDecoration(operationContext()));
+                       "index-1",
+                       *storageEngine);
 
     {
         WriteUnitOfWork wuow(operationContext());
