@@ -170,6 +170,8 @@ function testDelinquencyOnShard(routerDb, shardDb) {
         comment: findComment,
     });
 
+    const failPointDeferred = configureFailPoint(shardDb, "setPreYieldWaitDeferred", {}, {skip: 2});
+
     // Run the find() command in a parallel shell to retrieve the $currentOp information.
     const joinShell = startParallelShell(
         funWithArgs(
@@ -184,9 +186,11 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     failPoint.wait({timesEntered: 3});
     const curOp = shardDb.currentOp({"command.comment": findComment, "command.find": "testColl", "active": true});
+
+    failPointDeferred.off();
     joinShell();
 
-    // Ensure that serverStatus indicates a find() was run.Add commentMore actions
+    // Ensure that serverStatus indicates a find() was run.
     {
         const serverStatus = routerDb.serverStatus();
         const findMetrics = serverStatus.metrics.commands["find"];

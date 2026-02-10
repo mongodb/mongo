@@ -47,6 +47,7 @@ namespace mongo {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(setPreYieldWait);
+MONGO_FAIL_POINT_DEFINE(setPreYieldWaitDeferred);
 }  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(OperationContext* opCtx,
@@ -113,7 +114,13 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                                          const std::function<void()>& afterSnapshotAbandonFn) {
     tassert(11321328, "opCtx must not be null", opCtx);
     setPreYieldWait.executeIf(
-        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
+        [&](const BSONObj& data) {
+            if (auto e = data["waitForMillis"]; !e.eoo()) {
+                sleepFor(Milliseconds(e.numberInt()));
+            }
+            // Pause after setPreYieldWaitDeferred's skip count is exhausted.
+            setPreYieldWaitDeferred.pauseWhileSet(opCtx);
+        },
         [&](const BSONObj& config) {
             if (config.hasField("comment") && opCtx->getComment()) {
                 return opCtx->getComment()->String() == config.getStringField("comment");
