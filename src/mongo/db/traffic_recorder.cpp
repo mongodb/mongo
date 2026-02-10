@@ -563,6 +563,14 @@ void TrafficRecorder::_observe(Recording& recording,
     _shouldRecord.store(false);
 }
 
+void TrafficRecorder::observeRequest(const transport::Session& ts, const Message& message) {
+    observe(ts, message, EventType::kRequest);
+}
+
+void TrafficRecorder::observeResponse(const transport::Session& ts, const Message& message) {
+    observe(ts, message, EventType::kResponse);
+}
+
 
 std::pair<TrafficRecorder::LockedRecordingHandle, bool> TrafficRecorder::_prepare(
     const StartTrafficRecording& options, ServiceContext* svcCtx) {

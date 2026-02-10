@@ -58,9 +58,10 @@
 namespace mongo {
 
 enum class EventType : uint8_t {
-    kRegular = 0,       // A regular event.
-    kSessionStart = 1,  // A non-message event indicating the start of a session.
-    kSessionEnd = 2,    // A non-message event indicating the end of a session.
+    kRequest = 0,       // A user issued command.
+    kResponse = 1,      // A response, generated for a user command.
+    kSessionStart = 2,  // A non-message event indicating the start of a session.
+    kSessionEnd = 3,    // A non-message event indicating the end of a session.
 
     kMax,  // Not a valid event type, used to check values are in-range.
 };
@@ -139,9 +140,11 @@ public:
     // record 'kSessionStart' and 'kSessionEnd' events.
     // TODO SERVER-106769: change usage of TickSource/std::chrono::steady_clock to solution proposed
     // in SERVER-106769
-    void observe(const transport::Session& ts,
-                 const Message& message,
-                 EventType eventType = EventType::kRegular);
+    void observe(const transport::Session& ts, const Message& message, EventType eventType);
+
+    void observeRequest(const transport::Session& ts, const Message& message);
+
+    void observeResponse(const transport::Session& ts, const Message& message);
 
     class TrafficRecorderSSS;
 
@@ -178,7 +181,7 @@ protected:
                         Microseconds offset,
                         const uint64_t& order,
                         const Message& message,
-                        EventType eventType = EventType::kRegular);
+                        EventType eventType);
 
         BSONObj getStats();
 

@@ -116,23 +116,23 @@ TEST(TrafficRecorderTest, CorrectOffsets) {
     Message message = Message();
     message.setData(dbQuery, "test_query");
 
-    trafficRecorder.observe(session, message);
+    trafficRecorder.observe(session, message, EventType::kRequest);
 
     mockClock.advance(Microseconds(500));
 
-    trafficRecorder.observe(session, message);
+    trafficRecorder.observe(session, message, EventType::kResponse);
 
     mockClock.advance(Milliseconds(10));
 
-    trafficRecorder.observe(session, message);
+    trafficRecorder.observe(session, message, EventType::kRequest);
 
     mockClock.advance(Microseconds(1));
 
-    trafficRecorder.observe(session, message);
+    trafficRecorder.observe(session, message, EventType::kResponse);
 
     mockClock.advance(Seconds(1'000'000'000));
 
-    trafficRecorder.observe(session, message);
+    trafficRecorder.observe(session, message, EventType::kRequest);
 
     TrafficRecorderTestUtil::verifyRecordedOffsets(trafficRecorder,
                                                    {0, 500, 10500, 10501, 1'000'000'000'010'501});

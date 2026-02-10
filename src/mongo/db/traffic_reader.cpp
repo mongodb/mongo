@@ -151,7 +151,7 @@ void getBSONObjFromPacket(TrafficReaderPacket& packet, BSONObjBuilder* builder) 
 
         // Some special events like session events don't have a Message, so these fields can be
         // optional.
-        if (packet.eventType == EventType::kRegular) {
+        if (packet.eventType == EventType::kRequest || packet.eventType == EventType::kResponse) {
             // Add the header fields to rawOp
             {
                 BSONObjBuilder header(rawop.subobjStart("header"));

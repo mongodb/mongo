@@ -64,9 +64,10 @@ jsTest.log("Recording file path: " + recordingFilePath);
 let res = convertTrafficRecordingToBSON(recordingFilePath);
 
 const eventType = {
-    Regular: 0,
-    SessionStart: 1,
-    SessionEnd: 2,
+    Request: 0,
+    Response: 1,
+    SessionStart: 2,
+    SessionEnd: 3,
 };
 let startEventRecorded = false;
 let endEventRecorded = false;
@@ -86,7 +87,7 @@ res.forEach((obj) => {
         assert.eq(startEventRecorded, true);
         // The session end event should be recorded last.
         assert.eq(endEventRecorded, false);
-        assert.eq(obj["event"], eventType.Regular);
+        assert(obj["event"] == eventType.Request || obj["event"] == eventType.Response);
         assert.eq(obj["rawop"]["header"]["opcode"], 2013);
         assert.eq(obj["seenconnectionnum"], 1);
         opTypes[obj["opType"]] = (opTypes[obj["opType"]] || 0) + 1;
