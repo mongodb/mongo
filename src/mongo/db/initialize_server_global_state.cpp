@@ -78,6 +78,10 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
+#ifdef _WIN32
+#include "mongo/logv2/log_util.h"
+#endif
+
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
@@ -376,9 +380,8 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         fassert(16448, !serverGlobalParams.logWithSyslog);
         auto [absoluteLogpath, exists] = [&] {
 #ifdef _WIN32
-            constexpr auto kWindowsNUL = "NUL"_sd;
-            if (serverGlobalParams.logpath == kWindowsNUL) {
-                return std::make_tuple(std::string(kWindowsNUL), true);
+            if (logv2::isLogPathWindowsNul(serverGlobalParams.logpath)) {
+                return std::make_tuple(std::string(logv2::kWindowsNUL), true);
             }
 #endif  // defined(_WIN32)
             std::string absolutePath =
