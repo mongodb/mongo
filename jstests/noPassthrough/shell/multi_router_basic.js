@@ -512,8 +512,6 @@ testCase("Testing isMultiRoutingDisabled will make the proxy run like a single r
     // Set back to false for other tests
     TestData.pinToSingleMongos = false;
     assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
-    // TODO (SERVER-116289) remove this assertion.
-    assert.eq(conn.hasPrimaryMongoRefreshed, true, "Should be MultiRouterMongo");
 });
 
 // ============================================================================
