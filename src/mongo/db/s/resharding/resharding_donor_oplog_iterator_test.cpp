@@ -49,6 +49,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface_factory.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_pipeline.h"
@@ -110,11 +111,70 @@ public:
     }
 } onInsertAlwaysReady;
 
+template <typename T>
+struct MockResult {
+    explicit MockResult(StatusWith<T> result) : result(std::move(result)) {}
+
+    StatusWith<T> result;
+    std::function<void()> beforeReturnResult = [] {
+    };
+};
+
+class MockReshardingDonorOplogPipeline : public ReshardingDonorOplogPipelineInterface {
+public:
+    MockReshardingDonorOplogPipeline(
+        std::vector<MockResult<std::vector<repl::OplogEntry>>> resultSequence)
+        : _resultSequence(std::move(resultSequence)) {}
+
+    ScopedPipeline initWithOperationContext(OperationContext* opCtx,
+                                            ReshardingDonorOplogId resumeToken) override {
+        _lastResumeToken = resumeToken;
+        return ScopedPipeline(opCtx, this);
+    }
+
+    void dispose(OperationContext* opCtx) override {}
+
+    ReshardingDonorOplogId getLastResumeTokenPassedToInit() {
+        return _lastResumeToken;
+    }
+
+protected:
+    std::vector<repl::OplogEntry> _getNextBatch(size_t batchSize) override {
+        if (_resultSequence.empty()) {
+            uasserted(11399600,
+                      "No more results available. Make sure to include final oplog entry when "
+                      "creating mock if you need to exhaust the results.");
+        }
+
+        auto mockResult = _resultSequence.front();
+        _resultSequence.erase(_resultSequence.begin());
+        mockResult.beforeReturnResult();
+
+        uassertStatusOK(mockResult.result);
+        return std::move(mockResult.result.getValue());
+    }
+
+    void _detachFromOperationContext() override {}
+
+private:
+    std::vector<MockResult<std::vector<repl::OplogEntry>>> _resultSequence;
+
+    ReshardingDonorOplogId _lastResumeToken;
+};
+
+repl::OplogEntry toOplogEntry(const repl::MutableOplogEntry& oplog) {
+    return repl::OplogEntry(oplog.toBSON());
+}
+
 class ReshardingDonorOplogIterTest : public ShardServerTestFixture {
 public:
+    repl::MutableOplogEntry makeInsertOplog(ReshardingDonorOplogId oplogId, BSONObj doc) {
+        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, doc, {}, oplogId);
+    }
+
     repl::MutableOplogEntry makeInsertOplog(Timestamp ts, BSONObj doc) {
         ReshardingDonorOplogId oplogId(ts, ts);
-        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, doc, {}, oplogId);
+        return makeInsertOplog(oplogId, doc);
     }
 
     repl::MutableOplogEntry makeFinalOplog(Timestamp ts) {
@@ -187,18 +247,24 @@ public:
 
     auto getNextBatch(ReshardingDonorOplogIterator* iter,
                       std::shared_ptr<executor::TaskExecutor> executor,
-                      CancelableOperationContextFactory factory) {
+                      CancelableOperationContextFactory factory,
+                      CancellationToken cancelToken) {
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .get() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return ExecutorFuture(executor)
-            .then([iter, executor, factory]() mutable {
-                return iter->getNextBatch(
-                    std::move(executor), CancellationToken::uncancelable(), factory);
+            .then([iter, executor, cancelToken, factory]() mutable {
+                return iter->getNextBatch(std::move(executor), cancelToken, factory);
             })
             .then([](auto x) { return x; })
             .get();
+    }
+
+    auto getNextBatch(ReshardingDonorOplogIterator* iter,
+                      std::shared_ptr<executor::TaskExecutor> executor,
+                      CancelableOperationContextFactory factory) {
+        return getNextBatch(iter, std::move(executor), factory, CancellationToken::uncancelable());
     }
 
     ServiceContext::UniqueClient makeKillableClient() {
@@ -397,6 +463,153 @@ DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTest,
     AlternativeClientRegion acr(altClient);
 
     ASSERT_THROWS_CODE(getNextBatch(&iter, executor, factory), DBException, 6077499);
+}
+
+TEST_F(ReshardingDonorOplogIterTest, GetNextBatchAutomaticallyRetriesOnRetryableError) {
+    const auto oplog1Id = ReshardingDonorOplogId(Timestamp(2, 4), Timestamp(102, 104));
+
+    const auto oplog1 = toOplogEntry(makeInsertOplog(oplog1Id, BSON("x" << 1)));
+    const auto oplog2 = toOplogEntry(makeInsertOplog(Timestamp(330, 60), BSON("y" << 1)));
+    const auto finalOplog = toOplogEntry(makeFinalOplog(Timestamp(430, 240)));
+
+    std::vector<MockResult<std::vector<repl::OplogEntry>>> mockResponses;
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog1});
+    mockResponses.emplace_back(Status(ErrorCodes::QueryPlanKilled, "mock error"));
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog2, finalOplog});
+    auto mockPipeline = std::make_unique<MockReshardingDonorOplogPipeline>(mockResponses);
+    auto mockPipelinePtr = mockPipeline.get();
+
+    ReshardingDonorOplogIterator iter(
+        std::move(mockPipeline), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+    ASSERT_EQ(ReshardingDonorOplogId(), mockPipelinePtr->getLastResumeTokenPassedToInit());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog2), getId(next[0]));
+    ASSERT_EQ(oplog1Id, mockPipelinePtr->getLastResumeTokenPassedToInit());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+    ASSERT_EQ(oplog1Id, mockPipelinePtr->getLastResumeTokenPassedToInit());
+}
+
+TEST_F(ReshardingDonorOplogIterTest, GetNextBatchPassesHighestSeenOplogIdAsResumeToken) {
+    const auto oplog1Id = ReshardingDonorOplogId(Timestamp(2, 4), Timestamp(102, 104));
+    const auto oplog2Id = ReshardingDonorOplogId(Timestamp(33, 6), Timestamp(133, 106));
+    const auto oplog3Id = ReshardingDonorOplogId(Timestamp(43, 24), Timestamp(143, 124));
+    const auto oplog4Id = ReshardingDonorOplogId(Timestamp(49, 85), Timestamp(149, 185));
+
+    const auto oplog1 = toOplogEntry(makeInsertOplog(oplog1Id, BSON("x" << 1)));
+    const auto oplog2 = toOplogEntry(makeInsertOplog(oplog2Id, BSON("y" << 1)));
+    const auto oplog3 = toOplogEntry(makeInsertOplog(oplog3Id, BSON("z" << 1)));
+    const auto oplog4 = toOplogEntry(makeInsertOplog(oplog4Id, BSON("a" << 1)));
+    const auto finalOplog = toOplogEntry(makeFinalOplog(Timestamp(55, 7)));
+
+    std::vector<MockResult<std::vector<repl::OplogEntry>>> mockResponses;
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog1});
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog2, oplog3});
+    mockResponses.emplace_back(Status(ErrorCodes::QueryPlanKilled, "mock error"));
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog4});
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{finalOplog});
+    auto mockPipeline = std::make_unique<MockReshardingDonorOplogPipeline>(mockResponses);
+    auto mockPipelinePtr = mockPipeline.get();
+
+    ReshardingDonorOplogIterator iter(
+        std::move(mockPipeline), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+    ASSERT_EQ(ReshardingDonorOplogId(), mockPipelinePtr->getLastResumeTokenPassedToInit());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 2U);
+    ASSERT_BSONOBJ_EQ(getId(oplog2), getId(next[0]));
+    ASSERT_BSONOBJ_EQ(getId(oplog3), getId(next[1]));
+    ASSERT_EQ(oplog1Id, mockPipelinePtr->getLastResumeTokenPassedToInit());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog4), getId(next[0]));
+    ASSERT_EQ(oplog3Id, mockPipelinePtr->getLastResumeTokenPassedToInit());
+
+    next = getNextBatch(&iter, executor, factory);
+    ASSERT_TRUE(next.empty());
+    ASSERT_EQ(oplog4Id, mockPipelinePtr->getLastResumeTokenPassedToInit());
+}
+
+TEST_F(ReshardingDonorOplogIterTest, GetNextBatchStopsWhenCancellationTokenIsCanceled) {
+    CancellationSource cancelSource;
+    auto cancelToken = cancelSource.token();
+
+    const auto oplog1 = toOplogEntry(makeInsertOplog(Timestamp(2, 4), BSON("x" << 1)));
+    const auto oplog2 = toOplogEntry(makeInsertOplog(Timestamp(33, 6), BSON("y" << 1)));
+    const auto finalOplog = toOplogEntry(makeFinalOplog(Timestamp(43, 24)));
+
+    std::vector<MockResult<std::vector<repl::OplogEntry>>> mockResponses;
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog1});
+
+    {
+        MockResult<std::vector<repl::OplogEntry>> mockResult(
+            Status(ErrorCodes::InterruptedDueToReplStateChange, "fake stepdown"));
+        mockResult.beforeReturnResult = [&] {
+            cancelSource.cancel();
+        };
+        mockResponses.emplace_back(mockResult);
+    }
+
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog2, finalOplog});
+    auto mockPipeline = std::make_unique<MockReshardingDonorOplogPipeline>(mockResponses);
+
+    ReshardingDonorOplogIterator iter(
+        std::move(mockPipeline), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory, cancelToken);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+
+    ASSERT_THROWS_CODE(getNextBatch(&iter, executor, factory, cancelToken),
+                       DBException,
+                       ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ReshardingDonorOplogIterTest, GetNextBatchThrowsOnNonRetryableError) {
+    const auto oplog1 = toOplogEntry(makeInsertOplog(Timestamp(2, 4), BSON("x" << 1)));
+
+    std::vector<MockResult<std::vector<repl::OplogEntry>>> mockResponses;
+    mockResponses.emplace_back(std::vector<repl::OplogEntry>{oplog1});
+    mockResponses.emplace_back(Status(ErrorCodes::InternalError, "fake test error"));
+    auto mockPipeline = std::make_unique<MockReshardingDonorOplogPipeline>(mockResponses);
+
+    ReshardingDonorOplogIterator iter(
+        std::move(mockPipeline), kResumeFromBeginning, &onInsertAlwaysReady);
+    auto executor = makeTaskExecutorForIterator();
+    auto factory = makeCancelableOpCtx();
+    auto altClient = makeKillableClient();
+    AlternativeClientRegion acr(altClient);
+
+    auto next = getNextBatch(&iter, executor, factory);
+    ASSERT_EQ(next.size(), 1U);
+    ASSERT_BSONOBJ_EQ(getId(oplog1), getId(next[0]));
+
+    ASSERT_THROWS_CODE(
+        getNextBatch(&iter, executor, factory), DBException, ErrorCodes::InternalError);
 }
 
 }  // anonymous namespace
