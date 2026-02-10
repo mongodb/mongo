@@ -11,6 +11,11 @@ const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 
+// Background query analysis operations such as index creation may throw off
+// the checks between the replSetGetStatus result and the last oplog entry.
+// TODO SERVER-109841: This should be deleted if we move this into ReplSetTest.
+rst.waitForQueryAnalysisWriterSetup();
+
 const db = rst.getPrimary().getDB("oplog_scan_optimizations");
 const localDb = rst.getPrimary().getDB("local");
 const collName = "oplog_scan_optimizations";

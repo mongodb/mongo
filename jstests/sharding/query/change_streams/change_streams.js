@@ -28,11 +28,14 @@ function runTest(collName, shardKey) {
     // Test that the config server is running with {periodicNoopIntervalSecs: 1}. This ensures that
     // the config server does not unduly delay a change stream despite its low write rate.
     //
-    const noopPeriod = assert.commandWorked(
-        st.configRS.getPrimary().adminCommand({getParameter: 1, periodicNoopIntervalSecs: 1}),
-    );
-    assert.eq(noopPeriod.periodicNoopIntervalSecs, 1, noopPeriod);
-
+    // Note that we only test this for ASC fixtures, as non ASC fixtures do this with a different parameter.
+    //
+    if (!TestData.notASC) {
+        const noopPeriod = assert.commandWorked(
+            st.configRS.getPrimary().adminCommand({getParameter: 1, periodicNoopIntervalSecs: 1}),
+        );
+        assert.eq(noopPeriod.periodicNoopIntervalSecs, 1, noopPeriod);
+    }
     //
     // Sanity tests
     //

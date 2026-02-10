@@ -20,6 +20,12 @@ function checkChangeStreamMetrics(db, expectedTotal, expectedWithExpandedEvents)
 const rst = new ReplSetTest({name: jsTest.name(), nodes: 1});
 rst.startSet();
 rst.initiate();
+
+// Background query analysis operations such as index creation may throw off
+// the checks between the replSetGetStatus result and the last oplog entry.
+// TODO SERVER-109841: This should be deleted if we move this into ReplSetTest.
+rst.waitForQueryAnalysisWriterSetup();
+
 const db = rst.getPrimary().getDB(jsTest.name());
 const coll = db.getCollection(jsTest.name());
 
