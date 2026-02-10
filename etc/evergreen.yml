@@ -110,9 +110,6 @@ commit_queue_aliases:
   - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
-  - variant: "^(al2023-arm64-sep-benchmark)$"
-    variant_tags: []
-    task_tags: ["benchmarks_sep"]
 
 github_pr_aliases:
   - variant: "commit-queue"
@@ -122,9 +119,6 @@ github_pr_aliases:
   - variant: "^(amazon-linux2023-arm64-static-compile|linux-x86-dynamic-compile-required)$"
     variant_tags: []
     task_tags: ["clang_tidy"]
-  - variant: "^(al2023-arm64-sep-benchmark)$"
-    variant_tags: []
-    task_tags: ["benchmarks_sep"]
 
 patch_aliases:
   - alias: required

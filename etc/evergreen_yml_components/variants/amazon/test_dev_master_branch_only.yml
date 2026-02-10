@@ -263,23 +263,6 @@ buildvariants:
     tasks:
       - name: .magic_restore
 
-  - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
-    display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
-    tags: ["required"]
-    cron: "0 */4 * * *"
-    run_on:
-      - amazon2023.3-arm64-large
-    expansions:
-      build_timeout_seconds: 900
-      bazel_compile_flags: >-
-        --define=MONGO_DISTMOD=amazon2023
-        --dbg_level=1
-        --separate_debug=False
-      evergreen_remote_exec: on
-      compile_variant: *al2023-arm64-sep-benchmark
-    tasks:
-      - name: .benchmarks_sep
-
   ### Query Patch-Specific Build Variants ###
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
