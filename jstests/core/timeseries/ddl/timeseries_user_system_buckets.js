@@ -191,6 +191,13 @@ db.dropDatabase();
         createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
     });
 
+    jsTest.log("Case collection: bucket timeseries / view: non timeseries.");
+    runTest(() => {
+        createWorked(kBucket, tsOptions);
+        // TODO SERVER-85855 change assert to ensure the creation fail
+        assert.commandWorked(db.runCommand({create: kColl, viewOn: "otherName", pipeline: []}));
+    });
+
     jsTest.log("Case collection: bucket timeseries / collection: bucket timeseries.");
     runTest(
         () => {

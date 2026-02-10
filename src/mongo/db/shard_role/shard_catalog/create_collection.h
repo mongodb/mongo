@@ -103,4 +103,17 @@ translateOptionsIfClusterByDefault(const NamespaceString& nss,
                                    CollectionOptions collectionOptions,
                                    const boost::optional<BSONObj>& idIndex = boost::none);
 
+/**
+ * Check if we already have a collection or view compatible with the given create command.
+ * In case of timeseries create command it also checks if the corresponding timeseries buckets
+ * collection already exists and is compatible.
+ *
+ * Returns:
+ *  - false: if no conflicting collection or view exists
+ *  - true: if the namespace already exists and has same options
+ *  - throws NamespaceExists error if a collection or view already exists with different options
+ */
+MONGO_MOD_PRIVATE
+bool checkNamespaceAndTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
+                                                     const CreateCommand& cmd);
 }  // namespace mongo

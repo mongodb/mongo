@@ -304,15 +304,6 @@ void assertTimeseriesLocalCatalogConsistency(OperationContext* opCtx, const Coll
                 "and/or backing up its contents.",
             !coll->ns().isTimeseriesBucketsCollection() ||
                 coll->getTimeseriesOptions().has_value());
-    tassert(9934502,
-            fmt::format("Encountered invalid state for target collection '{}'. ",
-                        coll->ns().toStringForErrorMsg()) +
-                "The collection namespace is not prefixed with 'system.buckets.' but has "
-                "associated time-series options. Please consider options to correct this, "
-                "including renaming the collection or dropping the collection after inspecting "
-                "and/or backing up its contents.",
-            viewlessTimeseriesEnabled(opCtx) || coll->ns().isTimeseriesBucketsCollection() ||
-                !coll->getTimeseriesOptions().has_value());
 
     // Refuse to track if both 'coll' and 'system.buckets.coll' are regular collections in the local
     // catalog. This prevents the inconsistency from propagating to the global catalog.

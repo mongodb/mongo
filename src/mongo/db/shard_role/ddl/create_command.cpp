@@ -33,14 +33,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -51,29 +49,19 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/views/view.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/uuid.h"
 
 #include <memory>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -108,159 +96,6 @@ constexpr auto kCreateCommandHelp =
     "  changeStreamPreAndPostImages: <document: pre- and post-images options for change streams>,\n"
     "  writeConcern: <document: write concern expression for the operation>]\n"
     "}"_sd;
-
-BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
-    BSONArrayBuilder builder;
-    for (const auto& stage : pipeline) {
-        builder.append(stage);
-    }
-    return builder.obj();
-}
-
-/**
- * Compares the provided `CollectionOptions` to the the options for the provided `NamespaceString`
- * in the storage catalog.
- * If the options match, does nothing.
- * If the options do not match, throws an exception indicating what doesn't match.
- * If `ns` is not found in the storage catalog (because it was dropped between checking for its
- * existence and calling this function), throws the original `NamespaceExists` exception.
- */
-void checkCollectionOptions(OperationContext* opCtx,
-                            const Status& originalStatus,
-                            const CreateCommand& cmd,
-                            const CollectionOptions& options) {
-    const auto& ns = cmd.getNamespace();
-    AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
-
-    auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
-
-    const auto catalog = CollectionCatalog::get(opCtx);
-    const auto coll = catalog->lookupCollectionByNamespace(opCtx, ns);
-    if (coll) {
-
-        const bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
-            holds_alternative<bool>(*cmd.getClusteredIndex()) &&
-            !get<bool>(*cmd.getClusteredIndex());
-        auto requestedOptions =
-            (hasExplicitlyDisabledClustering ? options
-                                             : translateOptionsIfClusterByDefault(ns, options));
-        auto existingOptions = coll->getCollectionOptions();
-
-        if (requestedOptions.timeseries) {
-            // When checking that the options for the timeseries collection are the same, filter out
-            // the options that were internally generated upon time-series collection creation (i.e.
-            // were not specified by the user).
-            uassertStatusOK(
-                timeseries::validateAndSetBucketingParameters(requestedOptions.timeseries.get()));
-            existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
-                false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
-        }
-
-        uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "namespace " << ns.toStringForErrorMsg()
-                              << " already exists, but with different options: "
-                              << existingOptions.toBSON(),
-                requestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
-        return;
-    }
-
-    const auto view = catalog->lookupView(opCtx, ns);
-    if (!view) {
-        // If the collection/view disappeared in between attempting to create it
-        // and retrieving the options, just propagate the original error.
-        uassertStatusOK(originalStatus);
-        // The assertion above should always fail, as this function should only ever be called
-        // if the original attempt to create the collection failed.
-        MONGO_UNREACHABLE_TASSERT(10083507);
-    }
-
-    auto fullNewNamespace = NamespaceStringUtil::deserialize(ns.dbName(), options.viewOn);
-    uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "namespace " << ns.toStringForErrorMsg()
-                          << " already exists, but is a view on "
-                          << view->viewOn().toStringForErrorMsg() << " rather than "
-                          << fullNewNamespace.toStringForErrorMsg(),
-            view->viewOn() == fullNewNamespace);
-
-    auto existingPipeline = pipelineAsBsonObj(view->pipeline());
-    uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "namespace " << ns.toStringForErrorMsg()
-                          << " already exists, but with pipeline " << existingPipeline
-                          << " rather than " << options.pipeline,
-            existingPipeline.woCompare(options.pipeline) == 0);
-
-    // Note: the server can add more values to collation options which were not
-    // specified in the original user request. Use the collator to check for
-    // equivalence.
-    auto newCollator = options.collation.isEmpty()
-        ? nullptr
-        : uassertStatusOK(collatorFactory->makeFromBSON(options.collation));
-
-    if (!CollatorInterface::collatorsMatch(view->defaultCollator(), newCollator.get())) {
-        const auto defaultCollatorSpecBSON =
-            view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON() : BSONObj();
-        uasserted(ErrorCodes::NamespaceExists,
-                  str::stream() << "namespace " << ns.toStringForErrorMsg()
-                                << " already exists, but with collation: "
-                                << defaultCollatorSpecBSON << " rather than " << options.collation);
-    }
-}
-
-void checkTimeseriesBucketsCollectionOptions(OperationContext* opCtx,
-                                             const Status& error,
-                                             const NamespaceString& bucketsNs,
-                                             CollectionOptions& options) {
-    auto coll = acquireCollectionMaybeLockFree(
-        opCtx,
-        // TODO (SERVER-82072): Do not skip shard version checks.
-        CollectionAcquisitionRequest{bucketsNs,
-                                     PlacementConcern::kPretendUnsharded,
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::OperationType::kRead});
-    uassert(error.code(), error.reason(), coll.exists());
-
-    auto existingOptions = coll.getCollectionPtr()->getCollectionOptions();
-    uassert(error.code(), error.reason(), existingOptions.timeseries);
-
-    uassertStatusOK(timeseries::validateAndSetBucketingParameters(*options.timeseries));
-
-    // When checking that the options for the buckets collection are the same, filter out the
-    // options that were internally generated upon time-series collection creation (i.e. were not
-    // specified by the user).
-    uassert(error.code(),
-            error.reason(),
-            options.matchesStorageOptions(
-                uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
-                    false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions))),
-                CollatorFactoryInterface::get(opCtx->getServiceContext())));
-}
-
-void checkTimeseriesViewOptions(OperationContext* opCtx,
-                                const Status& error,
-                                const NamespaceString& viewNs,
-                                const CollectionOptions& options) {
-    auto acquisition =
-        acquireCollectionOrViewMaybeLockFree(opCtx,
-                                             CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                                 opCtx,
-                                                 viewNs,
-                                                 AcquisitionPrerequisites::OperationType::kRead,
-                                                 AcquisitionPrerequisites::ViewMode::kCanBeView));
-    uassert(error.code(), error.reason(), acquisition.isView());
-    const auto& view = acquisition.getView().getViewDefinition();
-
-    uassert(error.code(), error.reason(), view.viewOn() == viewNs.makeTimeseriesBucketsNamespace());
-    uassert(error.code(),
-            error.reason(),
-            CollatorInterface::collatorsMatch(
-                view.defaultCollator(),
-                !options.collation.isEmpty()
-                    ? uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                          ->makeFromBSON(options.collation))
-                          .get()
-                    : nullptr));
-}
 
 class CmdCreate final : public CreateCmdVersion1Gen<CmdCreate> {
 public:
@@ -317,10 +152,6 @@ public:
 
             ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
                 opCtx, std::vector<NamespaceString>{cmd.getNamespace()});
-
-            auto createViewlessTimeseriesColl =
-                gFeatureFlagCreateViewlessTimeseriesCollections
-                    .isEnabledUseLastLTSFCVWhenUninitialized(VersionContext::getDecoration(opCtx));
 
             CreateCommandReply reply;
 
@@ -560,20 +391,11 @@ public:
             // if a collection with identical options already exists.
             if (createStatus == ErrorCodes::NamespaceExists &&
                 !opCtx->inMultiDocumentTransaction()) {
-                auto options = CollectionOptions::fromCreateCommand(cmd);
-                if (options.timeseries && !createViewlessTimeseriesColl) {
-                    const auto& bucketNss = cmd.getNamespace().isTimeseriesBucketsCollection()
-                        ? cmd.getNamespace()
-                        : cmd.getNamespace().makeTimeseriesBucketsNamespace();
-                    checkTimeseriesBucketsCollectionOptions(
-                        opCtx, createStatus, bucketNss, options);
-
-                    if (!cmd.getNamespace().isTimeseriesBucketsCollection()) {
-                        checkTimeseriesViewOptions(
-                            opCtx, createStatus, cmd.getNamespace(), options);
-                    }
-                } else {
-                    checkCollectionOptions(opCtx, createStatus, cmd, options);
+                auto collExists = checkNamespaceAndTimeseriesBucketsAlreadyExists(opCtx, cmd);
+                if (!collExists) {
+                    // If the collection/view disappeared in between attempting to create it
+                    // and retrieving the options, just propagate the original error.
+                    uassertStatusOK(createStatus);
                 }
             } else {
                 uassertStatusOK(createStatus);

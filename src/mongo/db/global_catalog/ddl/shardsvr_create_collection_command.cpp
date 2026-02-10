@@ -127,11 +127,14 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
     // current create operation with other DDL operations.
     auto shardRole = setShardRoleToShardVersionIgnoredIfNeeded(opCtx, ns);
 
-    // Preventively set the ShardVersion to IGNORED for the timeseries buckets namespace as well.
-    auto bucketsShardRole = [&]() -> boost::optional<ScopedSetShardRole> {
-        if (cmd.getTimeseries() && !ns.isTimeseriesBucketsCollection()) {
-            return setShardRoleToShardVersionIgnoredIfNeeded(opCtx,
-                                                             ns.makeTimeseriesBucketsNamespace());
+    // TODO SERVER-118970 remove this timeseries related code once all timeseries will have only one
+    // namespace (viewless)
+    auto otherTimeseriesShardRole = [&]() -> boost::optional<ScopedSetShardRole> {
+        if (cmd.getTimeseries()) {
+            auto otherTimeseriesNss = ns.isTimeseriesBucketsCollection()
+                ? ns.getTimeseriesViewNamespace()
+                : ns.makeTimeseriesBucketsNamespace();
+            return setShardRoleToShardVersionIgnoredIfNeeded(opCtx, otherTimeseriesNss);
         }
         return boost::none;
     }();
