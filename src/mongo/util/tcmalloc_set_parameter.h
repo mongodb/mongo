@@ -33,6 +33,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/tenant_id.h"
 
+#include <functional>
+
 namespace mongo {
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
@@ -55,4 +57,8 @@ void setMemoryReleaseRate(TcmallocReleaseRateT val);
 Status onUpdateHeapProfilingSampleIntervalBytes(long long newValue);
 Status validateHeapProfilingSampleIntervalBytes(long long newValue,
                                                 const boost::optional<TenantId>& tenantId);
+Status onUpdateHeapProfilingMaxObjects(long long newValue);
+
+// Allows heap_profiler.cpp to register a callback for updating max sampled objects.
+void setHeapProfilingMaxObjectsCallback(std::function<void(long long)> callback);
 }  // namespace mongo

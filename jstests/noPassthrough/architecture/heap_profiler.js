@@ -75,6 +75,49 @@ function testHeapProfilerRespectsMemoryLimit() {
     MongoRunner.stopMongod(db);
 }
 
+function testHeapProfilingMaxObjectsRuntimeUpdate() {
+    let db;
+    try {
+        db = MongoRunner.runMongod({
+            setParameter: {heapProfilingSampleIntervalBytes: minProfilingRate},
+        });
+    } catch (err) {
+        jsTestLog("Heap profiler is not available on this platform.");
+        quit();
+    }
+
+    const adminDb = db.getDB("admin");
+
+    jsTestLog("Test runtime update of heapProfilingMaxObjects");
+
+    // Get initial value
+    let res = adminDb.runCommand({getParameter: 1, heapProfilingMaxObjects: 1});
+    assert.commandWorked(res);
+    const initialValue = res.heapProfilingMaxObjects;
+    jsTestLog("Initial heapProfilingMaxObjects: " + initialValue);
+
+    // Set a new value at runtime
+    const newValue = 100000;
+    assert.commandWorked(adminDb.runCommand({setParameter: 1, heapProfilingMaxObjects: newValue}));
+
+    // Verify the value was updated
+    res = adminDb.runCommand({getParameter: 1, heapProfilingMaxObjects: 1});
+    assert.commandWorked(res);
+    assert.eq(res.heapProfilingMaxObjects, newValue, "heapProfilingMaxObjects was not updated to " + newValue);
+
+    // Set back to 0 (use heuristic)
+    assert.commandWorked(adminDb.runCommand({setParameter: 1, heapProfilingMaxObjects: 0}));
+    res = adminDb.runCommand({getParameter: 1, heapProfilingMaxObjects: 1});
+    assert.commandWorked(res);
+    assert.eq(res.heapProfilingMaxObjects, 0);
+
+    // Verify heap profiler still works after the update
+    const ss = adminDb.serverStatus();
+    assert(ss.hasOwnProperty("heapProfile"), "heapProfile section should exist");
+
+    MongoRunner.stopMongod(db);
+}
+
 const conn = MongoRunner.runMongod();
 const adminDb = conn.getDB("admin");
 const buildInfo = adminDb.runCommand("buildInfo");
@@ -88,6 +131,7 @@ if (buildInfo.allocator === "tcmalloc-google") {
     testHeapProfilerOnStartup({setParameter: {heapProfilingSampleIntervalBytes: minProfilingRate}});
     testHeapProfilerOnRuntime();
     testHeapProfilerRespectsMemoryLimit();
+    testHeapProfilingMaxObjectsRuntimeUpdate();
 } else if (buildInfo.allocator === "tcmalloc-gperf") {
     jsTestLog("Testing tcmalloc-gperf heap profiler");
     testHeapProfilerOnStartup({

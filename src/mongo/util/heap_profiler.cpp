@@ -43,6 +43,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
+#include "mongo/util/tcmalloc_set_parameter.h"
 
 #include <algorithm>
 #include <array>
@@ -72,6 +73,7 @@
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <absl/debugging/symbolize.h>
+#include <tcmalloc/common.h>
 #include <tcmalloc/malloc_extension.h>
 #endif
 
@@ -726,6 +728,20 @@ public:
         heapProfiler = new HeapProfiler();
     }
 
+    static void setMaxSampledObjects(long long value) {
+        if (heapProfiler) {
+            // Either use the user-configured maximum, or the heuristic that each tcmalloc sample
+            // takes up a tcmalloc page
+            // (https://github.com/google/tcmalloc/blob/master/docs/sampling.md), do not exceed 5%
+            // of pages in the system.
+            size_t maxObjects = value != 0
+                ? static_cast<size_t>(value)
+                : static_cast<size_t>((0.05 * ProcessInfo::getMemSizeMB()) * (1024 * 1024) /
+                                      tcmalloc::tcmalloc_internal::kPageSize);
+            heapProfiler->_maxSampledObjects.store(maxObjects);
+        }
+    }
+
 private:
     struct StackInfo {
         StackInfo(const tcmalloc::Profile::Sample& stackSample, int id) {
@@ -774,7 +790,7 @@ private:
             LOGV2(8592504,
                   "Generating heap profiler serverStatus",
                   "heapProfilingSampleIntervalBytes"_attr = HeapProfilingSampleIntervalBytes,
-                  "maximumSampledObjects"_attr = _maxSampledObjects);
+                  "maximumSampledObjects"_attr = _maxSampledObjects.load());
         }
 
         stdx::lock_guard lk(heapProfiler->_mutex);
@@ -807,7 +823,7 @@ private:
                     stackInfo->activeBytes = sample.sum;
                 }
 
-                if (activeSamples > _maxSampledObjects) {
+                if (activeSamples > _maxSampledObjects.load()) {
                     LOGV2(9060100,
                           "Exceeded active sample maximum, disabling heap profiler",
                           "activeSamples"_attr = activeSamples);
@@ -873,12 +889,12 @@ private:
     stdx::unordered_map<uint32_t, std::unique_ptr<StackInfo>> _stackInfoMap;
     Atomic<bool> _logGeneralStats = true;
     // Either use the user-configured maximum, or the heuristic that each tcmalloc sample takes up a
-    // page-- do not exceed 5% of pages in the system.
-    const size_t _maxSampledObjects =
+    // tcmalloc page (https://github.com/google/tcmalloc/blob/master/docs/sampling.md), do not
+    // exceed 5% of pages in the system.
+    Atomic<size_t> _maxSampledObjects =
         HeapProfilingMaxObjects != 0 ? HeapProfilingMaxObjects : []() {
-            return (static_cast<float>(ProcessInfo::getMemSizeMB() * (1024 * 1024)) /
-                    static_cast<float>(ProcessInfo::getPageSize())) *
-                0.05;
+            return (0.05 * ProcessInfo::getMemSizeMB() * (1024 * 1024) /
+                    tcmalloc::tcmalloc_internal::kPageSize);
         }();
 
     // In order to reduce load on ftdc we track the stacks we deem important enough to emit
@@ -915,6 +931,9 @@ public:
 MONGO_INITIALIZER_GENERAL(StartHeapProfiling, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext*) {
     HeapProfiler::start();
+    // Register callback for runtime updates to heapProfilingMaxObjects.
+    setHeapProfilingMaxObjectsCallback(
+        [](long long value) { HeapProfiler::setMaxSampledObjects(value); });
 }
 #elif defined(MONGO_CONFIG_TCMALLOC_GPERF)
 using heap_profiler_detail_gperf_tcmalloc::HeapProfiler;

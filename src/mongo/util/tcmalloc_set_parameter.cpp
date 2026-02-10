@@ -51,6 +51,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 
 #include <boost/optional/optional.hpp>
@@ -364,6 +365,25 @@ Status validateHeapProfilingSampleIntervalBytes(long long newValue,
         fmt::format("heapProfilingSampleIntervalBytes must have a minimum rate of {} bytes or be "
                     "disabled with a rate of 0.",
                     heapProfilerMinRate)};
+}
+
+// Callback function pointer for updating heap profiler max objects.
+// This is set by heap_profiler.cpp at startup if heap profiling is available.
+std::function<void(long long)> heapProfilingMaxObjectsCallback;
+
+void setHeapProfilingMaxObjectsCallback(std::function<void(long long)> callback) {
+    heapProfilingMaxObjectsCallback = std::move(callback);
+}
+
+Status onUpdateHeapProfilingMaxObjects(long long newValue) {
+    if (heapProfilingMaxObjectsCallback) {
+        heapProfilingMaxObjectsCallback(newValue);
+    } else {
+        LOGV2_WARNING(11746200,
+                      "heapProfilingMaxObjects runtime update ignored. Runtime updates require "
+                      "tcmalloc-google on POSIX. Startup values are still applied.");
+    }
+    return Status::OK();
 }
 
 namespace {

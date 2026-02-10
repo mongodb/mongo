@@ -89,11 +89,12 @@ server_parameters:
         description:
             "Set the maximum number of objects tracked by the tcmalloc-google heap profiler
             before it is disabled"
-        set_at: startup
+        set_at: [startup, runtime]
         cpp_vartype: long long
         cpp_varname: HeapProfilingMaxObjects
         default: 0
-        validator: {lt: 1048576}
+        on_update: onUpdateHeapProfilingMaxObjects
+        validator: {gte: 0, lt: 1048576}
         redact: false
 
     tcmallocReleaseRate:
