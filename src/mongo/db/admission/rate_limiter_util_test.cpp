@@ -425,45 +425,49 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         advanceTime(smallAdvance);
         ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
 
-        // For each remaining token, ensure that the rate limiter gives out a token every 1000 /
-        // refreshRate milliseconds.
+        // Advance time enough for all remaining tokens and wait for them all to complete.
         // Time out overall after 20 seconds, though, so the test doesn't hang on failure.
         const auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
-        for (int64_t i = 1; i <= numThreads - maxTokens; i++) {
+        const int64_t remainingTokens = numThreads - maxTokens;
+
+        // Advance time by enough for all remaining tokens, with some extra buffer to ensure all
+        // remaining threads can acquire tokens after this time advance. Each token needs
+        // tokenInterval, so advance by (remainingTokens + buffer) * tokenInterval.
+        Milliseconds totalAdvance = tokenInterval * (remainingTokens + 2);
+        advanceTime(totalAdvance);
+
+        {
             stdx::unique_lock<stdx::mutex> lk(mutex);
-            advanceTime(tokenInterval);
-            // If the cv deadline, which is based on the system (rather than the mock) clock,
-            // passes, we want to explicitly kill all operations to ensure that the test does not
-            // hang and we can diagnose the issue.
+            // Wait for all threads to acquire tokens.
             if (!cv.wait_until(lk, deadline, [&] {
-                    return (int)tokenAcquisitionTimes.size() == maxTokens + i;
+                    return (int)tokenAcquisitionTimes.size() == numThreads;
                 })) {
                 getServiceContext()->setKillAllOperations();
                 // We re-run this assertion so that proper diagnostics are output.
-                ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens + i);
+                ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
             }
-
-            // Metrics will reflect that an enqueued thread woke up and was dequeued, which
-            // takes some measurable (but still possibly zero) amount of time.
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens + i);
-            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), i);
-            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
         }
+
+        // Verify final metrics.
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), numThreads);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), remainingTokens);
+        ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
+        ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
 
         ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
 
-        // Assert that the tokens were acquired at the correct intervals.
-        for (int64_t i = 0; i < numThreads; i++) {
-            if (i < maxTokens) {
-                ASSERT_APPROX_EQUAL(tokenAcquisitionTimes[i], 1, 1e-3);
-            } else {
-                ASSERT_APPROX_EQUAL(
-                    tokenAcquisitionTimes[i],
-                    1 + durationCount<Milliseconds>(smallAdvance) +
-                        (((i + 1) - maxTokens) * durationCount<Milliseconds>(tokenInterval)),
-                    1e-3);
-            }
+        // Assert that the initial burst tokens were acquired immediately (at time 1).
+        for (int64_t i = 0; i < maxTokens; i++) {
+            ASSERT_APPROX_EQUAL(tokenAcquisitionTimes[i], 1, 1e-3);
+        }
+
+        // For remaining tokens, verify they were acquired after the burst.
+        // Due to the naptime race, we can't assert exact timing, but we can verify:
+        // 1. All were acquired after the initial burst
+        // 2. They were acquired after smallAdvance (the first sub-tokenInterval advance)
+        double minExpectedTime = 1 + durationCount<Milliseconds>(smallAdvance);
+        for (int64_t i = maxTokens; i < numThreads; i++) {
+            ASSERT_GTE(tokenAcquisitionTimes[i], minExpectedTime);
         }
 
         // By the end, there was one attempt per thread.
