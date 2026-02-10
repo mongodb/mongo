@@ -367,13 +367,15 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                                                    _donorShard.toString()),
                                        _service()->getService());
 
-                   boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
+                   std::shared_ptr<HierarchicalCancelableOperationContextFactory> aggOpCtxFactory;
                    {
                        stdx::lock_guard lk(_mutex);
                        _aggCancelSource.emplace(cancelToken);
-                       aggOpCtxFactory.emplace(_aggCancelSource->token(), executor);
+                       aggOpCtxFactory =
+                           std::make_shared<HierarchicalCancelableOperationContextFactory>(
+                               _aggCancelSource->token(), executor);
                    }
-                   return iterate(client.get(), *aggOpCtxFactory);
+                   return iterate(client.get(), aggOpCtxFactory);
                });
            })
         .until([this, executor, cancelToken, delay](StatusWith<bool> statusWithMoreOplogsToCome) {
@@ -414,11 +416,12 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
         });
 }
 
-bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextFactory factory) {
+bool ReshardingOplogFetcher::iterate(
+    Client* client, std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     try {
         std::shared_ptr<Shard> targetShard;
         {
-            auto opCtxRaii = factory.makeOperationContext(client);
+            auto opCtxRaii = factory->makeOperationContext(client);
             opCtxRaii->checkForInterrupt();
 
             StatusWith<std::shared_ptr<Shard>> swDonor =
@@ -447,10 +450,11 @@ bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextF
     }
 }
 
-void ReshardingOplogFetcher::_ensureCollection(Client* client,
-                                               CancelableOperationContextFactory factory,
-                                               const NamespaceString nss) {
-    auto opCtxRaii = factory.makeOperationContext(client);
+void ReshardingOplogFetcher::_ensureCollection(
+    Client* client,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
+    const NamespaceString nss) {
+    auto opCtxRaii = factory->makeOperationContext(client);
     auto opCtx = opCtxRaii.get();
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -477,8 +481,8 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
 }
 
 AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
-    Client* client, CancelableOperationContextFactory factory) {
-    auto opCtxRaii = factory.makeOperationContext(client);
+    Client* client, std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    auto opCtxRaii = factory->makeOperationContext(client);
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
 
@@ -615,14 +619,15 @@ repl::MutableOplogEntry ReshardingOplogFetcher::_makeProgressMarkOplog(
     return oplog;
 }
 
-bool ReshardingOplogFetcher::consume(Client* client,
-                                     CancelableOperationContextFactory factory,
-                                     Shard* shard) {
+bool ReshardingOplogFetcher::consume(
+    Client* client,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
+    Shard* shard) {
     _ensureCollection(client, factory, _oplogBufferNss);
 
     auto aggRequest = _makeAggregateCommandRequest(client, factory);
 
-    auto opCtxRaii = factory.makeOperationContext(client);
+    auto opCtxRaii = factory->makeOperationContext(client);
     int currentNumBatchesProcessed = 0;
     bool moreToCome = true;
 
@@ -645,7 +650,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service()->getService());
-            auto opCtxRaii = factory.makeOperationContext(client.get());
+            auto opCtxRaii = factory->makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
 
             auto prevBatchLastOplogId = [&] {

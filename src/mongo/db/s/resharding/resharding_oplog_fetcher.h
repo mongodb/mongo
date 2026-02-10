@@ -32,6 +32,7 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -125,9 +126,12 @@ public:
      * Returns true if there are more oplog entries to be copied, and returns false if the sentinel
      * finish oplog entry has been copied.
      */
-    bool consume(Client* client, CancelableOperationContextFactory factory, Shard* shard);
+    bool consume(Client* client,
+                 std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
+                 Shard* shard);
 
-    bool iterate(Client* client, CancelableOperationContextFactory factory);
+    bool iterate(Client* client,
+                 std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     /**
      * Notifies the fetcher that oplog application has started.
@@ -171,11 +175,11 @@ private:
      * Returns true if there's more work to do and the task should be rescheduled.
      */
     void _ensureCollection(Client* client,
-                           CancelableOperationContextFactory factory,
+                           std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory,
                            NamespaceString nss);
 
-    AggregateCommandRequest _makeAggregateCommandRequest(Client* client,
-                                                         CancelableOperationContextFactory factory);
+    AggregateCommandRequest _makeAggregateCommandRequest(
+        Client* client, std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
                                      const CancellationToken& cancelToken);

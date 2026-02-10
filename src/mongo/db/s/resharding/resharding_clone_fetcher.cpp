@@ -74,7 +74,7 @@ void ReshardingCloneFetcher::setUpWriterThreads(WriteCallback cb) {
             Future<void>::makeReady()
                 .thenRunOn(_executor)
                 .then([this, cb, i] {
-                    auto opCtx = _factory.makeOperationContext(&cc());
+                    auto opCtx = _factory->makeOperationContext(&cc());
                     {
                         stdx::lock_guard lk(*opCtx->getClient());
                         opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx.get()));

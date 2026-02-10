@@ -582,7 +582,7 @@ public:
         return doc[ReshardingOplogFetcherProgress::kNumEntriesFetchedFieldName].Long();
     }
 
-    CancelableOperationContextFactory makeCancelableOpCtx() {
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> makeCancelableOpCtx() {
         auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
             ThreadPool::Options options;
             options.poolName = "TestReshardOplogFetcherCancelableOpCtxPool";
@@ -591,8 +591,8 @@ public:
             return options;
         }());
 
-        return CancelableOperationContextFactory(operationContext()->getCancellationToken(),
-                                                 cancelableOpCtxExecutor);
+        return std::make_shared<HierarchicalCancelableOperationContextFactory>(
+            operationContext()->getCancellationToken(), cancelableOpCtxExecutor);
     }
 
 protected:

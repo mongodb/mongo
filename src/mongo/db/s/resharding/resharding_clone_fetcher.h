@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -75,7 +76,8 @@ public:
         : _executor(std::move(executor)),
           _cleanupExecutor(std::move(cleanupExecutor)),
           _cancelSource(cancelToken),
-          _factory(_cancelSource.token(), _executor),
+          _factory(std::make_shared<HierarchicalCancelableOperationContextFactory>(
+              _cancelSource.token(), _executor)),
           _remoteCursors(std::move(remoteCursors)),
           _numWriteThreads(numWriteThreads),
           _queues(_numWriteThreads),
@@ -118,7 +120,7 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor;
     std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     CancellationSource _cancelSource;
-    CancelableOperationContextFactory _factory;
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> _factory;
     std::vector<OwnedRemoteCursor> _remoteCursors;
     int _numWriteThreads;
     std::vector<ExecutorFuture<executor::TaskExecutor::ResponseStatus>> _cmdFutures;
