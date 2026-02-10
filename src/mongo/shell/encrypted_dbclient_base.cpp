@@ -871,7 +871,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     FindCommandRequest findCmd{fullNameNS};
     findCmd.setFilter(BSON("_id" << uuid));
     findCmd.setReadConcern(repl::ReadConcernArgs::kMajority);
-    findCmd.setReadPreference(ReadPreferenceSetting{ReadPreference::PrimaryPreferred});
+    findCmd.setReadPreference(ReadPreferenceSetting{ReadPreference::PrimaryOnly});
 
     Client* client = &cc();
     auto opCtx = client->getOperationContext();
