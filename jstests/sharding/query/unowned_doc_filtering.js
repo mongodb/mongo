@@ -58,8 +58,8 @@ function runTest(st, coll, ownedDocs, unownedDocs, isHashed) {
     assertOrphanedDocsFiltered(coll, ownedDocs, unownedDocs, countFilters);
 
     // Restart the shards, wait for them to become available and redo the check.
-    st.restartShardRS(0, undefined, undefined, true);
-    st.restartShardRS(1, undefined, undefined, true);
+    st.restartShardRS(0);
+    st.restartShardRS(1);
     assertOrphanedDocsFiltered(coll, ownedDocs, unownedDocs, countFilters);
 }
 

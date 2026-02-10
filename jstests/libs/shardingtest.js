@@ -798,22 +798,22 @@ export class ShardingTest {
 
     /**
      * Restarts each node in a particular shard replica set using the shard's original startup
-     * options by default.
-     *
-     * Option { startClean : true } forces clearing the data directory.
-     * Option { auth : Object } object that contains the auth details for admin credentials.
-     *   Should contain the fields 'user' and 'pwd'
-     *
+     * options.
      *
      * @param {int} shard server number (0, 1, 2, ...) to be restarted
      */
-    restartShardRS(n, options, signal, wait) {
+    restartShardRS(n, waitForPrimary = false) {
         const prevShardName = this._connections[n].shardName;
         for (let i = 0; i < this["rs" + n].nodeList().length; i++) {
             this["rs" + n].restart(i);
         }
 
         this["rs" + n].awaitSecondaryNodes();
+
+        if (waitForPrimary) {
+            this["rs" + n].waitForPrimary();
+        }
+
         this._connections[n] = new Mongo(this["rs" + n].getURL(), undefined, {gRPC: false});
         this._connections[n].shardName = prevShardName;
         this._connections[n].rs = this["rs" + n];

@@ -56,8 +56,8 @@ function setupCollectionForTest(collName) {
     // This document will go to shard 1
     assert.commandWorked(st.s0.getDB(kDatabaseName).getCollection(collName).insert({Key: 0, inc: 0}));
 
-    st.restartShardRS(0);
-    st.restartShardRS(1);
+    st.restartShardRS(0, /* waitForPrimary */ true);
+    st.restartShardRS(1, /* waitForPrimary */ true);
 }
 
 const freshMongoS = st.s0;
@@ -130,8 +130,8 @@ let session = null;
 withRetryOnTransientTxnError(
     () => {
         jsTest.log("Testing: Transactions with unsharded collection, which is unknown on the shard");
-        st.restartShardRS(0);
-        st.restartShardRS(1);
+        st.restartShardRS(0, /* waitForPrimary */ true);
+        st.restartShardRS(1, /* waitForPrimary */ true);
 
         session = staleMongoS.startSession();
         session.startTransaction();
@@ -147,8 +147,8 @@ withRetryOnTransientTxnError(
 withRetryOnTransientTxnError(
     () => {
         jsTest.log("Testing: Create collection as first op inside transaction works");
-        st.restartShardRS(0);
-        st.restartShardRS(1);
+        st.restartShardRS(0, /* waitForPrimary */ true);
+        st.restartShardRS(1, /* waitForPrimary */ true);
 
         session = staleMongoS.startSession();
         session.startTransaction();
@@ -177,7 +177,7 @@ withRetryOnTransientTxnError(
     assert.commandWorked(bulk.execute());
 
     // Restart the shard to have UNKNOWN shard version.
-    st.restartShardRS(0);
+    st.restartShardRS(0, /* waitForPrimary */ true);
 
     // Anticipate a refresh of the logical session cache to avoid the risk of it happening later by
     // affecting the actual number of refreshing threads and sharding statistics. In sharded

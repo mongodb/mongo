@@ -70,9 +70,9 @@ function runSharding() {
     jsTestLog("Restarting the mongos:");
     st.restartMongos(0);
     jsTestLog("Restarting shard0:");
-    st.restartShardRS(0, {startClean: false}, undefined, true);
+    st.restartShardRS(0);
     jsTestLog("Restarting shard1:");
-    st.restartShardRS(1, {startClean: false}, undefined, true);
+    st.restartShardRS(1);
 
     st.waitForShardingInitialized();
 
