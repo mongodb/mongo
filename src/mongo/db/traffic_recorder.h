@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder/utils/task_scheduler.h"
+#include "mongo/db/traffic_recorder_event.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/atomic_word.h"
@@ -56,15 +57,6 @@
 #include <boost/optional.hpp>
 
 namespace mongo {
-
-enum class EventType : uint8_t {
-    kRequest = 0,       // A user issued command.
-    kResponse = 1,      // A response, generated for a user command.
-    kSessionStart = 2,  // A non-message event indicating the start of a session.
-    kSessionEnd = 3,    // A non-message event indicating the end of a session.
-
-    kMax,  // Not a valid event type, used to check values are in-range.
-};
 struct TrafficRecordingPacket {
     EventType eventType;
     const uint64_t id;
