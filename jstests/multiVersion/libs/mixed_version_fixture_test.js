@@ -76,11 +76,15 @@ export function testPerformReplSetRollingRestart({
             " and options " +
             tojsononeline(restartNodeOptions),
     );
+    // Save a reference to the node that was primary before restarting secondaries. Pass it to the
+    // callback so tests can run operations that only the old version supports; the current primary
+    // after upgradeSecondaries() may be the restarted node in a 2-node set.
+    const originalPrimary = primaryConnection;
     rst.upgradeSecondaries({...restartVersion, ...copyJSON(restartNodeOptions)});
     primaryConnection = rst.getPrimary();
 
     jsTest.log.info("Calling the afterSecondariesHaveRestarted function");
-    afterSecondariesHaveRestarted(primaryConnection);
+    afterSecondariesHaveRestarted(primaryConnection, originalPrimary);
 
     // TODO SERVER-109457 Try a scenario where you force election here so that the restarted
     // secondary could become primary while another active secondary has not restarted yet. This

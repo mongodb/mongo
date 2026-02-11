@@ -140,14 +140,10 @@ testPerformReplSetRollingRestart({
     startingVersion: {binVersion: "last-lts"},
     setupFn: setUp,
     beforeRestart: () => {},
-    afterSecondariesHaveRestarted: (primaryConnection) => {
-        const db = getDB(primaryConnection);
-
-        // Create collections while secondaries are on new version and primary is on old version
-        assertCreateDollarCollectionsWorks(db);
-
-        // check that collections are queryable
-        assertCollectionsQueryable(db);
+    afterSecondariesHaveRestarted: (primaryConnection, originalPrimary) => {
+        // Create on the node that wasn't restarted (still on last-lts).
+        assertCreateDollarCollectionsWorks(getDB(originalPrimary));
+        assertCollectionsQueryable(getDB(primaryConnection));
     },
     afterPrimariesHaveRestarted: (primaryConnection) => {
         const db = getDB(primaryConnection);
