@@ -19,7 +19,6 @@ selector:
     - jstests/core/query/plan_cache/*.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
     - jstests/core/index/index_filter_commands.js
-    - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
     - jstests/core/index/wildcard/wildcard_index_cached_plans.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
@@ -48,23 +47,17 @@ selector:
     - jstests/core/query/and/and_or_nested.js
     - jstests/core/query/boolean_simplifier_stress.js
     - jstests/core/query/collation/merge_sort_collation.js
-    - jstests/core/query/collation_correctness_pbt.js
-    - jstests/core/query/complex_rename_match_swapping_pbt.js
     - jstests/core/query/distinct/distinct_subplanning.js
     - jstests/core/query/explode_for_sort_fetch.js
     - jstests/core/query/expr/expr_valid_positions.js
     - jstests/core/query/find/find_dedup.js
-    - jstests/core/query/fixed_collation_correctness_pbt.js
     - jstests/core/query/force_plan.js
-    - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/internal_strip_invalid_assignment.js
     - jstests/core/query/json_schema/*.js
     - jstests/core/query/map_reduce/map_reduce_subplanning.js
     - jstests/core/query/match_numeric_components.js
     - jstests/core/query/or/*.js
     - jstests/core/query/or_use_clustered_collection.js
-    - jstests/core/query/partial_index_pbt.js
-    - jstests/core/query/plan_stability_pbt.js
     - jstests/core/query/project/positional_projection.js
     - jstests/core/query/size_match_expr.js
     - jstests/core/query/sort/sort_dotted_paths.js
@@ -74,10 +67,6 @@ selector:
     - jstests/core/query/sort/sort_merge_memory_limit.js
     - jstests/core/query/sort/sort_with_update_between_getmores.js
     - jstests/core/query/type/null_undefined.js
-    - jstests/core/timeseries/pbt/timeseries_add_fields_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_match_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_project_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_agg_stages_basic_behavior_pbt.js
     - jstests/core/timeseries/query/timeseries_computed_field.js
     - jstests/core/timeseries/query/timeseries_filter_extended_range.js
     - jstests/core/timeseries/query/timeseries_graph_lookup.js
@@ -90,6 +79,7 @@ selector:
     - jstests/core/timeseries/query/timeseries_view_aggregate.js
     - jstests/core/query/partial_index_logical.js
     - jstests/core/administrative/profile/profile_find.js
+    - jstests/core/**/*_pbt.js
 
 executor:
   archive:

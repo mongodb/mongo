@@ -23,13 +23,10 @@ selector:
     - jstests/aggregation/optimization/expression_swap_limit.js
     - jstests/aggregation/optimization/is_count_like.js
     - jstests/aggregation/plan_cache/sbe_plan_cache_key_encode_partial_index.js
-    - jstests/aggregation/sources/addFields/add_fields_pbt.js
-    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
     - jstests/aggregation/sources/match/expr_match.js
     - jstests/aggregation/sources/match/match.js
-    - jstests/aggregation/sources/match/match_pbt.js
     - jstests/aggregation/sources/replaceRoot/replace_root_match.js
-    - jstests/aggregation/sources/sort/sort_via_index_pbt.js
+    - jstests/aggregation/**/*_pbt.js
 executor:
   archive:
     hooks:
