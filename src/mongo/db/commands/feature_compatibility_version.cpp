@@ -454,8 +454,11 @@ Timestamp FeatureCompatibilityVersion::setIfCleanStartup(
     repl::StorageInterface* storageInterface,
     const multiversion::FeatureCompatibilityVersion& minimumRequiredFCV,
     long long term) {
+
+    auto defaultStartupFCVSnapshot = gDefaultStartupFCV.get();
+
     if (!hasNoReplicatedCollections(opCtx)) {
-        if (!gDefaultStartupFCV.empty()) {
+        if (!defaultStartupFCVSnapshot.empty()) {
             LOGV2(7557701,
                   "Ignoring the provided defaultStartupFCV parameter since the FCV already exists");
         }
@@ -465,7 +468,7 @@ Timestamp FeatureCompatibilityVersion::setIfCleanStartup(
     // If an FCV was specified at startup through a startup parameter, set it to that FCV.
     // Otherwise, set it to an FCV implicitly selected as per the node's configuration.
     FeatureCompatibilityVersionDocument fcvDoc;
-    if (gDefaultStartupFCV.empty()) {
+    if (defaultStartupFCVSnapshot.empty()) {
         // The config server will run setFeatureCompatibilityVersion as part of addShard, but some
         // new features can block downgrade and require manual intervention. To mitigate this, if
         // the server was started as a shard, the default featureCompatibilityVersion is the minimum
@@ -481,7 +484,7 @@ Timestamp FeatureCompatibilityVersion::setIfCleanStartup(
         }();
         fcvDoc.setVersion(implicitStartupFCV);
     } else {
-        StringData versionString = StringData(gDefaultStartupFCV);
+        StringData versionString = StringData(defaultStartupFCVSnapshot);
         FCV parsedVersion;
 
         if (versionString == multiversion::toString(GenericFCV::kLastLTS)) {

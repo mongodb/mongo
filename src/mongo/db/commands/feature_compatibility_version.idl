@@ -51,7 +51,7 @@ server_parameters:
 
     defaultStartupFCV:
         description: "Startup parameter to set a default FCV at startup"
-        set_at: startup
-        cpp_vartype: std::string
+        set_at: [startup, runtime]
+        cpp_vartype: synchronized_value<std::string>
         cpp_varname: gDefaultStartupFCV
         redact: false

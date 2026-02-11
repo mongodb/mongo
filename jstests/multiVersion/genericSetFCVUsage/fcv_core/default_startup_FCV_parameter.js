@@ -72,6 +72,16 @@ function runStandaloneTest() {
     checkFCV(adminDB, latestFCV);
     assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
     MongoRunner.stopMongod(conn);
+
+    jsTestLog("Test starting with defaultStartupFCV = latest, changing it at runtime");
+    conn = MongoRunner.runMongod({binVersion: latest, setParameter: "defaultStartupFCV=" + latestFCV});
+    assert.neq(null, conn);
+    adminDB = conn.getDB("admin");
+    checkFCV(adminDB, latestFCV);
+    assert.commandWorked(adminDB.runCommand({setParameter: 1, defaultStartupFCV: lastLTSFCV}));
+    const result = assert.commandWorked(adminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}));
+    assert.eq(lastLTSFCV, result.defaultStartupFCV);
+    MongoRunner.stopMongod(conn);
 }
 
 function runReplicaSetTest() {
@@ -175,6 +185,24 @@ function runReplicaSetTest() {
     checkFCV(primaryAdminDB, latestFCV);
     checkFCV(secondaryAdminDB, latestFCV);
     assert(rawMongoProgramOutput(".*").includes("The provided 'defaultStartupFCV' is not a valid FCV"));
+    rst.stopSet();
+
+    clearRawMongoProgramOutput();
+    jsTestLog("Test starting with defaultStartupFCV = latest, and changing it at runtime");
+    rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {binVersion: latest, setParameter: {defaultStartupFCV: latestFCV}},
+    });
+    rst.startSet();
+    rst.initiate();
+    assert.neq(null, rst);
+    primaryAdminDB = rst.getPrimary().getDB("admin");
+    secondaryAdminDB = rst.getSecondary().getDB("admin");
+    checkFCV(primaryAdminDB, latestFCV);
+    checkFCV(secondaryAdminDB, latestFCV);
+    assert.commandWorked(primaryAdminDB.runCommand({setParameter: 1, defaultStartupFCV: lastLTSFCV}));
+    const result = assert.commandWorked(primaryAdminDB.runCommand({getParameter: 1, defaultStartupFCV: 1}));
+    assert.eq(lastLTSFCV, result.defaultStartupFCV);
     rst.stopSet();
 }
 
