@@ -70,8 +70,7 @@ export var DiscoverTopology = (function () {
 
         // Discover mongos URIs from the connection string. If a mongos is not passed in explicitly,
         // it will not be discovered.
-        // TODO (SERVER-115639) refactor this line once the host property is unified.
-        const mongosUris = new MongoURI("mongodb://" + (conn.isMultiRouter ? conn.hosts : conn.host));
+        const mongosUris = new MongoURI(conn.uri);
 
         const mongos = {
             type: Topology.kRouter,
@@ -123,6 +122,10 @@ export var DiscoverTopology = (function () {
      * shard or a replica set shard.
      */
     function findConnectedNodes(conn, options = {connectFn: kDefaultConnectFn}) {
+        // if conn is a DB object, get the underlying Mongo object
+        if (conn.getMongo !== undefined) {
+            conn = conn.getMongo();
+        }
         const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== "isdbgrid";
 
         if (isMongod) {

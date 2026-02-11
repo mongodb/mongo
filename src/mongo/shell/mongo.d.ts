@@ -234,6 +234,9 @@ declare class Mongo {
      * @param uri Connection string URI (e.g., "mongodb://localhost:27017" or "mongodb+srv://..."). Omit for default localhost.
      * @param encryptedDBClientCallback Optional callback for client-side field level encryption
      * @param options Connection options object
+     *
+     * To create a Mongo instance, use `connect(uri)` so the shell can choose the right connection type
+     * (single node/replica set `Mongo` vs Multi-Router `Mongo`) based on the cluster topology.
      */
     constructor(uri?: string, encryptedDBClientCallback?, options?: object);
 
@@ -512,10 +515,18 @@ declare class Mongo {
 
 /**
  * Connect to MongoDB and return a connection object.
+ *
+ * This behaves like a connection factory:
+ * - For a URI that targets a single mongod or a replica set, this returns a regular `Mongo`.
+ * - For a URI that targets a mongos pool, this returns the multi-router variant.
+ *
  * @param connectionString MongoDB connection string (e.g., "mongodb://localhost:27017" or "mongodb+srv://...")
  * @returns Mongo connection object
  * @example
- * let conn = connect("mongodb://localhost:27017");
+ * let conn = connect("mongodb://localhost:27017").getMongo();
  * let db = conn.getDB("test");
+ * 
+ * or if you already have a mongo object and you with to reconnect with it:
+ * let conn = connect(db.getMongo().uri).getMongo();
  */
 declare function connect(connectionString: string): Mongo;

@@ -312,7 +312,7 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // The primary mongo acts as the holder of shared state among the connection pool.
     this.primaryMongo = this._getNextMongo();
     this.isMultiRouter = true;
-    this.hosts = mongoURI.servers.map((s) => s.server).join(",");
+    this.uri = uri;
 
     this.log("Established a Multi-Router Mongo connector. Mongos connections list: " + individualURIs);
 
@@ -629,8 +629,8 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             }
 
             if (prop === "host") {
-                // return a random host
-                // TODO (SERVER-115639) return target.hosts once the properties are unified.
+                // Return a random host for backward compatibility. For a full multi-host URI that
+                // can be passed to the "connect" function, use the 'uri' property instead.
                 return target._getNextMongo().host;
             }
 

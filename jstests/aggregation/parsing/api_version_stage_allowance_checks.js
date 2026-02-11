@@ -19,7 +19,7 @@ testDB.dropDatabase();
 const collName = "testColl";
 
 const testInternalClient = (function createInternalClient() {
-    const connInternal = new Mongo(testDB.getMongo().host);
+    const connInternal = connect(testDB.getMongo().uri).getMongo();
     const curDB = connInternal.getDB(dbName);
     assert.commandWorked(
         curDB.runCommand({

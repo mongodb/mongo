@@ -7,7 +7,9 @@
 //   docker_incompatible,
 // ]
 
-const mongod = new MongoURI(db.getMongo().host).servers[0];
+assert(db.getMongo().uri, "Mongo object should have 'uri' property");
+
+const mongod = new MongoURI(db.getMongo().uri).servers[0];
 const host = mongod.host;
 const port = mongod.port;
 
@@ -34,3 +36,15 @@ testConnect(false, `${host}/test`, "--port", port);
 testConnect(false, `mongodb://${host}:${port}/test`, "--port", port);
 testConnect(false, `mongodb://${host}:${port}/test`, "--host", host);
 testConnect(false, `mongodb://${host}:${port}/test`, "--host", host, "--port", port);
+
+// Test that the 'uri' property returns a valid mongodb:// URI that can be used for new connections
+{
+    const mongo = db.getMongo();
+
+    // The 'uri' should be usable to create a new connection
+    const newMongo = new Mongo(mongo.uri);
+    assert(newMongo, "Should be able to create new Mongo connection using uri property");
+
+    const newMongo2 = connect(mongo.uri).getMongo();
+    assert(newMongo2, "Should be able to create new Mongo connection using uri property");
+}

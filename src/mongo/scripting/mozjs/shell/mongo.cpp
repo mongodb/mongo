@@ -297,6 +297,8 @@ void setHiddenMongo(JSContext* cx,
         // 'newMongo' is a direct connection to an individual server. Its "host" property therefore
         // reports the stringified HostAndPort of the underlying DBClientConnection.
         to.setString(InternedString::host, host);
+        // For direct connections, construct a simple mongodb:// URI from the host.
+        to.setString(InternedString::uri, "mongodb://" + host + "/");
 
         JS::RootedValue value(cx);
         value.setObjectOrNull(newMongo);
@@ -840,6 +842,9 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, cs.connectionString().toString());
+    // Store the original connection string - it was valid for connecting, so it's valid for
+    // creating new connections. This avoids format conversion issues with multi-host strings.
+    o.setString(InternedString::uri, host);
     auto defaultDB = cs.getDatabase() == "" ? "test" : cs.getDatabase();
     o.setString(InternedString::defaultDB, defaultDB);
 
