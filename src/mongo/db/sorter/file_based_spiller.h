@@ -419,6 +419,8 @@ public:
 
     size_t getIteratorSize() override;
 
+    size_t getBufferSize() override;
+
     std::shared_ptr<Iterator<Key, Value>> getSortedIterator(const SorterRange& range,
                                                             const Settings& settings) override;
 
@@ -451,6 +453,11 @@ std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Val
 template <typename Key, typename Value>
 size_t FileBasedSorterStorage<Key, Value>::getIteratorSize() {
     return sizeof(sorter::FileIterator<Key, Value>);
+}
+
+template <typename Key, typename Value>
+size_t FileBasedSorterStorage<Key, Value>::getBufferSize() {
+    return kSortedFileBufferSize;
 }
 
 template <typename Key, typename Value>

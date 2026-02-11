@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
@@ -53,7 +54,13 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
       _sorterFileStats(/*sorterTracker=*/nullptr),
-      _resultBuffer(makeSortOptions(), &_sorterFileStats, SorterKeyComparator{}, NoOpBound{}),
+      _resultBuffer(makeSortOptions(),
+                    SorterKeyComparator{},
+                    NoOpBound{},
+                    (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
+                        ? std::make_shared<sorter::FileBasedSorterSpiller<SorterKey, SorterValue>>(
+                              expCtx->getTempDir(), &_sorterFileStats)
+                        : nullptr),
       _stageType(type),
       _nextInterval(nullptr) {}
 

@@ -313,11 +313,10 @@ for (let i = 0; i < 1; ++i) {
     assert.commandWorked(collection.insert(templateDoc));
 }
 
-// The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
-assert.commandFailedWithCode(
-    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-);
+// This sort should succeed despite the 100% kMaxIteratorsMemoryUsagePercentage reserving all
+// working memory for iterators and none for documents. The reservation only applies after spilling.
+assert.commandWorked(testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}));
+
 assert.eq(1, collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // kMaxIteratorsMemoryUsagePercentage is set to 1.0. All memory is used for the file iterators.

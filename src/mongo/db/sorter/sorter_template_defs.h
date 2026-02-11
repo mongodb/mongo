@@ -37,8 +37,6 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-// TODO SERVER-117081: Remove dependency after BoundedSorter doesn't create FileBasedSorterSpiller
-#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
 #include "mongo/db/sorter/sorter_file_name.h"
@@ -134,22 +132,22 @@ public:
 
     /// No data to iterate
     explicit InMemIterator(std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
-        : _spillHelper(spiller) {}
+        : _spiller(spiller) {}
 
     /// Only a single value
     explicit InMemIterator(const Data& singleValue,
                            std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
-        : _data(1, singleValue), _spillHelper(spiller) {}
+        : _data(1, singleValue), _spiller(spiller) {}
 
     /// Any number of values
     template <typename Container>
     explicit InMemIterator(const Container& input,
                            std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
-        : _data(input.begin(), input.end()), _spillHelper(spiller) {}
+        : _data(input.begin(), input.end()), _spiller(spiller) {}
 
     explicit InMemIterator(std::vector<Data> data,
                            std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
-        : _data(std::move(data)), _spillHelper(spiller) {}
+        : _data(std::move(data)), _spiller(spiller) {}
 
     bool more() override {
         return _index < _data.size();
@@ -189,12 +187,12 @@ public:
                 opts.tempDir);
         uassert(11539600,
                 "Requested to spill InMemIterator but did not provide a SorterSpiller",
-                _spillHelper != nullptr);
+                _spiller != nullptr);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
             *opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
-        auto iterator = _spillHelper->spillUnique(opts, settings, _data, _index);
+        auto iterator = _spiller->spillUnique(opts, settings, _data, _index);
 
         if (opts.sorterTracker) {
             opts.sorterTracker->spilledRanges.addAndFetch(1);
@@ -210,7 +208,7 @@ public:
 
 private:
     std::vector<Data> _data;
-    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spiller;
     uint32_t _index{0};
 };
 
@@ -444,8 +442,6 @@ private:
 template <typename Key, typename Value>
 class MergeableSorter : public Sorter<Key, Value> {
 public:
-    static constexpr std::size_t kFileIteratorSize = sizeof(FileIterator<Key, Value>);
-
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
@@ -476,15 +472,6 @@ public:
     }
 
 protected:
-    /**
-     * The maximum number of spills that can be merged simultaneously in order to respect memory
-     * limits. While merging, a chuck of 64KB from each spill is loaded to memory. The total size of
-     * chunks loaded to memory should not exceed the available memory.
-     */
-    size_t _spillsNumToRespectMemoryLimits =
-        std::max(this->_opts.maxMemoryUsageBytes / sorter::kSortedFileBufferSize,
-                 static_cast<std::size_t>(2));
-
     /**
      * An implementation of a k-way merge sort.
      *
@@ -531,6 +518,25 @@ protected:
 
     std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
 
+    /**
+     * The size of the iterator for the underlying storage used by the spiller.
+     * Only set if spiller != nullptr.
+     */
+    size_t _iteratorSize = 0;
+
+    /**
+     * The size of the buffer for the underlying storage used by the spiller.
+     */
+    size_t _bufferSize = 0;
+
+    /**
+     * The maximum number of spills that can be merged simultaneously in order to respect memory
+     * limits. While merging, a chunk of 64KB from each spill is loaded to memory. The total size of
+     * chunks loaded to memory should not exceed the available memory.
+     * Only set if spiller != nullptr.
+     */
+    size_t _spillsNumToRespectMemoryLimits = 0;
+
     size_t fileIteratorsMaxBytesSize =
         1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
     size_t fileIteratorsMaxNum;
@@ -540,16 +546,21 @@ private:
     // iterators can use up to maxIteratorsMemoryUsagePercentage of the maxMemoryUsageBytes with
     // lower bound fileIteratorsMaxBytesSize and upper bound 1MB.
     void setMaxMemoryUsageBytes() {
+        if (this->_spillHelper == nullptr) {
+            this->fileIteratorsMaxBytesSize = 0;
+            return;
+        }
+        _iteratorSize = this->_spillHelper->getStorage().getIteratorSize();
+        _bufferSize = this->_spillHelper->getStorage().getBufferSize();
         double percRequested = maxIteratorsMemoryUsagePercentage.load();
         auto iteratorMemBytesRequested =
             static_cast<size_t>(this->_opts.maxMemoryUsageBytes * percRequested);
         if (iteratorMemBytesRequested < this->fileIteratorsMaxBytesSize) {
-            this->fileIteratorsMaxBytesSize =
-                std::max(kFileIteratorSize, iteratorMemBytesRequested);
+            this->fileIteratorsMaxBytesSize = std::max(_iteratorSize, iteratorMemBytesRequested);
         }
         this->fileIteratorsMaxNum =
-            static_cast<size_t>(this->fileIteratorsMaxBytesSize / kFileIteratorSize);
-        this->fileIteratorsMaxBytesSize = kFileIteratorSize * this->fileIteratorsMaxNum;
+            static_cast<size_t>(this->fileIteratorsMaxBytesSize / _iteratorSize);
+        this->fileIteratorsMaxBytesSize = _iteratorSize * this->fileIteratorsMaxNum;
 
         if (this->fileIteratorsMaxBytesSize >= this->_opts.maxMemoryUsageBytes) {
             this->_opts.MaxMemoryUsageBytes(0);
@@ -557,6 +568,8 @@ private:
             this->_opts.MaxMemoryUsageBytes(this->_opts.maxMemoryUsageBytes -
                                             this->fileIteratorsMaxBytesSize);
         }
+        _spillsNumToRespectMemoryLimits =
+            std::max(this->_opts.maxMemoryUsageBytes / _bufferSize, static_cast<std::size_t>(2));
     }
 };
 
@@ -1332,20 +1345,18 @@ SortedStorageWriter<Key, Value>::SortedStorageWriter(const SortOptions& opts,
 //
 
 template <typename Key, typename Value, typename BoundMaker>
-BoundedSorter<Key, Value, BoundMaker>::BoundedSorter(const SortOptions& opts,
-                                                     SorterFileStats* fileStats,
-                                                     Comparator comp,
-                                                     BoundMaker makeBound,
-                                                     bool checkInput)
-    : BoundedSorterInterface<Key, Value>(opts),
+BoundedSorter<Key, Value, BoundMaker>::BoundedSorter(
+    const SortOptions& opts,
+    Comparator comp,
+    BoundMaker makeBound,
+    std::shared_ptr<SorterSpiller<Key, Value>> spiller,
+    bool checkInput)
+    : BoundedSorterInterface<Key, Value>(opts, spiller),
       compare(comp),
       makeBound(makeBound),
       _checkInput(checkInput),
       _opts(opts),
-      _heap(Greater<Key, Value>{&compare}),
-      _file(opts.tempDir
-                ? std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), fileStats)
-                : nullptr) {}
+      _heap(Greater<Key, Value>{&compare}) {}
 
 template <typename Key, typename Value, typename BoundMaker>
 void BoundedSorter<Key, Value, BoundMaker>::add(Key key, Value value) {
@@ -1495,18 +1506,17 @@ void BoundedSorter<Key, Value, BoundMaker>::_spill(size_t maxMemoryUsageBytes) {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << "Sort exceeded memory limit of " << maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting.",
-            _opts.tempDir);
+            this->_spillHelper != nullptr);
 
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        *(_opts.tempDir), internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
+        *(this->_spillHelper->getStorage().getSpillDirPath()),
+        internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     this->_stats.incrementSpilledKeyValuePairs(_heap.size());
     this->_stats.incrementSpilledRanges();
 
     // Write out all the values from the heap in sorted order.
-    // TODO SERVER-117081: Change BoundedSorter constructor to take a SorterSpiller.
-    sorter::FileBasedSorterSpiller<Key, Value> spillHelper(_file, *_opts.tempDir);
-    auto iteratorPtr = spillHelper.spillWithHeap(_opts, _heap);
+    auto iteratorPtr = this->_spillHelper->spillWithHeap(_opts, Settings(), _heap);
 
     if (auto* mergeIter =
             static_cast<typename sorter::MergeIterator<Key, Value>*>(_spillIter.get())) {

@@ -45,6 +45,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -396,23 +397,27 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         opts.Limit(limit.value());
     }
 
-    auto fileStats = expCtx->getAllowDiskUse() ? ds->_sortExecutor->getSorterFileStats() : nullptr;
+    auto spiller = expCtx->getAllowDiskUse()
+        ? std::make_shared<
+              sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
+              expCtx->getTempDir(), ds->_sortExecutor->getSorterFileStats())
+        : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
             ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
-                opts, fileStats, CompAsc{}, BoundMakerMin{boundOffset});
+                opts, CompAsc{}, BoundMakerMin{boundOffset}, std::move(spiller));
         } else {
             ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
-                opts, fileStats, CompDesc{}, BoundMakerMin{boundOffset});
+                opts, CompDesc{}, BoundMakerMin{boundOffset}, std::move(spiller));
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
             ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
-                opts, fileStats, CompAsc{}, BoundMakerMax{boundOffset});
+                opts, CompAsc{}, BoundMakerMax{boundOffset}, std::move(spiller));
         } else {
             ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
-                opts, fileStats, CompDesc{}, BoundMakerMax{boundOffset});
+                opts, CompDesc{}, BoundMakerMax{boundOffset}, std::move(spiller));
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -497,23 +502,27 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         opts.Limit(limitElem.numberLong());
     }
 
-    auto fileStats = expCtx->getAllowDiskUse() ? ds->_sortExecutor->getSorterFileStats() : nullptr;
+    auto spiller = expCtx->getAllowDiskUse()
+        ? std::make_shared<
+              sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
+              expCtx->getTempDir(), ds->_sortExecutor->getSorterFileStats())
+        : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
             ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
-                opts, fileStats, CompAsc{}, BoundMakerMin{boundOffset});
+                opts, CompAsc{}, BoundMakerMin{boundOffset}, std::move(spiller));
         } else {
             ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
-                opts, fileStats, CompDesc{}, BoundMakerMin{boundOffset});
+                opts, CompDesc{}, BoundMakerMin{boundOffset}, std::move(spiller));
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
             ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
-                opts, fileStats, CompAsc{}, BoundMakerMax{boundOffset});
+                opts, CompAsc{}, BoundMakerMax{boundOffset}, std::move(spiller));
         } else {
             ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
-                opts, fileStats, CompDesc{}, BoundMakerMax{boundOffset});
+                opts, CompDesc{}, BoundMakerMax{boundOffset}, std::move(spiller));
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {

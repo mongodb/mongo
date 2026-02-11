@@ -26,13 +26,10 @@ assert.commandWorked(coll.insert({x: 5, y: 1}));
 // Set the memory limit to be large enough to sort a single document in the collection.
 const documentBsonSize = Object.bsonsize(docs[0]);
 const sizeMultiplier = 5.0;
-// 10% of the memory, with minimum kFileIteratorSize (~140B) and maximum 1 MB, is reserved to store
-// the file iterators used by external sort in case of spilling.
-const fileIteratorMinimumMemory = 140;
 assert.commandWorked(
     db.adminCommand({
         setParameter: 1,
-        internalQueryMaxBlockingSortMemoryUsageBytes: documentBsonSize * sizeMultiplier + fileIteratorMinimumMemory,
+        internalQueryMaxBlockingSortMemoryUsageBytes: documentBsonSize * sizeMultiplier,
     }),
 );
 
@@ -67,7 +64,7 @@ assert.eq(profileObj.replanned, true, profileObj);
 assert.eq(
     profileObj.replanReason,
     `cached plan returned: QueryExceededMemoryLimitNoDiskUseAllowed: Sort exceeded memory limit of ${
-        documentBsonSize * sizeMultiplier + fileIteratorMinimumMemory
+        documentBsonSize * sizeMultiplier
     } bytes, but did not opt in to external sorting.`,
     profileObj,
 );

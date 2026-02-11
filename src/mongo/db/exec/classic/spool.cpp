@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep

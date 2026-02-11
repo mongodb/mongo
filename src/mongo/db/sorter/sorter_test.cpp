@@ -252,8 +252,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spillHe
     auto opts = SortOptions()
                     .Limit(0)
                     .TempDir(storageLocation.path())
-                    .MaxMemoryUsageBytes(sizeof(IWSorter::Data) +
-                                         MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize)
+                    .MaxMemoryUsageBytes(sizeof(IWSorter::Data))
                     .Tracker(&sorterTracker);
 
     IWPair pairInsertedBeforeShutdown(1, 100);
@@ -280,7 +279,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spillHe
         state.ranges,
         opts,
         IWComparator(ASC),
-        std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(nullptr));
+        std::shared_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(nullptr));
 }
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
@@ -648,22 +647,23 @@ public:
     }
 
     std::unique_ptr<S> makeAsc(SortOptions options,
-                               SorterFileStats* fileStats = nullptr,
+                               std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller = nullptr,
                                bool checkInput = true) {
         return std::make_unique<SAsc>(
-            options, fileStats, ComparatorAsc{}, BoundMakerAsc{}, checkInput);
+            options, ComparatorAsc{}, BoundMakerAsc{}, spiller, checkInput);
     }
-    std::unique_ptr<S> makeAscNoBound(SortOptions options,
-                                      SorterFileStats* fileStats = nullptr,
-                                      bool checkInput = true) {
+    std::unique_ptr<S> makeAscNoBound(
+        SortOptions options,
+        std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller = nullptr,
+        bool checkInput = true) {
         return std::make_unique<SAscNoBound>(
-            options, fileStats, ComparatorAsc{}, NoBoundAsc{}, checkInput);
+            options, ComparatorAsc{}, NoBoundAsc{}, spiller, checkInput);
     }
     std::unique_ptr<S> makeDesc(SortOptions options,
-                                SorterFileStats* fileStats = nullptr,
+                                std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller = nullptr,
                                 bool checkInput = true) {
         return std::make_unique<SDesc>(
-            options, fileStats, ComparatorDesc{}, BoundMakerDesc{}, checkInput);
+            options, ComparatorDesc{}, BoundMakerDesc{}, spiller, checkInput);
     }
 
     SorterTracker sorterTracker;
@@ -739,7 +739,7 @@ TEST_F(BoundedSorterTest, WrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    sorter = makeAsc({}, /*fileStats=*/nullptr, /*checkInput*/ false);
+    sorter = makeAsc({}, /*spiller=*/nullptr, /*checkInput*/ false);
     auto output = sort(input);
     ASSERT_EQ(output.size(), 7);
 
@@ -781,7 +781,9 @@ TEST_F(BoundedSorterTest, SpillSorted) {
     unittest::TempDir tempDir = makeTempDir();
     auto options =
         SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
-    sorter = makeAsc(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
         {0},
@@ -802,7 +804,9 @@ TEST_F(BoundedSorterTest, SpillSorted) {
 TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
     unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16);
-    sorter = makeAsc(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
         {0},
@@ -825,7 +829,9 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
     unittest::TempDir tempDir = makeTempDir();
     auto options =
         SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(16).Tracker(&sorterTracker);
-    sorter = makeAsc(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
         // 0 and 11 cannot swap.
@@ -863,8 +869,10 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
         {16},
     };
 
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller1 =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
     // Disable input order checking so we can see what happens.
-    sorter = makeAsc(options, /*fileStats=*/nullptr, /*checkInput=*/false);
+    sorter = makeAsc(options, std::move(spiller1), /*checkInput=*/false);
     auto output = sort(input);
     ASSERT_EQ(output.size(), 7);
 
@@ -878,8 +886,11 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
 
     ASSERT_EQ(sorter->stats().spilledRanges(), 2);
 
+
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller2 =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
     // Test that by default, bad input like this would be detected.
-    sorter = makeAsc(options);
+    sorter = makeAsc(options, std::move(spiller2));
     ASSERT(sorter->checkInput());
     ASSERT_THROWS_CODE(sort(input), DBException, 6369910);
 }
@@ -923,7 +934,9 @@ TEST_F(BoundedSorterTest, LimitSpill) {
                        .MaxMemoryUsageBytes(40)
                        .Tracker(&sorterTracker)
                        .Limit(3);
-    sorter = makeAsc(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort(
         {
@@ -957,7 +970,9 @@ TEST_F(BoundedSorterTest, ForceSpill) {
                        .MaxMemoryUsageBytes(100 * 1024 * 1024)
                        .Tracker(&sorterTracker);
 
-    sorter = makeAsc(options, &fileStats);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), &fileStats);
+    sorter = makeAsc(options, std::move(spiller));
     // Sorter stores pointers to sorterTracker and fileStats, it has to be destroyed before them.
     ScopeGuard sorterReset{[&]() {
         sorter.reset();
@@ -1079,7 +1094,7 @@ TEST_F(BoundedSorterTest, DescWrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    sorter = makeDesc({}, /*fileStats=*/nullptr, /*checkInput=*/false);
+    sorter = makeDesc({}, /*spiller=*/nullptr, /*checkInput=*/false);
     auto output = sort(input);
     ASSERT_EQ(output.size(), 7);
 
@@ -1254,7 +1269,9 @@ TEST_F(BoundedSorterTest, CompoundSpill) {
     unittest::TempDir tempDir = makeTempDir();
     auto options =
         SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker).MaxMemoryUsageBytes(40);
-    sorter = makeAsc(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAsc(options, std::move(spiller));
 
     // When each partition is small enough, we don't spill.
     ASSERT_EQ(sorter->stats().spilledRanges(), 0);
@@ -1303,7 +1320,9 @@ TEST_F(BoundedSorterTest, LargeSpill) {
 
     unittest::TempDir tempDir = makeTempDir();
     auto options = SortOptions().TempDir(tempDir.path()).MaxMemoryUsageBytes(kMemoryLimit);
-    sorter = makeAscNoBound(options);
+    std::shared_ptr<FileBasedSorterSpiller<Key, Doc>> spiller =
+        std::make_shared<FileBasedSorterSpiller<Key, Doc>>(tempDir.path(), nullptr);
+    sorter = makeAscNoBound(options, std::move(spiller));
 
     std::vector<Doc> input;
     input.reserve(kDocCountToCauseSpilling);

@@ -570,9 +570,8 @@ public:
         // of iterators that we can store in the reserved memory (MEM_LIMIT - DATA_MEM_LIMIT).
         MONGO_STATIC_ASSERT(
             (NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT <
-            std::max(static_cast<std::size_t>(
-                         (MEM_LIMIT - DATA_MEM_LIMIT) /
-                         MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
+            std::max(static_cast<std::size_t>((MEM_LIMIT - DATA_MEM_LIMIT) /
+                                              sizeof(FileIterator<IntWrapper, IntWrapper>)),
                      static_cast<std::size_t>(1)));
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT);
@@ -679,19 +678,18 @@ public:
         // Make sure we create a lot of spills
         MONGO_STATIC_ASSERT(
             (Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT >
-            std::max(static_cast<std::size_t>(
-                         (MEM_LIMIT - DATA_MEM_LIMIT) /
-                         MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
+            std::max(static_cast<std::size_t>((MEM_LIMIT - DATA_MEM_LIMIT) /
+                                              sizeof(FileIterator<IntWrapper, IntWrapper>)),
                      static_cast<std::size_t>(1)));
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT);
     }
 
     size_t correctSpilledRanges() const override {
-        std::size_t maximumNumberOfIterators = std::max(
-            static_cast<std::size_t>((MEM_LIMIT - DATA_MEM_LIMIT) /
-                                     MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
-            static_cast<std::size_t>(1));
+        std::size_t maximumNumberOfIterators =
+            std::max(static_cast<std::size_t>((MEM_LIMIT - DATA_MEM_LIMIT) /
+                                              sizeof(FileIterator<IntWrapper, IntWrapper>)),
+                     static_cast<std::size_t>(1));
         // It spills when the data in memory is more than the maximum allowed memory.
         std::size_t recordsPerRange = DATA_MEM_LIMIT / sizeof(IWPair) + 1;
         std::size_t documentsToAdd = Parent::NUM_ITEMS;

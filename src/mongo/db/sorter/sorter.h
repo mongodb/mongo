@@ -435,6 +435,8 @@ public:
         const SortOptions& opts, const Settings& settings = Settings()) = 0;
 
     virtual size_t getIteratorSize() = 0;
+
+    virtual size_t getBufferSize() = 0;
     /**
      * Reconstructs a sorter when resuming an index build, following persistFromShutdown.
      */
@@ -554,6 +556,7 @@ public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
+    typedef std::pair<Key, Value> Data;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
     virtual std::shared_ptr<Iterator> spill(const SortOptions& opts,
@@ -565,6 +568,11 @@ public:
                                                   const Settings& settings,
                                                   std::span<std::pair<Key, Value>> data,
                                                   uint32_t idx) = 0;
+
+    virtual std::shared_ptr<Iterator> spillWithHeap(
+        const SortOptions& opts,
+        const Settings& settings,
+        std::priority_queue<Data, std::vector<Data>, Greater<Key, Value>>& heap) = 0;
 
     virtual void mergeSpills(const SortOptions& opts,
                              const Settings& settings,
@@ -585,9 +593,7 @@ public:
     typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<Key, Value> Data;
     using Comparator = std::function<int(const Key&, const Key&)>;
-    typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings>
-        Settings;
+    using Settings = SorterSpiller<Key, Value>::Settings;
 
     explicit SorterSpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage)
         : _storage(std::move(storage)) {}
@@ -608,8 +614,10 @@ public:
 
     std::shared_ptr<Iterator> spillWithHeap(
         const SortOptions& opts,
-        std::priority_queue<Data, std::vector<Data>, Greater<Key, Value>>& heap) {
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _storage->makeWriter(opts, {});
+        const Settings& settings,
+        std::priority_queue<Data, std::vector<Data>, Greater<Key, Value>>& heap) override {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+            _storage->makeWriter(opts, settings);
         while (!heap.empty()) {
             writer->addAlreadySorted(heap.top().first, heap.top().second);
             heap.pop();
@@ -631,7 +639,6 @@ private:
         std::span<std::pair<Key, Value>> data,
         uint32_t idx) = 0;
 };
-
 
 /**
  * This is the way to input data to the sorting framework.
@@ -742,7 +749,9 @@ template <typename Key, typename Value>
 class BoundedSorterInterface : public SorterBase {
 
 public:
-    BoundedSorterInterface(const SortOptions& opts) : SorterBase(opts.sorterTracker) {}
+    BoundedSorterInterface(const SortOptions& opts,
+                           std::shared_ptr<SorterSpiller<Key, Value>> spiller)
+        : SorterBase(opts.sorterTracker), _spillHelper(spiller) {}
 
     virtual ~BoundedSorterInterface() {}
 
@@ -794,6 +803,9 @@ public:
 
     // Update current bound without adding new item.
     virtual void setBound(Key key) = 0;
+
+protected:
+    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
 };
 
 /**
@@ -818,11 +830,12 @@ template <typename Key, typename Value, typename BoundMaker>
 class BoundedSorter final : public BoundedSorterInterface<Key, Value> {
 public:
     using Comparator = std::function<int(const Key&, const Key&)>;
+    using Settings = SorterSpiller<Key, Value>::Settings;
 
     BoundedSorter(const SortOptions& opts,
-                  SorterFileStats* fileStats,
                   Comparator comp,
                   BoundMaker makeBound,
+                  std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                   bool checkInput = true);
 
     BoundedSorter(const BoundedSorter&) = delete;
@@ -887,7 +900,6 @@ private:
     using Data = std::pair<Key, Value>;
     std::priority_queue<Data, std::vector<Data>, Greater<Key, Value>> _heap;
 
-    std::shared_ptr<SorterFile> _file;
     std::unique_ptr<SpillIterator> _spillIter;
 
     boost::optional<Key> _min;

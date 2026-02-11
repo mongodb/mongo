@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/logv2/log.h"

@@ -36,6 +36,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sorter/container_based_spiller.h"
 #include "mongo/db/sorter/container_test_utils.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -159,7 +160,7 @@ struct FileTraits {
     }
 
     static std::size_t iteratorSizeBytes() {
-        return MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize;
+        return sizeof(FileIterator<IntWrapper, IntWrapper>);
     }
 };
 

@@ -52,6 +52,9 @@
 MONGO_MOD_PUB;
 namespace mongo::sorter {
 
+// TODO SERVER-119549 Make container buffer size more accurate
+constexpr inline std::size_t kContainerBufferSize = size_t{64} << 10;
+
 template <typename Key, typename Value>
 class ContainerIterator : public Iterator<Key, Value> {
 public:
@@ -291,6 +294,11 @@ public:
     size_t getIteratorSize() override {
         return sizeof(sorter::ContainerIterator<Key, Value>);
     };
+
+    // TODO SERVER-119549 Make container buffer size more accurate
+    size_t getBufferSize() override {
+        return kContainerBufferSize;
+    }
 
     std::shared_ptr<sorter::Iterator<Key, Value>> getSortedIterator(
         const SorterRange& range, const Settings& settings) override {
