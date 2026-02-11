@@ -58,12 +58,18 @@ public:
 
         /**
          * Cumulative number of pre-image documents deleted by the purging job.
+         * This number is an estimate based on the collection count estimates present in the
+         * 'CollectionTruncateMarker's, and initially is only as accurate as the initial size/count
+         * information for the collection is.
          */
         AtomicWord<int64_t> docsDeleted;
 
         /**
          * Cumulative size in bytes of all deleted documents from all pre-image collections by the
          * purging job.
+         * This number is an estimate based on the collection size estimates present in the
+         * 'CollectionTruncateMarker's, and initially is only as accurate as the initial size/count
+         * information for the collection is.
          */
         AtomicWord<int64_t> bytesDeleted;
 

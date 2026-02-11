@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 
+#include <memory>
 #include <shared_mutex>
 
 #include <boost/optional/optional.hpp>
@@ -186,10 +187,8 @@ std::shared_ptr<PreImagesTruncateMarkers> PreImagesTruncateManager::_createAndIn
 
             // Serialize installation under the collection's lock to guarantee the markers
             // installed aren't for a stale, dropped version of the collection.
-            auto baseMarkers = PreImagesTruncateMarkers::createMarkers(opCtx, preImagesCollection);
-
             auto truncateMarkers =
-                std::make_shared<PreImagesTruncateMarkers>(std::move(baseMarkers));
+                std::make_shared<PreImagesTruncateMarkers>(opCtx, preImagesCollection);
             _setTruncateMarkers(truncateMarkers);
             return truncateMarkers;
         });

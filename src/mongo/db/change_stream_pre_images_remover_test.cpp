@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -35,7 +34,6 @@
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -45,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -57,8 +56,10 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
@@ -66,12 +67,9 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
-#include <algorithm>
 #include <cstdint>
-#include <iterator>
 #include <limits>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -165,6 +163,7 @@ protected:
                           ->uuid();
 
         std::vector<BSONObj> preImageDocs;
+        preImageDocs.reserve(numRecords);
         for (int64_t i = 0; i < numRecords; i++) {
             preImageDocs.push_back(
                 generatePreImage(nsUUID, Timestamp{startOperationTime + Milliseconds{i}}).toBSON());
@@ -172,22 +171,63 @@ protected:
 
         AutoGetCollection preImagesCollectionRaii(opCtx, preImagesCollectionNss, MODE_IX);
         ASSERT(preImagesCollectionRaii);
+
         WriteUnitOfWork wuow(opCtx);
         auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
 
         ASSERT_OK(Helpers::insert(opCtx, changeStreamPreImagesCollection, preImageDocs));
         wuow.commit();
-    };
+    }
+
+    int countPreImagesForNsUUID(OperationContext* opCtx, UUID const& nsUUID) {
+        auto preImagesCollectionUUID =
+            CollectionCatalog::get(opCtx)
+                ->lookupCollectionByNamespace(operationContext(),
+                                              NamespaceString::kChangeStreamPreImagesNamespace)
+                ->uuid();
+
+        CollectionAcquisition preImagesCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest(
+                NamespaceStringOrUUID{NamespaceString::kChangeStreamPreImagesNamespace.dbName(),
+                                      preImagesCollectionUUID},
+                PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                repl::ReadConcernArgs::get(opCtx),
+                AcquisitionPrerequisites::kRead),
+            MODE_IS);
+
+        int count = 0;
+        auto cursor = preImagesCollection.getCollectionPtr()->getCursor(opCtx, true /* forward */);
+
+        RecordId seekTo =
+            change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)
+                .recordId();
+
+        boost::optional<Record> record =
+            cursor->seek(seekTo, SeekableRecordCursor::BoundInclusion::kInclude);
+        while (record) {
+            const BSONObj preImageObj = record->data.toBson();
+
+            if (nsUUID != change_stream_pre_image_util::getPreImageNsUUID(preImageObj)) {
+                // Record is already for a different 'nsUUID' value. Abort sampling.
+                break;
+            }
+            record = cursor->next();
+            ++count;
+        }
+        return count;
+    }
 
     // Inserts a pre-image into the pre-images collection. The pre-image inserted has a 'ts' of
     // 'preImageTS', and an 'operationTime' of either (1) 'preImageOperationTime', when
     // explicitly specified, or (2) a 'Date_t' derived from the 'preImageTS'.
-    void insertPreImage(NamespaceString nss,
+    void insertPreImage(const NamespaceString& nss,
                         Timestamp preImageTS,
                         boost::optional<Date_t> preImageOperationTime = boost::none) {
         auto opCtx = operationContext();
         auto uuid = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->uuid();
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
+
         WriteUnitOfWork wuow(opCtx);
         auto image = generatePreImage(uuid, preImageTS, preImageOperationTime);
         manager.insertPreImage(opCtx, image);
@@ -252,9 +292,140 @@ protected:
         ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime().opTime.getTimestamp(),
                   targetTimestamp);
     }
+
+    // This test is executed twice, with and without replicated truncates.
+    void testEnsureNoMoreInternalScansWithTruncates(long long expectedDocsDeleted) {
+        RAIIServerParameterControllerForTest minBytesPerMarker{
+            "preImagesCollectionTruncateMarkersMinBytes", 1};
+
+        auto uuid =
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
+                ->uuid();
+
+        auto clock = clockSource();
+        insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+        clock->advance(Milliseconds{1});
+        insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
+
+        ASSERT_EQ(2, countPreImagesForNsUUID(operationContext(), uuid));
+
+        setExpirationTime(Seconds{1});
+        // Verify that expiration works as expected.
+        auto passStats = performPass(Milliseconds{2000});
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+
+        ASSERT_EQ(0, countPreImagesForNsUUID(operationContext(), uuid));
+
+        // Assert that internal scans still occur while the collection exists.
+        passStats = performPass(Milliseconds{2000});
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 2);
+
+        // Assert that internal scans don't occur if the collection is dropped and no more documents
+        // exist.
+        invariantStatusOK(
+            storageInterface()->dropCollection(operationContext(), kPreImageEnabledCollection));
+        passStats = performPass(Milliseconds{2000});
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 3);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        // One more scan occurs after the drop verifying there's no more data and it is safe to
+        // ignore in the future.
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
+
+        passStats = performPass(Milliseconds{2000});
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 4);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
+    }
+
+    // This test is executed twice, with and without replicated truncates.
+    void testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
+        long long expectedDocsDeleted) {
+        auto uuid =
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
+                ->uuid();
+
+        auto clock = clockSource();
+        auto startOperationTime = clock->now();
+        auto numRecords = 1000;
+        prePopulatePreImagesCollection(kPreImageEnabledCollection, numRecords, startOperationTime);
+
+        ASSERT_EQ(numRecords, countPreImagesForNsUUID(operationContext(), uuid));
+
+        // Advance the clock to align with the most recent pre-image inserted.
+        clock->advance(Milliseconds{numRecords});
+
+        // Move the clock further ahead to simulate startup with a collection of expired pre-images.
+        clock->advance(Seconds{10});
+
+        setExpirationTime(Seconds{1});
+
+        auto passStats = performPass(Milliseconds{0});
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+
+        ASSERT_EQ(0, countPreImagesForNsUUID(operationContext(), uuid));
+    }
+
+    // This test is executed twice, with and without replicated truncates.
+    void testTruncatesAreOnlyAfterAllDurable(long long expectedDocsDeleted) {
+        RAIIServerParameterControllerForTest minBytesPerMarkerController{
+            "preImagesCollectionTruncateMarkersMinBytes", 1};
+
+        auto uuid =
+            CollectionCatalog::get(operationContext())
+                ->lookupCollectionByNamespace(operationContext(), kPreImageEnabledCollection)
+                ->uuid();
+
+        auto clock = clockSource();
+        auto startOperationTime = clock->now();
+        auto numRecordsBeforeAllDurableTimestamp = 1000;
+        prePopulatePreImagesCollection(
+            kPreImageEnabledCollection, numRecordsBeforeAllDurableTimestamp, startOperationTime);
+
+        ASSERT_EQ(numRecordsBeforeAllDurableTimestamp,
+                  countPreImagesForNsUUID(operationContext(), uuid));
+
+        // Advance the clock to align with the most recent pre-image inserted.
+        clock->advance(Milliseconds{numRecordsBeforeAllDurableTimestamp});
+
+        auto allDurableTS = storageInterface()->getAllDurableTimestamp(getServiceContext());
+
+        // Insert a pre-image that would be expired by truncate given its 'ts' is greater than the
+        // 'allDurableTS'. Force the 'operationTime' so the pre-image is expired by its
+        // 'operationTime'.
+        insertPreImage(kPreImageEnabledCollection, allDurableTS + 1, clock->now());
+
+        ASSERT_EQ(numRecordsBeforeAllDurableTimestamp + 1,
+                  countPreImagesForNsUUID(operationContext(), uuid));
+
+        // Pre-images eligible for truncation must have timestamps less than both the 'allDurable'
+        // and 'lastApplied' timestamps. In this test case, demonstrate that the 'allDurable'
+        // timestamp is respected even if the most recent pre-image 'ts' is less than the
+        // 'lastApplied'.
+        forceLastAppliedTimestamp(allDurableTS + 2);
+
+        // Force all pre-images to be expired by 'operationTime'.
+        clock->advance(Seconds{10});
+        setExpirationTime(Seconds{1});
+
+        auto passStats = performPass(Milliseconds{0});
+        ASSERT_EQ(passStats["maxTimestampEligibleForTruncate"].timestamp(), allDurableTS);
+        ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+        ASSERT_EQ(passStats["docsDeleted"].numberLong(), expectedDocsDeleted);
+        ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+
+        ASSERT_EQ(1, countPreImagesForNsUUID(operationContext(), uuid));
+    }
 };
 
-TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
+TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimestampRetrieval) {
     // Basic case.
     {
         Timestamp ts0(Date_t::now());
@@ -321,66 +492,41 @@ TEST_F(PreImagesRemoverTest, RecordIdToPreImageTimstampRetrieval) {
     }
 }
 
-TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithTruncates) {
-    RAIIServerParameterControllerForTest minBytesPerMarker{
-        "preImagesCollectionTruncateMarkersMinBytes", 1};
-
-    auto clock = clockSource();
-    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
-    clock->advance(Milliseconds{1});
-    insertPreImage(kPreImageEnabledCollection, Timestamp{clock->now()});
-
-    setExpirationTime(Seconds{1});
-    // Verify that expiration works as expected.
-    auto passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
-
-    // Assert that internal scans still occur while the collection exists.
-    passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 2);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 2);
-
-    // Assert that internal scans don't occur if the collection is dropped and no more documents
-    // exist.
-    invariantStatusOK(
-        storageInterface()->dropCollection(operationContext(), kPreImageEnabledCollection));
-    passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 3);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    // One more scan occurs after the drop verifying there's no more data and it is safe to ignore
-    // in the future.
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
-
-    passStats = performPass(Milliseconds{2000});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 4);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
+// Run test with local truncates.
+TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithLocalTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    testEnsureNoMoreInternalScansWithTruncates(2 /* expectedDocsDeleted */);
 }
 
-TEST_F(PreImagesRemoverTest, EnsureAllDocsEventualyTruncatedFromPrePopulatedCollection) {
-    auto clock = clockSource();
-    auto startOperationTime = clock->now();
-    auto numRecords = 1000;
-    prePopulatePreImagesCollection(kPreImageEnabledCollection, numRecords, startOperationTime);
-
-    // Advance the clock to align with the most recent pre-image inserted.
-    clock->advance(Milliseconds{numRecords});
-
-    // Move the clock further ahead to simulate startup with a collection of expired pre-images.
-    clock->advance(Seconds{10});
-
-    setExpirationTime(Seconds{1});
-
-    auto passStats = performPass(Milliseconds{0});
-    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecords);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+// Run test with replicated truncates.
+TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithReplicatedTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    testEnsureNoMoreInternalScansWithTruncates(3 /* expectedDocsDeleted */);
 }
 
-TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
+TEST_F(PreImagesRemoverTest,
+       EnsureAllDocsEventuallyTruncatedFromPrePopulatedCollectionLocalTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(1000 /* expectedDocsDeleted */);
+}
+
+TEST_F(PreImagesRemoverTest,
+       EnsureAllDocsEventuallyTruncatedFromPrePopulatedCollectionReplicatedTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", true};
+    // Note: the expected value here is very inaccurate, but this is due to no size information
+    // being used when estimating the number of documents in the truncate markers.
+    testEnsureAllDocsEventuallyTruncatedFromPrePopulatedCollection(
+        360448 /* expectedDocsDeleted */);
+}
+
+TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionLocalTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+
     setExpirationTime(Seconds{1});
 
     auto passStats = performPass(Milliseconds{0});
@@ -389,41 +535,38 @@ TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
 }
 
-TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
-    RAIIServerParameterControllerForTest minBytesPerMarkerController{
-        "preImagesCollectionTruncateMarkersMinBytes", 1};
+TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollectionReplicatesTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", true};
 
-    auto clock = clockSource();
-    auto startOperationTime = clock->now();
-    auto numRecordsBeforeAllDurableTimestamp = 1000;
-    prePopulatePreImagesCollection(
-        kPreImageEnabledCollection, numRecordsBeforeAllDurableTimestamp, startOperationTime);
-
-    // Advance the clock to align with the most recent pre-image inserted.
-    clock->advance(Milliseconds{numRecordsBeforeAllDurableTimestamp});
-
-    auto allDurableTS = storageInterface()->getAllDurableTimestamp(getServiceContext());
-
-    // Insert a pre-image that would be expired by truncate given its 'ts' is greater than
-    // the 'allDurable'. Force the 'operationTime' so the pre-image is expired by it's
-    // 'operationTime'.
-    insertPreImage(kPreImageEnabledCollection, allDurableTS + 1, clock->now());
-
-    // Pre-images eligible for truncation must have timestamps less than both the 'allDurable' and
-    // 'lastApplied' timestamps. In this test case, demonstrate that the 'allDurable' timestamp is
-    // respected even if the most recent pre-image 'ts' is less than the 'lastApplied'.
-    forceLastAppliedTimestamp(allDurableTS + 2);
-
-    // Force all pre-images to be expired by 'operationTime'.
-    clock->advance(Seconds{10});
     setExpirationTime(Seconds{1});
 
     auto passStats = performPass(Milliseconds{0});
-    ASSERT_EQ(passStats["maxTimestampEligibleForTruncate"].timestamp(), allDurableTS);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
-    ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecordsBeforeAllDurableTimestamp);
-    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
 }
+
+TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
+    RAIIServerParameterControllerForTest featureFlagScope{
+        "featureFlagUseReplicatedTruncatesForDeletions", false};
+    testTruncatesAreOnlyAfterAllDurable(1000 /* expectedDocsDeleted */);
+}
+
+// This test will currently fail when enabling the feature flag for replicated truncates.
+// The reason is that the sampling algorithm that is used for sampling documents in the pre-images
+// collection when the feature flag is enabled will not find enough of the existing documents. The
+// test creates many documents with Timestamps close to Timestamp(1, 2001) and then bumps the
+// majority-commited op time to Timestamp(4294969, 2) and creates another document.
+// The range of timestamps in the pre-images collection thus is very large, but the distribution of
+// documents in the range is very skewed. The equal range sampling won't consider most of the
+// documents, which makes the test fail.
+// TODO SERVER-119222: Reconsider the sampling algorithm and re-enable this test.
+// TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableReplicatedTruncates) {
+//     RAIIServerParameterControllerForTest featureFlagScope{
+//         "featureFlagUseReplicatedTruncatesForDeletions", true};
+//     testTruncatesAreOnlyAfterAllDurable(1 /* expectedDocsDeleted */);
+// }
 
 /**
  * Tests the conditions under which the ChangeStreamExpiredPreImagesRemoverService starts

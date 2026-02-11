@@ -39,11 +39,24 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 // TODO SERVER-115201: Break up the utils not to cross modules
 namespace MONGO_MOD_NEEDS_REPLACEMENT change_stream_pre_image_util {
+
+/**
+ * Whether or not replicated truncates should be used for pre-images collection truncation.
+ * This will first consult the active persistence provider (for ASC or DSC) and call
+ * 'shouldUseReplicatedTruncates()' on it. If this returns true, then replicated truncates will be
+ * used. If this does not return true, the feature flag
+ * 'gFeatureFlagUseReplicatedTruncatesForDeletions' will be consulted and its value will be
+ * returned.
+ */
+bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx);
+
 /**
  * If 'expireAfterSeconds' is defined for pre-images, returns its value. Otherwise, returns
  * boost::none.
@@ -59,12 +72,22 @@ boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
 
 /**
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
-be
- * generated from a pre-image.
+ * be generated from a pre-image.
  */
 Timestamp getPreImageTimestamp(const RecordId& rid);
 
+/**
+ * Converts the 'ChangeStreamPreImageId' to its 'RecordId' equivalent.
+ */
 RecordId toRecordId(ChangeStreamPreImageId id);
+
+/**
+ * Construct a 'RecordIdBound' for the specified combination of 'nsUUID', Timestamp 'ts' and
+ * 'applyOpsIndex'.
+ */
+RecordIdBound getPreImageRecordIdForNsTimestampApplyOpsIndex(const UUID& nsUUID,
+                                                             Timestamp ts,
+                                                             int64_t applyOpsIndex);
 
 /**
  * A given pre-images collection consists of segments of pre-images generated from different UUIDs.

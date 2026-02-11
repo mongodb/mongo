@@ -37,12 +37,15 @@
 #include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -78,6 +81,20 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
     return boost::none;
 }
 }  // namespace
+
+bool shouldUseReplicatedTruncatesForPreImages(OperationContext* opCtx) {
+    // First check persistence provider.
+    if (const auto& rss = rss::ReplicatedStorageService::get(opCtx);
+        rss.getPersistenceProvider().shouldUseReplicatedTruncates()) {
+        return true;
+    }
+
+    // Next check feature flag.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot);
+}
 
 boost::optional<Seconds> getExpireAfterSeconds(OperationContext* opCtx) {
     const auto changeStreamOptions = ChangeStreamOptionsManager::get(opCtx).getOptions(opCtx);
@@ -118,14 +135,20 @@ RecordId toRecordId(ChangeStreamPreImageId id) {
         BSON(ChangeStreamPreImage::kIdFieldName << id.toBSON()).firstElement());
 }
 
+RecordIdBound getPreImageRecordIdForNsTimestampApplyOpsIndex(const UUID& nsUUID,
+                                                             Timestamp ts,
+                                                             int64_t applyOpsIndex) {
+    return RecordIdBound(change_stream_pre_image_util::toRecordId(
+        ChangeStreamPreImageId(nsUUID, ts, applyOpsIndex)));
+}
+
 RecordIdBound getAbsoluteMinPreImageRecordIdBoundForNs(const UUID& nsUUID) {
-    return RecordIdBound(
-        change_stream_pre_image_util::toRecordId(ChangeStreamPreImageId(nsUUID, Timestamp(), 0)));
+    return getPreImageRecordIdForNsTimestampApplyOpsIndex(nsUUID, Timestamp(), 0);
 }
 
 RecordIdBound getAbsoluteMaxPreImageRecordIdBoundForNs(const UUID& nsUUID) {
-    return RecordIdBound(change_stream_pre_image_util::toRecordId(
-        ChangeStreamPreImageId(nsUUID, Timestamp::max(), std::numeric_limits<int64_t>::max())));
+    return getPreImageRecordIdForNsTimestampApplyOpsIndex(
+        nsUUID, Timestamp::max(), std::numeric_limits<int64_t>::max());
 }
 
 void truncatePreImagesByTimestampExpirationApproximation(

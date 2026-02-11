@@ -33,12 +33,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -49,12 +51,47 @@ namespace pre_image_marker_initialization_internal {
  */
 using RecordIdAndWallTime = CollectionTruncateMarkers::RecordIdAndWallTime;
 
-int64_t countTotalSamples(
-    const stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>& samplesMap);
+/**
+ * Pre-images samples for multiple collections, keyed by collection UUID.
+ */
+using SamplesMap = stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash>;
 
 /**
- * Returns the 'CollectionTruncateMarkers::RecordIdAndWallTime' for the most recent pre-image per
- * each 'nsUUID' in the pre-images collection.
+ * Pre-images truncate markers, keyed by collection UUID.
+ */
+using MarkersMap = ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>;
+
+int64_t countTotalSamples(const SamplesMap& samplesMap);
+
+/**
+ * Sample the values in the preimages collection for the given 'nsUUID' value in approximately equal
+ * Timestamp distance steps. Sampling will start by seeking to the minimum possible Timestamp value
+ * for the 'nsUUID', which is for timestamp 0 and applyOpsIndex 0. If a record is found that still
+ * belongs to the target 'nsUUID' value, it will be added to the sample. The Timestamp value will
+ * then be increased in roughly equally-sized steps until we exceed the timestamp in
+ * 'lastRidAndWall', or no further records for the 'nsUUID' value are found.
+ * All samples are returned in a vector, which is sorted primarily by Timestamp value, then
+ * 'applyOpsIndex' values of the samples. There will be at most 'numSamples' sample records
+ * returned, and at least one.
+ *
+ * The sampling currently does not take into account the 'applyOpsIndex' values. It will only seek
+ * to different Timestamp values, so the outcome will be suboptimal if there are large ranges with
+ * the same Timestamp but different applyOpsIndex values.
+ * It will work though if the Timestamp values in the collection have the same 't' (seconds) value,
+ * but differ only in their 'i' (increment) part.
+ */
+std::vector<RecordIdAndWallTime> sampleNSUUIDRangeEqually(
+    OperationContext* opCtx,
+    const CollectionAcquisition& preImagesCollection,
+    UUID nsUUID,
+    const RecordIdAndWallTime& lastRidAndWall,
+    uint64_t numSamples);
+
+/**
+ * Performs a loose reverse scan over the preimages collection and tracks the highest
+ * timestamp/applyOpsIndex combination for every distinct 'nsUUID' value. Returns the
+ * 'CollectionTruncateMarkers::RecordIdAndWallTime' for the most recent pre-image per each 'nsUUID'
+ * in the pre-images collection.
  */
 stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNsUUID(
     OperationContext* opCtx, const CollectionAcquisition& preImagesCollection);
@@ -69,19 +106,17 @@ stdx::unordered_map<UUID, RecordIdAndWallTime, UUID::Hash> sampleLastRecordPerNs
  * - (a) The collection is empty: No samples are returned.
  * - (b) There are more 'nsUUID's than 'targetNumSamples': 1 sample per nsUUID is returned.
  */
-stdx::unordered_map<UUID, std::vector<RecordIdAndWallTime>, UUID::Hash> collectPreImageSamples(
-    OperationContext* opCtx,
-    const CollectionAcquisition& preImagesCollection,
-    int64_t targetNumSamples);
+SamplesMap collectPreImageSamples(OperationContext* opCtx,
+                                  const CollectionAcquisition& preImagesCollection,
+                                  int64_t targetNumSamples);
 
 /**
  * Populates the 'markersMap' by scanning the pre-images collection.
  */
-void populateByScanning(
-    OperationContext* opCtx,
-    const CollectionAcquisition& preImagesCollection,
-    int32_t minBytesPerMarker,
-    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap);
+void populateByScanning(OperationContext* opCtx,
+                        const CollectionAcquisition& preImagesCollection,
+                        int32_t minBytesPerMarker,
+                        MarkersMap& markersMap);
 
 /**
  * Given:
@@ -97,21 +132,43 @@ void populateByScanning(
  * accurate; but, cumulatively, the total number of records and bytes captured by the 'markersMap'
  * should reflect the 'numRecords' and 'dataSize'.
  */
-void populateBySampling(
-    OperationContext* opCtx,
-    const CollectionAcquisition& preImagesCollection,
-    int64_t numRecords,
-    int64_t dataSize,
-    int32_t minBytesPerMarker,
-    uint64_t randomSamplesPerMarker,
-    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap);
+void populateByRandomSampling(OperationContext* opCtx,
+                              const CollectionAcquisition& preImagesCollection,
+                              int64_t numRecords,
+                              int64_t dataSize,
+                              int32_t minBytesPerMarker,
+                              uint64_t randomSamplesPerMarker,
+                              MarkersMap& markersMap);
+
+/**
+ * Populates the initial truncate markers in 'markersMap' via sampling the documents in the
+ * preimages collection in approximately equally-sized steps for each distinct 'nsUUID'. First
+ * performs a loose backward scan to enumerate all distinct 'nsUUID' values in the preimage
+ * collection, together with their maximum timestamp values. Afterwards, for each distinct 'nsUUID'
+ * value, a sample of up to 'numSamplesPerMarker' records is collected, starting at the lowest found
+ * timestamp and ending with the highest timestamp. The records in-between the lowest and highest
+ * timestamps are accessed in approximately equally-sized steps.
+ */
+void populateByEqualStepSampling(OperationContext* opCtx,
+                                 const CollectionAcquisition& preImagesCollection,
+                                 uint64_t numSamplesPerMarker,
+                                 MarkersMap& markersMap);
 }  // namespace pre_image_marker_initialization_internal
 
 /**
  * Statistics for a truncate pass over the system's pre-images collection.
  */
 struct PreImagesTruncateStats {
+    // The estimated number of bytes deleted in the truncate pass.
+    // This number is an estimate based on the collection size estimates present in the collection
+    // truncate markers, and it is only as accurate as the size/count information in the
+    // 'CollectionTruncateMarker's is.
     int64_t bytesDeleted{0};
+
+    // The estimated number of documents deleted in the truncate pass.
+    // This number is an estimate based on the collection count estimates present in the collection
+    // truncate markers, and it is only as accurate as the size/count information in the
+    // 'CollectionTruncateMarker's is.
     int64_t docsDeleted{0};
 
     // The number of 'nsUUID's scanned in the truncate pass.
@@ -129,9 +186,12 @@ struct PreImagesTruncateStats {
  * Manages truncate markers specific to the system's pre-images collection.
  */
 class PreImagesTruncateMarkers {
+    PreImagesTruncateMarkers(const PreImagesTruncateMarkers&) = delete;
+    PreImagesTruncateMarkers& operator=(const PreImagesTruncateMarkers&) = delete;
+
 public:
     /**
-     * Returns a 'PreImagesTruncateMarkers' instance populated with truncate markers that span the
+     * Creates a 'PreImagesTruncateMarkers' instance populated with truncate markers that span the
      * system's pre-images collection. However, these markers are not safe to use until
      * 'refreshMarkers' is called to update the highest seen recordId and wall time for each
      * nsUUID. Otherwise, pre-images would not be truncated until new inserts come in for each
@@ -139,9 +199,13 @@ public:
      *
      * Note: Pre-images inserted concurrently with creation might not be covered by the resulting
      * truncate markers.
+     *
+     * The 'preImagesCollection' is required to exist. Otherwise the constructor will trigger an
+     * invariant failure. The 'OperationContext' parameter is only used for the initial population
+     * of the truncate markers, but is not used afterwards.
      */
-    static PreImagesTruncateMarkers createMarkers(OperationContext* opCtx,
-                                                  const CollectionAcquisition& preImagesCollection);
+    PreImagesTruncateMarkers(OperationContext* opCtx,
+                             const CollectionAcquisition& preImagesCollection);
 
     /**
      * Opens a fresh snapshot and ensures the all pre-images visible in the snapshot are
@@ -171,12 +235,11 @@ public:
         return _preImagesCollectionUUID;
     }
 
+    const pre_image_marker_initialization_internal::MarkersMap& getMarkersMap_forTest() const {
+        return _markersMap;
+    }
+
 private:
-    friend class PreImagesTruncateManagerTest;
-
-    PreImagesTruncateMarkers(const UUID& preImagesCollectionUUID)
-        : _preImagesCollectionUUID{preImagesCollectionUUID} {}
-
     const UUID _preImagesCollectionUUID;
 
     /**
@@ -187,7 +250,7 @@ private:
      *
      * Maps pre-images of a given 'nsUUID' to their truncate markers.
      */
-    ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> _markersMap;
+    pre_image_marker_initialization_internal::MarkersMap _markersMap;
 };
 
 }  // namespace mongo

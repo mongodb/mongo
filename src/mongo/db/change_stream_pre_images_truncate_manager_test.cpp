@@ -121,7 +121,8 @@ protected:
     }
 
     int64_t getNumRecordsInMarkers(std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers) {
-        const auto markersSnapshot = truncateMarkers->_markersMap.getUnderlyingSnapshot();
+        const auto markersSnapshot =
+            truncateMarkers->getMarkersMap_forTest().getUnderlyingSnapshot();
         int64_t numRecords{0};
         for (const auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
@@ -134,7 +135,8 @@ protected:
     }
 
     int64_t getBytesInMarkers(std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers) {
-        const auto markersSnapshot = truncateMarkers->_markersMap.getUnderlyingSnapshot();
+        const auto markersSnapshot =
+            truncateMarkers->getMarkersMap_forTest().getUnderlyingSnapshot();
         int64_t bytes{0};
         for (const auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
@@ -156,7 +158,7 @@ protected:
         // Also validate that the _truncateManager contains the markers we are validated.
         ASSERT(_truncateManager.areTruncateMarkersPopulated_forTest());
 
-        ASSERT_EQ(truncateMarkers->_preImagesCollectionUUID, preImagesCollection.uuid());
+        ASSERT_EQ(truncateMarkers->getPreImagesCollectionUUID(), preImagesCollection.uuid());
 
         const auto& preImagesCollPtr = preImagesCollection.getCollectionPtr();
         const auto opCtx = operationContext();
@@ -170,26 +172,26 @@ protected:
 
     void validateMarkersExistForNsUUID(std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers,
                                        const UUID& nsUUID) {
-        ASSERT(truncateMarkers->_markersMap.find(nsUUID));
+        ASSERT(truncateMarkers->getMarkersMap_forTest().find(nsUUID));
     }
 
     void validateCreationMethod(
         std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers,
         const UUID& nsUUID,
         CollectionTruncateMarkers::MarkersCreationMethod expectedCreationMethod) {
-        auto nsUUIDTruncateMarkers = truncateMarkers->_markersMap.find(nsUUID);
+        auto nsUUIDTruncateMarkers = truncateMarkers->getMarkersMap_forTest().find(nsUUID);
         ASSERT(nsUUIDTruncateMarkers);
         ASSERT_EQ(nsUUIDTruncateMarkers->getMarkersCreationMethod(), expectedCreationMethod);
     }
 
     void validateMarkersDontExistForNsUUID(
         std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers, const UUID& nsUUID) {
-        ASSERT(!truncateMarkers->_markersMap.find(nsUUID));
+        ASSERT(!truncateMarkers->getMarkersMap_forTest().find(nsUUID));
     }
 
     void validateIncreasingRidAndWallTimesInMarkers(
         std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers) {
-        auto markersSnapshot = truncateMarkers->_markersMap.getUnderlyingSnapshot();
+        auto markersSnapshot = truncateMarkers->getMarkersMap_forTest().getUnderlyingSnapshot();
         for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
 

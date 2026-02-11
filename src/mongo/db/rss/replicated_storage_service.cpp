@@ -43,10 +43,11 @@ ReplicatedStorageService& ReplicatedStorageService::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
-PersistenceProvider& ReplicatedStorageService::getPersistenceProvider() {
+const PersistenceProvider& ReplicatedStorageService::getPersistenceProvider() const {
     invariant(_provider);
     return *_provider;
 }
+
 void ReplicatedStorageService::setPersistenceProvider(std::unique_ptr<PersistenceProvider>&& p) {
     _provider = std::move(p);
 }
