@@ -572,5 +572,104 @@ TEST(ExtractElementAtPathOrArrayAlongPath, FieldWithDotsDontHideNestedObjects) {
     assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
 }
 
+TEST(ExtractAllElementsAlongPathLegacy, FieldWithDotsMatchedDirectly) {
+    // Legacy behavior: fields with literal dots are matched before traversing.
+    BSONObj obj(fromjson("{\"a.b\": 'literal', a: {b: 'nested'}}"));
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+
+    // Legacy: finds the literal field "a.b" first.
+    assertBSONElementSetsAreEqual({BSON("" << "literal")}, actualElements);
+    assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
+TEST(ExtractAllElementsAlongPathLegacy, FieldWithDotsNotPresentFallsBackToNested) {
+    // When the literal field doesn't exist, legacy falls back to nested traversal.
+    BSONObj obj(fromjson("{a: {b: 'nested'}}"));
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+
+    // No literal field, so it finds nested.
+    assertBSONElementSetsAreEqual({BSON("" << "nested")}, actualElements);
+    assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
+TEST(ExtractAllElementsAlongPathLegacy, CompareWithCurrent) {
+    // Direct comparison: legacy vs current behavior with both fields present.
+    BSONObj obj(fromjson("{\"a.b.c\": 'literal', a: {b: {c: 'nested'}}}"));
+
+    BSONElementSet legacyElements;
+    BSONElementSet currentElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents legacyArrayComponents;
+    MultikeyComponents currentArrayComponents;
+
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, "a.b.c", legacyElements, expandArrayOnTrailingField, &legacyArrayComponents);
+    mdps::extractAllElementsAlongPath(
+        obj, "a.b.c", currentElements, expandArrayOnTrailingField, &currentArrayComponents);
+
+    // Legacy finds literal field.
+    assertBSONElementSetsAreEqual({BSON("" << "literal")}, legacyElements);
+    // Current finds nested field.
+    assertBSONElementSetsAreEqual({BSON("" << "nested")}, currentElements);
+}
+
+TEST(ExtractAllElementsAlongPathLegacy, MultipleDotsInFieldName) {
+    BSONObj obj(
+        fromjson("{\"field.with.many.dots\": 'value', field: {with: {many: {dots: 'nested'}}}}"));
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(obj,
+                                                              "field.with.many.dots",
+                                                              actualElements,
+                                                              expandArrayOnTrailingField,
+                                                              &actualArrayComponents);
+
+    // Legacy behavior: matches the literal field name first.
+    assertBSONElementSetsAreEqual({BSON("" << "value")}, actualElements);
+    assertArrayComponentsAreEqual(MultikeyComponents{}, actualArrayComponents);
+}
+
+TEST(ExtractAllElementsAlongPathLegacy, ArraysStillDetected) {
+    // Ensure array detection still works with legacy path.
+    BSONObj obj(fromjson("{\"a.b\": [1, 2, 3]}"));
+    BSONElementSet actualElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents actualArrayComponents;
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, "a.b", actualElements, expandArrayOnTrailingField, &actualArrayComponents);
+
+    // Array should be expanded.
+    assertBSONElementSetsAreEqual({BSON("" << 1), BSON("" << 2), BSON("" << 3)}, actualElements);
+    assertArrayComponentsAreEqual({0U}, actualArrayComponents);
+}
+
+TEST(ExtractAllElementsAlongPathLegacy, NoDotsInPath) {
+    // When path has no dots, both behaviors should be identical.
+    BSONObj obj(fromjson("{simple: 'value'}"));
+    BSONElementSet legacyElements;
+    BSONElementSet currentElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents legacyArrayComponents;
+    MultikeyComponents currentArrayComponents;
+
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, "simple", legacyElements, expandArrayOnTrailingField, &legacyArrayComponents);
+    mdps::extractAllElementsAlongPath(
+        obj, "simple", currentElements, expandArrayOnTrailingField, &currentArrayComponents);
+
+    // Both should find the same element.
+    assertBSONElementSetsAreEqual({BSON("" << "value")}, legacyElements);
+    assertBSONElementSetsAreEqual({BSON("" << "value")}, currentElements);
+}
+
 }  // namespace
 }  // namespace mongo

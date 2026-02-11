@@ -47,7 +47,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <utility>
 #include <vector>
 
@@ -115,6 +114,30 @@ BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
     invariant(indexedElements.size() <= 1U);
     return indexedElements.empty() ? nullElt : *indexedElements.begin();
 }
+
+/**
+ * Legacy version of extractNonFTSKeyElement that uses pre-SERVER-76875 dotted path extraction.
+ */
+BSONElement extractNonFTSKeyElementLegacy(const BSONObj& obj, StringData path) {
+    BSONElementSet indexedElements;
+    const bool expandArrayOnTrailingField = true;
+    MultikeyComponents arrayComponents;
+    // Use the legacy extraction function that checks for literal field names with dots first.
+    mdps::extractAllElementsAlongPathLegacy_forValidationOnly(
+        obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
+
+    if (MONGO_unlikely(enableCompoundTextIndexes.shouldFail())) {
+        return nullElt;
+    }
+    uassert(ErrorCodes::CannotBuildIndexKeys,
+            str::stream() << "Field '" << path
+                          << "' of text index contains an array in document: " << obj,
+            arrayComponents.empty());
+
+    // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
+    invariant(indexedElements.size() <= 1U);
+    return indexedElements.empty() ? nullElt : *indexedElements.begin();
+}
 }  // namespace
 
 MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
@@ -122,54 +145,6 @@ MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     b.appendNull("");
     nullObj = b.obj();
     nullElt = nullObj.firstElement();
-}
-
-void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
-                             const FTSSpec& spec,
-                             const BSONObj& obj,
-                             KeyStringSet* keys,
-                             key_string::Version keyStringVersion,
-                             Ordering ordering,
-                             const boost::optional<RecordId>& id) {
-    vector<BSONElement> extrasBefore;
-    vector<BSONElement> extrasAfter;
-
-    // Compute the non FTS key elements for the prefix.
-    for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
-        auto indexedElement = extractNonFTSKeyElement(obj, spec.extraBefore(i));
-        extrasBefore.push_back(indexedElement);
-    }
-
-    // Compute the non FTS key elements for the suffix.
-    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
-        auto indexedElement = extractNonFTSKeyElement(obj, spec.extraAfter(i));
-        extrasAfter.push_back(indexedElement);
-    }
-
-    TermFrequencyMap term_freqs;
-    spec.scoreDocument(obj, &term_freqs);
-
-    auto sequence = keys->extract_sequence();
-    for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
-        const string& term = i->first;
-        double weight = i->second;
-
-        key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
-        for (const auto& elem : extrasBefore) {
-            keyString.appendBSONElement(elem);
-        }
-        _appendIndexKey(keyString, weight, term, spec.getTextIndexVersion());
-        for (const auto& elem : extrasAfter) {
-            keyString.appendBSONElement(elem);
-        }
-
-        if (id) {
-            keyString.appendRecordId(*id);
-        }
-
-        sequence.push_back(keyString.release());
-    }
-    keys->adopt_sequence(std::move(sequence));
 }
 
 BSONObj FTSIndexFormat::getIndexKey(double weight,
@@ -224,6 +199,93 @@ void FTSIndexFormat::_appendIndexKey(KeyStringBuilder& keyString,
         }
     }
     keyString.appendNumberDouble(weight);
+}
+
+template <typename ExtractorFunction>
+void FTSIndexFormat::_getKeysImpl(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                  const FTSSpec& spec,
+                                  const BSONObj& obj,
+                                  KeyStringSet* keys,
+                                  key_string::Version keyStringVersion,
+                                  Ordering ordering,
+                                  const boost::optional<RecordId>& id,
+                                  ExtractorFunction extractFn) {
+    vector<BSONElement> extrasBefore;
+    vector<BSONElement> extrasAfter;
+
+    // Compute the non FTS key elements for the prefix.
+    for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
+        auto indexedElement = extractFn(obj, spec.extraBefore(i));
+        extrasBefore.push_back(indexedElement);
+    }
+
+    // Compute the non FTS key elements for the suffix.
+    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
+        auto indexedElement = extractFn(obj, spec.extraAfter(i));
+        extrasAfter.push_back(indexedElement);
+    }
+
+    TermFrequencyMap term_freqs;
+    spec.scoreDocument(obj, &term_freqs);
+
+    auto sequence = keys->extract_sequence();
+    for (TermFrequencyMap::const_iterator i = term_freqs.begin(); i != term_freqs.end(); ++i) {
+        const string& term = i->first;
+        double weight = i->second;
+
+        key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
+        for (const auto& elem : extrasBefore) {
+            keyString.appendBSONElement(elem);
+        }
+        _appendIndexKey(keyString, weight, term, spec.getTextIndexVersion());
+        for (const auto& elem : extrasAfter) {
+            keyString.appendBSONElement(elem);
+        }
+
+        if (id) {
+            keyString.appendRecordId(*id);
+        }
+
+        sequence.push_back(keyString.release());
+    }
+    keys->adopt_sequence(std::move(sequence));
+}
+
+void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                             const FTSSpec& spec,
+                             const BSONObj& obj,
+                             KeyStringSet* keys,
+                             key_string::Version keyStringVersion,
+                             Ordering ordering,
+                             const boost::optional<RecordId>& id) {
+    // Use current extraction that traverses nested objects for dotted paths.
+    _getKeysImpl(pooledBufferBuilder,
+                 spec,
+                 obj,
+                 keys,
+                 keyStringVersion,
+                 ordering,
+                 id,
+                 extractNonFTSKeyElement);
+}
+
+void FTSIndexFormat::getKeysLegacy_forValidationOnly(
+    SharedBufferFragmentBuilder& pooledBufferBuilder,
+    const FTSSpec& spec,
+    const BSONObj& obj,
+    KeyStringSet* keys,
+    key_string::Version keyStringVersion,
+    Ordering ordering,
+    const boost::optional<RecordId>& id) {
+    // Use legacy extraction that checks for literal field names with dots before traversing.
+    _getKeysImpl(pooledBufferBuilder,
+                 spec,
+                 obj,
+                 keys,
+                 keyStringVersion,
+                 ordering,
+                 id,
+                 extractNonFTSKeyElementLegacy);
 }
 }  // namespace fts
 }  // namespace mongo

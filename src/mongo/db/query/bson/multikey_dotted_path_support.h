@@ -73,5 +73,25 @@ void extractAllElementsAlongPath(const BSONObj& obj,
                                  bool expandArrayOnTrailingField = true,
                                  MultikeyComponents* arrayComponents = nullptr);
 
+/**
+ * Legacy version of extractAllElementsAlongPath that uses pre-SERVER-76865 behavior.
+ *
+ * This version checks for literal field names with embedded dots BEFORE traversing
+ * nested objects.
+ *
+ * For example, given document {"a.b": "x", "a": {"b": "y"}} and path "a.b":
+ * - This function returns "x" (literal field "a.b")
+ * - Current extractAllElementsAlongPath returns "y" (nested field a.b)
+ *
+ * Used only for validation to detect TEXT_INDEX_VERSION_3 indexes that need rebuilding.
+ * Should not be used for any other purpose.
+ */
+void extractAllElementsAlongPathLegacy_forValidationOnly(
+    const BSONObj& obj,
+    StringData path,
+    BSONElementSet& elements,
+    bool expandArrayOnTrailingField = true,
+    MultikeyComponents* arrayComponents = nullptr);
+
 }  // namespace multikey_dotted_path_support
 }  // namespace mongo

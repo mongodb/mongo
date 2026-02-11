@@ -393,5 +393,112 @@ TEST(FTSIndexFormat, GetKeysWithPositionalPathAllowed) {
         ASSERT_BSONELT_EQ(it.next(), fromjson("{'': 'foo'}").firstElement());
     }
 }
+
+TEST(FTSIndexFormat, GetKeysLegacyWithEmbeddedDots) {
+    // Legacy behavior: fields with embedded dots in the prefix/suffix are indexed.
+    BSONObj keyPattern = fromjson("{'field.with.dots': 1, 'content': 'text'}");
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << keyPattern << "textIndexVersion" << 3))));
+    SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
+
+    KeyStringSet legacyKeys;
+    KeyStringSet currentKeys;
+
+    // Document with literal field name containing dots.
+    BSONObj objToIndex = fromjson(
+        "{\"field.with.dots\": 99, content: 'searchable text', field: {with: {dots: 42}}}");
+
+    FTSIndexFormat::getKeysLegacy_forValidationOnly(allocator,
+                                                    spec,
+                                                    objToIndex,
+                                                    &legacyKeys,
+                                                    key_string::Version::kLatestVersion,
+                                                    Ordering::make(BSONObj()),
+                                                    boost::none);
+
+    FTSIndexFormat::getKeys(allocator,
+                            spec,
+                            objToIndex,
+                            &currentKeys,
+                            key_string::Version::kLatestVersion,
+                            Ordering::make(BSONObj()));
+
+    // Both should generate keys (for 'searchable' and 'text').
+    ASSERT_EQ(2U, legacyKeys.size());
+    ASSERT_EQ(2U, currentKeys.size());
+
+    // Check the prefix field value differs.
+    auto legacyKey = key_string::toBson(*legacyKeys.begin(), Ordering::make(BSONObj()));
+    auto currentKey = key_string::toBson(*currentKeys.begin(), Ordering::make(BSONObj()));
+
+    // Legacy should have 99 (literal field), current should have 42 (nested field).
+    ASSERT_EQ(3, legacyKey.nFields());
+    ASSERT_EQ(3, currentKey.nFields());
+
+    BSONObjIterator legacyIt{legacyKey};
+    BSONObjIterator currentIt{currentKey};
+
+    // First element is the prefix field.
+    ASSERT_EQ(99, legacyIt.next().numberInt());
+    ASSERT_EQ(42, currentIt.next().numberInt());
+}
+
+TEST(FTSIndexFormat, GetKeysLegacyWithSuffixField) {
+    // Test legacy behavior with suffix fields containing dots.
+    BSONObj keyPattern = fromjson("{'text': 'text', 'suffix.field': 1}");
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << keyPattern << "textIndexVersion" << 3))));
+    SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
+
+    KeyStringSet legacyKeys;
+    BSONObj objToIndex =
+        fromjson("{\"suffix.field\": 'literal', text: 'content', suffix: {field: 'nested'}}");
+
+    FTSIndexFormat::getKeysLegacy_forValidationOnly(allocator,
+                                                    spec,
+                                                    objToIndex,
+                                                    &legacyKeys,
+                                                    key_string::Version::kLatestVersion,
+                                                    Ordering::make(BSONObj()),
+                                                    boost::none);
+
+    ASSERT_EQ(1U, legacyKeys.size());
+
+    auto key = key_string::toBson(*legacyKeys.begin(), Ordering::make(BSONObj()));
+    ASSERT_EQ(3, key.nFields());
+
+    BSONObjIterator it{key};
+    it.next();  // Skip term
+    it.next();  // Skip weight
+
+    // Suffix field should be 'literal' (from literal field name).
+    ASSERT_EQ(std::string("literal"), it.next().String());
+}
+
+TEST(FTSIndexFormat, GetKeysLegacyMultiplePrefixFields) {
+    // Test with multiple prefix fields, some with embedded dots.
+    BSONObj keyPattern = fromjson("{'a': 1, 'b.c': 1, 'd': 'text'}");
+    FTSSpec spec(assertGet(FTSSpec::fixSpec(BSON("key" << keyPattern << "textIndexVersion" << 3))));
+    SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
+
+    KeyStringSet legacyKeys;
+    BSONObj objToIndex = fromjson("{a: 1, \"b.c\": 2, d: 'word', b: {c: 3}}");
+
+    FTSIndexFormat::getKeysLegacy_forValidationOnly(allocator,
+                                                    spec,
+                                                    objToIndex,
+                                                    &legacyKeys,
+                                                    key_string::Version::kLatestVersion,
+                                                    Ordering::make(BSONObj()),
+                                                    boost::none);
+
+    ASSERT_EQ(1U, legacyKeys.size());
+
+    auto key = key_string::toBson(*legacyKeys.begin(), Ordering::make(BSONObj()));
+    ASSERT_EQ(4, key.nFields());  // a, b.c, term, weight
+
+    BSONObjIterator it{key};
+    ASSERT_EQ(1, it.next().numberInt());  // a
+    ASSERT_EQ(2, it.next().numberInt());  // b.c (legacy finds literal field)
+}
+
 }  // namespace fts
 }  // namespace mongo

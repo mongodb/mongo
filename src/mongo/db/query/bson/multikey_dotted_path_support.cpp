@@ -155,5 +155,95 @@ void extractAllElementsAlongPath(const BSONObj& obj,
         obj, path, elements, expandArrayOnTrailingField, initialDepth, arrayComponents);
 }
 
+namespace {
+/**
+ * Recursive helper for extractAllElementsAlongPathLegacy.
+ * This is the implementation as it existed before SERVER-76875.
+ */
+void _extractAllElementsAlongPathLegacy(const BSONObj& obj,
+                                        StringData path,
+                                        BSONElementSet& elements,
+                                        bool expandArrayOnTrailingField,
+                                        BSONDepthIndex depth,
+                                        MultikeyComponents* arrayComponents) {
+    BSONElement e = obj.getField(path);
+
+    if (e.eoo()) {
+        size_t idx = path.find('.');
+        if (idx != std::string::npos) {
+            invariant(depth != std::numeric_limits<BSONDepthIndex>::max());
+            StringData left = path.substr(0, idx);
+            StringData next = path.substr(idx + 1, path.size());
+
+            BSONElement e = obj.getField(left);
+
+            if (e.type() == BSONType::object) {
+                _extractAllElementsAlongPathLegacy(e.embeddedObject(),
+                                                   next,
+                                                   elements,
+                                                   expandArrayOnTrailingField,
+                                                   depth + 1,
+                                                   arrayComponents);
+            } else if (e.type() == BSONType::array) {
+                bool allDigits = false;
+                if (next.size() > 0 && ctype::isDigit(next[0])) {
+                    unsigned temp = 1;
+                    while (temp < next.size() && ctype::isDigit(next[temp]))
+                        temp++;
+                    allDigits = temp == next.size() || next[temp] == '.';
+                }
+                if (allDigits) {
+                    _extractAllElementsAlongPathLegacy(e.embeddedObject(),
+                                                       next,
+                                                       elements,
+                                                       expandArrayOnTrailingField,
+                                                       depth + 1,
+                                                       arrayComponents);
+                } else {
+                    BSONObjIterator i(e.embeddedObject());
+                    while (i.more()) {
+                        BSONElement e2 = i.next();
+                        if (e2.type() == BSONType::object || e2.type() == BSONType::array)
+                            _extractAllElementsAlongPathLegacy(e2.embeddedObject(),
+                                                               next,
+                                                               elements,
+                                                               expandArrayOnTrailingField,
+                                                               depth + 1,
+                                                               arrayComponents);
+                    }
+                    if (arrayComponents) {
+                        arrayComponents->insert(depth);
+                    }
+                }
+            } else {
+                // do nothing: no match
+            }
+        }
+    } else {
+        if (e.type() == BSONType::array && expandArrayOnTrailingField) {
+            BSONObjIterator i(e.embeddedObject());
+            while (i.more()) {
+                elements.insert(i.next());
+            }
+            if (arrayComponents) {
+                arrayComponents->insert(depth);
+            }
+        } else {
+            elements.insert(e);
+        }
+    }
+}
+}  // namespace
+
+void extractAllElementsAlongPathLegacy_forValidationOnly(const BSONObj& obj,
+                                                         StringData path,
+                                                         BSONElementSet& elements,
+                                                         bool expandArrayOnTrailingField,
+                                                         MultikeyComponents* arrayComponents) {
+    BSONDepthIndex depth = 0;
+    _extractAllElementsAlongPathLegacy(
+        obj, path, elements, expandArrayOnTrailingField, depth, arrayComponents);
+}
+
 }  // namespace multikey_dotted_path_support
 }  // namespace mongo

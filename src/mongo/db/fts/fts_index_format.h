@@ -74,6 +74,23 @@ public:
                                const BSONObj& indexPrefix,
                                TextIndexVersion textIndexVersion);
 
+    /**
+     * Legacy version of getKeys that uses pre-SERVER-76875 dotted path extraction.
+     *
+     * This function generates keys using the legacy behavior where fields with embedded
+     * dots are checked before traversing nested objects. Used only for validation to
+     * detect TEXT_INDEX_VERSION_3 indexes need to be rebuilt.
+     *
+     * Should not be used for normal index operations.
+     */
+    static void getKeysLegacy_forValidationOnly(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                                                const FTSSpec& spec,
+                                                const BSONObj& obj,
+                                                KeyStringSet* keys,
+                                                key_string::Version keyStringVersion,
+                                                Ordering ordering,
+                                                const boost::optional<RecordId>& id);
+
 private:
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj.
@@ -99,6 +116,20 @@ private:
                                 double weight,
                                 const std::string& term,
                                 TextIndexVersion textIndexVersion);
+
+    /**
+     * Common implementation for getKeys and getKeysLegacy.
+     * Extracts FTS index keys using the provided extraction function for non-FTS fields.
+     */
+    template <typename ExtractorFunction>
+    static void _getKeysImpl(SharedBufferFragmentBuilder& pooledBufferBuilder,
+                             const FTSSpec& spec,
+                             const BSONObj& obj,
+                             KeyStringSet* keys,
+                             key_string::Version keyStringVersion,
+                             Ordering ordering,
+                             const boost::optional<RecordId>& id,
+                             ExtractorFunction extractFn);
 };
 }  // namespace fts
 }  // namespace mongo

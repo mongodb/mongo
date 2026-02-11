@@ -57,6 +57,38 @@ public:
         return _ftsSpec;
     }
 
+    /**
+     * For text indexes, returns true for TEXT_INDEX_VERSION_3 indexes to check for key generation
+     * differences.
+     *
+     * This allows us to detect TEXT_INDEX_VERSION_3 indexes that were created before SERVER-76875
+     * when fields with embedded dots were included in the index. Such indexes need to be rebuilt.
+     */
+    bool shouldCheckMissingIndexEntryAlternative(OperationContext* opCtx,
+                                                 const IndexCatalogEntry& entry) const override;
+
+    /**
+     * Checks if a missing text index entry is actually present when using legacy version 3
+     * key generation behavior, indicating the index was created before SERVER-76875 and needs to be
+     * rebuilt.
+     */
+    boost::optional<std::pair<std::string, std::string>> checkMissingIndexEntryAlternative(
+        OperationContext* opCtx,
+        const IndexCatalogEntry& entry,
+        const key_string::Value& missingKey,
+        const RecordId& recordId,
+        const BSONObj& document) const override;
+
+    /**
+     * Helper to generate keys using the legacy behavior before SERVER-76875 for validation.
+     * This uses the legacy dotted path extraction that checks for literal field names
+     * with dots before traversing nested objects.
+     */
+    KeyStringSet generateKeysLegacyDottedPath_forValidationOnly(OperationContext* opCtx,
+                                                                const IndexCatalogEntry* entry,
+                                                                const BSONObj& obj,
+                                                                const RecordId& id) const;
+
 private:
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
