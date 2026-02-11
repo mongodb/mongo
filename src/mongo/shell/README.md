@@ -253,3 +253,77 @@ with a space:
 [js_test:hybrid_unique_index_with_updates] [jsTest] }
 [js_test:hybrid_unique_index_with_updates] [jsTest] ----
 ```
+
+## Connections
+
+The shell provides different ways to connect to MongoDB deployments, handling single nodes, replica sets, and sharded clusters with multiple routers.
+
+### Direct Connection (`Mongo` type)
+
+The `Mongo` class represents a direct connection to a MongoDB deployment. This is the standard connection type used when connecting to:
+
+- A single `mongod` instance.
+- A Replica Set (when the connection string includes a `replicaSet` parameter).
+- A single `mongos` instance.
+
+The `Mongo` object manages the connection state, including authentication, read preferences, write concerns, and logical sessions. It is defined in `src/mongo/shell/mongo.js` (with core implementation in C++).
+
+### Multiple Mongos Fixtures
+
+When testing sharded clusters, it is often necessary to interact with multiple `mongos` to verify behavior across different routers.
+The production workload (based on drivers specs) attempts to balance the workload based on the speed response of the ping command on every router.
+Given in production is not possible to deterministically predict where the next command will be dispatched, we require a way to
+
+- Hold a pool of direct connection against every mongos
+- Dispach non-determinstically every command against the pool of connection
+- Maintain the same constaints of the drivers.
+
+#### Multi-Router Mongo
+
+The `MultiRouterMongo` class (defined in `src/mongo/shell/multi_router.js`) wraps a pool of connections to multiple `mongos` instances. It acts as a proxy that routes commands:
+
+- **Stateless Operations**: Dispatched to a random `mongos` in the pool to simulate non-deterministic load balancing.
+- **Stateful Operations**:
+  - **Transactions**: Pinned to a specific `mongos` for the duration of the transaction using `SessionMongoMap`.
+  - **Cursors**: `getMore`, `releaseMemory` and `killCursors` commands are routed to the `mongos` that established the initial cursor via `find` or `aggregate`
+- **Primary Fallback**: Maintains a "primary" connection for operations that require a stable reference or are not yet supported for random dispatch.
+
+**Cluster Time**:
+The clusterTime in a Multi-Router Mongo is a global single instance shared among every connection. While every connection will maintain its own clusterTime, the value will be ignored and any command will always carry the shared one, which is held by the primary connection.
+
+#### Testing-Specific Deviations
+
+While `MultiRouterMongo` primarily aims to mimic standard driver behavior (like random selection), certain operations deviate to accommodate the MongoDB testing framework's assumptions. In our testing environment, we often expect configuration changes to apply cluster-wide immediately, whereas a real driver would only affect the specific node it talks to.
+
+- **Broadcasted Refreshes**: Commands that refresh the router's view of the cluster (e.g., `flushRouterConfig`) are broadcast to **all** connected mongos instances. This ensures that a test step intending to update the routing table does so for the entire test fixture, preventing stale routing errors on subsequent commands.
+
+- **Broadcasted Server Parameters**: `setParameter` commands are node-specific by definition. However, many tests assume that setting a parameter (like a log level or feature flag) applies to the "system" they are testing. To support these tests without modification, `MultiRouterMongo` broadcasts `setParameter` to all routers in the pool.
+
+### Connection Factory
+
+The global `connect()` function is the primary entry point for establishing connections in the shell.
+
+#### `connect(url, user, pass)`
+
+The `connect` function parses the provided connection string and uses a `connectionFactory` to determine the appropriate connection object to return:
+
+1. **Standard Connection**: If the URI contains a single host or specifies a Replica Set (`setName`), it returns a standard `Mongo` object.
+2. **Multi-Router Connection**: If the URI lists multiple hosts and is _not_ a Replica Set, it attempts to create a `MultiRouterMongo` instance.
+   - If the multi-router connection fails (e.g., some hosts are unreachable), it gracefully falls back to a standard `Mongo` connection using the first available host.
+
+This factory pattern allows tests and scripts to use `connect()` agnostically, receiving a multi-router aware connection automatically when the environment supports it.
+
+Important Note: We should always prefer the `connect` function to re-connect against the same end-point unless a specific behaviour is required.
+Example:
+
+```
+// Connect the first time
+const db = connect(uri);
+
+// ... later in the test ...
+
+// Reconnect against the same end-point (automatically handles multi-router or single connection)
+const newConn = connect(db.getMongo().uri).getMongo();
+```
+
+This will ensure to return the correct connection type.
