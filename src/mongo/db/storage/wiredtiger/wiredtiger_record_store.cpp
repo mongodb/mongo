@@ -78,7 +78,6 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #include <algorithm>
@@ -89,14 +88,6 @@
 namespace mongo {
 
 namespace {
-
-struct RecordIdAndWall {
-    RecordId id;
-    Date_t wall;
-
-    RecordIdAndWall(RecordId lastRecord, Date_t wallTime)
-        : id(std::move(lastRecord)), wall(wallTime) {}
-};
 
 WiredTigerRecordStore::CursorKey makeCursorKey(const RecordId& rid, KeyFormat format) {
     if (format == KeyFormat::Long) {
