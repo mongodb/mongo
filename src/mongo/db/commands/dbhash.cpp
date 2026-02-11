@@ -87,7 +87,10 @@ namespace mongo {
 namespace {
 
 constexpr char SKIP_TEMP_COLLECTION[] = "skipTempCollections";
-constexpr char EXCLUDE_RECORDIDS[] = "excludeRecordIds";
+// If set, scans the collection in natural order and includes the replicated recordIds in the hash.
+// This enables stricter consistency checks across replica nodes when storage layout is expected to
+// be identical. Disabled by default.
+constexpr char INCLUDE_REPLICATED_RECORDIDS[] = "includeReplicatedRecordIds";
 // TODO SERVER-106005: Remove this option once all versions tested in multiversion suites can scan
 // in natural order for capped collections.
 constexpr char USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS[] = "useIndexScanForCappedCollections";
@@ -201,10 +204,10 @@ public:
             LOGV2(6859700, "Skipping hash computation for temporary collections");
         }
 
-        const bool excludeRecordIds =
-            cmdObj.hasField(EXCLUDE_RECORDIDS) && cmdObj[EXCLUDE_RECORDIDS].trueValue();
-        if (excludeRecordIds) {
-            LOGV2(6859701, "Exclude recordIds in dbHash for recordIdsReplicated collections");
+        const bool includeReplicatedRecordIds = cmdObj.hasField(INCLUDE_REPLICATED_RECORDIDS) &&
+            cmdObj[INCLUDE_REPLICATED_RECORDIDS].trueValue();
+        if (includeReplicatedRecordIds) {
+            LOGV2(6859701, "Include recordIds in dbHash for recordIdsReplicated collections");
         }
 
         const bool useIndexScanForCappedCollections =
@@ -281,7 +284,7 @@ public:
 
             // Compute the hash for this collection.
             std::string hash = _hashCollection(
-                opCtx, collection, excludeRecordIds, useIndexScanForCappedCollections);
+                opCtx, collection, includeReplicatedRecordIds, useIndexScanForCappedCollections);
 
             collectionToHashMap[std::string{collNss.coll()}] = hash;
 
@@ -373,18 +376,18 @@ public:
 private:
     std::string _hashCollection(OperationContext* opCtx,
                                 const CollectionAcquisition& collection,
-                                bool excludeRecordIds,
+                                bool includeReplicatedRids,
                                 bool useIndexScanForCappedCollections) {
         auto desc = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
 
-        // Replicated RecordIds circumvent the need to perform an _id lookup because natural
-        // scan order is preserved across nodes. If to exclude recordIds, existing _id scan should
-        // be kept too. This way a customer will get the same hash with excludeRecordIds option as
-        // the one before upgrade.
+        // Hashes for collections with replicated recordIds are generated with an _id scan by
+        // default. This ensures hashes are consistent for the same user data, regardless of how the
+        // data is organized in storage. Users can opt-in to including replicated recordIds in the
+        // hash by specifying 'includeReplicatedRecordIds' in the dbhash command.
         bool includeRids =
-            collection.getCollectionPtr()->areRecordIdsReplicated() && !excludeRecordIds;
+            collection.getCollectionPtr()->areRecordIdsReplicated() && includeReplicatedRids;
 
         if (desc && !includeRids &&
             !(collection.getCollectionPtr()->isCapped() && !useIndexScanForCappedCollections)) {

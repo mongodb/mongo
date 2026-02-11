@@ -2472,20 +2472,23 @@ export class ReplSetTest {
             if (skipTempCollections) {
                 commandObj.skipTempCollections = 1;
             }
-            // If we are running in a multiversion suite, preserve old behavior of checking capped
-            // collections in _id order instead of natural order. The
-            // 'useIndexScanForCappedCollections' option for dbHash should be ignored in older
-            // binaries.
-            if (
+            const isMultiversion =
                 typeof TestData !== "undefined" &&
                 (TestData.useRandomBinVersionsWithinReplicaSet ||
                     TestData.mongosBinVersion ||
                     TestData.multiversionBinVersion ||
-                    TestData.mixedBinVersions)
-            ) {
+                    TestData.mixedBinVersions);
+            if (isMultiversion) {
+                // If we are running in a multiversion suite, preserve old behavior of checking capped
+                // collections in _id order instead of natural order. The
+                // 'useIndexScanForCappedCollections' option for dbHash should be ignored in older
+                // binaries.
                 commandObj.useIndexScanForCappedCollections = 1;
             }
 
+            // If recordIds are replicated on a collection, always include them for testing.
+            // This should have no impact on collections without replicated recordIds.
+            commandObj.includeReplicatedRecordIds = 1;
             return assert.commandWorked(db.runCommand(commandObj));
         });
     }
