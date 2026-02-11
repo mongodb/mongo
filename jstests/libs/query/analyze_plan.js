@@ -1441,3 +1441,12 @@ export function assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, indexName
         assert.eq(indexName, stage.indexName, entry);
     }
 }
+
+/**
+ * Returns true if the plan was created by the multiplanner subplanner. In this case the plan has a SUBPLAN stage
+ * and the rejected plans are empty, since a single plan was composed from individual branch plans.
+ */
+export function isSubplannerCompositePlan(explain) {
+    const subplan = getPlanStage(explain, "SUBPLAN");
+    return subplan != null && !hasRejectedPlans(explain);
+}
