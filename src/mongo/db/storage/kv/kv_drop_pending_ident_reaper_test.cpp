@@ -813,5 +813,55 @@ TEST_F(KVDropPendingIdentReaperTest, IdentWithDelayStillNotDroppedAfterRemovingD
     ASSERT_EQUALS(identName, engine->droppedIdents.front());
 }
 
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsChecksForInterruptsBeforeDropping) {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+
+    Timestamp dropTimestamp{Seconds(10), 0};
+    std::string identName = "ident";
+
+    reaper.addDropPendingIdent(dropTimestamp, std::make_shared<Ident>(identName));
+
+    {
+        auto opCtx = makeOpCtx();
+        opCtx->markKilled();
+        ASSERT_THROWS_CODE(
+            reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp)),
+            DBException,
+            ErrorCodes::Interrupted);
+        ASSERT_EQUALS(0U, engine->droppedIdents.size());
+    }
+
+    {
+        auto opCtx = makeOpCtx();
+        reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
+        ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    }
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ImmediatelyCompletePendingDropWorksAfterInterruptedDrop) {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+
+    std::string identName = "ident";
+
+    reaper.addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(identName));
+
+    {
+        auto opCtx = makeOpCtx();
+        opCtx->markKilled();
+        ASSERT_THROWS_CODE(reaper.dropIdentsOlderThan(opCtx.get(), Timestamp::min()),
+                           DBException,
+                           ErrorCodes::Interrupted);
+        ASSERT_EQUALS(0U, engine->droppedIdents.size());
+    }
+
+    {
+        auto opCtx = makeOpCtx();
+        ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
+        ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    }
+}
+
 }  // namespace
 }  // namespace mongo
