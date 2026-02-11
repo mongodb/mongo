@@ -153,6 +153,14 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "local_resharding_operations_registry",
+    srcs = [
+        "//src/mongo/db/s/resharding:local_resharding_operations_registry.cpp",
+    ],
+    deps = ["//src/mongo/s:common_s"],
+)
+
+mongo_cc_library(
     name = "analyze_shard_key_util",
     srcs = [
         "analyze_shard_key_util.cpp",
@@ -987,6 +995,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "db_s_resharding_part3_test",
     srcs = [
+        "//src/mongo/db/s/resharding:local_resharding_operations_registry_test.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state_test.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_txn_cloner_test.cpp",
@@ -999,6 +1008,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":db_s_shard_server_test_deps",
+        ":local_resharding_operations_registry",
         ":sharding_test_helpers",
     ],
 )

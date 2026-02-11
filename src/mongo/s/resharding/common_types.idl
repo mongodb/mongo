@@ -97,7 +97,7 @@ structs:
     CommonReshardingMetadata:
         description: "Immutable metadata shared across all node types for a resharding operation."
         mod_visibility: private
-        generate_comparison_operators: false
+        generate_comparison_operators: true
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.

@@ -40,6 +40,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
+#include <compare>
 #include <cstddef>
 #include <string>
 
@@ -84,6 +85,14 @@ public:
     KeyPattern(const BSONObj& pattern);
 
     explicit KeyPattern() = default;
+
+    bool operator==(const KeyPattern& other) const {
+        return toBSON().woCompare(other.toBSON()) == 0;
+    }
+
+    std::strong_ordering operator<=>(const KeyPattern& other) const {
+        return toBSON().woCompare(other.toBSON()) <=> 0;
+    }
 
     /**
      * Returns a BSON representation of this KeyPattern.
