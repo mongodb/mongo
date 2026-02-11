@@ -95,7 +95,7 @@ public:
     int getConfigVersion() const {
         return _configVersion;
     }
-    int getConfigTerm() const {
+    long long getConfigTerm() const {
         return _configTerm;
     }
     ConfigVersionAndTerm getConfigVersionAndTerm() const {
@@ -172,7 +172,7 @@ public:
     /**
      * Sets _configTerm to "configTerm".
      */
-    void setConfigTerm(int configTerm) {
+    void setConfigTerm(long long configTerm) {
         _configTerm = configTerm;
     }
 
@@ -236,7 +236,7 @@ private:
     MemberState _state;
 
     int _configVersion = -1;
-    int _configTerm = OpTime::kUninitializedTerm;
+    long long _configTerm = OpTime::kUninitializedTerm;
     std::string _setName;
     HostAndPort _syncingTo;
 

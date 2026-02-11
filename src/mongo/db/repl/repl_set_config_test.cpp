@@ -338,14 +338,26 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingTermField) {
                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                            << "localhost:12345")))),
                   DBException);
-    ASSERT_THROWS(ReplSetConfig::parse(
-                      BSON("_id" << "rs0"
-                                 << "version" << 1 << "term"
-                                 << static_cast<long long>(std::numeric_limits<int>::max()) + 1
-                                 << "protocolVersion" << 1 << "members"
-                                 << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                          << "localhost:12345")))),
-                  DBException);
+    config = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "term"
+                   << static_cast<long long>(std::numeric_limits<int>::max()) + 1
+                   << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:12345"))));
+
+    ASSERT_OK(config.validate());
+
+    // Verify we can parse up to long long
+    config = ReplSetConfig::parse(
+        BSON("_id" << "rs0"
+                   << "version" << 1 << "term"
+                   << static_cast<long long>(std::numeric_limits<long long>::max())
+                   << "protocolVersion" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                            << "localhost:12345"))));
+
+    ASSERT_OK(config.validate());
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadMembers) {

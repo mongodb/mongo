@@ -171,7 +171,7 @@ structs:
                     created this configuration. Configurations in a replica set are
                     totally ordered by their term and configuration version."
                 default: -1
-                validator: {gte: -1, lt: 2147483648}
+                validator: {gte: -1, lte: 9223372036854775807}
             members:
                 type: array<memberConfig>
                 description:
