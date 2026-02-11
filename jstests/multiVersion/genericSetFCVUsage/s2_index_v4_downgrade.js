@@ -19,7 +19,7 @@ import "jstests/multiVersion/libs/verify_versions.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const targetDowngradeVersion = "8.0";
+const targetDowngradeVersion = "last-lts"; // last-lts is 8.0.
 
 /**
  * Runs the v4 2dsphere index downgrade test against the provided connection.
