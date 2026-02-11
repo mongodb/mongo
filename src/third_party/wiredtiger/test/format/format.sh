@@ -677,10 +677,10 @@ while :; do
 	# Check if the total number of jobs has been reached.
 	[[ $total_jobs -ne 0 ]] && [[ $count_jobs -ge $total_jobs ]] && quit=1
 
-	# Check if less than 60 seconds left on any timer. The goal is to avoid killing jobs that
+	# Check if less than 20 seconds left on any timer. The goal is to avoid killing jobs that
 	# haven't yet configured signal handlers, because we rely on handler output to determine
 	# their final status.
-	[[ $seconds -ne 0 ]] && [[ $(($seconds - $elapsed)) -lt 60 ]] && quit=1
+	[[ $seconds -ne 0 ]] && [[ $(($seconds - $elapsed)) -lt 20 ]] && quit=1
 
 	# Start another job if we're not quitting for any reason and the maximum number of jobs
 	# in parallel has not yet been reached.

@@ -215,7 +215,7 @@ def decrypt_page(page, page_metadata, opts):
     
     return decrypted_bytes
 
-def extract_disagg_pages(disagg_table, opts) -> DisaggTableSummary:
+def process_disagg_table(disagg_table, opts) -> DisaggTableSummary:
     '''
     Extract pages a json objects from the GetTableAtLSN API on the Object Read Proxy.
     

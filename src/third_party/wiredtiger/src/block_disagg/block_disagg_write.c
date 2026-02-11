@@ -173,7 +173,6 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
 
     put_args.backlink_lsn = block_meta->backlink_lsn;
     put_args.base_lsn = block_meta->base_lsn;
-    put_args.encryption = block_meta->encryption;
     put_args.image_size = page_image_size;
 
     if (F_ISSET(blk, WT_BLOCK_DISAGG_COMPRESSED))

@@ -404,6 +404,27 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_cursor_uri_incr_use --
+ *     An alternate way to mark a the data handle for a URI to be in use.
+ */
+static WT_INLINE int
+__wt_cursor_uri_incr_use(WT_SESSION_IMPL *session, const char *uri, WT_DATA_HANDLE **dhandle)
+{
+    WT_DECL_RET;
+
+    *dhandle = NULL;
+    WT_WITHOUT_DHANDLE(session, {
+        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, 0);
+        if (ret == 0) {
+            __wt_cursor_dhandle_incr_use(session);
+            *dhandle = session->dhandle;
+            WT_TRET(__wt_session_release_dhandle(session));
+        }
+    });
+    return (ret);
+}
+
+/*
  * __cursor_kv_return --
  *     Return a page referenced key/value pair to the application.
  */

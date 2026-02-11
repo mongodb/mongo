@@ -1314,7 +1314,6 @@ struct PageInfo {
     uint64_t backlink_lsn;
     uint64_t base_lsn;
     uint32_t flags;
-    WT_PAGE_LOG_ENCRYPTION encryption;
 };
 
 template <> struct std::formatter<PageInfo> {
@@ -1327,7 +1326,6 @@ template <> struct std::formatter<PageInfo> {
     auto
     format(const PageInfo &page, format_context &ctx) const
     {
-        /* TODO: print encryption if special formatting is given, e.g. {:e} */
         return std::format_to(ctx.out(),
           "{{table_id={}, page_id={}, lsn={}, backlink_lsn={}, base_lsn={}, "
           "flags={:#x}}}",
@@ -1375,10 +1373,9 @@ struct Pages : public Table<Pages> {
                   backlink_lsn,
                   base_lsn,
                   flags,
-                  encryption,
                   timestamp_materialized_us,
                   page_data)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);)";
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?);)";
 
         /*
          * Get all unique page IDs for a given table that have their latest page record with LSN <=
@@ -1476,7 +1473,6 @@ struct Pages : public Table<Pages> {
                   backlink_lsn,
                   base_lsn,
                   flags,
-                  encryption,
                   page_data
              FROM pages
              WHERE table_id = ?
@@ -1512,7 +1508,6 @@ struct Pages : public Table<Pages> {
              flags INTEGER NOT NULL,
              delta INTEGER AS ((flags & 0x2) != 0) VIRTUAL, -- WT_PAGE_LOG_DELTA
              discarded INTEGER AS ((flags & 0x10000) != 0) VIRTUAL, -- WT_PAGE_LOG_DISCARDED
-             encryption STRING NOT NULL,
              timestamp_materialized_us INTEGER NOT NULL,
              page_data BLOB,
          PRIMARY KEY (table_id, page_id, lsn));)",
@@ -1636,11 +1631,9 @@ struct Pages : public Table<Pages> {
               sqlite3_bind_int64, stmt.get(), 4, static_cast<sqlite3_int64>(args->backlink_lsn));
             SQ_CHECK(sqlite3_bind_int64, stmt.get(), 5, static_cast<sqlite3_int64>(args->base_lsn));
             SQ_CHECK(sqlite3_bind_int64, stmt.get(), 6, static_cast<sqlite3_int64>(args->flags));
-            SQ_CHECK(sqlite3_bind_text, stmt.get(), 7, args->encryption.dek,
-              strlen(args->encryption.dek), SQLITE_STATIC);
-            SQ_CHECK(sqlite3_bind_int64, stmt.get(), 8,
+            SQ_CHECK(sqlite3_bind_int64, stmt.get(), 7,
               static_cast<sqlite3_int64>(now_us() + (config.materialization_delay_ms * 1ms / 1us)));
-            SQ_CHECK(sqlite3_bind_blob, stmt.get(), 9, buf->data, buf->size, SQLITE_STATIC);
+            SQ_CHECK(sqlite3_bind_blob, stmt.get(), 8, buf->data, buf->size, SQLITE_STATIC);
             SQ_CHECK(sqlite3_step, stmt.get());
         }
 
@@ -1650,8 +1643,7 @@ struct Pages : public Table<Pages> {
               .lsn = lsn,
               .backlink_lsn = args->backlink_lsn,
               .base_lsn = args->base_lsn,
-              .flags = args->flags,
-              .encryption = args->encryption};
+              .flags = args->flags};
             auto acc_r = request(AccessMode::READ);
             verify_chain(acc_r.conn, start_page);
         }
@@ -1676,11 +1668,7 @@ struct Pages : public Table<Pages> {
               .lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)),
               .backlink_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt, 1)),
               .base_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt, 2)),
-              .flags = static_cast<uint32_t>(sqlite3_column_int64(stmt, 3)),
-              .encryption = WT_PAGE_LOG_ENCRYPTION{}};
-
-            const char *enc = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
-            strncpy(page.encryption.dek, enc ? enc : "", sizeof(page.encryption.dek));
+              .flags = static_cast<uint32_t>(sqlite3_column_int64(stmt, 3))};
 
             return std::move(page);
         };
@@ -1704,8 +1692,8 @@ struct Pages : public Table<Pages> {
                 LOG_AND_THROW("Got discarded page: {}", page);
             }
 
-            const void *blob = sqlite3_column_blob(stmt.get(), 5);
-            int size = sqlite3_column_bytes(stmt.get(), 5);
+            const void *blob = sqlite3_column_blob(stmt.get(), 4);
+            int size = sqlite3_column_bytes(stmt.get(), 4);
             fill_item(&results_array[count], blob, static_cast<size_t>(size));
 
             /* Continue to next row */
@@ -1738,7 +1726,6 @@ struct Pages : public Table<Pages> {
             const PageInfo &page = pages.front();
             args->backlink_lsn = page.backlink_lsn;
             args->base_lsn = page.base_lsn;
-            args->encryption = page.encryption;
             assert(flags != nullptr);
             *flags = page.flags;
         }
@@ -1930,8 +1917,7 @@ private:
                 .lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 2)),
                 .backlink_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 3)),
                 .base_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 4)),
-                .flags = static_cast<uint32_t>(sqlite3_column_int64(stmt.get(), 5)),
-                .encryption = WT_PAGE_LOG_ENCRYPTION{}});
+                .flags = static_cast<uint32_t>(sqlite3_column_int64(stmt.get(), 5))});
         }
     }
 
@@ -2193,8 +2179,6 @@ public:
     put(uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args, const WT_ITEM *buf)
     {
         storage.simulate_unstable_network();
-
-        /* TODO: handle dek encryption */
 
         const uint64_t lsn = storage.make_next_lsn();
         storage.put_page(table_id, page_id, lsn, args, buf);

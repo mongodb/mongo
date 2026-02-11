@@ -82,7 +82,6 @@ typedef struct PALM_KV_PAGE_MATCHES {
 
     uint64_t backlink_lsn;
     uint64_t base_lsn;
-    WT_PAGE_LOG_ENCRYPTION encryption;
     uint32_t flags;
 } PALM_KV_PAGE_MATCHES;
 
@@ -104,8 +103,7 @@ int palm_kv_abandon_after(PALM_KV_CONTEXT *context, uint64_t abandon_after_lsn);
 int palm_kv_get_page_ids(PALM_KV_CONTEXT *context, WT_ITEM *item, uint64_t checkpoint_lsn,
   uint64_t table_id, size_t *size);
 int palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, uint64_t lsn,
-  bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn, const WT_PAGE_LOG_ENCRYPTION *encryption,
-  uint32_t flags, const WT_ITEM *buf);
+  bool is_delta, uint64_t backlink_lsn, uint64_t base_lsn, uint32_t flags, const WT_ITEM *buf);
 int palm_kv_get_page_matches(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id,
   uint64_t lsn, bool ignore_materialization, PALM_KV_PAGE_MATCHES *matchesp);
 bool palm_kv_next_page_match(PALM_KV_PAGE_MATCHES *matches);

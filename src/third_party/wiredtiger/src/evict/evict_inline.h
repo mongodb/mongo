@@ -528,8 +528,10 @@ __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
     if (pct_fullp != NULL)
         *pct_fullp = (100.0 * bytes_updates) / bytes_max;
 
-    return (
-      bytes_updates > (uint64_t)(S2C(session)->evict->eviction_updates_trigger * bytes_max) / 100);
+    return (bytes_updates >
+      (uint64_t)(__wt_atomic_load_double_relaxed(&S2C(session)->evict->eviction_updates_trigger) *
+        bytes_max) /
+        100);
 }
 
 /* !!!
@@ -626,7 +628,7 @@ __wt_evict_needed(
         *pct_fullp = WT_MAX(0.0,
           100.0 -
             WT_MIN(WT_MIN(evict->eviction_trigger - pct_full, dirty_trigger - pct_dirty),
-              evict->eviction_updates_trigger - pct_updates));
+              __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger) - pct_updates));
 
     /*
      * Only check the dirty trigger when the session is not busy.
@@ -785,7 +787,7 @@ __evict_is_session_cache_trigger_tolerant(WT_SESSION_IMPL *session, uint8_t cach
 
     if (bytes_updates > bytes_updates_trigger) {
         /* Updates content is more than update trigger. */
-        bytes_over_updates_trigger = bytes_dirty - bytes_dirty_trigger;
+        bytes_over_updates_trigger = bytes_updates - bytes_updates_trigger;
 
         if (bytes_over_updates_trigger > bytes_updates_tolerance) {
             /* More than 100% of tolerance level. 100% of the app threads are non-tolerant. */

@@ -57,9 +57,21 @@ sys.path.append(os.path.dirname(__file__))
 if os.environ.get("TESTUTIL_TSAN") == "1":
     import subprocess
 
+    # Run with an empty LD_PRELOAD. If it's already set to libtsan for some reason, we usually don't
+    # want to run clang under TSan.
+    env_no_preload = os.environ.copy()
+    env_no_preload.pop("LD_PRELOAD", None)
+
     # FIXME-WT-13143 We assume TSan is only compatible with clang here. This may change in the future.
     command = "clang --print-file-name libtsan.so.2"
-    find_tsan_so = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+
+    find_tsan_so = subprocess.run(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env_no_preload,
+        universal_newlines=True)
     tsan_so_path = find_tsan_so.stdout.strip()
     if not os.path.isfile(tsan_so_path):
         print("Cannot find tsan lib")

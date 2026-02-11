@@ -198,6 +198,9 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
       __wt_atomic_load_uint64_relaxed(&conn->page_delta.max_internal_delta_count));
     WT_STATP_CONN_SET(session, stats, rec_max_leaf_page_deltas,
       __wt_atomic_load_uint64_relaxed(&conn->page_delta.max_leaf_delta_count));
+
+    /* Update eviction stats. */
+    __wt_evict_stats_update(session);
 }
 
 /*

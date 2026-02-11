@@ -37,8 +37,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import py_common.btree_format as btree_format
 import py_common.binary_data as binary_data
-from py_common.input import encode_bytes
-
+import py_common.mdb_log_parse as log_parse
 
 class Test(unittest.TestCase):
     """Unit tests for decoding a single WT pages using only."""
@@ -62,7 +61,7 @@ class Test(unittest.TestCase):
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(cur_dir, "binary_files", "WiredTiger01.txt")
         with open(file_path, "r", encoding="utf-8") as f:
-            return encode_bytes(f, opts)
+            return log_parse.encode_bytes(f, opts)
 
     def test_wtpage_headers_from_wiredtiger01(self):
         """Decode WiredTiger01.txt and verify page and block header fields."""

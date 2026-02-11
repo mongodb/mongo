@@ -82,7 +82,6 @@
 
 #define PALM_KV_ERR(palm, session, r) PALM_KV_ERR_GOTO(palm, session, r, err)
 
-#define PALM_ENCRYPTION_EQUAL(e1, e2) (memcmp((e1).dek, (e2).dek, sizeof((e1).dek)) == 0)
 /*
  * The default cache size for LMDB. Instead of changing this here, consider setting
  * cache_size_mb=.... when loading the extension library.
@@ -156,8 +155,6 @@ static int palm_configure_str(
   PALM *, WT_CONFIG_PARSER *, WT_CONFIG_ARG *, const char *, WT_CONFIG_ITEM *);
 static int palm_err(PALM *, WT_SESSION *, int, const char *, ...);
 static int palm_kv_err(PALM *, WT_SESSION *, int, const char *, ...);
-static int palm_get_dek(PALM *, WT_SESSION *, const WT_PAGE_LOG_ENCRYPTION *, uint64_t, uint64_t,
-  bool, uint64_t, WT_PAGE_LOG_ENCRYPTION *);
 static void palm_init_context(PALM *, PALM_KV_CONTEXT *);
 static int palm_init_lsn(PALM *);
 static int palm_setup_home(PALM *, WT_CONNECTION *, WT_CONFIG_ITEM *);
@@ -492,72 +489,6 @@ palm_kv_err(PALM *palm, WT_SESSION *session, int ret, const char *format, ...)
     va_end(ap);
 
     return (WT_ERROR);
-}
-
-/*
- * palm_get_dek --
- *     Check or generate a DEK (encryption key).
- */
-static int
-palm_get_dek(PALM *palm, WT_SESSION *session, const WT_PAGE_LOG_ENCRYPTION *encrypt_in,
-  uint64_t table_id, uint64_t page_id, bool is_delta, uint64_t base_lsn,
-  WT_PAGE_LOG_ENCRYPTION *encrypt_out)
-{
-    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
-    WT_PAGE_LOG_ENCRYPTION tmp;
-    bool was_zeroed;
-
-    /*
-     * The DEK is an encrypted encryption key. A production implementation of the page log interface
-     * would do encryption, using the DEK when it is set. If the DEK is not set, the implementation
-     * must figure out what the DEK should be, which may take some time. The DEK is stored with the
-     * page, and when the implementation gets a page it knows how to decrypt it. It also passes the
-     * DEK to the user of the interface (WiredTiger). That DEK must be kept and used for subsequent
-     * deltas to the page. Thus when deltas are written, the DEK doesn't have to be recomputed.
-     *
-     * Here in PALM, we don't want to do any encryption. Since the encrypt/decryption would
-     * invisible to the calling layer (WiredTiger), having encryption doesn't help test WiredTiger
-     * at all. Also, it gets in the way of efficient debugging.
-     *
-     * However, we do want to test that WiredTiger is passing along the DEK whenever it can and
-     * should. If it stopped doing so, the production page log would need to determine the DEK for
-     * itself more often, and we might not notice the error.
-     *
-     * So WiredTiger receives a DEK with every page get. When writing a delta for such a page, it
-     * needs to pass that DEK. One the other hand, when writing a delta for page that WiredTiger
-     * generated and wrote during the current connection, it uses a zeroed DEK, that's the best it
-     * can do.
-     *
-     * To test this without doing any extra KV requests, we generate and store a DEK for any page
-     * write that doesn't already have it - a simple encoding of the table id and page id. Then,
-     * we'd expect that if a DEK is ever passed to us in the put path, it must match that simple
-     * encoding. That tests that the correct DEK is being passed.
-     *
-     * To test that we're passing a DEK when we should, we compare the base_lsn to the LSN we
-     * started the run with. If the base_lsn is less than that, then WiredTiger must have previously
-     * gotten the page from the page log interface, hence the DEK should be set.
-     */
-#define PALM_DEK_FORMAT ("%" PRIu64 ":%" PRIu64)
-    tmp = zero_encryption;
-    if ((size_t)snprintf(&tmp.dek[0], sizeof(tmp.dek), PALM_DEK_FORMAT, table_id, page_id) >
-      sizeof(tmp.dek))
-        assert(false); /* should never overflow */
-
-    was_zeroed = PALM_ENCRYPTION_EQUAL(*encrypt_in, zero_encryption);
-    if (was_zeroed)
-        *encrypt_out = tmp;
-    else {
-        if (!PALM_ENCRYPTION_EQUAL(*encrypt_in, tmp))
-            return (palm_err(palm, session, EINVAL,
-              "encryption dek %31s does not match expected value %31s", encrypt_in->dek, tmp.dek));
-        PALM_VERBOSE_PRINT(palm, session, "palm using saved dek: %s\n", encrypt_in->dek);
-        *encrypt_out = *encrypt_in;
-    }
-
-    if (was_zeroed && is_delta && base_lsn < palm->begin_lsn)
-        return (palm_err(palm, session, EINVAL, "expected non-zero encryption dek"));
-
-    return (0);
 }
 
 /*
@@ -961,7 +892,6 @@ static int
 palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_DISCARD_ARGS *discard_args)
 {
-    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
     WT_ITEM *tombstone = NULL;
     PALM_HANDLE *palm_handle = (PALM_HANDLE *)plh;
     PALM *palm = palm_handle->palm;
@@ -1000,7 +930,7 @@ palm_handle_discard(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_
 
     PALM_KV_ERR(palm, session,
       palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, is_delta,
-        discard_args->backlink_lsn, discard_args->base_lsn, &zero_encryption, flags, tombstone));
+        discard_args->backlink_lsn, discard_args->base_lsn, flags, tombstone));
     PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_LSN, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
 
@@ -1049,7 +979,6 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     uint64_t lsn, prev_full_page_lsn, prev_lsn;
     int ret;
     bool context_valid, is_delta;
-    WT_PAGE_LOG_ENCRYPTION encryption;
 
     (void)checkpoint_id; /* Unused parameter */
 
@@ -1075,11 +1004,6 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
 
     palm_init_context(palm, &context);
 
-    /* Check or initialize the encryption field. */
-    PALM_KV_RET(palm, session,
-      palm_get_dek(palm, session, &put_args->encryption, palm_handle->table_id, page_id, is_delta,
-        put_args->base_lsn, &encryption));
-
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     context_valid = true;
     ret = palm_kv_get_global(&context, PALM_KV_GLOBAL_LSN, &lsn);
@@ -1097,7 +1021,7 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
 
     PALM_KV_ERR(palm, session,
       palm_kv_put_page(&context, palm_handle->table_id, page_id, lsn, is_delta,
-        put_args->backlink_lsn, put_args->base_lsn, &encryption, put_args->flags, buf));
+        put_args->backlink_lsn, put_args->base_lsn, put_args->flags, buf));
     PALM_KV_ERR(palm, session, palm_kv_put_global(&context, PALM_KV_GLOBAL_LSN, lsn + 1));
     PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
     put_args->lsn = lsn;
@@ -1139,7 +1063,6 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
   uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
   uint32_t *results_count)
 {
-    static WT_PAGE_LOG_ENCRYPTION zero_encryption;
     PALM *palm;
     PALM_KV_CONTEXT context;
     PALM_HANDLE *palm_handle;
@@ -1147,7 +1070,6 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     uint32_t count, i;
     uint64_t last_lsn, lsn;
     int ret;
-    bool zeroed_encryption, was_zeroed_encryption;
 
     (void)checkpoint_id; /* Unused parameter */
 
@@ -1169,8 +1091,6 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     PALM_KV_ERR(palm, session,
       palm_kv_get_page_matches(&context, palm_handle->table_id, page_id, lsn, false, &matches));
-    get_args->encryption = zero_encryption;
-    was_zeroed_encryption = true;
     for (count = 0; count < *results_count; ++count) {
         if (!palm_kv_next_page_match(&matches))
             break;
@@ -1198,18 +1118,6 @@ palm_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
         last_lsn = matches.lsn;
         get_args->backlink_lsn = matches.backlink_lsn;
         get_args->base_lsn = matches.base_lsn;
-        get_args->encryption = matches.encryption;
-        zeroed_encryption = PALM_ENCRYPTION_EQUAL(get_args->encryption, zero_encryption);
-        if (zeroed_encryption)
-            PALM_VERBOSE_PRINT(palm, session, "palm got zero dek%s\n", "");
-        else
-            PALM_VERBOSE_PRINT(
-              palm, session, "palm got non-zero dek: %s\n", get_args->encryption.dek);
-        if (zeroed_encryption && !was_zeroed_encryption) {
-            ret = palm_err(palm, session, EINVAL,
-              "base dek is not zeroed, delta encryption is zero and should not be");
-            goto err;
-        }
     }
     /* Did the caller give us enough output entries to hold all the results? */
     if (count == *results_count && palm_kv_next_page_match(&matches))

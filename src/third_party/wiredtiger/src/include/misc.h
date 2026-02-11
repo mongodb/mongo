@@ -100,6 +100,7 @@
 /* Min, max. */
 #define WT_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define WT_MAX(a, b) ((a) < (b) ? (b) : (a))
+#define WT_ABS(a) ((a) < 0 ? -(a) : (a))
 #define WT_CLAMP(x, low, high) (WT_MIN(WT_MAX((x), (low)), (high)))
 
 /* Check and reset, implicitly reset to 0. */

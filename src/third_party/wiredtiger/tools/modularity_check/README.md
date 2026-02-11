@@ -8,7 +8,7 @@ Tool to review the modularity of components in WiredTiger.
 ## Getting started:
 ```sh
 virtualenv venv
-(venv) pip install -r requirement.txt
+(venv) pip install -r requirements.txt
 ```
 
 ## Using the tool:

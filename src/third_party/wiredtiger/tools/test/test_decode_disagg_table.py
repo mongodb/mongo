@@ -76,7 +76,7 @@ class TestDecodeDisaggTable(unittest.TestCase):
         )
 
         with open(table_path, "r", encoding="utf-8") as disagg_file:
-            table_summary = page_service.extract_disagg_pages(disagg_file, opts)
+            table_summary = page_service.process_disagg_table(disagg_file, opts)
             
             self.assertEqual(table_summary.delta_pages, 2)
             self.assertEqual(table_summary.full_pages, 6)

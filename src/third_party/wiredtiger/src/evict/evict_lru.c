@@ -684,7 +684,7 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     target = evict->eviction_target;
     trigger = evict->eviction_trigger;
     updates_target = evict->eviction_updates_target;
-    updates_trigger = evict->eviction_updates_trigger;
+    updates_trigger = __wt_atomic_load_double_relaxed(&evict->eviction_updates_trigger);
 
     /* Build up the new state. */
     flags = 0;
@@ -2175,7 +2175,8 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
         if (!high_pressure && F_ISSET(conn->evict, WT_EVICT_CACHE_UPDATES)) {
             WT_IGNORE_RET(__wti_evict_updates_needed(session, &pct_updates));
             high_pressure = (pct_updates >
-              (conn->evict->eviction_updates_trigger * WT_DIRTY_PAGE_LOW_PRESSURE_THRESHOLD));
+              (__wt_atomic_load_double_relaxed(&conn->evict->eviction_updates_trigger) *
+                WT_DIRTY_PAGE_LOW_PRESSURE_THRESHOLD));
         }
 
         if (!high_pressure)
