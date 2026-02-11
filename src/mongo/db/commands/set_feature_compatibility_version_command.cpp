@@ -713,8 +713,9 @@ public:
 
         const boost::optional<Timestamp> changeTimestamp = getChangeTimestamp(opCtx, request);
 
-        FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
-            opCtx, request, actualVersion);
+        auto resolvedTransition =
+            FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+                opCtx, request, actualVersion);
 
         uassert(5563600,
                 "'phase' field is only valid to be specified on shards",
@@ -854,11 +855,8 @@ public:
                 // field because it would not be safe to upgrade the FCV.
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
-                    actualVersion,
-                    requestedVersion,
-                    isFromConfigServer,
+                    resolvedTransition.transitionalVersion,
                     changeTimestamp,
-                    true /* setTargetVersion */,
                     boost::none /* setIsCleaningServerMetadata */);
 
                 LOGV2(6744301,
@@ -944,8 +942,8 @@ public:
             }
         }
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        invariant(fcvSnapshot.isUpgradingOrDowngrading());
+        invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                      .isUpgradingOrDowngrading());
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
 
@@ -963,11 +961,8 @@ public:
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
-                    fcvSnapshot.getVersion(),
-                    requestedVersion,
-                    isFromConfigServer,
+                    resolvedTransition.transitionalVersion,
                     changeTimestamp,
-                    true /* setTargetVersion */,
                     true /* setIsCleaningServerMetadata*/);
             }
 
@@ -999,13 +994,7 @@ public:
             hangBeforeUpdatingFcvDoc.pauseWhileSet();
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                opCtx,
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion(),
-                requestedVersion,
-                isFromConfigServer,
-                changeTimestamp,
-                false /* setTargetVersion */,
-                false /* setIsCleaningServerMetadata */);
+                opCtx, requestedVersion, changeTimestamp, false /* setIsCleaningServerMetadata */);
         }
 
         // _finalizeUpgrade/_finalizeDowngrade are only for any tasks that must be done to fully

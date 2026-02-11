@@ -134,22 +134,17 @@ public:
                          std::make_tuple(GenericFCV::kLastContinuous,
                                          GenericFCV::kUpgradingFromLastContinuousToLatest,
                                          GenericFCV::kLatest)}) {
-            for (auto&& isFromConfigServer : {false, true}) {
-                // Start or complete upgrading to latest. If this release's lastContinuous ==
-                // lastLTS then the second loop iteration just overwrites the first.
-                _transitions[{from, to, isFromConfigServer}] = upgrading;
-                _transitions[{upgrading, to, isFromConfigServer}] = to;
-            }
+            // Upgrade to latest. If this release's lastContinuous ==
+            // lastLTS then the second loop iteration just overwrites the first.
+            _transitions[{from, to}] = {upgrading};
             _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
         }
 
         if (GenericFCV::kLastLTS != GenericFCV::kLastContinuous) {
             // Only config servers may request an upgrade from lastLTS to lastContinuous.
-            _transitions[{GenericFCV::kLastLTS, GenericFCV::kLastContinuous, true}] =
-                GenericFCV::kUpgradingFromLastLTSToLastContinuous;
-            _transitions[{GenericFCV::kUpgradingFromLastLTSToLastContinuous,
-                          GenericFCV::kLastContinuous,
-                          true}] = GenericFCV::kLastContinuous;
+            _transitions[{GenericFCV::kLastLTS, GenericFCV::kLastContinuous}] = {
+                .transitionalVersion = GenericFCV::kUpgradingFromLastLTSToLastContinuous,
+                .onlyFromConfigServer = true};
             _fcvDocuments[GenericFCV::kUpgradingFromLastLTSToLastContinuous] = makeFCVDoc(
                 GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
         }
@@ -161,66 +156,53 @@ public:
                          std::make_tuple(GenericFCV::kDowngradingFromLatestToLastLTS,
                                          GenericFCV::kUpgradingFromLastLTSToLatest,
                                          GenericFCV::kLastLTS)}) {
-            for (auto&& isFromConfigServer : {false, true}) {
-                // Start or complete downgrade from latest.  If this release's lastContinuous ==
-                // lastLTS then the second loop iteration just overwrites the first.
-                _transitions[{GenericFCV::kLatest, to, isFromConfigServer}] = downgrading;
-                _transitions[{downgrading, to, isFromConfigServer}] = to;
-
-                // Add transition from downgrading -> upgrading.
-                _transitions[{downgrading, GenericFCV::kLatest, isFromConfigServer}] = upgrading;
-            }
+            // Downgrade from latest.  If this release's lastContinuous ==
+            // lastLTS then the second loop iteration just overwrites the first.
+            _transitions[{GenericFCV::kLatest, to}] = {downgrading};
             _fcvDocuments[downgrading] =
                 makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
                 );
         }
     }
 
-    void addTransitionsUpgradingToDowngrading() {
-        if (repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled()) {
-            for (auto&& isFromConfigServer : {false, true}) {
-                _transitions[{GenericFCV::kUpgradingFromLastLTSToLatest,
-                              GenericFCV::kLastLTS,
-                              isFromConfigServer}] = GenericFCV::kDowngradingFromLatestToLastLTS;
-                _transitions[{GenericFCV::kUpgradingFromLastContinuousToLatest,
-                              GenericFCV::kLastContinuous,
-                              isFromConfigServer}] =
-                    GenericFCV::kDowngradingFromLatestToLastContinuous;
+    /**
+     * Given a server in FCV "actualVersion" and an upgrade/downgrade request to "requestedVersion",
+     * returns either the corresponding transitional FCV, or none if the transition can not be done.
+     * Some transitions can only be done if the request is from a config server.
+     */
+    boost::optional<ResolvedFCVTransition> resolveTransition(FCV actualVersion,
+                                                             FCV requestedVersion,
+                                                             bool isFromConfigServer) const {
+        FCV originalVersion;
+        if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(actualVersion)) {
+            // Starting a new upgrade/downgrade.
+            originalVersion = actualVersion;
+        } else {
+            auto transitionInfo = getTransitionFCVInfo(actualVersion);
+            if (transitionInfo.to == requestedVersion) {
+                // Resuming an upgrade/downgrade after it was interrupted.
+                originalVersion = transitionInfo.from;
+            } else if (transitionInfo.from == requestedVersion) {
+                if (!repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled() &&
+                    requestedVersion < actualVersion) {
+                    return boost::none;
+                }
+
+                // Returning back to the original FCV after a failed upgrade/downgrade
+                // (upgrading to downgrading / downgrading to upgrading transition).
+                originalVersion = transitionInfo.to;
+            } else {
+                return boost::none;
             }
         }
-    }
+        invariant(!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(originalVersion));
 
-    /**
-     * True if a server in multiversion::FeatureCompatibilityVersion "fromVersion" can
-     * transition to "newVersion". Different rules apply if the request is from a config server.
-     */
-    bool permitsTransition(FCV fromVersion, FCV newVersion, bool isFromConfigServer) const {
-        return _transitions.find({fromVersion, newVersion, isFromConfigServer}) !=
-            _transitions.end();
-    }
+        auto it = _transitions.find({originalVersion, requestedVersion});
+        if (it == _transitions.end() || (it->second.onlyFromConfigServer && !isFromConfigServer)) {
+            return boost::none;
+        }
 
-    /**
-     * Get a feature compatibility version enum value from a document representing the
-     * multiversion::FeatureCompatibilityVersion, or uassert if the document is invalid.
-     */
-    FCV versionFromFCVDoc(const FeatureCompatibilityVersionDocument& fcvDoc) const {
-        auto it = std::find_if(_fcvDocuments.begin(), _fcvDocuments.end(), [&](const auto& value) {
-            return value.second == fcvDoc;
-        });
-
-        uassert(5147400, "invalid feature compatibility document", it != _fcvDocuments.end());
-        return it->first;
-    }
-
-    /**
-     * Return an FCV representing the transition fromVersion -> newVersion. It may be transitional
-     * (such as kUpgradingFromLastLTSToLastContinuous) or not (such as kLastLTS). Different rules
-     * apply if the upgrade/downgrade request is from a config server.
-     */
-    FCV getTransitionalVersion(FCV fromVersion, FCV newVersion, bool isFromConfigServer) const {
-        auto it = _transitions.find({fromVersion, newVersion, isFromConfigServer});
-        fassert(5147401, it != _transitions.end());
-        return it->second;
+        return ResolvedFCVTransition{it->second.transitionalVersion};
     }
 
     /**
@@ -235,8 +217,12 @@ public:
 private:
     stdx::unordered_map<FCV, FeatureCompatibilityVersionDocument> _fcvDocuments;
 
-    // Map: (fromVersion, newVersion, isFromConfigServer) -> transitional version.
-    stdx::unordered_map<std::tuple<FCV, FCV, bool>, FCV> _transitions;
+    // Map: (fromVersion, newVersion) -> (transitional version, only from config server).
+    struct TransitionInfo {
+        FCV transitionalVersion;
+        bool onlyFromConfigServer = false;
+    };
+    stdx::unordered_map<std::tuple<FCV, FCV>, TransitionInfo> _transitions;
 } fcvTransitions;
 
 /**
@@ -305,18 +291,20 @@ StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersion
         opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
 }
 
-void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
     OperationContext* opCtx, const SetFeatureCompatibilityVersion& setFCVRequest, FCV fromVersion) {
 
     auto newVersion = setFCVRequest.getCommandParameter();
     auto isFromConfigServer = setFCVRequest.getFromConfigServer().value_or(false);
 
+    auto resolvedTransition =
+        fcvTransitions.resolveTransition(fromVersion, newVersion, isFromConfigServer);
     uassert(5147403,
             fmt::format("cannot set featureCompatibilityVersion to '{}' while "
                         "featureCompatibilityVersion is '{}'",
                         multiversion::toString(newVersion),
                         multiversion::toString(fromVersion)),
-            fcvTransitions.permitsTransition(fromVersion, newVersion, isFromConfigServer));
+            resolvedTransition.has_value());
 
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
     if (!fcvObj.isOK()) {
@@ -360,7 +348,7 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
 
     auto setFCVPhase = setFCVRequest.getPhase();
     if (!isFromConfigServer || !setFCVPhase) {
-        return;
+        return *resolvedTransition;
     }
 
     auto changeTimestamp = setFCVRequest.getChangeTimestamp();
@@ -397,34 +385,21 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
                 "example, was temporarily stuck on network.",
                 previousTimestamp == changeTimestamp);
     }
+
+    return *resolvedTransition;
 }
 
 void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     OperationContext* opCtx,
-    FCV fromVersion,
-    FCV newVersion,
-    bool isFromConfigServer,
+    FCV version,
     boost::optional<Timestamp> changeTimestamp,
-    bool setTargetVersion,
     boost::optional<bool> setIsCleaningServerMetadata) {
 
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
 
-    // Only transition to fully upgraded or downgraded states when we have completed all required
-    // upgrade/downgrade behavior, unless it is the downgrading to upgrading path or the upgrading
-    // to downgrading path.
-    bool isContinuingSameUpgradeOrDowngrade =
-        ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(fromVersion) &&
-        getTransitionFCVInfo(fromVersion).to == newVersion;
-
-    auto transitioningVersion = setTargetVersion && isContinuingSameUpgradeOrDowngrade
-        ? fromVersion
-        : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
-
     // Create the new FCV document that we want to replace the FCV document to.
-    FeatureCompatibilityVersionDocument newFCVDoc =
-        fcvTransitions.getFCVDocument(transitioningVersion);
+    FeatureCompatibilityVersionDocument newFCVDoc = fcvTransitions.getFCVDocument(version);
 
     newFCVDoc.setChangeTimestamp(changeTimestamp);
 
@@ -726,13 +701,8 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     }
 }
 
-void FeatureCompatibilityVersion::addTransitionsUpgradingToDowngrading() {
-    fcvTransitions.addTransitionsUpgradingToDowngrading();
-}
-
 void FeatureCompatibilityVersion::afterStartupActions(OperationContext* opCtx) {
     fassertInitializedAfterStartup(opCtx);
-    addTransitionsUpgradingToDowngrading();
 }
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {

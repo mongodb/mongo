@@ -45,6 +45,25 @@
 
 namespace MONGO_MOD_PUB mongo {
 
+/**
+ * Represents the resolved transitional FCV based on the actual and the requested version.
+ *
+ * Example - New FCV upgrade:
+ *   actualVersion: "8.0", requestedVersion: "8.3"
+ *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
+ *
+ * Example - Resume interrupted FCV upgrade:
+ *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.3"
+ *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
+ *
+ * Example - Return to original FCV after failed FCV upgrade ("upgrading to downgrading"):
+ *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.0"
+ *   => Resolved transitionalVersion: "downgrading from 8.3 to 8.0"
+ */
+struct ResolvedFCVTransition {
+    multiversion::FeatureCompatibilityVersion transitionalVersion;
+};
+
 class FeatureCompatibilityVersion {
 public:
     /**
@@ -63,12 +82,6 @@ public:
     static void fassertInitializedAfterStartup(OperationContext* opCtx);
 
     /**
-     * Adds transitions that allow users to downgrade back to the originalFCV after a failed
-     * upgrade.
-     */
-    static void addTransitionsUpgradingToDowngrading();
-
-    /**
      * Performs actions that need to be done after startup, including asserting if FCV is not
      * properly initialized and adding transitions for FCV states
      */
@@ -81,25 +94,22 @@ public:
     static StatusWith<BSONObj> findFeatureCompatibilityVersionDocument(OperationContext* opCtx);
 
     /**
-     * uassert that a transition from fromVersion to newVersion is permitted. Different rules apply
-     * if the request is from a config server.
+     * uassert that a transition from fromVersion to newVersion is permitted.
+     * Some transitions can only be done if the request is from a config server.
      */
-    static void validateSetFeatureCompatibilityVersionRequest(
+    static ResolvedFCVTransition validateSetFeatureCompatibilityVersionRequest(
         OperationContext* opCtx,
         const SetFeatureCompatibilityVersion& setFCVRequest,
         multiversion::FeatureCompatibilityVersion fromVersion);
 
     /**
-     * Updates the on-disk feature compatibility version document for the transition fromVersion ->
-     * newVersion. This is required to be a valid transition.
+     * Updates the on-disk feature compatibility version document to the given version.
+     * `version` may be a transitional or non-transitional FCV.
      */
     static void updateFeatureCompatibilityVersionDocument(
         OperationContext* opCtx,
-        multiversion::FeatureCompatibilityVersion fromVersion,
-        multiversion::FeatureCompatibilityVersion newVersion,
-        bool isFromConfigServer,
+        multiversion::FeatureCompatibilityVersion version,
         boost::optional<Timestamp> timestamp,
-        bool setTargetVersion,
         boost::optional<bool> setIsCleaningServerMetadata);
 
     /**
