@@ -548,7 +548,7 @@ void HashLookupStage::spillIndicesToRecordStore(SpillingStore* rs,
     CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
 
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);
-    _probeKey.reset(0, owned, tagKeyColl, valKeyColl);
+    value::ValueGuard keyGuard{owned, tagKeyColl, valKeyColl};
 
     auto valFromRs = readIndicesFromRecordStore(rs, tagKeyColl, valKeyColl);
 
@@ -601,8 +601,9 @@ PlanState HashLookupStage::getNext() {
                 } else if (_recordStoreHt) {
                     // The key wasn't in memory and we have spilled to a '_recordStoreHt', fetch it
                     // if it exists.
-                    auto [_, tagElemCollView, valElemCollView] =
+                    auto [owned, tagElemCollView, valElemCollView] =
                         normalizeStringIfCollator(tagElemView, valElemView);
+                    value::ValueGuard elemGuard{owned, tagElemCollView, valElemCollView};
 
                     auto indicesFromRS = readIndicesFromRecordStore(
                         _recordStoreHt.get(), tagElemCollView, valElemCollView);
@@ -623,8 +624,9 @@ PlanState HashLookupStage::getNext() {
                 // non-nullptr if we don't find the '_probeKey' in the '_ht'. Otherwise, the empty
                 // foreign side edge case won't fallthrough and we may hit this block and try to
                 // read from a non-existent '_recordStoreHt'.
-                auto [_, tagKeyCollView, valKeyCollView] =
+                auto [owned, tagKeyCollView, valKeyCollView] =
                     normalizeStringIfCollator(tagKeyView, valKeyView);
+                value::ValueGuard keyGuard{owned, tagKeyCollView, valKeyCollView};
 
                 auto indicesFromRS = readIndicesFromRecordStore(
                     _recordStoreHt.get(), tagKeyCollView, valKeyCollView);
