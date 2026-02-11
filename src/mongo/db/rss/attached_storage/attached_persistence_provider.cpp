@@ -161,4 +161,8 @@ bool AttachedPersistenceProvider::supportsCompaction() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::shouldTimestampTableCreations() const {
+    return false;
+}
+
 }  // namespace mongo::rss

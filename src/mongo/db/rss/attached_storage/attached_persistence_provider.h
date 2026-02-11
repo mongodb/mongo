@@ -165,6 +165,11 @@ public:
      * We can support compaction.
      */
     bool supportsCompaction() const override;
+
+    /**
+     * Table creation won't be timestamped.
+     */
+    bool shouldTimestampTableCreations() const override;
 };
 
 }  // namespace mongo::rss

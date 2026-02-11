@@ -204,6 +204,11 @@ public:
      * If true, the provider supports compaction.
      */
     virtual bool supportsCompaction() const = 0;
+
+    /**
+     * If true, this persistence provider expects collection/index table creation to be timestamped.
+     */
+    virtual bool shouldTimestampTableCreations() const = 0;
 };
 
 }  // namespace rss
