@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_size_and_info.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/container/flat_map.hpp>

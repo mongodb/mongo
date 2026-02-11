@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_size_and_info.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"

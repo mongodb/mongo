@@ -35,7 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_size_and_info.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
@@ -52,7 +52,14 @@
 namespace mongo {
 
 class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
+    struct StoredSizeCount {
+        CollectionSizeCount sizeCount;
+        bool dirty{false};  // Indicates if flush is needed.
+    };
+
 public:
+    static ReplicatedFastCountManager& get(ServiceContext* svcCtx);
+
     ReplicatedFastCountManager() {
         initializeFastCountCommitFn();
     }
@@ -66,10 +73,8 @@ public:
      */
     void initializeFastCountCommitFn();
 
-    static ReplicatedFastCountManager& get(ServiceContext* svcCtx);
-
-    inline static StringData kCountKey = "c"_sd;
     inline static StringData kSizeKey = "s"_sd;
+    inline static StringData kCountKey = "c"_sd;
 
     /**
      * Signals fastcount thread to start.
@@ -106,58 +111,65 @@ public:
     void disablePeriodicWrites_ForTest();
 
 private:
+    /**
+     * Scan metadata and write out dirty data to disk.
+     */
+    void _flush(OperationContext* opCtx,
+                const CollectionPtr& fastCountColl,
+                const absl::flat_hash_map<UUID, StoredSizeCount>& metadata);
+
     void _startBackgroundThread(ServiceContext* svcCtx);
     void _runBackgroundThreadOnTimer(OperationContext* opCtx);
     void _runIteration(OperationContext* opCtx);
 
-    void _createMetadataCollection(OperationContext* opCtx);
+    /**
+     * Write one collection's sizeCount to disk.
+     */
+    void _writeOneMetadata(OperationContext* opCtx,
+                           const CollectionPtr& fastCountColl,
+                           const UUID& uuid,
+                           const CollectionSizeCount& sizeCount,
+                           RecordId recordId);
 
-    void _writeMetadata(OperationContext* opCtx,
-                        const CollectionPtr& coll,
-                        const UUID& uuid,
-                        const CollectionSizeCount& sizeCount,
-                        RecordId recordId);
-
-    void _updateMetadata(OperationContext* opCtx,
-                         const CollectionPtr& coll,
-                         const Snapshotted<BSONObj>& doc,
-                         const UUID& uuid,
-                         const CollectionSizeCount& sizeCount);
-    void _insertMetadata(OperationContext* opCtx,
-                         const CollectionPtr& coll,
-                         const UUID& uuid,
-                         const CollectionSizeCount& sizeCount);
+    void _updateOneMetadata(OperationContext* opCtx,
+                            const CollectionPtr& fastCountColl,
+                            const Snapshotted<BSONObj>& doc,
+                            const UUID& uuid,
+                            RecordId recordId,
+                            const CollectionSizeCount& sizeCount);
+    void _insertOneMetadata(OperationContext* opCtx,
+                            const CollectionPtr& fastCountColl,
+                            const UUID& uuid,
+                            const CollectionSizeCount& sizeCount);
 
     /**
-     * Formats and returns the document to write to the metadata collection.
+     * Acquire the fastcount collection that underpins this class.
+     * Returns boost::none if it doesn't exist.
      */
-    BSONObj _getDocForWrite(const UUID& uuid, const CollectionSizeCount& sizeCount);
+    boost::optional<CollectionOrViewAcquisition> _acquireFastCountCollection(
+        OperationContext* opCtx);
 
-    // Acquire or create if missing, the kSystemReplicatedFastCountStore collection.
-    CollectionOrViewAcquisition _acquireFastCountCollection(OperationContext* opCtx);
+    /**
+     * Formats and returns the document to write to the fastcount collection.
+     */
+    BSONObj _getDocForWrite(const UUID& uuid, const CollectionSizeCount& sizeCount) const;
 
-    RecordId _keyForUUID(const UUID& uuid);
-    UUID _UUIDForKey(RecordId key);
+    /**
+     * Generates a key (RecordId) into the fastcount collection given a user
+     * collection uuid.
+     */
+    RecordId _keyForUUID(const UUID& uuid) const;
+    UUID _UUIDForKey(RecordId key) const;
 
-    StringData _threadName = "sizeCount"_sd;
-    struct StoredSizeCount {
-        CollectionSizeCount sizeCount;
-        bool dirty{false};  // indicate if write is needed
-        // boost::optional<Timestamp> lastUpdated;
-    };
-
+    StringData _threadName = "replicatedSizeCount"_sd;
     stdx::thread _backgroundThread;
-
     bool _writeMetadataPeriodically = true;
-
     AtomicWord<bool> _isDisabled = false;
-
     stdx::condition_variable _condVar;
-
-    mutable stdx::mutex _metadataMutex;
 
     // Map of collection UUID to the last committed size and count.
     absl::flat_hash_map<UUID, StoredSizeCount> _metadata;
+    mutable stdx::mutex _metadataMutex;
 };
 
 }  // namespace mongo
