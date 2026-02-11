@@ -56,8 +56,10 @@ void LookupHashTableIter::initSearchArray() {
                                       hashTableMatchIter->second.end());
         } else if (_hashTable._recordStoreHt) {
             // The key wasn't in memory. Check the '_hashTable._recordStoreHt' disk spill.
-            auto [_, tagElemCollView, valElemCollView] =
+            auto [owned, tagElemCollView, valElemCollView] =
                 _hashTable.normalizeStringIfCollator(tagElemView, valElemView);
+            value::ValueGuard elemGuard{owned, tagElemCollView, valElemCollView};
+
             boost::optional<std::vector<size_t>> indicesFromRS =
                 _hashTable.readIndicesFromRecordStore(
                     _hashTable._recordStoreHt.get(), tagElemCollView, valElemCollView);
@@ -82,8 +84,10 @@ void LookupHashTableIter::initSearchScalar() {
         _hashTableMatchVectorIdx = 0;
     } else if (_hashTable._recordStoreHt) {
         // The key wasn't in memory. Check the '_hashTable._recordStoreHt' disk spill.
-        auto [_, tagKeyCollView, valKeyCollView] =
+        auto [owned, tagKeyCollView, valKeyCollView] =
             _hashTable.normalizeStringIfCollator(_outerKeyTag, _outerKeyVal);
+        value::ValueGuard keyGuard{owned, tagKeyCollView, valKeyCollView};
+
         boost::optional<std::vector<size_t>> indicesFromRS = _hashTable.readIndicesFromRecordStore(
             _hashTable._recordStoreHt.get(), tagKeyCollView, valKeyCollView);
         if (indicesFromRS) {
@@ -330,7 +334,7 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     }
 
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);
-    _htProbeKey.reset(0, owned, tagKeyColl, valKeyColl);
+    value::ValueGuard keyGuard{owned, tagKeyColl, valKeyColl};
 
     auto valFromRs = readIndicesFromRecordStore(rs, tagKeyColl, valKeyColl);
 
