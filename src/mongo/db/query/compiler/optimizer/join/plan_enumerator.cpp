@@ -45,8 +45,7 @@ const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
 }
 
-bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
-                                                JoinMethod method,
+bool PlanEnumeratorContext::canPlanBeEnumerated(JoinMethod method,
                                                 const JoinSubset& left,
                                                 const JoinSubset& right,
                                                 const JoinSubset& subset) {
@@ -57,15 +56,15 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
         return false;
     }
 
-    if (type == PlanTreeShape::LEFT_DEEP && !right.isBaseCollectionAccess()) {
+    if (_strategy.planShape == PlanTreeShape::LEFT_DEEP && !right.isBaseCollectionAccess()) {
         // Left-deep tree must have a "base" collection and not an intermediate join on the right.
         return false;
     }
-    if (type == PlanTreeShape::RIGHT_DEEP && !left.isBaseCollectionAccess()) {
+    if (_strategy.planShape == PlanTreeShape::RIGHT_DEEP && !left.isBaseCollectionAccess()) {
         // Right-deep tree must have a "base" collection and not an intermediate join on the left.
         return false;
     }
-    if (type == PlanTreeShape::ZIG_ZAG && !left.isBaseCollectionAccess() &&
+    if (_strategy.planShape == PlanTreeShape::ZIG_ZAG && !left.isBaseCollectionAccess() &&
         !right.isBaseCollectionAccess()) {
         // Zig-zag is the least strict: at least one of the left or right must be a base collection.
         return false;
@@ -78,8 +77,8 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
     // - Zig-zag plans, since these can have intermediate joins on either side of the HJ, OR
     // - A join between two base collections, since these can be reordered regardless of plan shape.
     bool bothBaseColls = left.isBaseCollectionAccess() && right.isBaseCollectionAccess();
-    bool eligibleToPrune = _enableHJOrderPruning && method == JoinMethod::HJ &&
-        (type == PlanTreeShape::ZIG_ZAG || bothBaseColls);
+    bool eligibleToPrune = _strategy.enableHJOrderPruning && method == JoinMethod::HJ &&
+        (_strategy.planShape == PlanTreeShape::ZIG_ZAG || bothBaseColls);
     if (eligibleToPrune &&
         _estimator->getOrEstimateSubsetCardinality(left.subset) >
             _estimator->getOrEstimateSubsetCardinality(right.subset)) {
@@ -99,13 +98,12 @@ void PlanEnumeratorContext::updateBestJoinPlanForSubset(JoinMethod method,
         _registry.registerJoinNode(subset, method, left, right, std::move(cost)));
 }
 
-void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
-                                        JoinMethod method,
+void PlanEnumeratorContext::addJoinPlan(JoinMethod method,
                                         const JoinSubset& left,
                                         const JoinSubset& right,
                                         const std::vector<EdgeId>& edges,
                                         JoinSubset& subset) {
-    if (!canPlanBeEnumerated(type, method, left, right, subset)) {
+    if (!canPlanBeEnumerated(method, left, right, subset)) {
         return;
     }
 
@@ -157,8 +155,7 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
                     _registry.joinPlanNodeToBSON(subset.plans.back(), _ctx.joinGraph.numNodes()));
 }
 
-void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
-                                               const JoinSubset& left,
+void PlanEnumeratorContext::enumerateJoinPlans(const JoinSubset& left,
                                                const JoinSubset& right,
                                                JoinSubset& cur) {
     if (left.plans.empty() || right.plans.empty()) {
@@ -178,12 +175,12 @@ void PlanEnumeratorContext::enumerateJoinPlans(PlanTreeShape type,
         return;
     }
 
-    addJoinPlan(type, JoinMethod::INLJ, left, right, joinEdges, cur);
-    addJoinPlan(type, JoinMethod::HJ, left, right, joinEdges, cur);
-    addJoinPlan(type, JoinMethod::NLJ, left, right, joinEdges, cur);
+    addJoinPlan(JoinMethod::INLJ, left, right, joinEdges, cur);
+    addJoinPlan(JoinMethod::HJ, left, right, joinEdges, cur);
+    addJoinPlan(JoinMethod::NLJ, left, right, joinEdges, cur);
 }
 
-void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
+void PlanEnumeratorContext::enumerateJoinSubsets() {
     int numNodes = _ctx.joinGraph.numNodes();
     // Use CombinationSequence to efficiently calculate the final size of each level of the dynamic
     // programming table.
@@ -246,8 +243,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 
                 auto& cur = joinSubsetsCurrLevel[subsetIdx];
 
-                enumerateJoinPlans(type, prevJoinSubset, _joinSubsets[kBaseLevel][i], cur);
-                enumerateJoinPlans(type, _joinSubsets[kBaseLevel][i], prevJoinSubset, cur);
+                enumerateJoinPlans(prevJoinSubset, _joinSubsets[kBaseLevel][i], cur);
+                enumerateJoinPlans(_joinSubsets[kBaseLevel][i], prevJoinSubset, cur);
             }
         }
     }
@@ -256,7 +253,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 std::string PlanEnumeratorContext::toString() const {
     const auto numNodes = _ctx.joinGraph.numNodes();
     std::stringstream ss;
-    ss << "HJ order pruning enabled: " << _enableHJOrderPruning << "\n";
+    ss << "HJ order pruning enabled: " << _strategy.enableHJOrderPruning << "\n";
     for (size_t level = 0; level < _joinSubsets.size(); level++) {
         ss << "Level " << level << ":\n";
         const auto n = _joinSubsets[level].size();

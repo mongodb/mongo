@@ -420,11 +420,10 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                 std::unique_ptr<JoinCardinalityEstimator> estimator,
                                                 std::unique_ptr<JoinCostEstimator> coster,
-                                                PlanTreeShape shape,
-                                                bool enableHJOrderPruning) {
-    PlanEnumeratorContext peCtx(ctx, std::move(estimator), std::move(coster), enableHJOrderPruning);
+                                                EnumerationStrategy strategy) {
+    PlanEnumeratorContext peCtx(ctx, std::move(estimator), std::move(coster), std::move(strategy));
 
-    peCtx.enumerateJoinSubsets(shape);
+    peCtx.enumerateJoinSubsets();
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     const auto& registry = peCtx.registry();

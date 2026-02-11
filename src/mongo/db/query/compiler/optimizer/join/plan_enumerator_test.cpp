@@ -129,11 +129,17 @@ public:
         return std::make_unique<JoinCostEstimatorImpl>(jCtx, ce);
     }
 
+    static EnumerationStrategy strategy(PlanTreeShape shape, bool enableHJPrune = false) {
+        return EnumerationStrategy{.planShape = shape,
+                                   .mode = PlanEnumerationMode::CHEAPEST,
+                                   .enableHJOrderPruning = enableHJPrune};
+    }
+
     PlanEnumeratorContext makeEnumeratorContext(const JoinReorderingContext& ctx,
-                                                bool pruneHJ = false) {
+                                                EnumerationStrategy strategy) {
         auto ce = makeFakeEstimator(ctx);
         auto coster = makeCoster(ctx, *ce);
-        return {ctx, std::move(ce), std::move(coster), pruneHJ};
+        return {ctx, std::move(ce), std::move(coster), std::move(strategy)};
     }
 
     // Asserts that for all HJ enumerated at every level of enumeration, the CE for the LHS of the
@@ -174,8 +180,11 @@ public:
         auto jCtx = makeContext();
 
         // Note: These tests run with pruning enabled to keep the large output understandable.
-        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
-        ctx.enumerateJoinSubsets(shape);
+        auto ctx = makeEnumeratorContext(jCtx,
+                                         EnumerationStrategy{.planShape = shape,
+                                                             .mode = PlanEnumerationMode::CHEAPEST,
+                                                             .enableHJOrderPruning = true});
+        ctx.enumerateJoinSubsets();
         ASSERT_EQ(numNodes, ctx.getSubsets(0).size());
         for (size_t k = 1; k < numNodes; ++k) {
             // The expected number of subsets for the k'th level is N choose k+1 (binomial
@@ -207,8 +216,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     graph.addSimpleEqualityEdge((NodeId)0, (NodeId)1, 0, 1);
     auto jCtx = makeContext();
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::LEFT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(2, level0.size());
@@ -224,8 +233,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsTwo) {
     }
 
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::RIGHT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(2, level0.size());
@@ -252,8 +261,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     auto jCtx = makeContext();
 
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::LEFT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(3, level0.size());
@@ -276,8 +285,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThree) {
     }
 
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::RIGHT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(3, level0.size());
@@ -309,8 +318,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
 
     auto jCtx = makeContext();
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::LEFT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(3, level0.size());
@@ -333,8 +342,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeNoCycle) {
     }
 
     {
-        auto ctx = makeEnumeratorContext(jCtx);
-        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+        auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::RIGHT_DEEP));
+        ctx.enumerateJoinSubsets();
 
         auto& level0 = ctx.getSubsets(0);
         ASSERT_EQ(3, level0.size());
@@ -366,24 +375,27 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsThreeWithPruning) {
 
     auto jCtx = makeContext();
     {
-        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
-        ctx.enumerateJoinSubsets(PlanTreeShape::LEFT_DEEP);
+        auto ctx =
+            makeEnumeratorContext(jCtx, strategy(PlanTreeShape::LEFT_DEEP, true /* HJ pruning */));
+        ctx.enumerateJoinSubsets();
 
         goldenCtx.outStream() << "LEFT DEEP, 3 Nodes with pruning" << "\n";
         goldenCtx.outStream() << ctx.toString() << std::endl;
     }
 
     {
-        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
-        ctx.enumerateJoinSubsets(PlanTreeShape::RIGHT_DEEP);
+        auto ctx =
+            makeEnumeratorContext(jCtx, strategy(PlanTreeShape::RIGHT_DEEP, true /* HJ pruning */));
+        ctx.enumerateJoinSubsets();
 
         goldenCtx.outStream() << "RIGHT DEEP, 3 Nodes with pruning" << "\n";
         goldenCtx.outStream() << ctx.toString() << std::endl;
     }
 
     {
-        auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
-        ctx.enumerateJoinSubsets(PlanTreeShape::ZIG_ZAG);
+        auto ctx =
+            makeEnumeratorContext(jCtx, strategy(PlanTreeShape::ZIG_ZAG, true /* HJ pruning */));
+        ctx.enumerateJoinSubsets();
 
         goldenCtx.outStream() << "ZIG ZAG, 3 Nodes with pruning" << "\n";
         goldenCtx.outStream() << ctx.toString() << std::endl;
@@ -401,8 +413,8 @@ TEST_F(JoinPlanEnumeratorTest, InitializeSubsetsFourWithPruning) {
     graph.addSimpleEqualityEdge(NodeId(2), NodeId(3), 2, 3);
 
     auto jCtx = makeContext();
-    auto ctx = makeEnumeratorContext(jCtx, true /* HJ pruning */);
-    ctx.enumerateJoinSubsets(PlanTreeShape::ZIG_ZAG);
+    auto ctx = makeEnumeratorContext(jCtx, strategy(PlanTreeShape::ZIG_ZAG, true /* HJ pruning */));
+    ctx.enumerateJoinSubsets();
 
     goldenCtx.outStream() << "ZIG ZAG, 4 Nodes with pruning" << "\n";
     goldenCtx.outStream() << ctx.toString() << std::endl;

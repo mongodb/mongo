@@ -43,6 +43,24 @@ namespace mongo::join_ordering {
 enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
 
 /**
+ * Determines what plans we enumerate.
+ */
+enum class PlanEnumerationMode {
+    // Only enumerate plans if they are cheaper than the lowest-cost plan for each subset.
+    CHEAPEST,
+};
+
+/**
+ * This configures the kinds of plans we're generating and how we're choosing between them during
+ * enumeration.
+ */
+struct EnumerationStrategy {
+    PlanTreeShape planShape;
+    PlanEnumerationMode mode;
+    bool enableHJOrderPruning;
+};
+
+/**
  * Context containing all the state for the bottom-up dynamic programming join plan enumeration
  * algorithm.
  */
@@ -51,11 +69,11 @@ public:
     PlanEnumeratorContext(const JoinReorderingContext& ctx,
                           std::unique_ptr<JoinCardinalityEstimator> estimator,
                           std::unique_ptr<JoinCostEstimator> coster,
-                          bool enableHJOrderPruning)
+                          EnumerationStrategy strategy)
         : _ctx{ctx},
           _estimator(std::move(estimator)),
           _coster(std::move(coster)),
-          _enableHJOrderPruning(enableHJOrderPruning) {}
+          _strategy(std::move(strategy)) {}
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
     PlanEnumeratorContext(const PlanEnumeratorContext&) = delete;
@@ -71,7 +89,7 @@ public:
     /**
      * Enumerates all join subsets in bottom-up fashion.
      */
-    void enumerateJoinSubsets(PlanTreeShape type = PlanTreeShape::ZIG_ZAG);
+    void enumerateJoinSubsets();
 
     JoinPlanNodeId getBestFinalPlan() const {
         tassert(11336904,
@@ -104,17 +122,13 @@ private:
      * outputting those plans in 'cur'. Note that 'left' and 'right' must be disjoint, and their
      * union must produce 'cur'.
      */
-    void enumerateJoinPlans(PlanTreeShape type,
-                            const JoinSubset& left,
-                            const JoinSubset& right,
-                            JoinSubset& cur);
+    void enumerateJoinPlans(const JoinSubset& left, const JoinSubset& right, JoinSubset& cur);
 
     /**
      * Helper for adding a join plan to subset 'cur', constructed using the specified join 'method'
      * connecting the best plans from the provided subsets.
      */
-    void addJoinPlan(PlanTreeShape type,
-                     JoinMethod method,
+    void addJoinPlan(JoinMethod method,
                      const JoinSubset& left,
                      const JoinSubset& right,
                      const std::vector<EdgeId>& edges,
@@ -125,8 +139,7 @@ private:
      * we would retain the tree shape specified by 'type' and the plan is valid for the given join
      * 'method'.
      */
-    bool canPlanBeEnumerated(PlanTreeShape type,
-                             JoinMethod method,
+    bool canPlanBeEnumerated(JoinMethod method,
                              const JoinSubset& left,
                              const JoinSubset& right,
                              const JoinSubset& subset);
@@ -140,7 +153,7 @@ private:
     const JoinReorderingContext& _ctx;
     std::unique_ptr<JoinCardinalityEstimator> _estimator;
     std::unique_ptr<JoinCostEstimator> _coster;
-    const bool _enableHJOrderPruning;
+    EnumerationStrategy _strategy;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector
     // represents the "level". The i'th level contains solutions for the optimal way to join all

@@ -81,7 +81,12 @@ public:
 
         auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
         planEnumCtx = std::make_unique<PlanEnumeratorContext>(
-            *jCtx, std::move(cardEstimator), std::move(costEstimator), false);
+            *jCtx,
+            std::move(cardEstimator),
+            std::move(costEstimator),
+            EnumerationStrategy{.planShape = PlanTreeShape::ZIG_ZAG,
+                                .mode = PlanEnumerationMode::CHEAPEST,
+                                .enableHJOrderPruning = true});
     }
 
     NamespaceString smallNss;
@@ -94,7 +99,6 @@ public:
     boost::optional<JoinReorderingContext> jCtx;
     std::unique_ptr<PlanEnumeratorContext> planEnumCtx;
     CatalogStats catalogStats;
-    std::unique_ptr<JoinCostEstimator> costEstimator;
     JoinCostEstimate zeroJoinCost =
         JoinCostEstimate(CardinalityEstimate{CardinalityType{0.0}, EstimationSource::Code},
                          CardinalityEstimate{CardinalityType{0.0}, EstimationSource::Code},

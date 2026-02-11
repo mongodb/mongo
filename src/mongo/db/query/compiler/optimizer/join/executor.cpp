@@ -256,11 +256,12 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 std::make_unique<JoinCardinalityEstimator>(JoinCardinalityEstimator::make(
                     ctx, swAccessPlans.getValue().estimate, samplingEstimators));
             auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(ctx, *cardEstimator);
-            reordered = constructSolutionBottomUp(ctx,
-                                                  std::move(cardEstimator),
-                                                  std::move(costEstimator),
-                                                  getPlanTreeShape(qkc.getJoinPlanTreeShape()),
-                                                  qkc.getEnableJoinEnumerationHJOrderPruning());
+            EnumerationStrategy strategy{.planShape = getPlanTreeShape(qkc.getJoinPlanTreeShape()),
+                                         .mode = PlanEnumerationMode::CHEAPEST,
+                                         .enableHJOrderPruning =
+                                             qkc.getEnableJoinEnumerationHJOrderPruning()};
+            reordered = constructSolutionBottomUp(
+                ctx, std::move(cardEstimator), std::move(costEstimator), std::move(strategy));
             break;
         }
         case JoinReorderModeEnum::kRandom:
