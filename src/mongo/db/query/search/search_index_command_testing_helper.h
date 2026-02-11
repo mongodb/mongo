@@ -44,6 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include <boost/optional/optional.hpp>
 
@@ -82,19 +83,22 @@ constexpr mongo::StringData kDropCommand = "dropSearchIndex"_sd;
 // replicateSearchIndexCommand to the router with the original user command.
 // 5. replicateSearchIndexCommand::typedRun() calls
 // search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(). This helper
-// resolves the view name (if necessary) and then asynchronously multicasts
-// _shardsvrRunSearchIndexCommand (which includes the original user command, the
-// alreadyInformedMongot hostAndPort, and the optional resolved view name) on every mongod in the
-// cluster.
+// resolves the view name (if necessary) and forces a refresh of the catalog cache to ensure
+// accurate routing information (especially important when tests run concurrently). It then checks
+// if the collection is tracked. For tracked collections (sharded or unsplittable), it
+// asynchronously multicasts _shardsvrRunSearchIndexCommand (which includes the original user
+// command, the alreadyInformedMongot hostAndPort, and the optional resolved view name) on every
+// mongod in the cluster. For untracked collections, it only sends the command to the primary shard
+// since the collection only exists there.
 // 6. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
 // mongot with the router, it does nothing as its mongot has already received the search index
 // command. Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded
 // from the router.
-// 7. After every mongod has been issued the _shardsvrRunSearchIndexCommand,
+// 7. After the target mongod(s) have been issued the _shardsvrRunSearchIndexCommand,
 // search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting() then issues a
-// $listSearchIndex command on every mongod until every mongod reports that the specified index is
-// queryable. It will return once the index is queryable across the entire cluster and throw an
-// error otherwise.
+// $listSearchIndex command on the target mongod(s) until they report that the specified index is
+// queryable. It will return once the index is queryable on all target mongods and throw an error
+// otherwise.
 // 8. The javascript search index command helper returns the response from step 3.
 
 
@@ -115,6 +119,19 @@ inline std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
         for (auto&& host : cs.getServers()) {
             servers.emplace_back(host);
         }
+    }
+    return servers;
+}
+
+inline std::vector<HostAndPort> getPrimaryShardHosts(OperationContext* opCtx,
+                                                     const ShardId& shardId) {
+    auto registry = Grid::get(opCtx)->shardRegistry();
+    const auto shard = uassertStatusOK(registry->getShard(opCtx, shardId));
+    const auto cs = shard->getConnString();
+
+    std::vector<HostAndPort> servers;
+    for (auto&& host : cs.getServers()) {
+        servers.emplace_back(host);
     }
     return servers;
 }
@@ -328,8 +345,23 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext*
         !opCtx->getService()->role().hasExclusively(ClusterRole::RouterServer)) {
         return;
     }
+
+    // Force a refresh of the catalog cache to ensure we have accurate routing information,
+    // especially important when tests run concurrently and the cache might be stale.
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+    auto swCri = catalogCache->getCollectionRoutingInfo(opCtx, nss);
+
+    std::vector<HostAndPort> targetHosts;
+    // Check if the collection is tracked. For untracked collections, only send commands to the
+    // primary shard since the collection only exists there.
+    if (swCri.isOK() && !swCri.getValue().cm.hasRoutingTable()) {
+        targetHosts = getPrimaryShardHosts(opCtx, swCri.getValue().cm.dbPrimary());
+    } else {
+        targetHosts = getAllClusterHosts(opCtx);
+    }
+
     auto idxCmdType = std::string(userCmd.firstElement().fieldName());
-    auto allClusterHosts = getAllClusterHosts(opCtx);
     const auto dbName = nss.dbName();
     BSONObj listSearchIndexesCmd;
     boost::optional<BSONObj> searchIdxLatestDefinition;
@@ -337,7 +369,7 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext*
         listSearchIndexesCmd = wrapCmdInShardSvrRunSearchIndexCmd(nss, userCmd);
     } else {
         auto cmdObj = wrapCmdInShardSvrRunSearchIndexCmd(nss, userCmd);
-        multiCastShardsvrRunSearchIndexCommandOnAllMongods(opCtx, allClusterHosts, dbName, cmdObj);
+        multiCastShardsvrRunSearchIndexCommandOnAllMongods(opCtx, targetHosts, dbName, cmdObj);
         if (idxCmdType.compare(kCreateCommand.toString()) == 0 ||
             idxCmdType.compare(kUpdateCommand.toString()) == 0) {
             listSearchIndexesCmd = createWrappedListSearchIndexesCmd(nss, userCmd);
@@ -354,7 +386,7 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext*
         return;
     }
     blockUntilIndexQueryable(
-        opCtx, dbName, listSearchIndexesCmd, allClusterHosts, searchIdxLatestDefinition);
+        opCtx, dbName, listSearchIndexesCmd, targetHosts, searchIdxLatestDefinition);
     return;
 }
 

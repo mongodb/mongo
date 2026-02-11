@@ -12,19 +12,17 @@ config_variables:
 
 test_kind: js_test
 description: |
-  This suite spins up a one shard cluster with atlas search enabled. This suite enables running search
-  integrations tests locally and on evergreen. This suite spins up a mongos, a mongod and
-  a mongot.
+  This suite spins up a two node sharded cluster with atlas search enabled, consisting of a
+  mongos, two mongods and two mongots. Unlike the mongot_e2e_sharded_collections suite,
+  collections are not implicitly sharded by test infrastructure.
 
 selector:
+  # IMPORTANT: THIS SUITE IS OPT-IN ONLY.
+  # We do _not_ select all the tests in the e2e directory. We assume that the hot path taken for
+  # queries in this suite matches the hot path taken in the mongot_e2e_single_shard suite,
+  # so we don't need to repeat coverage.
   roots:
-    - jstests/with_mongot/e2e/**/*.js
-    - jstests/with_mongot/e2e_infrastructure_tests/*.js
-  exclude_files:
     - jstests/with_mongot/e2e/sharding_no_passthrough/**/*.js
-    - jstests/with_mongot/e2e_infrastructure_tests/verify_coll_is_sharded.js
-  exclude_with_any_tags:
-    - assumes_against_mongod_not_mongos
 
 executor:
   config:
@@ -36,13 +34,15 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-      eval: jsTest.authenticate(db.getMongo())
+      eval: >-
+        jsTest.authenticate(db.getMongo());
       <<: *authOptions
   fixture:
     class: ShardedClusterFixture
     auth_options: *authOptions
     launch_mongot: true
-    num_shards: 1
+    num_shards: 2
+    num_mongos: 3
     mongod_options:
       keyFile: *keyFile
       set_parameters:

@@ -1,4 +1,3 @@
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
@@ -22,9 +21,12 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
  *  replicateSearchIndexCommand to the router with the original user command.
  *  5. replicateSearchIndexCommand::typedRun() calls
  *  search_index_testing_helper::_replicateSearchIndexCommandOnAllMongodsForTesting(). This helper
+ *  resolves the view name (if necessary) and forces a refresh of the catalog cache to ensure
+ *  accurate routing information (especially important when tests run concurrently). It then
  *  asynchronously multicasts _shardsvrRunSearchIndexCommand (which includes the original user
  *  command, the alreadyInformedMongot hostAndPort, and the optional resolved view name) on every
- *  mongod in the cluster.
+ *  mongod in the cluster for tracked collections, or only on the primary shard for untracked
+ *  collections.
  *  6. Each mongod receives the _shardsvrRunSearchIndexCommand command. If this mongod shares its
  *  mongot with the router, it does nothing as its mongot has already received the search index
  * command. Otherwise, mongod calls runSearchIndexCommand with the necessary parameters forwarded
@@ -105,7 +107,7 @@ function _runListSearchIndexOnNode(coll, indexName, latestDefinition) {
 function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefinition = null) {
     let response = assert.commandWorked(coll.getDB().runCommand(userCmd));
     // Please see block comment at the top of this file to understand the sharded implementation.
-    if (isShardedHelper(coll)) {
+    if (isShardedHelper(coll) || FixtureHelpers.isMongos(coll.getDB())) {
         assert.commandWorked(
             coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
     } else {
