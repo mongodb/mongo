@@ -3166,6 +3166,21 @@ TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
     checkTransformation(cd, boost::none);
 }
 
+// A `km` (key material) is an internal oplog entry type used for key management.
+// `km` ops should always be filtered out by the change stream.
+TEST_F(ChangeStreamStageTest, MatchFiltersKeyMaterial) {
+    repl::MutableOplogEntry km;
+    km.setOpType(repl::OpTypeEnum::kKeyMaterial);
+    km.setNss(NamespaceString());
+
+    // Actual content here does not matter.
+    km.setObject(BSONObj());
+    km.setOpTime(repl::OpTime(kDefaultTs, 0));
+    km.setWallClockTime(Date_t());
+
+    checkTransformation(repl::OplogEntry(km.toBSON()), boost::none);
+}
+
 TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSupportedEvents) {
     auto expCtx = getExpCtx();
     expCtx->setForPerShardCursor(true);

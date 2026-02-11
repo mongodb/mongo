@@ -620,6 +620,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // should have been filtered out by the change stream's oplog match filter already.
             tasserted(11888301, "Change stream encountered unexpected 'cd' oplog entry");
         }
+        case repl::OpTypeEnum::kKeyMaterial: {
+            // Key material ('km') oplog entries should not show up when we get here. They
+            // should have been filtered out by the change stream's oplog match filter already.
+            tasserted(11945200, "Change stream encountered unexpected 'km' oplog entry");
+        }
         default: {
             throwUnsupportedOplogEntryType(input, "unhandled case" /* error */);
         }

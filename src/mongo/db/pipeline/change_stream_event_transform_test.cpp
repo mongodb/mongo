@@ -511,6 +511,23 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
 }
 
 DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnexpectedKeyMaterial,
+                 "Tripwire assertion.*11945200") {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kKeyMaterial);
+    oplogEntry.setNss(NamespaceString());
+
+    // Actual content here does not matter.
+    oplogEntry.setObject(BSONObj());
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    // This will tassert in the event transformer, because it does not expect a 'km' oplog entry.
+    ASSERT_THROWS_CODE(
+        applyTransformation(repl::OplogEntry(oplogEntry.toBSON())), AssertionException, 11945200);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestUnsupportedOplogEntryType,
                  "Tripwire assertion.*11352603.*Unsupported oplog entry type") {
     // Need to create an invalid oplog 'document' here, as 'repl::OplogEntry' validates its invalid
