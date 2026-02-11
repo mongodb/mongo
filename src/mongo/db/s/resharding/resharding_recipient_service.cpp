@@ -657,11 +657,12 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     _retryingCancelableOpCtxFactory.emplace(
         _cancelState->getAbortOrStepdownToken(),
         _markKilledExecutor,
-        resharding::kRetryabilityPredicateIncludeWriteConcernTimeout);
+        resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
 
-    _finishOperationFactory.emplace(_cancelState->getStepdownToken(),
-                                    _markKilledExecutor,
-                                    resharding::kRetryabilityPredicateIncludeWriteConcernTimeout);
+    _finishOperationFactory.emplace(
+        _cancelState->getStepdownToken(),
+        _markKilledExecutor,
+        resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor] { return _startMetrics(executor); })
@@ -680,7 +681,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 _retryingCancelableOpCtxFactory.emplace(
                     _cancelState->getAbortOrStepdownToken(),
                     _markKilledExecutor,
-                    resharding::kRetryabilityPredicateIncludeWriteConcernTimeout);
+                    resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
                 if (_cancelState->isSteppingDown()) {
                     // Propagate any errors from the recipient stepping down.
                     return ExecutorFuture<void>(**executor, status);
