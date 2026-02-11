@@ -3,7 +3,22 @@
  * over 16 MB work as expected (especially with respect to producing correctly sized write batches).
  */
 
-export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
+/**
+ * Available test cases:
+ *   - "out": Tests $out stage
+ *   - "merge_replace_insert": Tests $merge with whenMatched: "replace", whenNotMatched: "insert"
+ *   - "merge_merge_insert": Tests $merge with whenMatched: "merge", whenNotMatched: "insert"
+ *   - "merge_keep_existing": Tests $merge with whenMatched: "keepExisting", whenNotMatched: "insert"
+ *   - "merge_update": Tests $merge with update setup (whenMatched: "merge", on: "_id")
+ *   - "merge_replace_fail": Tests $merge with whenMatched: "replace", whenNotMatched: "fail" (failure case)
+ *   - "merge_merge_fail": Tests $merge with whenMatched: "merge", whenNotMatched: "fail" (failure case)
+ *   - "merge_fail_insert": Tests $merge with whenMatched: "fail", whenNotMatched: "insert" (failure case)
+ *
+ * @param {Object} db - The database object to use
+ * @param {Function} awaitReplication - Function to call to await replication
+ * @param {string} [testCase] - Optional specific test case to run. If not provided, runs all tests.
+ */
+export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication, testCase = null) {
     const collName = "movies";
     const targetCollName = "movies2";
 
@@ -64,35 +79,63 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
         assert.commandWorked(bulk.execute({w: "majority"}));
     }
 
-    testWriteAggSpec({$out: targetCollName}, defaultSetUpFn);
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "insert"}},
-        defaultSetUpFn,
-    );
-    testWriteAggSpec({$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert"}}, defaultSetUpFn);
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "keepExisting", whenNotMatched: "insert"}},
-        defaultSetUpFn,
-    );
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert", on: "_id"}},
-        mergeUpdateSetupFn,
-    );
+    // Define all test cases
+    const testCases = {
+        "out": () => testWriteAggSpec({$out: targetCollName}, defaultSetUpFn),
+        "merge_replace_insert": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "insert"}},
+                defaultSetUpFn,
+            ),
+        "merge_merge_insert": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert"}},
+                defaultSetUpFn,
+            ),
+        "merge_keep_existing": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "keepExisting", whenNotMatched: "insert"}},
+                defaultSetUpFn,
+            ),
+        "merge_update": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert", on: "_id"}},
+                mergeUpdateSetupFn,
+            ),
+        "merge_replace_fail": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "fail", on: "_id"}},
+                defaultSetUpFn,
+                [ErrorCodes.MergeStageNoMatchingDocument],
+            ),
+        "merge_merge_fail": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "fail", on: "_id"}},
+                defaultSetUpFn,
+                [ErrorCodes.MergeStageNoMatchingDocument],
+            ),
+        "merge_fail_insert": () =>
+            testWriteAggSpec(
+                {$merge: {into: targetCollName, whenMatched: "fail", whenNotMatched: "insert", on: "_id"}},
+                mergeUpdateSetupFn,
+                [ErrorCodes.DuplicateKey],
+            ),
+    };
 
-    // Failure cases.
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "fail", on: "_id"}},
-        defaultSetUpFn,
-        [ErrorCodes.MergeStageNoMatchingDocument],
-    );
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "fail", on: "_id"}},
-        defaultSetUpFn,
-        [ErrorCodes.MergeStageNoMatchingDocument],
-    );
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "fail", whenNotMatched: "insert", on: "_id"}},
-        mergeUpdateSetupFn,
-        [ErrorCodes.DuplicateKey],
-    );
+    // Run either the specified test case or all test cases
+    if (testCase !== null) {
+        if (!(testCase in testCases)) {
+            throw new Error(
+                `Unknown test case: ${testCase}. Valid test cases are: ${Object.keys(testCases).join(", ")}`,
+            );
+        }
+        jsTestLog(`Running single test case: ${testCase}`);
+        testCases[testCase]();
+    } else {
+        // Run all test cases for backwards compatibility
+        for (const [name, testFn] of Object.entries(testCases)) {
+            jsTestLog(`Running test case: ${name}`);
+            testFn();
+        }
+    }
 }
