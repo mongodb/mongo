@@ -360,4 +360,11 @@ joinTestWrapper(() => {
         {$lookup: {from: foreignColl3.getName(), as: "y", localField: "x.c", foreignField: "c"}},
         {$unwind: "$y"},
     ]);
+
+    section("Projection on ambiguous field");
+    runBasicJoinTest([
+        {$lookup: {from: foreignColl2.getName(), as: "x", localField: "a", foreignField: "d"}},
+        {$unwind: "$x"},
+        {$project: {"_id": 0, "d": 1}},
+    ]);
 }); // joinTestWrapper();

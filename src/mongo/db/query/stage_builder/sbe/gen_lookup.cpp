@@ -1667,6 +1667,7 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
     std::vector<ProjectNode> nodes;
     std::vector<std::string> paths;
 
+    // Embedded fields take the precedence over fields coming from the propagated result object.
     if (node->rightEmbeddingField) {
         paths.emplace_back(node->rightEmbeddingField->fullPath());
         nodes.emplace_back(rightOutputs.get(SlotBasedStageBuilder::kResult));
@@ -1681,12 +1682,22 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
             nodes.emplace_back(ProjectNode::Drop{});
         } else if ((!node->rightEmbeddingField || field != node->rightEmbeddingField->fullPath()) &&
                    (!node->leftEmbeddingField || field != node->leftEmbeddingField->fullPath())) {
+            // This field is not one of the embeddings, so it must be propagated from a child stream
+            // that is not embedded.
             paths.emplace_back(field);
             // TODO: SERVER-113230 in case of conflict, we give priority to the left side. Depending
             // on the join graph, an embedding having the same name of a top-level field in the base
             // collection could fail to overwrite it.
             auto key = std::make_pair(SlotBasedStageBuilder::kField, field);
-            nodes.emplace_back(leftOutputs.has(key) ? leftOutputs.get(key) : rightOutputs.get(key));
+            if (!node->leftEmbeddingField && leftOutputs.has(key)) {
+                nodes.emplace_back(leftOutputs.get(key));
+            } else if (!node->rightEmbeddingField && rightOutputs.has(key)) {
+                nodes.emplace_back(rightOutputs.get(key));
+            } else {
+                tasserted(11924000,
+                          str::stream()
+                              << "Cannot locate field '" << field << "' in either child stream");
+            }
         }
     }
     auto [resultSlot, embedStage] = buildLookupResultObject(

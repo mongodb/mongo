@@ -303,14 +303,19 @@ const locationsDocs = [
         extra: {breeds: "basalt", feeling: "hot"},
     },
 ];
-const animasDocs = [
+const animalsDocs = [
     {_id: "dog", locationName: "doghouse", colors: ["chartreuse", "taupe"]},
     {_id: "bull", locationId: "bullpen", colors: ["red", "blue"]},
     {_id: "trout", colors: ["mauve"]}, // no "locationId" field, so no $lookup matches
 ];
 
 assert.commandWorked(locations.insertMany(locationsDocs));
-assert.commandWorked(animals.insertMany(animasDocs));
+assert.commandWorked(animals.insertMany(animalsDocs));
+
+// TODO: SERVER-119477 remove the disablement of Join Optimization once we can force the spilling
+// of its hash join implementation
+saveParameterToRestore("internalEnableJoinOptimization");
+setServerParameter("internalEnableJoinOptimization", false);
 
 outputPipelineAndSlowQueryLog(
     animals,
