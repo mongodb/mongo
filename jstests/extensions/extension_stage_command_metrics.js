@@ -26,6 +26,7 @@
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {observeExtensionMetricsChange} from "jstests/extensions/libs/extension_metrics_helpers.js";
 
 const collName = jsTestName();
 
@@ -47,45 +48,39 @@ function getExtensionCommandMetrics() {
     return serverStatus.metrics.commands.aggregate.withExtension;
 }
 
-function observeExtensionMetricsChange(pipelinesToRun) {
-    const metricsBefore = getExtensionCommandMetrics();
-    let nSuccesses = 0,
-        nFailures = 0;
-    for (const {coll, pipeline} of pipelinesToRun) {
-        try {
-            coll.aggregate(pipeline);
-            nSuccesses++;
-        } catch (e) {
-            nFailures++;
-        }
-    }
-    const metricsAfter = getExtensionCommandMetrics();
-    return {
-        nSuccessfulPipelines: nSuccesses,
-        successMetricDelta: metricsAfter.succeeded - metricsBefore.succeeded,
-        nFailedPipelines: nFailures,
-        failureMetricDelta: metricsAfter.failed - metricsBefore.failed,
-    };
-}
-
 /**
  * Verifies that the extension command metrics are changed by the provided pipelines.
  */
 function verifyExtensionMetricsChange(pipelinesToRun) {
-    const {nSuccessfulPipelines, successMetricDelta, nFailedPipelines, failureMetricDelta} =
-        observeExtensionMetricsChange(pipelinesToRun);
-    assert.eq(successMetricDelta, nSuccessfulPipelines);
-    assert.eq(failureMetricDelta, nFailedPipelines);
+    const operations = pipelinesToRun.map(({coll, pipeline}) => ({
+        operation: () => coll.aggregate(pipeline),
+    }));
+
+    const {nSuccessfulOperations, nFailedOperations, metricDeltas} = observeExtensionMetricsChange(
+        operations,
+        getExtensionCommandMetrics,
+        ["succeeded", "failed"],
+    );
+
+    assert.eq(metricDeltas.succeeded, nSuccessfulOperations);
+    assert.eq(metricDeltas.failed, nFailedOperations);
 }
 
 /**
  * Verifies that the extension command metrics are *not* changed by the provided pipelines.
  */
 function verifyExtensionMetricsDoNotChange(pipelinesToRun) {
-    const {nSuccessfulPipelines, successMetricDelta, nFailedPipelines, failureMetricDelta} =
-        observeExtensionMetricsChange(pipelinesToRun);
-    assert.eq(successMetricDelta, 0);
-    assert.eq(failureMetricDelta, 0);
+    const operations = pipelinesToRun.map(({coll, pipeline}) => ({
+        operation: () => coll.aggregate(pipeline),
+    }));
+
+    const {metricDeltas} = observeExtensionMetricsChange(operations, getExtensionCommandMetrics, [
+        "succeeded",
+        "failed",
+    ]);
+
+    assert.eq(metricDeltas.succeeded, 0);
+    assert.eq(metricDeltas.failed, 0);
 }
 
 describe("Extension stage command metrics", function () {
