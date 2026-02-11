@@ -412,13 +412,18 @@ void createIndexForApplyOps(OperationContext* opCtx,
  * @param dataImage can be BSONObj::isEmpty to signal the node is in initial sync and must
  *                  invalidate relevant image collection data.
  */
-void writeToImageCollection(OperationContext* opCtx,
-                            const LogicalSessionId& sessionId,
-                            const TxnNumber txnNum,
-                            const Timestamp timestamp,
-                            repl::RetryImageEnum imageKind,
-                            const BSONObj& dataImage,
-                            StringData invalidatedReason) {
+void writeToImageCollectionIfNeeded(OperationContext* opCtx,
+                                    const LogicalSessionId& sessionId,
+                                    const TxnNumber txnNum,
+                                    const Timestamp timestamp,
+                                    repl::RetryImageEnum imageKind,
+                                    const BSONObj& dataImage,
+                                    StringData invalidatedReason) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (!rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+        return;
+    }
+
     // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
     // stronger lock acquisition is taken on this namespace is during step up to create the
     // collection.
@@ -1755,13 +1760,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 op.getNss(),
                 [&] {
                     WriteUnitOfWork wuow(opCtx);
-                    writeToImageCollection(opCtx,
-                                           op.getSessionId().value(),
-                                           op.getTxnNumber().value(),
-                                           op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
-                                           op.getNeedsRetryImage().value(),
-                                           BSONObj(),
-                                           getInvalidatingReason(mode, isDataConsistent));
+                    writeToImageCollectionIfNeeded(
+                        opCtx,
+                        op.getSessionId().value(),
+                        op.getTxnNumber().value(),
+                        op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
+                        op.getNeedsRetryImage().value(),
+                        BSONObj(),
+                        getInvalidatingReason(mode, isDataConsistent));
                     wuow.commit();
                 },
                 mode == repl::OplogApplication::Mode::kSecondary);
@@ -2377,7 +2383,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
 
                     if (op.getNeedsRetryImage()) {
-                        writeToImageCollection(
+                        writeToImageCollectionIfNeeded(
                             opCtx,
                             op.getSessionId().value(),
                             op.getTxnNumber().value(),
@@ -2471,7 +2477,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage &&
                         isDataConsistent) {
                         // When in initial sync, we'll pass an empty image into
-                        // `writeToImageCollection`.
+                        // `writeToImageCollectionIfNeeded`.
                         request.setReturnDeleted(true);
                     }
 
@@ -2498,7 +2504,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // `config.transactions` table is responsible for whether to retry. The
                         // motivation here is to simply reduce the number of states related
                         // documents in the two collections can be in.
-                        writeToImageCollection(
+                        writeToImageCollectionIfNeeded(
                             opCtx,
                             op.getSessionId().value(),
                             op.getTxnNumber().value(),

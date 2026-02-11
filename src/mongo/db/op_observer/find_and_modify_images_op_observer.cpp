@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_role.h"  // for acquireCollection() and CollectionAcquisitionRequest
@@ -53,7 +54,12 @@ namespace {
  * through the server parameter storeFindAndModifyImagesInSideCollection.
  * See SERVER-59443.
  */
-void writeToImageCollection(OperationContext* opCtx, OpStateAccumulator* opAccumulator) {
+void writeToImageCollectionIfNeeded(OperationContext* opCtx, OpStateAccumulator* opAccumulator) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (!rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+        return;
+    }
+
     if (!opAccumulator) {
         return;
     }
@@ -105,7 +111,7 @@ void writeToImageCollection(OperationContext* opCtx, OpStateAccumulator* opAccum
 void FindAndModifyImagesOpObserver::onUpdate(OperationContext* opCtx,
                                              const OplogUpdateEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
-    writeToImageCollection(opCtx, opAccumulator);
+    writeToImageCollectionIfNeeded(opCtx, opAccumulator);
 }
 
 void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
@@ -115,7 +121,7 @@ void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
                                              const DocumentKey& documentKey,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
-    writeToImageCollection(opCtx, opAccumulator);
+    writeToImageCollectionIfNeeded(opCtx, opAccumulator);
 }
 
 void FindAndModifyImagesOpObserver::onUnpreparedTransactionCommit(
@@ -124,7 +130,7 @@ void FindAndModifyImagesOpObserver::onUnpreparedTransactionCommit(
     const TransactionOperations& transactionOperations,
     const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     OpStateAccumulator* opAccumulator) {
-    writeToImageCollection(opCtx, opAccumulator);
+    writeToImageCollectionIfNeeded(opCtx, opAccumulator);
 }
 
 void FindAndModifyImagesOpObserver::onTransactionPrepare(
@@ -135,7 +141,7 @@ void FindAndModifyImagesOpObserver::onTransactionPrepare(
     size_t numberOfPrePostImagesToWrite,
     Date_t wallClockTime,
     OpStateAccumulator* opAccumulator) {
-    writeToImageCollection(opCtx, opAccumulator);
+    writeToImageCollectionIfNeeded(opCtx, opAccumulator);
 }
 
 }  // namespace mongo

@@ -529,7 +529,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
             query: {_id: -1, x: -1},
             update: {$inc: {x: -10}},
         };
-        const expectFindAndModifyImage = true;
+        const expectFindAndModifyImage = !TestData.doesNotSupportFindAndModifyImageCollection;
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
@@ -548,7 +548,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
             update: {$inc: {x: -10}},
             new: true,
         };
-        const expectFindAndModifyImage = true;
+        const expectFindAndModifyImage = !TestData.doesNotSupportFindAndModifyImageCollection;
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
@@ -566,7 +566,7 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
             query: {_id: -1, x: -1},
             remove: true,
         };
-        const expectFindAndModifyImage = true;
+        const expectFindAndModifyImage = !TestData.doesNotSupportFindAndModifyImageCollection;
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,

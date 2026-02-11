@@ -137,6 +137,13 @@ public:
     bool supportsCrossShardTransactions() const override;
 
     /**
+     * Attached storage supports storing findAndModify pre/post-images in the image collection.
+     * However, currently we disable it if featureFlagDisallowFindAndModifyImageCollection is
+     * enabled for testing purposes. The feature flag will be removed in SERVER-117324.
+     */
+    bool supportsFindAndModifyImageCollection() const override;
+
+    /**
      * We can support oplog cap maintainer thread and oplog sampling.
      */
     bool supportsOplogSampling() const override;

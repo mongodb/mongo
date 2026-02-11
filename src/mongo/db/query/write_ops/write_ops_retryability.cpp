@@ -42,6 +42,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -283,14 +284,16 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
             "Expected OplogEntry with pre or post image",
             oplog.getPreImageOpTime() || oplog.getPostImageOpTime() || oplog.getNeedsRetryImage());
     if (oplog.getNeedsRetryImage()) {
-        if (disallowFindAndModifyImageCollection(opCtx)) {
-            auto image = fetchPreOrPostImageFromSnapshot(opCtx, oplog);
-            uassert(ErrorCodes::IncompleteTransactionHistory,
-                    makePreOrPostImageNotFoundErrorMessage(oplog),
-                    image);
-            return *image;
+        auto& rss = rss::ReplicatedStorageService::get(opCtx);
+        if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+            return fetchPreOrPostImageFromImageCollection(opCtx, oplog);
         }
-        return fetchPreOrPostImageFromImageCollection(opCtx, oplog);
+
+        auto image = fetchPreOrPostImageFromSnapshot(opCtx, oplog);
+        uassert(ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(oplog),
+                image);
+        return *image;
     }
     return fetchPreOrPostImageFromOplog(opCtx, oplog);
 }

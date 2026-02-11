@@ -95,7 +95,7 @@ function runTest(conn, shardConn) {
     }
     assertNumEntries(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: reapThreshold,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : reapThreshold,
         numTransactionsCollEntries: reapThreshold,
     });
 
@@ -104,7 +104,7 @@ function runTest(conn, shardConn) {
     runInternalTxn(conn, parentLsid, reapThreshold + 1);
     assertNumEntriesSoon(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: 1,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : 1,
         numTransactionsCollEntries: 1,
     });
 
@@ -119,7 +119,7 @@ function runTest(conn, shardConn) {
     }
     assertNumEntriesSoon(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: 1,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : 1,
         numTransactionsCollEntries: 1,
     });
 
@@ -135,9 +135,14 @@ function runTest(conn, shardConn) {
     }
     assertNumEntries(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: numBeforeFailover,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : numBeforeFailover,
         numTransactionsCollEntries: numBeforeFailover,
     });
+
+    if (TestData.doesNotSupportGracefulStepdown) {
+        // TODO (SLS-1414): Enable failover testing.
+        return;
+    }
 
     // Step down and back up the new primary and verify it only reaps newly expired internal
     // sessions.
@@ -155,7 +160,9 @@ function runTest(conn, shardConn) {
     }
     assertNumEntries(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: numBeforeFailover + numAfterFailover,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection
+            ? 0
+            : numBeforeFailover + numAfterFailover,
         numTransactionsCollEntries: numBeforeFailover + numAfterFailover,
     });
 
@@ -166,7 +173,7 @@ function runTest(conn, shardConn) {
     }
     assertNumEntriesSoon(shardConn, {
         sessionUUID: parentLsid.id,
-        numImageCollectionEntries: numBeforeFailover,
+        numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : numBeforeFailover,
         numTransactionsCollEntries: numBeforeFailover,
     });
 

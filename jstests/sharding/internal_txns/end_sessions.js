@@ -122,7 +122,9 @@ withRetryOnTransientTxnError(() => {
 });
 
 numTransactionsCollEntries++;
-numImageCollEntries++;
+if (!TestData.doesNotSupportFindAndModifyImageCollection) {
+    numImageCollEntries++;
+}
 
 assert.eq(
     numTransactionsCollEntries,

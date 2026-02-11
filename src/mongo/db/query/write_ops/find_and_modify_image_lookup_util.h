@@ -41,11 +41,6 @@
 namespace mongo {
 
 /**
- * Returns true if findAndModify image collection is supported.
- */
-MONGO_MOD_PUBLIC bool disallowFindAndModifyImageCollection(OperationContext* opCtx);
-
-/**
  * Fetches and returns the pre- or post-image of the findAndModify operation by performing a
  * snapshot read against the collection wrote to. If the operation was executed in a transaction,
  * the oplog entry must have the commit timestamp.

@@ -271,4 +271,5 @@ feature_flags:
         description: "Disallow storing findAndModify pre/post-images to a side collection."
         cpp_varname: gFeatureFlagDisallowFindAndModifyImageCollection
         default: false
-        fcv_gated: true
+        fcv_gated: false
+        incremental_rollout_phase: in_development

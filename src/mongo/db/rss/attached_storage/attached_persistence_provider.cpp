@@ -127,6 +127,11 @@ bool AttachedPersistenceProvider::supportsCrossShardTransactions() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsFindAndModifyImageCollection() const {
+    // TODO (SERVER-117324): Remove this feature flag.
+    return !gFeatureFlagDisallowFindAndModifyImageCollection.checkEnabled();
+}
+
 bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }

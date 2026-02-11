@@ -69,13 +69,6 @@ BSONObj extractFindAndModifyIdFilter(const repl::OplogEntry& oplogEntry) {
 }
 }  // namespace
 
-bool disallowFindAndModifyImageCollection(OperationContext* opCtx) {
-    // TODO (SERVER-117324): Use PersistenceProvider instead of this helper.
-    return gFeatureFlagDisallowFindAndModifyImageCollection.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-}
-
 boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(OperationContext* opCtx,
                                                          const repl::OplogEntry& oplogEntry) {
     invariant(oplogEntry.getNeedsRetryImage());

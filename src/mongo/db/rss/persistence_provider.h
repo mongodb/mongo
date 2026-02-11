@@ -175,6 +175,11 @@ public:
     virtual bool supportsCrossShardTransactions() const = 0;
 
     /**
+     * If true, the provider supports storing findAndModify pre/post-images in the image collection.
+     */
+    virtual bool supportsFindAndModifyImageCollection() const = 0;
+
+    /**
      * If true, the provider supports starting the oplog cap maintainer thread and oplog sampling.
      */
     virtual bool supportsOplogSampling() const = 0;
