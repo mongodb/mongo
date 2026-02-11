@@ -1,4 +1,4 @@
-base_suite: sharded_collections_jscore_passthrough
+base_suite: sharded_collections_jscore_passthrough_base
 description: >-
   This suite runs through all fuzzer generated tests and ensures that the 'queryShapeHash'
   attribute returned in explain is same for multiple explain invocations, across all nodes of two

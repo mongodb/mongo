@@ -98,3 +98,6 @@ filters:
   - "sharding_jscore_passthrough.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "sharded_collections_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

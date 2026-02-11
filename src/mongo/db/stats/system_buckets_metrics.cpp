@@ -31,10 +31,18 @@
 #include "mongo/db/stats/system_buckets_metrics.h"
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/util/string_map.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+
+// TODO SERVER-119235: Remove this once these commands support rawData.
+static const StringDataSet kCommandsAllowedToTargetBuckets = {
+    "moveChunk"_sd,
+    "split"_sd,
+};
 
 SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
     _commandsExecuted = &*MetricBuilder<Counter64>("numCommandsTargetingSystemBuckets");
@@ -42,6 +50,15 @@ SystemBucketsMetricsCommandHooks::SystemBucketsMetricsCommandHooks() {
 
 void SystemBucketsMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
                                                    CommandInvocation* invocation) {
+
+    if (kCommandsAllowedToTargetBuckets.contains(invocation->definition()->getName())) {
+        LOGV2_DEBUG(11923700,
+                    2,
+                    "Skipping system buckets metrics counter for allowed command",
+                    "command"_attr = invocation->definition()->getName(),
+                    "namespace"_attr = invocation->ns().toStringForErrorMsg());
+        return;
+    }
 
     if (
         // This command have been initiated by another command (e.g. DBDirectClient)

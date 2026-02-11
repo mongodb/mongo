@@ -1,4 +1,4 @@
-base_suite: sharded_collections_jscore_passthrough
+base_suite: sharded_collections_jscore_passthrough_base
 description: >-
   Test the correctness of query settings application by emulating cursor hints with
   'setQuerySettings' commands. This suite runs jscore tests using a sahrded cluster

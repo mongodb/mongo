@@ -60,7 +60,7 @@ resmoke_suite_test(
     srcs = [
         "//jstests/core/ddl:drop_database.js",
     ],
-    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough.yml",
+    config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_base.yml",
     data = ["//buildscripts/resmokeconfig:common_jstest_data"],
     resmoke_args = ["--runAllFeatureFlagTests"],
     tags = [

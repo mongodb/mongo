@@ -57,6 +57,11 @@ DB.prototype.createCollection = function () {
 DB.prototype.getCollection = function () {
     let collection = originalGetCollection.apply(this, arguments);
 
+    // TODO SERVER-118882 remove once 9.0 becomes last LTS.
+    if (collection.getName().startsWith("system.buckets.")) {
+        return collection;
+    }
+
     // The following "collStats" command can behave unexpectedly when running in a causal
     // consistency suite with secondary read preference. "collStats" does not support causal
     // consistency, making it possible to see a stale view of the collection if run on a

@@ -63,3 +63,6 @@ filters:
   - "generated_suites/sharding*kill_primaries*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "generated_suites/sharded_collections_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

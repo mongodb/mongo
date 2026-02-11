@@ -272,7 +272,7 @@ export var TimeseriesTest = class {
                 .sort({_id: 1})
                 .toArray()
                 .map((doc) => doc._id);
-            const currentShards = getTimeseriesCollForDDLOps(db, coll)
+            const currentShards = coll
                 .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
                 .toArray()
                 .map((doc) => doc.shard);
@@ -296,7 +296,7 @@ export var TimeseriesTest = class {
                     }),
                 );
 
-                const updatedShards = getTimeseriesCollForDDLOps(db, coll)
+                const updatedShards = coll
                     .aggregate([{"$collStats": {storageStats: {}}}, {$project: {shard: 1}}, {$sort: {shard: 1}}])
                     .toArray()
                     .map((doc) => doc.shard);
