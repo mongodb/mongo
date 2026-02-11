@@ -386,6 +386,8 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->_isRankFusion = _isRankFusion;
 
+    expCtx->_requiresTimeseriesExtendedRangeSupport = _requiresTimeseriesExtendedRangeSupport;
+
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 

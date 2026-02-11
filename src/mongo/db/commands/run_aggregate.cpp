@@ -667,16 +667,15 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid,
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
-    const NamespaceStringSet& pipelineInvolvedNamespaces) {
-    auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx,
-        request,
-        std::move(collator),
-        MongoProcessInterface::create(opCtx),
-        uassertStatusOK(resolveInvolvedNamespaces(opCtx, request, pipelineInvolvedNamespaces)),
-        uuid,
-        CurOp::get(opCtx)->dbProfileLevel() > 0,
-        allowDiskUseByDefault.load());
+    const ResolvedNamespaceMap& resolvedNamespaces) {
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    request,
+                                                    std::move(collator),
+                                                    MongoProcessInterface::create(opCtx),
+                                                    resolvedNamespaces,
+                                                    uuid,
+                                                    CurOp::get(opCtx)->dbProfileLevel() > 0,
+                                                    allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
     if (request.getIsHybridSearch()) {
@@ -739,6 +738,8 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
         auto exchange =
             make_intrusive<Exchange>(request.getExchange().value(), std::move(pipeline));
 
+        auto resolvedNamespaces =
+            uassertStatusOK(resolveInvolvedNamespaces(opCtx, request, pipelineInvolvedNamespaces));
         for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
             // For every new pipeline we have create a new ExpressionContext as the context
             // cannot be shared between threads. There is no synchronization for pieces of
@@ -750,7 +751,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                                                                  : nullptr,
                                            expCtx->uuid,
                                            expCtx->collationMatchesDefault,
-                                           pipelineInvolvedNamespaces);
+                                           resolvedNamespaces);
 
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
@@ -1131,18 +1132,35 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // If we're operating over a view, we first parse just the original user-given request
     // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
     // the two pipelines together below.
-    auto expCtx = makeExpressionContext(opCtx,
-                                        request,
-                                        std::move(collator),
-                                        uuid,
-                                        collationMatchesDefault,
-                                        liteParsedPipeline.getInvolvedNamespaces());
+    const auto resolvedNamespaces = uassertStatusOK(
+        resolveInvolvedNamespaces(opCtx, request, liteParsedPipeline.getInvolvedNamespaces()));
+    auto expCtx = makeExpressionContext(
+        opCtx, request, std::move(collator), uuid, collationMatchesDefault, resolvedNamespaces);
     // If any involved collection contains extended-range data, set a flag which individual
-    // DocumentSource parsers can check.
+    // DocumentSource parsers can check. First, check the in-memory collections.
     collections.forEach([&](const CollectionPtr& coll) {
         if (coll->getRequiresTimeseriesExtendedRangeSupport())
             expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
     });
+
+    // It's possible that an involved nss that resolves to a timeseries buckets collection requires
+    // extended range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
+    if (!expCtx->getRequiresTimeseriesExtendedRangeSupport()) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        for (auto& [_, resolvedNs] : resolvedNamespaces) {
+            const auto& nss = resolvedNs.ns;
+            if (nss.isTimeseriesBucketsCollection()) {
+                auto readTimestamp =
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                auto collPtr = CollectionPtr(catalog->establishConsistentCollection(
+                    opCtx, NamespaceStringOrUUID(nss), readTimestamp));
+                if (collPtr && collPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+                    expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+                    break;
+                }
+            }
+        }
+    }
 
     auto requestForQueryStats = origRequest.has_value() ? *origRequest : request;
     expCtx->startExpressionCounters();
