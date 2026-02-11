@@ -877,6 +877,10 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
     });
 }
 
+bool CollectionImpl::shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const {
+    return _metadata->timeseriesBucketingParametersHaveChanged_DO_NOT_USE.has_value();
+}
+
 void CollectionImpl::removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) {
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.timeseriesBucketingParametersHaveChanged_DO_NOT_USE.reset();

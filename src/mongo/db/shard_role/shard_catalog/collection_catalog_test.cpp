@@ -835,6 +835,43 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
     }
 }
 
+TEST_F(ForEachCollectionFromDbTest, ModifyAllCollectionsMatchingHandlesConcurrentClone) {
+    auto opCtx = operationContext();
+    auto originalNss = NamespaceString::createNamespaceString_forTest("db", "original");
+    auto cloneNss = NamespaceString::createNamespaceString_forTest("db", "clone_of_original");
+
+    // Start with a single temp collection.
+    CollectionOptions tempCollOptions;
+    tempCollOptions.temp = true;
+    ASSERT_OK(storageInterface()->createCollection(opCtx, originalNss, tempCollOptions));
+
+    // Simulate a concurrent clone: on the first callback invocation, create another temp
+    // collection. modifyAllCollectionsMatching should re-iterate and modify it too.
+    int numModified = 0;
+    catalog::modifyAllCollectionsMatching(
+        opCtx,
+        [&](const Collection* collection) {
+            if (collection->ns() == originalNss) {
+                ASSERT_OK(storageInterface()->createCollection(opCtx, cloneNss, tempCollOptions));
+            }
+            WriteUnitOfWork wuow(opCtx);
+            CollectionWriter writer(opCtx, collection->ns());
+            writer.getWritableCollection(opCtx)->setIsTemp(opCtx, false);
+            wuow.commit();
+            numModified++;
+        },
+        [&](const Collection* collection) { return collection->getCollectionOptions().temp; });
+
+    // Both original collection and the clone should have been modified.
+    ASSERT_EQUALS(numModified, 2);
+    ASSERT(!CollectionCatalog::get(opCtx)
+                ->lookupCollectionByNamespace(opCtx, originalNss)
+                ->isTemporary());
+    ASSERT(!CollectionCatalog::get(opCtx)
+                ->lookupCollectionByNamespace(opCtx, cloneNss)
+                ->isTemporary());
+}
+
 /**
  * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
  */

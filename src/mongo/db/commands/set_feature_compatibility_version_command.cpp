@@ -225,25 +225,16 @@ void maybeModifyDataOnDowngradeForTest(OperationContext* opCtx,
     if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
             requestedVersion, originalVersion)) {
         LOGV2(8700500, "Automatically issuing collMod to strip recordIdsReplicated:true field.");
-        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-            catalog::forEachCollectionFromDb(
-                opCtx,
-                dbName,
-                MODE_X,
-                [&](const Collection* collection) {
-                    BSONObjBuilder responseBuilder;
-                    auto collMod = CollMod{collection->ns()};
-                    collMod.setRecordIdsReplicated(false);
-                    uassertStatusOK(processCollModCommand(
-                        opCtx, collection->ns(), collMod, nullptr, &responseBuilder));
-                    return true;
-                },
-                [&](const Collection* collection) {
-                    return collection->areRecordIdsReplicated();
-                    ;
-                });
-        }
+        catalog::modifyAllCollectionsMatching(
+            opCtx,
+            [&](const Collection* collection) {
+                BSONObjBuilder responseBuilder;
+                auto collMod = CollMod{collection->ns()};
+                collMod.setRecordIdsReplicated(false);
+                uassertStatusOK(processCollModCommand(
+                    opCtx, collection->ns(), collMod, nullptr, &responseBuilder));
+            },
+            [&](const Collection* collection) { return collection->areRecordIdsReplicated(); });
     }
 }
 
@@ -1189,25 +1180,19 @@ private:
 
         if (feature_flags::gRemoveLegacyTimeseriesBucketingParametersHaveChanged
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_X,
-                    [&](const Collection* collection) {
-                        CollMod collModCmd{collection->ns()};
-                        collModCmd.set_removeLegacyTimeseriesBucketingParametersHaveChanged(true);
+            catalog::modifyAllCollectionsMatching(
+                opCtx,
+                [&](const Collection* collection) {
+                    CollMod collModCmd{collection->ns()};
+                    collModCmd.set_removeLegacyTimeseriesBucketingParametersHaveChanged(true);
 
-                        BSONObjBuilder responseBuilder;
-                        uassertStatusOK(processCollModCommand(
-                            opCtx, collection->ns(), collModCmd, nullptr, &responseBuilder));
-                        return true;
-                    },
-                    [&](const Collection* collection) {
-                        return collection->getTimeseriesOptions() != boost::none;
-                    });
-            }
+                    BSONObjBuilder responseBuilder;
+                    uassertStatusOK(processCollModCommand(
+                        opCtx, collection->ns(), collModCmd, nullptr, &responseBuilder));
+                },
+                [&](const Collection* collection) {
+                    return collection->shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged();
+                });
         }
     }
 
@@ -1700,34 +1685,26 @@ private:
             if (feature_flags::gTSBucketingParametersUnchanged
                     .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
-                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                    catalog::forEachCollectionFromDb(
-                        opCtx,
-                        dbName,
-                        MODE_X,
-                        [&](const Collection* collection) {
-                            // Only remove the catalog entry flag if it exists. It could've been
-                            // removed if the downgrade process was interrupted and is being run
-                            // again. The downgrade process cannot be aborted at this point.
-                            if (collection->timeseriesBucketingParametersHaveChanged()) {
-                                // To remove timeseries bucketing parameters from persistent
-                                // storage, issue the "collMod" command with none of the parameters
-                                // set.
-                                BSONObjBuilder responseBuilder;
-                                uassertStatusOK(processCollModCommand(opCtx,
-                                                                      collection->ns(),
-                                                                      CollMod{collection->ns()},
-                                                                      nullptr,
-                                                                      &responseBuilder));
-                                return true;
-                            }
-                            return true;
-                        },
-                        [&](const Collection* collection) {
-                            return collection->getTimeseriesOptions() != boost::none;
-                        });
-                }
+                catalog::modifyAllCollectionsMatching(
+                    opCtx,
+                    [&](const Collection* collection) {
+                        // To remove timeseries bucketing parameters from persistent
+                        // storage, issue the "collMod" command with none of the parameters
+                        // set.
+                        BSONObjBuilder responseBuilder;
+                        uassertStatusOK(processCollModCommand(opCtx,
+                                                              collection->ns(),
+                                                              CollMod{collection->ns()},
+                                                              nullptr,
+                                                              &responseBuilder));
+                    },
+                    [&](const Collection* collection) {
+                        // Only remove the catalog entry flag if it exists. It could've been
+                        // removed if the downgrade process was interrupted and is being run
+                        // again. The downgrade process cannot be aborted at this point.
+                        return collection->getTimeseriesOptions() != boost::none &&
+                            collection->timeseriesBucketingParametersHaveChanged();
+                    });
             }
 
             maybeModifyDataOnDowngradeForTest(opCtx, requestedVersion, originalVersion);

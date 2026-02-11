@@ -37,6 +37,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -91,19 +92,22 @@ Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& ns
 }
 
 
-void forEachCollectionFromDb(OperationContext* opCtx,
-                             const DatabaseName& dbName,
-                             LockMode collLockMode,
-                             CollectionCatalog::CollectionInfoFn callback,
-                             CollectionCatalog::CollectionInfoFn predicate) {
+CollectionCatalogIterationResult forEachCollectionFromDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    LockMode collLockMode,
+    CollectionCatalog::CollectionInfoFn callback,
+    CollectionCatalog::CollectionInfoFn predicate) {
 
     auto catalogForIteration = CollectionCatalog::get(opCtx);
     size_t collectionCount = 0;
+    auto result = CollectionCatalogIterationResult::kNoMatches;
     for (auto&& coll : catalogForIteration->range(dbName)) {
         auto uuid = coll->uuid();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
             continue;
         }
+        result = CollectionCatalogIterationResult::kSomeMatches;
 
         boost::optional<Lock::CollectionLock> clk;
         CollectionPtr collection;
@@ -141,6 +145,36 @@ void forEachCollectionFromDb(OperationContext* opCtx,
         }
         hangBeforeGettingNextCollection.pauseWhileSet();
         collectionCount += 1;
+    }
+
+    return result;
+}
+
+void modifyAllCollectionsMatching(OperationContext* opCtx,
+                                  std::function<void(const Collection* collection)> callback,
+                                  CollectionCatalog::CollectionInfoFn predicate) {
+    auto callbackAndContinue = [&](const Collection* collection) {
+        callback(collection);
+        return true;
+    };
+
+    bool keepIterating = true;
+    for (size_t i = 0; keepIterating; i++) {
+        static constexpr size_t kMaxIterations = 100;
+        tassert(117883,
+                "modifyAllCollectionsMatching reached max iterations without convergence",
+                i < kMaxIterations);
+
+        keepIterating = false;
+        for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+            Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+            // If some collection satisfied the predicate, a concurrent DDL could have cloned it
+            // before we ran the callback, so there could be a new collection satisfying the
+            // predicate that we have missed and we must re-check the catalog to find it.
+            keepIterating |=
+                forEachCollectionFromDb(opCtx, dbName, MODE_X, callbackAndContinue, predicate) ==
+                CollectionCatalogIterationResult::kSomeMatches;
+        }
     }
 }
 

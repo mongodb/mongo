@@ -139,12 +139,6 @@
     exclude_with_any_tags:
       - featureFlagCreateViewlessTimeseriesCollections
 
-- name: exclude_files
-  value:
-    exclude_files:
-      # TODO SERVER-117883 Remove this once the test is fixed.
-      - jstests/core/catalog/list_collections_correctness.js
-
 - name: replica_sets_fixture
   value:
     executor:

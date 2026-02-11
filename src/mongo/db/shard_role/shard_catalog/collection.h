@@ -442,6 +442,7 @@ public:
      * during FCV upgrade.
      */
     // TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
+    virtual bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const = 0;
     virtual void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) = 0;
 
     /**

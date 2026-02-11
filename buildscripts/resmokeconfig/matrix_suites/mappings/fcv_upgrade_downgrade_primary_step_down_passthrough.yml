@@ -10,4 +10,3 @@ overrides:
 excludes:
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"
   - "fcv_upgrade_downgrade_primary_step_down_overrides.exclude_fcv_tags"
-  - "fcv_upgrade_downgrade_primary_step_down_overrides.exclude_files"

@@ -215,6 +215,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const final {
+        MONGO_UNREACHABLE;
+    }
+
     void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) final {
         MONGO_UNREACHABLE;
     }

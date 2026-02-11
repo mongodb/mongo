@@ -292,6 +292,11 @@ public:
         unimplementedTasserted();
     }
 
+    bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const final {
+        unimplementedTasserted();
+        return false;
+    }
+
     void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) final {
         unimplementedTasserted();
     }

@@ -316,6 +316,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged() const override {
+        MONGO_UNREACHABLE;
+    }
+
     void removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) override {
         MONGO_UNREACHABLE;
     }

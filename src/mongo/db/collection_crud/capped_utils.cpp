@@ -40,9 +40,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog.h"
@@ -53,9 +55,9 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
@@ -92,6 +94,15 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     const auto& fromNss = fromCollection.nss();
     const auto& toNss = toCollection.nss();
 
+    AutoStatsTracker statsTracker(opCtx,
+                                  toNss,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(toNss.dbName()));
+
+    uassertStatusOK(userAllowedCreateNS(opCtx, toNss));
+
     if (!fromCollection.exists()) {
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "source collection " << fromNss.toStringForErrorMsg()
@@ -124,7 +135,11 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         if (temp)
             options.temp = true;
 
-        uassertStatusOK(createCollection(opCtx, toNss, options, BSONObj()));
+        writeConflictRetry(opCtx, "cloneCollectionAsCapped", toNss, [&] {
+            WriteUnitOfWork wunit(opCtx);
+            invariant(db->createCollection(opCtx, toNss, options));
+            wunit.commit();
+        });
     }
 
     tassert(10769702,

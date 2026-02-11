@@ -50,6 +50,15 @@ namespace catalog {
 MONGO_MOD_PUBLIC
 Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& nss);
 
+enum class MONGO_MOD_PUBLIC CollectionCatalogIterationResult {
+    // No collection in the catalog matched the predicate.
+    kNoMatches,
+    // At least one collection in the catalog matched the predicate.
+    // This may be returned even if the callback is never called,
+    // if a collection that matched the predicate got concurrently dropped.
+    kSomeMatches,
+};
+
 /**
  * Iterates through all the collections in the given database and runs the callback function on each
  * collection. If a predicate is provided, then the callback will only be executed against the
@@ -62,11 +71,26 @@ Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& ns
  * Iterating through the remaining collections stops when the callback returns false.
  */
 MONGO_MOD_PUBLIC
-void forEachCollectionFromDb(OperationContext* opCtx,
-                             const DatabaseName& dbName,
-                             LockMode collLockMode,
-                             CollectionCatalog::CollectionInfoFn callback,
-                             CollectionCatalog::CollectionInfoFn predicate = nullptr);
+CollectionCatalogIterationResult forEachCollectionFromDb(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    LockMode collLockMode,
+    CollectionCatalog::CollectionInfoFn callback,
+    CollectionCatalog::CollectionInfoFn predicate = nullptr);
+
+
+/**
+ * Iterates through all collections in all databases that satisfy the predicate and runs the
+ * callback function on each collectiom, which should modify it to no longer satisfy the predicate.
+ *
+ * This function differs from `forEachCollectionFromDb` in that it will ensures if a collection
+ * matching the predicate is cloned while iterating the catalog, it is also modified. Thus,
+ * it ensures that the catalog converges to a state where no collection satisfies the predicate.
+ */
+MONGO_MOD_PUBLIC
+void modifyAllCollectionsMatching(OperationContext* opCtx,
+                                  std::function<void(const Collection* collection)> callback,
+                                  CollectionCatalog::CollectionInfoFn predicate);
 
 /**
  * Checks whether the specified namespace should be included in the debug dump of the config
