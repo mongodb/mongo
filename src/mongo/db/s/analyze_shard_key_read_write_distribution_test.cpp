@@ -2010,8 +2010,9 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
     auto updateMod = BSON("a" << BSON("x" << 0) << "b" << BSON("y" << "A") << "c" << 0);
 
     WriteMetrics metrics;
-    metrics.numSingleShard = 1;
-    metrics.numByRange = std::vector<int64_t>({0, 1, 0});
+    metrics.numMultiShard = 1;
+    metrics.numByRange = std::vector<int64_t>({1, 1, 0});
+    metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
         targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
     assertMetricsForWriteQuery(
@@ -2026,8 +2027,9 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertEve
     auto updateMod = BSON("a" << BSON("x" << 0));
 
     WriteMetrics metrics;
-    metrics.numSingleShard = 1;
-    metrics.numByRange = std::vector<int64_t>({0, 1, 0});
+    metrics.numMultiShard = 1;
+    metrics.numByRange = std::vector<int64_t>({1, 1, 0});
+    metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
         targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
     assertMetricsForWriteQuery(
@@ -2042,8 +2044,9 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertPre
     auto updateMod = BSON("b" << BSON("y" << "A"));
 
     WriteMetrics metrics;
-    metrics.numSingleShard = 1;
-    metrics.numByRange = std::vector<int64_t>({1, 0, 0});
+    metrics.numMultiShard = 1;
+    metrics.numByRange = std::vector<int64_t>({1, 1, 0});
+    metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
         targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
     assertMetricsForWriteQuery(
@@ -2058,8 +2061,9 @@ TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsertSuf
     auto updateMod = BSON("a" << BSON("x" << 0));
 
     WriteMetrics metrics;
-    metrics.numSingleShard = 1;
-    metrics.numByRange = std::vector<int64_t>({0, 1, 0});
+    metrics.numMultiShard = 1;
+    metrics.numByRange = std::vector<int64_t>({1, 1, 0});
+    metrics.numSingleWritesWithoutShardKey = 1;
     assertMetricsForWriteQuery(
         targeter, makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */), metrics);
     assertMetricsForWriteQuery(
@@ -2264,11 +2268,11 @@ protected:
 
 TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
     auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
-                                   const SampledQueryDocument& queryDoc,
-                                   const std::vector<int64_t> numByRange) {
+                                   const SampledQueryDocument& queryDoc) {
         WriteMetrics metrics;
-        metrics.numSingleShard = 1;
-        metrics.numByRange = numByRange;
+        metrics.numScatterGather = 1;
+        metrics.numByRange = std::vector<int64_t>({1, 1, 1});
+        metrics.numSingleWritesWithoutShardKey = 1;
         assertMetricsForWriteQuery(targeter, queryDoc, metrics);
     };
 
@@ -2276,14 +2280,12 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
     auto filter = BSON("_id" << 0);
     auto updateMod =
         BSON("_id" << 0 << "a" << BSON("x" << 0) << "b" << BSON("y" << "A") << "c" << 0);
-    auto numByRange = std::vector<int64_t>({0, 1, 0});
+
     assertTargetMetrics(targeter,
-                        makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */),
-                        numByRange);
+                        makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */));
+
     assertTargetMetrics(
-        targeter,
-        makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */),
-        numByRange);
+        targeter, makeSampledBulkWriteUpdateQueryDocument(filter, updateMod, false /* upsert */));
 }
 
 TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {

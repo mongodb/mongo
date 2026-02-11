@@ -257,24 +257,6 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
     _numUpdate++;
     auto info =
         _getTargetingInfoForQuery(opCtx, filter, collation, letParameters, runtimeConstants);
-
-    if (info.desc != QueryTargetingInfo::Description::kSingleKey) {
-        // If this is a non-upsert replacement update, the replacement document can be used as
-        // the filter.
-        auto isReplacementUpdate =
-            !upsert && updateMod.type() == write_ops::UpdateModification::Type::kReplacement;
-        const auto& cm = _getChunkManager();
-
-        // Currently, targeting by replacement document is only done when the query targets an exact
-        // id value.
-        if (isReplacementUpdate &&
-            isExactIdQuery(opCtx, ns, filter, collation, cm.isSharded(), cm.getDefaultCollator())) {
-            auto filter =
-                _getShardKeyPattern().extractShardKeyFromDoc(updateMod.getUpdateReplacement());
-            info = _getTargetingInfoForQuery(
-                opCtx, filter, collation, letParameters, runtimeConstants);
-        }
-    }
     _incrementMetricsForQuery(info, multi);
 }
 
