@@ -106,6 +106,8 @@ struct ShellGlobalParams {
     bool shouldRetryWrites = false;
     bool shouldUseImplicitSessions = true;
 
+    bool jsDebugMode = false;
+
     int jsHeapLimitMB = 0;
     AssignableAtomicBool nokillop{false};
     Seconds idleSessionTimeout = Seconds{0};

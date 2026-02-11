@@ -1,0 +1,31 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "js_debugger",
+    srcs = [
+        "debugger.cpp",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/scripting/mozjs/common:mozjs_common",
+        "//src/third_party/mozjs",
+    ],
+)

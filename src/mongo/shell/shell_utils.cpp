@@ -81,6 +81,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/bench.h"
+#include "mongo/shell/debugger/debugger.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_extended.h"
@@ -1351,6 +1352,18 @@ void initScope(Scope& scope) {
 
     if (!dbConnect.empty()) {
         uassert(12513, "connect failed", scope.exec(dbConnect, "(connect)", false, true, false));
+    }
+
+    // Initialize debugger
+    if (shellGlobalParams.jsDebugMode) {
+        // Inject debugger initialization function (internal use)
+        // Pass the scope as data parameter so it can access JSContext
+        scope.injectNative("_initDebuggerGlobal", mongo::mozjs::initDebuggerGlobal, &scope);
+        try {
+            scope.exec("_initDebuggerGlobal()", "(debugger-init)", false, true, false);
+        } catch (const DBException& e) {
+            std::cerr << "[JSDEBUG] Failed to initialize debugger: " << e.toString() << std::endl;
+        }
     }
 }
 

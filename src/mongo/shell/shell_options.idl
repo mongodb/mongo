@@ -154,6 +154,11 @@ configs:
         duplicate_behavior: append
         hidden: true
 
+    "jsDebugMode":
+        description: "Enable debug mode for interactive JS debugging"
+        arg_vartype: Switch
+        cpp_varname: shellGlobalParams.jsDebugMode
+
     # Positional Arguments.
     "dbaddress":
         description: "dbaddress"
