@@ -90,5 +90,8 @@ export function getMatchingLoglinesCount(logLines, fields, ignoreFields) {
 // if no such logline was found.
 export function findSlowInProgressQueryLogLine(db, comment) {
     const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    if (comment === undefined) {
+        return findMatchingLogLine(globalLog.log, {id: 1794200});
+    }
     return findMatchingLogLine(globalLog.log, {id: 1794200, comment: comment});
 }
