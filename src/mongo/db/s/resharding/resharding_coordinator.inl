@@ -1457,7 +1457,10 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
                 .onCompletion([this](Status status) {
                     _ctHolder->cancelCommitMonitor();
                     if (status.isOK()) {
-                        LOGV2(5391603, "Resharding operation is okay to enter critical section");
+                        LOGV2(5391603,
+                              "Resharding operation is okay to enter critical section",
+                              "coordinatorAllShardsHighestRemainingOperationTimeEstimated"_attr =
+                                  _metrics->getHighEstimateRemainingTimeMillis());
                     }
                     return status;
                 });
