@@ -16,7 +16,7 @@ mongo_cc_library(
     ],
     copts = select({
         "@platforms//os:windows": [
-            # See the /Zc:preprocessor comment in third_party/mozjs/BUILD.bazel
+            # See comments in third_party/mozjs/BUILD.bazel
             "/Zc:preprocessor",
             "/wd5104",
             "/wd5105",

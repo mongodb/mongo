@@ -33,53 +33,182 @@
 
 #include <jsapi.h>
 
+#include <js/CompilationAndEvaluation.h>
+#include <js/SourceText.h>
+
 namespace mongo {
 namespace mozjs {
 
-class DebuggerGlobal {
-public:
-    static Status init(JSContext* cx) {
 
-        // Get the main global object (the one running user code)
-        JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
-        if (!global) {
-            return Status(ErrorCodes::JSInterpreterFailure, "No global object");
-        }
+DebuggerObject::DebuggerObject(JSContext* cx, JS::HandleObject debugger)
+    : _cx(cx), _debugger(cx, debugger) {}
 
-        // Define the Debugger object on the global if not already present
-        if (!JS_DefineDebuggerObject(cx, global)) {
-            return Status(ErrorCodes::JSInterpreterFailure, "Failed to define Debugger object");
-        }
+DebuggerObject DebuggerObject::create(JSContext* cx, JS::RootedObject const& global) {
 
-        // Get Debugger constructor
-        JS::RootedValue debuggerCtor(cx);
-        if (!JS_GetProperty(cx, global, "Debugger", &debuggerCtor)) {
-            return Status(ErrorCodes::JSInterpreterFailure, "Failed to get Debugger constructor");
-        }
-
-        // Create new Debugger instance
-        JS::RootedObject debugger(cx);
-        if (!JS::Construct(cx, debuggerCtor, JS::HandleValueArray::empty(), &debugger)) {
-            return Status(ErrorCodes::JSInterpreterFailure, "Failed to create Debugger instance");
-        }
-
-        // Add the global as a debuggee
-        // Note: We're still in the debugger's compartment, so we need to wrap global
-        JS::RootedValueArray<1> args(cx);
-        JS::RootedObject wrappedGlobal(cx, global);
-        if (!JS_WrapObject(cx, &wrappedGlobal)) {
-            return Status(ErrorCodes::JSInterpreterFailure, "Failed to wrap global");
-        }
-        args[0].setObject(*wrappedGlobal);
-
-        JS::RootedValue rval(cx);
-        if (!JS_CallFunctionName(cx, debugger, "addDebuggee", args, &rval)) {
-            return Status(ErrorCodes::JSInterpreterFailure, "Failed to add global as debuggee");
-        }
-
-        return Status::OK();
+    // Define the Debugger object in the debugger's global
+    if (!JS_DefineDebuggerObject(cx, global)) {
+        uasserted(ErrorCodes::InternalError, "Failed to define Debugger object");
     }
+
+    // Get Debugger constructor from the debugger's global
+    JS::RootedValue debuggerCtor(cx);
+    if (!JS_GetProperty(cx, global, "Debugger", &debuggerCtor)) {
+        uasserted(ErrorCodes::InternalError, "Failed to get Debugger constructor");
+    }
+
+    // Create new Debugger instance in the separate compartment
+    JS::RootedObject debugger(cx);
+    if (!JS::Construct(cx, debuggerCtor, JS::HandleValueArray::empty(), &debugger)) {
+        uasserted(ErrorCodes::InternalError, "Failed to create Debugger instance");
+    }
+
+    return DebuggerObject(cx, debugger);
+}
+
+Status DebuggerObject::addDebuggee(JS::RootedObject const& global) {
+    // Add the global as a debuggee
+
+    // Note: We should be in the debugger's compartment, so we need to wrap global
+    JS::RootedObject wrappedGlobal(_cx, global);
+    if (!JS_WrapObject(_cx, &wrappedGlobal)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to wrap global");
+    }
+    JS::RootedValueArray<1> args(_cx);
+    args[0].setObject(*wrappedGlobal);
+
+    JS::RootedValue rval(_cx);
+    if (!JS_CallFunctionName(_cx, _debugger, "addDebuggee", args, &rval)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to add global as debuggee");
+    }
+
+    return Status::OK();
+}
+
+bool DebuggerObject::onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    std::cout << "[WIP] in debugger callback!" << std::endl;
+    return true;
 };
+
+Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& global) {
+    Status status = Status::OK();
+    if (!(status = registerNativeFunction(_cx,
+                                          global,
+                                          "__onDebuggerStatementCallback",
+                                          DebuggerObject::onDebuggerStatementCallback,
+                                          1))
+             .isOK()) {
+        return status;
+    }
+
+    const char* hookCode = R"HOOK(
+            (function(frame) {
+                // Call C++ callback
+                globalThis.__onDebuggerStatementCallback(frame);
+                return undefined;
+            })
+        )HOOK";
+
+    JS::RootedValue onDebuggerStatement(_cx);
+    status = compileJSCodeBlock(hookCode, "debugger-hook", &onDebuggerStatement);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (!JS_SetProperty(_cx, _debugger, "onDebuggerStatement", onDebuggerStatement)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to set hook");
+    }
+
+    return status;
+}
+
+Status DebuggerObject::compileJSCodeBlock(const char* code,
+                                          const char* name,
+                                          JS::MutableHandleValue out) {
+
+    JS::CompileOptions opts(_cx);
+    opts.setFileAndLine(name, 1);
+
+    JS::SourceText<mozilla::Utf8Unit> source;
+    if (!source.init(_cx, code, strlen(code), JS::SourceOwnership::Borrowed)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to init code source");
+    }
+
+    if (!JS::Evaluate(_cx, opts, source, out)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to compile JS code block");
+    }
+
+    return Status::OK();
+}
+
+
+Status DebuggerObject::registerNativeFunction(
+    JSContext* cx, JS::HandleObject global, const char* name, JSNative func, unsigned argc) {
+    JS::RootedFunction jsFunc(cx, JS_NewFunction(cx, func, argc, 0, name));
+    if (!jsFunc) {
+        return Status(ErrorCodes::JSInterpreterFailure,
+                      str::stream() << "Failed to create function: " << name);
+    }
+
+    JS::RootedObject jsFuncObj(cx, JS_GetFunctionObject(jsFunc));
+    JS::RootedValue jsFuncVal(cx, JS::ObjectValue(*jsFuncObj));
+    if (!JS_SetProperty(cx, global, name, jsFuncVal)) {
+        return Status(ErrorCodes::JSInterpreterFailure,
+                      str::stream() << "Failed to set global property: " << name);
+    }
+
+    return Status::OK();
+}
+
+
+Status DebuggerGlobal::init(JSContext* cx) {
+
+    // Get the main global object (the one running user code)
+    JS::RootedObject mainGlobal(cx, JS::CurrentGlobalOrNull(cx));
+    if (!mainGlobal) {
+        return Status(ErrorCodes::JSInterpreterFailure, "No global object");
+    }
+
+    // Create a NEW global object for the debugger (separate compartment)
+    // Define a JSClass for the debugger global
+    static const JSClass debuggerGlobalClass = {
+        "DebuggerGlobal",
+        JSCLASS_GLOBAL_FLAGS,
+        &JS::DefaultGlobalClassOps,
+    };
+
+    JS::RealmOptions realmOptions;
+    JS::RootedObject debuggerGlobal(
+        cx,
+        JS_NewGlobalObject(
+            cx, &debuggerGlobalClass, nullptr, JS::FireOnNewGlobalHook, realmOptions));
+
+    if (!debuggerGlobal) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to create debugger compartment");
+    }
+
+    Status status = Status::OK();
+
+    // Create debugger in its own compartment (using nested scope for compartment management)
+    {
+        // Enter the debugger's compartment
+        JSAutoRealm realm(cx, debuggerGlobal);
+
+        DebuggerObject debuggerObject = DebuggerObject::create(cx, debuggerGlobal);
+        status = debuggerObject.addDebuggee(mainGlobal);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Set up onDebuggerStatement hook
+        status = debuggerObject.setOnDebuggerStatementCallback(debuggerGlobal);
+        if (!status.isOK()) {
+            return status;
+        }
+
+    }  // Exit debugger compartment - JSAutoRealm goes out of scope here
+
+    return status;
+}
 
 BSONObj initDebuggerGlobal(const BSONObj& args, void* data) {
     uassert(ErrorCodes::BadValue, "initDebuggerGlobal accepts no arguments", args.nFields() == 0);

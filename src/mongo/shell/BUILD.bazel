@@ -136,6 +136,15 @@ mongo_cc_library(
         "shell_utils_extended.cpp",
         "shell_utils_launcher.cpp",
     ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See comments in third_party/mozjs/BUILD.bazel
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":benchrun",
         ":program_runner",

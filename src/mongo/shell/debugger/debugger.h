@@ -31,10 +31,51 @@
 
 #include "mongo/base/status.h"
 
+#include <jsapi.h>
+
 namespace mongo {
 namespace mozjs {
 
+// Main entrypoint for the shell to initialize when in debug mode
 BSONObj initDebuggerGlobal(const BSONObj& args, void* data);
 
-}
+
+class DebuggerGlobal {
+public:
+    static Status init(JSContext* cx);
+};
+
+/**
+ * Facade interface of https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html
+ * and its relevant functionality.
+ */
+class DebuggerObject {
+    JSContext* _cx;
+    JS::PersistentRooted<JSObject*> _debugger;
+
+    // Invoked when the JS "debugger" keyword is executed.
+    static bool onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+
+    // Helper: Register a native function in the debugger compartment.
+    Status registerNativeFunction(
+        JSContext* cx, JS::HandleObject global, const char* name, JSNative func, unsigned argc);
+
+    // Helper: Compile a JS Code block and set a reference.
+    Status compileJSCodeBlock(const char* code, const char* name, JS::MutableHandleValue out);
+
+public:
+    DebuggerObject(JSContext* cx, JS::HandleObject debugger);
+
+    // Create a Debugger instance in the compartment.
+    static DebuggerObject create(JSContext* cx, JS::RootedObject const& global);
+
+    // Add a global object for this Debugger instance to debug.
+    // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#adddebuggee-global
+    Status addDebuggee(JS::RootedObject const& global);
+
+    // Set the "onDebuggerStatement" callback in the compartment
+    // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#ondebuggerstatement-frame
+    Status setOnDebuggerStatementCallback(JS::RootedObject const& global);
+};
+}  // namespace mozjs
 }  // namespace mongo
