@@ -74,48 +74,48 @@ buildvariants:
       - name: compile_integration_and_test_no_audit_parallel_stream_TG
         distros:
           - rhel8.8-large
-      - name: .aggfuzzer .common !.feature_flag_guarded
-      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded !.requires_large_host
-      - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded .requires_large_host
+      - name: .aggfuzzer .common !.requires_extra_system_deps !.feature_flag_guarded
+      - name: .aggregation !.requires_extra_system_deps !.unwind !.encrypt !.feature_flag_guarded !.requires_large_host
+      - name: .aggregation !.requires_extra_system_deps !.unwind !.encrypt !.feature_flag_guarded .requires_large_host
         distros:
           - rhel8.8-large
       - name: audit
-      - name: .auth !.multiversion
-      - name: .causally_consistent !.wo_snapshot !.durable_history
-      - name: .change_streams
-      - name: .change_stream_fuzzer
-      - name: .misc_js !.requires_large_host
-      - name: .misc_js .requires_large_host
+      - name: .auth !.requires_extra_system_deps !.multiversion
+      - name: .causally_consistent !.requires_extra_system_deps !.wo_snapshot !.durable_history
+      - name: .change_streams !.requires_extra_system_deps
+      - name: .change_stream_fuzzer !.requires_extra_system_deps
+      - name: .misc_js !.requires_extra_system_deps !.requires_large_host
+      - name: .misc_js !.requires_extra_system_deps .requires_large_host
         distros:
           - rhel8.8-large
-      - name: .concurrency !.no_txns !.kill_terminate !.incompatible_inmemory !.feature_flag_guarded
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate !.incompatible_inmemory !.feature_flag_guarded
         distros:
           - rhel8.8-medium # Some workloads require a lot of memory, use a bigger machine for this suite.
       - name: initial_sync_fuzzer_gen
-      - name: .jscore .common !.decimal !.requires_large_host !.feature_flag_guarded
-      - name: .jscore .common !.decimal .requires_large_host !.feature_flag_guarded
+      - name: .jscore .common !.requires_extra_system_deps !.decimal !.requires_large_host !.feature_flag_guarded
+      - name: .jscore .common !.requires_extra_system_deps !.decimal .requires_large_host !.feature_flag_guarded
         distros:
           - rhel8.8-large
       - name: jsCore_txns_large_txns_format
-      - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_inmemory
-      - name: .multi_shard .common
+      - name: .jstestfuzz !.requires_extra_system_deps !.initsync !.feature_flag_guarded !.incompatible_inmemory
+      - name: .multi_shard .common !.requires_extra_system_deps
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-      - name: .read_write_concern !.durable_history !.requires_large_host
-      - name: .read_write_concern !.durable_history .requires_large_host
+      - name: .read_write_concern !.requires_extra_system_deps !.durable_history !.requires_large_host
+      - name: .read_write_concern !.requires_extra_system_deps !.durable_history .requires_large_host
         distros:
           - rhel8.8-large
       - name: replica_sets_gen
-      - name: .replica_sets .common
-      - name: .replica_sets .multi_oplog !.encrypt !.requires_large_host
-      - name: .replica_sets .multi_oplog !.encrypt .requires_large_host
+      - name: .replica_sets .common !.requires_extra_system_deps
+      - name: .replica_sets .multi_oplog !.requires_extra_system_deps !.encrypt !.requires_large_host
+      - name: .replica_sets .multi_oplog !.requires_extra_system_deps !.encrypt .requires_large_host
         distros:
           - rhel8.8-large
       - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
       - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
         distros:
           - rhel8.8-medium
-      - name: .resharding_fuzzer
-      - name: .retry
+      - name: .resharding_fuzzer !.requires_extra_system_deps
+      - name: .retry !.requires_extra_system_deps
       - name: rollback_fuzzer_gen
       - name: sasl
       - name: secondary_reads_passthrough_gen
@@ -123,14 +123,14 @@ buildvariants:
       - name: sharded_multi_stmt_txn_jscore_passthrough_gen
         distros:
           - rhel8.8-medium
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
         distros:
           - rhel8.8-large
-      - name: .sharding .common !.multiversion !.csrs !.encrypt !.feature_flag_guarded
+      - name: .sharding .common !.requires_extra_system_deps !.multiversion !.csrs !.encrypt !.feature_flag_guarded
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-      - name: .ssl
-      - name: .updatefuzzer
+      - name: .ssl !.requires_extra_system_deps
+      - name: .updatefuzzer !.requires_extra_system_deps
       - name: generate_buildid_to_debug_symbols_mapping
 
   - <<: *linux_x86_dynamic_compile_variant_dependency

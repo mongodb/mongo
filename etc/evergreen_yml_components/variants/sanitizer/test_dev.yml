@@ -769,15 +769,15 @@ buildvariants:
         --mongosSetParameters="{findShardsOnConfigTimeoutMS: 30000}"
         --excludeWithAnyTags=requires_increased_memlock_limits,featureFlagSbeFull,incompatible_aubsan,requires_sbe
     tasks:
-      - name: .aggregation !.sbe_only
-      - name: .auth
+      - name: .aggregation !.requires_extra_system_deps !.sbe_only
+      - name: .auth !.requires_extra_system_deps
       - name: audit
-      - name: .causally_consistent !.wo_snapshot
+      - name: .causally_consistent !.requires_extra_system_deps !.wo_snapshot
       - name: .change_streams
       # - name: disk_wiredtiger
-      - name: .misc_js
-      - name: .concurrency !.no_txns !.kill_terminate !.compute_mode !.feature_flag_guarded
-      - name: .encrypt
+      - name: .misc_js !.requires_extra_system_deps
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate !.compute_mode !.feature_flag_guarded
+      - name: .encrypt !.requires_extra_system_deps
       - name: external_auth
       - name: external_auth_aws
       - name: external_auth_oidc
@@ -789,24 +789,24 @@ buildvariants:
       - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
-      - name: .multi_shard .common
-      - name: .query_fuzzer
-      - name: .read_write_concern
+      - name: .multi_shard .common !.requires_extra_system_deps
+      - name: .query_fuzzer !.requires_extra_system_deps
+      - name: .read_write_concern !.requires_extra_system_deps
       - name: replica_sets_large_txns_format_jscore_passthrough
-      - name: .replica_sets !.multi_oplog !.uninitialized_fcv !.feature_flag_guarded
-      - name: .replica_sets .encrypt
-      - name: .resharding_fuzzer
-      - name: .retry
-      - name: .rollbackfuzzer
-      - name: .read_only
+      - name: .replica_sets !.requires_extra_system_deps !.multi_oplog !.uninitialized_fcv !.feature_flag_guarded
+      - name: .replica_sets .encrypt !.requires_extra_system_deps
+      - name: .resharding_fuzzer !.requires_extra_system_deps
+      - name: .retry !.requires_extra_system_deps
+      - name: .rollbackfuzzer !.requires_extra_system_deps
+      - name: .read_only !.requires_extra_system_deps
       - name: sasl
       - name: secondary_reads_passthrough_gen
       - name: session_jscore_passthrough
-      - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded !.uninitialized_fcv
-      - name: .sharding .common !.csrs !.jstestfuzz !.feature_flag_guarded
-      - name: .updatefuzzer
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.feature_flag_guarded !.uninitialized_fcv
+      - name: .sharding .common !.requires_extra_system_deps !.csrs !.jstestfuzz !.feature_flag_guarded
+      - name: .updatefuzzer !.requires_extra_system_deps
       - name: unittest_shell_hang_analyzer_gen
-      - name: .watchdog
+      - name: .watchdog !.requires_extra_system_deps
 
   - name: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
     display_name: "~Enterprise RHEL 8 SpiderMonkey Debug"
@@ -886,4 +886,4 @@ buildvariants:
       large_distro_name: rhel8.8-large
     tasks:
       - name: compile_and_archive_dist_test_TG
-      - name: .concurrency !.no_txns !.kill_terminate
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate

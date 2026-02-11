@@ -423,7 +423,7 @@ buildvariants:
       large_distro_name: rhel8.8-large
     tasks:
       - name: compile_and_archive_dist_test_TG
-      - name: .concurrency !.no_txns !.kill_terminate
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate
       - name: disk_wiredtiger
       - name: generate_buildid_to_debug_symbols_mapping
 
@@ -457,7 +457,7 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     tasks:
-      - name: .concurrency !.no_txns !.kill_terminate
+      - name: .concurrency !.requires_extra_system_deps !.no_txns !.kill_terminate
 
   - <<: *rhel8_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-all-feature-flags

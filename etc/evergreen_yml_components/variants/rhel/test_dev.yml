@@ -196,22 +196,22 @@ buildvariants:
       - name: sharding_multiversion_gen
       - name: sharding_jscore_multiversion_gen
       - name: sharding_jscore_kill_primary_multiversion_gen
-      - name: .sharding .txns !.requires_large_host
-      - name: .sharding .txns .requires_large_host
+      - name: .sharding .txns !.requires_extra_system_deps !.requires_large_host
+      - name: .sharding .txns .requires_large_host !.requires_extra_system_deps
         distros:
           - rhel8.8-large
       # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
-      - name: .sharding .common !.csrs !.feature_flag_guarded
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+      - name: .sharding .common !.requires_extra_system_deps !.csrs !.feature_flag_guarded
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
         distros:
           - rhel8.8-large
-      - name: .concurrency .sharded !.large
-      - name: .concurrency .sharded .large
-      - name: .unsplittable_collections
+      - name: .concurrency .sharded !.requires_extra_system_deps !.large
+      - name: .concurrency .sharded !.requires_extra_system_deps .large
+      - name: .unsplittable_collections !.requires_extra_system_deps
         distros:
           - rhel8.8-medium
-      - name: .multi_shard
+      - name: .multi_shard !.requires_extra_system_deps
 
   - <<: *linux_x86_dynamic_compile_variant_dependency
     name: enterprise-rhel-8-64-bit-dynamic-classic-engine
@@ -240,55 +240,55 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     tasks:
-      - name: .aggfuzzer !.sbe_only
-      - name: .aggregation !.sbe_only !.requires_large_host
-      - name: .aggregation !.sbe_only .requires_large_host
+      - name: .aggfuzzer !.requires_extra_system_deps !.sbe_only
+      - name: .aggregation !.requires_extra_system_deps !.sbe_only !.requires_large_host
+      - name: .aggregation !.requires_extra_system_deps !.sbe_only .requires_large_host
         distros:
           - rhel8.8-medium
       - name: .auth
-      - name: .causally_consistent !.sharding
-      - name: .change_stream_fuzzer
-      - name: .change_streams
-      - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
-      - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
+      - name: .causally_consistent !.requires_extra_system_deps !.sharding
+      - name: .change_stream_fuzzer !.requires_extra_system_deps
+      - name: .change_streams !.requires_extra_system_deps
+      - name: .concurrency !.requires_extra_system_deps !.large !.no_txns !.compute_mode !.feature_flag_guarded
+      - name: .concurrency .large !.requires_extra_system_deps !.no_txns !.compute_mode !.feature_flag_guarded
         distros:
           - rhel8.8-medium
-      - name: .encrypt
-      - name: .jscore .common !jsCore !.sbe_only !.feature_flag_guarded
-      - name: .jstestfuzz !.feature_flag_guarded
-      - name: .misc_js !.requires_large_host
-      - name: .misc_js .requires_large_host
+      - name: .encrypt !.requires_extra_system_deps
+      - name: .jscore .common !.requires_extra_system_deps !jsCore !.sbe_only !.feature_flag_guarded
+      - name: .jstestfuzz !.requires_extra_system_deps !.feature_flag_guarded
+      - name: .misc_js !.requires_extra_system_deps !.requires_large_host
+      - name: .misc_js .requires_large_host !.requires_extra_system_deps
         distros:
           - rhel8.8-medium
-      - name: .multi_shard
-      - name: .query_fuzzer
+      - name: .multi_shard !.requires_extra_system_deps
+      - name: .query_fuzzer !.requires_extra_system_deps
       - name: query_golden_classic
       - name: query_golden_sharding
-      - name: .random_multiversion_ds
-      - name: .read_only
-      - name: .read_write_concern !.large !.requires_large_host
-      - name: .read_write_concern !.large .requires_large_host
+      - name: .random_multiversion_ds !.requires_extra_system_deps
+      - name: .read_only !.requires_extra_system_deps
+      - name: .read_write_concern !.requires_extra_system_deps !.large !.requires_large_host
+      - name: .read_write_concern !.requires_extra_system_deps !.large .requires_large_host
         distros:
           - rhel8.8-medium
-      - name: .read_write_concern .large
+      - name: .read_write_concern .large !.requires_extra_system_deps
         distros:
           - rhel8.8-medium
-      - name: .replica_sets !.encrypt !.auth !.feature_flag_guarded
+      - name: .replica_sets !.requires_extra_system_deps !.encrypt !.auth !.feature_flag_guarded
         distros:
           - rhel8.8-xlarge
-      - name: .rollbackfuzzer
-      - name: .sharding .common !.feature_flag_guarded
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+      - name: .rollbackfuzzer !.requires_extra_system_deps
+      - name: .sharding .common !.requires_extra_system_deps !.feature_flag_guarded
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.requires_extra_system_deps !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
         distros:
           - rhel8.8-medium
-      - name: .sharding .txns !.requires_large_host
-      - name: .sharding .txns .requires_large_host
+      - name: .sharding .txns !.requires_extra_system_deps !.requires_large_host
+      - name: .sharding .txns !.requires_extra_system_deps .requires_large_host
         distros:
           - rhel8.8-medium
-      - name: .updatefuzzer
+      - name: .updatefuzzer !.requires_extra_system_deps
       - name: aggregation_repeat_queries_multiplan_single_solutions
-      - name: audit
+      - name: audit !.requires_extra_system_deps
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen
