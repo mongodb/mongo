@@ -59,14 +59,6 @@
 namespace mongo {
 namespace aggregation_request_helper {
 
-/**
- * Validate the aggregate command object.
- */
-void validate(const AggregateCommandRequest& aggregate,
-              const BSONObj& cmdObj,
-              const NamespaceString& nss,
-              boost::optional<ExplainOptions::Verbosity> explainVerbosity);
-
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const BSONObj& cmdObj,
     const boost::optional<auth::ValidatedTenancyScope>& vts,
@@ -124,14 +116,26 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
     }
 }
 
+// TODO SERVER-119402: Change explainVerbosity parameter to bool.
 void validate(const AggregateCommandRequest& aggregate,
               const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+    // True if the aggregate command itself included an 'explain' field.
     bool hasExplainElem = aggregate.getExplain().has_value();
-    bool hasExplain = explainVerbosity.has_value() || aggregate.getExplain().has_value();
+
+    // True if this request is being explained, either via a top-level 'explain'
+    // command (via explainVerbosity) or via an inline 'explain' field in the
+    // aggregation command.
+    bool hasExplain = explainVerbosity.has_value() || hasExplainElem;
     bool hasFromRouterElem = getFromRouter(aggregate).has_value();
     bool hasNeedsMergeElem = aggregate.getNeedsMerge().has_value();
+
+    if (explainVerbosity) {
+        uassert(ErrorCodes::FailedToParse,
+                "The 'explain' option is illegal when a explain verbosity is also provided",
+                !cmdObj.hasField(AggregateCommandRequest::kExplainFieldName));
+    }
 
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid collection name specified '{}'",

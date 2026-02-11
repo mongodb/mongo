@@ -115,6 +115,14 @@ void addIfrFlagsToRequest(AggregateCommandRequest& request,
                           std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 
 /**
+ * Validate the aggregate command object.
+ */
+void validate(const AggregateCommandRequest& aggregate,
+              const BSONObj& cmdObj,
+              const NamespaceString& nss,
+              boost::optional<ExplainOptions::Verbosity> explainVerbosity);
+
+/**
  * Validates if 'AggregateCommandRequest' specs complies with the current Client, which is required
  * for API versioning checks. Throws uassert in case of any failure.
  */

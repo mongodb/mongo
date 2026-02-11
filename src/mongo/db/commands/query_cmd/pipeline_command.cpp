@@ -79,61 +79,14 @@
 namespace mongo {
 namespace {
 
-class PipelineCommand final : public Command {
+class PipelineCommand final : public TypedCommand<PipelineCommand> {
 public:
-    PipelineCommand() : Command("aggregate") {}
+    using Request = AggregateCommandRequest;
+
+    PipelineCommand() : TypedCommand(Request::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
-    }
-
-    /**
-     * It's not known until after parsing whether or not an aggregation command is an explain
-     * request, because it might include the `explain: true` field (ie. aggregation explains do not
-     * need to arrive via the `explain` command). Therefore even parsing of regular aggregation
-     * commands needs to be able to handle the explain case.
-     *
-     * As a result, aggregation command parsing is done in parseForExplain():
-     *
-     * - To parse a regular aggregation command, call parseForExplain() with `explainVerbosity` of
-     *   boost::none.
-     *
-     * - To parse an aggregation command as the sub-command in an `explain` command, call
-     *   parseForExplain() with `explainVerbosity` set to the desired verbosity.
-     */
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        return parseForExplain(opCtx, opMsgRequest, boost::none);
-    }
-
-    std::unique_ptr<CommandInvocation> parseForExplain(
-        OperationContext* opCtx,
-        const OpMsgRequest& opMsgRequest,
-        boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
-
-        SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
-
-        const auto aggregationRequest =
-            aggregation_request_helper::parseFromBSON(opMsgRequest.body,
-                                                      opMsgRequest.validatedTenancyScope,
-                                                      explainVerbosity,
-                                                      serializationCtx);
-
-        auto privileges = uassertStatusOK(
-            auth::getPrivilegesForAggregate(opCtx,
-                                            AuthorizationSession::get(opCtx->getClient()),
-                                            aggregationRequest.getNamespace(),
-                                            aggregationRequest,
-                                            false));
-
-        // Forbid users from passing 'querySettings' explicitly.
-        uassert(7708001,
-                "BSON field 'querySettings' is an unknown field",
-                query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
-                    !aggregationRequest.getQuerySettings().has_value());
-
-        return std::make_unique<Invocation>(
-            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges), opCtx);
     }
 
     bool allowedWithSecurityToken() const final {
@@ -164,19 +117,12 @@ public:
         return true;
     }
 
-    class Invocation final : public CommandInvocation {
+    class Invocation final : public MinimalInvocationBase {
     public:
-        Invocation(Command* cmd,
-                   const OpMsgRequest& request,
-                   AggregateCommandRequest aggregationRequest,
-                   PrivilegeVector privileges,
-                   OperationContext* opCtx)
-            : CommandInvocation(cmd),
-              _request(request),
-              _dbName(aggregationRequest.getDbName()),
-              _aggregationRequest(std::move(aggregationRequest)),
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : MinimalInvocationBase(opCtx, cmd, opMsgRequest),
               _ifrContext([&]() {
-                  const auto& requestFlagValues = _aggregationRequest.getIfrFlags();
+                  const auto& requestFlagValues = request().getIfrFlags();
                   return requestFlagValues.has_value()
                       ? std::make_shared<IncrementalFeatureRolloutContext>(
                             requestFlagValues.value())
@@ -184,15 +130,20 @@ public:
               }()),
               _extensionMetrics(
                   static_cast<const PipelineCommand*>(cmd)->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(_aggregationRequest,
+              _liteParsedPipeline(request(),
                                   false /* isRunningAgainstView_ForHybridSearch */,
                                   {.ifrContext = _ifrContext,
                                    .opCtx = opCtx,
                                    .extensionMetrics = &_extensionMetrics}),
-              _privileges(std::move(privileges)) {
-            auto externalDataSources = _aggregationRequest.getExternalDataSources();
+              _privileges(uassertStatusOK(
+                  auth::getPrivilegesForAggregate(opCtx,
+                                                  AuthorizationSession::get(opCtx->getClient()),
+                                                  request().getNamespace(),
+                                                  request(),
+                                                  false))) {
+            auto externalDataSources = request().getExternalDataSources();
             // Support collection-less aggregate commands without $_externalDataSources.
-            if (_aggregationRequest.getNamespace().isCollectionlessAggregateNS()) {
+            if (request().getNamespace().isCollectionlessAggregateNS()) {
                 uassert(7604400,
                         "$_externalDataSources can't be used with the collectionless aggregate",
                         !externalDataSources.has_value());
@@ -226,11 +177,11 @@ public:
             };
 
             auto externalDataSourcesIter =
-                findCollNameInExternalDataSourceOption(_aggregationRequest.getNamespace().coll());
+                findCollNameInExternalDataSourceOption(request().getNamespace().coll());
             uassert(7039003,
                     "Source namespace must be an external data source",
                     externalDataSourcesIter != externalDataSources->end());
-            _usedExternalDataSources.emplace_back(_aggregationRequest.getNamespace(),
+            _usedExternalDataSources.emplace_back(request().getNamespace(),
                                                   externalDataSourcesIter->getDataSources());
 
             for (const auto& involvedNamespace : _liteParsedPipeline.getInvolvedNamespaces()) {
@@ -255,7 +206,7 @@ public:
         }
 
         const GenericArguments& getGenericArguments() const override {
-            return _aggregationRequest.getGenericArguments();
+            return request().getGenericArguments();
         }
 
     private:
@@ -275,7 +226,7 @@ public:
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
-            bool isExplain = _aggregationRequest.getExplain().get_value_or(false);
+            bool isExplain = request().getExplain().get_value_or(false);
             return _liteParsedPipeline.supportsReadConcern(level, isImplicitDefault, isExplain);
         }
 
@@ -291,16 +242,31 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
-            CommandHelpers::handleMarkKillOnClientDisconnect(
-                opCtx, !Pipeline::aggHasWriteStage(_request.body));
+            const auto& explain = request().getExplain();
+            const auto& body = unparsedRequest().body;
             boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
-            if (_aggregationRequest.getExplain().get_value_or(false)) {
+
+            uassertNoQuerySettings(opCtx);
+
+            // Run aggregate-specific semantic validation beyond what the IDL-parsing provides. We
+            // pass boost::none as explainVerbosity because 'validate()' interprets a non-none
+            // explainVerbosity as a top-level explain.
+            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
+            aggregation_request_helper::validate(request(), body, ns(), boost::none);
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
+                                                             !Pipeline::aggHasWriteStage(body));
+
+
+            // If aggregation contains inline 'explain' we set explain verbosity.
+            if (explain.get_value_or(false)) {
                 verbosity = ExplainOptions::Verbosity::kQueryPlanner;
             }
+
+
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest,
+                                         request(),
                                          _liteParsedPipeline,
-                                         _request.body,
+                                         body,
                                          _privileges,
                                          verbosity,
                                          reply,
@@ -309,51 +275,55 @@ public:
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
-            if (!_aggregationRequest.getExplain() && !_aggregationRequest.getExchange()) {
+            if (!explain && !request().getExchange()) {
                 query_request_helper::validateCursorResponse(
                     reply->getBodyBuilder().asTempObj(),
                     auth::ValidatedTenancyScope::get(opCtx),
-                    _aggregationRequest.getNamespace().tenantId(),
-                    _aggregationRequest.getSerializationContext());
+                    ns().tenantId(),
+                    request().getSerializationContext());
             }
             _extensionMetrics.markSuccess();
         }
 
-        NamespaceString ns() const override {
-            return _aggregationRequest.getNamespace();
-        }
-
-        const DatabaseName& db() const override {
-            return _dbName;
-        }
-
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     rpc::ReplyBuilderInterface* result) override {
-            // See run() method for details.
+                     rpc::ReplyBuilderInterface* reply) override {
+            const auto& body = unparsedRequest().body;
 
+            uassertNoQuerySettings(opCtx);
+
+            // See run() for why we need this validation.
+            // TODO SERVER-119402: Change explainVerbosity parameter to bool.
+            aggregation_request_helper::validate(request(), body, ns(), verbosity);
+
+            // Mark this request as 'explain' so that downstream components such as query stats key
+            // construction can see it.
+            request().setExplain(true);
+
+            // See run() method for details.
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest,
+                                         request(),
                                          _liteParsedPipeline,
-                                         _request.body,
+                                         body,
                                          _privileges,
                                          verbosity,
-                                         result,
+                                         reply,
                                          _usedExternalDataSources,
                                          _ifrContext));
         }
 
-        bool canRetryOnStaleShardMetadataError(const OpMsgRequest& opMsgRequest) const override {
+        void uassertNoQuerySettings(OperationContext* opCtx) const {
+            // Forbid users from passing 'querySettings' explicitly.
+            uassert(7708001,
+                    "BSON field 'querySettings' is an unknown field",
+                    query_settings::allowQuerySettingsFromClient(opCtx->getClient()) ||
+                        !request().getQuerySettings().has_value());
+        }
+
+        bool canRetryOnStaleShardMetadataError(const OpMsgRequest& /* unused */) const override {
             // Can not rerun the command when executing an aggregation that runs $mergeCursors as it
             // may have consumed the cursors within.
-            SerializationContext serializationCtx = opMsgRequest.getSerializationContext();
-
-            const AggregateCommandRequest aggregationRequest =
-                aggregation_request_helper::parseFromBSON(opMsgRequest.body,
-                                                          opMsgRequest.validatedTenancyScope,
-                                                          boost::none,
-                                                          serializationCtx);
-            return !aggregation_request_helper::hasMergeCursors(aggregationRequest);
+            return !aggregation_request_helper::hasMergeCursors(request());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -363,9 +333,10 @@ public:
                         ->isAuthorizedForPrivileges(_privileges));
         }
 
-        const OpMsgRequest& _request;
-        const DatabaseName _dbName;
-        AggregateCommandRequest _aggregationRequest;
+        NamespaceString ns() const override {
+            return request().getNamespace();
+        }
+
         // Store the IFR context as a shared pointer. This object is mutable while running the
         // command. It must be shared because commands with subpipelines pass the same IFR context
         // in to child subpipeline expression contexts, rather than copying it. We want to ensure
