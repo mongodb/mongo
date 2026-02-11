@@ -240,8 +240,6 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
                 makeTemporaryRecordStore();
             }
 
-            value::MaterializedRow key{1};
-            key.reset(0, true, tagKeyView, valKeyView);
             _computedTotalMemUsage -= size_estimator::estimate(tagKeyView, valKeyView);
 
             // Evict the hash table value.
