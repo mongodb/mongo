@@ -864,6 +864,7 @@ mongo_cc_unit_test(
         "session_catalog_migration_source_test.cpp",
         "//src/mongo/db/global_catalog/ddl:ddl_lock_manager_test.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_key_index_util_test.cpp",
+        "//src/mongo/db/global_catalog/ddl:shard_key_util_test.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_metadata_util_test.cpp",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:metadata_consistency_util_test.cpp",
         "//src/mongo/db/router_role/routing_cache:namespace_metadata_change_notifications_test.cpp",

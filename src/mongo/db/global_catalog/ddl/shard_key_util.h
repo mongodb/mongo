@@ -259,8 +259,15 @@ MONGO_MOD_NEEDS_REPLACEMENT BSONObj validateAndTranslateTimeseriesShardKey(
     const TimeseriesOptions& tsOptions, const BSONObj& tsShardKey);
 
 /**
- * Returns a chunk range with extended or truncated boundaries to match the number of fields in the
- * given metadata's shard key pattern.
+ * Returns true if the given shard key is already translated to the internal buckets collection
+ * raw key format, false otherwise.
+ */
+MONGO_MOD_NEEDS_REPLACEMENT bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions,
+                                                         const BSONObj& tsShardKey);
+
+/**
+ * Returns a chunk range with extended or truncated boundaries to match the number of fields in
+ * the given metadata's shard key pattern.
  */
 MONGO_MOD_NEEDS_REPLACEMENT ChunkRange
 extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata, const ChunkRange& range);

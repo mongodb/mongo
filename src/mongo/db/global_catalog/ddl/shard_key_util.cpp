@@ -375,6 +375,20 @@ BSONObj validateAndTranslateTimeseriesShardKey(const TimeseriesOptions& tsOption
         timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(tsOptions, tsShardKey));
 }
 
+bool isRawTimeseriesShardKey(const TimeseriesOptions& tsOptions, const BSONObj& tsShardKey) {
+    const auto& timeFieldName = tsOptions.getTimeField();
+    const auto& metaFieldName = tsOptions.getMetaField();
+    for (const auto& elem : tsShardKey) {
+        const auto& fieldName = elem.fieldNameStringData();
+        if (fieldName == timeFieldName ||
+            (metaFieldName &&
+             (fieldName == *metaFieldName || fieldName.starts_with(*metaFieldName + ".")))) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // TODO: SERVER-64187 move calls to validateShardKeyIsNotEncrypted into
 // validateShardKeyIndexExistsOrCreateIfPossible
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,

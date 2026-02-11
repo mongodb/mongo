@@ -567,6 +567,20 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto existingUUID = collEntry.getUuid();
     auto shardKeySpec = request.getKey();
 
+    // TODO: SERVER-119524 Remove this after 8.3 becomes last LTS.
+    // We need to perform translation of shard key for timeseries collections if the shard key is
+    // not already translated to raw key format to provide backwards compatibility.
+    if (collEntry.getTimeseriesFields() &&
+        (!setProvenance ||
+         (*request.getProvenance() == ReshardingProvenanceEnum::kReshardCollection))) {
+        auto tsOptions = collEntry.getTimeseriesFields().get().getTimeseriesOptions();
+        auto isTranslated = shardkeyutil::isRawTimeseriesShardKey(tsOptions, request.getKey());
+        if (!isTranslated) {
+            shardKeySpec =
+                shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, request.getKey());
+        }
+    }
+
     auto tempReshardingNss = resharding::constructTemporaryReshardingNss(nss, collEntry.getUuid());
 
     auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
