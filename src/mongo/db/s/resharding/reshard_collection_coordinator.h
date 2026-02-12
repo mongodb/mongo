@@ -73,10 +73,12 @@ private:
         return ReshardCollectionCoordinatorPhase_serializer(phase);
     }
 
+    BSONObj _computeFinalShardKey(const CurrentChunkManager& cmOld);
+
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    mongo::ReshardCollectionRequest _request;
+    const mongo::ReshardCollectionRequest _request;
 };
 
 }  // namespace mongo

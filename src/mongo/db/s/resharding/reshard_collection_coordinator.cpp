@@ -113,6 +113,21 @@ void ReshardCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuil
     cmdInfoBuilder->appendElements(_request.toBSON());
 }
 
+BSONObj ReshardCollectionCoordinator::_computeFinalShardKey(const CurrentChunkManager& cmOld) {
+    auto provenance = _doc.getProvenance();
+    if (resharding::isRewriteCollection(provenance)) {
+        // rewriteCollection reshards the collection on its existing key.
+        return cmOld.getShardKeyPattern().getKeyPattern().toBSON();
+    }
+
+    if (cmOld.isTimeseriesCollection() && resharding::isOrdinaryReshardCollection(provenance)) {
+        const auto& tsOptions = cmOld.getTimeseriesFields().get().getTimeseriesOptions();
+        return shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, *_doc.getKey());
+    }
+
+    return *_doc.getKey();
+}
+
 ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -139,35 +154,12 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                   << "' not found in cluster catalog",
                     cmOld.hasRoutingTable());
 
-            // rewriteCollection does not provide a shard key because it reshards the collection on
-            // its existing key. To avoid using stale metadata, we fetch and set the current shard
-            // key here after acquiring the DDL lock.
-            auto provenance = _doc.getProvenance();
-            auto currentShardKey = cmOld.getShardKeyPattern().getKeyPattern().toBSON();
-            if (resharding::isRewriteCollection(provenance)) {
-                _request.setKey(currentShardKey);
-                _doc.setReshardCollectionRequest(_request);
-            } else {
-                tassert(11342701,
-                        "Shard key not provided in reshardCollection request. Provide 'key' for "
-                        "all resharding requests except rewriteCollection.",
-                        _doc.getKey());
-            }
-
-            BSONObj translatedKey;
-            if (cmOld.isTimeseriesCollection() &&
-                resharding::isOrdinaryReshardCollection(provenance)) {
-                auto tsOptions = cmOld.getTimeseriesFields().get().getTimeseriesOptions();
-                translatedKey =
-                    shardkeyutil::validateAndTranslateTimeseriesShardKey(tsOptions, *_doc.getKey());
-            }
-
             StateDoc newDoc(_doc);
-            newDoc.setOldShardKey(currentShardKey);
+            newDoc.setOldShardKey(cmOld.getShardKeyPattern().getKeyPattern().toBSON());
             newDoc.setOldCollectionUUID(cmOld.getUUID());
             _updateStateDocument(opCtx, std::move(newDoc));
 
-            auto finalShardKey = translatedKey.isEmpty() ? *_doc.getKey() : translatedKey;
+            auto finalShardKey = _computeFinalShardKey(cmOld);
             ConfigsvrReshardCollection configsvrReshardCollection(nss(), finalShardKey);
             configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
@@ -208,6 +200,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                                                     _doc.getPerformVerification());
             configsvrReshardCollection.setPerformVerification(_doc.getPerformVerification());
 
+            auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream()
