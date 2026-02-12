@@ -33,6 +33,7 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
@@ -546,6 +547,26 @@ bool GraphLookUpStage::foreignShardedGraphLookupAllowed() const {
         gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot);
 }
 
+namespace {
+void tryOptimizeMatchOnlyPipelineDirectly(mongo::Pipeline* pipe) {
+    // pipeline_optimization::optimizePipeline() has small overhead compared to optimizing the only
+    // stage directly. This overhead can be noticeable when repeated for every document in the
+    // result set. Unless executed against a view, the 'from' pipeline will only contain a $match
+    // connecting the 'to' and 'from' fields.
+    if (DocumentSource* match = pipe->peekFront();
+        match && pipe->size() == 1 && match->getId() != DocumentSourceMatch::id) {
+        // $match is the only stage, optimize directly.
+        if (!static_cast<DocumentSourceMatch&>(*match).optimize()) {
+            (void)pipe->popFront();
+        }
+        pipe->validateCommon(true /* alreadyOptimized */);
+    } else {
+        // Running on against a view, need to optimize the whole pipeline.
+        pipeline_optimization::optimizeAndValidatePipeline(pipe);
+    }
+}
+}  // namespace
+
 std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                                                                 bool allowForeignSharded) {
     // We've already allocated space for the trailing $match stage in '_fromPipeline'.
@@ -567,7 +588,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             _fromExpCtx,
             std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
-            pipeline_optimization::optimizeAndValidatePipeline,
+            tryOptimizeMatchOnlyPipelineDirectly,
             shardTargetingPolicy);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         // This exception returns the information we need to resolve a sharded view. Update
@@ -614,7 +635,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             _fromExpCtx,
             std::move(pipeline),
             true /* attachCursorAfterOptimizing */,
-            pipeline_optimization::optimizeAndValidatePipeline,
+            tryOptimizeMatchOnlyPipelineDirectly,
             shardTargetingPolicy);
     }
 }
