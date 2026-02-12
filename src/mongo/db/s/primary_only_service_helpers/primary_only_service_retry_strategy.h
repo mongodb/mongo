@@ -54,6 +54,7 @@ public:
     void recordBackoff(Milliseconds backoff) override;
 
 private:
+    BackoffWithJitter _backoffWithJitter;
     std::unique_ptr<RetryStrategy> _underlyingStrategy;
     unique_function<void(const Status&)> _onTransientError;
     unique_function<void(const Status&)> _onUnrecoverableError;

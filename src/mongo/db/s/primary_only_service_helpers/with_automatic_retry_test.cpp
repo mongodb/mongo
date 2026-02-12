@@ -34,6 +34,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 
@@ -82,6 +83,7 @@ private:
 };
 
 TEST_F(WithAutomaticRetryTest, WithAutomaticRetryRetriesOnPredicateTrue) {
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
     auto errorToRetryOn = Status(ErrorCodes::IllegalOpMsgFlag, "foo");
     int numAttempts = 0;
     ExecutorFuture<void> future =

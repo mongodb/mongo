@@ -53,7 +53,8 @@ PrimaryOnlyServiceRetryStrategy::PrimaryOnlyServiceRetryStrategy(
     RetryabilityPredicate retryabilityPredicate,
     unique_function<void(const Status&)> onTransientError,
     unique_function<void(const Status&)> onUnrecoverableError)
-    : _underlyingStrategy(std::make_unique<DefaultRetryStrategy>(
+    : _backoffWithJitter(getRetryParameters().baseBackoff, getRetryParameters().maxBackoff),
+      _underlyingStrategy(std::make_unique<DefaultRetryStrategy>(
           makeCriteriaAdapter(std::move(retryabilityPredicate)), getRetryParameters())),
       _onTransientError(std::move(onTransientError)),
       _onUnrecoverableError(std::move(onUnrecoverableError)) {}
@@ -65,6 +66,7 @@ bool PrimaryOnlyServiceRetryStrategy::recordFailureAndEvaluateShouldRetry(
     auto willRetry =
         _underlyingStrategy->recordFailureAndEvaluateShouldRetry(s, origin, errorLabels);
     if (willRetry) {
+        _backoffWithJitter.incrementAttemptCount();
         _onTransientError(s);
     } else {
         _onUnrecoverableError(s);
@@ -77,7 +79,7 @@ void PrimaryOnlyServiceRetryStrategy::recordSuccess(const boost::optional<HostAn
 }
 
 Milliseconds PrimaryOnlyServiceRetryStrategy::getNextRetryDelay() const {
-    return _underlyingStrategy->getNextRetryDelay();
+    return std::max(_underlyingStrategy->getNextRetryDelay(), _backoffWithJitter.getBackoffDelay());
 }
 
 const TargetingMetadata& PrimaryOnlyServiceRetryStrategy::getTargetingMetadata() const {

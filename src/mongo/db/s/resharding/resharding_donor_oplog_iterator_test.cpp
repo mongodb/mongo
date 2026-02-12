@@ -57,6 +57,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/uuid.h"
@@ -466,6 +467,7 @@ DEATH_TEST_REGEX_F(ReshardingDonorOplogIterTestDeathTest,
 }
 
 TEST_F(ReshardingDonorOplogIterTest, GetNextBatchAutomaticallyRetriesOnRetryableError) {
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
     const auto oplog1Id = ReshardingDonorOplogId(Timestamp(2, 4), Timestamp(102, 104));
 
     const auto oplog1 = toOplogEntry(makeInsertOplog(oplog1Id, BSON("x" << 1)));
@@ -502,6 +504,7 @@ TEST_F(ReshardingDonorOplogIterTest, GetNextBatchAutomaticallyRetriesOnRetryable
 }
 
 TEST_F(ReshardingDonorOplogIterTest, GetNextBatchPassesHighestSeenOplogIdAsResumeToken) {
+    FailPointEnableBlock fp{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
     const auto oplog1Id = ReshardingDonorOplogId(Timestamp(2, 4), Timestamp(102, 104));
     const auto oplog2Id = ReshardingDonorOplogId(Timestamp(33, 6), Timestamp(133, 106));
     const auto oplog3Id = ReshardingDonorOplogId(Timestamp(43, 24), Timestamp(143, 124));

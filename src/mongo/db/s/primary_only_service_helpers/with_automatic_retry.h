@@ -54,7 +54,8 @@ const auto kDefaultRetryabilityPredicate = [](const Status& status) {
         status.isA<ErrorCategory::ExceededTimeLimitError>() ||
         status.isA<ErrorCategory::NotPrimaryError>() ||
         status.isA<ErrorCategory::NetworkTimeoutError>() ||
-        status == ErrorCodes::ShardingStateNotInitialized;
+        status == ErrorCodes::ShardingStateNotInitialized ||
+        status.isA<ErrorCategory::SystemOverloadedError>();
 };
 
 const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& status) {
