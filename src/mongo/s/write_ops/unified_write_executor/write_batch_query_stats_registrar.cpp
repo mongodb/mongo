@@ -141,10 +141,15 @@ void parseAndRegisterUpdateOp(OperationContext* opCtx,
             if (!parsedUpdate.hasParsedFindCommand()) {
                 return boost::none;
             }
+            // We don't need to calculate the hash for batched updates because we don't want to keep
+            // the queryShapeHash on CurOp. We don't want a single queryShapeHash to represent the
+            // batch and be outputted to slow query log and $currentOp.
+            if (updates.size() > 1) {
+                return boost::none;
+            }
             return shape_helpers::computeQueryShapeHash(
                 expCtx, deferredShape, wholeOp.getNamespace());
         });
-
 
     // Register query stats collection.
     query_stats::registerWriteRequest(opCtx, ns, writeOpIndex, [&]() {

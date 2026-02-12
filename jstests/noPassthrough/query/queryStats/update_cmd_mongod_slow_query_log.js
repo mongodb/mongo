@@ -1,10 +1,12 @@
 /**
- * Test to confirm queryShapeHash is outputted on mongod slow query logs for sharded cluster update commands.
+ * Test to confirm queryShapeHash is outputted on mongod slow query logs for sharded cluster update
+ * commands.
  *
  * @tags: [featureFlagQueryStatsUpdateCommand]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {getSlowQueryLogs} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test data to insert into collections
@@ -84,31 +86,8 @@ describe("Query Shape Hash Output Tests", function () {
         );
     });
 
-    function getSlowQueryLogs(queryComment, testDB) {
-        const logs = assert
-            .commandWorked(testDB.adminCommand({getLog: "global"}))
-            .log.map((entry) => {
-                try {
-                    return JSON.parse(entry);
-                } catch (e) {
-                    return null;
-                }
-            })
-            .filter((entry) => {
-                if (!entry || entry.msg !== "Slow query" || !entry.attr || !entry.attr.command) {
-                    return false;
-                }
-                // Get only "update" slow query logs.
-                if (entry.attr.type !== "update") {
-                    return false;
-                }
-                return entry.attr.command.comment === queryComment;
-            });
-        return logs;
-    }
-
     function getQueryShapeHashFromLogs(queryComment, testDB, serverName) {
-        const logs = getSlowQueryLogs(queryComment, testDB);
+        const logs = getSlowQueryLogs(testDB, queryComment, {commandType: "update"});
         if (logs.length === 0) {
             jsTest.log.info(`No slow query logs found for comment '${queryComment}' on ${serverName}`);
             return null;
@@ -250,7 +229,7 @@ describe("Query Shape Hash Output Tests", function () {
                     comment: comment,
                 }),
             );
-            const shardLogs = getSlowQueryLogs(comment, this.shard0DB);
+            const shardLogs = getSlowQueryLogs(this.shard0DB, comment, {commandType: "update"});
             const shardHashes = shardLogs.map((log) => log.attr.queryShapeHash || null);
 
             assert.eq(shardLogs.length, 3, "Shard should log one entry per update op.");
@@ -275,8 +254,8 @@ describe("Query Shape Hash Output Tests", function () {
                     comment: comment,
                 }),
             );
-            const shard0Logs = getSlowQueryLogs(comment, this.shard0DB);
-            const shard1Logs = getSlowQueryLogs(comment, this.shard1DB);
+            const shard0Logs = getSlowQueryLogs(this.shard0DB, comment, {commandType: "update"});
+            const shard1Logs = getSlowQueryLogs(this.shard1DB, comment, {commandType: "update"});
 
             const shard0Hashes = shard0Logs.map((log) => log.attr.queryShapeHash || null);
             const shard1Hashes = shard1Logs.map((log) => log.attr.queryShapeHash || null);

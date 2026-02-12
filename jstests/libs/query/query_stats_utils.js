@@ -1165,3 +1165,54 @@ export function getNumberOfGetMoresUntilNextDocForChangeStream(cursor) {
     cursor.next();
     return numGetMores;
 }
+
+/**
+ * Filters slow query logs for commands with a specific comment.
+ *
+ * @param {object} testDB - The database connection to get logs from.
+ * @param {string} queryComment - The comment to filter by.
+ * @param {object} options - Optional settings:
+ *   - {boolean} includeInProgress - If true, include "Slow in-progress query" logs.
+ *                                   If false, only include "Slow query" logs. Defaults to false.
+ *   - {string} commandType - If specified, only include logs with this command type
+ *                            (e.g., "update"). Defaults to null (no filtering by type).
+ * @returns {Array} Array of parsed log entries matching the filter criteria.
+ */
+export function getSlowQueryLogs(testDB, queryComment, options = {}) {
+    const {includeInProgress = false, commandType = null} = options;
+
+    const logs = assert
+        .commandWorked(testDB.adminCommand({getLog: "global"}))
+        .log.map((entry) => {
+            try {
+                return JSON.parse(entry);
+            } catch (e) {
+                return null;
+            }
+        })
+        .filter((entry) => {
+            if (!entry || !entry.attr || !entry.attr.command) {
+                return false;
+            }
+
+            // Filter by message type.
+            if (includeInProgress) {
+                if (entry.msg !== "Slow query" && entry.msg !== "Slow in-progress query") {
+                    return false;
+                }
+            } else {
+                if (entry.msg !== "Slow query") {
+                    return false;
+                }
+            }
+
+            // Filter by command type if specified.
+            if (commandType !== null && entry.attr.type !== commandType) {
+                return false;
+            }
+
+            return entry.attr.command.comment === queryComment;
+        });
+
+    return logs;
+}
