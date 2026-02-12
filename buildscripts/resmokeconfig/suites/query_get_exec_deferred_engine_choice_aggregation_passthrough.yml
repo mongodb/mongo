@@ -18,14 +18,7 @@ selector:
     # TODO SERVER-117566 implement caching in new get_executor
     - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
 
-    # TODO SERVER-117453 Implement subplanning in new get_executor
-    - jstests/aggregation/exec/query_limits_test.js
-    - jstests/aggregation/optimization/expression_swap_limit.js
-    - jstests/aggregation/optimization/is_count_like.js
-    - jstests/aggregation/plan_cache/sbe_plan_cache_key_encode_partial_index.js
-    - jstests/aggregation/sources/match/expr_match.js
-    - jstests/aggregation/sources/match/match.js
-    - jstests/aggregation/sources/replaceRoot/replace_root_match.js
+    # TODO SERVER-119602 enable PBT
     - jstests/aggregation/**/*_pbt.js
 executor:
   archive:

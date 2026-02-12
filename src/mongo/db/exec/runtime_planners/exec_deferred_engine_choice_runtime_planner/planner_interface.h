@@ -142,4 +142,20 @@ private:
 
     std::unique_ptr<MultiPlanStage> _multiplanStage;
 };
+
+/**
+ * Picks the best plan for each $or branch and using caching callbacks to cachek either whole plan
+ * or each branch in the classic plan cache.
+ */
+class SubPlanner final : public DeferredEngineChoicePlannerInterface {
+public:
+    SubPlanner(PlannerData plannerData);
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery, Pipeline* pipeline = nullptr) override;
+
+private:
+    std::unique_ptr<SubplanStage> _subPlanStage;
+};
+
 }  // namespace mongo::exec_deferred_engine_choice

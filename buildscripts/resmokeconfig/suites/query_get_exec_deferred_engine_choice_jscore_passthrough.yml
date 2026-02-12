@@ -16,6 +16,7 @@ selector:
     - jstests/core/query/query_settings/**/*.js
 
     # TODO SERVER-117566 implement caching in new get_executor
+    - jstests/core/administrative/profile/profile_find.js
     - jstests/core/query/plan_cache/*.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_plan_cache.js
     - jstests/core/index/index_filter_commands.js
@@ -23,64 +24,14 @@ selector:
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/query/sbe/from_plan_cache_flag.js
+    - jstests/core/query/partial_index_logical.js
     - jstests/core/query/plan_cache_stability.js
 
     # TODO SERVER-119040 Implement explain in new get_executor
     - jstests/core/query/explain/*.js
 
-    # TODO SERVER-117453 Implement subplanning in new get_executor
-    - jstests/core/administrative/current_op/currentop_find.js
-    - jstests/core/index/covered/coveredIndex4.js
-    - jstests/core/index/fts/fts_projection.js
-    - jstests/core/index/geo/geo_or.js
-    - jstests/core/index/hashed/hashed_index_collation.js
-    - jstests/core/index/hashed/hashed_index_queries_with_logical_operators.js
-    - jstests/core/index/index_stats.js
-    - jstests/core/index/indexn.js
-    - jstests/core/index/not_index_tagging.js
-    - jstests/core/index/wildcard/compound_wildcard_index_or.js
-    - jstests/core/index/wildcard/wildcard_and_text_indexes.js
-    - jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
-    - jstests/core/index/wildcard/wildcard_index_collation.js
-    - jstests/core/index/wildcard/wildcard_index_multikey.js
-    - jstests/core/query/and/and_or_index_sort.js
-    - jstests/core/query/and/and_or_nested.js
-    - jstests/core/query/boolean_simplifier_stress.js
-    - jstests/core/query/collation/merge_sort_collation.js
-    - jstests/core/query/distinct/distinct_subplanning.js
-    - jstests/core/query/explode_for_sort_fetch.js
-    - jstests/core/query/expr/expr_valid_positions.js
-    - jstests/core/query/find/find_dedup.js
-    - jstests/core/query/force_plan.js
-    - jstests/core/query/internal_strip_invalid_assignment.js
-    - jstests/core/query/json_schema/*.js
-    - jstests/core/query/map_reduce/map_reduce_subplanning.js
-    - jstests/core/query/match_numeric_components.js
-    - jstests/core/query/or/*.js
-    - jstests/core/query/or_use_clustered_collection.js
-    - jstests/core/query/project/positional_projection.js
-    - jstests/core/query/size_match_expr.js
-    - jstests/core/query/sort/sort_dotted_paths.js
-    - jstests/core/query/sort/sort_dotted_paths_collation.js
-    - jstests/core/query/sort/sort_merge.js
-    - jstests/core/query/sort/sort_merge_collation.js
-    - jstests/core/query/sort/sort_merge_memory_limit.js
-    - jstests/core/query/sort/sort_with_update_between_getmores.js
-    - jstests/core/query/type/null_undefined.js
-    - jstests/core/timeseries/query/timeseries_computed_field.js
-    - jstests/core/timeseries/query/timeseries_filter_extended_range.js
-    - jstests/core/timeseries/query/timeseries_graph_lookup.js
-    - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
-    - jstests/core/timeseries/query/timeseries_match.js
-    - jstests/core/timeseries/query/timeseries_match_pushdown.js
-    - jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js
-    - jstests/core/timeseries/query/timeseries_predicates.js
-    - jstests/core/timeseries/query/timeseries_union_with.js
-    - jstests/core/timeseries/query/timeseries_view_aggregate.js
-    - jstests/core/query/partial_index_logical.js
-    - jstests/core/administrative/profile/profile_find.js
+    # TODO SERVER-119602 enable PBT
     - jstests/core/**/*_pbt.js
-
 executor:
   archive:
     hooks:

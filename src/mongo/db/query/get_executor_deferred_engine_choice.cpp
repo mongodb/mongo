@@ -137,7 +137,9 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
     PlanCacheInfo planCacheInfo{planCacheKey.planCacheKeyHash(), planCacheKey.planCacheShapeHash()};
     setOpDebugPlanCacheInfo(opCtx, planCacheInfo);
 
-    // TODO SERVER-117453 implement subplanning.
+    if (SubplanStage::needsSubplanning(*cq)) {
+        return std::make_unique<SubPlanner>(makePlannerData());
+    }
 
     auto solutions = uassertStatusOK(QueryPlanner::plan(*cq, *plannerParams));
     // The planner should have returned an error status if there are no solutions.
