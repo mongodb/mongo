@@ -53,41 +53,38 @@ using ItemVariant = WriteBatchResponseProcessor::ItemVariant;
 using Unexecuted = WriteBatchResponseProcessor::Unexecuted;
 using SucceededWithoutItem = WriteBatchResponseProcessor::SucceededWithoutItem;
 using FindAndModifyReplyItem = WriteBatchResponseProcessor::FindAndModifyReplyItem;
-using GroupItemsResult = WriteBatchResponseProcessor::GroupItemsResult;
 using ItemsByOpMap = WriteBatchResponseProcessor::ItemsByOpMap;
 using ShardResult = WriteBatchResponseProcessor::ShardResult;
 
 namespace {
-// This function returns the Status for a given ItemVariant ('itemVar'). If 'itemVar' is Unexecuted,
-// this function will return an OK status.
-Status getItemStatus(const ItemVariant& itemVar) {
-    return visit(OverloadedVisitor(
-                     [&](const Unexecuted&) { return Status::OK(); },
-                     [&](const SucceededWithoutItem&) { return Status::OK(); },
-                     [&](const BulkWriteReplyItem& item) { return item.getStatus(); },
-                     [&](const FindAndModifyReplyItem& item) { return item.swReply.getStatus(); }),
-                 itemVar);
-}
-
 // This function returns the error code for a given ItemVariant ('itemVar'). If 'itemVar' is
-// Unexecuted, this function will return ErrorCodes::OK.
-ErrorCodes::Error getErrorCode(const ItemVariant& itemVar) {
+// Unexecuted, this function will return boost::none.
+boost::optional<ErrorCodes::Error> getErrorCode(const ItemVariant& itemVar) {
+    using RetT = boost::optional<ErrorCodes::Error>;
     return visit(
         OverloadedVisitor(
-            [&](const Unexecuted&) { return ErrorCodes::OK; },
-            [&](const SucceededWithoutItem&) { return ErrorCodes::OK; },
-            [&](const BulkWriteReplyItem& item) { return item.getStatus().code(); },
-            [&](const FindAndModifyReplyItem& item) { return item.swReply.getStatus().code(); }),
+            [&](const Unexecuted&) -> RetT { return boost::none; },
+            [&](const SucceededWithoutItem&) -> RetT { return ErrorCodes::OK; },
+            [&](const BulkWriteReplyItem& item) -> RetT { return item.getStatus().code(); },
+            [&](const FindAndModifyReplyItem& item) -> RetT {
+                return item.swReply.getStatus().code();
+            }),
         itemVar);
 }
 
-// Like getErrorCode(), but takes a 'std::pair<ShardId,ItemVariant>' as its input.
-ErrorCodes::Error getErrorCodeForShardItemPair(const std::pair<ShardId, ItemVariant>& p) {
-    return getErrorCode(p.second);
+bool isOKItem(const ItemVariant& itemVar) {
+    auto code = getErrorCode(itemVar);
+    return code && *code == ErrorCodes::OK;
 }
 
 bool isRetryableError(const ItemVariant& itemVar) {
-    return write_op_helpers::isRetryErrCode(getErrorCode(itemVar));
+    auto code = getErrorCode(itemVar);
+    return code && write_op_helpers::isRetryErrCode(*code);
+}
+
+bool isNonRetryableError(const ItemVariant& itemVar) {
+    auto code = getErrorCode(itemVar);
+    return code && *code != ErrorCodes::OK && !write_op_helpers::isRetryErrCode(*code);
 }
 
 template <typename ResultT>
@@ -120,6 +117,21 @@ std::shared_ptr<const CannotImplicitlyCreateCollectionInfo> getCannotImplicitlyC
     }
 
     return {};
+}
+
+std::shared_ptr<const CannotImplicitlyCreateCollectionInfo> getCannotImplicitlyCreateCollectionInfo(
+    const ItemVariant& itemVar) {
+    using RetT = std::shared_ptr<const CannotImplicitlyCreateCollectionInfo>;
+    return visit(OverloadedVisitor(
+                     [&](const Unexecuted&) -> RetT { return {}; },
+                     [&](const SucceededWithoutItem&) -> RetT { return {}; },
+                     [&](const BulkWriteReplyItem& item) -> RetT {
+                         return getCannotImplicitlyCreateCollectionInfo(item.getStatus());
+                     },
+                     [&](const FindAndModifyReplyItem& item) -> RetT {
+                         return getCannotImplicitlyCreateCollectionInfo(item.swReply.getStatus());
+                     }),
+                 itemVar);
 }
 
 std::shared_ptr<const CollectionUUIDMismatchInfo> getCollectionUUIDMismatchInfo(
@@ -169,6 +181,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx, RoutingContext& routingCtx, const SimpleWriteBatchResponse& response) {
     const bool ordered = _cmdRef.getOrdered();
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    auto isNonRetryableErrorForPair = [](auto&& p) {
+        return isNonRetryableError(p.second);
+    };
 
     std::vector<std::pair<ShardId, ShardResult>> shardResults;
     shardResults.reserve(response.shardResponses.size());
@@ -179,48 +194,53 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                                   onShardResponse(opCtx, routingCtx, shardId, shardResponse));
     }
 
-    // Organize the items from the shard responses by op, and check if any of the items is an
-    // unrecoverable error.
-    auto [itemsByOp, unrecoverable, hasRetryableError] = groupItemsByOp(opCtx, shardResults);
+    // Organize the items from the shard responses by op.
+    auto itemsByOp = groupItemsByOp(opCtx, shardResults, response.opsUsingSVIgnored);
 
-    // For "RetryableWriteWithId" simple write batches, a different retry strategy is used. If the
-    // batch has any retryable errors (and 'inTransaction' and 'unrecoverable' are false), then all
-    // of the ops in the batch are retried regardless of what their execution status was.
+    // For "RetryableWriteWithId" simple write batches, a different retry strategy is used. If
+    // 'inTransaction' is false -AND- the batch contains a retryable error -AND- there wasn't
+    // a non-retryable error, then all of the ops in the batch are retried regardless of what
+    // their execution status was.
     //
     // This is the key difference between "RetryableWriteWithId" simple write batches and regular
-    // simple write batch.
-    if (response.isRetryableWriteWithId && hasRetryableError && !inTransaction && !unrecoverable) {
-        std::set<WriteOp> toRetry;
-        CollectionsToCreate collsToCreate;
-
-        // For each 'op', queue 'op' for retry and also increment counters as appropriate.
+    // simple write batches.
+    if (response.isRetryableWriteWithId && !inTransaction) {
+        bool hasRetryableErr = false;
+        bool hasNonRetryableErr = false;
         for (auto& [op, items] : itemsByOp) {
-            for (const auto& [shardId, itemVar] : items) {
-                if (isRetryableError(itemVar)) {
-                    // If 'itemVar' has a Status that is a retryable error, we pass that in when
-                    // calling queueOpForRetry().
-                    queueOpForRetry(op, getItemStatus(itemVar), toRetry, collsToCreate);
-                } else {
-                    // Otherwise, call queueOpForRetry() without a Status.
-                    queueOpForRetry(op, toRetry);
-                }
-            }
-
-            if (getWriteOpType(op) == kUpdate) {
-                getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdRetryCount.increment(1);
-            } else if (getWriteOpType(op) == kDelete) {
-                getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+            for (auto& [_, itemVar] : items) {
+                hasRetryableErr |= isRetryableError(itemVar);
+                hasNonRetryableErr |= isNonRetryableError(itemVar);
             }
         }
 
-        ProcessorResult result;
-        result.opsToRetry.insert(result.opsToRetry.end(), toRetry.begin(), toRetry.end());
-        result.collsToCreate = std::move(collsToCreate);
+        if (hasRetryableErr && !(ordered && hasNonRetryableErr)) {
+            std::set<WriteOp> toRetry;
+            CollectionsToCreate collsToCreate;
 
-        // Print the contents of 'opsToRetry' to the log if appropriate.
-        logOpsToRetry(result.opsToRetry);
+            // For each 'op', queue 'op' for retry and also increment counters as appropriate.
+            for (auto& [op, items] : itemsByOp) {
+                for (const auto& [shardId, itemVar] : items) {
+                    queueOpForRetry(op, toRetry);
+                    queueCreateCollectionIfNeeded(itemVar, collsToCreate);
+                }
 
-        return result;
+                if (getWriteOpType(op) == kUpdate) {
+                    getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+                } else if (getWriteOpType(op) == kDelete) {
+                    getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+                }
+            }
+
+            ProcessorResult result;
+            result.opsToRetry.insert(result.opsToRetry.end(), toRetry.begin(), toRetry.end());
+            result.collsToCreate = std::move(collsToCreate);
+
+            // Print the contents of 'opsToRetry' to the log if appropriate.
+            logOpsToRetry(result.opsToRetry);
+
+            return result;
+        }
     }
 
     // Update the counters (excluding _nErrors), update the list of retried stmtIds, and process
@@ -239,15 +259,14 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     std::set<WriteOp> toRetry;
     CollectionsToCreate collsToCreate;
     absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardSet;
+    bool continueProcessing = true;
 
     // Process the results for each op that was part of this batch.
     for (auto& [op, items] : itemsByOp) {
         tassert(11182201, "Expected op to have at least one item", !items.empty());
 
-        const bool shouldRetryOnUnexecutedOrRetryableError = !unrecoverable &&
-            !write_op_helpers::hasAnyNonRetryableError(items, getErrorCodeForShardItemPair);
-
-        bool continueProcessing = true;
+        const bool shouldRetryOnUnexecutedOrRetryableError =
+            !inTransaction && std::none_of(items.begin(), items.end(), isNonRetryableErrorForPair);
 
         // Process all of the reply items that correspond to 'op'.
         for (const auto& [shardId, itemVar] : items) {
@@ -271,13 +290,16 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                 },
                 [&](const BulkWriteReplyItem& item) {
                     const auto& status = item.getStatus();
+                    // If 'item' has an OK status, add 'shardId' to 'successfulShardSet'.
+                    if (status.isOK()) {
+                        successfulShardSet[getWriteOpId(op)].insert(shardId);
+                    }
+
                     if (!write_op_helpers::isRetryErrCode(status.code()) || inTransaction) {
-                        // If 'item' has an OK status, add 'shardId' to 'successfulShardSet'.
-                        if (status.isOK()) {
-                            successfulShardSet[getWriteOpId(op)].insert(shardId);
-                        }
-                        // Add 'item' to _results.
+                        // If 'item' is a not a retryable error, or if the command is running in a
+                        // transaction, record the result.
                         recordResult(opCtx, op, std::move(item));
+
                         // If we recorded an error and the write command is ordered or running in
                         // a transaction, then return false to stop processing.
                         if (_nErrors > 0 && (ordered || inTransaction)) {
@@ -286,9 +308,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                     } else if (shouldRetryOnUnexecutedOrRetryableError) {
                         // If the command isn't running in a transaction and 'item' is a retryable
                         // error and 'shouldRetryOnUnexecutedOrRetryableError' is true, then queue
-                        // 'op' to be retried and add any CannotImplicitlyCreateCollection errors
-                        // to 'collsToCreate'.
-                        queueOpForRetry(op, status, toRetry, collsToCreate);
+                        // 'op' to be retried.
+                        queueOpForRetry(op, toRetry);
+                        queueCreateCollectionIfNeeded(status, collsToCreate);
                     }
                     return true;
                 },
@@ -306,7 +328,8 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                         // If the command isn't running in a transaction and 'item' is a retryable
                         // error and 'shouldRetryOnUnexecutedOrRetryableError' is true, then queue
                         // 'op' to be retried.
-                        queueOpForRetry(op, status, toRetry, collsToCreate);
+                        queueOpForRetry(op, toRetry);
+                        queueCreateCollectionIfNeeded(status, collsToCreate);
                     }
                     return true;
                 });
@@ -466,16 +489,26 @@ void WriteBatchResponseProcessor::queueOpForRetry(const WriteOp& op,
     toRetry.emplace(op);
 }
 
-void WriteBatchResponseProcessor::queueOpForRetry(const WriteOp& op,
-                                                  const Status& status,
-                                                  std::set<WriteOp>& toRetry,
-                                                  CollectionsToCreate& collsToCreate) const {
-    toRetry.emplace(op);
-
-    if (auto info = getCannotImplicitlyCreateCollectionInfo(status)) {
+void WriteBatchResponseProcessor::queueCreateCollectionIfNeeded(
+    std::shared_ptr<const CannotImplicitlyCreateCollectionInfo> info,
+    CollectionsToCreate& collsToCreate) {
+    // If 'info' is not null, add it to 'collsToCreate'.
+    if (info) {
         auto nss = info->getNss();
         collsToCreate.emplace(std::move(nss), std::move(info));
     }
+}
+
+void WriteBatchResponseProcessor::queueCreateCollectionIfNeeded(
+    const Status& status, CollectionsToCreate& collsToCreate) {
+    return queueCreateCollectionIfNeeded(getCannotImplicitlyCreateCollectionInfo(status),
+                                         collsToCreate);
+}
+
+void WriteBatchResponseProcessor::queueCreateCollectionIfNeeded(
+    const ItemVariant& itemVar, CollectionsToCreate& collsToCreate) {
+    return queueCreateCollectionIfNeeded(getCannotImplicitlyCreateCollectionInfo(itemVar),
+                                         collsToCreate);
 }
 
 ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx,
@@ -653,40 +686,68 @@ ItemVariant WriteBatchResponseProcessor::makeErrorItem(const WriteOp& op,
     }
 }
 
-GroupItemsResult WriteBatchResponseProcessor::groupItemsByOp(
-    OperationContext* opCtx, std::vector<std::pair<ShardId, ShardResult>>& shardResults) const {
-    const bool ordered = _cmdRef.getOrdered();
+ItemsByOpMap WriteBatchResponseProcessor::groupItemsByOp(
+    OperationContext* opCtx,
+    const std::vector<std::pair<ShardId, ShardResult>>& shardResults,
+    const absl::flat_hash_set<WriteOpId>& opsUsingSVIgnored) const {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-
-    auto isUnrecoverable = [&](const ItemVariant& itemVar) {
-        const auto code = getErrorCode(itemVar);
-        return (code != ErrorCodes::OK &&
-                (inTransaction || (ordered && !write_op_helpers::isRetryErrCode(code))));
+    auto isOKItemForPair = [](auto&& p) {
+        return isOKItem(p.second);
     };
 
-    // Organize the items from the shard responses by op, and check if any of the items is an
-    // unrecoverable error.
-    ItemsByOpMap itemsByOp;
-    bool unrecoverable = false;
-    bool hasRetryableError = false;
+    auto isCollUUIDMismatchWithoutActualNamespace = [&](const ItemVariant& itemVar) -> bool {
+        if (const auto* bwItem = get_if<BulkWriteReplyItem>(&itemVar)) {
+            return write_op_helpers::isCollUUIDMismatchWithoutActualNamespace(bwItem->getStatus());
+        }
+        return false;
+    };
 
+    ItemsByOpMap itemMap;
+    absl::flat_hash_set<WriteOp> opsToRevisit;
+
+    // Organize the items by op and store them into 'itemMap'.
     for (const auto& [shardId, shardResult] : shardResults) {
-        for (auto& [op, itemVar] : shardResult.items) {
-            unrecoverable |= isUnrecoverable(itemVar);
-            hasRetryableError |= isRetryableError(itemVar);
+        for (const auto& [op, itemVar] : shardResult.items) {
+            const auto opId = getWriteOpId(op);
+            const bool opUsesSVIgnored = !inTransaction && opsUsingSVIgnored.count(opId);
 
-            auto it = itemsByOp.find(op);
-            if (it != itemsByOp.end()) {
-                it->second.emplace_back(shardId, std::move(itemVar));
-            } else {
-                std::vector<std::pair<ShardId, ItemVariant>> vec;
-                vec.emplace_back(shardId, std::move(itemVar));
-                itemsByOp.emplace(op, std::move(vec));
+            // For ops that use shardVersion IGNORED and are broadcast to all shards, by design we
+            // ignore CollectionUUIDMismatch errors that don't have an actual namespace if the op
+            // was successful on other shards.
+            //
+            // We implement this special behavior by adding the op to 'opsToRevisit' and then
+            // revisiting the op during a second pass (after this loop finishes).
+            if (opUsesSVIgnored && isCollUUIDMismatchWithoutActualNamespace(itemVar)) {
+                opsToRevisit.emplace(op);
+            }
+
+            // Store 'itemVar' into 'itemMap'.
+            auto [it, _] = itemMap.try_emplace(op);
+            it->second.emplace_back(shardId, itemVar);
+        }
+    }
+
+    // Visit the ops in 'opsToRevisit' and ignore CollectionUUIDMismatch errors for these ops
+    // as appropriate.
+    for (auto& op : opsToRevisit) {
+        auto& items = itemMap[op];
+        auto opId = getWriteOpId(op);
+
+        if (opHasSuccess(opId) || std::any_of(items.begin(), items.end(), isOKItemForPair)) {
+            // If 'op' has a successful result recorded already or if 'items' has an OK item, then
+            // remove all CollectionUUIDMismatch errors without an actual namespace from 'items'.
+            std::erase_if(items, [&](auto&& p) {
+                return isCollUUIDMismatchWithoutActualNamespace(p.second);
+            });
+
+            // If 'items' is now empty, remove 'op' from 'itemMap'.
+            if (items.empty()) {
+                itemMap.erase(op);
             }
         }
     }
 
-    return GroupItemsResult{std::move(itemsByOp), unrecoverable, hasRetryableError};
+    return itemMap;
 }
 
 void WriteBatchResponseProcessor::processCountersAndRetriedStmtIds(
@@ -993,13 +1054,14 @@ BulkWriteReplyItem combineErrorReplies(WriteOpId opId, std::vector<BulkWriteRepl
 }
 
 /**
- * Attempts to populate the "actualCollection" field of a CollectionUUIDMismatch error if it's not
- * populated already, contacting the primary shard if necessary.
+ * If 'error' is a CollectionUUIDMismatch error without an actual namespace, this function attempts
+ * to populate the "actualCollection" field on 'error', contacting the primary shard if necessary.
+ * Otherwise, this function does nothing.
  */
-void addActualCollectionForCollUUIDMismatchError(OperationContext* opCtx,
-                                                 Status& error,
-                                                 boost::optional<std::string>& actualCollection,
-                                                 bool& hasContactedPrimaryShard) {
+void addActualNamespaceForCollUUIDMismatchError(OperationContext* opCtx,
+                                                Status& error,
+                                                boost::optional<std::string>& actualCollection,
+                                                bool& hasContactedPrimaryShard) {
     // Return early if 'error' is not a CollectionUUIDMismatch error or if it's not missing the
     // "actualCollection" field.
     auto info = getCollectionUUIDMismatchInfo(error);
@@ -1063,6 +1125,20 @@ void WriteBatchResponseProcessor::recordTargetErrors(OperationContext* opCtx,
     }
 }
 
+bool WriteBatchResponseProcessor::opHasSuccess(WriteOpId opId) const {
+    auto it = _results.find(opId);
+    if (it == _results.end()) {
+        return false;
+    }
+
+    auto visitItem = OverloadedVisitor(
+        [&](const BulkWriteOpResults& result) { return result.hasSuccess; },
+        [&](const FindAndModifyReplyItem& result) { return result.swReply.getStatus().isOK(); });
+
+    const auto& resultVar = it->second;
+    return visit(std::move(visitItem), resultVar);
+}
+
 bool WriteBatchResponseProcessor::checkBulkWriteReplyMaxSize(OperationContext* opCtx) {
     // Cannot exceed the reply size limit if we have no responses.
     if (_results.empty()) {
@@ -1092,12 +1168,10 @@ bool WriteBatchResponseProcessor::checkBulkWriteReplyMaxSize(OperationContext* o
 
 std::vector<std::pair<WriteOpId, boost::optional<BulkWriteReplyItem>>>
 WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-
     std::vector<std::pair<WriteOpId, boost::optional<BulkWriteReplyItem>>> aggregatedReplies;
     std::map<NamespaceString, boost::optional<std::string>> actualCollections;
     std::map<NamespaceString, bool> hasContactedPrimaryShard;
-    bool hasCollUUIDMismatchErrorsWithNoActualCollection = false;
+    bool hasCollUUIDMismatchErrorsWithoutActualNamespace = false;
 
     for (const auto& nss : _cmdRef.getNssSet()) {
         actualCollections.emplace(nss, boost::none);
@@ -1105,7 +1179,7 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
     }
 
     // For CollectionUUIDMismatch errors, this lambda checks if "actualCollection" is set, and
-    // it updates the 'actualCollection' and 'hasCollUUIDMismatchErrorsWithNoActualCollection'
+    // it updates the 'actualCollection' and 'hasCollUUIDMismatchErrorsWithoutActualNamespace'
     // variables appropriately.
     auto noteCollUUIDMismatchError = [&](const WriteOp& op, const Status& status) {
         auto info = getCollectionUUIDMismatchInfo(status);
@@ -1118,7 +1192,7 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
                 actualCollection = info->actualCollection();
             }
         } else {
-            hasCollUUIDMismatchErrorsWithNoActualCollection = true;
+            hasCollUUIDMismatchErrorsWithoutActualNamespace = true;
         }
     };
 
@@ -1148,19 +1222,6 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
             if (reply->getStatus() == ErrorCodes::WouldChangeOwningShard) {
                 aggregatedReplies.emplace_back(opId, std::move(reply));
                 continue;
-            }
-
-            // There are errors that are safe to ignore if they were correctly applied to other
-            // shards and we're using ShardVersion::IGNORED. They are safe to ignore as they can be
-            // interpreted as no-ops if the shard response had been instead a successful result
-            // since they wouldn't have modified any data. As a result, we can swallow the errors
-            // and treat them as a successful operation.
-            const bool opIsMulti = _cmdRef.getOp(opId).getMulti();
-            const bool canIgnoreErrors =
-                write_op_helpers::shouldTargetAllShardsSVIgnored(inTransaction, opIsMulti) &&
-                write_op_helpers::isSafeToIgnoreErrorInPartiallyAppliedOp(reply->getStatus());
-            if (canIgnoreErrors) {
-                reply = boost::none;
             }
 
             if (reply && reply->getStatus() == ErrorCodes::CollectionUUIDMismatch) {
@@ -1199,16 +1260,16 @@ WriteBatchResponseProcessor::finalizeRepliesForOps(OperationContext* opCtx) {
         }
     }
 
-    // If there were any CollectionUUIDMismatch errors where "actualCollection" is not set, then
-    // call addActualCollectionForCollUUIDMismatchError() to populate the "actualCollection" field.
-    if (hasCollUUIDMismatchErrorsWithNoActualCollection) {
+    // If there were any CollectionUUIDMismatch errors without an actual namespace, then call
+    // addActualNamespaceForCollUUIDMismatchError() to populate the "actualCollection" field.
+    if (hasCollUUIDMismatchErrorsWithoutActualNamespace) {
         for (auto& [opId, item] : aggregatedReplies) {
             if (item && item->getStatus() == ErrorCodes::CollectionUUIDMismatch) {
                 auto op = WriteOp{_cmdRef.getOp(opId)};
                 const NamespaceString& nss = op.getNss();
 
                 auto error = item->getStatus();
-                addActualCollectionForCollUUIDMismatchError(
+                addActualNamespaceForCollUUIDMismatchError(
                     opCtx, error, actualCollections[nss], hasContactedPrimaryShard[nss]);
 
                 item->setStatus(std::move(error));

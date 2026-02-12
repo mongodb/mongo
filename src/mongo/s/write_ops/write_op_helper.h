@@ -152,21 +152,10 @@ ItemType getFirstNonRetryableError(const std::vector<ItemType>& items, GetCodeFn
 bool isOnlyTargetDataOwningShardsForMultiWritesEnabled();
 
 /**
- * Returns whether an operation should target all shards with ShardVersion::IGNORED(). This is
- * true for multi: true writes where 'onlyTargetDataOwningShardsForMultiWrites' is false and we are
- * not in a transaction.
+ * Return true if 'status' contains a CollectionUUIDMismatch error without an actual namespace,
+ * otherwise return false.
  */
-bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti);
-
-/**
- * Used to check if a partially applied (successful on some shards but not others)operation has an
- * errors that is safe to ignore. UUID mismatch errors are safe to ignore if the actualCollection is
- * null in conjuntion with other successful operations. This is true because it means we wrongly
- * targeted a non-owning shard with the operation and we wouldn't have applied any modifications
- * anyway. Note this is only safe if we're using ShardVersion::IGNORED since we're ignoring any
- * placement concern and broadcasting to all shards.
- */
-bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status);
+bool isCollUUIDMismatchWithoutActualNamespace(const Status& status);
 
 int computeBaseSizeEstimate(OperationContext* opCtx, const BulkWriteCommandRequest& client);
 

@@ -61,6 +61,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                                                   const WriteOp& op) try {
     auto nss = op.getNss();
     bool isViewfulTimeseries = false;
+    bool usesSVIgnored = false;
 
     // TODO SERVER-106874 remove the namespace translation check entirely once 9.0 becomes last
     // LTS. By then we will only have viewless timeseries that do not require nss translation.
@@ -177,6 +178,9 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
             // 'type' is kMultiShard (instead of targeting all shards).
             tr.endpoints = targetAllShards(opCtx, cri);
 
+            // Record that we set shardVersion to IGNORED for this op.
+            usesSVIgnored = true;
+
             for (auto& endpoint : tr.endpoints) {
                 auto& shardVersion = endpoint.shardVersion;
                 tassert(11841901,
@@ -204,7 +208,8 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         recordTargetingStats(opCtx, cri, tr, op);
     }
 
-    return Analysis{type, std::move(tr.endpoints), isViewfulTimeseries, std::move(sampleId)};
+    return Analysis{
+        type, std::move(tr.endpoints), isViewfulTimeseries, std::move(sampleId), usesSVIgnored};
 } catch (const DBException& ex) {
     auto status = ex.toStatus();
 

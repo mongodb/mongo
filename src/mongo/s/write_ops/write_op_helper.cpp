@@ -51,15 +51,7 @@ bool isOnlyTargetDataOwningShardsForMultiWritesEnabled() {
     return clusterParam->getValue(boost::none).getEnabled();
 }
 
-bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti) {
-    // Fetch the 'onlyTargetDataOwningShardsForMultiWrites' cluster param.
-    if (isMulti && !inTransaction) {
-        return !isOnlyTargetDataOwningShardsForMultiWritesEnabled();
-    }
-    return false;
-}
-
-bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status) {
+bool isCollUUIDMismatchWithoutActualNamespace(const Status& status) {
     return status.code() == ErrorCodes::CollectionUUIDMismatch &&
         !status.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
 }

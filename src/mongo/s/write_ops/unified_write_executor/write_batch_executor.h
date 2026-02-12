@@ -186,9 +186,11 @@ struct EmptyBatchResponse {};
 struct SimpleWriteBatchResponse {
     std::vector<std::pair<ShardId, ShardResponse>> shardResponses;
     bool isRetryableWriteWithId = false;
+    absl::flat_hash_set<WriteOpId> opsUsingSVIgnored;
 
-    static SimpleWriteBatchResponse makeEmpty(bool isRetryableWriteWithId) {
-        return SimpleWriteBatchResponse{{}, isRetryableWriteWithId};
+    static SimpleWriteBatchResponse makeEmpty(bool isRetryableWriteWithId,
+                                              absl::flat_hash_set<WriteOpId> opsUsingSVIgnored) {
+        return SimpleWriteBatchResponse{{}, isRetryableWriteWithId, std::move(opsUsingSVIgnored)};
     }
 };
 

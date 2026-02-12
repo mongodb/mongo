@@ -63,8 +63,8 @@ struct SimpleWriteBatch {
     };
 
     std::map<ShardId, ShardRequest> requestByShardId;
-
     bool isRetryableWriteWithId = false;
+    absl::flat_hash_set<WriteOpId> opsUsingSVIgnored;
 
     static SimpleWriteBatch makeEmpty(bool isRetryableWriteWithId) {
         return SimpleWriteBatch{{}, isRetryableWriteWithId};

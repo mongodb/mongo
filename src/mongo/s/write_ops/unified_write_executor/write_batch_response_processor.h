@@ -98,12 +98,6 @@ public:
 
     using ItemsByOpMap = std::map<WriteOp, std::vector<std::pair<ShardId, ItemVariant>>>;
 
-    struct GroupItemsResult {
-        ItemsByOpMap itemsByOp;
-        bool unrecoverable = false;
-        bool hasRetryableError = false;
-    };
-
     struct ShardResult {
         boost::optional<BatchWriteCommandReply> batchWriteReply;
         boost::optional<BulkWriteCommandReply> bulkWriteReply;
@@ -187,6 +181,12 @@ public:
     size_t getNumOkItemsProcessed() const {
         return _numOkItemsProcessed;
     }
+
+    /**
+     * Returns true if one or more successful results have been recorded for 'opId', otherwise
+     * returns false.
+     */
+    bool opHasSuccess(WriteOpId opId) const;
 
     /**
      * Returns true if we've exceeded the max reply size, false otherwise. If we have exceeded the
@@ -277,13 +277,25 @@ private:
     void queueOpForRetry(const WriteOp& op, std::set<WriteOp>& toRetry) const;
 
     /**
-     * Helper method that adds 'op' to 'toRetry', and extracts CannotImplicityCreateCollectionInfo
-     * from 'status' (if it exists) and stores it into 'collsToCreate'.
+     * Helper method that stores the given CannotImplicityCreateCollectionInfo ('info') into
+     * 'collsToCreate'. If 'info' is null, this method does nothing.
      */
-    void queueOpForRetry(const WriteOp& op,
-                         const Status& status,
-                         std::set<WriteOp>& toRetry,
-                         CollectionsToCreate& collsToCreate) const;
+    void queueCreateCollectionIfNeeded(
+        std::shared_ptr<const CannotImplicitlyCreateCollectionInfo> info,
+        CollectionsToCreate& collsToCreate);
+
+    /**
+     * Helper method that tries to extract a CannotImplicityCreateCollectionInfo from 'status',
+     * and if successful it stores the CannotImplicityCreateCollectionInfo into 'collsToCreate'.
+     */
+    void queueCreateCollectionIfNeeded(const Status& status, CollectionsToCreate& collsToCreate);
+
+    /**
+     * Helper method that tries to extract a CannotImplicityCreateCollectionInfo from 'itemVar',
+     * and if successful it stores the CannotImplicityCreateCollectionInfo into 'collsToCreate'.
+     */
+    void queueCreateCollectionIfNeeded(const ItemVariant& itemVar,
+                                       CollectionsToCreate& collsToCreate);
 
     /**
      * Generate an ItemVariant for 'op' with an error given by 'status', returned from 'shardId'.
@@ -297,8 +309,9 @@ private:
      * method also returns a flag indicating if 'shardResults' contains a retryable error, and
      * another flag indicating if an error occurred that is "unrecoverable".
      */
-    GroupItemsResult groupItemsByOp(
-        OperationContext* opCtx, std::vector<std::pair<ShardId, ShardResult>>& shardResults) const;
+    ItemsByOpMap groupItemsByOp(OperationContext* opCtx,
+                                const std::vector<std::pair<ShardId, ShardResult>>& shardResults,
+                                const absl::flat_hash_set<WriteOpId>& opsUsingSVIgnored) const;
 
     /**
      * Gets the error details and upsert details from 'result.batchWriteReply', converts these

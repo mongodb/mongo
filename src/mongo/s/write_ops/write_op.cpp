@@ -416,7 +416,7 @@ void WriteOp::_updateOpState(OperationContext* opCtx,
         // have modified any data. As a result, we can swallow the errors and treat them as a
         // successful operation.
         if (isTargetingAllShardsWithSVIgnored &&
-            write_op_helpers::isSafeToIgnoreErrorInPartiallyAppliedOp(_error->getStatus()) &&
+            write_op_helpers::isCollUUIDMismatchWithoutActualNamespace(_error->getStatus()) &&
             !_successfulShardSet.empty()) {
             if (!hasPendingChild) {
                 _error.reset();

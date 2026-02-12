@@ -243,10 +243,15 @@ public:
             }
 
             const auto& targetedSampleId = analysis.targetedSampleId;
+
             if (targetedSampleId && targetedSampleId->isFor(shardName)) {
                 auto& request = _batch->requestByShardId[shardName];
                 request.sampleIds.emplace(getWriteOpId(writeOp), targetedSampleId->getId());
             }
+        }
+
+        if (analysis.usesSVIgnored) {
+            _batch->opsUsingSVIgnored.emplace(getWriteOpId(writeOp));
         }
     }
 

@@ -163,3 +163,6 @@ filters:
   - "hashed_shard_key_index_optional_shard_collection.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "swallow_unnecessary_uuid_mismatch_error.js":
+    approvers:
+      - 10gen/query-execution-router

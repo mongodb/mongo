@@ -1074,7 +1074,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         routingCtx.onRequestSentForNss(nss);
     }
 
-    auto resp = SimpleWriteBatchResponse::makeEmpty(batch.isRetryableWriteWithId);
+    auto resp =
+        SimpleWriteBatchResponse::makeEmpty(batch.isRetryableWriteWithId, batch.opsUsingSVIgnored);
     bool stopParsingResponses = false;
 
     while (!stopParsingResponses && !sender.done()) {

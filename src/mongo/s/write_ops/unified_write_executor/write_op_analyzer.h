@@ -62,8 +62,9 @@ struct Analysis {
     // 'isViewfulTimeseries' is set to true when the write op is on the main namespace of a viewful
     // timeseries collection. This flag makes sure the executor sends the command with translation
     // to buckets namespace correctly.
-    bool isViewfulTimeseries;
+    bool isViewfulTimeseries = false;
     boost::optional<analyze_shard_key::TargetedSampleId> targetedSampleId;
+    bool usesSVIgnored = false;
 };
 class WriteOpAnalyzer {
 public:
