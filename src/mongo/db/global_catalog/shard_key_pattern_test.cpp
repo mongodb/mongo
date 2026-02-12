@@ -525,7 +525,7 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeyHashed) {
 }
 
 static bool indexComp(const ShardKeyPattern& pattern, const BSONObj& indexPattern) {
-    return pattern.isIndexUniquenessCompatible(indexPattern);
+    return pattern.isIndexUniquenessAndCollationCompatible(indexPattern, BSONObj());
 }
 
 TEST_F(ShardKeyPatternTest, UniqueIndexCompatibleSingle) {
@@ -980,6 +980,24 @@ TEST_F(ShardKeyPatternTest, CompareShardKeyGenerationAPIsOnDottedFields) {
     ASSERT_BSONOBJ_EQ(resultUsingInner, shardKeyPattern.extractShardKeyFromDoc(doc));
     // This one is used by getDocumentKey in op_observer_util.cpp
     ASSERT_BSONOBJ_EQ(resultUsingInner, bson::extractElementsBasedOnTemplate(doc, shardKeyBSON));
+}
+
+TEST_F(ShardKeyPatternTest, NonSimpleCollationUniqueIndexesForbidden) {
+    auto shardKeyBSON = BSON("x" << 1);
+    auto collationBSON = BSON("locale" << "en_US");
+    auto simpleCollationBSON = BSON("locale" << "simple");
+    auto idPrefixedBSON = BSON("_id" << 1 << "y" << 1);
+    ShardKeyPattern shardKeyPattern(shardKeyBSON);
+    ASSERT_TRUE(shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, BSONObj()));
+    ASSERT_TRUE(
+        shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, simpleCollationBSON));
+    ASSERT_TRUE(shardKeyPattern.isIndexUniquenessAndCollationCompatible(idPrefixedBSON, BSONObj()));
+    ASSERT_TRUE(shardKeyPattern.isIndexUniquenessAndCollationCompatible(idPrefixedBSON,
+                                                                        simpleCollationBSON));
+    ASSERT_FALSE(
+        shardKeyPattern.isIndexUniquenessAndCollationCompatible(shardKeyBSON, collationBSON));
+    ASSERT_FALSE(
+        shardKeyPattern.isIndexUniquenessAndCollationCompatible(idPrefixedBSON, collationBSON));
 }
 
 }  // namespace

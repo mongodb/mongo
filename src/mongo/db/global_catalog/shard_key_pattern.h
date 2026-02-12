@@ -227,7 +227,7 @@ public:
 
     /**
      * Returns true if the shard key pattern can ensure that the index uniqueness is respected
-     * across all shards.
+     * across all shards and has a simple collation.
      *
      * Primarily this just checks whether the shard key pattern field names are equal to or a
      * prefix of the 'unique' or 'prepareUnique' index pattern field names. Since documents with the
@@ -247,6 +247,10 @@ public:
      *     shard key {a : 1} is not compatible with a unique/prepareUnique index on {b : 1}
      *     shard key {a : "hashed", b : 1} is not compatible with unique/prepareUnique index on
      *     {b : 1}
+     *     shard key {a : 1} is not compatible with unique/prepareUnique index on {a : 1},
+     *     {collation: "en_US"}
+     *     shard key {_id : 1} is not compatible with unique/prepareUnique index on {_id: 1, a : 1},
+     *     {collation: "en_US"}
      *
      * All unique index patterns starting with _id are assumed to be enforceable by the fact
      * that _ids must be unique, and so all unique _id prefixed indexes are compatible with
@@ -256,7 +260,8 @@ public:
      * { k : "hashed" } is not capable of being a unique/prepareUnique index and is an invalid
      * argument to this method.
      */
-    bool isIndexUniquenessCompatible(const BSONObj& indexPattern) const;
+    bool isIndexUniquenessAndCollationCompatible(const BSONObj& indexPattern,
+                                                 const BSONObj& collation = BSONObj()) const;
 
     /**
      * Returns true if the key pattern has an "_id" field of any flavor.

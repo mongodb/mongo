@@ -244,9 +244,9 @@ bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
 }
 
 bool isIdIndexFullyUnique(const ShardKeyPattern* shardKeyPattern, const BSONObj& indexKeyPattern) {
-    // We can't use ShardKeyPattern::isIndexUniquenessCompatible because it has a hard-coded
-    // exception for _id index that we want to bypass. _id is guaranteed to be unique across all
-    // shards only if the shard key is _id.
+    // We can't use ShardKeyPattern::isIndexUniquenessAndCollationCompatible because it has a
+    // hard-coded exception for _id index that we want to bypass. _id is guaranteed to be unique
+    // across all shards only if the shard key is _id.
     return shardKeyPattern == nullptr ||
         (shardKeyPattern->getKeyPatternFields().size() == 1 &&
          shardKeyPattern->getKeyPatternFields()[0]->equalsDottedField(
