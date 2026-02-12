@@ -425,12 +425,14 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
         auto [memoID, assign] = allocateAssignment(node);
         if (_enumerateOrChildrenLockstep) {
             LockstepOrAssignment newOrAssign;
+            newOrAssign.subnodes.reserve(node->numChildren());
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 newOrAssign.subnodes.push_back({memoIDForNode(node->getChild(i)), 0, boost::none});
             }
             assign->assignment = std::move(newOrAssign);
         } else {
             OrAssignment orAssignment;
+            orAssignment.subnodes.reserve(node->numChildren());
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 orAssignment.subnodes.push_back(memoIDForNode(node->getChild(i)));
             }
@@ -485,7 +487,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
         // deeply through $and and $elemMatch children.
         std::vector<MatchExpression*> indexedPreds;
 
-        // Partition the childen into the children that aren't predicates which may or may not be
+        // Partition the children into the children that aren't predicates which may or may not be
         // indexed ('subnodes'), children that aren't predicates which must use the index
         // ('mandatorySubnodes'). and children that are predicates ('indexedPreds').
         //
