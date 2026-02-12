@@ -923,7 +923,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     });
 
     addIfNeeded("opid", [](auto field, auto args, auto& b) {
-        OPDEBUG_APPEND_NUMBER2(b, field, static_cast<long long>(args.opCtx->getOpID()));
+        // We don't need to use the macro here because getOpID() is guaranteed to return an unsigned
+        // integer.
+        b.appendNumber(field, static_cast<long long>(args.opCtx->getOpID()));
     });
     addIfNeeded("nShards", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_NUMBER2(b, field, args.op.nShards);
