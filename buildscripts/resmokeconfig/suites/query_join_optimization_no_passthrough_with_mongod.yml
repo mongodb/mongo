@@ -27,3 +27,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalEnableJoinOptimization: true
+        internalQuerySamplingBySequentialScan: true
