@@ -284,6 +284,24 @@ bool acquireCollectionsForPipeline(const boost::intrusive_ptr<ExpressionContext>
         // Acquire all the nss at the same snapshot.
         allAcquisitions =
             makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(opCtx, requests));
+
+        // If we resolved a legacy timeseries view but did not subsequently find the
+        // targeted buckets collection, the timeseries collection may have been
+        // concurrently converted to viewless. In that case, throw CollectionBecameView
+        // to restart the aggregation.
+        // TODO SERVER-111172: Remove this logic once all timeseries collections are viewless.
+        const auto& primaryAcq = allAcquisitions.at(primaryNss);
+        if (!primaryAcq.isView() && !primaryAcq.collectionExists() &&
+            primaryNss.isTimeseriesBucketsCollection()) {
+            const auto& mainTimeseriesNss = primaryNss.getTimeseriesViewNamespace();
+            auto mainTimeseriesColl = CollectionCatalog::get(opCtx)->establishConsistentCollection(
+                opCtx, mainTimeseriesNss, boost::none /* readTimestamp */);
+            if (mainTimeseriesColl && mainTimeseriesColl->isTimeseriesCollection()) {
+                uasserted(ErrorCodes::CollectionBecameView,
+                          fmt::format("Detected metadata upgrade for timeseries collection '{}'",
+                                      primaryNss.toStringForErrorMsg()));
+            }
+        }
     };
 
     return initializeAutoGet(opCtx, primaryNss, secondaryNamespaces, initAutoGetCallback);
