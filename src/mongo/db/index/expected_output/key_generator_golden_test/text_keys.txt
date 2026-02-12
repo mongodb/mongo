@@ -1,0 +1,125 @@
+--- SimpleWord ---
+Input: { "data" : "cat" }
+Spec: { "key" : { "data" : "text" } }
+Keys (1):
+  { "" : "cat", "" : 1.1 }
+
+--- MultipleWords ---
+Input: { "data" : "cat sat" }
+Spec: { "key" : { "data" : "text" } }
+Keys (2):
+  { "" : "cat", "" : 0.75 }
+  { "" : "sat", "" : 0.75 }
+
+--- CompoundTrailing ---
+Input: { "data" : "cat", "x" : 5 }
+Spec: { "key" : { "data" : "text", "x" : 1 } }
+Keys (1):
+  { "" : "cat", "" : 1.1, "" : 5 }
+
+--- CompoundLeading ---
+Input: { "data" : "cat", "x" : 5 }
+Spec: { "key" : { "x" : 1, "data" : "text" } }
+Keys (1):
+  { "" : 5, "" : "cat", "" : 1.1 }
+
+--- MultipleTextFields ---
+Input: { "a" : "dog", "b" : "cat" }
+Spec: { "key" : { "a" : "text", "b" : "text" } }
+Keys (2):
+  { "" : "cat", "" : 1.1 }
+  { "" : "dog", "" : 1.1 }
+
+--- MissingTextField ---
+Input: { "other" : "cat" }
+Spec: { "key" : { "data" : "text" } }
+Keys (0):
+
+--- EmptyString ---
+Input: { "data" : "" }
+Spec: { "key" : { "data" : "text" } }
+Keys (0):
+
+--- LongText ---
+Input: { "data" : "the quick brown fox jumped over the lazy dog" }
+Spec: { "key" : { "data" : "text" } }
+Keys (6):
+  { "" : "brown", "" : 0.5833333333333334 }
+  { "" : "dog", "" : 0.5833333333333334 }
+  { "" : "fox", "" : 0.5833333333333334 }
+  { "" : "jump", "" : 0.5833333333333334 }
+  { "" : "lazi", "" : 0.5833333333333334 }
+  { "" : "quick", "" : 0.5833333333333334 }
+
+--- WeightedFields ---
+Input: { "title" : "important", "body" : "details here" }
+Spec: { "key" : { "title" : "text", "body" : "text" }, "weights" : { "title" : 10, "body" : 1 } }
+Keys (2):
+  { "" : "detail", "" : 1 }
+  { "" : "import", "" : 10 }
+
+--- WildcardText ---
+Input: { "a" : "hello world", "b" : "foo bar" }
+Spec: { "key" : { "$**" : "text" } }
+Keys (4):
+  { "" : "bar", "" : 0.75 }
+  { "" : "foo", "" : 0.75 }
+  { "" : "hello", "" : 0.75 }
+  { "" : "world", "" : 0.75 }
+
+--- DottedPathText ---
+Input: { "a" : { "b" : "nested text here" } }
+Spec: { "key" : { "a.b" : "text" } }
+Keys (2):
+  { "" : "nest", "" : 0.75 }
+  { "" : "text", "" : 0.75 }
+
+--- RepeatedWords ---
+Input: { "data" : "run running runs runner" }
+Spec: { "key" : { "data" : "text" } }
+Keys (2):
+  { "" : "run", "" : 1.53125 }
+  { "" : "runner", "" : 0.625 }
+
+--- PunctuationText ---
+Input: { "data" : "hello, world! this is... a test." }
+Spec: { "key" : { "data" : "text" } }
+Keys (3):
+  { "" : "hello", "" : 0.6666666666666666 }
+  { "" : "test", "" : 0.6666666666666666 }
+  { "" : "world", "" : 0.6666666666666666 }
+
+--- StopWordsOnly ---
+Input: { "data" : "the and is at" }
+Spec: { "key" : { "data" : "text" } }
+Keys (0):
+
+--- NumbersInText ---
+Input: { "data" : "test123 456 abc789" }
+Spec: { "key" : { "data" : "text" } }
+Keys (3):
+  { "" : "456", "" : 0.6666666666666666 }
+  { "" : "abc789", "" : 0.6666666666666666 }
+  { "" : "test123", "" : 0.6666666666666666 }
+
+--- NullTextField ---
+Input: { "data" : null }
+Spec: { "key" : { "data" : "text" } }
+Keys (0):
+
+--- MultipleTextFieldsOneMissing ---
+Input: { "a" : "cat dog" }
+Spec: { "key" : { "a" : "text", "b" : "text" } }
+Keys (2):
+  { "" : "cat", "" : 0.75 }
+  { "" : "dog", "" : 0.75 }
+
+--- ArrayOfStrings ---
+Input: { "data" : [ "hello world", "foo bar" ] }
+Spec: { "key" : { "data" : "text" } }
+Keys (4):
+  { "" : "bar", "" : 0.75 }
+  { "" : "foo", "" : 0.75 }
+  { "" : "hello", "" : 0.75 }
+  { "" : "world", "" : 0.75 }
+

@@ -164,6 +164,26 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "key_generator_golden_test",
+    srcs = [
+        "key_generator_golden_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/index/expected_output/key_generator_golden_test:golden_test_data",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":expression_params",
+        ":index_access_method",
+        ":multikey_paths",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/mongo/unittest:golden_test_base",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "key_gen_bm",
     srcs = [

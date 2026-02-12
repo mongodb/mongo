@@ -1,0 +1,79 @@
+--- CompoundIndex ---
+Input: { "a" : 1, "b" : 2, "c" : 3 }
+KeyPattern: { "a" : 1, "b" : -1, "c" : 1 }
+Keys (1):
+  { "" : 1, "" : 2, "" : 3 }
+
+--- NestedObject ---
+Input: { "a" : { "x" : 1, "y" : 2 } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "x" : 1, "y" : 2 } }
+
+--- SparseMissing ---
+Input: { "b" : 1 }
+KeyPattern: { "a" : 1 }
+Keys (0):
+
+--- ArrayOfObjectsDotted ---
+Input: { "a" : [ { "b" : { "c" : 10 } }, { "b" : { "c" : 20 } } ] }
+KeyPattern: { "a.b.c" : 1 }
+Keys (2):
+  { "" : 10 }
+  { "" : 20 }
+
+--- ArrayOfArrays ---
+Input: { "a" : [ [ 1, 2 ], [ 3, 4 ] ] }
+KeyPattern: { "a" : 1 }
+Keys (2):
+  { "" : [ 1, 2 ] }
+  { "" : [ 3, 4 ] }
+
+--- CompoundBothMissing ---
+Input: { "c" : 1 }
+KeyPattern: { "a" : 1, "b" : 1 }
+Keys (1):
+  { "" : null, "" : null }
+
+--- CompoundDeeplyDotted ---
+Input: { "a" : { "b" : { "c" : 1 } }, "d" : { "e" : { "f" : 2 } } }
+KeyPattern: { "a.b.c" : 1, "d.e.f" : 1 }
+Keys (1):
+  { "" : 1, "" : 2 }
+
+--- UndefinedValue ---
+Input: { "a" : { "$undefined" : true } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "$undefined" : true } }
+
+--- MinKeyValue ---
+Input: { "a" : { "$minKey" : 1 } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "$minKey" : 1 } }
+
+--- MaxKeyValue ---
+Input: { "a" : { "$maxKey" : 1 } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "$maxKey" : 1 } }
+
+--- RegexValue ---
+Input: { "a" : { "$regex" : "^abc", "$options" : "i" } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "$regex" : "^abc", "$options" : "i" } }
+
+--- DateValue ---
+Input: { "a" : { "$date" : "2009-02-13T23:31:30.000+00:00" } }
+KeyPattern: { "a" : 1 }
+Keys (1):
+  { "" : { "$date" : "2009-02-13T23:31:30.000+00:00" } }
+
+--- SparseCompoundPartialMissing ---
+Input: { "a" : 5 }
+KeyPattern: { "a" : 1, "b" : 1 }
+Keys (1):
+  { "" : 5, "" : null }
+
