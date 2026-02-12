@@ -1,13 +1,24 @@
 /**
- * Finds metrics files in the given directory.
+ * Finds metrics files in the given directory created after the specified timestamp.
  * @param {string} directory - The directory path to search in.
- * @returns {Array<Object>} An array of file objects (from listFiles()) whose names end with
- *     "-metrics.jsonl". Each file object has a 'name' property containing the full file path.
+ * @param {Date} afterDate - Only return files created after this Date. If not provided, all metrics files are returned.
+ * @returns {Array<Object>} An array of file objects (from listFiles()) whose names end with "-metrics.jsonl" and were
+ *     created after the specified timestamp. Each file object has a 'name' property containing the full file path.
  */
-export function findMetricsFiles(directory) {
+export function findMetricsFiles(directory, afterDate = new Date(0)) {
     const files = listFiles(directory);
     return files.filter(function (file) {
-        return file.name.endsWith("-metrics.jsonl");
+        if (!file.name.endsWith("-metrics.jsonl")) {
+            return false;
+        }
+        if (file.lastModified < afterDate.getTime()) {
+            jsTest.log.info(
+                `Skipping metric file ${file.name} because it was modified ` +
+                    `${new Date(file.lastModified)} which is before ${afterDate}`,
+            );
+            return false;
+        }
+        return true;
     });
 }
 

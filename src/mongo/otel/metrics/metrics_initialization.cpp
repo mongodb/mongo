@@ -38,11 +38,16 @@
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/stdx/chrono.h"
 
+#include <google/protobuf/message.h>
+#include <opentelemetry/exporters/otlp/otlp_file_client.h>
+#include <opentelemetry/exporters/otlp/otlp_file_client_options.h>
+#include <opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h>
 #include <opentelemetry/exporters/otlp/otlp_file_metric_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h>
 #include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/proto/resource/v1/resource.pb.h>
 #include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h>
 #include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_options.h>
 #include <opentelemetry/sdk/metrics/meter_provider.h>
@@ -63,7 +68,7 @@ Status initializeHttp(const std::string& endpoint, const std::string& compressio
           "Initializing OpenTelemetry metrics using HTTP exporter",
           "endpoint"_attr = endpoint);
 
-    opentelemetry::exporter::otlp::OtlpHttpMetricExporterOptions hmeOpts;
+    otlp::OtlpHttpMetricExporterOptions hmeOpts;
     hmeOpts.url = endpoint;
     hmeOpts.compression = compression;
 
@@ -86,6 +91,18 @@ Status initializeHttp(const std::string& endpoint, const std::string& compressio
     return Status::OK();
 }
 
+// Uses the otlp file client to write out an empty file to do some one-time initialization.
+void prepOtlpFileClient(const otlp::OtlpFileMetricExporterOptions& fmeOpts) {
+    otlp::OtlpFileClientOptions options;
+    // This will create the same file as the actual output, which will empty from the export here
+    // and be overwritten when we actually output metrics.
+    options.backend_options = fmeOpts.backend_options;
+    otlp::OtlpFileClientRuntimeOptions runtimeOptions;
+    otlp::OtlpFileClient client(std::move(options), std::move(runtimeOptions));
+    opentelemetry::proto::resource::v1::Resource emptyMessage;
+    invariant(client.Export(emptyMessage, 1) == opentelemetry::sdk::common::ExportResult::kSuccess);
+}
+
 Status initializeFile(const std::string& directory) {
     LOGV2(10500902,
           "Initializing OpenTelemetry metrics using file exporter",
@@ -93,7 +110,7 @@ Status initializeFile(const std::string& directory) {
 
     auto pid = ProcessId::getCurrent().toString();
 
-    opentelemetry::exporter::otlp::OtlpFileMetricExporterOptions fmeOpts;
+    otlp::OtlpFileMetricExporterOptions fmeOpts;
     otlp::OtlpFileClientFileSystemOptions sysOpts;
     sysOpts.file_pattern = fmt::format("{}/mongodb-{}-%Y%m%d-metrics.jsonl", directory, pid);
     fmeOpts.backend_options = sysOpts;
@@ -104,6 +121,11 @@ Status initializeFile(const std::string& directory) {
     metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
     pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
     pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
+    // We do a empty file write immediately here because there's some one-time static initialization
+    // that needs to be done in the file exporter, which is currently not done in a thread-safe way,
+    // so if there are multiple file exporters (e.g. for metrics and for traces) it can lead to a
+    // data race.
+    prepOtlpFileClient(fmeOpts);
 
     auto reader =
         metrics_sdk::PeriodicExportingMetricReaderFactory::Create(std::move(exporter), pemOpts);

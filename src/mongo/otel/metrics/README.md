@@ -2,7 +2,7 @@
 
 This module provides an OpenTelemetry-compatible metrics API for instrumenting MongoDB code.
 Metrics are created through the `MetricsService` and can be tested using the provided test
-utilities. For now, this is only supported in mongod, SERVER-116960 will add this in mongos.
+utilities. This is supported in mongos and mongod.
 
 ## Creating Metrics
 
