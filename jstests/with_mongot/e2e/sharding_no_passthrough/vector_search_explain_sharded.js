@@ -58,7 +58,9 @@ describe("$vectorSearch sharded explain", function () {
         // Shard the collection and split at _id: 10.
         assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
         assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 10}}));
-        assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 11}, to: otherShardName}));
+        assert.commandWorked(
+            db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 11}, to: otherShardName, _waitForDelete: true}),
+        );
 
         createSearchIndex(coll, {
             name: index,
