@@ -452,10 +452,7 @@ public:
                     const Comparator& comp,
                     std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                     const Settings& settings)
-        : Sorter<Key, Value>(opts),
-          _comp(comp),
-          _settings(settings),
-          _spillHelper(std::move(spiller)) {
+        : Sorter<Key, Value>(opts), _comp(comp), _settings(settings), _spiller(std::move(spiller)) {
         setMaxMemoryUsageBytes();
     }
 
@@ -467,7 +464,7 @@ public:
         : Sorter<Key, Value>(opts, storageIdentifier),
           _comp(comp),
           _settings(settings),
-          _spillHelper(std::move(spiller)) {
+          _spiller(std::move(spiller)) {
         setMaxMemoryUsageBytes();
     }
 
@@ -498,13 +495,13 @@ protected:
                        "targetNumSpills"_attr = numTargetedSpills,
                        "parallelNumSpills"_attr = numParallelSpills);
 
-            _spillHelper->mergeSpills(this->_opts,
-                                      this->_settings,
-                                      this->_stats,
-                                      this->_iters,
-                                      _comp,
-                                      numTargetedSpills,
-                                      numParallelSpills);
+            _spiller->mergeSpills(this->_opts,
+                                  this->_settings,
+                                  this->_stats,
+                                  this->_iters,
+                                  _comp,
+                                  numTargetedSpills,
+                                  numParallelSpills);
         }
     }
 
@@ -516,7 +513,7 @@ protected:
     const Comparator _comp;
     const Settings _settings;
 
-    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spiller;
 
     /**
      * The size of the iterator for the underlying storage used by the spiller.
@@ -546,12 +543,12 @@ private:
     // iterators can use up to maxIteratorsMemoryUsagePercentage of the maxMemoryUsageBytes with
     // lower bound fileIteratorsMaxBytesSize and upper bound 1MB.
     void setMaxMemoryUsageBytes() {
-        if (this->_spillHelper == nullptr) {
+        if (this->_spiller == nullptr) {
             this->fileIteratorsMaxBytesSize = 0;
             return;
         }
-        _iteratorSize = this->_spillHelper->getStorage().getIteratorSize();
-        _bufferSize = this->_spillHelper->getStorage().getBufferSize();
+        _iteratorSize = this->_spiller->getStorage().getIteratorSize();
+        _bufferSize = this->_spiller->getStorage().getBufferSize();
         double percRequested = maxIteratorsMemoryUsagePercentage.load();
         auto iteratorMemBytesRequested =
             static_cast<size_t>(this->_opts.maxMemoryUsageBytes * percRequested);
@@ -598,7 +595,7 @@ public:
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, storageIdentifier, comp, std::move(spiller), settings) {
         invariant(opts.tempDir);
-        invariant(this->_spillHelper != nullptr);
+        invariant(this->_spiller != nullptr);
 
         auto path = *opts.tempDir / storageIdentifier;
         uassert(16815,
@@ -610,8 +607,8 @@ public:
                        ranges.end(),
                        std::back_inserter(this->_iters),
                        [this](const SorterRange& range) {
-                           return this->_spillHelper->getStorage().getSortedIterator(
-                               range, this->_settings);
+                           return this->_spiller->getStorage().getSortedIterator(range,
+                                                                                 this->_settings);
                        });
         this->_stats.setSpilledRanges(this->_iters.size());
     }
@@ -657,9 +654,9 @@ public:
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
                 return std::make_unique<InMemIterator<Key, Value>>(std::move(_data),
-                                                                   this->_spillHelper);
+                                                                   this->_spiller);
             }
-            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spillHelper);
+            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spiller);
         }
 
         spill();
@@ -683,7 +680,7 @@ public:
 
     typename Sorter<Key, Value>::PersistedState persistDataForShutdown() override {
         spill();
-        this->_spillHelper->getStorage().keep();
+        this->_spiller->getStorage().keep();
 
         std::vector<SorterRange> ranges;
         ranges.reserve(this->_iters.size());
@@ -692,7 +689,7 @@ public:
                        std::back_inserter(ranges),
                        [](auto&& it) { return it->getRange(); });
 
-        return {this->_spillHelper->getStorage().getStorageIdentifier(), ranges};
+        return {this->_spiller->getStorage().getStorageIdentifier(), ranges};
     }
 
 private:
@@ -727,7 +724,7 @@ private:
             return;
         }
 
-        if (this->_spillHelper == nullptr) {
+        if (this->_spiller == nullptr) {
             // This error message only applies to sorts from user queries made through the find or
             // aggregation commands. Other clients, such as bulk index builds, should suppress this
             // error, either by allowing external sorting or by catching and throwing a more
@@ -741,12 +738,12 @@ private:
 
         // Ensure there is sufficient disk space for spilling
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *(this->_spillHelper->getStorage().getSpillDirPath()),
+            *(this->_spiller->getStorage().getSpillDirPath()),
             internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
         sort();
 
-        auto iterator = this->_spillHelper->spill(this->_opts, this->_settings, _data, /*idx=*/0);
+        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data, /*idx=*/0);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -955,9 +952,9 @@ public:
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
                 return std::make_unique<InMemIterator<Key, Value>>(std::move(_data),
-                                                                   this->_spillHelper);
+                                                                   this->_spiller);
             }
-            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spillHelper);
+            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spiller);
         }
 
         spill();
@@ -1104,7 +1101,7 @@ private:
         sort();
         updateCutoff();
 
-        auto iters = this->_spillHelper->spill(this->_opts, this->_settings, _data, /*idx=*/0);
+        auto iters = this->_spiller->spill(this->_opts, this->_settings, _data, /*idx=*/0);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1506,17 +1503,17 @@ void BoundedSorter<Key, Value, BoundMaker>::_spill(size_t maxMemoryUsageBytes) {
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             str::stream() << "Sort exceeded memory limit of " << maxMemoryUsageBytes
                           << " bytes, but did not opt in to external sorting.",
-            this->_spillHelper != nullptr);
+            this->_spiller != nullptr);
 
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        *(this->_spillHelper->getStorage().getSpillDirPath()),
+        *(this->_spiller->getStorage().getSpillDirPath()),
         internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed()));
 
     this->_stats.incrementSpilledKeyValuePairs(_heap.size());
     this->_stats.incrementSpilledRanges();
 
     // Write out all the values from the heap in sorted order.
-    auto iteratorPtr = this->_spillHelper->spillWithHeap(_opts, Settings(), _heap);
+    auto iteratorPtr = this->_spiller->spillWithHeap(_opts, Settings(), _heap);
 
     if (auto* mergeIter =
             static_cast<typename sorter::MergeIterator<Key, Value>*>(_spillIter.get())) {

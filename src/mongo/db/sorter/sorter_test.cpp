@@ -245,7 +245,7 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest,
         makeSorterSpiller(opts, /*fileStats=*/nullptr, storageIdentifier));
 }
 
-DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spillHelper != nullptr") {
+DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSorterSpiller, "this->_spiller != nullptr") {
     unittest::TempDir storageLocation = makeTempDir();
     SorterTracker sorterTracker;
 

@@ -737,8 +737,6 @@ public:
 protected:
     SortOptions _opts;
 
-    std::shared_ptr<SorterSpiller<Key, Value>> _spiller;
-
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 
     boost::optional<SharedBufferFragmentBuilder> _memPool;
@@ -751,7 +749,7 @@ class BoundedSorterInterface : public SorterBase {
 public:
     BoundedSorterInterface(const SortOptions& opts,
                            std::shared_ptr<SorterSpiller<Key, Value>> spiller)
-        : SorterBase(opts.sorterTracker), _spillHelper(spiller) {}
+        : SorterBase(opts.sorterTracker), _spiller(spiller) {}
 
     virtual ~BoundedSorterInterface() {}
 
@@ -805,7 +803,7 @@ public:
     virtual void setBound(Key key) = 0;
 
 protected:
-    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spiller;
 };
 
 /**
