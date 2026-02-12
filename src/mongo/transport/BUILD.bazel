@@ -307,11 +307,29 @@ mongo_idl_library(
 )
 
 mongo_cc_unit_test(
+    name = "message_compressor_test",
+    srcs = [
+        "message_compressor_manager_test.cpp",
+        "message_compressor_registry_test.cpp",
+    ],
+    copts = select({
+        "//bazel/config:compiler_type_gcc": ["-Wno-stringop-overflow"],
+        "//conditions:default": [],
+    }),
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":message_compressor",
+        ":message_compressor_options_server_idl",
+        "//src/mongo:base",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:message",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "transport_test",
     srcs = [
         "max_conns_override_test.cpp",
-        "message_compressor_manager_test.cpp",
-        "message_compressor_registry_test.cpp",
         "proxy_protocol_header_parser_test.cpp",
         "service_executor_test.cpp",
         "session_manager_test.cpp",
@@ -326,8 +344,6 @@ mongo_cc_unit_test(
     data = ["//jstests/libs:test_pem_files"],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
-        ":message_compressor",
-        ":message_compressor_options_server_idl",
         ":service_executor",
         ":session_manager",
         ":transport_layer",
