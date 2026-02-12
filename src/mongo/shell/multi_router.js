@@ -93,7 +93,7 @@ class SessionMongoMap {
      */
     toString() {
         const entries = Array.from(this._map.entries())
-            .map(([key, mongo]) => `${key}: ${mongo.host}`)
+            .map(([key, value]) => `${key}: ${value.mongo.host}`)
             .join(", ");
         return `SessionMongoMap(${this._map.size} entries) { ${entries} }`;
     }
@@ -118,15 +118,32 @@ class CursorTracker {
         return cursorId instanceof NumberLong ? this.connectionsByCursorId[cursorId] : undefined;
     }
 
+    isNoCursor(cursorId) {
+        return bsonBinaryEqual({_: cursorId}, {_: this.kNoCursor});
+    }
+
     setConnectionUsedForCursor(cursorId, cursorConn) {
         // Skip if it's the "no cursor" sentinel value
-        if (cursorId instanceof NumberLong && !bsonBinaryEqual({_: cursorId}, {_: this.kNoCursor})) {
+        if (cursorId instanceof NumberLong && !this.isNoCursor(cursorId)) {
             this.connectionsByCursorId[cursorId] = cursorConn;
+            return true;
         }
+        return false;
     }
 
     count() {
         return Object.keys(this.connectionsByCursorId).length;
+    }
+
+    toString() {
+        const entries = Object.entries(this.connectionsByCursorId)
+            .map(([cursorId, mongo]) => `${cursorId} -> ${mongo.host}`)
+            .join("\n");
+        const count = this.count();
+        if (count === 0) {
+            return "CursorTracker(0 cursors) {}";
+        }
+        return `CursorTracker(${count} cursors) {\n${entries}\n  }`;
     }
 }
 
@@ -365,10 +382,10 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // ============================================================================
 
     // Broadcast the command to all mongoses and returns error if any returns error.
-    this.broadcast = function (dbName, cmd) {
+    this.broadcast = function (dbName, cmd, options, secToken) {
         let res;
         for (const mongo of this._mongoConnections) {
-            res = mongo.getDB(dbName).runCommand(cmd);
+            res = mongo._runCommandImpl(dbName, cmd, options, secToken);
             if (!res.ok) {
                 return res;
             }
@@ -378,7 +395,7 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
 
     this.refreshClusterParameters = function () {
         // This will force the refresh of all the cluster parameters
-        return this.broadcast("admin", {getClusterParameter: "*"});
+        return this.broadcast("admin", {getClusterParameter: "*"}, 0, undefined);
     };
 
     this.setLogLevel = function (logLevel, component, session) {
@@ -392,53 +409,90 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return result;
     };
 
-    this.runCommand = function (dbname, cmd, options) {
-        // Ensure we call this overriden runCommand if pinToSingleMongos is undefined or disabled.
+    this.selectMongo = function (cmd) {
+        let selectedMongo;
+        // Some query commands must use the same mongos that initiated the cursor
+        const cursorID = extractCursorID(cmd);
+        if (cursorID) {
+            const mongoForCursor = this._cursorTracker.getConnectionUsedForCursor(cursorID);
+            if (!mongoForCursor) {
+                // While a mongo is expected to be found, there are tests that specifically run getMore on non-existent cursors.
+                // For this case any mongo is equivalent because the command is only expecting to fail.
+                selectedMongo = this.primaryMongo;
+            }
+            selectedMongo = mongoForCursor;
+        }
+
+        // Multi-document transactions must use the same mongos
+        if (cmd && cmd.lsid && cmd.txnNumber) {
+            const mongoForSession = this._sessionToMongoMap.get(cmd.lsid, cmd.txnNumber);
+            if (!mongoForSession) {
+                let sessionInfo = {sessionId: cmd.lsid, txnNumber: cmd.txnNumber};
+                this.log("Found no mongo for the multi-document transaction: " + tojson(sessionInfo));
+                if (!selectedMongo) {
+                    selectedMongo = this._getNextMongo();
+                }
+                // This will erase the previous entry for the same session id but different txnNumber
+                this._sessionToMongoMap.set(cmd.lsid, cmd.txnNumber, selectedMongo);
+            }
+            if (!selectedMongo) {
+                selectedMongo = mongoForSession;
+            }
+        }
+
+        // If no mongos was pinned for the command, select a random one.
+        if (!selectedMongo) {
+            selectedMongo = this._getNextMongo();
+        }
+
+        return selectedMongo;
+    };
+
+    this._runCommandImpl = function (dbname, cmd, options, secToken) {
+        // Ensure we call this overridden _runCommandImpl if pinToSingleMongos is undefined or disabled.
         assert.neq(TestData.pinToSingleMongos, true);
 
         assertIsSupportedCommand(cmd);
 
         if (requiresBroadcast(cmd)) {
-            return this.broadcast(dbname, cmd);
+            return this.broadcast(dbname, cmd, options, secToken);
         }
 
-        let mongo;
+        const mongo = this.selectMongo(cmd);
 
-        // Multi-document transactions must use the same mongos
-        // Extract the first connection randomly and pin it for subsequent use
-        if (cmd && cmd.lsid && cmd.txnNumber) {
-            mongo = this._sessionToMongoMap.get(cmd.lsid, cmd.txnNumber);
-            if (!mongo) {
-                let sessionInfo = {sessionId: cmd.lsid, txnNuber: cmd.txnNumber};
-                this.log("Found no mongo for the multi-document transaction: " + tojson(sessionInfo));
-                mongo = this._getNextMongo();
-                // This will erase the previous entry for the same session id but different txnNumber
-                this._sessionToMongoMap.set(cmd.lsid, cmd.txnNumber, mongo);
+        // Ensure the command carries the latest known cluster time across all
+        // connections. The session layer sets $clusterTime before the entire override
+        // chain of "runCommand" starts, which can execute new commands and advance the
+        // cluster time without updating the command object.
+        // The command might therefore carrying a stale cluster time.
+        // With one mongos, this is never a problem because the mongos will have the latest cluster time.
+        // With multiple mongos, this is not guaranteed.
+        // For strict concurrency suites this can cause tests to fail.
+        if (cmd.$clusterTime) {
+            const latest = this.primaryMongo.getClusterTime();
+            if (latest && bsonWoCompare({_: latest.clusterTime}, {_: cmd.$clusterTime.clusterTime}) > 0) {
+                cmd.$clusterTime = latest;
             }
         }
 
-        // some query commands must use the same mongos that initiated the cursor
-        const cursorID = extractCursorID(cmd);
-        if (cursorID) {
-            mongo = this._cursorTracker.getConnectionUsedForCursor(cursorID);
-            if (!mongo) {
-                // While a mongo is expected to be found, there are tests that specifically run getMore on non-existent cursors.
-                // For this case any mongo is equivalent because the command is only expecting to fail.
-                mongo = this.primaryMongo;
-            }
-        }
+        let result = mongo._runCommandImpl(dbname, cmd, options, secToken);
 
-        // If no mongo has been selected yet, pick one randomly
-        if (!mongo) {
-            mongo = this._getNextMongo();
+        // Ensure the multi-router carries the latest clusterTime for the next command.
+        if (result?.$clusterTime) {
+            this.advanceClusterTime(result.$clusterTime);
         }
-
-        const result = mongo.runCommand(dbname, cmd, options);
 
         // Track cursor-to-mongos mapping for aggregations and finds
         // After extracting the first connection randomly, we pin it for subsequent getMore commands
         if (result && result.cursor && result.cursor.id && !cmd.getMore) {
-            this._cursorTracker.setConnectionUsedForCursor(result.cursor.id, mongo);
+            const isCursorInserted = this._cursorTracker.setConnectionUsedForCursor(result.cursor.id, mongo);
+            if (isCursorInserted) {
+                // Inject the MultiRouterMongo instance into the result so that DBCursor objects that are built on top of it will have a reference to the MultiRouterMongo instance.
+                // This will ensure any further "next" will run against the multi-router.
+                if (result._mongo) {
+                    result = {...result, _mongo: this};
+                }
+            }
         }
 
         if (isQuerySettingsCommand(cmd) && result && result.ok) {
@@ -454,65 +508,43 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return result;
     };
 
+    this.adminCommand = function (cmd) {
+        return Mongo.prototype.adminCommand.call(this, cmd);
+    };
+
+    this.getMongo = function () {
+        return this;
+    };
+
+    // Delegates to Mongo.prototype.runCommand so that passthrough overrides
+    // (e.g. network_error_and_txn_override.js) run before routing.
+    this.runCommand = function (dbname, cmd, options) {
+        return Mongo.prototype.runCommand.call(this, dbname, cmd, options);
+    };
+
     // ============================================================================
     // Session management
     // ============================================================================
 
-    this.startSession = function (options = {}, proxy) {
-        if (!options.hasOwnProperty("retryWrites") && this.primaryMongo.hasOwnProperty("_retryWrites")) {
-            options.retryWrites = this.primaryMongo._retryWrites;
-        }
-
-        const newDriverSession = new DriverSession(proxy, options);
-
-        if (typeof TestData === "object" && TestData.testName) {
-            print(
-                "New session started with sessionID: " +
-                    tojsononeline(newDriverSession.getSessionId()) +
-                    " and options: " +
-                    tojsononeline(options),
-            );
-        }
-
-        return newDriverSession;
+    this.startSession = function (options = {}) {
+        return Mongo.prototype.startSession.call(this, options);
     };
 
-    this._getDefaultSession = function (proxy) {
-        if (!this.hasOwnProperty("_defaultSession")) {
-            if (_shouldUseImplicitSessions()) {
-                try {
-                    this._defaultSession = this.startSession({causalConsistency: false}, proxy);
-                } catch (e) {
-                    if (e instanceof DriverSession.UnsupportedError) {
-                        chatty("WARNING: No implicit session: " + e.message);
-                        this._defaultSession = new _DummyDriverSession(proxy);
-                    } else {
-                        print("ERROR: Implicit session failed: " + e.message);
-                        throw e;
-                    }
-                }
-            } else {
-                this._defaultSession = new _DummyDriverSession(proxy);
-            }
-            this._defaultSession._isExplicit = false;
-        }
-        return this._defaultSession;
+    this._getDefaultSession = function () {
+        return Mongo.prototype._getDefaultSession.apply(this);
     };
 
     // ============================================================================
-    // Database and admin operations
+    // Database operations
     // ============================================================================
 
-    this.getDB = function (name, proxy) {
-        // Note this implementations allows to capture any overridden implementation of Mongo.prototype.getDB from custom hooks (e.g. enable_sessions.js)
-        let newDb = this.primaryMongo.getDB(name);
-        newDb._mongo = proxy;
-        return newDb;
+    this.getDB = function (name) {
+        // Delegates to Mongo.prototype.getDB to capture any overridden implementation
+        // from custom hooks (e.g. enable_sessions.js).
+        return Mongo.prototype.getDB.call(this, name);
     };
 
-    this.adminCommand = function (cmd, proxy) {
-        return this.getDB("admin", proxy).runCommand(cmd);
-    };
+    this.defaulDB = this.getDB("test");
 
     // ============================================================================
     // Authentication methods
@@ -564,17 +596,40 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return disable;
     };
 
+    this.toString = function () {
+        const allHosts = this._mongoConnections
+            .map((m, i) => {
+                const marker = m === this.primaryMongo ? " (primary)" : "";
+                return `  [${i}] ${m.host}${marker}`;
+            })
+            .join("\n");
+
+        return `MultiRouterMongo (${this._mongoConnections.length} routers) { name: ${this._name} }
+                All connections: ${allHosts}
+                Cursor tracker: ${this._cursorTracker.toString()}
+                Session map: ${this._sessionToMongoMap.toString()}`;
+    };
+
+    this.tojson = this.toString;
+
     // TODO SERVER-116289 Remove this helper
     this.hasPrimaryMongoRefreshed = false;
     this.refreshPrimaryMongoIfNeeded = function () {
         if (!this.hasPrimaryMongoRefreshed) {
-            assert.commandWorked(this.primaryMongo.adminCommand({flushRouterConfig: 1}));
+            assert.commandWorked(this.primaryMongo._runCommandImpl("admin", {flushRouterConfig: 1}, 0, undefined));
             this.hasPrimaryMongoRefreshed = true;
         }
     };
 
     // ============================================================================
     // Proxy handler
+    //
+    // The handler is responsible for dispatching commands against either the target instance or the primary mongo instance.
+    // The target instance is the MultiRouterMongo instance, which re-defines the _runCommandImpl method to dispatch commands against a random mongos.
+    // The primary mongo instance is a pinned connection that the proxy falls back on under specific cases that are commented
+    // The "proxy" is the proxy instance, which is a reference to this handler
+    // Every caller has a direct reference against the proxy. (via db.getMongo())
+    // As a consequence, "this" (which represents the caller instance) will always represents the proxy.
     // ============================================================================
     return new Proxy(this, {
         get(target, prop, proxy) {
@@ -590,42 +645,15 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
                 return value;
             }
 
-            if (prop === "_runCommandImpl") {
-                throw new Error("You should never run _runCommandImpl against the proxy but always against a Mongo!");
-            }
-
-            if (prop === "adminCommand") {
-                return function (cmd) {
-                    return target.adminCommand(cmd, proxy);
-                };
-            }
-
-            if (prop === "getMongo") {
-                return function () {
-                    return proxy;
+            // hasOwnProperty must specifically check the object instance
+            if (prop === "hasOwnProperty") {
+                return function (key) {
+                    return target.hasOwnProperty(key);
                 };
             }
 
             if (prop === "defaultDB") {
-                return target.getDB("test", proxy);
-            }
-
-            if (prop === "getDB") {
-                return function (name) {
-                    return target.getDB(name, proxy);
-                };
-            }
-
-            if (prop === "_getDefaultSession") {
-                return function () {
-                    return target._getDefaultSession(proxy);
-                };
-            }
-
-            if (prop === "startSession") {
-                return function (options) {
-                    return target.startSession(options, proxy);
-                };
+                return proxy.getDB("test");
             }
 
             if (prop === "host") {
@@ -634,11 +662,15 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
                 return target._getNextMongo().host;
             }
 
+            // If the property is defined on the MultiRouterMongo instance itself, then
+            // return it.
+            // Note this is returned "unbinded", which means that "this" will be the caller instance.
+            // Since the caller instance must always be the proxy, "this" will always be the proxy.
             if (target.hasOwnProperty(prop)) {
                 return target[prop];
             }
 
-            // For every un-implemented property, run on primary mongo
+            // Fallback to the primary mongo.
             const value = target.primaryMongo[prop];
             if (typeof value === "function") {
                 return value.bind(target.primaryMongo);

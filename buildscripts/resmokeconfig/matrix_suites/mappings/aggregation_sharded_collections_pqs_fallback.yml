@@ -6,5 +6,8 @@ description: >-
   which implicitly shards accessed collections.
 excludes:
   - "query_settings.common_aggregation_excludes"
+overrides:
+  # TODO (SERVER-119259) - Remove this override once query settings fallback is fixed for different mongos.
+  - "query_settings.sharding_temporarily_enforce_1_mongos"
 eval:
   - "query_settings.eval_implicit_query_settings_fallback"

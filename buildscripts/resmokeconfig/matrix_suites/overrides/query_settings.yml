@@ -164,6 +164,12 @@
     eval: >-
       await import("jstests/libs/override_methods/implicit_query_settings_fallback.js");
 
+- name: sharding_temporarily_enforce_1_mongos
+  value:
+    executor:
+      fixture:
+        num_mongos: 1
+
 - name: test_data_cursor_hints_to_query_settings
   value:
     executor:

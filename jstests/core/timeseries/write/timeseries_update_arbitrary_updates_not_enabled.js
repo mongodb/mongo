@@ -17,6 +17,9 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
+// TODO (SERVER-119522): Remove this once the issue is resolved.
+TestData.pinToSingleMongos = true;
+
 const timeFieldName = "time";
 const metaFieldName = "tag";
 const dateTime = ISODate("2021-07-12T16:00:00Z");

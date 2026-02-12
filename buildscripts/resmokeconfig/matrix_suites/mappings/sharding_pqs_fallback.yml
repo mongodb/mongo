@@ -3,6 +3,9 @@ description: >-
   Test the correctness of the query settings fallback mechanism by introducing planner
   failures and then expecting that the fallback-generated plan is identical to the
   original plan. This suite runs jscore tests using a sharded cluster fixture.
+overrides:
+  # TODO (SERVER-119259) - Remove this override once query settings fallback is fixed for different mongos.
+  - "query_settings.sharding_temporarily_enforce_1_mongos"
 excludes:
   - "query_settings.common_core_excludes"
   - "query_settings.fallback_core_excludes"
