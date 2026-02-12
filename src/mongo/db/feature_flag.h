@@ -234,11 +234,11 @@ public:
     void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override;
 
     bool canBeEnabled() const override {
-        return _enabled;
+        return _enabled.load();
     }
 
     bool getForServerParameter() const override {
-        return _enabled;
+        return _enabled.load();
     }
 
     void setForServerParameter(bool enabled) override;
@@ -267,7 +267,7 @@ protected:
                                                 ServerGlobalParams::FCVSnapshot fcv) const;
 
 private:
-    bool _enabled;
+    AtomicWord<bool> _enabled;
     bool _enableOnTransitionalFCV;
     multiversion::FeatureCompatibilityVersion _version;
 };

@@ -142,7 +142,7 @@ feature_flags:
         version: 8.1
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
-    # TODO SERVER-118776: remove this feature flag and instead use
+    # TODO SERVER-119354: remove this feature flag and instead use
     # gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe()
     featureFlagViewlessTimeseriesUpgradeDowngradeRetriableError:
         description: >-
