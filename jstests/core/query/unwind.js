@@ -8,7 +8,7 @@
  * ]
  */
 
-// TODO (SERVER-118495): Remove the mongos pinning once the related issue is resolved.
+// TODO (SERVER-117130): Remove the mongos pinning once the related issue is resolved.
 // When a database is dropped, a stale router will report "database not found" error for
 // deletes (instead of "ok") when pauseMigrationsDuringMultiUpdates is enabled.
 if (TestData.pauseMigrationsDuringMultiUpdates) {
