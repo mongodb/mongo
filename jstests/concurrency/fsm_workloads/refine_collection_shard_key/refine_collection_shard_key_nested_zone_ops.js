@@ -1,7 +1,13 @@
 /**
  * Same as the base workload, but refines to a nested shard key.
  *
- * @tags: [requires_persistence, requires_sharding, assumes_stable_shard_list]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_sharding,
+ *   assumes_stable_shard_list,
+ *   # TODO: SERVER-114503 Investigate DDL commands FSM tests leaking cursors.
+ *   can_leak_idle_cursors,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

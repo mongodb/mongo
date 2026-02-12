@@ -102,6 +102,7 @@ executor:
       transition_configsvr: true
       move_primary_comment: *movePrimaryComment
       is_fsm_workload: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

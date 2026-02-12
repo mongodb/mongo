@@ -71,6 +71,7 @@ executor:
           runningWithBalancer: true
           implicitlyShardOnCreateCollectionOnly: true
   hooks:
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

@@ -60,6 +60,9 @@ filters:
   - "drop_sessions_collection.py":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "check_idle_cursors.py":
+    approvers:
+      - 10gen/server-jstest-infra
   - "rotate_execution_control_params.py":
     approvers:
       - 10gen/server-workload-resilience

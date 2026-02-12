@@ -103,6 +103,7 @@ executor:
       shard_stepdown: true
       is_fsm_workload: true
       randomize_kill: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

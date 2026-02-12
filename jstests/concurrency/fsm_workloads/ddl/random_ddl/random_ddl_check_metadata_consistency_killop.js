@@ -7,6 +7,8 @@
  *   requires_sharding,
  *   # killOp does not support stepdowns.
  *   does_not_support_stepdowns,
+ *   # TODO: SERVER-114503 Investigate DDL commands FSM tests leaking cursors.
+ *   can_leak_idle_cursors,
  *  ]
  */
 

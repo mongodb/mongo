@@ -42,6 +42,7 @@ executor:
       mongod_options:
         oplogSize: 1024
   hooks:
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

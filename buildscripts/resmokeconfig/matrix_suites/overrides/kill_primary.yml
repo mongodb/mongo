@@ -287,6 +287,7 @@
         # too many network errors occur when re-running a transaction we will run out of retries.
         - class: ContinuousStepdown
           randomize_kill: true
+        - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections
@@ -306,6 +307,7 @@
         test: true
         hooks:
           - ContinuousStepdown
+          - CheckIdleCursors
           - CheckReplDBHash
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
@@ -384,6 +386,7 @@
       archive:
         test: true
         hooks:
+          - CheckIdleCursors
           - CheckReplDBHash
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
@@ -392,6 +395,7 @@
       hooks:
         - class: ContinuousStepdown
           randomize_kill: true
+        - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections

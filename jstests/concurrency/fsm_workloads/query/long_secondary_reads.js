@@ -13,7 +13,9 @@
  *   # Tests which expect commands to fail and catch the error can cause transactions to abort and
  *   # retry indefinitely.
  *   catches_command_failures,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   # TODO: SERVER-114502 Investigate agg_lookup and long_secondary_reads fsm tests leaking cursors.
+ *   can_leak_idle_cursors,
  * ]
  */
 

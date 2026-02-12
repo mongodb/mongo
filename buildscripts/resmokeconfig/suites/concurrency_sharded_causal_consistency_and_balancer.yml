@@ -69,6 +69,7 @@ executor:
           implicitlyShardOnCreateCollectionOnly: true
 
   hooks:
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

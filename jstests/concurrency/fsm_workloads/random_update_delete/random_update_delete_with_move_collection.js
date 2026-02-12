@@ -13,6 +13,8 @@
  * # TODO (SERVER-91251): Run this with stepdowns on sanitizers.
  * tsan_incompatible,
  * incompatible_aubsan,
+ * # TODO: SERVER-114503 Investigate DDL commands FSM tests leaking cursors.
+ * can_leak_idle_cursors,
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

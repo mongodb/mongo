@@ -142,6 +142,7 @@ executor:
       add_remove_random_shards: false # TODO(SERVER-91474): turn this to true when fixing the ticket
       move_primary_comment: *movePrimaryComment
       is_fsm_workload: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

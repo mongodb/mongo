@@ -133,6 +133,7 @@ executor:
       add_remove_random_shards: true
       move_primary_comment: *movePrimaryComment
       is_fsm_workload: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

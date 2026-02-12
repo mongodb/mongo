@@ -173,6 +173,7 @@ executor:
       shard_stepdown: true
       stepdown_interval_ms: 15000
       is_fsm_workload: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

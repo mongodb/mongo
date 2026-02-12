@@ -94,6 +94,7 @@ executor:
       config_stepdown: true
       shard_stepdown: true
       is_fsm_workload: true
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

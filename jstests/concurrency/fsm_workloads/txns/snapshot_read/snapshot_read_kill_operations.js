@@ -8,6 +8,8 @@
  *   requires_getmore,
  *   # This test relies on query commands returning specific batch-sized responses.
  *   assumes_no_implicit_cursor_exhaustion,
+ *   # TODO: SERVER-114500 Investigate snapshot_read* FSM tests leaking cursors.
+ *   can_leak_idle_cursors,
  * ]
  */
 

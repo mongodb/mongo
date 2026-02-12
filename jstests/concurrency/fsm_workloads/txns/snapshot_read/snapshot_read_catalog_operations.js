@@ -5,7 +5,12 @@
  * once the read has begun, catalog operations with conflicting locks will block until the read is
  * finished.
  *
- * @tags: [creates_background_indexes, uses_transactions]
+ * @tags: [
+ *   creates_background_indexes,
+ *   uses_transactions,
+ *   # TODO: SERVER-114500 Investigate snapshot_read* FSM tests leaking cursors.
+ *   can_leak_idle_cursors,
+ * ]
  */
 
 import {doSnapshotFind, doSnapshotGetMore} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";

@@ -57,6 +57,7 @@ executor:
           runningWithBalancer: false
           implicitlyShardOnCreateCollectionOnly: true
   hooks:
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
     # - class: RunDBCheckInBackground

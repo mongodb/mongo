@@ -7,6 +7,7 @@
  *
  * @tags: [
  *     requires_fcv_51,
+ *     can_leak_idle_cursors,
  * ]
  */
 

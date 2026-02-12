@@ -131,6 +131,7 @@ executor:
     - class: ContinuousInitialSync
       is_fsm_workload: true
       sync_interval_secs: 15
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

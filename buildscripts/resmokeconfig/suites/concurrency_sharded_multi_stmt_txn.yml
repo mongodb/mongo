@@ -96,6 +96,7 @@ executor:
           traceExceptions: false
           implicitlyShardOnCreateCollectionOnly: true
   hooks:
+    - class: CheckIdleCursors
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash

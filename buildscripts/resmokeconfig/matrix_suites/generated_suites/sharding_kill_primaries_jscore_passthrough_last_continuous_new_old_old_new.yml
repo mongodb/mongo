@@ -10,6 +10,7 @@ executor:
   archive:
     hooks:
       - ContinuousStepdown
+      - CheckIdleCursors
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
@@ -74,6 +75,7 @@ executor:
   hooks:
     - class: ContinuousStepdown
       randomize_kill: true
+    - class: CheckIdleCursors
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections

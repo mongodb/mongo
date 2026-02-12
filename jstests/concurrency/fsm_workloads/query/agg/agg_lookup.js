@@ -2,6 +2,10 @@
  * agg_lookup.js
  *
  * Runs a $lookup aggregation simultaneously with updates.
+ * @tags: [
+ *   # TODO: SERVER-114502 Investigate agg_lookup and long_secondary_reads fsm tests leaking cursors.
+ *   can_leak_idle_cursors,
+ * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

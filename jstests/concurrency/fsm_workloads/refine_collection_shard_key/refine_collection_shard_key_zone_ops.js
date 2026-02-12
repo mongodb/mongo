@@ -13,7 +13,13 @@
  *  - refineCollectionShardKey - Refines the collection's shard key and decreases the latch count
  *    such that the next latch collection will be targeted by the test.
  *
- * @tags: [requires_persistence, requires_sharding, assumes_stable_shard_list]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_sharding,
+ *   assumes_stable_shard_list,
+ *   # TODO: SERVER-114503 Investigate DDL commands FSM tests leaking cursors.
+ *   can_leak_idle_cursors,
+ * ]
  */
 import "jstests/libs/parallelTester.js";
 
