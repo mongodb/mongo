@@ -197,8 +197,7 @@ PlanState HashLookupUnwindStage::getNext() {
             }
             _outerKeyOpen = true;
             // We just got this outer doc, so reset the iterator to the outer key.
-            auto [outerKeyTag, outerKeyVal] = _inOuterMatchAccessor->getViewOfValue();
-            _hashTable.htIter.reset(outerKeyTag, outerKeyVal);
+            _hashTable.htIter.reset(_inOuterMatchAccessor->getViewOfValue());
             // No match yet.
             _innerSideMatched = false;
         }

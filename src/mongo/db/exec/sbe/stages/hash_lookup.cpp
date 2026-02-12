@@ -224,8 +224,7 @@ PlanState HashLookupStage::getNext() {
         // We just got this outer doc, so reset the $lookup "as" result array accumulator to nothing
         // and the hash table iterator to the outer key.
         _lookupStageOutput.reset(0, false, value::TypeTags::Nothing, 0);
-        auto [outerKeyTag, outerKeyVal] = _inOuterMatchAccessor->getViewOfValue();
-        _hashTable.htIter.reset(outerKeyTag, outerKeyVal);
+        _hashTable.htIter.reset(_inOuterMatchAccessor->getViewOfValue());
 
         // Accumulate all the matching inner docs for the outer key(s).
         accumulateFromValueIndicesVariant(_hashTable.htIter.getAllMatchingIndices());

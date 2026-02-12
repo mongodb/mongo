@@ -117,7 +117,7 @@ public:
      * Resets the iterator state to the start of a (new) outer key or key array.
      * Must be called before "getNextMatchingIndex()" or "getAllMatchingIndices()" are called.
      */
-    void reset(const value::TypeTags& outerKeyTag, const value::Value& outerKeyVal);
+    void reset(value::TagValueView outerKey);
 
 private:
     /**
@@ -137,10 +137,8 @@ private:
     // The LookupHashTable instance this is iterating, so we can call some methods in it.
     LookupHashTable& _hashTable;
 
-    // Tag of the current outer key, which may be a scalar or array.
-    value::TypeTags _outerKeyTag = value::TypeTags::Nothing;
-    // Value of the current outer key, which may be a scalar or array.
-    value::Value _outerKeyVal = 0;
+    // The current outer key, which may be a scalar or array.
+    value::TagValueView _outerKey{value::TypeTags::Nothing, 0};
     // Indicates whether the outer key is a scalar or array.
     bool _outerKeyIsArray = false;
     // Have we looked for the current individual key yet ('_hashTableMatchXyz' members are valid)?
@@ -154,9 +152,6 @@ private:
     std::set<size_t> _hashTableMatchSet;
     // If '_outerKeyIsArray' is true, the current position in '_hashTableMatchSet'.
     std::set<size_t>::const_iterator _hashTableMatchSetIter;
-
-    // Outer key used to probe the hash table.
-    value::FixedSizeRow<1 /*N*/> _iterProbeKey{1 /* columns */};
 };  // class LookupHashTableIter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,18 +270,15 @@ private:
     bool shouldCheckDiskSpace();
 
     /**
-     * Normalizes a string if '_collator' is populated and returns a third parameter to let the
-     * caller know if it should own the tag and value.
+     * Normalizes a string if '_collator' is populated.
      */
-    std::tuple<bool, value::TypeTags, value::Value> normalizeStringIfCollator(
-        value::TypeTags tag, value::Value val) const;
+    value::TagValueMaybeOwned normalizeStringIfCollator(value::TagValueView key) const;
 
     boost::optional<std::vector<size_t>> readIndicesFromRecordStore(SpillingStore* rs,
-                                                                    value::TypeTags tagKey,
-                                                                    value::Value valKey);
+                                                                    value::TagValueView key);
 
     std::pair<RecordId, key_string::TypeBits> serializeKeyForRecordStore(
-        const value::FixedSizeRow<1 /*N*/>& key) const;
+        value::TagValueView key) const;
 
     // Writes an inner collection doc to the disk buffer. via upsertToRecordStore(). These can be
     // read back from the disk store via SpillingStore::readFromRecordStore() (spilling.h).
@@ -295,13 +287,11 @@ private:
                                   const value::FixedSizeRow<1 /*N*/>&);
 
     void spillIndicesToRecordStore(SpillingStore* rs,
-                                   value::TypeTags tagKey,
-                                   value::Value valKey,
+                                   value::TagValueView key,
                                    const std::vector<size_t>& value);
 
     int64_t writeIndicesToRecordStore(SpillingStore* rs,
-                                      value::TypeTags tagKey,
-                                      value::Value valKey,
+                                      value::TagValueView key,
                                       const std::vector<size_t>& value,
                                       bool update);
 
@@ -334,9 +324,6 @@ private:
 
     // Next inner collection document index.
     size_t _valueId{0};
-
-    // Outer key used to probe the hash table.
-    value::FixedSizeRow<1 /*N*/> _htProbeKey{1 /* columns */};
 
     HashLookupStats _hashLookupStats;
 

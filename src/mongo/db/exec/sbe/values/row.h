@@ -381,16 +381,15 @@ private:
 template <typename RowType>
 struct RowEq {
     using ComparatorType = StringDataComparator;
+    // Supporting comparison of RowType with value::TagValueView allows lookup by
+    // TagValueView in hash containers where RowType is the key.
+    using is_transparent = void;
 
     explicit RowEq(const ComparatorType* comparator = nullptr) : _comparator(comparator) {}
 
     bool operator()(const RowType& lhs, const RowType& rhs) const {
         for (size_t idx = 0; idx < lhs.size(); ++idx) {
-            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
-            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, _comparator);
-
-            if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
+            if (!valuesEqual(lhs.getViewOfValue(idx), rhs.getViewOfValue(idx))) {
                 return false;
             }
         }
@@ -398,8 +397,21 @@ struct RowEq {
         return true;
     }
 
+    bool operator()(const value::TagValueView& value, const RowType& row) const {
+        return row.size() == 1 && valuesEqual(value, row.getViewOfValue(0));
+    }
+
+    bool operator()(const RowType& row, const value::TagValueView& value) const {
+        return (*this)(value, row);
+    }
+
 private:
     const ComparatorType* _comparator = nullptr;
+
+    bool valuesEqual(const value::TagValueView& lhs, const value::TagValueView& rhs) const {
+        auto [tag, val] = compareValue(lhs.tag, lhs.value, rhs.tag, rhs.value, _comparator);
+        return tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0;
+    }
 };
 typedef RowEq<MaterializedRow> MaterializedRowEq;
 typedef RowEq<FixedSizeRow<1 /*N*/>> SingleRowFixedSizeRowEq;
@@ -441,6 +453,9 @@ typedef RowLess<MaterializedRow> MaterializedRowLess;
 template <typename RowType>
 struct RowHasher {
     using CollatorType = CollatorInterface*;
+    // Also supporting hashing of value::TagValueView allows lookup by
+    // TagValueView in hash containers where RowType is the key.
+    using is_transparent = void;
 
     explicit RowHasher(const CollatorType collator = nullptr) : _collator(collator) {}
 
@@ -451,6 +466,10 @@ struct RowHasher {
             res = hashCombine(res, hashValue(tag, val, _collator));
         }
         return res;
+    }
+
+    std::size_t operator()(const value::TagValueView& view) const {
+        return hashCombine(hashInit(), hashValue(view.tag, view.value, _collator));
     }
 
 private:

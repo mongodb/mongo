@@ -592,6 +592,9 @@ public:
 
     TagValueMaybeOwned(bool owned, TypeTags t, Value v) : _owned(owned), _tag(t), _value(v) {}
 
+    explicit TagValueMaybeOwned(TagValueView view)
+        : _owned(false), _tag(view.tag), _value(view.value) {}
+
     TagValueMaybeOwned(TagValueMaybeOwned&& o) {
         _tag = o._tag;
         _value = o._value;
@@ -661,6 +664,10 @@ public:
         TagValueOwned ret = TagValueOwned::fromRaw(_tag, _value);
         disownAndClear();
         return ret;
+    }
+
+    TagValueView view() const {
+        return {_tag, _value};
     }
 
     /**
