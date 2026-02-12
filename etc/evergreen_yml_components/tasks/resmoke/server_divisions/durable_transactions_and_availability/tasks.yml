@@ -2411,6 +2411,8 @@ tasks:
         vars:
           suite: disagg_two_nodes_repl_jscore_passthrough
           use_large_distro: "true"
+          # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
+          resmoke_args: --storageEngineCacheSizeGB=5
 
   - <<: *gen_task_template
     name: disagg_repl_jscore_passthrough_secondary_reads_gen
@@ -2426,6 +2428,8 @@ tasks:
         vars:
           suite: disagg_repl_jscore_passthrough_secondary_reads
           use_large_distro: "true"
+          # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
+          resmoke_args: --storageEngineCacheSizeGB=5
 
   - <<: *gen_task_template
     name: disagg_backup_restore_jscore_passthrough_gen
