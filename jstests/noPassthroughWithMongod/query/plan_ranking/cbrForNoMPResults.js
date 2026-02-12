@@ -64,9 +64,11 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
 
     const execStats = getExecutionStats(explain)[0];
     assert.eq(execStats.nReturned, 1, toJsonForLog(explain));
-    // TODO SERVER-115958: This test failes with featureFlagSbeFull.
+    // TODO SERVER-115958: This test fails with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
-        assert.eq(execStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
+        // CBR for no MP results strategy calls runTrials again if not earlyExit.
+        // This leads to at least one more work occurring.
+        assert.eq(execStats.executionStages.works, 3 /* seek + advance + post-resume */, toJsonForLog(explain));
         assert.eq(execStats.allPlansExecution.length, 2, toJsonForLog(explain));
 
         // Winning plan trials' stats
@@ -110,7 +112,7 @@ function testEOFIsPlannedWithMultiPlanner() {
     assert.eq(executionStats.nReturned, 1, toJsonForLog(explain));
     // TODO SERVER-115958: This test failes with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
-        assert.eq(executionStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
+        assert.eq(executionStats.executionStages.works, 3 /* seek + advance + post-resume */, toJsonForLog(explain));
         assert.eq(executionStats.allPlansExecution.length, 2, toJsonForLog(explain));
 
         // Winning plan trials' stats

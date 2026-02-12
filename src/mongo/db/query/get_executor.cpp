@@ -716,11 +716,6 @@ private:
             return nullptr;
         }
 
-        if (cq.getExplain().has_value()) {
-            // Explain for executionStats cannot resume a partially executed MultiPlanStage.
-            return nullptr;
-        }
-
         auto& solutions = rResult.solutions;
         auto& maybeExplainData = rResult.maybeExplainData;
 
