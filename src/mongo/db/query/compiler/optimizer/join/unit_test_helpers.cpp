@@ -137,7 +137,7 @@ std::unique_ptr<ce::SamplingEstimator> JoinOrderingTestFixture::samplingEstimato
         nss,
         PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
         sampleSize,
-        ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
+        SamplingCEMethodEnum::kRandom,
         boost::none,
         CardinalityEstimate{CardinalityType{static_cast<double>(size)}, EstimationSource::Code});
     samplingEstimator->generateSample(ce::NoProjection{});

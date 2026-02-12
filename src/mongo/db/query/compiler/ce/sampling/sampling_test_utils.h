@@ -202,8 +202,8 @@ struct PlanRankingExecutionStatistics {
 
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef);
 
-std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>
-iniitalizeSamplingAlgoBasedOnChunks(int numOfChunks);
+std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBasedOnChunks(
+    int numOfChunks);
 
 /**
  * Sampling accuracy test extension used as a vessel to generate samples over collections and
@@ -219,8 +219,7 @@ public:
         DataConfiguration dataConfig,
         WorkloadConfiguration queryConfig,
         std::vector<SampleSizeDef> sampleSizes,
-        std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
-            samplingAlgoAndChunks,
+        std::vector<std::pair<SamplingCEMethodEnum, boost::optional<int>>> samplingAlgoAndChunks,
         bool printResults = true);
 
     void runNDVSamplingEstimatorTestConfiguration(
@@ -228,8 +227,7 @@ public:
         WorkloadConfiguration queryConfig,
         int numIters,
         std::vector<SampleSizeDef> sampleSizes,
-        std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
-            samplingAlgoAndChunks);
+        std::vector<std::pair<SamplingCEMethodEnum, boost::optional<int>>> samplingAlgoAndChunks);
 };
 
 /**
@@ -283,8 +281,7 @@ ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
 void printResult(DataConfiguration dataConfig,
                  int sampleSize,
                  WorkloadConfiguration queryConfig,
-                 const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
-                     samplingAlgoAndChunks,
+                 const std::pair<SamplingCEMethodEnum, boost::optional<int>>& samplingAlgoAndChunks,
                  ErrorCalculationSummary error);
 
 /**

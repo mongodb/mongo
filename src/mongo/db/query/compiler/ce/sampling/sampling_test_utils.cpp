@@ -174,12 +174,12 @@ size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
     MONGO_UNREACHABLE;
 }
 
-std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>
-iniitalizeSamplingAlgoBasedOnChunks(int numOfChunks) {
+std::pair<SamplingCEMethodEnum, boost::optional<int>> iniitalizeSamplingAlgoBasedOnChunks(
+    int numOfChunks) {
     if (numOfChunks <= 0) {
-        return {SamplingEstimatorImpl::SamplingStyle::kRandom, boost::none};
+        return {SamplingCEMethodEnum::kRandom, boost::none};
     } else {
-        return {SamplingEstimatorImpl::SamplingStyle::kChunk, numOfChunks};
+        return {SamplingCEMethodEnum::kChunk, numOfChunks};
     }
 }
 
@@ -349,8 +349,7 @@ ErrorCalculationSummary runQueries(WorkloadConfiguration queryConfig,
 void printResult(DataConfiguration dataConfig,
                  int sampleSize,
                  WorkloadConfiguration queryConfig,
-                 const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
-                     samplingAlgoAndChunks,
+                 const std::pair<SamplingCEMethodEnum, boost::optional<int>>& samplingAlgoAndChunks,
                  ErrorCalculationSummary error) {
     BSONObjBuilder builder;
 
@@ -451,8 +450,7 @@ void SamplingAccuracyTest::runSamplingEstimatorTestConfiguration(
     DataConfiguration dataConfig,
     WorkloadConfiguration queryConfig,
     const std::vector<SampleSizeDef> sampleSizes,
-    const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
-        samplingAlgoAndChunks,
+    const std::vector<std::pair<SamplingCEMethodEnum, boost::optional<int>>> samplingAlgoAndChunks,
     bool printResults) {
     auto dataBSON = getDataBSON(dataConfig);
     const auto collection = createColl(dataBSON, operationContext());
@@ -487,7 +485,7 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
     WorkloadConfiguration queryConfig,
     int numIters,
     const std::vector<SampleSizeDef> sampleSizes,
-    const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
+    const std::vector<std::pair<SamplingCEMethodEnum, boost::optional<int>>>
         samplingAlgoAndChunks) {
     // Generate data according to the provided configuration
     const auto dataBSON = getDataBSON(dataConfig);
@@ -546,15 +544,14 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
     auto colls = MultipleCollectionAccessor(
         collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        collection.nss(),
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        boost::none,
-        makeCardinalityEstimate(collCard));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  collection.nss(),
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  boost::none,
+                                                  makeCardinalityEstimate(collCard));
     samplingEstimator.generateSample(projectionParams);
 
     return samplingEstimator;

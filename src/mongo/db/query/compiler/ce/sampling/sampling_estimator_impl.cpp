@@ -48,8 +48,6 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -247,16 +245,6 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
     auto func = sbe::makeE<sbe::EFunction>(
         "makeBsonObj"_sd, sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
     return sbe::makeProjectStage(std::move(stage), 0 /* nodeId */, outputSlot, std::move(func));
-}
-
-inline SamplingEstimatorImpl::SamplingStyle getSamplingStyle(SamplingCEMethodEnum method) {
-    switch (method) {
-        case SamplingCEMethodEnum::kRandom:
-            return SamplingEstimatorImpl::SamplingStyle::kRandom;
-        case SamplingCEMethodEnum::kChunk:
-            return SamplingEstimatorImpl::SamplingStyle::kChunk;
-    }
-    MONGO_UNREACHABLE_TASSERT(11083904);
 }
 }  // namespace
 
@@ -563,7 +551,7 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
         generateFullCollScanSample();
-    } else if (_samplingStyle == SamplingStyle::kRandom) {
+    } else if (_samplingStyle == SamplingCEMethodEnum::kRandom) {
         generateRandomSample();
     } else {
         tassert(9372901, "The number of chunks should be positive.", _numChunks && *_numChunks > 0);
@@ -771,7 +759,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
                                              size_t sampleSize,
-                                             SamplingStyle samplingStyle,
+                                             SamplingCEMethodEnum samplingStyle,
                                              boost::optional<int> numChunks,
                                              CardinalityEstimate collectionCard)
     : _opCtx(opCtx),
@@ -787,7 +775,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
                                              const NamespaceString& nss,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                             SamplingStyle samplingStyle,
+                                             SamplingCEMethodEnum samplingStyle,
                                              CardinalityEstimate collectionCard,
                                              SamplingConfidenceIntervalEnum ci,
                                              double marginOfError,
@@ -861,7 +849,7 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
                                       collections,
                                       cq.nss(),
                                       yieldPolicy,
-                                      getSamplingStyle(qkc.getInternalQuerySamplingCEMethod()),
+                                      qkc.getInternalQuerySamplingCEMethod(),
                                       collCard,
                                       qkc.getConfidenceInterval(),
                                       qkc.getSamplingMarginOfError(),

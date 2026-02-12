@@ -76,7 +76,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(ce::NoProjection{});
@@ -97,7 +97,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(includedSampleFields);
@@ -128,7 +128,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
                                                       kTestNss,
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       sampleSize,
-                                                      SamplingEstimatorImpl::SamplingStyle::kChunk,
+                                                      SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
                                                       makeCardinalityEstimate(2000));
         samplingEstimator.generateSample(ce::NoProjection{});
@@ -182,7 +182,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
                                                       kTestNss,
                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                       sampleSize,
-                                                      SamplingEstimatorImpl::SamplingStyle::kChunk,
+                                                      SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
                                                       makeCardinalityEstimate(2000));
         samplingEstimator.generateSample(includedSampleFields);
@@ -242,7 +242,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   sampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
                                                   makeCardinalityEstimate(collectionSize));
     samplingEstimator.generateSample(ce::NoProjection{});
@@ -268,7 +268,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   sampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
                                                   makeCardinalityEstimate(collectionSize));
     samplingEstimator.generateSample(includedSampleFields);
@@ -299,7 +299,7 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(topLevelSampleFieldNames);
@@ -330,7 +330,7 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(topLevelSampleFieldNames);
@@ -357,7 +357,7 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(ce::NoProjection{});
@@ -387,7 +387,7 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(topLevelSampleFieldNames);
@@ -409,15 +409,14 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
     // A sample was generated on construction with size being the pre-determined size.
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        kSampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(10));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  kSampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(10));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -455,15 +454,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // All documents in the collection satisfy the predicate.
@@ -510,15 +508,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
@@ -527,7 +524,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        SamplingCEMethodEnum::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
     samplingEstimatorWithProjection.generateSample(StringSet{"a", "b"});
@@ -591,15 +588,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
@@ -672,15 +668,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityMultipleExpressions) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 30);
@@ -724,15 +719,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
@@ -740,7 +734,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
         kTestNss,
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        SamplingCEMethodEnum::kRandom,
         numChunks,
         makeCardinalityEstimate(card));
     samplingEstimatorWithProjection.generateSample(StringSet{"nil"});
@@ -764,15 +758,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Test IndexBounds with single field.
@@ -853,15 +846,14 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
     // Test IndexBounds with single field.
     OrderedIntervalList list("arr");
@@ -979,15 +971,14 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
 
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 20);
@@ -1112,7 +1103,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(ce::NoProjection{});
@@ -1145,7 +1136,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a", "b.c"});
@@ -1163,7 +1154,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{});
@@ -1183,7 +1174,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a"});
@@ -1207,7 +1198,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a"});
@@ -1231,7 +1222,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a"});
@@ -1261,7 +1252,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a", "b"});
@@ -1298,7 +1289,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
     samplingEstimator.generateSample(StringSet{"a", "b"});
@@ -1335,7 +1326,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
 
@@ -1363,7 +1354,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
 
@@ -1391,7 +1382,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   kTestNss,
                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                   kSampleSize,
-                                                  SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                                  SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10));
 
@@ -1488,7 +1479,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
                                           kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
-                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card));
     makeNDVAssertions(estimator, sampleSize);
@@ -1508,7 +1499,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
                                           kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
-                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card));
     makeNDVAssertions(estimator, sampleSize);
@@ -1528,7 +1519,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
                                           kTestNss,
                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                           sampleSize,
-                                          SamplingEstimatorForTesting::SamplingStyle::kRandom,
+                                          SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card));
     makeNDVAssertions(estimator, sampleSize);
@@ -1544,15 +1535,14 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
-    SamplingEstimatorForTesting samplingEstimator(
-        operationContext(),
-        colls,
-        kTestNss,
-        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-        sampleSize,
-        SamplingEstimatorForTesting::SamplingStyle::kRandom,
-        numChunks,
-        makeCardinalityEstimate(card));
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(card));
     samplingEstimator.generateSample(StringSet{"a"});
     // Ignore $expr semantics for now.
     absl::flat_hash_set<FieldPath> exprPaths;

@@ -121,7 +121,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                  int sampleSize,
                                  std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
                                  NamespaceString nss,
-                                 ce::SamplingEstimatorImpl::SamplingStyle samplingStyle,
+                                 SamplingCEMethodEnum samplingStyle,
                                  boost::optional<int> numChunks,
                                  boost::optional<PlanningTimeProfile&> timeProfile) {
     const auto collection = acquireCollection(

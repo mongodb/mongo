@@ -52,8 +52,6 @@ StringSet extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
  */
 class SamplingEstimatorImpl : public SamplingEstimator {
 public:
-    enum class SamplingStyle { kRandom = 1, kChunk = 2 };
-
     /**
      * Factory function for creating a 'SamplingEstimator' for use in differet calls into CBR.
      */
@@ -72,7 +70,7 @@ public:
                           const MultipleCollectionAccessor& collections,
                           const NamespaceString& nss,
                           PlanYieldPolicy::YieldPolicy yieldPolicy,
-                          SamplingStyle samplingStyle,
+                          SamplingCEMethodEnum samplingStyle,
                           CardinalityEstimate collectionCard,
                           SamplingConfidenceIntervalEnum ci,
                           double marginOfError,
@@ -89,7 +87,7 @@ public:
                           const NamespaceString& nss,
                           PlanYieldPolicy::YieldPolicy yieldPolicy,
                           size_t sampleSize,
-                          SamplingStyle samplingStyle,
+                          SamplingCEMethodEnum samplingStyle,
                           boost::optional<int> numChunks,
                           CardinalityEstimate collectionCard);
 
@@ -346,7 +344,7 @@ private:
     const MultipleCollectionAccessor& _collections;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
-    SamplingStyle _samplingStyle;
+    SamplingCEMethodEnum _samplingStyle;
     size_t _sampleSize;
     // The set of top level fields that we want to include in the sampled documents.
     StringSet _topLevelSampleFieldNames;

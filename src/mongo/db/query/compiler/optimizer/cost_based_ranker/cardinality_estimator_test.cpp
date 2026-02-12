@@ -767,7 +767,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         collection.nss(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
-        ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        SamplingCEMethodEnum::kRandom,
         boost::none,
         ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
     samplingEstimator.generateSample(projectionParams);
@@ -925,7 +925,7 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
         collection.nss(),
         PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
         sampleSize,
-        ce::SamplingEstimatorForTesting::SamplingStyle::kRandom,
+        SamplingCEMethodEnum::kRandom,
         boost::none,
         ce::SamplingEstimatorTest::makeCardinalityEstimate(collCard));
     samplingEstimator.generateSample(projectionParams);

@@ -48,10 +48,10 @@ std::vector<size_t> queryndvs = {1000, 1000};
 
 const std::vector<SampleSizeDef> sampleSizes{SampleSizeDef::ErrorSetting1,
                                              SampleSizeDef::ErrorSetting2};
-const std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
-    samplingAlgoAndChunks{{SamplingEstimatorImpl::SamplingStyle::kRandom, boost::none},
-                          {SamplingEstimatorImpl::SamplingStyle::kChunk, 10},
-                          {SamplingEstimatorImpl::SamplingStyle::kChunk, 20}};
+const std::vector<std::pair<SamplingCEMethodEnum, boost::optional<int>>> samplingAlgoAndChunks{
+    {SamplingCEMethodEnum::kRandom, boost::none},
+    {SamplingCEMethodEnum::kChunk, 10},
+    {SamplingCEMethodEnum::kChunk, 20}};
 
 namespace {
 std::pair<DataConfiguration, WorkloadConfiguration> buildConfigs(

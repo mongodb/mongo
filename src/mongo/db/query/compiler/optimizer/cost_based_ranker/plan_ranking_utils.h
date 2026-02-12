@@ -80,8 +80,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
                                  int sampleSize,
                                  std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
                                  NamespaceString nss,
-                                 ce::SamplingEstimatorImpl::SamplingStyle samplingStyle =
-                                     ce::SamplingEstimatorImpl::SamplingStyle::kRandom,
+                                 SamplingCEMethodEnum samplingStyle = SamplingCEMethodEnum::kRandom,
                                  boost::optional<int> numChunks = boost::none,
                                  boost::optional<PlanningTimeProfile&> times = boost::none);
 
