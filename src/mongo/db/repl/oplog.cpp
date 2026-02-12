@@ -1505,14 +1505,15 @@ void logOplogConstraintViolation(OperationContext* opCtx,
 
 UpdateResult updateObjectByRid(OperationContext* opCtx,
                                const OplogEntry& op,
-                               const CollectionPtr& collPtr,
+                               CollectionAcquisition& coll,
                                OpCounters* opCounters,
                                const BSONElement& idField,
                                OplogApplication::Mode mode,
-                               CollectionAcquisition& coll,
                                UpdateRequest request,
                                bool recordPreImage,
                                BSONObj& preImage) {
+    const CollectionPtr& collPtr = coll.getCollectionPtr();
+
     tassert(7834903, "updateObjectByRid does not support upsert requests", !request.isUpsert());
     auto rid = *op.getDurableReplOperation().getRecordId();
 
@@ -1535,14 +1536,6 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
     if (recordPreImage) {
         // Make a copy since obj needs to be used to perform the update.
         preImage = obj.value().copy();
-    }
-
-    // Oplog entries from the applyOps command need to perform shard filtering when run against
-    // primary nodes, so we route all ApplyOps oplog application through the query system to ensure
-    // correctness. Shard filtering is not performed on secondary nodes so we don't need to do this
-    // for other oplog application modes.
-    if (mode == OplogApplication::Mode::kApplyOpsCmd) {
-        return doUpdate(opCtx, coll, request);
     }
 
     // Check for a mismatch between the _id in the oplog entry and the _id
@@ -1578,41 +1571,52 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 BSONObj::kEmptyObject /* upsertedObject */};
     }
 
+    // Oplog entries from the applyOps command need to set fromMigrate:true when they write to
+    // orphaned documents, so we route all ApplyOps oplog application through the query system to
+    // ensure correctness. This is not done for oplog entries applied on secondary nodes so we don't
+    // need to do this for other oplog application modes.
+    if (mode == OplogApplication::Mode::kApplyOpsCmd) {
+        return doUpdate(opCtx, coll, request);
+    }
+
     return update::parseAndTransformOplogUpdate(opCtx, coll, obj, request, rid, cursor.get());
 }
 
 UpdateResult updateObject(OperationContext* opCtx,
                           const OplogEntry& op,
-                          const CollectionPtr& collection,
-                          CollectionAcquisition& collectionAcquisition,
+                          CollectionAcquisition& coll,
                           const UpdateRequest& request,
                           bool recordPreImage,
                           BSONObj& preImage) {
+    const CollectionPtr& collPtr = coll.getCollectionPtr();
+
     if (recordPreImage) {
         // Load the document version before update to be used as the change stream pre-image since
         // the update operation will load the new version of the document.
         invariant(op.getObject2());
         auto&& documentId = *op.getObject2();
 
-        auto documentFound = Helpers::findById(opCtx, collection->ns(), documentId, preImage);
+        auto documentFound = Helpers::findById(opCtx, collPtr->ns(), documentId, preImage);
         invariant(documentFound);
     }
 
-    return doUpdate(opCtx, collectionAcquisition, request);
+    return doUpdate(opCtx, coll, request);
 }
 
 DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                const OplogEntry& op,
-                               const CollectionPtr& collection,
+                               CollectionAcquisition& coll,
                                OpCounters* opCounters,
                                const BSONElement& idField,
                                OplogApplication::Mode mode,
                                const DeleteRequest& request) {
+    const CollectionPtr& collPtr = coll.getCollectionPtr();
+
     DeleteResult result;
     auto rid = *op.getDurableReplOperation().getRecordId();
 
     Snapshotted<BSONObj> preImage;
-    bool foundPreImage = collection->findDoc(opCtx, rid, &preImage);
+    bool foundPreImage = collPtr->findDoc(opCtx, rid, &preImage);
 
     if (!foundPreImage) {
         // The record could not be found in the collection.
@@ -1648,11 +1652,20 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
         return {.nDeleted = 0};
     }
 
+    // Oplog entries from the applyOps command need to set fromMigrate:true when they write to
+    // orphaned documents, so we route ApplyOps oplog application through the query system to ensure
+    // correctness. This is not done for oplog entries applied on secondary nodes so we don't need
+    // to do this for other oplog application modes.
+    if (mode == OplogApplication::Mode::kApplyOpsCmd) {
+        return deleteObject(opCtx, coll, request);
+    }
+
+
     // Perform the delete.
     WriteUnitOfWork wuow{opCtx};
     collection_internal::deleteDocument(
         opCtx,
-        collection,
+        collPtr,
         preImage,
         request.getStmtId(),
         rid,
@@ -2303,18 +2316,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             request.setUpsert(false);
                             return updateObjectByRid(opCtx,
                                                      op,
-                                                     collection,
+                                                     collectionAcquisition,
                                                      opCounters,
                                                      idField,
                                                      mode,
-                                                     collectionAcquisition,
                                                      request,
                                                      recordPreImage,
                                                      changeStreamPreImage);
                         } else {
                             return updateObject(opCtx,
                                                 op,
-                                                collection,
                                                 collectionAcquisition,
                                                 request,
                                                 recordPreImage,
@@ -2492,7 +2503,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     DeleteResult result;
                     if (op.getDurableReplOperation().getRecordId().has_value()) {
                         result = deleteObjectByRid(
-                            opCtx, op, collection, opCounters, idField, mode, request);
+                            opCtx, op, collectionAcquisition, opCounters, idField, mode, request);
                     } else {
                         // Run an Express delete by _id query.
                         result = deleteObject(opCtx, collectionAcquisition, request);
