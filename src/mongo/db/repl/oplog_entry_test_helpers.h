@@ -34,6 +34,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/util/modules.h"
@@ -226,5 +227,114 @@ repl::OplogEntry makeAbortTransactionOplogEntry(
     OperationSessionInfo sessionInfo,
     boost::optional<repl::OpTime> prevWriteOpTimeInTransaction);
 
+/**
+ * Creates a insert oplog entry without a recordId. Uses DurableOplogEntryParams to construct
+ * the entry.
+ */
+OplogEntry makeInsertOplogEntry(OpTime opTime,
+                                const NamespaceString& nss,
+                                const UUID& uuid,
+                                const BSONObj& docToInsert);
+
+/**
+ * Creates a delete oplog entry without a recordId. Uses DurableOplogEntryParams to construct
+ * the entry.
+ */
+OplogEntry makeDeleteOplogEntry(OpTime opTime,
+                                const NamespaceString& nss,
+                                const UUID& uuid,
+                                const BSONObj& docToDelete);
+
+/**
+ * Creates a insert oplog entry with the given recordId. Uses DurableOplogEntryParams to construct
+ * the entry, then adds the recordId since it's not included in the params struct.
+ */
+OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const UUID& uuid,
+                                            const BSONObj& docToInsert,
+                                            const RecordId& rid);
+
+/**
+ * Creates an update oplog entry with the given recordId.
+ */
+OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const BSONObj& documentToUpdate,
+                                            const BSONObj& updatedDocument,
+                                            const RecordId& rid);
+
+/**
+ * Creates an update oplog entry with the upsert flag set.
+ */
+OplogEntry makeUpdateOplogEntryWithUpsert(OpTime opTime,
+                                          const NamespaceString& nss,
+                                          const BSONObj& documentToUpdate,
+                                          const BSONObj& updatedDocument);
+
+/**
+ * Creates an update oplog entry with both the upsert flag and recordId set.
+ */
+OplogEntry makeUpdateOplogEntryWithUpsertAndRecordId(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& documentToUpdate,
+                                                     const BSONObj& updatedDocument,
+                                                     const RecordId& rid);
+
+/**
+ * Creates a delete oplog entry with the given recordId. Uses DurableOplogEntryParams to construct
+ * the entry, then adds the recordId since it's not included in the params struct.
+ */
+OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const UUID& uuid,
+                                            const BSONObj& docToDelete,
+                                            const RecordId& rid);
+
+/*
+ * Returns a collection UUID.
+ */
+UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Inserts a document into a collection at a specific recordId. Returns the RecordId where the
+ * document was inserted.
+ */
+void insertDocumentAtRecordId(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& doc,
+                              const RecordId& rid);
+
+/**
+ * Checks if a document exists at a specific recordId.
+ */
+bool documentExistsAtRecordId(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const RecordId& rid);
+
+/**
+ * Returns document at a specific recordId if it exists.
+ */
+boost::optional<BSONObj> documentAtRecordId(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const RecordId& rid);
+
+template <typename T, bool enable>
+class SetSteadyStateConstraints : public T {
+protected:
+    void setUp() override {
+        T::setUp();
+        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints.load();
+        oplogApplicationEnforcesSteadyStateConstraints.store(enable);
+    }
+
+    void tearDown() override {
+        oplogApplicationEnforcesSteadyStateConstraints.store(_constraintsEnabled);
+        T::tearDown();
+    }
+
+private:
+    bool _constraintsEnabled;
+};
 }  // namespace repl
 }  // namespace MONGO_MOD_PUB mongo

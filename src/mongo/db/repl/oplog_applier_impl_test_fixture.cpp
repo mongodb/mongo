@@ -618,6 +618,12 @@ UUID createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& ns
     return options.uuid.value();
 }
 
+void createCollectionWithPreImages(OperationContext* opCtx, const NamespaceString& nss) {
+    CollectionOptions options;
+    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
+    createCollection(opCtx, nss, options);
+}
+
 void createDatabase(OperationContext* opCtx, StringData dbName) {
     Lock::GlobalWrite globalLock(opCtx);
     bool justCreated;

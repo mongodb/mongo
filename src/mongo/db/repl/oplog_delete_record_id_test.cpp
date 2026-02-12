@@ -31,18 +31,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -55,104 +51,6 @@ namespace repl {
 namespace {
 
 /**
- * Creates a delete oplog entry without a recordId. Uses DurableOplogEntryParams to construct
- * the entry.
- */
-OplogEntry makeDeleteOplogEntry(OpTime opTime,
-                                const NamespaceString& nss,
-                                const UUID& uuid,
-                                const BSONObj& docToDelete) {
-    return {DurableOplogEntry{DurableOplogEntryParams{
-        .opTime = opTime,
-        .opType = OpTypeEnum::kDelete,
-        .nss = nss,
-        .uuid = uuid,
-        .oField = docToDelete,
-        .wallClockTime = Date_t::now(),
-    }}};
-}
-
-/**
- * Creates a delete oplog entry with the given recordId. Uses DurableOplogEntryParams to construct
- * the entry, then adds the recordId since it's not included in the params struct.
- */
-OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
-                                            const NamespaceString& nss,
-                                            const UUID& uuid,
-                                            const BSONObj& docToDelete,
-                                            const RecordId& rid) {
-    OplogEntry baseEntry = makeDeleteOplogEntry(opTime, nss, uuid, docToDelete);
-
-    // Add the recordId field since it's not included in DurableOplogEntryParams.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    rid.serializeToken("rid", &builder);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates a collection with recordIdsReplicated enabled.
- */
-UUID createCollectionWithRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    options.recordIdsReplicated = true;
-    createCollection(opCtx, nss, options);
-    return options.uuid.value();
-}
-
-/**
- * Creates a collection with both recordIdsReplicated and change stream pre-images enabled.
- */
-UUID createCollectionWithRecordIdsReplicatedAndPreImages(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    options.recordIdsReplicated = true;
-    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
-    createCollection(opCtx, nss, options);
-    return options.uuid.value();
-}
-
-/**
- * Inserts a document into a collection at a specific recordId. Returns the RecordId where the
- * document was inserted.
- */
-void insertDocumentAtRecordId(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& doc,
-                              const RecordId& rid) {
-    WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    ASSERT(coll);
-
-    InsertStatement stmt{doc};
-    stmt.replicatedRecordId = rid;
-    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr /* opDebug */));
-
-    wuow.commit();
-}
-
-/**
- * Checks if a document exists at a specific recordId.
- */
-bool documentExistsAtRecordId(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const RecordId& rid) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
-        return false;
-    }
-    auto cursor = coll->getCursor(opCtx);
-    auto record = cursor->seekExact(rid);
-    if (record.has_value()) {
-        record->data.makeOwned();
-    }
-    return record.has_value();
-}
-
-/**
  * Test fixture for delete oplog entries with recordId.
  */
 class DeleteWithRecordIdTest : public OplogApplierImplTest {
@@ -160,29 +58,15 @@ protected:
     void setUp() override {
         OplogApplierImplTest::setUp();
         _nss = NamespaceString::createNamespaceString_forTest("test.deleteRecordId");
-        _uuid = createCollectionWithRecordIdsReplicated(_opCtx.get(), _nss);
+
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
     }
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-};
-
-template <typename T, bool enable>
-class SetSteadyStateConstraints : public T {
-protected:
-    void setUp() override {
-        T::setUp();
-        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints.load();
-        oplogApplicationEnforcesSteadyStateConstraints.store(enable);
-    }
-
-    void tearDown() override {
-        oplogApplicationEnforcesSteadyStateConstraints.store(_constraintsEnabled);
-        T::tearDown();
-    }
-
-private:
-    bool _constraintsEnabled;
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
 };
 
 typedef SetSteadyStateConstraints<DeleteWithRecordIdTest, false>
@@ -479,11 +363,14 @@ protected:
             .createPreImagesCollection(_opCtx.get());
 
         _nss = NamespaceString::createNamespaceString_forTest("test.deleteRecordIdPreImages");
-        _uuid = createCollectionWithRecordIdsReplicatedAndPreImages(_opCtx.get(), _nss);
+        createCollectionWithPreImages(_opCtx.get(), _nss);
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
     }
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
 };
 
 TEST_F(DeleteWithRecordIdAndPreImagesTest,

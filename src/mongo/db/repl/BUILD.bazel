@@ -1451,6 +1451,8 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:index_builds_common",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/unittest",
     ],
 )
 

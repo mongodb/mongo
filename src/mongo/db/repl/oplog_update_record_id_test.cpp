@@ -31,18 +31,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -58,174 +52,6 @@ namespace repl {
 namespace {
 
 /**
- * Creates a delete oplog entry with the given recordId.
- */
-OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
-                                            const NamespaceString& nss,
-                                            const BSONObj& docToDelete,
-                                            const RecordId& rid) {
-    OplogEntry baseEntry = makeDeleteDocumentOplogEntry(opTime, nss, docToDelete);
-
-    // Add the recordId field since it's not included in DurableOplogEntryParams.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    rid.serializeToken("rid", &builder);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates an insert oplog entry with the given recordId.
- */
-OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
-                                            const NamespaceString& nss,
-                                            const BSONObj& docToInsert,
-                                            const RecordId& rid) {
-    OplogEntry baseEntry = makeInsertDocumentOplogEntry(opTime, nss, docToInsert);
-
-    // Add the recordId field since it's not included in DurableOplogEntryParams.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    rid.serializeToken("rid", &builder);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates an update oplog entry with the given recordId.
- */
-OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
-                                            const NamespaceString& nss,
-                                            const BSONObj& documentToUpdate,
-                                            const BSONObj& updatedDocument,
-                                            const RecordId& rid) {
-    OplogEntry baseEntry =
-        makeUpdateDocumentOplogEntry(opTime, nss, documentToUpdate, updatedDocument);
-
-    // Add the recordId field since it's not included in DurableOplogEntryParams.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    rid.serializeToken("rid", &builder);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates an update oplog entry with the upsert flag set.
- */
-OplogEntry makeUpdateOplogEntryWithUpsert(OpTime opTime,
-                                          const NamespaceString& nss,
-                                          const BSONObj& documentToUpdate,
-                                          const BSONObj& updatedDocument) {
-    OplogEntry baseEntry =
-        makeUpdateDocumentOplogEntry(opTime, nss, documentToUpdate, updatedDocument);
-
-    // Add the upsert flag ("b" field) to the oplog entry.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    builder.append("b", true);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates an update oplog entry with both the upsert flag and recordId set.
- */
-OplogEntry makeUpdateOplogEntryWithUpsertAndRecordId(OpTime opTime,
-                                                     const NamespaceString& nss,
-                                                     const BSONObj& documentToUpdate,
-                                                     const BSONObj& updatedDocument,
-                                                     const RecordId& rid) {
-    OplogEntry baseEntry =
-        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
-
-    // Add the upsert flag ("b" field) to the oplog entry that already has a recordId.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    builder.append("b", true);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates a collection with recordIdsReplicated enabled.
- */
-void createCollectionWithRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    options.recordIdsReplicated = true;
-    createCollection(opCtx, nss, options);
-}
-
-/**
- * Creates a collection with both recordIdsReplicated and change stream pre-images enabled.
- */
-UUID createCollectionWithRecordIdsReplicatedAndPreImages(OperationContext* opCtx,
-                                                         const NamespaceString& nss) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    options.recordIdsReplicated = true;
-    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
-    createCollection(opCtx, nss, options);
-    return options.uuid.value();
-}
-
-/**
- * Inserts a document into a collection at a specific recordId.
- */
-void insertDocumentAtRecordId(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& doc,
-                              const RecordId& rid) {
-    WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    ASSERT(coll);
-
-    InsertStatement stmt{doc};
-    stmt.replicatedRecordId = rid;
-    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr /* opDebug */));
-
-    wuow.commit();
-}
-
-/**
- * Checks if a document exists at a specific recordId.
- */
-bool documentExistsAtRecordId(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const RecordId& rid) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
-        return false;
-    }
-    auto cursor = coll->getCursor(opCtx);
-    auto record = cursor->seekExact(rid);
-    if (record.has_value()) {
-        record->data.makeOwned();
-    }
-    return record.has_value();
-}
-
-/**
- * Gets the document at a specific recordId. Returns boost::none if not found.
- */
-boost::optional<BSONObj> getDocumentAtRecordId(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const RecordId& rid) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
-        return boost::none;
-    }
-    auto cursor = coll->getCursor(opCtx);
-    auto record = cursor->seekExact(rid);
-    if (!record.has_value()) {
-        return boost::none;
-    }
-    record->data.makeOwned();
-    return record->data.releaseToBson();
-}
-
-/**
  * Test fixture for update oplog entries with recordId.
  */
 class UpdateWithRecordIdTest : public OplogApplierImplTest {
@@ -233,28 +59,14 @@ protected:
     void setUp() override {
         OplogApplierImplTest::setUp();
         _nss = NamespaceString::createNamespaceString_forTest("test.updateRecordId");
-        createCollectionWithRecordIdsReplicated(_opCtx.get(), _nss);
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
     }
 
     NamespaceString _nss;
-};
-
-template <typename T, bool enable>
-class SetSteadyStateConstraints : public T {
-protected:
-    void setUp() override {
-        T::setUp();
-        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints.load();
-        oplogApplicationEnforcesSteadyStateConstraints.store(enable);
-    }
-
-    void tearDown() override {
-        oplogApplicationEnforcesSteadyStateConstraints.store(_constraintsEnabled);
-        T::tearDown();
-    }
-
-private:
-    bool _constraintsEnabled;
+    UUID _uuid = UUID::gen();
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
 };
 
 typedef SetSteadyStateConstraints<UpdateWithRecordIdTest, false>
@@ -281,7 +93,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints, SuccessInSecondaryMod
     ASSERT_OK(runOpSteadyState(op));
 
     // Verify the document was updated.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 200), updatedDoc.value());
 }
@@ -306,7 +118,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
     ASSERT_OK(runOpSteadyState(op));
 
     // Verify the document was updated with only the specified fields changed.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 150 << "y" << 250 << "z" << 300),
                       updatedDoc.value());
@@ -332,7 +144,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
     ASSERT_OK(runOpSteadyState(op));
 
     // Verify the field was deleted from the document.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "keep" << 1), updatedDoc.value());
 }
@@ -384,7 +196,7 @@ TEST_F(UpdateWithRecordIdTestDisableSteadyStateConstraints, IdMismatchFails) {
     ASSERT_EQ(runOpSteadyState(op).code(), 7834902);
     // Original document should remain unchanged since upsert path was used.
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    auto existingDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto existingDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_BSONOBJ_EQ(doc, existingDoc.value());
 }
 
@@ -403,7 +215,7 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints, IdMismatchFails) {
     // and the record should not be updated.
     ASSERT_EQ(runOpSteadyState(op).code(), 7834902);
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    auto unchangedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto unchangedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_BSONOBJ_EQ(doc, unchangedDoc.value());
 }
 
@@ -428,9 +240,9 @@ TEST_F(UpdateWithRecordIdTestEnableSteadyStateConstraints,
     ASSERT_OK(runOpSteadyState(op));
 
     // Verify only the targeted document was updated.
-    auto doc1 = getDocumentAtRecordId(_opCtx.get(), _nss, rid1);
-    auto doc2 = getDocumentAtRecordId(_opCtx.get(), _nss, rid2);
-    auto doc3 = getDocumentAtRecordId(_opCtx.get(), _nss, rid3);
+    auto doc1 = documentAtRecordId(_opCtx.get(), _nss, rid1);
+    auto doc2 = documentAtRecordId(_opCtx.get(), _nss, rid2);
+    auto doc3 = documentAtRecordId(_opCtx.get(), _nss, rid3);
     ASSERT_BSONOBJ_EQ(BSON("_id" << 10 << "x" << 1), doc1.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 20 << "x" << 200), doc2.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 30 << "x" << 3), doc3.value());
@@ -455,7 +267,7 @@ TEST_F(UpdateWithRecordIdTest, UpdateWithRecordIdSuccessInInitialSyncMode) {
     ASSERT_OK(runOpInitialSync(op));
 
     // Verify the document was updated.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "x" << 300), updatedDoc.value());
 }
@@ -489,7 +301,7 @@ TEST_F(UpdateWithRecordIdTest, UpdateWithRecordIdMismatchIdInInitialSyncModeSucc
 
     // In initial sync mode, the _id mismatch is ignored and the function returns Status::OK()
     // without updating the document.
-    auto unchangedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto unchangedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(unchangedDoc.has_value());
     ASSERT_BSONOBJ_EQ(doc, unchangedDoc.value());
 }
@@ -514,9 +326,9 @@ TEST_F(UpdateWithRecordIdTest, UpdateWithRecordIdMultipleDocumentsInInitialSyncM
     ASSERT_OK(runOpInitialSync(op));
 
     // Verify only the targeted document was updated.
-    auto doc1 = getDocumentAtRecordId(_opCtx.get(), _nss, rid1);
-    auto doc2 = getDocumentAtRecordId(_opCtx.get(), _nss, rid2);
-    auto doc3 = getDocumentAtRecordId(_opCtx.get(), _nss, rid3);
+    auto doc1 = documentAtRecordId(_opCtx.get(), _nss, rid1);
+    auto doc2 = documentAtRecordId(_opCtx.get(), _nss, rid2);
+    auto doc3 = documentAtRecordId(_opCtx.get(), _nss, rid3);
     ASSERT_BSONOBJ_EQ(BSON("_id" << 100 << "a" << 100), doc1.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 200 << "a" << 2), doc2.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 300 << "a" << 3), doc3.value());
@@ -546,19 +358,19 @@ TEST_F(UpdateWithRecordIdTest, FcbisScenarioWithMismatchedRecordIdsInInitialSync
 
     // Verify rid: 1 still doesn't exist and rid: 2 document is unchanged.
     ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, originalRid));
-    auto docAfterUpdate = getDocumentAtRecordId(_opCtx.get(), _nss, clonedRid);
+    auto docAfterUpdate = documentAtRecordId(_opCtx.get(), _nss, clonedRid);
     ASSERT_TRUE(docAfterUpdate.has_value());
     ASSERT_BSONOBJ_EQ(clonedDoc, docAfterUpdate.value());
 
     // Step 3: Apply delete oplog entry targeting rid: 1 (should be no-op since rid: 1 doesn't
     // exist).
     auto deleteOp =
-        makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, BSON("_id" << 1), originalRid);
+        makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 1), originalRid);
     ASSERT_OK(runOpInitialSync(deleteOp));
 
     // Verify rid: 1 still doesn't exist and rid: 2 document is unchanged.
     ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, originalRid));
-    auto docAfterDelete = getDocumentAtRecordId(_opCtx.get(), _nss, clonedRid);
+    auto docAfterDelete = documentAtRecordId(_opCtx.get(), _nss, clonedRid);
     ASSERT_TRUE(docAfterDelete.has_value());
     ASSERT_BSONOBJ_EQ(clonedDoc, docAfterDelete.value());
 
@@ -566,12 +378,12 @@ TEST_F(UpdateWithRecordIdTest, FcbisScenarioWithMismatchedRecordIdsInInitialSync
     // rid: 2 (from FCBIS clone), this insert is skipped during initial sync (DuplicateKey errors
     // are handled by returning Status::OK()).
     auto insertOp = makeInsertOplogEntryWithRecordId(
-        nextOpTime(), _nss, BSON("_id" << 1 << "a" << 2), clonedRid);
+        nextOpTime(), _nss, _uuid, BSON("_id" << 1 << "a" << 2), clonedRid);
     ASSERT_OK(runOpInitialSync(insertOp));
 
     // Verify the final state: document at rid: 2 should still be the cloned document.
     ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, originalRid));
-    auto finalDoc = getDocumentAtRecordId(_opCtx.get(), _nss, clonedRid);
+    auto finalDoc = documentAtRecordId(_opCtx.get(), _nss, clonedRid);
     ASSERT_TRUE(finalDoc.has_value());
     ASSERT_BSONOBJ_EQ(clonedDoc, finalDoc.value());
 }
@@ -608,7 +420,7 @@ TEST_F(ApplyOpsUpdateTest, UpdateByIdSucceeds) {
     ASSERT_OK(runOpApplyOpsCmd(op));
 
     // Verify the document was updated.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 500), updatedDoc.value());
 }
@@ -633,9 +445,9 @@ TEST_F(ApplyOpsUpdateTest, ApplyOpsUpdateByIdMultipleDocumentsSucceeds) {
     ASSERT_OK(runOpApplyOpsCmd(op));
 
     // Verify only the targeted document was updated.
-    auto doc1 = getDocumentAtRecordId(_opCtx.get(), _nss, rid1);
-    auto doc2 = getDocumentAtRecordId(_opCtx.get(), _nss, rid2);
-    auto doc3 = getDocumentAtRecordId(_opCtx.get(), _nss, rid3);
+    auto doc1 = documentAtRecordId(_opCtx.get(), _nss, rid1);
+    auto doc2 = documentAtRecordId(_opCtx.get(), _nss, rid2);
+    auto doc3 = documentAtRecordId(_opCtx.get(), _nss, rid3);
     ASSERT_BSONOBJ_EQ(BSON("_id" << 10 << "value" << "a"), doc1.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 20 << "value" << "updated"), doc2.value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 30 << "value" << "c"), doc3.value());
@@ -656,7 +468,7 @@ TEST_F(ApplyOpsUpdateTest, ApplyOpsUpdateByIdDocumentNotFoundFails) {
 
     // The existing document should still be there and unchanged.
     ASSERT_TRUE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
-    auto unchangedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto unchangedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 100), unchangedDoc.value());
 }
 
@@ -676,7 +488,7 @@ TEST_F(ApplyOpsUpdateTest, ApplyOpsUpdateWithUpsertSucceeds) {
     ASSERT_OK(runOpApplyOpsCmd(op));
 
     // Verify the document was updated.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 600), updatedDoc.value());
 }
@@ -728,11 +540,14 @@ protected:
             .createPreImagesCollection(_opCtx.get());
 
         _nss = NamespaceString::createNamespaceString_forTest("test.updateRecordIdPreImages");
-        _uuid = createCollectionWithRecordIdsReplicatedAndPreImages(_opCtx.get(), _nss);
+        createCollectionWithPreImages(_opCtx.get(), _nss);
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
     }
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
 };
 
 TEST_F(UpdateWithRecordIdAndPreImagesTest,
@@ -760,7 +575,7 @@ TEST_F(UpdateWithRecordIdAndPreImagesTest,
     ASSERT_OK(runOpSteadyState(op));
 
     // Verify the document was updated.
-    auto updatedDoc = getDocumentAtRecordId(_opCtx.get(), _nss, rid);
+    auto updatedDoc = documentAtRecordId(_opCtx.get(), _nss, rid);
     ASSERT_TRUE(updatedDoc.has_value());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 200 << "data" << "original"), updatedDoc.value());
 

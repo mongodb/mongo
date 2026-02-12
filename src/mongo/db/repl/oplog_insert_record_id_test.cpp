@@ -30,18 +30,13 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -54,129 +49,22 @@ namespace repl {
 namespace {
 
 /**
- * Creates a insert oplog entry without a recordId. Uses DurableOplogEntryParams to construct
- * the entry.
- */
-OplogEntry makeInsertOplogEntry(OpTime opTime,
-                                const NamespaceString& nss,
-                                const UUID& uuid,
-                                const BSONObj& docToInsert) {
-    return {DurableOplogEntry{DurableOplogEntryParams{
-        .opTime = opTime,
-        .opType = OpTypeEnum::kInsert,
-        .nss = nss,
-        .uuid = uuid,
-        .oField = docToInsert,
-        .wallClockTime = Date_t::now(),
-    }}};
-}
-
-/**
- * Creates a insert oplog entry with the given recordId. Uses DurableOplogEntryParams to construct
- * the entry, then adds the recordId since it's not included in the params struct.
- */
-OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
-                                            const NamespaceString& nss,
-                                            const UUID& uuid,
-                                            const BSONObj& docToInsert,
-                                            const RecordId& rid) {
-    OplogEntry baseEntry = makeInsertOplogEntry(opTime, nss, uuid, docToInsert);
-
-    // Add the recordId field since it's not included in DurableOplogEntryParams.
-    BSONObjBuilder builder;
-    builder.appendElements(baseEntry.getEntry().toBSON());
-    rid.serializeToken("rid", &builder);
-
-    return {DurableOplogEntry(builder.obj())};
-}
-
-/**
- * Creates a collection with recordIdsReplicated enabled.
- */
-UUID createCollectionWithRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    options.recordIdsReplicated = true;
-    createCollection(opCtx, nss, options);
-    return options.uuid.value();
-}
-
-/**
- * Inserts a document into a collection at a specific recordId.
- */
-void insertDocumentAtRecordId(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& doc,
-                              const RecordId& rid) {
-    WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    ASSERT(coll);
-
-    InsertStatement stmt{doc};
-    stmt.replicatedRecordId = rid;
-    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr /* opDebug */));
-
-    wuow.commit();
-}
-
-/**
- * Returns document at a specific recordId if it exists.
- */
-boost::optional<BSONObj> documentAtRecordId(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            const RecordId& rid) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
-        return boost::none;
-    }
-    auto cursor = coll->getCursor(opCtx);
-    auto record = cursor->seekExact(rid);
-    if (record.has_value()) {
-        return record->data.getOwned().releaseToBson();
-    }
-    return boost::none;
-}
-
-/**
- * Returns true if a document exists at a specific recordId.
- */
-bool documentExistsAtRecordId(OperationContext* optCtx,
-                              const NamespaceString& nss,
-                              const RecordId& rid) {
-    return documentAtRecordId(optCtx, nss, rid).has_value();
-}
-
-/**
  * Test fixture for insert oplog entries with recordId.
  */
-class InsertTest : public OplogApplierImplTest {
+class InsertTestRecordIdsEnabled : public OplogApplierImplTest {
 protected:
     void setUp() override {
         OplogApplierImplTest::setUp();
         _nss = NamespaceString::createNamespaceString_forTest("test.insertRecordId");
-        _uuid = createCollectionWithRecordIdsReplicated(_opCtx.get(), _nss);
+
+        createCollection(_opCtx.get(), _nss, {});
+        _uuid = getCollectionUUID(_opCtx.get(), _nss);
     }
 
     NamespaceString _nss;
     UUID _uuid = UUID::gen();
-};
-
-template <typename T, bool enable>
-class SetSteadyStateConstraints : public T {
-protected:
-    void setUp() override {
-        T::setUp();
-        _constraintsEnabled = oplogApplicationEnforcesSteadyStateConstraints.load();
-        oplogApplicationEnforcesSteadyStateConstraints.store(enable);
-    }
-
-    void tearDown() override {
-        oplogApplicationEnforcesSteadyStateConstraints.store(_constraintsEnabled);
-        T::tearDown();
-    }
-
-private:
-    bool _constraintsEnabled;
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
 };
 
 // =============================================================================
@@ -184,8 +72,10 @@ private:
 // =============================================================================
 
 
-typedef SetSteadyStateConstraints<InsertTest, true> InsertEnabledSteadyStateConstraintsTest;
-typedef SetSteadyStateConstraints<InsertTest, false> InsertDisabledSteadyStateConstraintsTest;
+typedef SetSteadyStateConstraints<InsertTestRecordIdsEnabled, true>
+    InsertEnabledSteadyStateConstraintsTest;
+typedef SetSteadyStateConstraints<InsertTestRecordIdsEnabled, false>
+    InsertDisabledSteadyStateConstraintsTest;
 
 using InsertEnabledSteadyStateConstraintsDeathTest = InsertEnabledSteadyStateConstraintsTest;
 using InsertDisabledSteadyStateConstraintsDeathTest = InsertDisabledSteadyStateConstraintsTest;
@@ -357,7 +247,7 @@ DEATH_TEST_F(InsertDisabledSteadyStateConstraintsTest,
 /**
  * Test fixture for insert oplog entries in applyOps mode on a recordIdsReplicated collection.
  */
-class ApplyOpsInsertTest : public InsertTest {
+class ApplyOpsInsertTest : public InsertTestRecordIdsEnabled {
 protected:
     Status runOpApplyOpsCmd(const OplogEntry& op) {
         Status status = _applyOplogEntryOrGroupedInsertsWrapper(

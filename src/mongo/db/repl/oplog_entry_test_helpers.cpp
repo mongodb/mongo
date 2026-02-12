@@ -30,9 +30,17 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/unittest/assert.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
 
 namespace mongo {
@@ -383,5 +391,151 @@ repl::OplogEntry makeAbortTransactionOplogEntry(
     return {op.toBSON()};
 }
 
+OplogEntry makeInsertOplogEntry(OpTime opTime,
+                                const NamespaceString& nss,
+                                const UUID& uuid,
+                                const BSONObj& docToInsert) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kInsert,
+        .nss = nss,
+        .uuid = uuid,
+        .oField = docToInsert,
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeDeleteOplogEntry(OpTime opTime,
+                                const NamespaceString& nss,
+                                const UUID& uuid,
+                                const BSONObj& docToDelete) {
+    return {DurableOplogEntry{DurableOplogEntryParams{
+        .opTime = opTime,
+        .opType = OpTypeEnum::kDelete,
+        .nss = nss,
+        .uuid = uuid,
+        .oField = docToDelete,
+        .wallClockTime = Date_t::now(),
+    }}};
+}
+
+OplogEntry makeInsertOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const UUID& uuid,
+                                            const BSONObj& docToInsert,
+                                            const RecordId& rid) {
+    OplogEntry baseEntry = makeInsertOplogEntry(opTime, nss, uuid, docToInsert);
+
+    // Add the recordId field since it's not included in DurableOplogEntryParams.
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    rid.serializeToken("rid", &builder);
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const BSONObj& documentToUpdate,
+                                            const BSONObj& updatedDocument,
+                                            const RecordId& rid) {
+    OplogEntry baseEntry =
+        makeUpdateDocumentOplogEntry(opTime, nss, documentToUpdate, updatedDocument);
+
+    // Add the recordId field since it's not included in DurableOplogEntryParams.
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    rid.serializeToken("rid", &builder);
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithUpsert(OpTime opTime,
+                                          const NamespaceString& nss,
+                                          const BSONObj& documentToUpdate,
+                                          const BSONObj& updatedDocument) {
+    OplogEntry baseEntry =
+        makeUpdateDocumentOplogEntry(opTime, nss, documentToUpdate, updatedDocument);
+
+    // Add the upsert flag ("b" field) to the oplog entry.
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("b", true);
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeUpdateOplogEntryWithUpsertAndRecordId(OpTime opTime,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& documentToUpdate,
+                                                     const BSONObj& updatedDocument,
+                                                     const RecordId& rid) {
+    OplogEntry baseEntry =
+        makeUpdateOplogEntryWithRecordId(opTime, nss, documentToUpdate, updatedDocument, rid);
+
+    // Add the upsert flag ("b" field) to the oplog entry that already has a recordId.
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    builder.append("b", true);
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+OplogEntry makeDeleteOplogEntryWithRecordId(OpTime opTime,
+                                            const NamespaceString& nss,
+                                            const UUID& uuid,
+                                            const BSONObj& docToDelete,
+                                            const RecordId& rid) {
+    OplogEntry baseEntry = makeDeleteDocumentOplogEntry(opTime, nss, docToDelete);
+
+    // Add the recordId field since it's not included in DurableOplogEntryParams.
+    BSONObjBuilder builder;
+    builder.appendElements(baseEntry.getEntry().toBSON());
+    rid.serializeToken("rid", &builder);
+
+    return {DurableOplogEntry(builder.obj())};
+}
+
+UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    const auto optUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
+    ASSERT_TRUE(optUuid);
+    return *optUuid;
+}
+
+void insertDocumentAtRecordId(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& doc,
+                              const RecordId& rid) {
+    WriteUnitOfWork wuow(opCtx);
+    AutoGetCollection coll(opCtx, nss, MODE_IX);
+    ASSERT_TRUE(coll);
+
+    InsertStatement stmt{doc};
+    stmt.replicatedRecordId = rid;
+    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr /* opDebug */));
+
+    wuow.commit();
+}
+
+boost::optional<BSONObj> documentAtRecordId(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const RecordId& rid) {
+    AutoGetCollection coll(opCtx, nss, MODE_IS);
+    if (!coll) {
+        return boost::none;
+    }
+    auto cursor = coll->getCursor(opCtx);
+    auto record = cursor->seekExact(rid);
+    if (record.has_value()) {
+        return record->data.getOwned().releaseToBson();
+    }
+    return boost::none;
+}
+
+bool documentExistsAtRecordId(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const RecordId& rid) {
+    return documentAtRecordId(opCtx, nss, rid).has_value();
+}
 }  // namespace repl
 }  // namespace mongo
