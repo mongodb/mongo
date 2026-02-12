@@ -111,7 +111,8 @@ export function makeBatchInsertCommandArb(
  * @returns {fc.Arbitrary<DeleteByRandomIdCommand>}
  */
 export function makeDeleteByRandomIdCommandArb() {
-    return fc.constant(new DeleteByRandomIdCommand());
+    // "pick" is an arbitrary integer used to provide randomness for id selection
+    return fc.nat().map((pick) => new DeleteByRandomIdCommand(pick));
 }
 
 /**
@@ -193,7 +194,9 @@ export function makeTimeseriesCommandSequenceArb(
     ranges = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
-    const cmdArb = makeTimeseriesCommandArb(
+    const insertArb = makeInsertCommandArb(timeField, metaField, metaValue, minFields, maxFields, ranges, fieldNameArb);
+
+    const batchInsertArb = makeBatchInsertCommandArb(
         timeField,
         metaField,
         metaValue,
@@ -205,8 +208,7 @@ export function makeTimeseriesCommandSequenceArb(
         fieldNameArb,
     );
 
-    return fc.array(cmdArb, {
-        minLength: minCommands,
-        maxLength: maxCommands,
-    });
+    const deleteArb = makeDeleteByRandomIdCommandArb();
+
+    return fc.commands([insertArb, batchInsertArb, deleteArb], {minLength: minCommands, maxLength: maxCommands});
 }

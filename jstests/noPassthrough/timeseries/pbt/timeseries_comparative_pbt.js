@@ -77,16 +77,9 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         );
 
         fc.assert(
-            fc.property(programArb, (program) => {
+            fc.property(programArb, (cmds) => {
                 const model = makeEmptyModel();
-                const real = {tsColl, ctrlColl};
-
-                for (const cmd of program) {
-                    if (cmd.check(model)) {
-                        cmd.run(model, real);
-                    }
-                }
-
+                fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
                 assertCollectionsMatch();
             }),
             {numRuns: 50},
