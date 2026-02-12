@@ -1271,7 +1271,9 @@ TEST_F(DurableCatalogTest, CreateTableToleratesExistingIdent) {
 
     const auto catalogId = mdbCatalog->reserveCatalogId(opCtx);
 
+    StorageWriteTransaction swt(ru);
     ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, recordStoreOptions));
+    swt.commit();
     Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLk(opCtx, nss, MODE_IX);
     WriteUnitOfWork wuow(opCtx);

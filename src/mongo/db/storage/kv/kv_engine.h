@@ -268,6 +268,8 @@ public:
      *
      * This recovery process makes no guarantees about the integrity of data recovered or even that
      * it still exists when recovered.
+     *
+     * Must be called from within a WriteUnitOfWork.
      */
     virtual Status recoverOrphanedIdent(const rss::PersistenceProvider& provider,
                                         RecoveryUnit& ru,

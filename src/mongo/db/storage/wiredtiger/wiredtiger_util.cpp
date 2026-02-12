@@ -1512,4 +1512,17 @@ void WiredTigerUtil::truncate(WiredTigerRecoveryUnit& ru, StringData uri) {
                   *ru.getSession());
 }
 
+Status WiredTigerUtil::createTable(WiredTigerRecoveryUnit& ru,
+                                   const char* uri,
+                                   const char* config) {
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot create a table while in read-only mode",
+            !ru.readOnly());
+
+    invariant(ru.inUnitOfWork());
+    auto& session = *ru.getSessionNoTxn();
+    LOGV2(51780, "create table", "uri"_attr = uri, "config"_attr = config);
+    return wtRCToStatus(session.create(uri, config), session);
+}
+
 }  // namespace mongo

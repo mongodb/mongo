@@ -66,13 +66,25 @@ runReadOnlyTest(
                 });
 
                 // Check that create fails.
-                assert.commandFailed(db.runCommand({create: "quux"}));
+                assert.commandFailedWithCode(db.runCommand({create: "quux"}), [ErrorCodes.IllegalOperation]);
+
+                // Check that implicit create fails.
+                assert.commandFailedWithCode(db.quux.insert({a: 1}), [ErrorCodes.IllegalOperation]);
+                assert.commandFailedWithCode(db.foo.update({a: 1}, {a: 1}, {upsert: true}), [
+                    ErrorCodes.IllegalOperation,
+                ]);
 
                 // Check that drop fails.
-                assert.commandFailed(db.runCommand({drop: "foo"}));
+                assert.commandFailedWithCode(db.runCommand({drop: "foo"}), [ErrorCodes.IllegalOperation]);
 
                 // Check that dropDatabase fails.
-                assert.commandFailed(db.runCommand({dropDatabase: 1}));
+                assert.commandFailedWithCode(db.runCommand({dropDatabase: 1}), [ErrorCodes.IllegalOperation]);
+
+                // Check that renameCollection fails
+                assert.commandFailedWithCode(
+                    db.adminCommand({renameCollection: db.getName() + ".foo", to: db.getName() + ".foo2"}),
+                    [ErrorCodes.IllegalOperation],
+                );
 
                 // Check that we can read our indexes out.
                 let indexes = readableCollection.getIndexes();
@@ -84,7 +96,15 @@ runReadOnlyTest(
                 assert.docEq(expectedIndexes, actualIndexes);
 
                 // Check that createIndexes fails.
-                assert.commandFailed(db.runCommand({createIndexes: this.name, indexes: [{key: {d: 1}, name: "foo"}]}));
+                assert.commandFailedWithCode(
+                    db.runCommand({createIndexes: this.name, indexes: [{key: {d: 1}, name: "foo"}]}),
+                    [ErrorCodes.IllegalOperation],
+                );
+
+                // Check that dropIndexes fails.
+                assert.commandFailedWithCode(db.runCommand({dropIndexes: this.name, index: {a: 1}}), [
+                    ErrorCodes.IllegalOperation,
+                ]);
             },
         };
     })(),

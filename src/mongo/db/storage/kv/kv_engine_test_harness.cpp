@@ -119,12 +119,14 @@ protected:
         KVEngine* engine = helper->getEngine();
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        StorageWriteTransaction swt(ru);
         ASSERT_OK(
             engine->createRecordStore(provider,
                                       ru,
                                       NamespaceString::createNamespaceString_forTest("catalog"),
                                       "collection-catalog",
                                       RecordStore::Options{}));
+        swt.commit();
 
         return engine->getRecordStore(opCtx,
                                       NamespaceString::createNamespaceString_forTest("catalog"),
@@ -238,7 +240,9 @@ protected:
         auto opCtx = _makeOperationContext(engine);
         auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        StorageWriteTransaction swt(ru);
         ASSERT_OK(engine->createRecordStore(provider, ru, nss, ident, recordStoreOptions));
+        swt.commit();
         auto rs = engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
         ASSERT(rs);
         return rs;
@@ -356,6 +360,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
         auto opCtx = _makeOperationContext(engine);
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+        StorageWriteTransaction swt(ru);
         ASSERT_OK(engine->createSortedDataInterface(provider,
                                                     ru,
                                                     kNss,
@@ -363,6 +368,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
                                                     kIdent,
                                                     config,
                                                     boost::none /* storageEngineIndexOptions */));
+        swt.commit();
         sorted = engine->getSortedDataInterface(
             opCtx.get(), ru, kNss, kUUID, kIdent, config, kRecordStoreOptions.keyFormat);
         ASSERT(sorted);
@@ -399,8 +405,10 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
+        WriteUnitOfWork wuow(opCtx.get());
         rs = engine->makeTemporaryRecordStore(
             *shard_role_details::getRecoveryUnit(opCtx.get()), ident, KeyFormat::Long);
+        wuow.commit();
         ASSERT(rs);
     }
 

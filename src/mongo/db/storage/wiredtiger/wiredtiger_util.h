@@ -427,6 +427,13 @@ public:
      */
     static void logMetadata(WiredTigerSession& session, StringData uri);
 
+    /**
+     * Creates a new WiredTiger table with the given uri and config.
+     *
+     * Must be called in a WriteUnitOfWork.
+     */
+    static Status createTable(WiredTigerRecoveryUnit& ru, const char* uri, const char* config);
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.

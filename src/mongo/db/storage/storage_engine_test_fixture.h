@@ -40,9 +40,11 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_repair_observer.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/modules.h"
 
@@ -106,13 +108,19 @@ public:
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(
+        WriteUnitOfWork wuow(opCtx);
+        auto rs = _storageEngine->makeTemporaryRecordStore(
             opCtx, _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
+        wuow.commit();
+        return rs;
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryClustered(OperationContext* opCtx) {
-        return _storageEngine->makeTemporaryRecordStore(
+        WriteUnitOfWork wuow(opCtx);
+        auto rs = _storageEngine->makeTemporaryRecordStore(
             opCtx, _storageEngine->generateNewInternalIdent(), KeyFormat::String);
+        wuow.commit();
+        return rs;
     }
 
     /**
@@ -122,8 +130,11 @@ public:
         const std::string identName = _storageEngine->generateNewCollectionIdent(collName.dbName());
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        return _storageEngine->getEngine()->createRecordStore(
+        WriteUnitOfWork wuow(opCtx);
+        auto rs = _storageEngine->getEngine()->createRecordStore(
             provider, ru, collName, identName, RecordStore::Options{});
+        wuow.commit();
+        return rs;
     }
 
     Status dropIndexTable(OperationContext* opCtx, NamespaceString nss, StringData indexName) {

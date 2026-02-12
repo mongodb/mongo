@@ -219,8 +219,10 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    WriteUnitOfWork wuow(opCtxPtr.get());
     ASSERT_OK(
         _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+    wuow.commit();
     auto rs = _helper->getWiredTigerKVEngine()->getRecordStore(
         opCtxPtr.get(), nss, ident, options, UUID::gen());
     ASSERT(rs);
@@ -250,9 +252,12 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!boost::filesystem::exists(tmpFile));
 
 #ifdef _WIN32
-    auto status =
-        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
-    ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
+    {
+        WriteUnitOfWork wuow(opCtxPtr.get());
+        auto status = _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(
+            provider, ru, nss, ident, options);
+        ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
+    }
 #else
 
     // Dropping a collection might fail if we haven't checkpointed the data.
@@ -273,9 +278,13 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(tmpFile, *dataFilePath, err);
     ASSERT(!err) << err.message();
 
-    auto status =
-        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
-    ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
+    {
+        WriteUnitOfWork wuow(opCtxPtr.get());
+        auto status = _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(
+            provider, ru, nss, ident, options);
+        ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
+        wuow.commit();
+    }
 #endif
 }
 
@@ -287,8 +296,10 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     RecordStore::Options options;
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    StorageWriteTransaction swt(ru);
     ASSERT_OK(
         _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+    swt.commit();
 
     UUID uuid = UUID::gen();
     auto rs =
@@ -323,6 +334,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
+    WriteUnitOfWork wuow(opCtxPtr.get());
     auto status =
         _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
@@ -342,9 +354,13 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
 
     // This should recreate an empty data file successfully and move the old one to a name that ends
     // in ".corrupt".
-    auto status =
-        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
-    ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
+    {
+        WriteUnitOfWork wuow(opCtxPtr.get());
+        auto status = _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(
+            provider, ru, nss, ident, options);
+        ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
+        wuow.commit();
+    }
 
     boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
     ASSERT(boost::filesystem::exists(corruptFile));
@@ -462,6 +478,7 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     RecordStore::Options options;
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    StorageWriteTransaction swt(ru);
     ASSERT_OK(
         _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
 
@@ -474,6 +491,7 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
 
     const auto status =
         _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
+    swt.commit();
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::ObjectAlreadyExists);
 }
@@ -492,8 +510,12 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
-    ASSERT_OK(
-        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+    {
+        StorageWriteTransaction swt(ru);
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        swt.commit();
+    }
 
     const boost::optional<boost::filesystem::path> dataFilePath =
         _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
@@ -506,8 +528,12 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
 
     // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
     // when creating a new table with the same ident.
-    ASSERT_OK(
-        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+    {
+        StorageWriteTransaction swt(ru);
+        ASSERT_OK(
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        swt.commit();
+    }
 
     const boost::filesystem::path renamedFilePath = dataFilePath->generic_string() + ".1";
     ASSERT(boost::filesystem::exists(*dataFilePath));
@@ -988,8 +1014,10 @@ protected:
         auto& provider =
             rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        StorageWriteTransaction swt(ru);
         Status stat =
             _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
+        swt.commit();
         if (!stat.isOK()) {
             return stat;
         }

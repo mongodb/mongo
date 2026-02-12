@@ -92,6 +92,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/update/document_diff_serialization.h"
@@ -2203,7 +2204,9 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
     auto storageEngine = serviceContext->getStorageEngine();
     auto ident = storageEngine->generateNewInternalIdent();
     auto ru = storageEngine->newRecoveryUnit();
+    StorageWriteTransaction swt(*ru);
     auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+    swt.commit();
 
     auto k = BSONBinData("K", 1, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);
@@ -2260,7 +2263,9 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
     auto storageEngine = serviceContext->getStorageEngine();
     auto ident = storageEngine->generateNewInternalIdent();
     auto ru = storageEngine->newRecoveryUnit();
+    StorageWriteTransaction swt(*ru);
     auto trs = storageEngine->getEngine()->makeTemporaryRecordStore(*ru, ident, KeyFormat::String);
+    swt.commit();
 
     auto k = BSONBinData("K", 1, BinDataGeneral);
     auto v = BSONBinData("V", 1, BinDataGeneral);

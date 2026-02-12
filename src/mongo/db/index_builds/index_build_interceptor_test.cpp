@@ -35,6 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -71,11 +72,14 @@ protected:
     std::unique_ptr<IndexBuildInterceptor> createIndexBuildInterceptor(BSONObj spec) {
         auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
         IndexBuildInfo indexBuildInfo(spec, *storageEngine, _nss.dbName());
-        return std::make_unique<IndexBuildInterceptor>(operationContext(),
-                                                       createIndex(std::move(spec)),
-                                                       indexBuildInfo,
-                                                       /*resume=*/false,
-                                                       /*generateTableWrites=*/true);
+        WriteUnitOfWork wuow(operationContext());
+        auto interceptor = std::make_unique<IndexBuildInterceptor>(operationContext(),
+                                                                   createIndex(std::move(spec)),
+                                                                   indexBuildInfo,
+                                                                   /*resume=*/false,
+                                                                   /*generateTableWrites=*/true);
+        wuow.commit();
+        return interceptor;
     }
 
     /**

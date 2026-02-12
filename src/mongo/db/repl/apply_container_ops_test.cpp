@@ -107,8 +107,10 @@ protected:
         _bytesIdent = se->generateNewInternalIdent();
         _intIdent = se->generateNewInternalIdent();
         auto ru = se->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
         _trsBytes = se->getEngine()->makeTemporaryRecordStore(*ru, _bytesIdent, KeyFormat::String);
         _trsInt = se->getEngine()->makeTemporaryRecordStore(*ru, _intIdent, KeyFormat::Long);
+        swt.commit();
         _nss = NamespaceString::createNamespaceString_forTest("test.t");
     }
 

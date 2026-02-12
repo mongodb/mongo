@@ -38,6 +38,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 #include <utility>
@@ -88,7 +89,9 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    WriteUnitOfWork wuow(opCtx.get());
     const auto res = _engine->createRecordStore(provider, ru, nss, ident, recordStoreOptions);
+    wuow.commit();
     return _engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
 }
 
@@ -110,8 +113,10 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    WriteUnitOfWork wuow(opCtx.get());
     const auto res = _engine->createRecordStore(
         provider, ru, NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
+    wuow.commit();
 
     // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
     return std::make_unique<WiredTigerRecordStore::Oplog>(

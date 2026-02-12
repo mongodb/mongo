@@ -107,8 +107,10 @@ public:
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
+        StorageWriteTransaction swt(ru);
         invariant(Status::OK() ==
                   WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
+        swt.commit();
 
         return std::make_unique<WiredTigerIdIndex>(
             opCtx, ru, uri, UUID::gen(), "" /* ident */, config, kIsLogged);
@@ -148,8 +150,10 @@ public:
 
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
+        StorageWriteTransaction swt(ru);
         invariant(Status::OK() ==
                   WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
+        swt.commit();
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(

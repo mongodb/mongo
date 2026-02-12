@@ -1377,6 +1377,7 @@ void MultiIndexBlock::persistResumeState(OperationContext* opCtx,
     invariant(!_buildIsCleanedUp);
     invariant(_buildUUID);
 
+    WriteUnitOfWork wuow(opCtx);
     if (!_resumeStateTempRecordStore) {
         _resumeStateTempRecordStore =
             opCtx->getServiceContext()
@@ -1385,6 +1386,7 @@ void MultiIndexBlock::persistResumeState(OperationContext* opCtx,
     }
 
     _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
+    wuow.commit();
 }
 
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
@@ -1407,6 +1409,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         }
 
+        WriteUnitOfWork wuow(opCtx);
         if (!_resumeStateTempRecordStore) {
             _resumeStateTempRecordStore =
                 opCtx->getServiceContext()
@@ -1415,6 +1418,7 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
         }
 
         _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
+        wuow.commit();
 
         // Ensure all temporary tables are kept around after destruction.
         _resumeStateTempRecordStore->keep();

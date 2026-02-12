@@ -119,9 +119,11 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
 
     // Lazily initialize table when we record the first document.
     if (!_skippedRecordsTable) {
+        WriteUnitOfWork wuow(opCtx);
         _skippedRecordsTable =
             opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
                 opCtx, _ident, KeyFormat::Long);
+        wuow.commit();
     }
 
     writeConflictRetry(

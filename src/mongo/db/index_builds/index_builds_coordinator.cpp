@@ -2192,10 +2192,12 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             } else {
                 // IndexBuildInterceptor requires the the skipped records tracker table ident to
                 // be present in the resume case, so create a new table if none exists already.
+                WriteUnitOfWork wuow(opCtx);
                 skippedRecordsTrackerIdent = storageEngine->generateNewInternalIdent();
                 auto tempTable = storageEngine->makeTemporaryRecordStore(
                     opCtx, *skippedRecordsTrackerIdent, KeyFormat::Long);
                 tempTable->keep();
+                wuow.commit();
             }
             if (indexStateInfo.getDuplicateKeyTrackerTable()) {
                 constraintViolationsTrackerIdent =

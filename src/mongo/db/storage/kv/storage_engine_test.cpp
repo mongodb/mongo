@@ -416,6 +416,7 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
 TEST_F(StorageEngineTest, TemporaryRecordStoreReuseOrErrorExistingIdent) {
     const std::string ident = ident::generateNewInternalIdent();
     auto opCtx = cc().makeOperationContext();
+    WriteUnitOfWork wuow(opCtx.get());
     auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), ident, KeyFormat::Long);
     ASSERT(tempRs);
 
@@ -425,6 +426,7 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreReuseOrErrorExistingIdent) {
     ASSERT(reused);
     auto cursor = reused->rs()->getCursor(opCtx.get(), retryRu);
     ASSERT_FALSE(cursor->next());
+    wuow.commit();
 }
 
 class StorageEngineReconcileTest : public StorageEngineTest {
@@ -488,10 +490,10 @@ protected:
         std::unique_ptr<TemporaryRecordStore> ret;
         {
             Lock::GlobalLock lk(opCtx, MODE_IX);
+            WriteUnitOfWork wuow(opCtx);
             ret = _storageEngine->makeTemporaryRecordStoreForResumableIndexBuild(opCtx,
                                                                                  KeyFormat::Long);
             BSONObj resInfo = makePretendResumeInfo(pretendSideTable, indexSpec);
-            WriteUnitOfWork wuow(opCtx);
             ASSERT_OK(ret->rs()->insertRecord(opCtx,
                                               *shard_role_details::getRecoveryUnit(opCtx),
                                               resInfo.objdata(),
@@ -799,12 +801,14 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreEventuallyDropped)
 
     std::string ident;
     {
+        WriteUnitOfWork wuow(opCtx.get());
         auto tempRs = _storageEngine->makeTemporaryRecordStore(
             opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
         ident = std::string{tempRs->rs()->getIdent()};
 
         ASSERT(identExists(opCtx.get(), ident));
+        wuow.commit();
     }
 
     // The temporary record store RAII object should queue itself to be dropped by the storage
@@ -818,6 +822,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
 
     std::string ident;
     {
+        WriteUnitOfWork wuow(opCtx.get());
         auto tempRs = _storageEngine->makeTemporaryRecordStore(
             opCtx.get(), _storageEngine->generateNewInternalIdent(), KeyFormat::Long);
         ASSERT(tempRs.get());
@@ -825,6 +830,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
 
         ASSERT(identExists(opCtx.get(), ident));
         tempRs->keep();
+        wuow.commit();
     }
 
     // The ident for the record store should still exist even after a pass of the timestamp monitor.

@@ -114,8 +114,10 @@ public:
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        StorageWriteTransaction swt(ru);
         const auto res =
             _engine->createRecordStore(provider, ru, nss, ident, RecordStore::Options{});
+        swt.commit();
         return _engine->getRecordStore(opCtx, nss, ident, RecordStore::Options{}, UUID::gen());
     }
 
