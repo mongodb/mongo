@@ -188,7 +188,7 @@ public:
     /**
      * Indicates whether extra logging should occur during validation.
      */
-    bool logDiagnostics() {
+    bool logDiagnostics() const {
         return _logDiagnostics;
     }
 
@@ -201,22 +201,22 @@ public:
     }
 
 private:
-    const ValidateMode _validateMode;
+    ValidateMode _validateMode;
 
-    const RepairMode _repairMode;
+    RepairMode _repairMode;
 
     // Can be set to obtain better insight into what validate sees/does.
-    const bool _logDiagnostics;
+    bool _logDiagnostics;
 
-    const ValidationVersion _validationVersion;
+    ValidationVersion _validationVersion;
 
-    const boost::optional<std::string> _verifyConfigurationOverride;
+    boost::optional<std::string> _verifyConfigurationOverride;
 
-    const boost::optional<Timestamp> _readTimestamp;
+    boost::optional<Timestamp> _readTimestamp;
 
-    const boost::optional<std::vector<std::string>> _hashPrefixes;
+    boost::optional<std::vector<std::string>> _hashPrefixes;
 
-    const boost::optional<std::vector<std::string>> _revealHashedIds;
+    boost::optional<std::vector<std::string>> _revealHashedIds;
 };
 
 }  // namespace mongo::CollectionValidation
