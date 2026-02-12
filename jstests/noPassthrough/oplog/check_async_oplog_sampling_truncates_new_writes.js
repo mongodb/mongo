@@ -134,11 +134,14 @@ assert.soon(() => {
     while (cursor.hasNext()) {
         const entry = cursor.next();
         jsTest.log.info("Checking " + tojson(entry));
-        largeDocIDs.forEach((id) => {
-            if (id == entry.o["_id"]) {
-                return false;
-            }
+
+        const foundId = largeDocIDs.some((id) => {
+            return id == entry.o["_id"];
         });
+
+        if (foundId) {
+            return false;
+        }
     }
     return true;
 });
