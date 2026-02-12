@@ -80,6 +80,10 @@ private:
 class RangeDeleterServiceTest : service_context_test::WithSetupTransportLayer,
                                 public ShardServerTestFixture {
 public:
+    using Options = ShardServerTestFixture::Options;
+
+    RangeDeleterServiceTest() : ShardServerTestFixture() {}
+
     void setUp() override;
     void tearDown() override;
 
@@ -101,6 +105,10 @@ public:
 
     inline static const std::string kShardKey = "_id";
     inline static const BSONObj kShardKeyPattern = BSON(kShardKey << 1);
+
+protected:
+    explicit RangeDeleterServiceTest(Options options)
+        : ShardServerTestFixture(std::move(options)) {}
 
 private:
     void _setFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid);

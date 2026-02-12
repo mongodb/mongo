@@ -362,6 +362,19 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete,
     TaskPending pending) {
+    auto lock = _acquireMutexUnconditionally();
+    uassert(ErrorCodes::NotYetInitialized,
+            "RangeDeleterService is not yet initialized for the current term",
+            _getTermInitializationFuture(lock).isReady());
+
+    LOGV2_DEBUG(7536600,
+                2,
+                "Registering range deletion task",
+                "collectionUUID"_attr = rdt.getCollectionUuid(),
+                "range"_attr = redact(rdt.getRange().toString()),
+                "pending"_attr = pending);
+
+    auto [task, registrationResult] = _rangeDeletionTasks.registerTask(rdt);
 
     auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
         (void)pendingFuture.thenRunOn(_executor)
@@ -371,34 +384,42 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             })
             .then([this,
                    collectionUuid = rdt.getCollectionUuid(),
-                   range = rdt.getRange(),
-                   registrationTime = rdt.getTimestamp().value_or(
-                       Timestamp(getGlobalServiceContext()->getFastClockSource()->now())),
-                   taskId = rdt.getId()]() {
+                   range = task->getRange(),
+                   registrationTime = task->getRegistrationTime(),
+                   taskId = task->getTaskId()]() {
                 // Acquire lock to safely access the range deletion tasks tracker.
                 auto lock = _acquireMutexUnconditionally();
                 auto overlappingTasks =
                     _rangeDeletionTasks.getOverlappingTasks(collectionUuid, range);
 
                 std::vector<ExecutorFuture<void>> futures;
-                for (const auto& [_, task] : overlappingTasks) {
+                for (const auto& [_, overlappingTask] : overlappingTasks) {
                     // The current task is now in the map since we call
                     // getOverlappingTasks() after registration. We do not want to wait on
                     // ourselves, so skip.
-                    if (task->getTaskId() == taskId) {
+                    if (overlappingTask->getTaskId() == taskId) {
                         continue;
                     }
-                    if ((task->getRegistrationTime() < registrationTime) ||
-                        (task->getRegistrationTime() == registrationTime &&
-                         taskId < task->getTaskId())) {
-                        futures.emplace_back(task->getCompletionFuture().thenRunOn(_executor));
+
+                    if ((overlappingTask->getRegistrationTime() < registrationTime) ||
+                        (overlappingTask->getRegistrationTime() == registrationTime &&
+                         taskId < overlappingTask->getTaskId())) {
+                        LOGV2_DEBUG(11943500,
+                                    2,
+                                    "Waiting for overlapping range deletion task to complete",
+                                    "collectionUUID"_attr = collectionUuid,
+                                    "range"_attr = redact(range.toString()),
+                                    "overlapping_range"_attr =
+                                        redact(overlappingTask->getRange().toString()));
+                        futures.emplace_back(
+                            overlappingTask->getCompletionFuture().thenRunOn(_executor));
                     }
                 }
                 // We want to wait for all overlapping range deletion tasks to finish before
-                // proceeding with this task. This is because the range deleter service assumes that
-                // there are no overlapping range deletion tasks and attempting to union tasks or
-                // splice incoming tasks could lead to unexpected behavior with the current
-                // implementation.
+                // proceeding with this task. This is because the range deleter service assumes
+                // that there are no overlapping range deletion tasks and attempting to union
+                // tasks or splice incoming tasks could lead to unexpected behavior with the
+                // current implementation.
                 if (futures.empty()) {
                     return SemiFuture<std::vector<Status>>::makeReady(std::vector<Status>{});
                 }
@@ -445,20 +466,6 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
                 }
             });
     };
-
-    auto lock = _acquireMutexUnconditionally();
-    uassert(ErrorCodes::NotYetInitialized,
-            "RangeDeleterService is not yet initialized for the current term",
-            _getTermInitializationFuture(lock).isReady());
-
-    LOGV2_DEBUG(7536600,
-                2,
-                "Registering range deletion task",
-                "collectionUUID"_attr = rdt.getCollectionUuid(),
-                "range"_attr = redact(rdt.getRange().toString()),
-                "pending"_attr = pending);
-
-    auto [task, registrationResult] = _rangeDeletionTasks.registerTask(rdt);
 
     // Register the task on the service only once, duplicate registrations will join.
     if (registrationResult == RangeDeletionTaskTracker::kRegisteredNewTask) {

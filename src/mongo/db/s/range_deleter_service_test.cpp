@@ -58,6 +58,7 @@
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -77,6 +78,16 @@ void simulateStepup(OperationContext* opCtx, long long term) {
     RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, term);
     RangeDeleterService::get(opCtx)->getServiceUpFuture().get(opCtx);
 }
+
+class RangeDeleterServiceTestWithMockClock : public RangeDeleterServiceTest {
+public:
+    RangeDeleterServiceTestWithMockClock()
+        : RangeDeleterServiceTest(Options().useMockClock(true, Milliseconds{1})) {}
+
+    ClockSourceMock* fastClock() const {
+        return checked_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+};
 }  // namespace
 
 /**
@@ -1061,6 +1072,50 @@ TEST_F(RangeDeleterServiceTest, RegisterOverlappingTaskWaitsForOlderTask) {
     // Now task1 should be able to complete (after task0 finished)
     completionFuture1.get(opCtx);
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTestWithMockClock,
+       RegisterOverlappingTasksWithEqualDefaultRegistrationTimeDoesNotDeadlock) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Force stable UUID ordering so that, when registration times are equal, the first task will
+    // wait on the second task.
+    auto id0 = UUID::gen();
+    auto id1 = UUID::gen();
+    if (id1 < id0) {
+        std::swap(id0, id1);
+    }
+
+    // Task0: [10, 30) and Task1: [5, 15) overlap. Do not provide an explicit registration timestamp
+    // so that during registration, they compute a default time from the fastClock.
+    auto rdt0 = createRangeDeletionTask(uuidCollA,
+                                        BSON(RangeDeleterServiceTest::kShardKey << 10),
+                                        BSON(RangeDeleterServiceTest::kShardKey << 30));
+    auto rdt1 = createRangeDeletionTask(uuidCollA,
+                                        BSON(RangeDeleterServiceTest::kShardKey << 5),
+                                        BSON(RangeDeleterServiceTest::kShardKey << 15));
+
+    rdt0.setId(id0);
+    rdt1.setId(id1);
+
+    auto completionFuture0 = rds->registerTask(
+        rdt0, SemiFuture<void>::makeReady(), RangeDeleterService::TaskPending::kPending);
+
+    // The fast clock auto-advances on every read; by rewinding it by 1ms here, we force the next
+    // task's registration time to equal the prior task's registration time.
+    fastClock()->advance(Milliseconds{-1});
+
+    auto completionFuture1 = rds->registerTask(
+        rdt1, SemiFuture<void>::makeReady(), RangeDeleterService::TaskPending::kPending);
+
+    insertRangeDeletionTaskDocument(opCtx, rdt0);
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+
+    removePendingField(opCtx, rdt0.getId());
+    removePendingField(opCtx, rdt1.getId());
+
+    completionFuture0.get(opCtx);
+    completionFuture1.get(opCtx);
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterOverlappingTasksNoDeadlock) {
