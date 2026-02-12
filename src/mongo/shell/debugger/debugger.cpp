@@ -34,11 +34,16 @@
 #include <jsapi.h>
 
 #include <js/CompilationAndEvaluation.h>
+#include <js/Conversions.h>
 #include <js/SourceText.h>
 
 namespace mongo {
 namespace mozjs {
 
+
+static AtomicWord<bool> _paused{false};
+static std::string _pausedScript;
+static int _pausedLine{0};
 
 DebuggerObject::DebuggerObject(JSContext* cx, JS::HandleObject debugger)
     : _cx(cx), _debugger(cx, debugger) {}
@@ -85,8 +90,24 @@ Status DebuggerObject::addDebuggee(JS::RootedObject const& global) {
 }
 
 bool DebuggerObject::onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
-    std::cout << "[WIP] in debugger callback!" << std::endl;
+
+    DebuggerFrame frame(cx);
+    _pausedScript = frame.getScriptUrl();
+    _pausedLine = frame.getLineNumber();
+
+    std::cout << std::endl;
+    std::cout << "JSDEBUG> JavaScript execution paused in 'debugger' statement." << std::endl;
+    std::cout << "JSDEBUG> Type 'dbcont' to continue" << std::endl;
+
+    _paused.store(true);  // cue the thread to prompt the user
     return true;
+};
+
+bool DebuggerObject::isPausedCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    args.rval().setBoolean(_paused.load());
+
+    return true;  // this is independent of the JS return value
 };
 
 Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& global) {
@@ -100,10 +121,27 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
         return status;
     }
 
+    if (!(status = registerNativeFunction(
+              _cx, global, "__isPaused", DebuggerObject::isPausedCallback, 1))
+             .isOK()) {
+        return status;
+    }
+
+
     const char* hookCode = R"HOOK(
             (function(frame) {
-                // Call C++ callback
+                // Store location info so C++ can access it
+                globalThis.__pausedLocation = {
+                    script: frame.script?.url ?? "unknown",
+                    line: frame.script?.getOffsetLocation?.call(frame.script, frame.offset)?.lineNumber ?? 0,
+                };
+                
+                // invoke the C++ callback
                 globalThis.__onDebuggerStatementCallback(frame);
+                while (globalThis.__isPaused()) {
+                    // wait
+                }
+
                 return undefined;
             })
         )HOOK";
@@ -159,6 +197,109 @@ Status DebuggerObject::registerNativeFunction(
     return Status::OK();
 }
 
+DebuggerFrame::DebuggerFrame(JSContext* cx) : _cx(cx) {}
+
+// Currently this just queries the context for a "__pausedLocation" property of the form {script,
+// line}. Relying on JS here drastically reduces LOC to otherwise retrieve those in C++.
+std::string DebuggerFrame::getScriptUrl() {
+    JS::RootedObject global(_cx, JS::CurrentGlobalOrNull(_cx));
+
+    // Read location info that was set by the JavaScript hook
+    JS::RootedValue locationVal(_cx);
+    if (JS_GetProperty(_cx, global, "__pausedLocation", &locationVal) && locationVal.isObject()) {
+        JS::RootedObject locationObj(_cx, &locationVal.toObject());
+
+        // Get script property
+        JS::RootedValue scriptVal(_cx);
+        if (JS_GetProperty(_cx, locationObj, "script", &scriptVal) && scriptVal.isString()) {
+            JS::RootedString scriptStr(_cx, scriptVal.toString());
+            JS::UniqueChars scriptChars = JS_EncodeStringToUTF8(_cx, scriptStr);
+            if (scriptChars) {
+                return std::string(scriptChars.get());
+            }
+        }
+    }
+    return "";
+}
+
+// Currently this just queries the context for a "__pausedLocation" property of the form {script,
+// line}. Relying on JS here drastically reduces LOC to otherwise retrieve those in C++.
+int DebuggerFrame::getLineNumber() {
+    JS::RootedObject global(_cx, JS::CurrentGlobalOrNull(_cx));
+
+    // Read location info that was set by the JavaScript hook
+    JS::RootedValue locationVal(_cx);
+    if (JS_GetProperty(_cx, global, "__pausedLocation", &locationVal) && locationVal.isObject()) {
+        JS::RootedObject locationObj(_cx, &locationVal.toObject());
+
+        // Get line property
+        JS::RootedValue lineVal(_cx);
+        if (JS_GetProperty(_cx, locationObj, "line", &lineVal)) {
+            int32_t lineNum;
+            if (JS::ToInt32(_cx, lineVal, &lineNum)) {
+                return lineNum;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+std::unique_ptr<std::thread> _stdinThread;
+
+void DebuggerGlobal::handleStdinThread() {
+    // Open /dev/tty to read directly from the terminal, even when stdin is redirected
+    FILE* tty_in = fopen("/dev/tty", "r");
+    if (!tty_in) {
+        std::cerr << "Failed to open /dev/tty for debug input: " << strerror(errno) << std::endl;
+        std::cerr << "Debug pause/continue will not work" << std::endl;
+        return;
+    }
+
+    // Open /dev/tty for writing as well, so prompts appear even when stdout is redirected
+    FILE* tty_out = fopen("/dev/tty", "w");
+    if (!tty_out) {
+        std::cerr << "Failed to open /dev/tty for debug output: " << strerror(errno) << std::endl;
+        fclose(tty_in);
+        return;
+    }
+
+    char buffer[256];
+    while (true) {
+        if (_paused.load()) {
+            if (!_pausedScript.empty()) {
+                fprintf(tty_out, "JSDEBUG@%s:%d> ", _pausedScript.c_str(), _pausedLine);
+            } else {
+                fprintf(tty_out, "JSDEBUG> ");
+            }
+            fflush(tty_out);
+            if (!fgets(buffer, sizeof(buffer), tty_in)) {
+                // EOF or error
+                break;
+            }
+
+            std::string command(buffer);
+
+            // Trim whitespace and newline
+            command.erase(0, command.find_first_not_of(" \t\n\r"));
+            command.erase(command.find_last_not_of(" \t\n\r") + 1);
+
+            if (command == "dbcont") {
+                fprintf(tty_out, "JSDEBUG> Continuing execution...\n");
+                fflush(tty_out);
+                _paused.store(false);
+            }
+        } else {
+            // Not paused, sleep a bit to avoid spinning
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
+    }
+
+
+    fclose(tty_in);
+    fclose(tty_out);
+}
 
 Status DebuggerGlobal::init(JSContext* cx) {
 
@@ -206,6 +347,9 @@ Status DebuggerGlobal::init(JSContext* cx) {
         }
 
     }  // Exit debugger compartment - JSAutoRealm goes out of scope here
+
+    // Start stdin handling thread for debug commands
+    _stdinThread = std::make_unique<std::thread>(handleStdinThread);
 
     return status;
 }

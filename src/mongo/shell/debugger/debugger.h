@@ -43,6 +43,7 @@ BSONObj initDebuggerGlobal(const BSONObj& args, void* data);
 class DebuggerGlobal {
 public:
     static Status init(JSContext* cx);
+    static void handleStdinThread();
 };
 
 /**
@@ -55,6 +56,8 @@ class DebuggerObject {
 
     // Invoked when the JS "debugger" keyword is executed.
     static bool onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+
+    static bool isPausedCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     // Helper: Register a native function in the debugger compartment.
     Status registerNativeFunction(
@@ -76,6 +79,26 @@ public:
     // Set the "onDebuggerStatement" callback in the compartment
     // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#ondebuggerstatement-frame
     Status setOnDebuggerStatementCallback(JS::RootedObject const& global);
+};
+
+
+/**
+ * Facade interface of https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.Frame.html
+ * and its relevant functionality.
+ */
+class DebuggerFrame {
+    JSContext* _cx;
+
+public:
+    DebuggerFrame(JSContext* cx);
+
+    // Return the script url of the frame instance.
+    // Will look something like "jstests/my_test.js".
+    std::string getScriptUrl();
+
+    // Return the line number of the frame instance.
+    // Uses 1-based indexing, so line 1 is the first line of the file.
+    int getLineNumber();
 };
 }  // namespace mozjs
 }  // namespace mongo
