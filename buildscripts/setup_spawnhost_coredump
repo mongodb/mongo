@@ -273,7 +273,6 @@ fi' >> .bash_profile
 
     SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
     if [[ -n $SRC_DIR ]]; then
-        ln -s ${SRC_DIR}/.gdbinit .
         ln -s ${SRC_DIR}/src src
         ln -s ${SRC_DIR}/buildscripts buildscripts
     else
@@ -360,12 +359,15 @@ EOF
     # normally performed during .gnu_debuglink loading.
     find bin lib -name "*.debug" -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./create_build_id_links.sh
 
-    # Boost-Pretty-Printer supports auto-detection for the boost version but relies on the system
-    # installed version of boost. To avoid this behavior we explicitly specify the boost_version.
-    # Moreover, the most recent version of boost that Boost-Pretty-Printer verifies it supports is
-    # version 1.73.0. While 1.73.0 is older than the version in the src/third_party/boost/
-    # directory, the pretty printer in Boost-Pretty-Printer will display boost::optional values
-    # correctly.
+    if [[ -n "${SRC_DIR}" && -f "${SRC_DIR}/.gdbinit" ]]; then
+        cat >> ~/.gdbinit <<EOF
+# Source mongo/.gdbinit early, especially before 'set solib-search-path' where GDB will open many
+# file descriptors. If there are too many file descriptors open when GDB loads another .gdbinit,
+# GDB can crash.
+source ${SRC_DIR}/.gdbinit
+EOF
+    fi
+
     cat >> ~/.gdbinit <<EOF
 set auto-load safe-path /
 set solib-search-path ./lib/
@@ -375,6 +377,12 @@ set print static-members off
 set print pretty on
 set index-cache enabled on
 
+# Boost-Pretty-Printer supports auto-detection for the boost version but relies on the system
+# installed version of boost. To avoid this behavior we explicitly specify the boost_version.
+# Moreover, the most recent version of boost that Boost-Pretty-Printer verifies it supports is
+# version 1.73.0. While 1.73.0 is older than the version in the src/third_party/boost/
+# directory, the pretty printer in Boost-Pretty-Printer will display boost::optional values
+# correctly.
 python
 import sys
 sys.path.insert(0, './Boost-Pretty-Printer')
@@ -430,6 +438,5 @@ fi
 # to error.
 if [[ -n "${slack_user}" ]]; then
     "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "$slack_message"
-    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "If you run into segfaults starting up gdb, please add -nx to your gdb command."
     "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "If you run into unresolved system library symbols when debugging unit tests, please add -ex 'set sysroot $HOME_DIR/rbe_sysroot/' to your gdb command."
 fi
