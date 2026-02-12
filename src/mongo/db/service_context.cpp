@@ -49,6 +49,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -67,6 +68,8 @@ namespace mongo {
 namespace {
 
 ServiceContext* globalServiceContext = nullptr;
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyStorageStartupRecoveryComplete);
 
 }  // namespace
 
@@ -500,6 +503,10 @@ void ServiceContext::waitForStartupComplete() {
 }
 
 void ServiceContext::notifyStorageStartupRecoveryComplete() {
+    if (MONGO_unlikely(hangBeforeNotifyStorageStartupRecoveryComplete.shouldFail())) {
+        LOGV2(11340502, "Pausing at fail point hangBeforeNotifyStorageStartupRecoveryComplete");
+        hangBeforeNotifyStorageStartupRecoveryComplete.pauseWhileSet();
+    }
     {
         stdx::lock_guard lk(_mutex);
         _startupComplete = true;

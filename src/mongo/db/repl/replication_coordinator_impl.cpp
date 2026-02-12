@@ -778,6 +778,14 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     _externalState->setGlobalTimestamp(getServiceContext(), lastOpTime.getTimestamp());
 
     auto opCtx = cc().makeOperationContext();
+
+    // Wait until _initAndListen completes before allowing transition to STARTUP2.
+    // _finishLoadLocalConfig runs asynchronously after startup() returns, and _setCurrentRSConfig
+    // below can trigger initial sync (via _startDataReplication). Initial sync takes locks that
+    // could conflict with operations still running in _initAndListen after startup() returns,
+    // potentially causing a livelock.
+    getServiceContext()->waitForStartupComplete();
+
     stdx::unique_lock lock(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
@@ -5138,15 +5146,6 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 }
 
 void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCtx) {
-    // It doesn't make sense to become a secondary before _initAndListen
-    // finishes. Perhaps more importantly, we need to take the Global lock
-    // several times in _initAndListen, and we don't want to reacquire (and not
-    // yield) the Global lock below if we race with taking the Global lock in
-    // _initAndListen.
-    LOGV2(
-        6295104,
-        "Starting ReplicationCoordinatorImpl::finishRecoveryIfEligible after startup completes...");
-    opCtx->getServiceContext()->waitForStartupComplete();
     LOGV2(6295105, "Starting ReplicationCoordinatorImpl::finishRecoveryIfEligible");
     if (MONGO_unlikely(hangBeforeFinishRecovery.shouldFail())) {
         hangBeforeFinishRecovery.pauseWhileSet(opCtx);
