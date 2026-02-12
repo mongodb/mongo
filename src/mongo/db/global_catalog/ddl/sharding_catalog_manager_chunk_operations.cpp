@@ -74,6 +74,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/resource_yielder.h"
@@ -82,7 +83,6 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
-#include "mongo/db/storage/snapshot_window_options_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -469,7 +469,10 @@ unsigned int getHistoryWindowInSeconds() {
         return secs;
     }
 
-    return std::max(minSnapshotHistoryWindowInSeconds.load(),
+    auto& provider =
+        rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+
+    return std::max(provider.getMinSnapshotHistoryWindowInSeconds(),
                     gTransactionLifetimeLimitSeconds.load());
 }
 

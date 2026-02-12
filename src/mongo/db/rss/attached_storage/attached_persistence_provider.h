@@ -177,6 +177,16 @@ public:
      * Table creation won't be timestamped.
      */
     bool shouldTimestampTableCreations() const override;
+
+    /**
+     * The minimum number of seconds of snapshot history to maintain.
+     */
+    int getMinSnapshotHistoryWindowInSeconds() const override;
+
+    /**
+     * Set minimum number of seconds of snapshot history to maintain.
+     */
+    void setMinSnapshotHistoryWindowInSeconds(int seconds) override;
 };
 
 }  // namespace mongo::rss

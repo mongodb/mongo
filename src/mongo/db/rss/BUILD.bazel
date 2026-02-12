@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -65,4 +65,22 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+idl_generator(
+    name = "snapshot_window_options_gen",
+    src = "snapshot_window_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_window_options",
+    srcs = [
+        ":snapshot_window_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
 )

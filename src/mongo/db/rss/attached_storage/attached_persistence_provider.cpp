@@ -30,6 +30,7 @@
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/snapshot_window_options_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 
@@ -168,6 +169,14 @@ bool AttachedPersistenceProvider::supportsCompaction() const {
 
 bool AttachedPersistenceProvider::shouldTimestampTableCreations() const {
     return false;
+}
+
+int AttachedPersistenceProvider::getMinSnapshotHistoryWindowInSeconds() const {
+    return minSnapshotHistoryWindowInSeconds.load();
+}
+
+void AttachedPersistenceProvider::setMinSnapshotHistoryWindowInSeconds(int seconds) {
+    minSnapshotHistoryWindowInSeconds.store(seconds);
 }
 
 }  // namespace mongo::rss

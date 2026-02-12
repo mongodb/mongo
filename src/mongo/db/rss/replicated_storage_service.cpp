@@ -43,6 +43,11 @@ ReplicatedStorageService& ReplicatedStorageService::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
+PersistenceProvider& ReplicatedStorageService::getPersistenceProvider() {
+    invariant(_provider);
+    return *_provider;
+}
+
 const PersistenceProvider& ReplicatedStorageService::getPersistenceProvider() const {
     invariant(_provider);
     return *_provider;

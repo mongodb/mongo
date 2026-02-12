@@ -367,7 +367,7 @@ public:
                        ClockSource* cs,
                        WiredTigerConfig wtConfig,
                        const WiredTigerExtensions& wtExtensions,
-                       const rss::PersistenceProvider& provider,
+                       rss::PersistenceProvider& provider,
                        bool repair,
                        bool isReplSet,
                        bool shouldRecoverFromOplogAsStandalone,
@@ -691,6 +691,10 @@ public:
 
     static Status updateEvictionThreadsMin(const int32_t& threadsMin);
 
+    int getMinSnapshotHistoryWindowInSeconds() const {
+        return _provider.getMinSnapshotHistoryWindowInSeconds();
+    }
+
 private:
     StatusWith<Timestamp> _pinOldestTimestamp(WithLock,
                                               const std::string& requestingServiceName,
@@ -927,6 +931,9 @@ private:
     Atomic<bool> _inStandaloneMode;
 
     const bool _supportsTableLogging;
+
+    // Reference to the persistence provider for accessing storage configuration.
+    rss::PersistenceProvider& _provider;
 };
 
 /**

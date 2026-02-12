@@ -35,7 +35,6 @@
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/db/storage/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
@@ -1283,7 +1282,7 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine, BS
     BSONObjBuilder settings(bob->subobjStart("snapshot-window-settings"));
     settings.append("total number of SnapshotTooOld errors", totalNumberOfSnapshotTooOldErrors);
     settings.append("minimum target snapshot window size in seconds",
-                    minSnapshotHistoryWindowInSeconds.load());
+                    engine->getMinSnapshotHistoryWindowInSeconds());
     settings.append("current available snapshot window size in seconds",
                     static_cast<int>(currentAvailableSnapshotWindow));
     settings.append("latest majority snapshot timestamp available",

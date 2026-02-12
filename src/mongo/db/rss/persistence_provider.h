@@ -214,6 +214,16 @@ public:
      * If true, this persistence provider expects collection/index table creation to be timestamped.
      */
     virtual bool shouldTimestampTableCreations() const = 0;
+
+    /**
+     * The minimum number of seconds of snapshot history to maintain.
+     */
+    virtual int getMinSnapshotHistoryWindowInSeconds() const = 0;
+
+    /**
+     * Set minimum number of seconds of snapshot history to maintain.
+     */
+    virtual void setMinSnapshotHistoryWindowInSeconds(int seconds) = 0;
 };
 
 }  // namespace rss
