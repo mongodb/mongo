@@ -100,6 +100,45 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
         prevStages: prefixPipeline,
     });
 
+    // Test that a unique index on the "on" fields cannot be used to satisfy the requirement if
+    // it has a different collation.
+    resetTargetColl(targetShardKey, targetSplit);
+    assert.commandWorked(targetColl.createIndex(indexSpec, {unique: true, collation: {locale: "en_US"}}));
+    assertMergeFailsWithoutUniqueIndex({
+        source: sourceColl,
+        onFields: Object.keys(indexSpec),
+        target: targetColl,
+        prevStages: prefixPipeline,
+    });
+    assertMergeFailsWithoutUniqueIndex({
+        source: sourceColl,
+        onFields: Object.keys(indexSpec),
+        target: targetColl,
+        options: {collation: {locale: "en"}},
+        prevStages: prefixPipeline,
+    });
+    assertMergeFailsWithoutUniqueIndex({
+        source: sourceColl,
+        onFields: Object.keys(indexSpec),
+        target: targetColl,
+        options: {collation: {locale: "simple"}},
+        prevStages: prefixPipeline,
+    });
+    assertMergeFailsWithoutUniqueIndex({
+        source: sourceColl,
+        onFields: Object.keys(indexSpec),
+        target: targetColl,
+        options: {collation: {locale: "en_US", strength: 1}},
+        prevStages: prefixPipeline,
+    });
+    assertMergeSucceedsWithExpectedUniqueIndex({
+        source: sourceColl,
+        target: targetColl,
+        onFields: Object.keys(indexSpec),
+        options: {collation: {locale: "en_US"}},
+        prevStages: prefixPipeline,
+    });
+
     // Test that a unique index with dotted field names can be used.
     resetTargetColl(targetShardKey, targetSplit);
     const dottedPathIndexSpec = Object.merge(targetShardKey, {"newField.subField": 1});
