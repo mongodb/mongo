@@ -9,3 +9,6 @@ filters:
   - "pause_migrations_during_multi_update*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "unified_write_executor/write_batch_query_stats_registrar*":
+    approvers:
+      - 10gen/query-integration-observability

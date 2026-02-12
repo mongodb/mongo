@@ -1899,16 +1899,21 @@ WriteResult performUpdates(
                 curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
         }
+
+        bool writeResultAppended = false;
         ON_BLOCK_EXIT([&] {
             if (curOp) {
                 finishCurOp(opCtx, &*curOp);
                 // The last SingleWriteResult will be for the operation we just executed. If it
                 // succeeded, and metrics were requested, set them now.
                 if (originalOpIndex.has_value() &&
-                    curOp->debug().getQueryStatsInfo().metricsRequested &&
-                    out.results.back().isOK()) {
-                    out.results.back().getValue().setQueryStatsMetrics(write_ops::QueryStatsMetrics(
-                        *originalOpIndex, curOp->debug().getCursorMetrics()));
+                    curOp->debug().getQueryStatsInfo().metricsRequested && writeResultAppended) {
+                    tassert(11514201, "A write result must be appended.", !out.results.empty());
+                    if (out.results.back().isOK()) {
+                        out.results.back().getValue().setQueryStatsMetrics(
+                            write_ops::QueryStatsMetrics(*originalOpIndex,
+                                                         curOp->debug().getCursorMetrics()));
+                    }
                 }
             }
         });
@@ -1952,6 +1957,7 @@ WriteResult performUpdates(
                                                      source,
                                                      forgoOpCounterIncrements);
             out.results.emplace_back(reply);
+            writeResultAppended = true;
             forgoOpCounterIncrements = true;
             lastOpFixer.finishedOpSuccessfully();
 
