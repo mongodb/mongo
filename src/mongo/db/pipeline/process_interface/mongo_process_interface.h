@@ -613,10 +613,15 @@ public:
         boost::optional<BSONObj> readConcern) = 0;
 
     /**
-     * Returns zero or one document with the document _id being equal to 'documentKey'. The document
-     * is looked up only on the current node. Returns boost::none if no matching documents were
-     * found, including cases where the given namespace does not exist. It is illegal to call this
-     * method on nodes other than mongod.
+     * Returns zero or one document with the given 'documentKey'. If the collection is the oplog
+     * collection, 'documentKey' must be the "ts" field. Otherwise, it must be the "_id" field.
+     * The document is looked up only on the current node. Returns boost::none if no matching
+     * documents were found, including cases where the given namespace does not exist.
+     * - It is illegal to call this method on nodes other than mongod.
+     * - On a shardsvr mongod, this method is only allowed to be called against a user collection
+     *   when specifying read concern "snapshot" with "atClusterTime", and the caller must
+     *   guarantee that the chunk containing the document (if exists) is owned by the mongod at
+     *   at timestamp.
      */
     virtual boost::optional<Document> lookupSingleDocumentLocally(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

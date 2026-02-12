@@ -34,15 +34,18 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/find_and_modify_image_lookup_util.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/idl/idl_parser.h"
@@ -289,7 +292,38 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
             return fetchPreOrPostImageFromImageCollection(opCtx, oplog);
         }
 
-        auto image = fetchPreOrPostImageFromSnapshot(opCtx, oplog);
+        auto findOneLocallyFunc = [&](const NamespaceString& nss,
+                                      const BSONObj& filter,
+                                      const boost::optional<repl::ReadConcernArgs>& readConcern)
+            -> boost::optional<BSONObj> {
+            // Set up a separate OperationContext since waiting for read concern is not
+            // supported when running in a transaction and the retry might be running in a
+            // retryable internal transaction.
+            auto newClient = opCtx->getService()->makeClient("extractPreOrPostImage");
+            auto executor = getLocalExecutor(opCtx);
+
+            AlternativeClientRegion acr(newClient);
+            CancelableOperationContext newOpCtx(
+                cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+
+            FindCommandRequest findRequest(nss);
+            findRequest.setFilter(filter);
+            if (gFeatureFlagAllBinariesSupportRawDataOperations
+                    .isEnabledUseLatestFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                // This must be set for the request to work against a timeseries collection.
+                findRequest.setRawData(true);
+            }
+
+            repl::ReadConcernArgs::get(newOpCtx.get()) =
+                readConcern ? *readConcern : repl::ReadConcernArgs::get(opCtx);
+            DBDirectClient client(newOpCtx.get());
+            auto cursor = client.find(findRequest);
+            return cursor->more() ? boost::make_optional(cursor->next()) : boost::none;
+        };
+
+        auto image = fetchPreOrPostImageFromSnapshot(oplog, findOneLocallyFunc);
         uassert(ErrorCodes::IncompleteTransactionHistory,
                 makePreOrPostImageNotFoundErrorMessage(oplog),
                 image);

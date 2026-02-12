@@ -907,9 +907,8 @@ void OplogEntry::setCommitTransactionTimestamp(boost::optional<mongo::Timestamp>
 StatusWith<Timestamp> OplogEntry::extractCommitTransactionTimestamp() const {
     if (!isInTransaction()) {
         return Status{mongo::ErrorCodes::Error(11730800),
-                      str::stream() << "Expected a transaction oplog entry but found op type "
-                                    << repl::OpType_serializer(getOpType()) << " with session id "
-                                    << getSessionId() << " and txn number " << getTxnNumber()};
+                      str::stream() << "Expected a transaction oplog entry but found "
+                                    << redact(toBSONForLogging())};
     }
     if (isTerminalApplyOps()) {
         return getTimestamp();

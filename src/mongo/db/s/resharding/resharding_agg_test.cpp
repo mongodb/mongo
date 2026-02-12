@@ -193,20 +193,10 @@ public:
             new MockTransactionHistoryIterator(_mockResults, time));
     }
 
-    BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
-        auto optionIter = _collectionOptions.find(nss);
-        invariant(optionIter != _collectionOptions.end(),
-                  str::stream() << nss.toStringForErrorMsg() << " was not registered");
-
-        return optionIter->second;
-    }
-
-    boost::optional<Document> lookupSingleDocument(
+    boost::optional<Document> lookupSingleDocumentLocally(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
-        boost::optional<UUID> collectionUUID,
-        const Document& documentKey,
-        boost::optional<BSONObj> readConcern) override {
+        const Document& documentKey) override {
         DBDirectClient client(expCtx->getOperationContext());
         auto result = client.findOne(nss, documentKey.toBson());
         if (result.isEmpty()) {
@@ -216,13 +206,8 @@ public:
         return Document(result.getOwned());
     }
 
-    void setCollectionOptions(const NamespaceString& nss, const BSONObj option) {
-        _collectionOptions[nss] = option;
-    }
-
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;
-    std::map<NamespaceString, BSONObj> _collectionOptions;
 };
 
 repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
@@ -1533,10 +1518,6 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
 
     {
         auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
-        // Register a dummy uuid just to not make test crash. The stub for findSingleDoc ignores
-        // the UUID so it doesn't matter what the value here is.
-        mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
-                                                 BSON("uuid" << UUID::gen()));
         expCtx->setMongoProcessInterface(std::move(mockMongoInterface));
     }
 
@@ -1635,10 +1616,6 @@ TEST_F(ReshardingAggWithStorageTest,
         expCtx->setNamespaceString(NamespaceString::kRsOplogNamespace);
         {
             auto mockMongoInterface = std::make_shared<MockMongoInterface>(pipelineSource);
-            // Register a dummy uuid just to not make test crash. The stub for findSingleDoc ignores
-            // the UUID so it doesn't matter what the value here is.
-            mockMongoInterface->setCollectionOptions(NamespaceString::kConfigImagesNamespace,
-                                                     BSON("uuid" << UUID::gen()));
             expCtx->setMongoProcessInterface(std::move(mockMongoInterface));
         }
 

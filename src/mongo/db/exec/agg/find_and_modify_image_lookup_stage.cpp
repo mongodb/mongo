@@ -42,17 +42,24 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/write_ops/find_and_modify_image_lookup_util.h"
+#include "mongo/db/read_concern.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/scoped_read_concern.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -73,79 +80,56 @@ namespace {
 
 using OplogEntry = repl::OplogEntryBase;
 
+MONGO_FAIL_POINT_DEFINE(failFindAndModifyImageLookupStageFindOneWithSnapshotTooOld);
+
 /**
- * Fetches the pre- or post-image entry for the given 'findAndModify' oplog entry or for the given
- * inner op in the given 'applyOps' oplog entry from the findAndModify image collection, and returns
- * a forged noop oplog entry containing the image. Returns none if no matching image entry is not
- * found.
+ * Perform a local findOne using the given read concern to find the document that matches in the
+ * given filter in the given collection. Returns none if no document is found.
  */
-boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
-    const boost::intrusive_ptr<ExpressionContext> pExpCtx,
-    const repl::OplogEntry& oplogEntry,
-    boost::optional<repl::DurableReplOperation> innerOp = boost::none) {
-    invariant(!innerOp ||
-              (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps));
-    const auto sessionId = *oplogEntry.getSessionId();
-
-    auto localImageCollInfo = pExpCtx->getMongoProcessInterface()->getCollectionOptions(
-        pExpCtx->getOperationContext(), NamespaceString::kConfigImagesNamespace);
-
-    // Extract the UUID from the collection information. We should always have a valid uuid here.
-    auto imageCollUUID = invariantStatusOK(UUID::parse(localImageCollInfo["uuid"]));
-    const auto& readConcernBson =
-        repl::ReadConcernArgs::get(pExpCtx->getOperationContext()).toBSON();
-    auto imageDoc = pExpCtx->getMongoProcessInterface()->lookupSingleDocument(
-        pExpCtx,
-        NamespaceString::kConfigImagesNamespace,
-        imageCollUUID,
-        Document{BSON("_id" << sessionId.toBSON())},
-        readConcernBson);
-
-    if (!imageDoc) {
-        // If no image document with the corresponding 'sessionId' is found, we skip forging the
-        // no-op and rely on the retryable write mechanism to catch that no pre- or post- image
-        // exists.
-        LOGV2_DEBUG(580602,
-                    2,
-                    "Not forging no-op image oplog entry because no image document found with "
-                    "sessionId",
-                    "sessionId"_attr = sessionId);
-        return boost::none;
+boost::optional<BSONObj> findOneLocally(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                        const NamespaceString& nss,
+                                        const BSONObj& filter,
+                                        const boost::optional<repl::ReadConcernArgs>& readConcern) {
+    if (MONGO_unlikely(failFindAndModifyImageLookupStageFindOneWithSnapshotTooOld.shouldFail(
+            [&](const BSONObj& data) {
+                return data.getStringField("nss") == nss.toString_forTest();
+            }))) {
+        tassert(11731903,
+                "Expected the findOne to have readConcern 'snapshot'",
+                readConcern->getLevel() == repl::ReadConcernLevelEnum::kSnapshotReadConcern);
+        uasserted(ErrorCodes::SnapshotTooOld, "Failing findOne during findAndModify image lookup");
     }
 
-    auto image = repl::ImageEntry::parse(imageDoc->toBson(), IDLParserContext("image entry"));
-
-    if (image.getTxnNumber() != oplogEntry.getTxnNumber()) {
-        // In our snapshot, fetch the current transaction number for a session. If that
-        // transaction number doesn't match what's found on the image lookup, it implies that
-        // the image is not the correct version for this oplog entry. We will not forge a noop
-        // from it.
-        LOGV2_DEBUG(
-            580603,
-            2,
-            "Not forging no-op image oplog entry because image document has a different txnNum",
-            "sessionId"_attr = oplogEntry.getSessionId(),
-            "expectedTxnNum"_attr = oplogEntry.getTxnNumber(),
-            "actualTxnNum"_attr = image.getTxnNumber());
-        return boost::none;
+    const bool isRawData = isRawDataOperation(pExpCtx->getOperationContext());
+    ON_BLOCK_EXIT([&] { isRawDataOperation(pExpCtx->getOperationContext()) = isRawData; });
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(pExpCtx->getOperationContext()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // This must be set for the request to work against a timeseries collection.
+        isRawDataOperation(pExpCtx->getOperationContext()) = true;
     }
 
-    // Forge a no-op image entry to be returned.
-    repl::MutableOplogEntry forgedNoop;
-    forgedNoop.setSessionId(sessionId);
-    forgedNoop.setTxnNumber(*oplogEntry.getTxnNumber());
-    forgedNoop.setObject(image.getImage());
-    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
-    forgedNoop.setWallClockTime(oplogEntry.getWallClockTime());
-    forgedNoop.setNss(innerOp ? innerOp->getNss() : oplogEntry.getNss());
-    forgedNoop.setUuid(innerOp ? innerOp->getUuid() : *oplogEntry.getUuid());
-    forgedNoop.setStatementIds(innerOp ? innerOp->getStatementIds() : oplogEntry.getStatementIds());
+    boost::optional<ScopedReadConcern> scopedReadConcern;
+    if (readConcern) {
+        scopedReadConcern.emplace(pExpCtx->getOperationContext(), *readConcern);
 
-    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
-    // collisions because we always reserve an extra oplog slot when writing the retryable
-    // findAndModify entry on the primary.
-    forgedNoop.setOpTime(repl::OpTime(oplogEntry.getTimestamp() - 1, *oplogEntry.getTerm()));
-    return repl::OplogEntry{forgedNoop.toBSON()};
+        auto status = mongo::waitForReadConcern(pExpCtx->getOperationContext(),
+                                                *readConcern,
+                                                nss.dbName(),
+                                                true /* allowAfterClusterTime */);
+        if (!status.isOK()) {
+            LOGV2_WARNING(11731902,
+                          "Failed to wait for read concern before doing a local find",
+                          "nss"_attr = nss,
+                          "readConcern"_attr = readConcern,
+                          "status"_attr = status);
+            return boost::none;
+        }
+    }
+
+    auto doc = pExpCtx->getMongoProcessInterface()->lookupSingleDocumentLocally(
+        pExpCtx, nss, Document{filter});
+    return doc ? boost::make_optional(doc->toBson()) : boost::none;
 }
 
 }  // namespace
@@ -227,12 +211,19 @@ Document FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage(Document in
         return inputDoc;
     }
 
+    auto findOneLocallyFunc = [&](const NamespaceString& nss,
+                                  const BSONObj& filter,
+                                  const boost::optional<repl::ReadConcernArgs>& readConcern) {
+        return findOneLocally(pExpCtx, nss, filter, readConcern);
+    };
+
     if (inputOplogEntry.isCrudOpType() && inputOplogEntry.getNeedsRetryImage()) {
         // Strip the needsRetryImage field if set.
         MutableDocument downConvertedDoc{inputDoc};
         downConvertedDoc.remove(repl::OplogEntryBase::kNeedsRetryImageFieldName);
 
-        if (const auto forgedNoopOplogEntry = forgeNoopImageOplogEntry(pExpCtx, inputOplogEntry)) {
+        if (const auto forgedNoopOplogEntry = forgeNoopImageOplogEntry(
+                pExpCtx->getOperationContext(), inputOplogEntry, findOneLocallyFunc)) {
             const auto imageType = inputOplogEntry.getNeedsRetryImage();
             const auto imageOpTime = forgedNoopOplogEntry->getOpTime();
             downConvertedDoc.setField(
@@ -268,8 +259,42 @@ Document FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage(Document in
                 continue;
             }
 
-            const auto forgedNoopOplogEntry =
-                forgeNoopImageOplogEntry(pExpCtx, inputOplogEntry, op);
+            auto mutableOp = uassertStatusOK(
+                repl::MutableOplogEntry::parse(inputOplogEntry.getEntry().toBSON()));
+            mutableOp.setMultiOpType(boost::none);
+            mutableOp.setDurableReplOperation(op);
+            auto findAndModifyOplogEntry = repl::OplogEntry(mutableOp.toBSON());
+
+            const auto forgedNoopOplogEntry = [&]() -> boost::optional<repl::OplogEntry> {
+                auto& rss = rss::ReplicatedStorageService::get(pExpCtx->getOperationContext());
+                if (!rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+                    // The commitTimestamp is only needed when fetching the image from the snapshot.
+                    // Despite the name, 'commitTxnTs' is actually the timestamp of the last
+                    // oplog entry in the oplog chain for the transaction.
+                    // - For unprepared transaction, it is the timestamp for the terminal oplog
+                    //   entry which is also the commit timestamp for the transaction.
+                    // - For prepared transaction, it is the timestamp for the commitTransaction
+                    //   oplog entry which is not the same as the commit timestamp for the
+                    //   transaction.
+                    auto lastOplogEntryDoc = findOneLocally(pExpCtx,
+                                                            NamespaceString::kRsOplogNamespace,
+                                                            BSON("ts" << *commitTxnTs),
+                                                            boost::none /* readConcern */);
+
+                    if (!lastOplogEntryDoc) {
+                        // The commit oplog entry is no longer available.
+                        return boost::none;
+                    }
+
+                    auto lastOplogEntry =
+                        uassertStatusOK(repl::OplogEntry::parse(*lastOplogEntryDoc));
+                    auto commitTimestamp =
+                        uassertStatusOK(lastOplogEntry.extractCommitTransactionTimestamp());
+                    findAndModifyOplogEntry.setCommitTransactionTimestamp(commitTimestamp);
+                }
+                return forgeNoopImageOplogEntry(
+                    pExpCtx->getOperationContext(), findAndModifyOplogEntry, findOneLocallyFunc);
+            }();
 
             // Downcovert the document for this applyOps oplog entry by downcoverting this
             // operation.

@@ -31,12 +31,10 @@
 #include "mongo/db/query/write_ops/find_and_modify_image_lookup_util.h"
 
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/local_executor.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -67,10 +65,54 @@ BSONObj extractFindAndModifyIdFilter(const repl::OplogEntry& oplogEntry) {
             !idField.eoo());
     return idField.wrap();
 }
+
+/**
+ * Fetches the pre- or post-image for the given findAndModify operation from the image collection.
+ */
+boost::optional<BSONObj> fetchPreOrPostImageFromImageCollection(
+    const repl::OplogEntry oplogEntry, FindOneLocallyFunc findOneLocallyFunc) {
+    auto imageDoc = findOneLocallyFunc(NamespaceString::kConfigImagesNamespace,
+                                       BSON("_id" << oplogEntry.getSessionId()->toBSON()),
+                                       boost::none /* readConcern */);
+
+    if (!imageDoc) {
+        return boost::none;
+    }
+
+    auto image = repl::ImageEntry::parse(*imageDoc, IDLParserContext("image entry"));
+    if (image.getTxnNumber() != oplogEntry.getTxnNumber()) {
+        // In our snapshot, fetch the current transaction number for a session. If that transaction
+        // number doesn't match what's found on the image lookup, it implies that the image is not
+        // the correct version for this oplog entry. We will not forge a noop from it.
+        LOGV2_DEBUG(
+            580603,
+            2,
+            "Not forging no-op image oplog entry because image document has a different txnNum",
+            "sessionId"_attr = oplogEntry.getSessionId(),
+            "expectedTxnNum"_attr = oplogEntry.getTxnNumber(),
+            "actualTxnNum"_attr = image.getTxnNumber());
+        return boost::none;
+    }
+    return image.getImage();
+}
+
+/**
+ * Fetches the pre- or post-image for the given findAndModify operation.
+ */
+boost::optional<BSONObj> fetchPreOrPostImage(OperationContext* opCtx,
+                                             const repl::OplogEntry& oplogEntry,
+                                             FindOneLocallyFunc findOneLocallyFunc) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+        return fetchPreOrPostImageFromImageCollection(oplogEntry, findOneLocallyFunc);
+    }
+    return fetchPreOrPostImageFromSnapshot(oplogEntry, findOneLocallyFunc);
+}
+
 }  // namespace
 
-boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(OperationContext* opCtx,
-                                                         const repl::OplogEntry& oplogEntry) {
+boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(const repl::OplogEntry& oplogEntry,
+                                                         FindOneLocallyFunc findOneLocallyFunc) {
     invariant(oplogEntry.getNeedsRetryImage());
 
     auto idFilter = extractFindAndModifyIdFilter(oplogEntry);
@@ -78,47 +120,50 @@ boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(OperationContext* opCtx
         ? *oplogEntry.getCommitTransactionTimestamp()
         : oplogEntry.getTimestamp();
 
-    // Set up a separate OperationContext since waiting for read concern is not supported running a
-    // transaction and the caller may be handling a retry in a retryable internal transaction.
-    auto newClient = opCtx->getService()->makeClient("fetchPreOrPostImageFromSnapshot");
-    auto executor = getLocalExecutor(opCtx);
-    AlternativeClientRegion acr(newClient);
-    CancelableOperationContext newOpCtx(
-        cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
-
     repl::ReadConcernArgs snapshotReadConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
     snapshotReadConcern.setArgsAtClusterTimeForSnapshot(
         oplogEntry.getNeedsRetryImage() == repl::RetryImageEnum::kPostImage ? opTimestamp
                                                                             : opTimestamp - 1);
 
-    repl::ReadConcernArgs::get(newOpCtx.get()) = snapshotReadConcern;
-    DBDirectClient client(newOpCtx.get());
     try {
-        FindCommandRequest findRequest(oplogEntry.getNss());
-        findRequest.setFilter(idFilter);
-        if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabledUseLatestFCVWhenUninitialized(
-                VersionContext::getDecoration(newOpCtx.get()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            // This must be set for the request to work against a timeseries collection.
-            findRequest.setRawData(true);
-        }
-        auto cursor = client.find(findRequest);
+        auto doc = findOneLocallyFunc(oplogEntry.getNss(), idFilter, snapshotReadConcern);
         tassert(11730902,
                 str::stream() << "Could not find the document that the findAndModify operation "
                                  "wrote to in the snapshot for "
                               << oplogEntry.getTimestamp(),
-                cursor->more());
-        auto doc = cursor->next();
-        tassert(
-            11730903,
-            str::stream() << "Found multiple documents with _id that the findAndModify operation "
-                             "wrote to in the snapshot for "
-                          << oplogEntry.getTimestamp(),
-            !cursor->more());
+                doc);
         return doc;
     } catch (const ExceptionFor<ErrorCategory::SnapshotError>&) {
         return boost::none;
     }
+}
+
+boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(OperationContext* opCtx,
+                                                           const repl::OplogEntry& oplogEntry,
+                                                           FindOneLocallyFunc findOneLocallyFunc) {
+    invariant(oplogEntry.getNeedsRetryImage());
+
+    auto image = fetchPreOrPostImage(opCtx, oplogEntry, findOneLocallyFunc);
+
+    if (!image) {
+        return boost::none;
+    }
+
+    repl::MutableOplogEntry forgedNoop;
+    forgedNoop.setSessionId(*oplogEntry.getSessionId());
+    forgedNoop.setTxnNumber(*oplogEntry.getTxnNumber());
+    forgedNoop.setObject(*image);
+    forgedNoop.setOpType(repl::OpTypeEnum::kNoop);
+    forgedNoop.setWallClockTime(oplogEntry.getWallClockTime());
+    forgedNoop.setNss(oplogEntry.getNss());
+    forgedNoop.setUuid(oplogEntry.getUuid());
+    forgedNoop.setStatementIds(oplogEntry.getStatementIds());
+
+    // Set the opTime to be the findAndModify timestamp - 1. We guarantee that there will be no
+    // collisions because we always reserve an extra oplog slot when writing the retryable
+    // findAndModify entry on the primary.
+    forgedNoop.setOpTime(repl::OpTime(oplogEntry.getTimestamp() - 1, *oplogEntry.getTerm()));
+    return repl::OplogEntry{forgedNoop.toBSON()};
 }
 
 }  // namespace mongo

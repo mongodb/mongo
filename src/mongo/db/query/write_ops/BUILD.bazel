@@ -90,12 +90,11 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db:local_executor",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:oplog_entry",
     ],
 )
@@ -112,6 +111,7 @@ mongo_cc_library(
     deps = [
         ":find_and_modify_image_lookup_util",
         "//src/mongo:base",
+        "//src/mongo/db:local_executor",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:profile_collection",
         "//src/mongo/db:query_exec",
