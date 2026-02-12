@@ -39,6 +39,8 @@ buildvariants:
       - name: verify_resmoke_coredump
         distros:
           - amazon2023-arm64-latest-m8g-2xlarge
+      - name: merge_queue_metrics_mongo
+      - name: merge_queue_metrics_mms
 
   # Experimental variant running bazel targets for integration tests. To be removed with SERVER-103537.
   - name: bazel-integration-tests

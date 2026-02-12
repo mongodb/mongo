@@ -2382,3 +2382,39 @@ tasks:
             - workdir
           args:
             - "./src/buildscripts/bazel_testbuilds/verify_resmoke_coredump_test.sh"
+
+  - name: merge_queue_metrics_mongo
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: //buildscripts:github_merge_queue_metrics -- --owner=10gen --repo=mms
+          env: MERGE_QUEUE_ANALYTICS_GITHUB_TOKEN=${MERGE_QUEUE_ANALYTICS_GITHUB_TOKEN}
+
+  - name: merge_queue_metrics_mms
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: //buildscripts:github_merge_queue_metrics -- --owner=10gen --repo=mms
+          env: MERGE_QUEUE_ANALYTICS_GITHUB_TOKEN=${MERGE_QUEUE_ANALYTICS_GITHUB_TOKEN}

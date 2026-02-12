@@ -516,3 +516,16 @@ py_binary(
         ),
     ],
 )
+
+py_binary(
+    name = "github_merge_queue_metrics",
+    srcs = ["github_merge_queue_metrics.py"],
+    main = "github_merge_queue_metrics.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)

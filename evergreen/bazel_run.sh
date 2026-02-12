@@ -20,7 +20,7 @@ bazel_evergreen_shutils::activate_and_cd_src
 bazel_evergreen_shutils::export_ssl_paths_if_needed
 
 # Use `eval` to force evaluation of the environment variables in the echo statement:
-eval echo "Execution environment: Args: ${args} Target: ${target} Env: ${env} redact_args: ${redact_args}"
+eval echo "Execution environment: Args: ${args} Target: ${target} redact_args: ${redact_args}"
 
 BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
 
