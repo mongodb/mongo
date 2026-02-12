@@ -784,6 +784,16 @@ server_parameters:
         default: false
         redact: false
 
+    internalJoinPlanSamplingSize:
+        description: For queries running through join optimization, control the sample size.
+        set_at: [startup, runtime]
+        cpp_varname: "internalJoinPlanSamplingSize"
+        cpp_vartype: AtomicWord<int>
+        default: 1000
+        validator:
+            gt: 0
+        redact: false
+
     internalQueryNumWorksPerPlanForMPEstimation:
         description: >-
             Number of works per plan that the cost-based plan ranker choice should do to evaluate

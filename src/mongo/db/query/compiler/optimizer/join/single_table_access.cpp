@@ -51,11 +51,20 @@ SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& co
         if (samplingEstimators.find(nss) == samplingEstimators.end()) {
             cost_based_ranker::CardinalityType numRecords{static_cast<double>(
                 collections.lookupCollection(nss)->getRecordStore()->numRecords())};
-            auto estimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
-                *node.accessPath,
-                ce::CardinalityEstimate{numRecords, cost_based_ranker::EstimationSource::Metadata},
-                yieldPolicy,
-                collections);
+
+            const auto& cq = node.accessPath;
+            const auto& qkc = cq->getExpCtx()->getQueryKnobConfiguration();
+            std::unique_ptr<ce::SamplingEstimator> estimator =
+                std::make_unique<ce::SamplingEstimatorImpl>(
+                    cq->getOpCtx(),
+                    collections,
+                    cq->nss(),
+                    yieldPolicy,
+                    qkc.getInternalJoinPlanSamplingSize(),
+                    qkc.getInternalQuerySamplingCEMethod(),
+                    qkc.getNumChunksForChunkBasedSampling(),
+                    ce::CardinalityEstimate{numRecords,
+                                            cost_based_ranker::EstimationSource::Metadata});
 
             // Generate a sample for the fields relevant to this join.
             // TODO SERVER-112233: figure out based on join predicates which fields exactly we need.

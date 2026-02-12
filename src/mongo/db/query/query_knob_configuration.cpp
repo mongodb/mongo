@@ -103,6 +103,7 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _enablePathArrayness = internalEnablePathArrayness.loadRelaxed();
     _enablePipelineOptimizationAdditionalTestingRules =
         internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
+    _internalJoinPlanSamplingSize = internalJoinPlanSamplingSize.loadRelaxed();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -160,6 +161,10 @@ size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() con
 
 bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
     return _enableJoinEnumerationHJOrderPruning;
+}
+
+size_t QueryKnobConfiguration::getInternalJoinPlanSamplingSize() const {
+    return _internalJoinPlanSamplingSize;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {

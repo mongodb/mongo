@@ -174,28 +174,28 @@ Close enough?: NO
 db.many_rows.aggregate([{"$lookup":{"from":"one_row","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"i_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.one_row.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"i_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 # Join on a missing field
@@ -254,14 +254,14 @@ Close enough?: NO
 db.mostly_nulls.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":{"$ne":null}}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6067708333333335  
+Estimated cardinality: 1.001  
 Close enough?: yes
 
 ```js
 db.mostly_nulls.aggregate([{"$lookup":{"from":"mostly_nulls","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":{"$ne":null}}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 1304.6888020833335  
+Estimated cardinality: 501.00049999999993  
 Close enough?: NO
 
 # Joins with filter on the left side over the join field
@@ -269,36 +269,36 @@ Close enough?: NO
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"d_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"d_idx":1}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 10156.25  
+Estimated cardinality: 10000  
 Close enough?: NO
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"i_idx":{"$lt":50}}}])
 ```
 Actual cardinality: 50  
-Estimated cardinality: 130.20833333333334  
-Close enough?: NO
+Estimated cardinality: 50  
+Close enough?: yes
 
 # Joins with filter on the left side over another field (residual predicate)
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"d_idx":1}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 101.5625  
+Estimated cardinality: 100  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right"}},{"$unwind":"$right"},{"$match":{"d_idx":{"$lt":5}}}])
 ```
 Actual cardinality: 500  
-Estimated cardinality: 505.2083333333333  
+Estimated cardinality: 500  
 Close enough?: yes
 
 # Joins with unsatisfiable filter on left side
@@ -321,37 +321,37 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"i_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"i_idx":{"$ne":1}}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 999  
-Estimated cardinality: 997.3958333333334  
+Estimated cardinality: 999  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$d_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"i_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 260.4166666666667  
-Close enough?: NO
+Estimated cardinality: 100  
+Close enough?: yes
 
 # Join with filters on the right side over another field (residual predicate)
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx"]}},{"d_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 101.5625  
+Estimated cardinality: 100  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$d_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$d_idx"]}},{"i_idx":1}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 260.4166666666667  
-Close enough?: NO
+Estimated cardinality: 100  
+Close enough?: yes
 
 # Right side filter matches all rows
 ```js
@@ -396,14 +396,14 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right1"}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right2"}},{"$unwind":"$right2"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right1"}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right2"}},{"$unwind":"$right2"},{"$match":{"d_idx":1}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 101.5625  
+Estimated cardinality: 100  
 Close enough?: yes
 
 ## Different join keys
@@ -418,14 +418,14 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right1"}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","localField":"i_idx_offset","foreignField":"i_idx_offset","as":"right2"}},{"$unwind":"$right2"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"i_idx","foreignField":"i_idx","as":"right1"}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","localField":"i_idx_offset","foreignField":"i_idx_offset","as":"right2"}},{"$unwind":"$right2"},{"$match":{"d_idx":1}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 101.5625  
+Estimated cardinality: 100  
 Close enough?: yes
 
 # Multi-table joins - star
@@ -440,14 +440,14 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right1","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","as":"right2","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right2"},{"$match":{"i_idx":1}}])
 ```
 Actual cardinality: 1  
-Estimated cardinality: 2.6041666666666665  
+Estimated cardinality: 1  
 Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right1","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","as":"right2","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right2"},{"$match":{"d_idx":1}}])
 ```
 Actual cardinality: 100  
-Estimated cardinality: 101.5625  
+Estimated cardinality: 100  
 Close enough?: yes
 
 # Multi-table joins - zero-cardinality tables at various positions
@@ -495,5 +495,5 @@ Estimated cardinality: 0
 Close enough?: yes
 
 # Summary
-Good estimations: 51  
-Bad estimations: 16  
+Good estimations: 54  
+Bad estimations: 13  
