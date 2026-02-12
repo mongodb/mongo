@@ -25,43 +25,12 @@
  * - Cluster streams never invalidate (cluster continues to exist)
  *
  * ================================================================================
- * KEY INSIGHT: Per-Shard Event Emission for createIndexes/dropIndexes
+ * INDEX EVENTS (createIndexes / dropIndexes)
  * ================================================================================
- *
- * When MongoDB executes createIndexes or dropIndexes on a sharded collection, each
- * shard that has data for that collection emits its own change stream event. This
- * results in multiple events with the same clusterTime (one per shard).
- *
- * The number of events depends on the CURRENT data distribution:
- *
- * | Current Data Distribution      | Events Emitted   |
- * |--------------------------------|------------------|
- * | Not sharded / single shard     | 1                |
- * | Range (single chunk initially) | 1                |
- * | Hashed (pre-split across set)  | shardSet.length  |
- *
- * WHY HASHED = shardSet.length:
- * - Hashed shard keys cause IMMEDIATE pre-split distribution across shards in the shard set.
- * - Zones are used to restrict data to only shards in the shardSet.
- * - Each shard in the shardSet emits its own createIndexes/dropIndexes event.
- *
- * WHY RANGE = 1 (initially):
- * - Range shard keys start with a SINGLE chunk on the primary shard
- * - Data only exists on one shard initially (until splits/migrations occur)
- * - Only that one shard emits the event
- *
- * IMPORTANT FOR RESHARD OPERATIONS:
- * - CreateIndexCommand (before reshard): Event count based on CURRENT shard key distribution
- *   Example: hashed→range reshard creates index while data is still hashed = N events
- * - DropIndexCommand (after reshard): Event count based on NEW shard key distribution
- *   Example: hashed→range reshard drops old index after data is range-distributed = 1 event
- *
- * LIMITATION: This logic assumes hashed keys always distribute to all shards and range
- * keys stay on one shard. In reality, data distribution can change via moveChunk/balancer.
- * TODO SERVER-114858: Track actual data distribution instead of inferring from shard key type.
- *
- * The generator passes `collectionCtx.shardKeySpec` (the collection's current shard key)
- * to commands for predicting event counts based on current data distribution.
+ * When MongoDB executes createIndexes or dropIndexes on a sharded collection, it is
+ * one event per shard. We do not include these in expected events:
+ * CreateIndexCommand and DropIndexCommand return [] from getChangeEvents();
+ * ShardCollectionCommand omits the implicit createIndexes when sharding a new collection.
  * ================================================================================
  */
 
@@ -343,12 +312,8 @@ class DropDatabaseCommand extends Command {
 /**
  * Helper function to check if a shard key spec uses hashed sharding.
  *
- * This is important for predicting change stream event counts because:
- * - Hashed shard keys cause IMMEDIATE data distribution across participating shards (pre-split).
- * - Range shard keys start with a SINGLE chunk on one shard.
- *
- * This distribution difference affects how many createIndexes/dropIndexes events
- * are emitted - one per shard that has data.
+ * Used for command behavior (e.g. presplitHashedZones when sharding, toString).
+ * Hashed keys cause immediate pre-split across shards; range keys start with one chunk.
  *
  * @param {Object} shardKeySpec - The shard key specification (e.g., {data: "hashed"} or {data: 1})
  * @returns {boolean} - True if any field in the shard key uses "hashed"
@@ -358,50 +323,6 @@ function isHashedShardKey(shardKeySpec) {
         return false;
     }
     return Object.values(shardKeySpec).some((v) => v === "hashed");
-}
-
-/**
- * Generate per-shard events for index operations (createIndexes/dropIndexes).
- *
- * Index operations emit one event per shard that has data. For sharded collections
- * with hashed keys, data is pre-split across all shards in the shard set, so each
- * shard emits its own event. For range keys or unsharded collections, data starts
- * on a single shard.
- *
- * @param {string} operationType - The operation type ("createIndexes" or "dropIndexes").
- * @param {string} dbName - Database name.
- * @param {string} collName - Collection name.
- * @param {boolean} isSharded - Whether the collection is sharded.
- * @param {Object} currentShardKeySpec - The current shard key specification.
- * @param {Object} indexSpec - Optional index spec to use for event count (for drop index after unshard).
- * @param {Array} shardSet - Array of shards in the shard set.
- * @returns {Array} - Array of event objects.
- */
-function generatePerShardIndexEvents(
-    operationType,
-    dbName,
-    collName,
-    isSharded,
-    currentShardKeySpec,
-    indexSpec,
-    shardSet,
-) {
-    // TODO SERVER-114858: This logic assumes hashed keys distribute to all shards and
-    // range keys stay on one shard. Once move chunk is properly implemented, we may
-    // need to track actual data distribution rather than inferring from shard key type.
-    // Use indexSpec if provided (for drop index), otherwise use currentShardKeySpec.
-    const keySpecForEventCount = indexSpec || currentShardKeySpec;
-    const hasHashedShardKey = isHashedShardKey(keySpecForEventCount);
-    const numEvents = isSharded && hasHashedShardKey ? shardSet.length : 1;
-
-    const events = [];
-    for (let i = 0; i < numEvents; i++) {
-        events.push({
-            operationType: operationType,
-            ns: {db: dbName, coll: collName},
-        });
-    }
-    return events;
 }
 
 /**
@@ -459,20 +380,9 @@ function _configureZonesForShardSet(connection, ns, shardKeySpec, shardSet) {
  * Create index command.
  * Creates an index for the shard key (required before sharding or resharding).
  *
- * CHANGE STREAM EVENT BEHAVIOR:
- * ============================
- * The number of 'createIndexes' events emitted depends on the collection's CURRENT
- * shard key type (not the index being created):
- *
- * | Current Shard Key           | Events Emitted   |
- * |-----------------------------|------------------|
- * | Not sharded                 | 1                |
- * | Range (e.g., {a:1})         | 1                |
- * | Hashed (e.g., {a:"hashed"}) | shardSet.length  |
- *
- * WHY: Hashed shard keys cause immediate pre-split distribution across shards in the shard set
- * (via zones), so each shard emits its own createIndexes event. Range shard keys start with a
- * single chunk on one shard, so only one event is emitted.
+ * CHANGE STREAM EVENT BEHAVIOR (server): createIndexes emits one event per shard that has
+ * data (1 for unsharded/range, shardSet.length for hashed). We do not include these in
+ * expected events; getChangeEvents() returns [].
  *
  * Precondition (guaranteed by FSM): collection exists.
  */
@@ -501,15 +411,8 @@ class CreateIndexCommand extends Command {
     }
 
     getChangeEvents(watchMode) {
-        return generatePerShardIndexEvents(
-            "createIndexes",
-            this.dbName,
-            this.collName,
-            this.collectionCtx.isSharded || false,
-            this.collectionCtx.shardKeySpec || null,
-            null, // No special index spec for create
-            this.shardSet,
-        );
+        // Do not emit events: per-shard createIndexes event count is not easily predictable.
+        return [];
     }
 }
 
@@ -517,24 +420,9 @@ class CreateIndexCommand extends Command {
  * Drop index command.
  * Drops an old shard key index (cleanup after resharding to a new shard key).
  *
- * CHANGE STREAM EVENT BEHAVIOR:
- * ============================
- * The number of 'dropIndexes' events emitted depends on the collection's CURRENT
- * shard key type (the NEW shard key AFTER resharding, not the index being dropped):
- *
- * | Current Shard Key           | Events Emitted   |
- * |-----------------------------|------------------|
- * | Not sharded                 | 1                |
- * | Range (e.g., {a:1})         | 1                |
- * | Hashed (e.g., {a:"hashed"}) | shardSet.length  |
- *
- * WHY: After resharding, data distribution is determined by the NEW shard key.
- * If the new key is hashed, data is pre-split across shards in the shard set (via zones),
- * so each shard emits a dropIndexes event when removing the old index. If the new key is
- * range, data starts on a single shard, resulting in one event.
- *
- * IMPORTANT: The generator passes `collectionCtx.shardKeySpec` as the NEW shard key
- * (after reshard) for event count calculation, and `indexSpec` as the old index to drop.
+ * CHANGE STREAM EVENT BEHAVIOR (server): dropIndexes emits one event per shard that has
+ * data (based on current shard key after reshard). We do not include these in expected
+ * events; getChangeEvents() returns [].
  *
  * Preconditions (guaranteed by generator): collection exists, index exists.
  */
@@ -562,17 +450,8 @@ class DropIndexCommand extends Command {
     }
 
     getChangeEvents(watchMode) {
-        // Event count is based on CURRENT shard key distribution, not the index being dropped.
-        // When the collection is hashed-sharded, all shards emit events for any index operation.
-        return generatePerShardIndexEvents(
-            "dropIndexes",
-            this.dbName,
-            this.collName,
-            this.collectionCtx.isSharded || false,
-            this.collectionCtx.shardKeySpec || null,
-            null, // Use current shard key for event count, like CreateIndexCommand
-            this.shardSet,
-        );
+        // Do not emit events: per-shard dropIndexes event count is not easily predictable.
+        return [];
     }
 }
 
@@ -582,11 +461,9 @@ class DropIndexCommand extends Command {
  *
  * CHANGE STREAM EVENT BEHAVIOR:
  * ============================
- * shardCollection emits ONLY a 'shardCollection' event.
- *
- * IMPORTANT: Index creation is handled SEPARATELY by the generator:
- * - CreateIndexCommand (BEFORE shard): Creates the shard key index
- *   → Since collection is not yet sharded, emits 1 createIndexes event
+ * When sharding a non-existent collection, MongoDB implicitly: (1) creates the collection
+ * (emits 'create'), (2) creates the shard key index (emits 'createIndexes'), (3) shards
+ * (emits 'shardCollection'). We omit createIndexes from expected events.
  *
  * The generator orchestrates the full sequence:
  *   1. CreateIndexCommand (shard key index)
@@ -634,17 +511,11 @@ class ShardCollectionCommand extends Command {
     getChangeEvents(watchMode) {
         const events = [];
 
-        // When sharding a non-existent collection, MongoDB implicitly:
-        // 1. Creates the collection (emits 'create')
-        // 2. Creates the shard key index (emits 'createIndexes')
-        // 3. Shards the collection (emits 'shardCollection')
+        // When sharding a non-existent collection, MongoDB implicitly creates the collection
+        // (emits 'create') then shards (emits 'shardCollection'). We omit createIndexes from expected events.
         if (!this.collectionCtx.exists) {
             events.push({
                 operationType: "create",
-                ns: {db: this.dbName, coll: this.collName},
-            });
-            events.push({
-                operationType: "createIndexes",
                 ns: {db: this.dbName, coll: this.collName},
             });
         }
@@ -703,7 +574,7 @@ class UnshardCollectionCommand extends Command {
     getChangeEvents(watchMode) {
         // unshardCollection internally uses reshard machinery to move data to a single shard,
         // so MongoDB emits a reshardCollection event (not an unshardCollection event).
-        // Note: dropIndexes event for the old shard key is handled by a separate DropIndexCommand.
+        // Note: DropIndexCommand (old shard key cleanup) is run by the generator after this.
         return [
             {
                 operationType: "reshardCollection",
@@ -720,12 +591,6 @@ class UnshardCollectionCommand extends Command {
  * CHANGE STREAM EVENT BEHAVIOR:
  * ============================
  * reshardCollection emits ONLY a 'reshardCollection' event.
- *
- * IMPORTANT: Index-related events are handled SEPARATELY by the generator:
- * - CreateIndexCommand (BEFORE reshard): Creates index for new shard key
- *   → Event count depends on OLD shard key type (see CreateIndexCommand docs)
- * - DropIndexCommand (AFTER reshard): Drops old shard key index
- *   → Event count depends on NEW shard key type (see DropIndexCommand docs)
  *
  * The generator orchestrates the full sequence:
  *   1. CreateIndexCommand (new shard key index)
@@ -787,7 +652,7 @@ class ReshardCollectionCommand extends Command {
 
     getChangeEvents(watchMode) {
         // Reshard emits only reshardCollection event.
-        // Index events are handled by separate CreateIndexCommand/DropIndexCommand.
+        // Index events (createIndexes/dropIndexes) are handled by separate commands; we do not emit them.
         return [
             {
                 operationType: "reshardCollection",

@@ -38,6 +38,9 @@ class ChangeStreamReader {
      *   - readingMode: ChangeStreamReadingMode value. Default: Continuous.
      *   - showExpandedEvents: Optional boolean to show expanded events (default: true).
      *   - batchSize: Optional cursor batch size for getMore operations (default: 1).
+     *   - excludeOperationTypes: Optional array of operation types to filter out at the
+     *       pipeline level (e.g., ["createIndexes", "dropIndexes"]). Use this for tests
+     *       that don't want to deal with unpredictable per-shard event counts.
      */
     static run(conn, config) {
         switch (config.readingMode) {
@@ -93,6 +96,12 @@ class ChangeStreamReader {
             pipeline.push({$match: {"ns.db": {$ne: Connector.controlDatabase}}});
         }
 
+        // Filter out specified operation types at the pipeline level if requested.
+        // This avoids unpredictable per-shard event counts in multi-shard clusters.
+        if (config.excludeOperationTypes && config.excludeOperationTypes.length > 0) {
+            pipeline.push({$match: {operationType: {$nin: config.excludeOperationTypes}}});
+        }
+
         const watchOptions = {
             pipeline: pipeline,
             collection: config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1, // 1 means watch all collections
@@ -144,9 +153,6 @@ class ChangeStreamReader {
             }
         }
 
-        jsTest.log.info(
-            `ChangeStreamReader [${cfg.instanceName}]: Completed reading ${cfg.numberOfEventsToRead} events`,
-        );
         jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
         cst.cleanUp();
     }
@@ -193,9 +199,6 @@ class ChangeStreamReader {
             cst.cleanUp();
         }
 
-        jsTest.log.info(
-            `ChangeStreamReader [${cfg.instanceName}]: Completed reading ${cfg.numberOfEventsToRead} events`,
-        );
         jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
     }
 }

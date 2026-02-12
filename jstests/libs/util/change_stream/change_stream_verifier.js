@@ -262,8 +262,6 @@ class SequentialPairwiseFetchingTestCase {
         const endsWithInvalidate =
             lastEvent && lastEvent.changeEvent && lastEvent.changeEvent.operationType === "invalidate";
         if (!endsWithInvalidate) {
-            // TODO SERVER-117490: Use assertDone() to support deferred matching for out-of-order
-            // per-shard events.
             matcher.assertDone();
         }
     }
@@ -398,11 +396,10 @@ class SingleReaderVerificationTestCase {
 
         // Verify that change event sequence matches the expectations.
         const matcher = ctx.getChangeStreamMatcher(this._readerInstanceName);
+
         for (const rec of events) {
             matcher.matches(rec.changeEvent, rec.cursorClosed);
         }
-        // TODO SERVER-117490: Use assertDone() to support deferred matching for out-of-order
-        // per-shard events.
         matcher.assertDone();
     }
 }
@@ -493,6 +490,8 @@ class PrefixReadTestCase {
                 continue;
             }
 
+            // readChangeEventsFromClusterTime inherits excludeOperationTypes from base config,
+            // so excluded events are filtered at the pipeline level.
             const actual = ctx
                 .readChangeEventsFromClusterTime(conn, this._readerInstanceName, ts, expected.length)
                 .map(extractComparable);
@@ -511,8 +510,6 @@ class PrefixReadTestCase {
         for (const rec of events) {
             matcher.matches(rec.changeEvent, rec.cursorClosed);
         }
-        // TODO SERVER-117490: Use assertDone() to support deferred matching for out-of-order
-        // per-shard events.
         matcher.assertDone();
     }
 }

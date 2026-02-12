@@ -38,6 +38,7 @@ import {
     createShardingTest,
     createMatcher,
     cleanupTestDatabase,
+    kExcludedOperationTypes,
 } from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
@@ -1124,6 +1125,7 @@ describe("ChangeStreamReader integration", function () {
             readingMode: ChangeStreamReadingMode.kContinuous,
             startAtClusterTime: startTime,
             numberOfEventsToRead: expectedEvents.length,
+            excludeOperationTypes: kExcludedOperationTypes,
         };
 
         ChangeStreamReader.run(testContext.st.s, readerConfig);
@@ -1295,6 +1297,7 @@ describe("ChangeStreamReader integration", function () {
             readingMode: ChangeStreamReadingMode.kContinuous,
             startAtClusterTime: startTime,
             numberOfEventsToRead: expectedEvents.length,
+            excludeOperationTypes: kExcludedOperationTypes,
         };
 
         ChangeStreamReader.run(st.s, readerConfig);

@@ -2,7 +2,7 @@
  * FSM test: Fetch-one-and-resume vs continuous reading mode comparison.
  * Verifies that both reading modes produce equivalent results.
  *
- * @tags: [assumes_balancer_off, uses_change_streams]
+ * @tags: [assumes_balancer_off, does_not_support_stepdowns, uses_change_streams]
  */
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
@@ -113,8 +113,7 @@ function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1
     }
 }
 
-// TODO SERVER-117490: Re-enable once deferred matching is fully understood.
-describe.skip("FSM Fetch-One-And-Resume", function () {
+describe("FSM Fetch-One-And-Resume", function () {
     it("compares reading modes", function () {
         const compareReadingModes = (fsmSt, {expectedEvents, baseReaderConfig, createInstanceName}) => {
             const readerContinuous = createInstanceName("reader_continuous");

@@ -22,6 +22,14 @@ const TEST_DB = "test_cs";
 const TEST_SEED = 42;
 
 /**
+ * Operation types to filter out before comparison.
+ * These events have unpredictable behavior in multi-shard clusters:
+ * - createIndexes: Emitted per-shard, count depends on shard distribution
+ * - dropIndexes: Emitted per-shard, count depends on shard distribution
+ */
+const kExcludedOperationTypes = ["createIndexes", "dropIndexes"];
+
+/**
  * Get a fresh cluster time by doing a no-op write.
  * This ensures we get a timestamp that corresponds to an actual oplog entry,
  * which is required for reliable change stream resume tokens.
@@ -104,19 +112,18 @@ function setupFsmTest(ctx, testName) {
         .flatMap((cmd) => cmd.getChangeEvents(ChangeStreamWatchMode.kCollection))
         .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
 
-    jsTest.log.info(`FSM ${testName}: Cluster config - shards: ${ctx.fsmShards.length}, mongos: 1`);
+    const numberOfEventsToRead = expectedEvents.length;
+
     jsTest.log.info(
-        `FSM ${testName}: Generated ${commands.length} commands, expecting ${expectedEvents.length} events`,
+        `FSM ${testName}: shards=${ctx.fsmShards.length}, commands=${commands.length}, ` +
+            `expectedEvents=${expectedEvents.length}`,
     );
-    jsTest.log.info(`FSM ${testName}: Expected events: ${tojson(expectedEvents.map((e) => e.event.operationType))}`);
 
     const startTime = getCurrentClusterTime(ctx.fsmSt.s, dbName);
 
     const writerInstanceName = `writer_${testName}_${ts}`;
     ctx.fsmInstancesToCleanup.push(writerInstanceName);
     Writer.run(ctx.fsmSt.s, {commands, instanceName: writerInstanceName});
-
-    jsTest.log.info(`FSM ${testName}: Commands executed, starting change stream at ${tojson(startTime)}`);
 
     const createInstanceName = (prefix) => {
         const name = `${prefix}_${testName}_${ts}`;
@@ -130,7 +137,8 @@ function setupFsmTest(ctx, testName) {
         collName,
         readingMode: ChangeStreamReadingMode.kContinuous,
         startAtClusterTime: startTime,
-        numberOfEventsToRead: expectedEvents.length,
+        numberOfEventsToRead,
+        excludeOperationTypes: kExcludedOperationTypes,
     };
 
     return {dbName, collName, commands, expectedEvents, baseReaderConfig, createInstanceName};
@@ -166,6 +174,7 @@ function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1
 export {
     TEST_DB,
     TEST_SEED,
+    kExcludedOperationTypes,
     getCurrentClusterTime,
     createShardingTest,
     createMatcher,
