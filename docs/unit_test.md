@@ -10,6 +10,9 @@ listed out in [Banned Features](#banned-features). The unit testing framework al
 enhanced reporting of test output (see
 [Enhanced Reporting of Test Output](#enhanced-reporting-of-test-output)).
 
+The core unittest features can be accessed by including the `mongo/unittest/unittest.h` header and
+using the `mongo_cc_unit_test` bazel rule.
+
 ## GoogleTest Features
 
 ### Parameterized tests
@@ -35,15 +38,19 @@ TEST_P(TestFixture, MongoTest) {
 }
 ```
 
+### GoogleMock
+
+GoogleMock can be used by including the `mongo/unittest/unittest.h` header. You should never
+directly include `<gmock/gmock.h>`. There are matchers for common mongo types such as `BSONObj`
+in `mongo/unittest/matcher.h`.
+
 ## Banned Features
 
 - `ASSERT_DEATH` - should not be used. Use `DEATH_TEST` instead (see [Death Tests](#death-tests)).
-- GoogleMock - not yet available for use. Support for GoogleMock is coming soon.
 
 ## Upcoming Features
 
 - IDE Integration
-- GoogleMock
 - Color output (Evergreen support, filter out color when terminal not detected)
 - Output filtering/formatting
 - New APIs to help with unit testing developer experience
