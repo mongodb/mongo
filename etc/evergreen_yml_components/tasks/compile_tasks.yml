@@ -999,6 +999,20 @@ tasks:
             CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
           args:
             - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            PROMOTE_TO_CLOUD_ENV: ${promote_to_cloud_dev}
+            CLOUD_ENV: "cloud-qa"
+            PROMOTE_BUILD_VARIANT: ${promote_build_variant}
+            PROMOTE_MONGO_VERSION: ${version}
+            PROMOTE_REVISION: ${promote_revision}
+            PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
+            CLOUD_ENV_API_PUBLIC_KEY: ${cloud_qa_api_public_key}
+            CLOUD_ENV_API_PRIVATE_KEY: ${cloud_qa_api_private_key}
+          args:
+            - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
 
   - name: crypt_push
     run_on: rhel8.7-small
