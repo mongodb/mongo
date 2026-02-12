@@ -46,6 +46,12 @@ namespace {
 using namespace change_stream_pre_image_test_helper;
 using namespace pre_image_marker_initialization_internal;
 
+BSONObj recordIdToBSON(const RecordId& rid) {
+    BSONObjBuilder bob;
+    record_id_helpers::appendToBSONAs(rid, &bob, "");
+    return bob.obj();
+}
+
 /**
  * Tests components of pre-image truncate marker initialization across a pre-image collection.
  */
@@ -71,7 +77,11 @@ public:
 
         int i = 0;
         for (const auto& expectedPreImage : expectedPreImages) {
-            ASSERT_EQ(extractRecordIdAndWallTime(expectedPreImage).id, samples[i++].id);
+            ASSERT_EQ(extractRecordIdAndWallTime(expectedPreImage).id, samples[i].id)
+                << "\nexpected count: " << samples.size() << "\ni: " << i
+                << "\nexpected: " << expectedPreImage.toBSON()
+                << "\nactual: " << recordIdToBSON(samples[i].id);
+            i++;
         }
     }
 };
@@ -399,26 +409,20 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize1) {
 
     // Collection contains a single entry for 'kNsUUID', and we expect it to be sampled.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
 
     // Collection contains two entries for 'kNsUUID', but we expect 'kPreImage2' to be the only
     // document sampled.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage2});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage2});
 
     // Collection contains three entries for 'kNsUUID', but we expect 'kPreImage3' to be the only
     // document sampled.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage3});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage3});
 }
 
 // Tests for sample size 2, which has a few special cases.
@@ -430,26 +434,20 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSize2) {
 
     // Collection contains a single entry for 'kNsUUID'.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
 
     // Collection contains two entries for 'kNsUUID', and we expect both to be contained in the
     // sample.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2});
 
     // Collection contains three entries for 'kNsUUID', and we 'kPreImage1' and 'kPreImage3' to be
     // sampled.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage3});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage3});
 }
 
 // Tests for a sample size larger than the number of documents in the collection.
@@ -461,25 +459,19 @@ TEST_F(PreImageMarkerInitializationTest, SampleNSUUIDRangeEquallySampleSizeLarge
 
     // Collection contains a single entry for 'kNsUUID'.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage1);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1});
 
     // Collection contains two entries for 'kNsUUID', and we expect both to be contained in the
     // sample.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage2);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2});
 
     // Collection contains three entries for 'kNsUUID', and we expect them all to be sampled.
     insertDirectlyToPreImagesCollection(opCtx, kPreImage3);
-    {
-        assertEqualRangeSampleForNsUUIDContainsExactPreimages(
-            kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2, kPreImage3});
-    }
+    assertEqualRangeSampleForNsUUIDContainsExactPreimages(
+        kNumSamples, std::vector<ChangeStreamPreImage>{kPreImage1, kPreImage2, kPreImage3});
 }
 
 // Test sampling when the document timestamps in the collection are almost equally distributed.
@@ -645,11 +637,11 @@ TEST_F(PreImageMarkerInitializationTest,
 
     constexpr uint64_t kNumSamples = 10;
 
-    // The sampling algorithm is based on Timestamp distances. It does not produce good results in
-    // case all documents have the same Timestamp value, and only differ in terms of 'applyOpsIndex'
-    // values.
+    // The different 'applyOpsIndex' values here are not perfectly distributed because the step size
+    // used for sampling is calculated using integer division, which leads to cumulative rounding
+    // errors when adding the (rounded-down) step size multiple times.
     std::vector<ChangeStreamPreImage> expectedPreImages;
-    for (int i : {0, 49}) {
+    for (int i : {0, 5, 10, 15, 20, 25, 30, 35, 40, 49}) {
         expectedPreImages.push_back(buildPreImage(
             kNsUUID, Timestamp(Seconds(baseTime), 0), i /* applyOpsIndex */, BSON("x" << i)));
     }

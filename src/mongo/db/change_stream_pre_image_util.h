@@ -34,12 +34,14 @@
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/platform/int128.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <utility>
 
 #include <boost/optional/optional.hpp>
 
@@ -72,14 +74,43 @@ boost::optional<Date_t> getPreImageOpTimeExpirationDate(OperationContext* opCtx,
 
 /**
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
- * be generated from a pre-image.
+ * be generated from a pre-image, otherwise the behavior of this method is undefined.
  */
 Timestamp getPreImageTimestamp(const RecordId& rid);
 
 /**
+ * Parses the 'ts' and 'applyOpsIndex' fields from the 'ChangeStreamPreImageId' associated with the
+ * 'rid'. The 'rid' MUST be generated from a pre-image, otherwise the behavior of this method is
+ * undefined.
+ */
+std::pair<Timestamp, int64_t> getPreImageTimestampAndApplyOpsIndex(const RecordId& rid);
+
+/**
+ * Converts the 'ts' and 'applyOpsIndex' fields from the 'rid' into a numeric value, for easier
+ * arithmetic. The 'rid' MUST be generated from a pre-image.
+ * In the resulting numeric value, the 'Timestamp' part will be more significant than the
+ * 'applyOpsIndex' part, i.e. the resulting numeric values sort first by their 'Timestamp' part,
+ * then by their 'applyOpsIndex' part.
+ */
+uint128_t timestampAndApplyOpsIndexToNumber(const RecordId& rid);
+
+/**
+ * Converts the 'ts' and 'applyOpsIndex' values into a numeric value, for easier arithmetic.
+ * In the resulting numeric value, the 'Timestamp' part will be more significant than the
+ * 'applyOpsIndex' part, i.e. the resulting numeric values sort first by their 'Timestamp' part,
+ * then by their 'applyOpsIndex' part.
+ */
+uint128_t timestampAndApplyOpsIndexToNumber(Timestamp ts, int64_t applyOpsIndex);
+
+/**
+ * Converts the numeric value back into its 'ts' and 'applyOpsIndex' components.
+ */
+std::pair<Timestamp, int64_t> timestampAndApplyOpsIndexFromNumber(uint128_t value);
+
+/**
  * Converts the 'ChangeStreamPreImageId' to its 'RecordId' equivalent.
  */
-RecordId toRecordId(ChangeStreamPreImageId id);
+RecordId toRecordId(const ChangeStreamPreImageId& id);
 
 /**
  * Construct a 'RecordIdBound' for the specified combination of 'nsUUID', Timestamp 'ts' and

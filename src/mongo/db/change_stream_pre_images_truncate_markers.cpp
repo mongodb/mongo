@@ -40,7 +40,6 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -168,24 +167,33 @@ void sampleRangeEquallyWithCursor(SeekableRecordCursor& cursor,
     // Sample size needs at least 1.
     invariant(numSamples >= 1);
 
-    // Convert lowest and highest recorded values to 'Timestamp's, and calculate the distance
-    // between them.
-    const Timestamp lowest = change_stream_pre_image_util::getPreImageTimestamp(firstRidAndWall.id);
-    const Timestamp highest = change_stream_pre_image_util::getPreImageTimestamp(lastRidAndWall.id);
+    // Convert lowest and highest values into uint128_t values, for easy arithmetic.
+    const auto lowest =
+        change_stream_pre_image_util::timestampAndApplyOpsIndexToNumber(firstRidAndWall.id);
+    const auto highest =
+        change_stream_pre_image_util::timestampAndApplyOpsIndexToNumber(lastRidAndWall.id);
     invariant(lowest <= highest);
 
-    // Clamp 'stepSize' to at least 1, so that the algorithm is guaranteed to make progress.
-    const unsigned long long distance = highest.asULL() - lowest.asULL();
-    const unsigned long long stepSize = std::max<unsigned long long>(distance / numSamples, 1);
+    const auto distance = highest - lowest;
+
+    // Clamp 'stepSize' to at least 1, so that the algorithm is guaranteed to make progress. Note
+    // that the step size is calculated using integer division, so that the 'stepSize' value is
+    // rounded down. Adding 'stepSize' multiple times can lead to a cumulative rounding error. This
+    // should be negligible for real-word use cases though, as records should mostly have Timestamp
+    // differences, and the Timestamp part accounts for the upper 64 bits of the distance.
+    const auto stepSize = std::max<decltype(distance)>(distance / numSamples, 1);
 
     // Add 'stepSize' here and start sampling at 'lowest + stepSize' because we have already
     // included the lowest possible record.
-    Timestamp current = lowest + stepSize;
+    auto current = lowest + stepSize;
 
     while (current < highest && samples.size() < numSamples) {
+        auto [currentTs, currentApplyOpsIndex] =
+            change_stream_pre_image_util::timestampAndApplyOpsIndexFromNumber(current);
+
         RecordId seekTo =
             change_stream_pre_image_util::getPreImageRecordIdForNsTimestampApplyOpsIndex(
-                nsUUID, current, 0 /* applyOpsIndex */)
+                nsUUID, currentTs /* timestamp */, currentApplyOpsIndex /* applyOpsIndex */)
                 .recordId();
 
         boost::optional<Record> record =
@@ -221,16 +229,14 @@ void sampleRangeEquallyWithCursor(SeekableRecordCursor& cursor,
         samples.emplace_back(record->id,
                              PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj));
 
-        // Forward to next Timestamp value. Note that we only increase the Timestamp part of
-        // the preimage id here and not the applyOpsIndex part.
-        // If the timestamp part of the record just read is already larger than the
-        // Timestamp for the next planned step, we can as well bump it up to what we just
-        // read plus the step size. That way we can avoid reading the same records again if
-        // they are farther apart (in Timestamp terms) than the step size.
-        const Timestamp recordTimestamp =
-            change_stream_pre_image_util::getPreImageTimestamp(record->id);
-
-        current = std::max<Timestamp>(current, recordTimestamp) + stepSize;
+        // Forward to next Timestamp value. If the timestamp part of the record just read is already
+        // larger than the Timestamp for the next planned step, we can as well bump it up to what we
+        // just read plus the step size. That way we can avoid reading the same records again if
+        // they are farther apart than the step size.
+        current =
+            std::max(current,
+                     change_stream_pre_image_util::timestampAndApplyOpsIndexToNumber(record->id)) +
+            stepSize;
     }
 }
 
