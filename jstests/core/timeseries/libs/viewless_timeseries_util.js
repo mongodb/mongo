@@ -7,6 +7,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
+import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 export function areViewlessTimeseriesEnabled(db) {
     if (
@@ -70,7 +71,32 @@ export function getTimeseriesCollForDDLOps(db, coll) {
  * FixtureHelpers::isSharded on the given collection.
  */
 export function isShardedTimeseries(coll) {
-    return FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(getTimeseriesBucketsColl(coll));
+    // We must use snapshot read concern to avoid racing with viewless timeseries upgrade/downgrade,
+    // so bypass overrides, which may want to impose a different read concern (e.g. majority).
+    return OverrideHelpers.withPreOverrideRunCommand(() => {
+        try {
+            const collEntry = coll
+                .getDB()
+                .getSiblingDB("config")
+                .collections.findOne(
+                    {_id: {$in: [coll.getFullName(), getTimeseriesBucketsColl(coll).getFullName()]}},
+                    {} /* projection */,
+                    {} /* options */,
+                    "snapshot",
+                );
+            if (collEntry === null) {
+                return false;
+            }
+            return collEntry.unsplittable === null || !collEntry.unsplittable;
+        } catch (e) {
+            // readConcern "snapshot" is not supported on standalone nodes, but on a sharded cluster
+            // there can be no standalone nodes, so the collection is not sharded.
+            if (e.code === ErrorCodes.NotAReplicaSet) {
+                return false;
+            }
+            throw e;
+        }
+    });
 }
 
 /**
