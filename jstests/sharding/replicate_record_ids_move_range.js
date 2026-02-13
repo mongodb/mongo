@@ -52,7 +52,7 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
     const coll = testDB[collName];
     const ns = coll.getFullName();
 
-    assert.commandWorked(coll.getDB().createCollection(coll.getName(), {recordIdsReplicated: true}));
+    assert.commandWorked(coll.getDB().createCollection(coll.getName()));
     const keyPattern = isHashed ? {_id: "hashed"} : keyDoc;
     assert.commandWorked(coll.createIndex(keyPattern));
 

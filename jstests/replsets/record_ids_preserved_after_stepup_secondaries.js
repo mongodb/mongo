@@ -35,7 +35,7 @@ const primDB = primary.getDB(dbName);
 // secondary became the primary.
 const ops = [];
 ops.push({op: "i", ns: dbName + "." + collName, o: {_id: 1}, o2: {_id: 1}, rid: NumberLong(3)});
-assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+assert.commandWorked(primDB.runCommand({create: collName}));
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
 
 // Now make the secondary step up.

@@ -28,7 +28,7 @@ const testDB = mongos.getDB(dbName);
 const coll = testDB[collName];
 
 assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
-assert.commandWorked(testDB.createCollection(collName, {recordIdsReplicated: true}));
+assert.commandWorked(testDB.createCollection(collName));
 
 let collInfo = coll.exists();
 assert(collInfo.options.recordIdsReplicated, tojson(collInfo));

@@ -20,7 +20,7 @@ const collName = "replRecIdCollForCollMod";
 
 // Create a collection with the param set.
 const testDB = primary.getDB("test");
-testDB.runCommand({create: collName, recordIdsReplicated: true});
+testDB.runCommand({create: collName});
 const coll = testDB.getCollection(collName);
 assert.commandWorked(coll.insert({_id: 1}));
 

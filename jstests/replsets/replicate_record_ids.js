@@ -54,7 +54,7 @@ const validateRidInOplogs = function (oplogQuery, expectedRid) {
 let docA = {"a": 1};
 
 // Create a collection with the param set. The recordId should show up in the oplog.
-primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
+primDB.runCommand({create: replRidCollName});
 const docAInsertOpTime = assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
 replSet.awaitReplication();
 const docAReplRid = getRidForDoc(primDB, replRidCollName, docA);

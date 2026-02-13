@@ -19,8 +19,7 @@ db[collName].drop();
 db[cappedCollName].drop();
 db[createdAsCappedCollName].drop();
 
-jsTestLog("Creating collection with recordIdsReplicated:true...");
-assert.commandWorked(db.runCommand({create: collName, recordIdsReplicated: true}));
+assert.commandWorked(db.runCommand({create: collName}));
 assert.commandWorked(db[collName].createIndex({a: 1}));
 
 jsTestLog("Cloning as capped should work with replicatedRecordIds and preserve the option.");
@@ -42,9 +41,7 @@ indexes = db[collName].getIndexes();
 assert.eq(indexes.length, 1, indexes);
 
 jsTestLog("Creating collection with capped:true and recordIdsReplicated:true should be allowed.");
-assert.commandWorked(
-    db.runCommand({create: createdAsCappedCollName, capped: true, size: 2000, recordIdsReplicated: true}),
-);
+assert.commandWorked(db.runCommand({create: createdAsCappedCollName, capped: true, size: 2000}));
 collectionOptions = db[createdAsCappedCollName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
 assert(collectionOptions.options.recordIdsReplicated, collectionOptions);

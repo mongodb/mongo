@@ -467,7 +467,7 @@ const testCases = [
         // TODO (SERVER-68173): Enable featureFlagRecordIdsReplicated.
         shouldSkip: (conn) => !FeatureFlagUtil.isEnabled(conn, "RecordIdsReplicated"),
         createCollection: (conn, dbName, collName) => {
-            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName, recordIdsReplicated: true}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
             return dbName + "." + collName;
         },
         insertDocuments: (conn, dbName, collName) => {

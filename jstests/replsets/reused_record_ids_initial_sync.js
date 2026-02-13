@@ -54,8 +54,7 @@ let primary = rst.getPrimary();
 let primDB = primary.getDB(dbName);
 const secondary = rst.getSecondary();
 
-jsTestLog("Create collection with recordsIdsReplicated param set");
-primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
+primDB.runCommand({create: replRidCollName});
 
 assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [{"_id": 1}], writeConcern: {w: 2}}));
 

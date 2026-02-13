@@ -120,7 +120,7 @@ function testRenameReplRidBehavior(srcDB, dstDB, dropTarget) {
 
 function testRenameNoDropTarget(srcDB, dstDB) {
     makeSrcAndDstNames();
-    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {recordIdsReplicated: true});
+    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {});
     const dst = dstDB[dstCollName];
     assertDropCollection(dstDB, dstCollName);
 
@@ -130,7 +130,7 @@ function testRenameNoDropTarget(srcDB, dstDB) {
 
 function testRenameDropTargetTrue(srcDB, dstDB, dstCollOptions) {
     makeSrcAndDstNames();
-    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {recordIdsReplicated: true});
+    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {});
     const dst = assertDropAndRecreateCollection(dstDB, dstCollName, dstCollOptions);
     assert.commandWorked(dst.insert([{_id: new Date(), name: "cool"}]));
 
@@ -140,7 +140,7 @@ function testRenameDropTargetTrue(srcDB, dstDB, dstCollOptions) {
 
 function testRenameWithIndexesAndPostInsert(srcDB, dstDB) {
     makeSrcAndDstNames();
-    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {recordIdsReplicated: true});
+    const src = assertDropAndRecreateCollection(srcDB, srcCollName, {});
     const dst = dstDB[dstCollName];
     assertDropCollection(dstDB, dstCollName);
 
@@ -157,8 +157,8 @@ function testRenameWithIndexesAndPostInsert(srcDB, dstDB) {
 testRenameNoDropTarget(dbA, dbA);
 testRenameNoDropTarget(dbA, dbB);
 
-testRenameDropTargetTrue(dbA, dbA, {recordIdsReplicated: true});
-testRenameDropTargetTrue(dbA, dbB, {recordIdsReplicated: true});
+testRenameDropTargetTrue(dbA, dbA, {});
+testRenameDropTargetTrue(dbA, dbB, {});
 testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}});
 testRenameDropTargetTrue(dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}});
 testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});

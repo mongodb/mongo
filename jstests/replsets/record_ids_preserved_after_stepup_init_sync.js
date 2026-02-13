@@ -26,7 +26,7 @@ const primDB = primary.getDB(dbName);
 
 // Insert documents where some have a $recordId field within them. The recordId provided
 // here is just a field and is separate from the true recordId used when inserting.
-assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+assert.commandWorked(primDB.runCommand({create: collName}));
 assert.commandWorked(
     primDB[collName].insertMany([
         {_id: 1, a: 1}, // recordId: 1

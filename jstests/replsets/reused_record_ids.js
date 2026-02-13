@@ -43,8 +43,7 @@ const replRidCollName = "replRecIdColl";
 
 let primDB = primary.getDB(dbName);
 
-// Create a collection with the param `recordsIdsReplicated` param set.
-primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
+primDB.runCommand({create: replRidCollName});
 
 jsTestLog("Blocking replication to secondary.");
 stopReplicationOnSecondaries(rst);

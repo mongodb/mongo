@@ -87,7 +87,7 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
 
         // Insert documents where some have a $recordId field within them. The recordId provided
         // here is just a field and is separate from the true recordId used when inserting.
-        assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+        assert.commandWorked(primDB.runCommand({create: collName}));
         assert.commandWorked(
             primDB[collName].insertMany([
                 {_id: 1, a: 1}, // recordId: 1
@@ -129,7 +129,7 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
         // Case 2: Add a new node and while initial sync is ongoing, insert more documents on
         // to the primary after collection copying to test oplog application during initial sync.
         primDB[collName].drop();
-        assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+        assert.commandWorked(primDB.runCommand({create: collName}));
         assert.commandWorked(primDB[collName].insertMany([{_id: 1}, {_id: 2}]));
         assert.commandWorked(primDB[collName].remove({_id: 2}));
 
@@ -179,7 +179,7 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
         // During collection copy, all the documents will have been copied over already. However
         // oplog application will try to re-insert them.
         primDB[collName].drop();
-        assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+        assert.commandWorked(primDB.runCommand({create: collName}));
         assert.commandWorked(primDB[collName].insertMany([{_id: 1}, {_id: 2}]));
         assert.commandWorked(primDB[collName].remove({_id: 2}));
 
@@ -226,7 +226,7 @@ export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeC
         jsTestLog("Beginning case 4.");
         // Case 3: Add a new node that has to collection copy a few 16 MB documents.
         primDB[collName].drop();
-        assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
+        assert.commandWorked(primDB.runCommand({create: collName}));
         // Insert a few 16 MB documents.
         for (let i = 0; i < 5; i++) {
             assert.commandWorked(primDB[collName].insert({_id: -100 + i, a: "a".repeat(16 * 1024 * 1024 - 26)}));
