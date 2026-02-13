@@ -31,11 +31,12 @@ TimeseriesTest.run((insert) => {
     const collOptions = [null, {timeseries: {timeField: timeFieldName, metaField: tagFieldName}}];
     const numHosts = 10;
     const numDocs = 200;
-
-    Random.setRandomSeed();
-    const hosts = TimeseriesTest.generateHosts(numHosts);
+    const docsPerHost = numDocs / numHosts;
 
     let testFunc = function (collAOption, collBOption) {
+        const scenario =
+            "collA=" + (collAOption ? "timeseries" : "regular") + ", collB=" + (collBOption ? "timeseries" : "regular");
+
         // Prepare two time-series collections.
         const collA = testDB.getCollection("a");
         const collB = testDB.getCollection("b");
@@ -43,59 +44,49 @@ TimeseriesTest.run((insert) => {
         collB.drop();
         assert.commandWorked(testDB.createCollection(collA.getName(), collAOption));
         assert.commandWorked(testDB.createCollection(collB.getName(), collBOption));
-        let entryCountPerHost = new Array(numHosts).fill(0);
-        let insertTimeseriesDoc = function (coll) {
-            let host = TimeseriesTest.getRandomElem(hosts);
-            assert.commandWorked(
-                insert(coll, {
-                    measurement: "cpu",
-                    time: ISODate(),
-                    tags: host.tags,
-                }),
-            );
-            // Here we extract the hostId from "host.tags.hostname". It is expected that the
-            // "host.tags.hostname" is in the form of 'host_<hostNum>'.
-            return parseInt(host.tags.hostname.substring(5, host.tags.hostname.length));
-        };
-        for (let i = 0; i < numDocs; i++) {
-            let hostId = insertTimeseriesDoc(collA);
-            entryCountPerHost[hostId]++;
-            hostId = insertTimeseriesDoc(collB);
-            if (hostId % 2 == 0) {
-                // Calculate the expected entry count per host. Later we will union collA entries
-                // with the collB entries whose hostId is even.
-                entryCountPerHost[hostId]++;
-            }
+
+        for (let h = 0; h < numHosts; h++) {
+            const docs = Array.from({length: docsPerHost}, () => ({
+                measurement: "cpu",
+                time: ISODate(),
+                tags: {hostname: "host_" + h},
+            }));
+            assert.commandWorked(insert(collA, docs));
+            assert.commandWorked(insert(collB, docs));
+        }
+
+        const expectedCountPerHost = 2 * docsPerHost;
+        const expectedResults = [];
+        for (let h = 0; h < numHosts; h++) {
+            expectedResults.push({_id: "host_" + h, count: expectedCountPerHost});
         }
 
         const results = collA
             .aggregate([
-                {
-                    $unionWith: {
-                        coll: collB.getName(),
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: {
-                                        $eq: [
-                                            {
-                                                $mod: [{$toInt: {$substr: ["$tags.hostname", 5, -1]}}, 2],
-                                            },
-                                            0,
-                                        ],
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                },
+                {$unionWith: {coll: collB.getName()}},
                 {$group: {_id: "$tags.hostname", count: {$sum: 1}}},
                 {$sort: {_id: 1}},
             ])
             .toArray();
-        assert.eq(numHosts, results.length, results);
+
+        assert.eq(
+            numHosts,
+            results.length,
+            "Scenario: " + scenario + ". Expected " + numHosts + " groups. Results: " + tojson(results),
+        );
         for (let i = 0; i < numHosts; i++) {
-            assert.eq({_id: "host_" + i, count: entryCountPerHost[i]}, results[i], results);
+            assert.eq(
+                expectedResults[i],
+                results[i],
+                "Scenario: " +
+                    scenario +
+                    ". Host " +
+                    i +
+                    ": expected " +
+                    tojson(expectedResults[i]) +
+                    ", got " +
+                    tojson(results[i]),
+            );
         }
     };
 
@@ -103,7 +94,7 @@ TimeseriesTest.run((insert) => {
     // parameters.
     collOptions.forEach(function (collAOption) {
         collOptions.forEach(function (collBOption) {
-            if (collAOption == null && collBOption == null) {
+            if (collAOption === null && collBOption === null) {
                 // Normal $unionWith call, both inner and outer collections are non-time-series
                 // collections.
                 return;
