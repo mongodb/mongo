@@ -345,73 +345,66 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
-    std::vector<BSONObj> indexSpecs;
-    indexSpecs.reserve(indexes.size());
-    for (const auto& indexBuildInfo : indexes) {
-        indexSpecs.push_back(indexBuildInfo.spec);
-    }
+    // Only operations originating from user connections need to wait while there are more than
+    // 'maxNumActiveUserIndexBuilds' index builds currently running.
+    if (opCtx->getClient()->isFromUserConnection()) {
+        // The global lock acquires the RSTL lock which we use to assert that we're the
+        // primary node when running user operations. Additionally, releasing this lock
+        // allows the node to step down after we have checked the replication state. If this
+        // node steps down after this check, similar assertions will cause the index build
+        // to fail later on when locks are reacquired. Therefore, this assertion is not
+        // required for correctness, but only intended to rate limit index builds started on
+        // primaries.
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            auto intent = nss.isReplicated() ? rss::consensus::IntentRegistry::Intent::Write
+                                             : rss::consensus::IntentRegistry::Intent::LocalWrite;
+            uassert(ErrorCodes::NotWritablePrimary,
+                    "Not primary while waiting to start an index build",
+                    rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                        .canDeclareIntent(intent, opCtx));
+        } else {
+            repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            uassert(ErrorCodes::NotWritablePrimary,
+                    "Not primary while waiting to start an index build",
+                    replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
+        }
 
-    {
-        // Only operations originating from user connections need to wait while there are more than
-        // 'maxNumActiveUserIndexBuilds' index builds currently running.
-        if (opCtx->getClient()->isFromUserConnection()) {
-            {
-                // The global lock acquires the RSTL lock which we use to assert that we're the
-                // primary node when running user operations. Additionally, releasing this lock
-                // allows the node to step down after we have checked the replication state. If this
-                // node steps down after this check, similar assertions will cause the index build
-                // to fail later on when locks are reacquired. Therefore, this assertion is not
-                // required for correctness, but only intended to rate limit index builds started on
-                // primaries.
-                if (gFeatureFlagIntentRegistration.isEnabled()) {
-                    auto intent = nss.isReplicated()
-                        ? rss::consensus::IntentRegistry::Intent::Write
-                        : rss::consensus::IntentRegistry::Intent::LocalWrite;
-                    uassert(ErrorCodes::NotWritablePrimary,
-                            "Not primary while waiting to start an index build",
-                            rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                                .canDeclareIntent(intent, opCtx));
-                } else {
-                    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-                    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-                    uassert(ErrorCodes::NotWritablePrimary,
-                            "Not primary while waiting to start an index build",
-                            replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
-                }
+        // The checks here catch empty index builds and also allow us to stop index
+        // builds before waiting for throttling.
+        uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
+
+        stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+        bool messageLogged = false;
+        opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
+            const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
+            if (_numActiveIndexBuilds < maxActiveBuilds) {
+                _numActiveIndexBuilds++;
+                return true;
             }
 
-            // The checks here catch empty index builds and also allow us to stop index
-            // builds before waiting for throttling.
-            uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
-
-            stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
-            bool messageLogged = false;
-            opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
-                const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
-                if (_numActiveIndexBuilds < maxActiveBuilds) {
-                    _numActiveIndexBuilds++;
-                    return true;
+            if (!messageLogged) {
+                std::vector<BSONObj> indexSpecs;
+                indexSpecs.reserve(indexes.size());
+                for (const auto& indexBuildInfo : indexes) {
+                    indexSpecs.push_back(indexBuildInfo.spec);
                 }
-
-                if (!messageLogged) {
-                    LOGV2(
-                        4715500,
-                        "Too many index builds running simultaneously, waiting until the number of "
-                        "active index builds is below the threshold",
-                        "numActiveIndexBuilds"_attr = _numActiveIndexBuilds,
-                        "maxNumActiveUserIndexBuilds"_attr = maxActiveBuilds,
-                        "indexSpecs"_attr = indexSpecs,
-                        "buildUUID"_attr = buildUUID,
-                        "collectionUUID"_attr = collectionUUID);
-                    messageLogged = true;
-                }
-                return false;
-            });
-        } else {
-            // System index builds have no limit and never wait, but do consume a slot.
-            stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
-            _numActiveIndexBuilds++;
-        }
+                LOGV2(4715500,
+                      "Too many index builds running simultaneously, waiting until the number of "
+                      "active index builds is below the threshold",
+                      "numActiveIndexBuilds"_attr = _numActiveIndexBuilds,
+                      "maxNumActiveUserIndexBuilds"_attr = maxActiveBuilds,
+                      "indexSpecs"_attr = indexSpecs,
+                      "buildUUID"_attr = buildUUID,
+                      "collectionUUID"_attr = collectionUUID);
+                messageLogged = true;
+            }
+            return false;
+        });
+    } else {
+        // System index builds have no limit and never wait, but do consume a slot.
+        stdx::unique_lock<stdx::mutex> lk(_throttlingMutex);
+        _numActiveIndexBuilds++;
     }
 
     ScopeGuard onScopeExitGuard([&] {
