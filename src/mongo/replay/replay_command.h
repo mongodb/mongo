@@ -74,6 +74,8 @@ public:
 
     std::string parseOpType() const;
 
+    EventType getEventType() const;
+
 private:
     /** Extract the actual message body containing the actual bson command containing the query */
     OpMsgRequest parseBody() const;

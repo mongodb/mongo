@@ -115,6 +115,10 @@ std::string ReplayCommand::parseOpType() const {
     }
 }
 
+EventType ReplayCommand::getEventType() const {
+    return _packet.eventType;
+}
+
 bool ReplayCommand::isSessionStart() const {
     return _packet.eventType == EventType::kSessionStart;
 }

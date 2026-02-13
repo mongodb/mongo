@@ -30,11 +30,15 @@
 #include "mongo/replay/session_simulator.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder_event.h"
 #include "mongo/replay/mini_mock.h"
 #include "mongo/replay/performance_reporter.h"
+#include "mongo/replay/replay_command.h"
 #include "mongo/replay/replay_command_executor.h"
+#include "mongo/replay/replay_hook_manager.h"
 #include "mongo/replay/replay_test_server.h"
 #include "mongo/replay/test_packet.h"
 #include "mongo/replay/traffic_recording_iterator.h"
@@ -46,6 +50,8 @@
 #include <memory>
 
 #include <boost/filesystem/path.hpp>
+#include <gmock/gmock-more-matchers.h>
+#include <gmock/gmock.h>
 
 namespace mongo {
 
@@ -101,7 +107,7 @@ auto operator+(const MongoDur& mongoDuration,
 class TestPackets {
 public:
     struct Args {
-        std::chrono::seconds offset;
+        std::chrono::microseconds offset;
         TestReaderPacket packet;
     };
 
@@ -265,6 +271,68 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
         // Initially report "now" as _later than_ the command should have run.
         sessionSimulator.nowHook->ret(replayStartTime + 10s);
         // Don't expect any call to sleepFor.
+
+        sessionSimulator.run();
+    }
+}
+
+class MockObserver : public ReplayObserver {
+public:
+    MOCK_METHOD(void, onRequest, (ReplayCommand & command), (override));
+    MOCK_METHOD(void, onResponse, (ReplayCommand & command), (override));
+    MOCK_METHOD(void, onSessionStart, (ReplayCommand & command), (override));
+    MOCK_METHOD(void, onSessionEnd, (ReplayCommand & command), (override));
+    MOCK_METHOD(void,
+                onLiveResponse,
+                (const ReplayCommand& recordedResponse, const BSONObj& liveResponse),
+                (override));
+};
+
+// Server responses may contain additional fields like `"ok" :1`.
+// Tests care that the expected data is present.
+MATCHER_P(BSONSuperSetOf, expectedBSON, "") {
+    for (const auto& elem : expectedBSON) {
+        if (arg.getField(elem.fieldName()).woCompare(elem) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+TEST(SessionSimulatorTest, HooksInvoked) {
+    ReplayTestServer server{{"find"}, {fakeResponse}};
+    auto replayStartTime = std::chrono::steady_clock::now();
+
+    TestPackets packets;
+
+    auto recordedResponse = BSON("recorded" << "responseData");
+
+    // Simulate a find command occurring 1 second into the recording.
+    packets += {1ms, TestReaderPacket::sessionStart()};
+    packets += {2ms, TestReaderPacket::find(BSON("name" << "Alice"))};
+    packets += {3ms, TestReaderPacket::response(recordedResponse)};
+    packets += {4ms, TestReaderPacket::sessionEnd()};
+
+    auto observer = std::make_shared<MockObserver>();
+    ReplayObserverManager::get().registerObserver(observer);
+
+    // test simulator scoped in order to complete all the tasks.
+    {
+        TestSessionSimulator sessionSimulator{
+            packets, replayStartTime, server.getConnectionString()};
+        // Report "now" is later than all packets so replay progresses normally.
+        sessionSimulator.nowHook->defaultRet(replayStartTime + 1s);
+
+        using namespace ::testing;
+        InSequence s;
+
+        EXPECT_CALL(*observer, onSessionStart(Property(&ReplayCommand::isSessionStart, IsTrue())));
+        EXPECT_CALL(*observer,
+                    onRequest(Property(&ReplayCommand::getEventType, Eq(EventType::kRequest))));
+        EXPECT_CALL(*observer,
+                    onLiveResponse(Property(&ReplayCommand::getEventType, Eq(EventType::kResponse)),
+                                   BSONSuperSetOf(fromjson(fakeResponse))));
+        EXPECT_CALL(*observer, onSessionEnd(Property(&ReplayCommand::isSessionEnd, IsTrue())));
 
         sessionSimulator.run();
     }

@@ -64,7 +64,7 @@ public:
                                  const std::string& perfFileName = "",
                                  size_t diskThreshold = DUMP_TO_DISK_THRESHOLD);
     ~PerformanceReporter();
-    void executeAndRecordPerf(ExecutionCallback&&, const ReplayCommand&);
+    BSONObj executeAndRecordPerf(ExecutionCallback&&, const ReplayCommand&);
     // addPacket assumes that there is only one bg thread that is responsible of writing down to
     // disk the performance information recorded. Thus no locking is needed, since all the work is
     // scheduled via the SessionScheduler (which uses a simple producer/consumer model).

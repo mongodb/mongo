@@ -55,6 +55,12 @@ public:
 
     static TestReaderPacket make(BSONObj command);
 
+    static TestReaderPacket sessionStart();
+
+    static TestReaderPacket sessionEnd();
+
+    static TestReaderPacket response(BSONObj body);
+
     static TestReaderPacket find(BSONObj filter, BSONObj projection = {});
 
     static TestReaderPacket insert(BSONArray documents);

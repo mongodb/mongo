@@ -30,8 +30,10 @@
 #include "mongo/replay/session_simulator.h"
 
 #include "mongo/db/query/util/stop_token.h"
+#include "mongo/db/traffic_recorder_event.h"
 #include "mongo/logv2/log.h"
 #include "mongo/replay/replay_command.h"
+#include "mongo/replay/replay_hook_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
@@ -95,7 +97,12 @@ bool isReplayable(const std::string& commandType) {
 void SessionSimulator::run(mongo::stop_token stopToken) {
     LOGV2_DEBUG(10893001, 1, "Session execution started");
     auto onFail = ScopeGuard([] { LOGV2_ERROR(10893003, "Session execution failed"); });
+    // Holder for observers/hooks which wish to store per-session state.
+    // E.g., cursor re-mapping need only apply within a session, so can avoid
+    // cross-thread synchronisation by having an instance per session.
+    auto sessionObservers = ReplayObserverManager::get().makeSessionObservers();
     bool stopEventSeen = false;
+    boost::optional<BSONObj> lastResponse;
     for (const auto& packet : _source) {
         if (stopToken.stop_requested()) {
             LOGV2_WARNING(10893004, "Session execution halted");
@@ -103,13 +110,26 @@ void SessionSimulator::run(mongo::stop_token stopToken) {
             return;
         }
         ReplayCommand command{packet};
-        if (!isReplayable(command.parseOpType())) {
-            continue;
-        }
 
         const auto& [offset, sessionId] = extractOffsetAndSessionFromCommand(command);
 
         if (sessionId != _sessionID) {
+            continue;
+        }
+
+        if (packet.eventType == EventType::kResponse) {
+            // No action needs to be taken when reading a recorded response,
+            // but hooks should be informed so they can inspect the live vs recorded
+            // response data.
+            if (lastResponse) {
+                sessionObservers.observeLiveResponse(command, *lastResponse);
+                lastResponse.reset();
+            }
+            continue;
+        }
+        // May modify packet.
+        sessionObservers.observe(command);
+        if (!isReplayable(command.parseOpType())) {
             continue;
         }
 
@@ -133,7 +153,7 @@ void SessionSimulator::run(mongo::stop_token stopToken) {
         }
 
         // must be a runnable command.
-        runCommand(command);
+        lastResponse = runCommand(command);
     }
     if (!stopEventSeen) {
         // TODO: SERVER-111903 strengthen this to a uassert once session end events
@@ -163,11 +183,11 @@ void SessionSimulator::stop() {
             _running);
 }
 
-void SessionSimulator::runCommand(const ReplayCommand& command) const {
+BSONObj SessionSimulator::runCommand(const ReplayCommand& command) const {
     uassert(ErrorCodes::ReplayClientSessionSimulationError,
             "SessionSimulator is not connected to a valid mongod/s instance.",
             _running);
-    _perfReporter->executeAndRecordPerf(
+    return _perfReporter->executeAndRecordPerf(
         [this](const ReplayCommand& command) { return _commandExecutor->runCommand(command); },
         command);
 }

@@ -29,20 +29,46 @@
 
 #include "mongo/replay/test_packet.h"
 
+#include "mongo/db/traffic_reader.h"
+#include "mongo/db/traffic_recorder_event.h"
+
 
 namespace mongo {
 TestReaderPacket::TestReaderPacket(TrafficReaderPacket base, Message ownedMessage)
     : TrafficReaderPacket(base), ownedMessage(ownedMessage) {}
 
-TestReaderPacket TestReaderPacket::make(BSONObj command) {
+auto makeMessage(BSONObj body = {}) {
     OpMsgBuilder builder;
-    builder.setBody(command);
-    auto message = builder.finish();
+    builder.setBody(body);
+    return builder.finish();
+}
+
+TestReaderPacket TestReaderPacket::make(BSONObj command) {
+    auto message = makeMessage(command);
     return TestReaderPacket(TrafficReaderPacket{.message = message.buf()}, message);
 }
 
+TestReaderPacket TestReaderPacket::sessionStart() {
+    auto message = makeMessage();
+    return TestReaderPacket(
+        TrafficReaderPacket{.eventType = EventType::kSessionStart, .message = message.buf()},
+        message);
+}
+
+TestReaderPacket TestReaderPacket::sessionEnd() {
+    auto message = makeMessage();
+    return TestReaderPacket(
+        TrafficReaderPacket{.eventType = EventType::kSessionEnd, .message = message.buf()},
+        message);
+}
+
+TestReaderPacket TestReaderPacket::response(BSONObj body) {
+    auto message = makeMessage(body);
+    return TestReaderPacket(
+        TrafficReaderPacket{.eventType = EventType::kResponse, .message = message.buf()}, message);
+}
+
 TestReaderPacket TestReaderPacket::find(BSONObj filter, BSONObj projection) {
-    OpMsgBuilder builder;
     BSONObj findCommand = BSON("find" << "test"
                                       << "$db"
                                       << "test"
@@ -50,8 +76,7 @@ TestReaderPacket TestReaderPacket::find(BSONObj filter, BSONObj projection) {
     if (!projection.isEmpty()) {
         findCommand = findCommand.addFields(BSON("projection" << projection));
     }
-    builder.setBody(findCommand);
-    auto message = builder.finish();
+    auto message = makeMessage(findCommand);
     return TestReaderPacket(TrafficReaderPacket{.message = message.buf()}, message);
 }
 
@@ -72,25 +97,21 @@ TestReaderPacket TestReaderPacket::insert(BSONArray documents) {
 }
 
 TestReaderPacket TestReaderPacket::aggregate(BSONArray pipeline) {
-    OpMsgBuilder builder;
     BSONObj aggregateCommand =
         BSON("aggregate" << "test" << "$db" << "test" << "pipeline" << pipeline << "cursor"
                          << BSON("batchSize" << 100));
-    builder.setBody(aggregateCommand);
-    auto message = builder.finish();
+    auto message = makeMessage(aggregateCommand);
     return TestReaderPacket(TrafficReaderPacket{.message = message.buf()}, message);
 }
 
 TestReaderPacket TestReaderPacket::del(BSONObj filter) {
-    OpMsgBuilder builder;
     BSONObj deleteOp = BSON("q" << filter << "limit" << 1);
     BSONObj deleteCommand = BSON("delete" << "test"
                                           << "$db"
                                           << "test"
                                           << "deletes" << BSON_ARRAY(deleteOp));
 
-    builder.setBody(deleteCommand);
-    auto message = builder.finish();
+    auto message = makeMessage(deleteCommand);
     return TestReaderPacket(TrafficReaderPacket{.message = message.buf()}, message);
 }
 

@@ -92,12 +92,11 @@ void PerformanceReporter::close() {
     }
 }
 
-void PerformanceReporter::executeAndRecordPerf(ExecutionCallback&& f,
-                                               const ReplayCommand& command) {
+BSONObj PerformanceReporter::executeAndRecordPerf(ExecutionCallback&& f,
+                                                  const ReplayCommand& command) {
     if (!isPerfRecordingEnabled()) {
         // no perf recording involved, just execute the lambda (which should run the command).
-        f(command);
-        return;
+        return f(command);
     }
     // compute the information needed and store on file the perf recorded.
     const auto start = std::chrono::high_resolution_clock::now();
@@ -109,6 +108,7 @@ void PerformanceReporter::executeAndRecordPerf(ExecutionCallback&& f,
     const auto duration =
         std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     add(PerformancePacket{sessionId, messageId, duration, ncount});
+    return resp;
 }
 
 void PerformanceReporter::add(const PerformancePacket& packet) {

@@ -80,7 +80,7 @@ public:
 protected:
     void start();
     void stop();
-    void runCommand(const ReplayCommand&) const;
+    BSONObj runCommand(const ReplayCommand&) const;
 
     virtual std::chrono::steady_clock::time_point now() const;
     virtual void sleepFor(std::chrono::steady_clock::duration duration) const;

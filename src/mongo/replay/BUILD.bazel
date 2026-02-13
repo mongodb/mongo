@@ -19,6 +19,7 @@ mongo_cc_library(
         "replay_client.cpp",
         "replay_command.cpp",
         "replay_command_executor.cpp",
+        "replay_hook_manager.cpp",
         "session_handler.cpp",
         "session_scheduler.cpp",
         "session_simulator.cpp",
