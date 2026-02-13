@@ -673,6 +673,8 @@ std::unique_ptr<DeleteStageParams> makeDeleteStageParamsForDeleteDocuments() {
 /**
  * Shared implementation between findDocuments, deleteDocuments, and _findOrDeleteById.
  * _findOrDeleteById is used by findById, and deleteById.
+ * If doing a find, this function can throw a StorageUnavailableException. This should only be
+ * possible if we're inside a WT transaction and have already done a write.
  */
 enum class FindDeleteMode { kFind, kDelete };
 StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
@@ -866,6 +868,13 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
         return Result{docs};
     };
 
+    // In case we're doing a find, we don't expect a StorageUnavailableException to be thrown in
+    // most cases. An exception can only be thrown if we're inside a WT transaction and a write has
+    // already been executed. In this case we would let the exception go up the stack and cancel the
+    // current operation as we don't want to abandon the current snapshot which could lead to
+    // invalid references above in the stack.
+    // In case of a delete, if a StorageUnavailableException is thrown it will be caught by
+    // writeConflictRetry() and the current snapshot will be abandoned.
     return isFind ? doFindOrDeleteDocuments()
                   : writeConflictRetry(opCtx, opStr, nsOrUUID, doFindOrDeleteDocuments);
 }
