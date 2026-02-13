@@ -37,6 +37,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+MONGO_FAIL_POINT_DEFINE(hangAfterReplicatedFastCountSnapshot);
+
 namespace mongo {
 
 static const ServiceContext::Decoration<ReplicatedFastCountManager> getReplicatedFastCountManager =
@@ -146,21 +148,33 @@ void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
     _writeMetadataPeriodically = false;
 }
 
+absl::flat_hash_map<UUID, ReplicatedFastCountManager::StoredSizeCount>
+ReplicatedFastCountManager::_getSnapshotOfDirtyMetadata() {
+    absl::flat_hash_map<UUID, StoredSizeCount> dirtyMetadata;
+    {
+        stdx::lock_guard lock(_metadataMutex);
+        dirtyMetadata.reserve(_metadata.size());
+        for (auto&& [metadataKey, metadataValue] : _metadata) {
+            if (metadataValue.dirty) {
+                dirtyMetadata[metadataKey] = metadataValue;
+                metadataValue.dirty = false;
+            }
+        }
+    }
+    return dirtyMetadata;
+}
+
 void ReplicatedFastCountManager::_flush(
     OperationContext* opCtx,
     const CollectionPtr& coll,
-    const absl::flat_hash_map<UUID, StoredSizeCount>& metadata) {
+    const absl::flat_hash_map<UUID, StoredSizeCount>& dirtyMetadata) {
     // TODO SERVER-117512: We're performing one write per collection here. But we should be
     // able to bundle many of these writes in a single applyOps using the WUOW
     // grouping interface. Might be a problem with updates.
 
-    for (auto&& [metadataKey, metadataVal] : metadata) {
-        if (metadataVal.dirty) {
-            _writeOneMetadata(
-                opCtx, coll, metadataKey, metadataVal.sizeCount, _keyForUUID(metadataKey));
-            stdx::lock_guard lock(_metadataMutex);
-            _metadata[metadataKey].dirty = false;
-        }
+    for (auto&& [metadataKey, metadataVal] : dirtyMetadata) {
+        _writeOneMetadata(
+            opCtx, coll, metadataKey, metadataVal.sizeCount, _keyForUUID(metadataKey));
     }
 }
 
@@ -214,12 +228,11 @@ void ReplicatedFastCountManager::_runBackgroundThreadOnTimer(OperationContext* o
 }
 
 void ReplicatedFastCountManager::_runIteration(OperationContext* opCtx) {
-    // TODO SERVER-117652: Make copy so we don't hold locks too long. Should use immutable data
-    // structures.
-    absl::flat_hash_map<UUID, StoredSizeCount> metadata = [&]() {
-        stdx::lock_guard lock(_metadataMutex);
-        return _metadata;
-    }();
+    const absl::flat_hash_map<UUID, StoredSizeCount> dirtyMetadata = _getSnapshotOfDirtyMetadata();
+
+    if (MONGO_unlikely(hangAfterReplicatedFastCountSnapshot.shouldFail())) {
+        hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
+    }
 
     auto acquisition = _acquireFastCountCollection(opCtx);
     uassert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
@@ -231,7 +244,7 @@ void ReplicatedFastCountManager::_runIteration(OperationContext* opCtx) {
                   << acquisition->isView());
 
     try {
-        _flush(opCtx, fastCountColl, metadata);
+        _flush(opCtx, fastCountColl, dirtyMetadata);
     } catch (const DBException& ex) {
         LOGV2_WARNING(7397500,
                       "Failed to persist collection sizeCount metadata",

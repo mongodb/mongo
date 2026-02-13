@@ -112,11 +112,17 @@ public:
 
 private:
     /**
-     * Scan metadata and write out dirty data to disk.
+     * Return a copy of a subset of _metadata, only including the dirty entries. Clears the dirty
+     * flags for all currently dirty entries.
+     */
+    absl::flat_hash_map<UUID, StoredSizeCount> _getSnapshotOfDirtyMetadata();
+
+    /**
+     * Write out dirty data to disk.
      */
     void _flush(OperationContext* opCtx,
                 const CollectionPtr& fastCountColl,
-                const absl::flat_hash_map<UUID, StoredSizeCount>& metadata);
+                const absl::flat_hash_map<UUID, StoredSizeCount>& dirtyMetadata);
 
     void _startBackgroundThread(ServiceContext* svcCtx);
     void _runBackgroundThreadOnTimer(OperationContext* opCtx);

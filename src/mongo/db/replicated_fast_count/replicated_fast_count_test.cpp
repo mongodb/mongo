@@ -351,6 +351,80 @@ TEST_F(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
     checkUncommittedFastCountChanges(_opCtx, uuid, 0, 0);
 }
 
+TEST_F(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    auto sampleDoc = BSON("_id" << 0 << "x" << 0);
+    UUID uuid = UUID::gen();
+
+    const int64_t numInitialDocs = 5;
+    const int64_t initialSize = numInitialDocs * sampleDoc.objsize();
+    const int64_t numExtraDocs = 5;
+    const int64_t numTotalDocs = numInitialDocs + numExtraDocs;
+    const int64_t totalSize = numTotalDocs * sampleDoc.objsize();
+
+    {
+        AutoGetCollection coll(_opCtx, _nss1, LockMode::MODE_IX);
+        uuid = coll->uuid();
+        for (int i = 0; i < numInitialDocs; ++i) {
+            WriteUnitOfWork wuow{_opCtx};
+            auto doc = BSON("_id" << i << "x" << i);
+            ASSERT_OK(Helpers::insert(_opCtx, *coll, doc));
+            wuow.commit();
+        }
+    }
+
+    checkCommittedFastCountChanges(uuid, _fastCountManager, numInitialDocs, initialSize);
+
+    stdx::thread iterThread;
+
+    {
+        FailPointEnableBlock fp("hangAfterReplicatedFastCountSnapshot");
+        auto initialTimesEntered = fp.initialTimesEntered();
+
+        iterThread = stdx::thread([this] {
+            auto clientForThread = getService()->makeClient("ReplicatedFastCountBackground");
+            auto opCtxHolder = clientForThread->makeOperationContext();
+            auto* opCtxForThread = opCtxHolder.get();
+            // Hang after we make a copy of the _metadata map which should include our initial
+            // inserts to the collection, but before we actually write to disk and change our dirty
+            // flag for the collection we wrote to.
+            _fastCountManager->runIteration_ForTest(opCtxForThread);
+        });
+
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+
+        // Insert more documents into the same collection, creating new dirty metadata for that
+        // collection.
+        {
+            AutoGetCollection coll(_opCtx, _nss1, LockMode::MODE_IX);
+            for (int i = numInitialDocs; i < numTotalDocs; ++i) {
+                WriteUnitOfWork wuow{_opCtx};
+                auto doc = BSON("_id" << i << "x" << i);
+                ASSERT_OK(Helpers::insert(_opCtx, *coll, doc));
+                wuow.commit();
+            }
+        }
+
+        checkCommittedFastCountChanges(uuid, _fastCountManager, numTotalDocs, totalSize);
+
+        // Disable failpoint by letting it go out of scope.
+    }
+
+    iterThread.join();
+
+    // If the dirty metadata wasn't incorrectly cleared, this flush should persist our second batch
+    // of inserts.
+    _fastCountManager->runIteration_ForTest(_opCtx);
+
+    // Verify that all of our writes were persisted to disk.
+    checkFastCountMetadataInInternalCollection(_opCtx,
+                                               uuid,
+                                               /*expectPersisted=*/true,
+                                               numTotalDocs,
+                                               totalSize);
+}
+
 // TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
 // counts. Test for drop, create.
 
