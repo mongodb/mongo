@@ -21,23 +21,29 @@ def resmoke_config_impl(ctx):
 
     deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
 
+    args = [
+        "bazel/resmoke/resmoke_config_generator.py",
+        "--output",
+        generated_config_file.path,
+        "--test-list",
+        test_list_file.path,
+        "--base-config",
+        base_config_file.path,
+        "--exclude-with-any-tags",
+        ",".join(ctx.attr.exclude_with_any_tags),
+        "--include-with-any-tags",
+        ",".join(ctx.attr.include_with_any_tags),
+    ]
+    if ctx.attr.group_size > 0:
+        args.extend(["--group-size", str(ctx.attr.group_size)])
+    if ctx.attr.group_count_multiplier != "":
+        args.extend(["--group-count-multiplier", ctx.attr.group_count_multiplier])
+
     ctx.actions.run(
         executable = python.interpreter.path,
         inputs = deps,
         outputs = [generated_config_file],
-        arguments = [
-            "bazel/resmoke/resmoke_config_generator.py",
-            "--output",
-            generated_config_file.path,
-            "--test-list",
-            test_list_file.path,
-            "--base-config",
-            base_config_file.path,
-            "--exclude-with-any-tags",
-            ",".join(ctx.attr.exclude_with_any_tags),
-            "--include-with-any-tags",
-            ",".join(ctx.attr.include_with_any_tags),
-        ],
+        arguments = args,
         env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
     )
 
@@ -54,6 +60,8 @@ resmoke_config = rule(
         "exclude_files": attr.label_list(allow_files = True),
         "exclude_with_any_tags": attr.string_list(),
         "include_with_any_tags": attr.string_list(),
+        "group_size": attr.int(default = 0, doc = "Number of tests to run in each group (for test_kind: parallel_fsm_workload_test)"),
+        "group_count_multiplier": attr.string(default = "", doc = "Multiplier for the number of groups (for test_kind: parallel_fsm_workload_test)"),
         "base_config": attr.label(
             allow_files = True,
             doc = "The base resmoke YAML config for the suite",
@@ -77,6 +85,8 @@ def resmoke_suite_test(
         tags = [],
         timeout = "eternal",
         exec_properties = {},
+        group_size = 0,
+        group_count_multiplier = "",
         **kwargs):
     generated_config = name + "_config"
     resmoke_config(
@@ -86,6 +96,8 @@ def resmoke_suite_test(
         base_config = config,
         exclude_with_any_tags = exclude_with_any_tags,
         include_with_any_tags = include_with_any_tags,
+        group_size = group_size,
+        group_count_multiplier = group_count_multiplier,
         tags = ["resmoke_config"],
     )
 

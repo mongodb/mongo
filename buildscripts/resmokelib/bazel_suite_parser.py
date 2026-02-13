@@ -31,6 +31,8 @@ def parse_resmoke_suite_test(target_label: str) -> Dict[str, List[str]]:
             - exclude_files: List of test file labels to exclude
             - exclude_with_any_tags: List of tag strings
             - include_with_any_tags: List of tag strings
+            - group_size: Integer or None for number of tests per group (for test_kind: parallel_fsm_workload_test)
+            - group_count_multiplier: String for group count multiplier (for test_kind: parallel_fsm_workload_test)
     Raises:
         BazelParseError: If BUILD.bazel file not found or target not found
     """
@@ -79,6 +81,8 @@ def parse_resmoke_suite_test(target_label: str) -> Dict[str, List[str]]:
         "exclude_files": _extract_attribute(rule_block, "exclude_files"),
         "exclude_with_any_tags": _extract_attribute(rule_block, "exclude_with_any_tags"),
         "include_with_any_tags": _extract_attribute(rule_block, "include_with_any_tags"),
+        "group_size": _extract_int_attribute(rule_block, "group_size"),
+        "group_count_multiplier": _extract_scalar_attribute(rule_block, "group_count_multiplier"),
     }
 
 
@@ -136,6 +140,39 @@ def _extract_attribute(block: str, attribute_name: str) -> List[str]:
         items.extend(re.findall(string_pattern, line))
 
     return items
+
+
+def _extract_int_attribute(block: str, attribute_name: str) -> int | None:
+    """Extract an integer attribute from a BUILD.bazel rule block.
+    Args:
+        block: The text content of a BUILD.bazel rule block
+        attribute_name: The name of the attribute to extract (e.g., "group_size")
+    Returns:
+        Integer value of the attribute. Returns None if attribute not found.
+    """
+    # Pattern to match: attribute_name = <integer>
+    pattern = rf"{attribute_name}\s*=\s*(\d+)"
+    match = re.search(pattern, block)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _extract_scalar_attribute(block: str, attribute_name: str) -> str:
+    """Extract a string attribute from a BUILD.bazel rule block.
+    Args:
+        block: The text content of a BUILD.bazel rule block
+        attribute_name: The name of the attribute to extract (e.g., "group_count_multiplier")
+    Returns:
+        String value of the attribute. Returns empty string if attribute not found.
+    """
+    # Pattern to match: attribute_name = "<value>"
+    quoted_pattern = rf'{attribute_name}\s*=\s*["\']([^"\']+)["\']'
+    match = re.search(quoted_pattern, block)
+    if match:
+        return match.group(1)
+
+    return ""
 
 
 def resolve_target_to_files(target_label: str) -> str:

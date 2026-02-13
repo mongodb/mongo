@@ -302,6 +302,10 @@ def expand_from_target_selector(config):
             selector["include_with_any_tags"] = target_config["include_with_any_tags"]
         if target_config["exclude_with_any_tags"]:
             selector["exclude_with_any_tags"] = target_config["exclude_with_any_tags"]
+        if target_config["group_size"] is not None:
+            selector["group_size"] = target_config["group_size"]
+        if target_config["group_count_multiplier"]:
+            selector["group_count_multiplier"] = float(target_config["group_count_multiplier"])
 
         config["selector"] = selector
 
