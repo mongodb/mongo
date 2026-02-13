@@ -6,6 +6,9 @@ filters:
   - "test_evergreen_task_timeout.py":
     approvers:
       - 10gen/devprod-correctness
+  - "test_exception_extractor.py":
+    approvers:
+      - 10gen/devprod-correctness
   - "test_generate_sbom.py":
     approvers:
       - 10gen/code-review-team-ssdlc
