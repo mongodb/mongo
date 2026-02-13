@@ -7,6 +7,21 @@ function tojsonOnelineSortKeys(x) {
     return tojson(x, indent, nolint, depth, sortKeys);
 }
 
+// Takes an array of documents ('result').
+// If `shouldSort` is true:
+//    - Discards the field ordering, by recursively sorting the fields of each object.
+//    - Discards the result-set ordering by sorting the array of normalized documents.
+// Returns a string.
+function normalizeArray(result, shouldSort = true) {
+    if (!Array.isArray(result)) {
+        throw Error("The result is not an array: " + tojson(result));
+    }
+
+    const normalizedResults = shouldSort ? result.map((d) => tojsonOnelineSortKeys(d)).sort()
+                                         : result.map((d) => tojsononeline(d));
+    return normalizedResults.join("\n") + "\n";
+}
+
 // Takes an array of documents.
 // - Discards the field ordering, by recursively sorting the fields of each object.
 // - Discards the result-set ordering by sorting the array of normalized documents.

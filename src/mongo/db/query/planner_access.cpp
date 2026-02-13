@@ -1765,10 +1765,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         return nullptr;
     }
 
-    if (!wcp::expandWildcardFieldBounds(ixscanNodes)) {
-        return nullptr;
-    }
-
     // If all index scans are identical, then we collapse them into a single scan. This prevents
     // us from creating OR plans where the branches of the OR perform duplicate work.
     ixscanNodes = collapseEquivalentScans(std::move(ixscanNodes));

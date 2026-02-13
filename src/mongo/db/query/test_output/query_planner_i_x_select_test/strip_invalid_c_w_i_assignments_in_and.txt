@@ -1,0 +1,13 @@
+The expanded CWIs:
+0: kp: { x: 1, y: 1 } sparse name: '(test_foo, y)'
+1: kp: { x: 1, $_path: 1 } sparse name: '(test_foo, $_path)'
+
+The expression assigned with the CWIs by rateIndices:
+$and
+    x $eq 1 || First: 0 1 notFirst: full path: x
+    z $eq 1 || First: notFirst: full path: z
+
+Test that the invalid CWI assignment is stripped:
+$and
+    x $eq 1 || First: 1 notFirst: full path: x
+    z $eq 1 || First: notFirst: full path: z
