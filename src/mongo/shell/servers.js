@@ -1020,14 +1020,17 @@ MongoRunner.StopError = function (returnCode) {
 MongoRunner.StopError.prototype = Object.create(Error.prototype);
 MongoRunner.StopError.prototype.constructor = MongoRunner.StopError;
 
-// Constants for exit codes of MongoDB processes
-// On Windows, std::abort causes the process to exit with return code 14.
-MongoRunner.EXIT_ABORT = _isWindows() ? 14 : 6;
+// Constants for exit codes of MongoDB processes.
+// See exit_code.h for implementation details.
+
 MongoRunner.EXIT_CLEAN = 0;
+MongoRunner.EXIT_FAIL = 1;
 MongoRunner.EXIT_BADOPTIONS = 2;
 MongoRunner.EXIT_REPLICATION_ERROR = 3;
 MongoRunner.EXIT_NEED_UPGRADE = 4;
 MongoRunner.EXIT_SHARDING_ERROR = 5;
+// On Windows, std::abort causes the process to exit with return code 14.
+MongoRunner.EXIT_ABORT = _isWindows() ? 14 : 6;
 // SIGKILL is translated to TerminateProcess() on Windows, which causes the program to
 // terminate with exit code 1.
 MongoRunner.EXIT_SIGKILL = _isWindows() ? 1 : 9;
@@ -1041,8 +1044,15 @@ MongoRunner.EXIT_FS = 45;
 MongoRunner.EXIT_CLOCK_SKEW = 47; // OpTime clock skew; deprecated
 MongoRunner.EXIT_NET_ERROR = 48;
 MongoRunner.EXIT_WINDOWS_SERVICE_STOP = 49;
+MongoRunner.EXIT_LAUNCHER_MIDDLE_ERROR = 50;
+MongoRunner.EXIT_LAUNCHER_ERROR = 51;
 MongoRunner.EXIT_POSSIBLE_CORRUPTION = 60;
+MongoRunner.EXIT_WATCHDOG = 61;
 MongoRunner.EXIT_NEED_DOWNGRADE = 62;
+MongoRunner.EXIT_RESERVED_BEGIN = 64;
+MongoRunner.EXIT_RESERVED_END = 78;
+MongoRunner.EXIT_THREAD_SANITIZER = 86;
+MongoRunner.EXIT_PROCESS_HEALTH_CHECK = 87;
 MongoRunner.EXIT_UNCAUGHT = 100; // top level exception that wasn't caught
 MongoRunner.EXIT_TEST = 101;
 MongoRunner.EXIT_AUDIT_ROTATE_ERROR = 102;
