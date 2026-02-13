@@ -79,8 +79,6 @@ BSONObj TicketHolderQueueStats::toBson() const {
         BSONObjBuilder bb;
         if (stats.admissions > 0) {
             bb.append("admissions", stats.admissions);
-        }
-        if (stats.totalTimeQueuedMicros > 0) {
             bb.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros);
         }
         queuesBuilder.append(queueTypeToString(queueName), bb.obj());
