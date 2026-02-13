@@ -1,0 +1,71 @@
+--- SimplePoint ---
+Input: { "a" : [ 0, 0 ] }
+KeyPattern: { "a" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "wAAAAAAAAAA=", "$type" : "80" } }
+
+--- EmbeddedObject ---
+Input: { "a" : { "x" : 5, "y" : 10 } }
+KeyPattern: { "a" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "wB+B+B+B8AA=", "$type" : "80" } }
+
+--- NegativeCoords ---
+Input: { "loc" : [ -73.97, 40.77 ] }
+KeyPattern: { "loc" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "Ydp9eV2lQAA=", "$type" : "80" } }
+
+--- DottedTrailingField ---
+Input: { "a" : [ 0, 0 ], "b" : { "c" : 42 } }
+KeyPattern: { "a" : "2d", "b.c" : 1 }
+Keys (1):
+  { "" : { "$binary" : "wAAAAAAAAAA=", "$type" : "80" }, "" : 42 }
+
+--- LargeCoords ---
+Input: { "a" : [ 179.5, 89.5 ] }
+KeyPattern: { "a" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "7//MMP/MMAA=", "$type" : "80" } }
+
+--- NearMinBoundary ---
+Input: { "a" : [ -179.99, -89.98999999999999 ] }
+KeyPattern: { "a" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "EAAAA/MMAAA=", "$type" : "80" } }
+
+--- HighPrecisionCoords ---
+Input: { "a" : [ 1.123456789, 2.987654321 ] }
+KeyPattern: { "a" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "wASh9dQk8AA=", "$type" : "80" } }
+
+--- DottedGeoPath ---
+Input: { "loc" : { "position" : [ 10, 20 ] } }
+KeyPattern: { "loc.position" : "2d" }
+Keys (1):
+  { "" : { "$binary" : "wH4H4H4H4AA=", "$type" : "80" } }
+
+--- MultipleTrailingFields ---
+Input: { "a" : [ 1, 2 ], "b" : "hello", "c" : 42 }
+KeyPattern: { "a" : "2d", "b" : 1, "c" : 1 }
+Keys (1):
+  { "" : { "$binary" : "wAGeeAGecAA=", "$type" : "80" }, "" : "hello", "" : 42 }
+
+--- MissingLocationField ---
+Input: { "b" : [ 1, 2 ] }
+KeyPattern: { "a" : "2d" }
+Keys (0):
+
+--- NullTrailingField ---
+Input: { "a" : [ 5, 10 ], "b" : null }
+KeyPattern: { "a" : "2d", "b" : 1 }
+Keys (1):
+  { "" : { "$binary" : "wB+B+B+B8AA=", "$type" : "80" }, "" : null }
+
+--- MissingTrailingField ---
+Input: { "a" : [ 5, 10 ] }
+KeyPattern: { "a" : "2d", "b" : 1 }
+Keys (1):
+  { "" : { "$binary" : "wB+B+B+B8AA=", "$type" : "80" }, "" : null }
+

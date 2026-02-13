@@ -52,3 +52,11 @@ filters:
   - "wildcard_access_method*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "key_generator_golden_test*":
+    approvers:
+      - 10gen/query-execution-write-exec
+      - 10gen/query-integration-features
+  - "expected_output/key_generator_golden_test/*":
+    approvers:
+      - 10gen/query-execution-write-exec
+      - 10gen/query-integration-features

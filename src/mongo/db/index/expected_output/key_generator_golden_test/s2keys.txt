@@ -1,0 +1,139 @@
+--- V3_Point ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 40, -73 ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V3_MultiPoint ---
+Input: { "a" : { "type" : "MultiPoint", "coordinates" : [ [ 0, 0 ], [ 1, 0 ], [ 1, 1 ] ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (3):
+  { "" : { "$numberLong" : "1152921504875282432" } }
+  { "" : { "$numberLong" : "1153105535097110528" } }
+  { "" : { "$numberLong" : "1153277837910736896" } }
+
+--- V3_CompoundNonGeo ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] }, "b" : 42 }
+KeyPattern: { "a" : "2dsphere", "b" : 1 }
+Keys (1):
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : 42 }
+
+--- V3_CompoundNonGeoBefore ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] }, "b" : "hello" }
+KeyPattern: { "b" : 1, "a" : "2dsphere" }
+Keys (1):
+  { "" : "hello", "" : { "$numberLong" : "1152921504606846977" } }
+
+--- V3_MissingGeoField ---
+Input: { "b" : 1 }
+KeyPattern: { "a" : "2dsphere" }
+Keys (0):
+
+--- V3_ArrayOfGeoObjects ---
+Input: { "a" : { "b" : [ { "geo" : { "type" : "Point", "coordinates" : [ 0, 0 ] } }, { "geo" : { "type" : "Point", "coordinates" : [ 3, 3 ] } } ] } }
+KeyPattern: { "a.b.geo" : "2dsphere" }
+Keys (2):
+  { "" : { "$numberLong" : "1152921504606846977" } }
+  { "" : { "$numberLong" : "1157514470122841853" } }
+
+--- V2_Point ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 40, -73 ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : "5f20200112011003" }
+
+--- V3_LegacyCoordPair ---
+Input: { "a" : [ 40, -73 ] }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V3_LegacyEmbeddedCoordObject ---
+Input: { "a" : { "x" : 40, "y" : -73 } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V3_NullGeoField ---
+Input: { "a" : null }
+KeyPattern: { "a" : "2dsphere" }
+Keys (0):
+
+--- V3_EmptyArrayGeoField ---
+Input: { "a" : [] }
+KeyPattern: { "a" : "2dsphere" }
+Keys (0):
+
+--- V3_EmptyObjectGeoField ---
+Input: { "a" : {} }
+KeyPattern: { "a" : "2dsphere" }
+Keys (0):
+
+--- V3_CompoundArrayNonGeo ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] }, "b" : [ 1, 2, 3 ] }
+KeyPattern: { "a" : "2dsphere", "b" : 1 }
+Keys (3):
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : 1 }
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : 2 }
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : 3 }
+
+--- V3_CompoundMissingNonGeo ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] } }
+KeyPattern: { "a" : "2dsphere", "b" : 1 }
+Keys (1):
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : null }
+
+--- V3_CompoundEmptyArrayLeading ---
+Input: { "c" : [], "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] } }
+KeyPattern: { "c" : 1, "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$undefined" : true }, "" : { "$numberLong" : "1152921504606846977" } }
+
+--- V3_MultipleGeoFields ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 0, 0 ] }, "b" : { "type" : "Point", "coordinates" : [ 1, 1 ] } }
+KeyPattern: { "a" : "2dsphere", "b" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "1152921504606846977" }, "" : { "$numberLong" : "1153277837650709461" } }
+
+--- V2_LegacyCoordPair ---
+Input: { "a" : [ 40, -73 ] }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : "5f20200112011003" }
+
+--- V4_Point ---
+Input: { "a" : { "type" : "Point", "coordinates" : [ 40, -73 ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V4_LegacyCoordPair ---
+Input: { "a" : [ 40, -73 ] }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V4_LegacyEmbeddedCoordObject ---
+Input: { "a" : { "x" : 40, "y" : -73 } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5691773093605457193" } }
+
+--- V3_AmbiguousLegacyAndGeoJSON ---
+Input: { "a" : { "x" : 40, "y" : -70, "type" : "Point", "coordinates" : [ -70, 40 ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-5685310680706645935" } }
+
+--- V4_AmbiguousLegacyAndGeoJSON ---
+Input: { "a" : { "x" : 40, "y" : -70, "type" : "Point", "coordinates" : [ -70, 40 ] } }
+KeyPattern: { "a" : "2dsphere" }
+Keys (1):
+  { "" : { "$numberLong" : "-8506816465018499813" } }
+
+--- V4_CompoundAmbiguous ---
+Input: { "a" : { "x" : 40, "y" : -70, "type" : "Point", "coordinates" : [ -70, 40 ] }, "b" : "test" }
+KeyPattern: { "a" : "2dsphere", "b" : 1 }
+Keys (1):
+  { "" : { "$numberLong" : "-8506816465018499813" }, "" : "test" }
+
