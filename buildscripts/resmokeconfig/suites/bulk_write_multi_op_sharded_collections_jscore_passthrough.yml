@@ -223,6 +223,7 @@ executor:
     cluster_options:
       class: ShardedClusterFixture
       settings:
+        num_mongos: 3
         num_shards: 2
         enable_balancer: false
         mongos_options:
