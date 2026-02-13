@@ -104,7 +104,6 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _enablePipelineOptimizationAdditionalTestingRules =
         internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
     _internalJoinPlanSamplingSize = internalJoinPlanSamplingSize.loadRelaxed();
-    _internalJoinEnumerateCollScanPlans = internalJoinEnumerateCollScanPlans.loadRelaxed();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -166,10 +165,6 @@ bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
 
 size_t QueryKnobConfiguration::getInternalJoinPlanSamplingSize() const {
     return _internalJoinPlanSamplingSize;
-}
-
-bool QueryKnobConfiguration::getInternalJoinEnumerateCollScanPlans() const {
-    return _internalJoinEnumerateCollScanPlans;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {
