@@ -518,6 +518,10 @@ last-continuous:
       ticket: SERVER-106239
     - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
       ticket: SERVER-116528
+    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+      ticket: SERVER-117009
+    - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+      ticket: SERVER-117009
   suites: null
 last-lts:
   all:
@@ -1093,4 +1097,8 @@ last-lts:
       ticket: SERVER-106239
     - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
       ticket: SERVER-116528
+    - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
+      ticket: SERVER-117009
+    - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
+      ticket: SERVER-117009
   suites: null
