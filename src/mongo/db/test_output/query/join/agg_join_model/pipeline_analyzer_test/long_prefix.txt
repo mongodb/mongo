@@ -11,9 +11,6 @@
                     },
                     "projection": {
                         "k": false
-                    },
-                    "sort": {
-                        "e": {"$numberInt":"1"}
                     }
                 },
                 "embedPath": ""

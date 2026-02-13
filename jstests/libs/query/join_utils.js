@@ -61,6 +61,14 @@ export function usedNestedLoopJoinEmbedding(explain) {
     return stages.includes("NESTED_LOOP_JOIN_EMBEDDING");
 }
 
+export function plannerStageIsJoinOptNode(stageObj) {
+    return (
+        stageObj.stage.includes("NESTED_LOOP_JOIN_EMBEDDING") ||
+        stageObj.stage.includes("INDEXED_NESTED_LOOP_JOIN_EMBEDDING") ||
+        stageObj.stage.includes("HASH_JOIN_EMBEDDING")
+    );
+}
+
 /**
  * Returns a boolean that indicates if the explain showed that join optimization was used.
  */

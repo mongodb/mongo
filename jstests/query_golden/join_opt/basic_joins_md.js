@@ -361,6 +361,28 @@ joinTestWrapper(() => {
         {$unwind: "$y"},
     ]);
 
+    section(
+        "Example with a $lookup with no join predicate but the rest of the pipeline establishes a connected join graph. ",
+    );
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl2.getName(),
+                as: "coll12",
+                pipeline: [],
+            },
+        },
+        {$unwind: "$coll12"},
+        {
+            $lookup: {
+                from: foreignColl3.getName(),
+                let: {a: "$a", a12: "$coll12.a"},
+                pipeline: [{$match: {$expr: {$and: [{$eq: ["$a", "$$a"]}, {$eq: ["$a", "$$a12"]}]}}}],
+                as: "coll13",
+            },
+        },
+        {$unwind: "$coll13"},
+    ]);
     section("Projection on ambiguous field");
     runBasicJoinTest([
         {$lookup: {from: foreignColl2.getName(), as: "x", localField: "a", foreignField: "d"}},

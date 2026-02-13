@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -289,6 +290,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
     expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
     auto swCQ = createCanonicalQuery(expCtx, nss, *suffix);
+
     expCtx->setPlanCache(oldPlanCache);
 
     if (!swCQ.isOK()) {
@@ -297,6 +299,9 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return swCQ.getStatus();
     }
 
+    if (swCQ.getValue()->getSortPattern()) {
+        return Status(ErrorCodes::BadValue, "Sort stage found in pipeline");
+    }
     // Initialize the JoinGraph & base NodeId.
     MutableJoinGraph graph{buildParams.joinGraphBuildParams};
     auto baseNodeId =

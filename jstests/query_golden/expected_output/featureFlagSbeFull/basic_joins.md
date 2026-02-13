@@ -5226,7 +5226,323 @@ rightEmbeddingField: "y"
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
-## 16. Projection on ambiguous field
+## 16. Example with a $lookup with no join predicate but the rest of the pipeline establishes a connected join graph. 
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "coll12",
+			"pipeline" : [ ]
+		}
+	},
+	{
+		"$unwind" : "$coll12"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign3",
+			"let" : {
+				"a" : "$a",
+				"a12" : "$coll12.a"
+			},
+			"pipeline" : [
+				{
+					"$match" : {
+						"$expr" : {
+							"$and" : [
+								{
+									"$eq" : [
+										"$a",
+										"$$a"
+									]
+								},
+								{
+									"$eq" : [
+										"$a",
+										"$$a12"
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"as" : "coll13"
+		}
+	},
+	{
+		"$unwind" : "$coll13"
+	}
+]
+```
+### Results
+```json
+
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
+### Summarized explain
+Execution Engine: sbe
+```json
+{
+	"queryShapeHash" : "D060F6366A3C1C0103DAAB82FED1F975E6C22D0CDCE01464F5EA3DB8CFEBCC80",
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : {
+					"direction" : "forward",
+					"filter" : { },
+					"nss" : "test.basic_joins_md",
+					"stage" : "COLLSCAN"
+				}
+			}
+		},
+		{
+			"$lookup" : {
+				"as" : "coll12",
+				"from" : "basic_joins_md_foreign2",
+				"let" : { },
+				"pipeline" : [ ],
+				"unwinding" : {
+					"preserveNullAndEmptyArrays" : false
+				}
+			}
+		},
+		{
+			"$lookup" : {
+				"as" : "coll13",
+				"from" : "basic_joins_md_foreign3",
+				"let" : {
+					"a" : "$a",
+					"a12" : "$coll12.a"
+				},
+				"pipeline" : [
+					{
+						"$match" : {
+							"$expr" : {
+								"$and" : [
+									{
+										"$eq" : [
+											"$a",
+											"$$a"
+										]
+									},
+									{
+										"$eq" : [
+											"$a",
+											"$$a12"
+										]
+									}
+								]
+							}
+						}
+					}
+				],
+				"unwinding" : {
+					"preserveNullAndEmptyArrays" : false
+				}
+			}
+		}
+	]
+}
+```
+
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [coll13.a $= a,a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "coll12"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= a]
+  leftEmbeddingField: "coll13"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a $= coll13.a,a = a]
+leftEmbeddingField: "coll12"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [a $= a]
+  |  leftEmbeddingField: "coll13"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  COLLSCAN [test.basic_joins_md]
+  |  |  direction: "forward"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a $= coll13.a,a = a]
+leftEmbeddingField: "coll12"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [a $= a]
+  |  leftEmbeddingField: "coll13"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  COLLSCAN [test.basic_joins_md]
+  |  |  direction: "forward"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  direction: "forward"
+```
+### With random order, seed 44, nested loop joins
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a $= a,coll12.a $= a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "coll13"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "coll12"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  direction: "forward"
+```
+### With random order, seed 44, hash join enabled
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a $= a,coll12.a $= a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "coll13"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "coll12"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  direction: "forward"
+```
+### With random order, seed 45, nested loop joins
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [coll13.a $= a,coll12.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= a]
+  leftEmbeddingField: "coll13"
+  rightEmbeddingField: "coll12"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With random order, seed 45, hash join enabled
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [coll13.a $= a,coll12.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= a]
+  leftEmbeddingField: "coll13"
+  rightEmbeddingField: "coll12"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With fixed order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [coll13.a $= a,coll12.a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [a $= a]
+  leftEmbeddingField: "coll13"
+  rightEmbeddingField: "coll12"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [coll13.a $= a,a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "coll12"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a $= a]
+  leftEmbeddingField: "coll13"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign3]
+  direction: "forward"
+```
+## 17. Projection on ambiguous field
 ### No join opt
 ### Pipeline
 ```json

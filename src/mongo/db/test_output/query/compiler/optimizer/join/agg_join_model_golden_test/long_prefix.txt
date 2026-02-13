@@ -8,11 +8,6 @@ input {
             }
         },
         {
-            "$sort": {
-                "e": {"$numberInt":"1"}
-            }
-        },
-        {
             "$project": {
                 "k": false,
                 "_id": true
@@ -68,9 +63,6 @@ output: {
                     },
                     "projection": {
                         "k": false
-                    },
-                    "sort": {
-                        "e": {"$numberInt":"1"}
                     }
                 },
                 "embedPath": ""

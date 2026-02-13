@@ -365,7 +365,6 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$match: {c: 1}},
-            {$sort: {e: 1}},
             {$project: {k: 0}},
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
             {$unwind: "$fromA"},
@@ -381,6 +380,40 @@ TEST_F(PipelineAnalyzerTest, LongPrefix) {
     ASSERT_OK(swJoinModel);
     auto& joinModel = swJoinModel.getValue();
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, PipelineInEligibleForSortStage) {
+    const auto sortPrefixQuery = R"([
+            {$match: {c: 1}},
+            {$sort: {e: 1}},
+            {$project: {k: 0}},
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(sortPrefixQuery, {"A", "B"});
+    // This is not where we examine the pipeline for a $sort stage.
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto status = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams).getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(status.reason(), "Sort stage found in pipeline");
+
+    const auto sortSubPipelineQuery = R"([
+        {$lookup: {
+            from: "A",
+            localField: "a",
+            foreignField: "b",
+            as: "fromA",
+            pipeline: [{$sort: {b: -1}}]
+        }},
+        {$unwind: "$fromA"}
+    ])";
+    pipeline = makePipeline(sortSubPipelineQuery, {"A", "B"});
+    // We check $lookup subpipeline here, so this method will flag the $sort in the subpipeline.
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
 TEST_F(PipelineAnalyzerTest, LocalFieldOverride) {
