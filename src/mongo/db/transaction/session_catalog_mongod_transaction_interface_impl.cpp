@@ -70,6 +70,14 @@ void MongoDSessionCatalogTransactionInterfaceImpl::refreshTransactionFromStorage
     txnParticipant.refreshFromStorageIfNeeded(opCtx);
 }
 
+void MongoDSessionCatalogTransactionInterfaceImpl::invalidateTransactionOnCheckInIfNeeded(
+    OperationContext* opCtx) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    if (txnParticipant && txnParticipant.shouldInvalidateBeforeCheckIn()) {
+        txnParticipant.invalidate(opCtx);
+    }
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::
     refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);

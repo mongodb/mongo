@@ -886,6 +886,14 @@ public:
             return o().txnResourceStash->getReadConcernArgs();
         }
 
+        bool getRecoveredFromPreciseCheckpointRequiresOplogScanForTest() const {
+            return p().recoveredFromPreciseCheckpointRequiresOplogScan;
+        }
+
+        bool checkStatementExecutedSelfForTest(StmtId stmtId) const {
+            return _checkStatementExecutedSelf(stmtId) != boost::none;
+        }
+
         void transitionToPreparedforTest(OperationContext* opCtx, repl::OpTime prepareOpTime) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOpTime;
@@ -945,6 +953,18 @@ public:
          */
         void addPreparedTransactionPreciseCheckpointRecoveryFields(
             SessionTxnRecord& sessionTxnRecord) const;
+
+        /**
+         * Returns true if this is a committed internal prepared transaction for a retryable write
+         * that was recovered from a precise checkpoint. Recovered prepared transactions do not have
+         * their operation history applied in memory, so this transaction participant must be
+         * invalidated before checking the session back in. This ensures that a subsequent retry
+         * will trigger a refresh from storage during session checkout.
+         */
+        bool shouldInvalidateBeforeCheckIn() const {
+            return p().recoveredFromPreciseCheckpointRequiresOplogScan &&
+                transactionIsCommitted() && _isInternalSessionForRetryableWrite();
+        }
 
     private:
         struct StatementInfo {
@@ -1360,11 +1380,17 @@ private:
         // having to scan through the oplog.
         CommittedStatementTimestampMap activeTxnCommittedStatements;
 
+        // Set to true if the transaction was recovered from a precise checkpoint. In this case,
+        // we don't track which statement IDs have been committed or which transaction operations
+        // have been applied. Future retryability checks must retrieve previous write data by
+        // scanning through the oplog. This is achieved by invalidating the TransactionParticipant
+        // on checkin when 'shouldInvalidateBeforeCheckIn()' returns true.
+        bool recoveredFromPreciseCheckpointRequiresOplogScan{false};
+
         // Set to true if we need to write an "abort" oplog entry in the case of an abort.  This
         // is the case when we have (or may have) written or replicated an oplog entry for the
         // transaction.
         bool needToWriteAbortEntry{false};
-
     } _p;
 };  // class TransactionParticipant
 

@@ -61,9 +61,13 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
     // every transaction that it runs including large transactions and with the default oplogSize,
     // oplog reading done by the find command may not be able to keep up with the oplog truncation,
     // causing the command to fail with CappedPositionLost.
+    let numNodes = 2;
+    if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
+        numNodes = 1;
+    }
     const st = new ShardingTest({
         shards: 1,
-        rs: {nodes: 2, oplogSize: 256},
+        rs: {nodes: numNodes, oplogSize: 256},
         rsOptions: {
             setParameter: {
                 maxNumberOfTransactionOperationsInSingleOplogEntry: maxNumberOfTransactionOperationsInSingleOplogEntry,

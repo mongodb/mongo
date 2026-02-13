@@ -237,6 +237,7 @@ public:
 
 private:
     OperationContextSession _operationContextSession;
+    OperationContext* const _opCtx;
     MongoDSessionCatalogTransactionInterface* _ti;
 };
 

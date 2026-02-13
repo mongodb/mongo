@@ -37,6 +37,10 @@ const kTestMode = {
     kFailover: 3,
 };
 
+if (TestData.doesNotSupportGracefulStepdown) {
+    delete kTestMode.kFailover;
+}
+
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);

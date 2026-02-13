@@ -75,6 +75,8 @@ public:
 
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
 
+    void invalidateTransactionOnCheckInIfNeeded(OperationContext* opCtx) override;
+
     ScanSessionsCallbackFn makeParentSessionWorkerFnForReap(
         TxnNumber* parentSessionActiveTxnNumber) override;
 

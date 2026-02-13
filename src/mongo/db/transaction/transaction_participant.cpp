@@ -2131,9 +2131,7 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
             o(lg).affectedNamespaces.emplace(std::move(ns));
         }
 
-        // TODO SERVER-113731: Handle recovering history when we support retryable transactions.
-        p().activeTxnCommittedStatements = {};
-        o(lg).hasIncompleteHistory = true;
+        p().recoveredFromPreciseCheckpointRequiresOplogScan = true;
 
         // This should be called after checking out the session without refresh, which already sets
         // isValid.
@@ -2185,6 +2183,12 @@ TransactionOperations* TransactionParticipant::Participant::retrieveCompletedTra
     // or prepared.
     invariant(o().txnState.isInSet(TransactionState::kInProgress | TransactionState::kPrepared),
               str::stream() << "Current state: " << o().txnState);
+
+    tassert(11373101,
+            "Prepared transactions recovered from a precise checkpoint should not have "
+            "transactionOperations",
+            !p().recoveredFromPreciseCheckpointRequiresOplogScan);
+
 
     return &(p().transactionOperations);
 }
@@ -3656,6 +3660,7 @@ void TransactionParticipant::Participant::_invalidate(WithLock wl) {
 void TransactionParticipant::Participant::_resetRetryableWriteState(WithLock wl) {
     p().activeTxnCommittedStatements.clear();
     o(wl).hasIncompleteHistory = false;
+    p().recoveredFromPreciseCheckpointRequiresOplogScan = false;
 }
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
@@ -3822,6 +3827,11 @@ boost::optional<Timestamp> TransactionParticipant::Participant::_getCommitTimest
 boost::optional<TransactionParticipant::Participant::StatementInfo>
 TransactionParticipant::Participant::_checkStatementExecutedSelf(StmtId stmtId) const {
     invariant(o().isValid);
+    tassert(11373100,
+            "Prepared transactions recovered from a precise checkpoint should not have "
+            "activeTxnCommittedStatements",
+            !p().recoveredFromPreciseCheckpointRequiresOplogScan);
+
     if (_isInternalSessionForRetryableWrite()) {
         invariant(!transactionIsAborted());
     }

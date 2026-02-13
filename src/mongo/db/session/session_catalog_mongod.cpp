@@ -496,7 +496,9 @@ void abortInProgressTransactions(OperationContext* opCtx,
 }
 
 void _checkInUnscopedSession(OperationContext* opCtx,
+                             MongoDSessionCatalogTransactionInterface* ti,
                              OperationContextSession::CheckInReason reason) {
+    ti->invalidateTransactionOnCheckInIfNeeded(opCtx);
     OperationContextSession::checkIn(opCtx, reason);
 }
 
@@ -750,7 +752,7 @@ MongoDSessionCatalog::checkOutSessionWithoutOplogRead(OperationContext* opCtx) {
 
 void MongoDSessionCatalog::checkInUnscopedSession(OperationContext* opCtx,
                                                   OperationContextSession::CheckInReason reason) {
-    _checkInUnscopedSession(opCtx, reason);
+    _checkInUnscopedSession(opCtx, _ti.get(), reason);
 }
 
 void MongoDSessionCatalog::checkOutUnscopedSession(OperationContext* opCtx) {
@@ -764,17 +766,22 @@ SessionCatalog::ScanSessionsCallbackFn MongoDSessionCatalog::makeSessionWorkerFn
 
 MongoDOperationContextSession::MongoDOperationContextSession(
     OperationContext* opCtx, MongoDSessionCatalogTransactionInterface* ti)
-    : _operationContextSession(opCtx), _ti(ti) {
+    : _operationContextSession(opCtx), _opCtx(opCtx), _ti(ti) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
     _ti->refreshTransactionFromStorageIfNeeded(opCtx);
 }
 
-MongoDOperationContextSession::~MongoDOperationContextSession() = default;
+MongoDOperationContextSession::~MongoDOperationContextSession() {
+    // Only invalidate if the session is still checked out.
+    if (OperationContextSession::get(_opCtx)) {
+        _ti->invalidateTransactionOnCheckInIfNeeded(_opCtx);
+    }
+};
 
 void MongoDOperationContextSession::checkIn(OperationContext* opCtx,
                                             OperationContextSession::CheckInReason reason) {
-    _checkInUnscopedSession(opCtx, reason);
+    _checkInUnscopedSession(opCtx, _ti, reason);
 }
 
 void MongoDOperationContextSession::checkOut(OperationContext* opCtx) {

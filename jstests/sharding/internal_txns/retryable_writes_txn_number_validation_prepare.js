@@ -13,7 +13,11 @@ import {
     makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-const rst = new ReplSetTest({nodes: 2});
+let numNodes = 2;
+if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
+    numNodes = 1;
+}
+const rst = new ReplSetTest({nodes: numNodes});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 let primary = rst.getPrimary();
@@ -31,6 +35,11 @@ const kTestMode = {
     kFailoverOldPrimary: 3,
     kFailoverNewPrimary: 4,
 };
+
+if (TestData.doesNotSupportGracefulStepdown) {
+    delete kTestMode.kFailoverOldPrimary;
+    delete kTestMode.kFailoverNewPrimary;
+}
 
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {

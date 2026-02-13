@@ -63,6 +63,12 @@ public:
      */
     virtual bool isTransactionInProgress(OperationContext* opCtx) = 0;
 
+    /**
+     * Invalidates the TransactionParticipant on check-in for committed internal prepared
+     * transactions recovered from a precise checkpoint, ensuring subsequent retries reload
+     * operation history from storage.
+     */
+    virtual void invalidateTransactionOnCheckInIfNeeded(OperationContext* opCtx) = 0;
 
     /**
      * Gets a description of the current transaction state.
