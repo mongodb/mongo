@@ -88,7 +88,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
         }),
         querySolution.get());
 
-    // TODO SERVER-119040: Pass explain information to executor.
     return executorFromSolution(engine,
                                 std::move(canonicalQuery),
                                 std::move(querySolution),

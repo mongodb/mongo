@@ -22,13 +22,11 @@ selector:
     - jstests/core/index/index_filter_commands.js
     - jstests/core/index/wildcard/wildcard_index_cached_plans.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
+    - jstests/core/query/explain/explain_plan_cache.js
     - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
     - jstests/core/query/sbe/from_plan_cache_flag.js
     - jstests/core/query/partial_index_logical.js
     - jstests/core/query/plan_cache_stability.js
-
-    # TODO SERVER-119040 Implement explain in new get_executor
-    - jstests/core/query/explain/*.js
 
     # TODO SERVER-119602 enable PBT
     - jstests/core/**/*_pbt.js
