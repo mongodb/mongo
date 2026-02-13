@@ -51,6 +51,32 @@
 
 namespace mongo {
 
+/**
+ * Maintains an in-memory cache of the size and count of all collections.
+ *
+ * Terminology:
+ * The term "fast count" is historical, but should be equivalent to "fast size"
+ * and "fast sizecount" to refer to a cached, and therefore "fast", size or count
+ * value for a collection.
+ *
+ *
+ * This cache is intended to be accurate, and helps the server avoid expensive
+ * collection scans to compute these values. The validate command can check and repair
+ * the fast count and size with various flags to the command, like --enforceFastCount.
+ *
+ * Backing the in-memory cache is a pair of collections used for recovery scenarios.
+ *
+ * This class and its backing collections are a singleton that creates its internal
+ * collection(s) once, the first time a mongod creates its data files. It is assumed
+ * these backing collections exist from then on.
+ *
+ * This class is thread-safe, and synchroizes access to the in-memory SizeCount cache,
+ * i.e. _metadata.
+ *
+ * The write path should generally not depend directly on this class, because it relies on
+ * the collection write path to persist fast SizeCounts. Instead, operations should
+ * interact with this class through UncommittedFastCountChange.
+ */
 class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
     struct StoredSizeCount {
         CollectionSizeCount sizeCount;
@@ -99,10 +125,11 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
-     * Manually triggers an iteration to write dirty metadata to the internal collection for testing
-     * purposes.
+     * Snapshots and writes dirty in-memory SizeCounts to the internal fastcount collection on disk.
+     * Not recommended outside of the Checkpointer, generally for mirroring legacy sizeStorer
+     * behavior.
      */
-    void runIteration_ForTest(OperationContext* opCtx);
+    void flush(OperationContext* opCtx);
 
     /**
      * Disables periodic background writes of metadata for testing purposes. Must be called before
@@ -118,15 +145,14 @@ private:
     absl::flat_hash_map<UUID, StoredSizeCount> _getSnapshotOfDirtyMetadata();
 
     /**
-     * Write out dirty data to disk.
+     * Write out dirtyMetadata to fastCountColl.
      */
-    void _flush(OperationContext* opCtx,
-                const CollectionPtr& fastCountColl,
-                const absl::flat_hash_map<UUID, StoredSizeCount>& dirtyMetadata);
+    void _doFlush(OperationContext* opCtx,
+                  const CollectionPtr& fastCountColl,
+                  const absl::flat_hash_map<UUID, StoredSizeCount>& dirtyMetadata);
 
     void _startBackgroundThread(ServiceContext* svcCtx);
     void _runBackgroundThreadOnTimer(OperationContext* opCtx);
-    void _runIteration(OperationContext* opCtx);
 
     /**
      * Write one collection's sizeCount to disk.
@@ -173,7 +199,10 @@ private:
     AtomicWord<bool> _isDisabled = false;
     stdx::condition_variable _condVar;
 
-    // Map of collection UUID to the last committed size and count.
+    /**
+     * In-memory cache of Fast Size & Counts since last checkpoint.
+     * Implemented as a map of collection UUID to the last committed size and count.
+     */
     absl::flat_hash_map<UUID, StoredSizeCount> _metadata;
     mutable stdx::mutex _metadataMutex;
 };
