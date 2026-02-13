@@ -76,6 +76,17 @@ server_parameters:
             gte: 1
         redact: false
 
+    # TODO (SERVER-119515): Move this to a higher level.
+    primaryDrivenIndexBuildPrefetching:
+        description: "Whether primary-driven index builds use prefetching."
+        set_at:
+            - runtime
+            - startup
+        cpp_varname: primaryDrivenIndexBuildPrefetching
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
     primaryDrivenIndexBuildIndexInsertionBatchSize:
         description: "The number of index keys in a batch when inserting keys from the sorter to the index table. This will be upper-bounded by internalIndexBuildBulkLoadYieldIterations"
         set_at:

@@ -650,6 +650,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     bool readOnce = useReadOnceCursorsForIndexBuilds.load();
     shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(readOnce);
 
+    // TODO (SERVER-119515): Move this to a higher level.
+    if (_method == IndexBuildMethodEnum::kPrimaryDriven &&
+        !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
+        shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(
+            primaryDrivenIndexBuildPrefetching.load());
+    }
+
     size_t numScanRestarts = 0;
     bool restartCollectionScan = false;
     Timer timer;
