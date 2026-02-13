@@ -6,11 +6,6 @@
 /**
  * SingleChangeStreamMatcher - Matches events from a single change stream.
  * Supports tolerant matching for per-shard events that can arrive out of order.
- *
- * TODO SERVER-117490: The deferred matching logic here handles out-of-order per-shard events
- * (e.g., createIndexes, dropIndexes) that can arrive interleaved with other events due to
- * async execution across shards. Callers should use assertDone() after processing all events
- * to verify all expected events were matched and no extra events were received.
  */
 class SingleChangeStreamMatcher {
     /**
