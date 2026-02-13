@@ -81,7 +81,7 @@ export const $config = (function () {
                     );
                 }
             } catch (e) {
-                // TODO(SERVER-119156): Remove once this issue is fixed.
+                // TODO(SERVER-96916): Remove once this issue is fixed.
                 if (e.code == 10065) {
                     return;
                 }
