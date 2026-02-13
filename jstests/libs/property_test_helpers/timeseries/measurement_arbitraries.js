@@ -4,7 +4,11 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-import {makeMetricArb, makeMetricStreamArb} from "jstests/libs/property_test_helpers/timeseries/metric_arbitraries.js";
+import {
+    makeMetricArb,
+    makeSensorDateMetricStreamArb,
+    makeMetricStreamArb,
+} from "jstests/libs/property_test_helpers/timeseries/metric_arbitraries.js";
 
 /**
  * Make a single measurement document arbitrary.
@@ -49,10 +53,14 @@ export function makeMeasurementDocArb(
         throw new Error("makeMeasurementDocArb: metaFieldname must be a non-empty string");
     }
 
-    const {intRange, dateRange, fieldNameArb = fc.string({minLength: 1, maxLength: 8})} = ranges;
-
-    const intMin = intRange?.min ?? -1000;
-    const intMax = intRange?.max ?? 1000;
+    const {
+        intRange,
+        doubleRange,
+        longRange,
+        decimalRange,
+        dateRange,
+        fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
+    } = ranges;
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
     const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
@@ -65,8 +73,11 @@ export function makeMeasurementDocArb(
     const timeArb = fc.date({min: dateMin, max: dateMax});
 
     // Parent metric arb used for meta (when not fixed) and for extra fields
-    const parentMetricArb = makeMetricArb(["int", "date", "uuid"], {
-        intRange: {min: intMin, max: intMax},
+    const parentMetricArb = makeMetricArb(undefined, {
+        intRange,
+        doubleRange,
+        longRange,
+        decimalRange,
         dateRange: {min: dateMin, max: dateMax},
     });
 
@@ -147,16 +158,17 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
 
     const {
         intRange,
+        doubleRange,
+        longRange,
+        decimalRange,
         dateRange,
         minFields = 1,
         maxFields = 5,
         minDocs = 0,
         maxDocs = 20,
         fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
+        timeBucketing = "hours",
     } = ranges;
-
-    const intMin = intRange?.min ?? -1000;
-    const intMax = intRange?.max ?? 1000;
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
     const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
@@ -176,8 +188,11 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     const docCountArb = fc.integer({min: minDocs, max: maxDocs});
 
     // Parent metric arb for meta (when not fixed) and extra fields
-    const parentMetricArb = makeMetricArb(["int", "date", "uuid"], {
-        intRange: {min: intMin, max: intMax},
+    const parentMetricArb = makeMetricArb(undefined, {
+        intRange,
+        doubleRange,
+        longRange,
+        decimalRange,
         dateRange: {min: dateMin, max: dateMax},
     });
 
@@ -195,10 +210,13 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
             maxLength: docCount,
         });
 
-        const timeStreamArb = fc.array(fc.date({min: dateMin, max: dateMax}), {
-            minLength: docCount,
-            maxLength: docCount,
-        });
+        // Sensor-like increasing time stream to create meaningful bucket boundaries.
+        const timeStreamArb = makeSensorDateMetricStreamArb(
+            docCount,
+            docCount,
+            {dateRange: {min: dateMin, max: dateMax}},
+            timeBucketing,
+        );
 
         const metaStreamArb = fc.array(fc.constant(chosenMetaValue), {minLength: docCount, maxLength: docCount});
 
@@ -206,7 +224,10 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         // with minLength = maxLength = docCount, so every stream[i] is defined.
         const extraFieldStreamArbs = fieldNames.map(() =>
             makeMetricStreamArb(docCount, docCount, {
-                intRange: {min: intMin, max: intMax},
+                intRange,
+                doubleRange,
+                longRange,
+                decimalRange,
                 dateRange: {min: dateMin, max: dateMax},
             }),
         );
