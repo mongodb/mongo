@@ -313,6 +313,10 @@ public:
         // frequent schema changes.
         commandBuilder.append("transactions", BSON("includeLastCommitted" << false));
 
+        // Exclude intermediate primary/standby optimes from FTDC;
+        // only the derived oplogLagMillis is useful for monitoring.
+        commandBuilder.append("standby", BSON("includeRawOptimes" << false));
+
         // Exclude apiVersions.
         commandBuilder.append("metrics", BSON("apiVersions" << false));
 

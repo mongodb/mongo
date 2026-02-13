@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 
+#include "mongo/db/repl/optime.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -190,6 +192,57 @@ TEST(ReplSetHeartbeatArgs, AcceptsUnknownField) {
     args.addToBSON(&builder2);
     builder2.append("unknownField", 1);
     ASSERT_BSONOBJ_EQ_UNORDERED(argsObj, builder2.obj());
+}
+
+TEST(ReplSetHeartbeatArgsV1, PrimaryOptimeFieldsParsedFromReplData) {
+    // Verify that $replData sub-document is stored in getExtra() when present in the
+    // heartbeat command body (placed in request metadata by disagg primary, merged by OP_MSG).
+    OpTime primaryOpTime({100, 3}, 5);
+    Date_t primaryWallTime = Date_t() + Seconds(12345);
+
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append(kSetNameFieldName, "mySet");
+    cmdBuilder.appendNumber(kConfigVersionFieldName, 1LL);
+    cmdBuilder.appendNumber(kConfigTermFieldName, -1LL);
+    cmdBuilder.append(kSenderHostFieldName, "host:1");
+    cmdBuilder.appendNumber(kSenderIdFieldName, 0LL);
+    cmdBuilder.appendNumber(kTermFieldName, 5LL);
+    cmdBuilder.append(kPrimaryIdFieldName, 0LL);
+    {
+        BSONObjBuilder replDataBuilder(cmdBuilder.subobjStart(rpc::kReplSetMetadataFieldName));
+        primaryOpTime.append("lastAppliedOpTime", &replDataBuilder);
+        replDataBuilder.appendDate("lastAppliedWallTime", primaryWallTime);
+    }
+
+    ReplSetHeartbeatArgsV1 parsed;
+    ASSERT_OK(parsed.initialize(cmdBuilder.obj()));
+
+    auto extra = parsed.getExtra();
+    ASSERT_TRUE(extra.has_value());
+    auto opTimeElem = (*extra)["lastAppliedOpTime"];
+    auto wallTimeElem = (*extra)["lastAppliedWallTime"];
+    ASSERT_FALSE(opTimeElem.eoo());
+    ASSERT_FALSE(wallTimeElem.eoo());
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(opTimeElem.Obj()).getValue(), primaryOpTime);
+    ASSERT_EQUALS(wallTimeElem.Date(), primaryWallTime);
+}
+
+TEST(ReplSetHeartbeatArgsV1, PrimaryOptimeFieldsAbsentByDefault) {
+    // When $replData is absent, getExtra() should be boost::none.
+    ReplSetHeartbeatArgsV1 args;
+    args.setSetName("mySet");
+    args.setConfigVersion(1);
+    args.setTerm(5);
+    args.setSenderHost(HostAndPort("host:1"));
+
+    BSONObj serialized = args.toBSON();
+
+    ASSERT_FALSE(serialized.hasField(rpc::kReplSetMetadataFieldName));
+
+    ReplSetHeartbeatArgsV1 parsed;
+    ASSERT_OK(parsed.initialize(serialized));
+
+    ASSERT_FALSE(parsed.getExtra().has_value());
 }
 
 }  // namespace
