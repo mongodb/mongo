@@ -646,7 +646,7 @@ def _impl(ctx):
     dwarf32_feature = feature(
         name = "dwarf32",
         # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
-        enabled = ctx.attr.compiler == COMPILERS.CLANG or ctx.attr.fission or ctx.attr.distro == "suse15",
+        enabled = ctx.attr.fission or ctx.attr.distro == "suse15",
         implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
@@ -667,7 +667,7 @@ def _impl(ctx):
     # gdb crashes with -gsplit-dwarf and -gdwarf64
     dwarf64_feature = feature(
         name = "dwarf64",
-        enabled = ctx.attr.compiler == COMPILERS.GCC and not ctx.attr.fission and not ctx.attr.distro == "suse15",
+        enabled = not ctx.attr.fission and not ctx.attr.distro == "suse15",
         implies = ["per_object_debug_info"],
         flag_sets = [
             flag_set(
