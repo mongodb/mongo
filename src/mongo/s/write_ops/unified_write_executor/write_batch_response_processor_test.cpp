@@ -30,8 +30,10 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -2592,6 +2594,141 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
     ASSERT_EQ(batch.size(), 1);
     ASSERT_EQ(batch[0].getIdx(), 0);
     ASSERT_EQ(batch[0].getStatus().code(), ErrorCodes::BadValue);
+}
+
+// Helper to create a QueryStatsMetrics object with all required fields populated.
+write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
+                                                   long long keysExamined,
+                                                   long long docsExamined,
+                                                   long long nMatched) {
+    CursorMetrics metrics;
+    metrics.setKeysExamined(keysExamined);
+    metrics.setDocsExamined(docsExamined);
+    metrics.setBytesRead(100);
+    metrics.setReadingTimeMicros(50);
+    metrics.setWorkingTimeMillis(10);
+    metrics.setHasSortStage(false);
+    metrics.setUsedDisk(false);
+    metrics.setFromMultiPlanner(false);
+    metrics.setFromPlanCache(false);
+    metrics.setPlanningTimeMicros(5);
+    metrics.setNDocsSampled(0);
+    metrics.setCpuNanos(1000);
+    metrics.setNumInterruptChecks(1);
+    metrics.setNMatched(nMatched);
+    metrics.setNUpserted(0);
+    metrics.setNModified(nMatched);
+    metrics.setNDeleted(0);
+    metrics.setNInserted(0);
+
+    write_ops::QueryStatsMetrics qsm;
+    qsm.setOriginalOpIndex(originalOpIndex);
+    qsm.setMetrics(metrics);
+    return qsm;
+}
+
+TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromShardResponse) {
+    // Test that queryStatsMetrics from shard responses are aggregated into
+    // OpDebug.
+    auto updateRequest = write_ops::UpdateCommandRequest(
+        nss1,
+        std::vector<write_ops::UpdateOpEntry>{
+            write_ops::UpdateOpEntry(BSON("_id" << 0),
+                                     write_ops::UpdateModification(BSON("a" << 0))),
+            write_ops::UpdateOpEntry(BSON("_id" << 1),
+                                     write_ops::UpdateModification(BSON("a" << 1)))});
+    auto request = BatchedCommandRequest(updateRequest);
+
+    const bool inTransaction = false;
+
+    // Set up QueryStatsInfo in OpDebug for each operation index.
+    // This simulates what WriteBatchQueryStatsRegisterer::registerRequest does.
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+    opDebug.setQueryStatsInfoAtOpIndex(1, OpDebug::QueryStatsInfo{});
+
+    // Build the response using BatchedCommandResponse and serialize via toBSON().
+    BatchedCommandResponse batchedResponse;
+    batchedResponse.setStatus(Status::OK());
+    batchedResponse.setN(2);
+    batchedResponse.setNModified(2);
+    batchedResponse.setQueryStatsMetrics(
+        {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+
+    RemoteCommandResponse rcr(
+        host1, setTopLevelOK(batchedResponse.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction)}}});
+
+    // Verify that the metrics were aggregated into OpDebug for each operation.
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics0.keysExamined, 10);
+    ASSERT_EQ(*metrics0.docsExamined, 5);
+
+    const auto& metrics1 = opDebug.getAdditiveMetrics(1);
+    ASSERT_EQ(*metrics1.keysExamined, 20);
+    ASSERT_EQ(*metrics1.docsExamined, 15);
+}
+
+TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromMultipleShards) {
+    // Test that queryStatsMetrics from multiple shards are aggregated correctly.
+    auto updateRequest = write_ops::UpdateCommandRequest(
+        nss1,
+        std::vector<write_ops::UpdateOpEntry>{write_ops::UpdateOpEntry(
+            BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0)))});
+    auto request = BatchedCommandRequest(updateRequest);
+
+    const bool inTransaction = false;
+
+    // Set up QueryStatsInfo in OpDebug for the operation.
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+
+    // Build responses using BatchedCommandResponse for each shard, with different
+    // metrics for the same operation.
+    BatchedCommandResponse batchedResponse1;
+    batchedResponse1.setStatus(Status::OK());
+    batchedResponse1.setN(1);
+    batchedResponse1.setNModified(1);
+    batchedResponse1.setQueryStatsMetrics({makeQueryStatsMetrics(0, 10, 5, 1)});
+
+    BatchedCommandResponse batchedResponse2;
+    batchedResponse2.setStatus(Status::OK());
+    batchedResponse2.setN(1);
+    batchedResponse2.setNModified(1);
+    batchedResponse2.setQueryStatsMetrics({makeQueryStatsMetrics(0, 15, 8, 1)});
+
+    RemoteCommandResponse rcr1(
+        host1, setTopLevelOK(batchedResponse1.toBSON()), Microseconds{0}, false);
+    RemoteCommandResponse rcr2(
+        host2, setTopLevelOK(batchedResponse2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 0)}, inTransaction)}}});
+
+    // Verify that the metrics from both shards were aggregated (summed) for the
+    // operation.
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(metrics0.keysExamined.value_or(0), 25);  // 10 + 15
+    ASSERT_EQ(metrics0.docsExamined.value_or(0), 13);  // 5 + 8
 }
 
 }  // namespace

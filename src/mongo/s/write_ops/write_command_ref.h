@@ -1279,7 +1279,7 @@ public:
     template <class Visitor>
     decltype(auto) visitUpdateOpData(Visitor&& v) const {
         return visitImpl([&](auto&& r) -> decltype(auto) {
-            return r.visitOpUpdateData(_index, std::forward<Visitor>(v));
+            return r.visitUpdateOpData(_index, std::forward<Visitor>(v));
         });
     }
 

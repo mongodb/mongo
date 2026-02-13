@@ -65,7 +65,8 @@ void parseAndRegisterUpdateOp(OperationContext* opCtx,
             return;
     }
 
-    const auto& wholeOp = updateOp.getCommand().getBatchedCommandRequest().getUpdateRequest();
+    const write_ops::UpdateCommandRequest& wholeOp =
+        updateOp.getCommand().getBatchedCommandRequest().getUpdateRequest();
 
     // Skip registering the request with encrypted fields as indicated by the inclusion of
     // encryptionInformation. It is important to do this before canonicalizing and optimizing the
@@ -199,10 +200,17 @@ void WriteBatchQueryStatsRegistrar::registerRequest(OperationContext* opCtx,
     // Initializes the map to indicate that we have already processed the command.
     opDebug.ensureQueryStatsInfoForBatchWrites();
 
-    for (size_t opIndex = 0; opIndex < cmdRef.getNumOps(); opIndex++) {
+    size_t nOps = cmdRef.getNumOps();
+    for (size_t opIndex = 0; opIndex < nOps; opIndex++) {
         const auto& updateOp = cmdRef.getOp(opIndex).getUpdateOp();
         parseAndRegisterUpdateOp(opCtx, updateOp.getNss(), opIndex, updateOp);
     }
+
+    // If we are collecting query stats for any of the ops, record the batch size now.
+    opDebug.forEachQueryStatsInfoForBatchWrites(
+        [nOps](size_t opIndex, OpDebug::QueryStatsInfo& info) {
+            info.additiveMetrics.nUpdateOps = nOps;
+        });
 }
 
 void WriteBatchQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(

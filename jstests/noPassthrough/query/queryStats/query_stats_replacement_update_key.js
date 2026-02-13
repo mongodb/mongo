@@ -56,6 +56,7 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjRequired,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
+                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -90,6 +91,7 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjComplex,
                 shapeFields: queryShapeUpdateFieldsComplex,
                 keyFields: updateKeyFieldsComplex,
+                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -105,6 +107,7 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjEmpty,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
+                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
     });
@@ -121,19 +124,16 @@ runReplacementUpdateKeyTests(
     (fixture) => MongoRunner.stopMongod(fixture),
 );
 
-// TODO SERVER-112050 Enable this when we support sharded clusters for update.
-describe.skip("Sharded", function () {
-    runReplacementUpdateKeyTests(
-        "Sharded",
-        () => {
-            const st = new ShardingTest({
-                shards: 2,
-                mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
-            });
-            const testDB = st.s.getDB("test");
-            st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
-            return {fixture: st, testDB};
-        },
-        (st) => st.stop(),
-    );
-});
+runReplacementUpdateKeyTests(
+    "Sharded",
+    () => {
+        const st = new ShardingTest({
+            shards: 2,
+            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+        });
+        const testDB = st.s.getDB("test");
+        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+        return {fixture: st, testDB};
+    },
+    (st) => st.stop(),
+);

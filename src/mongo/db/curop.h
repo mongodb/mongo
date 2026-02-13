@@ -180,6 +180,12 @@ public:
     void setEndOfOpMetrics(long long nreturned);
 
     /**
+     * Sets metrics collected at the end of a batched write operation onto curOp's OpDebug
+     * instance.
+     */
+    void setEndOfOpMetricsForBatchWrites();
+
+    /**
      * Marks the operation end time, records the length of the client response if a valid response
      * exists, and then - subject to the current values of slowMs and sampleRate - logs this CurOp
      * to file under the given LogComponent. Returns 'true' if, in addition to being logged, this

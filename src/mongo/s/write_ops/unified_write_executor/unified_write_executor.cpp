@@ -31,6 +31,7 @@
 
 #include "mongo/db/fle_crud.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
+#include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
@@ -98,7 +99,12 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
     WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor, targetEpoch);
 
     scheduler.run(opCtx);
-    return processor.generateClientResponse(opCtx);
+    auto response = processor.generateClientResponse(opCtx);
+
+    CurOp::get(opCtx)->setEndOfOpMetricsForBatchWrites();
+    collectQueryStatsMongosBatchWrites(opCtx);
+
+    return response;
 }
 
 BatchedCommandResponse write(OperationContext* opCtx,
