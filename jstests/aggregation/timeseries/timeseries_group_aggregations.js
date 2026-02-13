@@ -25,7 +25,7 @@ import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 // Only run this test for debug=off opt=on without sanitizers active, since this test runs lots of
 // queries.
 if (isSlowBuild(db)) {
-    jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
+    jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -72,13 +72,14 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
     pipeline = pipeline.concat([{$_internalInhibitOptimization: {}}, {$sort: {_id: 1}}]);
 
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
-    // Clear the plan cache so each query is unaffected by state.
-    bpColl.getPlanCache().clear();
+    // We don't need to worry about the plan cache because this test creates no additional indexes.
+    // These pipeline shapes only produce one candidate plan, so the MultiPlanner (which writes to
+    // the cache) does not run.
     const bpResults = bpColl.aggregate(pipeline, {allowDiskUse}).toArray();
 
     function errFn() {
-        jsTestLog(classicColl.explain().aggregate(pipeline, {allowDiskUse}));
-        jsTestLog(bpColl.explain().aggregate(pipeline, {allowDiskUse}));
+        jsTest.log.info(classicColl.explain().aggregate(pipeline, {allowDiskUse}));
+        jsTest.log.info(bpColl.explain().aggregate(pipeline, {allowDiskUse}));
         return "Got different results for pipeline " + tojson(pipeline);
     }
     assert.eq(classicResults, bpResults, errFn);
@@ -289,7 +290,7 @@ function runAggregations(allowDiskUse, forceSpilling) {
         }
     }
 
-    jsTestLog(`Ran ${numPipelinesRun} pipelines with allowDisk=${allowDiskUse},
+    jsTest.log.info(`Ran ${numPipelinesRun} pipelines with allowDisk=${allowDiskUse},
                 forceSpilling=${forceSpilling}`);
 }
 
