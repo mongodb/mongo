@@ -406,12 +406,18 @@ void MigrationDestinationManager::_setStateFailNoLog(StringData msg) {
 }
 
 void MigrationDestinationManager::_setStateFail(StringData msg) {
-    LOGV2(21998, "Error during migration", "error"_attr = redact(msg));
+    static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
+        Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2)};
+    LOGV2_DEBUG(
+        21998, (*logSuppressor)().toInt(), "Error during migration", "error"_attr = redact(msg));
     _setStateFailNoLog(msg);
 }
 
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
-    LOGV2_WARNING(22010, "Error during migration", "error"_attr = redact(msg));
+    static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
+        Seconds{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+    LOGV2_DEBUG(
+        22010, (*logSuppressor)().toInt(), "Error during migration", "error"_attr = redact(msg));
     _setStateFailNoLog(msg);
 }
 
