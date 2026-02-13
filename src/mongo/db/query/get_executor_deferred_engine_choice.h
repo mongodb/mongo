@@ -30,29 +30,19 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/get_executor_helpers.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
-#include "mongo/db/update/update_driver.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec_deferred_engine_choice {
 

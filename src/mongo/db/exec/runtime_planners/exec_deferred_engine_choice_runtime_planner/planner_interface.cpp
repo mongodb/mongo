@@ -73,10 +73,10 @@ std::unique_ptr<QuerySolution> extendSolutionWithPipeline(std::unique_ptr<QueryS
 
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
-DeferredEngineChoicePlannerInterface::makeSbePlanExecutor(std::unique_ptr<CanonicalQuery> cq,
-                                                          std::unique_ptr<QuerySolution> solution,
-                                                          std::unique_ptr<MultiPlanStage> mps,
-                                                          Pipeline* pipeline) {
+DeferredEngineChoicePlannerInterface::_makeSbePlanExecutor(std::unique_ptr<CanonicalQuery> cq,
+                                                           std::unique_ptr<QuerySolution> solution,
+                                                           std::unique_ptr<MultiPlanStage> mps,
+                                                           Pipeline* pipeline) {
     plannerParams()->setTargetSbeStageBuilder(*cq, collections());
 
     finalizePipelineStages(pipeline, cq.get());
@@ -129,30 +129,35 @@ DeferredEngineChoicePlannerInterface::makeSbePlanExecutor(std::unique_ptr<Canoni
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
 DeferredEngineChoicePlannerInterface::executorFromSolution(
-    bool toSbe,
+    EngineChoice engine,
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<QuerySolution> querySolution,
     std::unique_ptr<MultiPlanStage> mps,
     Pipeline* pipeline) {
     // TODO SERVER-117636 implement multiplanning in new get executor.
-    if (toSbe) {
-        return makeSbePlanExecutor(
-            std::move(cq), std::move(querySolution), std::move(mps), pipeline);
+    switch (engine) {
+        case EngineChoice::kSbe:
+            return _makeSbePlanExecutor(
+                std::move(cq), std::move(querySolution), std::move(mps), pipeline);
+        case EngineChoice::kClassic: {
+            auto expCtx = cq->getExpCtx();
+            auto planStage = mps ? std::move(mps) : buildExecutableTree(*querySolution);
+            return uassertStatusOK(
+                plan_executor_factory::make(opCtx(),
+                                            std::move(_plannerData.workingSet),
+                                            std::move(planStage),
+                                            std::move(querySolution),
+                                            std::move(cq),
+                                            expCtx,
+                                            collections().getMainCollectionAcquisition(),
+                                            plannerOptions(),
+                                            std::move(_nss),
+                                            yieldPolicy(),
+                                            boost::none,
+                                            PlanExplainerData{}));
+        }
     }
-    auto expCtx = cq->getExpCtx();
-    auto planStage = mps ? std::move(mps) : buildExecutableTree(*querySolution);
-    return uassertStatusOK(plan_executor_factory::make(opCtx(),
-                                                       std::move(_plannerData.workingSet),
-                                                       std::move(planStage),
-                                                       std::move(querySolution),
-                                                       std::move(cq),
-                                                       expCtx,
-                                                       collections().getMainCollectionAcquisition(),
-                                                       plannerOptions(),
-                                                       std::move(_nss),
-                                                       yieldPolicy(),
-                                                       boost::none,
-                                                       PlanExplainerData{}));
+    MONGO_UNREACHABLE_TASSERT(11966100);
 }
 
 }  // namespace mongo::exec_deferred_engine_choice

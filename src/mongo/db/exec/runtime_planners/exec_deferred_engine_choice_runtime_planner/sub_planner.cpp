@@ -68,7 +68,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
     uassertStatusOK(_subPlanStage->pickBestPlan(*plannerParams(), trialPeriodYieldPolicy.get()));
 
     auto querySolution = _subPlanStage->extractBestWholeQuerySolution();
-    auto engine = chooseEngine(
+    const auto engine = chooseEngine(
         opCtx(),
         collections(),
         canonicalQuery.get(),
@@ -81,10 +81,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
             .plannerOptions = plannerOptions(),
         }),
         querySolution.get());
-    const bool useSbe = engine == EngineChoice::kSbe;
 
     // TODO SERVER-119040: Pass explain information to executor.
-    return executorFromSolution(useSbe,
+    return executorFromSolution(engine,
                                 std::move(canonicalQuery),
                                 std::move(querySolution),
                                 nullptr /*MultiPlanStage*/,

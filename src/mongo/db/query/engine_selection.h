@@ -29,18 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/exec/classic/delete_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/write_ops/canonical_update.h"
-#include "mongo/db/query/write_ops/parsed_delete.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/util/modules.h"
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

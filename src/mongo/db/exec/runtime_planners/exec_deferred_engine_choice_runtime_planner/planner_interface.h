@@ -37,6 +37,7 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -63,17 +64,11 @@ public:
      * to use and call this function to lower depending on the decision.
      */
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> executorFromSolution(
-        bool toSbe,
+        EngineChoice engine,
         std::unique_ptr<CanonicalQuery> canonicalQuery,
         std::unique_ptr<QuerySolution> querySolution,
         std::unique_ptr<MultiPlanStage> mps,
         Pipeline* pipeline = nullptr);
-
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(
-        std::unique_ptr<CanonicalQuery> canonicalQuery,
-        std::unique_ptr<QuerySolution> querySolution,
-        std::unique_ptr<MultiPlanStage> mps,
-        Pipeline* pipeline);
 
     OperationContext* opCtx() {
         return _plannerData.opCtx;
@@ -101,6 +96,13 @@ protected:
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     PlannerData _plannerData;
     NamespaceString _nss;
+
+private:
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _makeSbePlanExecutor(
+        std::unique_ptr<CanonicalQuery> canonicalQuery,
+        std::unique_ptr<QuerySolution> querySolution,
+        std::unique_ptr<MultiPlanStage> mps,
+        Pipeline* pipeline);
 };
 
 /**

@@ -74,7 +74,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
     uassertStatusOK(_multiplanStage->pickBestPlan());
 
     auto querySolution = _multiplanStage->extractBestSolution();
-    auto engine = chooseEngine(
+    const auto engine = chooseEngine(
         opCtx(),
         collections(),
         canonicalQuery.get(),
@@ -87,10 +87,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
             .plannerOptions = plannerOptions(),
         }),
         querySolution.get());
-    const bool useSbe = engine == EngineChoice::kSbe;
 
     // TODO SERVER-119040: Pass explain information to executor.
-    return executorFromSolution(useSbe,
+    return executorFromSolution(engine,
                                 std::move(canonicalQuery),
                                 std::move(querySolution),
                                 std::move(_multiplanStage),
