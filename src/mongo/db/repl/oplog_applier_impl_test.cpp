@@ -1281,9 +1281,9 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateRidOnNonRridCollectionGro
 DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateNoRidOnRridCollectionGrouped, "11454703") {
     auto nss = NamespaceString::createNamespaceString_forTest(
         "test.SteadyStateNoRidOnRridCollectionGrouped");
-    CollectionOptions options;
-    options.recordIdsReplicated = true;
-    createCollection(_opCtx.get(), nss, options);
+    RAIIServerParameterControllerForTest featureFlagController =
+        RAIIServerParameterControllerForTest("featureFlagRecordIdsReplicated", true);
+    createCollection(_opCtx.get(), nss, {});
 
     MutableOplogEntry op1Mutable;
     op1Mutable.setOpType(OpTypeEnum::kInsert);
