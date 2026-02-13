@@ -674,6 +674,15 @@ Status _parseQueryStatsAndReturnEmptyResult(
                     4,
                     "Skipping query stats due to NamespaceNotFound",
                     "status"_attr = ex.toStatus());
+    } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
+        // Ignore IFRFlagRetry errors. Since we're on the path to return an empty result, there's no
+        // need to retry with IFR flags disabled and collect query stats. Can just return an empty
+        // result.
+        LOGV2_DEBUG(11943600,
+                    4,
+                    "Skipping query stats due to IFRFlagRetry when parsing and attempting to "
+                    "return empty result",
+                    "status"_attr = ex.toStatus());
     }
 
     // If validation is ok, just return empty result
