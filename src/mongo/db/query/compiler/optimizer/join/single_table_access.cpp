@@ -105,10 +105,23 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         }();
         MultipleCollectionAccessor singleMca{singleAcq};
 
+        const auto& qkc = node.accessPath->getExpCtx()->getQueryKnobConfiguration();
+        size_t options = QueryPlannerParams::DEFAULT;
+        // Note this is a different default from the classic 'find()' codepath. This is done to
+        // prevent the optimizer from choosing unselective index scans which perform a lot of random
+        // IO when a collection scan is better. The impact of this can be multiplied in join plans
+        // as the inner side may be executed multiple times.
+        // TODO SERVER-13065: Update this comment once 'find()' consider collection scans in the
+        // presence of indexes.
+        if (qkc.getInternalJoinEnumerateCollScanPlans()) {
+            options |= QueryPlannerParams::INCLUDE_COLLSCAN;
+        }
+
         QueryPlannerParams params(QueryPlannerParams::ArgsForSingleCollectionQuery{
             .opCtx = opCtx,
             .canonicalQuery = *node.accessPath,
             .collections = singleMca,
+            .plannerOptions = options,
             .cbrEnabled = true,
             .planRankerMode = QueryPlanRankerModeEnum::kSamplingCE,
         });

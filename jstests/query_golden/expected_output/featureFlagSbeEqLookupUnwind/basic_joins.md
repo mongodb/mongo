@@ -109,18 +109,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With bottom-up plan enumeration (right-deep)
 usedJoinOptimization: true
@@ -133,18 +124,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With bottom-up plan enumeration (zig-zag)
 usedJoinOptimization: true
@@ -157,18 +139,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With random order, seed 44, nested loop joins
 usedJoinOptimization: true
@@ -178,18 +151,9 @@ NESTED_LOOP_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
-  |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |  |
-  |  IXSCAN [test.basic_joins_md_foreign1]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   |  direction: "forward"
-  |  indexBounds: { "_id" : [ "(0.0, inf]" ] }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -202,18 +166,9 @@ HASH_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
-  |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |  |
-  |  IXSCAN [test.basic_joins_md_foreign1]
-  |  keyPattern: { "_id" : 1 }
-  |  indexName: "_id_"
-  |  isMultiKey: false
-  |  isUnique: true
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   |  direction: "forward"
-  |  indexBounds: { "_id" : [ "(0.0, inf]" ] }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -229,18 +184,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With random order, seed 45, hash join enabled
 usedJoinOptimization: true
@@ -253,18 +199,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With fixed order, index join
 usedJoinOptimization: true
@@ -277,18 +214,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -301,18 +229,9 @@ rightEmbeddingField: "none"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign1]
-  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } } ] }
-  |
-  IXSCAN [test.basic_joins_md_foreign1]
-  keyPattern: { "_id" : 1 }
-  indexName: "_id_"
-  isMultiKey: false
-  isUnique: true
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$lt" : 3 } }, { "_id" : { "$gt" : 0 } } ] }
   direction: "forward"
-  indexBounds: { "_id" : [ "(0.0, inf]" ] }
 ```
 ## 2. Basic example with two joins
 ### No join opt
@@ -1273,19 +1192,9 @@ rightEmbeddingField: "x"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign2]
-  
-  |
-  IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
-  indexName: "b_1"
-  isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
-  isUnique: false
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "b" : { "$gt" : "aaa" } }
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -1295,19 +1204,9 @@ HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
-  |  
-  |  |
-  |  IXSCAN [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  multiKeyPaths: { "b" : [ ] }
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "b" : { "$gt" : "aaa" } }
   |  direction: "forward"
-  |  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "x"
@@ -1630,19 +1529,9 @@ rightEmbeddingField: "x"
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign2]
-  
-  |
-  IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
-  indexName: "b_1"
-  isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
-  isUnique: false
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "b" : { "$gt" : "aaa" } }
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -1652,19 +1541,9 @@ HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
-  |  
-  |  |
-  |  IXSCAN [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  multiKeyPaths: { "b" : [ ] }
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "b" : { "$gt" : "aaa" } }
   |  direction: "forward"
-  |  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
   |
   HASH_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "x"
@@ -2054,38 +1933,21 @@ rightEmbeddingField: "x"
   |  filter: { "a" : { "$gt" : 1 } }
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign2]
-  
-  |
-  IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
-  indexName: "b_1"
-  isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
-  isUnique: false
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "b" : { "$gt" : "aaa" } }
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
 
 ```
-INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b = b]
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
+  |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
@@ -2427,38 +2289,21 @@ rightEmbeddingField: "x"
   |  filter: { "a" : { "$gt" : 1 } }
   |  direction: "forward"
   |
-  FETCH [test.basic_joins_md_foreign2]
-  
-  |
-  IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
-  indexName: "b_1"
-  isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
-  isUnique: false
-  isSparse: false
-  isPartial: false
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "b" : { "$gt" : "aaa" } }
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
 
 ```
-INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b = b]
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
-  |  FETCH [test.basic_joins_md_foreign2]
+  |  COLLSCAN [test.basic_joins_md_foreign2]
   |  filter: { "b" : { "$gt" : "aaa" } }
-  |  |
-  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
-  |  indexName: "b_1"
-  |  isMultiKey: false
-  |  isUnique: false
-  |  isSparse: false
-  |  isPartial: false
+  |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"

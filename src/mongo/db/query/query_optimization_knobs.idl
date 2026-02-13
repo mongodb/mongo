@@ -794,6 +794,16 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalJoinEnumerateCollScanPlans:
+        description:
+            For queries running through join optimization, control whether collection scans are enumerated
+            as potential plans for single table plan fragments.
+        set_at: [startup, runtime]
+        cpp_varname: "internalJoinEnumerateCollScanPlans"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
     internalQueryNumWorksPerPlanForMPEstimation:
         description: >-
             Number of works per plan that the cost-based plan ranker choice should do to evaluate
