@@ -878,6 +878,7 @@ Status runAggregateImpl(OperationContext* opCtx,
             // extract accurate bounds.
             auto bounds = extractDocsNeededBounds(*pipeline.get());
             auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(pipeline->peekFront());
+            tassert(11798700, "Expected DocumentSourceSearch at pipeline front", searchStage);
             searchStage->setDocsNeededBounds(bounds);
         }
         return {std::move(pipeline), pipelineCtx};
