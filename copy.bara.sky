@@ -29,6 +29,7 @@ def make_workflow(workflow_name, destination_url, branch):
             ".cursor/**",
             "AGENTS.md",
             ".github/CODEOWNERS",
+            "monguard/**",
         ]),
         authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
         mode = "ITERATIVE",

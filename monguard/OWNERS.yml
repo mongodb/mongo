@@ -1,0 +1,6 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/devprod-build
+      - 10gen/devprod-correctness
