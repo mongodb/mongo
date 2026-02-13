@@ -2128,13 +2128,13 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
     // OplogSlotReserver.
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
 
-    // Batched writes do not violate the multiple timestamp constraint because they do not
-    // replicate over multiple applyOps oplog entries or write pre/post images to the
-    // image collection. However, multi-doc transactions may be replicated as a chain of
-    // applyOps oplog entries in addition to potentially writing to the image collection.
-    // Therefore, there are cases where the multiple timestamp constraint has to be relaxed
-    // in order to replicate multi-doc transactions.
-    // See onTransactionPrepare() and onUnpreparedTransactionCommit().
+    // Multi-doc transactions may be replicated as a chain of applyOps oplog entries in addition to
+    // potentially writing to the image collection. Therefore, there are cases where the multiple
+    // timestamp constraint has to be relaxed in order to replicate multi-doc transactions. See
+    // onTransactionPrepare() and onUnpreparedTransactionCommit().
+    // Batched writes may also relax the multiple timestamp constraint to be replicated as a chain
+    // of applyOps oplog entries. But writing pre/post images to the image collection is not
+    // supported as the config.image_collection only supports storing one image per retryable write.
     invariant(applyOpsOplogSlotAndOperationAssignment.numOperationsWithNeedsRetryImage == 0,
               "batched writes must not contain pre/post images to store in image collection");
 
