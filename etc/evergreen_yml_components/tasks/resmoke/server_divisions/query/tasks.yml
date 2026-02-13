@@ -2758,6 +2758,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           resmoke_jobs_max: 5
+          num_tasks: 10
 
   - <<: *gen_task_template
     name: query_join_optimization_no_passthrough_with_mongod_gen
