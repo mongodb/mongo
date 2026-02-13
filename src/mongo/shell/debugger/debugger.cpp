@@ -40,10 +40,16 @@
 namespace mongo {
 namespace mozjs {
 
-
+// Execution state
 static AtomicWord<bool> _paused{false};
 static std::string _pausedScript;
 static int _pausedLine{0};
+
+// Evaluation state for debugger REPL
+std::string _pendingEval;
+std::string _evalResult;
+AtomicWord<bool> _hasEvalRequest{false};
+AtomicWord<bool> _evalComplete{false};
 
 DebuggerObject::DebuggerObject(JSContext* cx, JS::HandleObject debugger)
     : _cx(cx), _debugger(cx, debugger) {}
@@ -110,24 +116,82 @@ bool DebuggerObject::isPausedCallback(JSContext* cx, unsigned argc, JS::Value* v
     return true;  // this is independent of the JS return value
 };
 
+/**
+ * Check if there's a pending evaluation request from stdin thread.
+ */
+bool DebuggerObject::hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    args.rval().setBoolean(_hasEvalRequest.load());
+    return true;
+}
+
+/**
+ * Get and clear the pending evaluation request.
+ */
+bool DebuggerObject::getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    std::string cmd = _pendingEval;
+    _hasEvalRequest.store(false);
+
+    JS::RootedString cmdStr(cx, JS_NewStringCopyZ(cx, cmd.c_str()));
+    args.rval().setString(cmdStr);
+    return true;
+}
+
+/**
+ * Store the stringified result of the frame.eval
+ */
+bool DebuggerObject::storeEvalResult(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    if (argc < 1 || !args[0].isString()) {
+        args.rval().setString(
+            JS_NewStringCopyZ(cx, "ERROR: storeEvalResult requires a string argument"));
+        return true;
+    }
+
+    JS::RootedString returnStr(cx, args[0].toString());
+    JS::UniqueChars returnChars = JS_EncodeStringToUTF8(cx, returnStr);
+    _evalResult = returnChars ? std::string(returnChars.get()) : "[Failed to convert]";
+
+    _evalComplete.store(true);
+
+    return true;
+}
+
 Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& global) {
     Status status = Status::OK();
-    if (!(status = registerNativeFunction(_cx,
-                                          global,
-                                          "__onDebuggerStatementCallback",
-                                          DebuggerObject::onDebuggerStatementCallback,
-                                          1))
+
+    if (!(status = registerNativeFunction(
+              _cx, global, "__onDebuggerStatement", DebuggerObject::onDebuggerStatementCallback, 1))
              .isOK()) {
         return status;
     }
 
     if (!(status = registerNativeFunction(
-              _cx, global, "__isPaused", DebuggerObject::isPausedCallback, 1))
+              _cx, global, "__isPaused", DebuggerObject::isPausedCallback, 0))
+             .isOK()) {
+        return status;
+    }
+    if (!(status = registerNativeFunction(
+              _cx, global, "__storeEvalResult", DebuggerObject::storeEvalResult, 1))
+             .isOK()) {
+        return status;
+    }
+    if (!(status = registerNativeFunction(
+              _cx, global, "__hasEvalRequest", DebuggerObject::hasEvalRequest, 0))
+             .isOK()) {
+        return status;
+    }
+    if (!(status = registerNativeFunction(
+              _cx, global, "__getEvalRequest", DebuggerObject::getEvalRequest, 0))
              .isOK()) {
         return status;
     }
 
-
+    // Doing more work here in JS makes for 10x fewer LOC in C++
     const char* hookCode = R"HOOK(
             (function(frame) {
                 // Store location info so C++ can access it
@@ -137,9 +201,45 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
                 };
                 
                 // invoke the C++ callback
-                globalThis.__onDebuggerStatementCallback(frame);
+                globalThis.__onDebuggerStatement(frame);
+
+                // Spin-wait until the paused flag is cleared
+                // This blocks JavaScript execution in this frame
                 while (globalThis.__isPaused()) {
-                    // wait
+
+                    // Check for pending evaluation requests
+                    if (globalThis.__hasEvalRequest()) {
+                        // Get the expression to evaluate
+                        const expr = globalThis.__getEvalRequest();
+
+                        // Wrap the expression to format the result with tojson in the debuggee context
+                        const wrappedExpr = `\
+                            (function() {
+                                try {
+                                    const __result = (${expr});
+                                    return tojson(__result);
+                                } catch (e) {
+                                    // eg. reference errors, assertion failures
+                                    return e.name + ": " + e.message;
+                                }
+                            })()`;
+                        // Evaluate in the context of the current frame
+                        let result = "";
+                        try {
+                            output = frame.eval(wrappedExpr);
+                            if (output.return) {
+                                result = output.return;
+                            } else if (output.throw) {
+                                // eg, syntax error in eval'ed string
+                                const e = output.throw.unsafeDereference(); // unwrap Debugger.Object
+                                result = e.name + ": " + e.message;
+                            }
+                        } catch (e) {
+                            // something really unexpected happened, but avoid a crash
+                            result = e.name + ": " + e.message;
+                        }
+                        globalThis.__storeEvalResult(result);
+                    }
                 }
 
                 return undefined;
@@ -245,7 +345,6 @@ int DebuggerFrame::getLineNumber() {
     return 0;
 }
 
-
 std::unique_ptr<std::thread> _stdinThread;
 
 void DebuggerGlobal::handleStdinThread() {
@@ -289,13 +388,34 @@ void DebuggerGlobal::handleStdinThread() {
                 fprintf(tty_out, "JSDEBUG> Continuing execution...\n");
                 fflush(tty_out);
                 _paused.store(false);
+            } else if (!command.empty()) {
+                // Command to be evaluated in the frame
+                _pendingEval = command;
+                _evalComplete.store(false);
+                _hasEvalRequest.store(true);
+
+                // Wait for the evaluation to complete (with timeout)
+                auto delay = std::chrono::milliseconds(100);
+                int retries = 100;  // total 10 secs
+                while (!_evalComplete.load() && retries > 0) {
+                    std::this_thread::sleep_for(delay);
+                    retries--;
+                }
+
+                if (_evalComplete.load()) {
+                    fprintf(tty_out, "%s\n", _evalResult.c_str());
+                    fflush(tty_out);
+                } else {
+                    fprintf(tty_out, "ERROR: Evaluation timed out\n");
+                    fflush(tty_out);
+                    _hasEvalRequest.store(false);
+                }
             }
         } else {
             // Not paused, sleep a bit to avoid spinning
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
     }
-
 
     fclose(tty_in);
     fclose(tty_out);

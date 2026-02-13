@@ -58,6 +58,9 @@ class DebuggerObject {
     static bool onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool isPausedCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool storeEvalResult(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
 
     // Helper: Register a native function in the debugger compartment.
     Status registerNativeFunction(
