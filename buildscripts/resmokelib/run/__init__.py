@@ -1874,6 +1874,13 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--shellJSDebugMode",
+            dest="shell_jsdebugmode",
+            action="store_true",
+            help="Enable JavaScript debugger for spawned mongo shells.",
+        )
+
+        parser.add_argument(
             "--noValidateSelectorPaths",
             dest="validate_selector_paths",
             action="store_false",

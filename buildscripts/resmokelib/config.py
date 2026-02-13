@@ -219,6 +219,8 @@ DEFAULTS = {
     "no_hooks": False,
     # Avoids performing signature verification on test extensions at load time.
     "skip_extensions_signature_verification": False,
+    # Enable shell JS debugging
+    "shell_jsdebugmode": False,
 }
 
 _SuiteOptions = collections.namedtuple(
@@ -738,6 +740,9 @@ SHARD_INDEX = None
 
 # JSON containing historic test runtimes
 HISTORIC_TEST_RUNTIMES = None
+
+# Shell debug options
+SHELL_JSDEBUGMODE = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

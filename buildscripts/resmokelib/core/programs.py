@@ -547,6 +547,10 @@ def mongo_shell_program(
     if config.SHELL_GRPC or mongod_set_parameters.get("useGrpcForSearch"):
         args.append("--gRPC")
 
+    if config.SHELL_JSDEBUGMODE:
+        # relay to the shell flags
+        kwargs["jsDebugMode"] = ""
+
     if connection_string is not None:
         # The --host and --port options are ignored by the mongo shell when an explicit connection
         # string is specified. We remove these options to avoid any ambiguity with what server the
