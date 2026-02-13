@@ -710,6 +710,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_blocked_disagg_next_checkpoint;
     int64_t cache_eviction_deepen;
     int64_t cache_write_hs;
+    int64_t eviction_pages_remaining_in_queue;
     int64_t eviction_consider_prefetch;
     int64_t cache_pages_inuse;
     int64_t cache_pages_inuse_ingest;
@@ -1221,6 +1222,7 @@ struct __wt_connection_stats {
     int64_t rec_page_mods_gt500;
     int64_t rec_hs_wrapup_next_prev_calls;
     int64_t rec_page_delete_fast;
+    int64_t rec_free_page_id_due_to_failed_replacement_reconciliation;
     int64_t rec_page_full_image_internal;
     int64_t rec_page_full_image_leaf;
     int64_t rec_page_delta_internal_key_deleted;
@@ -1719,6 +1721,7 @@ struct __wt_dsrc_stats {
     int64_t rec_hs_wrapup_next_prev_calls;
     int64_t rec_dictionary;
     int64_t rec_page_delete_fast;
+    int64_t rec_free_page_id_due_to_failed_replacement_reconciliation;
     int64_t rec_page_full_image_internal;
     int64_t rec_page_full_image_leaf;
     int64_t rec_page_delta_internal_key_deleted;

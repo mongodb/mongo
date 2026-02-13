@@ -332,7 +332,7 @@ real_checkpointer(THREAD_DATA *td)
 
         /* Verify the checkpoint we just wrote. */
         /* FIXME-WT-15357 Disagg: Implement checkpoint cursors */
-        if (!g.opts.disagg_storage) {
+        if (!g.opts.disagg.is_enabled) {
             if ((ret = verify_consistency(session, WT_TS_NONE, true)) != 0)
                 return (log_print_err("verify_consistency (checkpoint)", ret, 1));
         }
@@ -676,7 +676,7 @@ diagnose_key_error(WT_CURSOR *cursor1, int index1, WT_CURSOR *cursor2, int index
     memset(ckpt, 0, sizeof(ckpt));
 
     /* FIXME-WT-15357: Checkpoint cursors are not compatible with disagg for now. */
-    if (!g.opts.disagg_storage)
+    if (!g.opts.disagg.is_enabled)
         testutil_snprintf(ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name);
     else
         testutil_snprintf(ckpt, sizeof(ckpt), "%s", "");

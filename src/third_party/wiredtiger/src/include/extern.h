@@ -539,9 +539,21 @@ extern int __wt_debug_addr(WT_SESSION_IMPL *session, const uint8_t *addr, size_t
   const char *ofile) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_addr_print(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_btree_cursor_page(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_btree_cursor_tree_hs(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_cursor_page(void *cursor_arg, const char *ofile) WT_GCC_FUNC_DECL_ATTRIBUTE(
   (visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_layered_cursor_page(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_layered_cursor_tree_hs(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_offset(WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size,
@@ -2487,8 +2499,6 @@ static WT_INLINE void __wt_txn_err_set(WT_SESSION_IMPL *session, int ret);
 static WT_INLINE void __wt_txn_op_delete_apply_prepare_state(
   WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit);
 static WT_INLINE void __wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno);
-static WT_INLINE void __wt_txn_pinned_stable_timestamp(
-  WT_SESSION_IMPL *session, wt_timestamp_t *pinned_stable_tsp);
 static WT_INLINE void __wt_txn_pinned_timestamp(
   WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp);
 static WT_INLINE void __wt_txn_read_last(WT_SESSION_IMPL *session);
@@ -2496,6 +2506,8 @@ static WT_INLINE void __wt_txn_unmodify(WT_SESSION_IMPL *session);
 static WT_INLINE void __wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd);
 static WT_INLINE void __wt_upd_value_clear(WT_UPDATE_VALUE *upd_value);
 static WT_INLINE void __wt_usec_to_timespec(time_t usec, struct timespec *tsp);
+static WT_INLINE wt_timestamp_t __wt_txn_pinned_stable_timestamp(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_get_page_modify_ta(WT_SESSION_IMPL *session, WT_PAGE *page,
   WT_TIME_AGGREGATE **ta) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 

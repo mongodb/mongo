@@ -2052,14 +2052,15 @@ tasks:
         vars:
           directory: test/huge
 
-  - name: manydbs-test
-    tags: ["pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "make check directory"
-        vars:
-          directory: test/manydbs
+  # FIXME-WT-16548: Re-enable the test.
+  # - name: manydbs-test
+  #   tags: ["pull_request"]
+  #   commands:
+  #     - func: "get project"
+  #     - func: "compile wiredtiger"
+  #     - func: "make check directory"
+  #       vars:
+  #         directory: test/manydbs
 
   - name: packing-test
     tags: ["pull_request"]
@@ -2564,7 +2565,8 @@ tasks:
           unit_test_ignore: test/suite/hook_disagg.fail
           # The timeout for this command is on a test file basis. Make the timeouts long,
           # as there are a few files that contain a large number of slower tests.
-          unit_test_args: -v 2 --timeout 1800 --extra-long --hook "disagg=(role=leader)"
+          # FIXME-WT-16228: decrease the timeout when the performance of the disagg leader tests is improved.
+          unit_test_args: -v 2 --timeout 3600 --extra-long --hook "disagg=(role=leader)"
 
   # FIXME-WT-15652 Remove PALM tests when PALite is fully validated.
   # Run the tests with PALM for comparison with PALite to catch discrepancies.
@@ -4362,21 +4364,22 @@ tasks:
       # Run the long version of make check, that includes the full csuite tests
       - func: "make check all"
 
-      # Many dbs test - Run with:
-      # 1.  The defaults
-      - func: "many dbs test"
-      # 2.  Set idle flag to turn off operations.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -I
-      # 3.  More dbs.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -D 40
-      # 4.  With idle flag and more dbs.
-      - func: "many dbs test"
-        vars:
-          many_db_args: -I -D 40
+      # FIXME-WT-16548: Re-enable all the scenarios below for many dbs test.
+      # # Many dbs test - Run with:
+      # # 1.  The defaults
+      # - func: "many dbs test"
+      # # 2.  Set idle flag to turn off operations.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -I
+      # # 3.  More dbs.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -D 40
+      # # 4.  With idle flag and more dbs.
+      # - func: "many dbs test"
+      #   vars:
+      #     many_db_args: -I -D 40
 
       # extended test/thread runs
       - func: "thread test"

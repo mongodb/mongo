@@ -396,6 +396,7 @@ conn_stats = [
     EvictStat('eviction_pages_queued_post_lru', 'pages queued for eviction post lru sorting'),
     EvictStat('eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
     EvictStat('eviction_pages_queued_urgent_hs_dirty', 'pages queued for urgent eviction from history store due to high dirty content'),
+    EvictStat('eviction_pages_remaining_in_queue', 'pages already in queue when topping up'),
     EvictStat('eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     EvictStat('eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     EvictStat('eviction_reentry_hs_eviction_milliseconds', 'total milliseconds spent inside reentrant history store evictions in a reconciliation', 'no_clear,no_scale,size'),
@@ -1365,6 +1366,7 @@ conn_dsrc_stats = [
     ##########################################
     RecStat('rec_average_internal_page_delta_chain_length', 'average length of delta chain on internal page with deltas'),
     RecStat('rec_average_leaf_page_delta_chain_length', 'average length of delta chain on leaf page with deltas'),
+    RecStat('rec_free_page_id_due_to_failed_replacement_reconciliation', 'free page ID due to failed page replacement reconciliation in disagg'),
     RecStat('rec_hs_wrapup_next_prev_calls', 'cursor next/prev calls during HS wrapup search_near'),
     RecStat('rec_ingest_garbage_collection_keys_disk_image', 'number of keys that are garbage collected form the disk images in the ingest btrees for disaggregated storage'),
     RecStat('rec_ingest_garbage_collection_keys_update_chain', 'number of keys that are garbage collected form the update chains in the ingest btrees for disaggregated storage'),

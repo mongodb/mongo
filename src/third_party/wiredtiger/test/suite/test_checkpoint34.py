@@ -36,8 +36,8 @@ from helper import simulate_crash_restart
 #
 # Test precise checkpoint with fast truncate
 # FIXME-WT-15430: Re-enable once disaggregated storage works with fast truncate tests.
-@wttest.skip_for_hook("disagg", "fast truncate is not supported yet")
-@wttest.skip_for_hook("tiered", "FIXME-WT-14937: this is crashing for disagg.")
+@wttest.skip_for_hook("disagg", "FIXME-WT-15430: fast truncate is not supported for disagg yet")
+@wttest.skip_for_hook("tiered", "fast truncate is not supported for tiered yet")
 class test_checkpoint34(wttest.WiredTigerTestCase):
 
     format_values = [

@@ -30,9 +30,9 @@
 
 #include <map>
 #include <memory>
-#include <shared_mutex>
 #include <ostream>
 #include <set>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 extern "C" {
@@ -244,6 +244,8 @@ struct ContextInternal {
     tint_t _dyn_tint_last;
     // This mutex should be used to protect the access to the dynamic tables set.
     std::shared_mutex* _dyn_mutex;
+    // This mutex should be used to protect setting the global timestamps.
+    std::shared_mutex* _ts_mutex;
     // unique id per context, to work with multiple contexts, starts at 1.
     uint32_t _context_count;
 

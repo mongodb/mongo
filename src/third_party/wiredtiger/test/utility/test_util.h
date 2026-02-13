@@ -109,13 +109,9 @@ typedef struct {
     const char *argv0; /* Exec name */
     char usage[512];   /* Usage string for this parser */
 
-    const char *progname; /* Truncated program name */
-    char *build_dir;      /* Build directory path */
-    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
-    const char *disagg_mode;          /* Disaggregated storage mode */
-    const char *disagg_page_log;      /* Page and log service for disaggregated storage */
-    const char *disagg_page_log_home; /* Page and log service home dir for disaggregated storage */
-    char *tiered_storage_source;      /* Tiered storage source */
+    const char *progname;        /* Truncated program name */
+    char *build_dir;             /* Build directory path */
+    char *tiered_storage_source; /* Tiered storage source */
 
     enum {
         TABLE_NOT_SET = 0, /* Not explicitly set */
@@ -131,41 +127,47 @@ typedef struct {
     uint64_t data_seed;      /* Random seed for data ops */
     uint64_t extra_seed;     /* Random seed for extra ops */
 
-    uint64_t delay_ms;         /* Average length of delay when simulated */
-    uint64_t error_ms;         /* Average length of delay when simulated */
-    uint64_t force_delay;      /* Force a simulated network delay every N operations */
-    uint64_t force_error;      /* Force a simulated network error every N operations */
-    uint32_t local_retention;  /* Local retention for tiered storage */
-    uint64_t palm_map_size_mb; /* Megabytes of map size for PALM database */
-    uint32_t page_log_verbose; /* Page log verbosity; see WT_VERBOSE_LEVEL */
+    uint64_t delay_ms;        /* Average length of delay when simulated */
+    uint64_t error_ms;        /* Average length of delay when simulated */
+    uint64_t force_delay;     /* Force a simulated network delay every N operations */
+    uint64_t force_error;     /* Force a simulated network error every N operations */
+    uint32_t local_retention; /* Local retention for tiered storage */
 
-    bool internal_page_delta; /* Use internal page deltas */
-    bool leaf_page_delta;     /* Use leaf page deltas */
-
-    bool absolute_bucket_dir; /* Use an absolute bucket path when it is a directory */
-    bool compat;              /* Compatibility */
-    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
-    bool disagg_storage;      /* Uses disaggregated storage */
-    bool disagg_key_provider; /* Uses key provider testing module for disaggregated storage */
-    bool disagg_switch_mode;  /* Switching disaggregated storage mode during the test */
-    bool do_data_ops;         /* Have schema ops use data */
-    bool inmem;               /* In-memory */
-    bool make_bucket_dir;     /* Create bucket when it is a directory */
-    bool preserve;            /* Don't remove files on exit */
-    bool tiered_begun;        /* Tiered storage ready */
-    bool tiered_storage;      /* Configure tiered storage */
-    bool verbose;             /* Run in verbose mode */
-    /* FIXME-WT-16543 Create a struct for disagg options in TEST_OPTS */
-    uint64_t disagg_drain_threads; /* Number of drain threads for disaggregated storage*/
-    uint64_t nrecords;             /* Number of records */
-    uint64_t nops;                 /* Number of operations */
-    uint64_t nthreads;             /* Number of threads */
-    uint64_t n_append_threads;     /* Number of append threads */
-    uint64_t n_read_threads;       /* Number of read threads */
-    uint64_t n_write_threads;      /* Number of write threads */
+    bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
+    bool compat;               /* Compatibility */
+    bool do_data_ops;          /* Have schema ops use data */
+    bool inmem;                /* In-memory */
+    bool make_bucket_dir;      /* Create bucket when it is a directory */
+    bool preserve;             /* Don't remove files on exit */
+    bool tiered_begun;         /* Tiered storage ready */
+    bool tiered_storage;       /* Configure tiered storage */
+    bool verbose;              /* Run in verbose mode */
+    uint64_t nrecords;         /* Number of records */
+    uint64_t nops;             /* Number of operations */
+    uint64_t nthreads;         /* Number of threads */
+    uint64_t n_append_threads; /* Number of append threads */
+    uint64_t n_read_threads;   /* Number of read threads */
+    uint64_t n_write_threads;  /* Number of write threads */
 
     uint64_t tiered_flush_interval_us; /* Microseconds between flush_tier calls */
     uint64_t tiered_flush_next_us;     /* Next tiered flush in epoch microseconds */
+
+    /* Fields used for testing disaggregated storage. */
+    struct {
+        bool is_enabled;          /* Uses disaggregated storage */
+        bool key_provider;        /* Uses key provider testing module for disaggregated storage */
+        bool switch_mode;         /* Switching disaggregated storage mode during the test */
+        bool internal_page_delta; /* Use internal page deltas */
+        bool leaf_page_delta;     /* Use leaf page deltas */
+
+        const char *mode;          /* Disaggregated storage mode */
+        const char *page_log;      /* Page and log service for disaggregated storage */
+        const char *page_log_home; /* Page and log service home dir for disaggregated storage */
+
+        uint64_t drain_threads;        /* Number of drain threads for disaggregated storage*/
+        uint64_t page_log_map_size_mb; /* Megabytes of map size for PALM database */
+        uint32_t page_log_verbose;     /* Page log verbosity; see WT_VERBOSE_LEVEL */
+    } disagg;
 
     /*
      * Fields commonly shared within a test program. The test cleanup function will attempt to

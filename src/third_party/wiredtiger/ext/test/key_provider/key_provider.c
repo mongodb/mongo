@@ -198,7 +198,7 @@ kp_key_expired(KEY_PROVIDER *kp)
     }
 
     const uint64_t now = kp_timestamp();
-    double elapsed_usec = CLOCK_USECS(now - kp->state.key_time);
+    const uint64_t elapsed_usec = CLOCK_USECS(now - kp->state.key_time);
     return (elapsed_usec >= kp->key_expires * USEC_PER_SEC);
 }
 

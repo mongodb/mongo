@@ -263,7 +263,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
         /* Add in history store reconciliation for standard files. */
         rec_flags = WT_REC_CHECKPOINT;
-        if (!is_hs && !WT_IS_METADATA(btree->dhandle))
+        if (!is_hs && !WT_IS_METADATA(btree->dhandle) && !WT_IS_DISAGG_META(btree->dhandle))
             rec_flags |= WT_REC_HS;
 
         /* Write all dirty in-cache pages. */

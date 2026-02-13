@@ -1556,3 +1556,54 @@ err:
     }
     return (ret);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+
+typedef int (*fn_debug_cursor)(void *, const char *);
+
+/*
+ * __cursor_debug_dispatch --
+ *     Dispatch a debug operation based on the cursor type.
+ */
+static int
+__cursor_debug_dispatch(void *cursor_arg, const char *ofile, fn_debug_cursor fn_btree,
+  fn_debug_cursor fn_layered) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    const WT_CURSOR *cursor = (const WT_CURSOR *)cursor_arg;
+
+    if (WT_PREFIX_MATCH(cursor->uri, "file:"))
+        WT_RET(fn_btree(cursor_arg, ofile));
+    else if (WT_PREFIX_MATCH(cursor->uri, "table:"))
+        WT_RET(fn_layered(cursor_arg, ofile));
+    else
+        __wt_verbose_debug1(CUR2S(cursor), WT_VERB_DEFAULT,
+          "%s: unsupported cursor type for debug dump", cursor->uri);
+
+    return (0);
+}
+
+/*
+ * __wt_debug_cursor_page --
+ *     Dump the in-memory information for a cursor-referenced page.
+ */
+int
+__wt_debug_cursor_page(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    return (__cursor_debug_dispatch(
+      cursor_arg, ofile, __wt_debug_btree_cursor_page, __wt_debug_layered_cursor_page));
+}
+
+/*
+ * __wt_debug_cursor_tree_hs --
+ *     Dump the history store tree given a user cursor.
+ */
+int
+__wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    return (__cursor_debug_dispatch(
+      cursor_arg, ofile, __wt_debug_btree_cursor_tree_hs, __wt_debug_layered_cursor_tree_hs));
+}
+
+#endif /* HAVE_DIAGNOSTIC */

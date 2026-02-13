@@ -1555,6 +1555,78 @@ __clayered_put(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_I
 }
 
 /*
+ * __clayered_remove_follower --
+ *     Remove an entry from the ingest table.
+ */
+static WT_INLINE int
+__clayered_remove_follower(
+  WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_ITEM *key, bool positioned)
+{
+    WT_CURSOR *const c = clayered->ingest_cursor;
+
+    if (positioned) {
+        if (clayered->current_cursor == c) {
+            WT_ITEM value;
+
+            WT_ASSERT(session, F_ISSET(c, WT_CURSTD_KEY_INT));
+            /*
+             * If we are erasing a record that is already a tombstone, don't write another one: we
+             * don't ever want consecutive tombstones on an update chain.
+             */
+            WT_RET(c->get_value(c, &value));
+            if (__wt_clayered_deleted(&value))
+                return (WT_NOTFOUND);
+        }
+    } else
+        WT_ASSERT(session, F_ISSET(&clayered->iface, WT_CURSTD_KEY_EXT));
+
+    /* If we are positioned on the stable table, we need to set the key. */
+    if (clayered->current_cursor != c) {
+        /*
+         * Clear the existing cursor position. Don't clear the primary cursor: we're about to use it
+         * anyway. No need to do another search if we are already positioned.
+         */
+        WT_RET(__clayered_reset_cursors(clayered, true));
+        c->set_key(c, key);
+    }
+
+    c->set_value(c, &__wt_tombstone);
+    WT_RET(c->update(c));
+    clayered->current_cursor = c;
+
+    return (0);
+}
+
+/*
+ * __clayered_remove_leader --
+ *     Remove an entry from the stable table.
+ */
+static WT_INLINE int
+__clayered_remove_leader(
+  WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_ITEM *key, bool positioned)
+{
+    WT_CURSOR *const c = clayered->stable_cursor;
+
+    /* There is no content on the ingest table. We must be positioned on the stable table. */
+    if (!positioned) {
+        /*
+         * Clear the existing cursor position. Don't clear the primary cursor: we're about to use it
+         * anyway. We need the cursor still be positioned after the remove. Don't release the cursor
+         * if that is the case. Remove only retains the cursor position if it is positioned at the
+         * start.
+         */
+        WT_RET(__clayered_reset_cursors(clayered, true));
+        c->set_key(c, key);
+    } else
+        WT_ASSERT(session, F_ISSET(c, WT_CURSTD_KEY_INT));
+
+    WT_RET(c->remove(c));
+    clayered->current_cursor = c;
+
+    return (0);
+}
+
+/*
  * __clayered_remove_int --
  *     Remove an entry from the desired tree.
  */
@@ -1562,41 +1634,9 @@ static WT_INLINE int
 __clayered_remove_int(
   WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_ITEM *key, bool positioned)
 {
-    WT_CURSOR *c;
-
-    if (S2C(session)->layered_table_manager.leader) {
-        c = clayered->stable_cursor;
-        /* There is no content on the ingest table. We must be positioned on the stable table. */
-        if (!positioned) {
-            /*
-             * Clear the existing cursor position. Don't clear the primary cursor: we're about to
-             * use it anyway. We need the cursor still be positioned after the remove. Don't release
-             * the cursor if that is the case. Remove only retains the cursor position if it is
-             * positioned at the start.
-             */
-            WT_RET(__clayered_reset_cursors(clayered, true));
-            c->set_key(c, key);
-        } else
-            WT_ASSERT(session, F_ISSET(c, WT_CURSTD_KEY_INT));
-        WT_RET(c->remove(c));
-    } else {
-        c = clayered->ingest_cursor;
-        /* If we are positioned on the stable table, we need to set the key. */
-        if (!positioned || clayered->current_cursor != c) {
-            /*
-             * Clear the existing cursor position. Don't clear the primary cursor: we're about to
-             * use it anyway. No need to do another search if we are already positioned.
-             */
-            WT_RET(__clayered_reset_cursors(clayered, true));
-            c->set_key(c, key);
-        } else
-            WT_ASSERT(session, F_ISSET(c, WT_CURSTD_KEY_INT));
-        c->set_value(c, &__wt_tombstone);
-        WT_RET(c->update(c));
-    }
-
-    clayered->current_cursor = c;
-    return (0);
+    return (S2C(session)->layered_table_manager.leader ?
+        __clayered_remove_leader(session, clayered, key, positioned) :
+        __clayered_remove_follower(session, clayered, key, positioned));
 }
 
 /*
@@ -1740,7 +1780,6 @@ __clayered_remove(WT_CURSOR *cursor)
 {
     WT_CURSOR_LAYERED *clayered;
     WT_DECL_RET;
-    WT_ITEM value;
     WT_SESSION_IMPL *session;
     bool positioned;
 
@@ -1752,17 +1791,6 @@ __clayered_remove(WT_CURSOR *cursor)
     CURSOR_REMOVE_API_CALL(cursor, session, ret, clayered->dhandle);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
-
-    /*
-     * Remove fails if the key doesn't exist, do a search first. This requires a second pair of
-     * layered enter/leave calls as we search the full stack, but updates are limited to the
-     * top-level.
-     */
-    if (!positioned) {
-        WT_ERR(__clayered_enter(clayered, false, false, false));
-        WT_ERR(__clayered_lookup(session, clayered, &value));
-        __clayered_leave(clayered);
-    }
 
     WT_ERR(__clayered_enter(clayered, false, true, false));
     /*
@@ -2304,4 +2332,38 @@ err:
     }
 
     return (ret);
+}
+
+/*
+ * __wt_debug_layered_cursor_page --
+ *     Dump the in-memory information for a cursor-referenced page.
+ */
+int
+__wt_debug_layered_cursor_page(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    const WT_CURSOR *cursor = (const WT_CURSOR *)cursor_arg;
+    WT_UNUSED(ofile);
+
+    __wt_verbose_debug1(
+      CUR2S(cursor), WT_VERB_DEFAULT, "%s: unsupported cursor type for debug dump", cursor->uri);
+
+    return (0);
+}
+
+/*
+ * __wt_debug_layered_cursor_tree_hs --
+ *     Dump the in-memory information for a cursor-referenced tree's history store page.
+ */
+int
+__wt_debug_layered_cursor_tree_hs(void *cursor_arg, const char *ofile)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    const WT_CURSOR *cursor = (const WT_CURSOR *)cursor_arg;
+    WT_UNUSED(ofile);
+
+    __wt_verbose_debug1(
+      CUR2S(cursor), WT_VERB_DEFAULT, "%s: unsupported cursor type for debug dump", cursor->uri);
+
+    return (0);
 }

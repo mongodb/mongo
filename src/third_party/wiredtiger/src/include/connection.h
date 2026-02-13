@@ -240,7 +240,7 @@ struct __wt_disaggregated_storage {
     WT_PAGE_LOG_HANDLE *page_log_meta;         /* The page log for the metadata. */
     WT_PAGE_LOG_HANDLE *page_log_key_provider; /* The page log for the key provider. */
 
-    wt_shared uint64_t num_meta_put;     /* The number metadata puts since connection open. */
+    uint64_t num_meta_put;               /* The number metadata puts since connection open. */
     uint64_t num_meta_put_at_ckpt_begin; /* The number metadata puts at checkpoint begin. */
                                          /* Updates are protected by the checkpoint lock. */
 

@@ -433,7 +433,7 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
 
     WT_RET(__disagg_put_page(
       session, disagg->page_log_meta, page_id, item, disagg->last_metadata_page_lsn, lsnp));
-    __wt_atomic_add_uint64_v(&disagg->num_meta_put, 1);
+    ++disagg->num_meta_put;
 
     return (0);
 }

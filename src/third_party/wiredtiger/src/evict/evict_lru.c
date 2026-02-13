@@ -1475,8 +1475,10 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
             evict->evict_empty_score =
               WT_MIN(evict->evict_empty_score + WT_EVICT_SCORE_BUMP, WT_EVICT_SCORE_MAX);
         WT_STAT_CONN_INCR(session, eviction_queue_empty);
-    } else
+    } else {
         WT_STAT_CONN_INCR(session, eviction_queue_not_empty);
+        WT_STAT_CONN_INCRV(session, eviction_pages_remaining_in_queue, queue->evict_candidates);
+    }
 
     /*
      * Get some more pages to consider for eviction.
@@ -2139,9 +2141,7 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
                 return (true);
             }
         } else {
-            wt_timestamp_t pinned_stable_ts;
-            __wt_txn_pinned_stable_timestamp(session, &pinned_stable_ts);
-            if (newest_commit_timestamp > pinned_stable_ts) {
+            if (newest_commit_timestamp > __wt_txn_pinned_stable_timestamp(session)) {
                 WT_STAT_CONN_INCR(session, eviction_server_skip_pages_checkpoint_timestamp);
                 return (true);
             }

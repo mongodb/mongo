@@ -67,7 +67,7 @@ class test_bug011(wttest.WiredTigerTestCase):
 
         # Make use of the cache.
         for i in range(0, self.nops):
-            for i in range(0, self.ntables):
-                cursors[i].set_key(ds.key(random.randint(0, self.nrows - 1)))
-                cursors[i].search()
-                cursors[i].reset()
+            for j in range(0, self.ntables):
+                cursors[j].set_key(ds.key(random.randint(0, self.nrows - 1)))
+                cursors[j].search()
+                cursors[j].reset()

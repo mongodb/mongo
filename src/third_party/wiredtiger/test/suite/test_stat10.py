@@ -105,8 +105,7 @@ class test_stat10(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
     def test_tree_stats(self):
-        # FIXME-WT-14937: not working for disagg.
-        self.skipTest("page delta")
+        self.skipTest("FIXME-WT-16633: Re-enable the test once fixed")
         format = "key_format={},value_format={}".format(self.key_format, 'u')
         self.session.create(self.uri, format)
 

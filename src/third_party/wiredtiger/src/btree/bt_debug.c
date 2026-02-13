@@ -998,11 +998,11 @@ err:
 }
 
 /*
- * __wt_debug_cursor_page --
+ * __wt_debug_btree_cursor_page --
  *     Dump the in-memory information for a cursor-referenced page.
  */
 int
-__wt_debug_cursor_page(void *cursor_arg, const char *ofile)
+__wt_debug_btree_cursor_page(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
     WT_CURSOR_BTREE *cbt;
@@ -1034,11 +1034,11 @@ __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
 }
 
 /*
- * __wt_debug_cursor_tree_hs --
+ * __wt_debug_btree_cursor_tree_hs --
  *     Dump the history store tree given a user cursor.
  */
 int
-__wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
+__wt_debug_btree_cursor_tree_hs(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
     WT_BTREE *hs_btree;

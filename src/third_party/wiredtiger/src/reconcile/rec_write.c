@@ -698,7 +698,7 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->rec_start_oldest_id = __wt_txn_oldest_id(session);
 
     if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT))
-        __wt_txn_pinned_stable_timestamp(session, &r->rec_start_pinned_stable_ts);
+        r->rec_start_pinned_stable_ts = __wt_txn_pinned_stable_timestamp(session);
     else
         r->rec_start_pinned_stable_ts = WT_TS_NONE;
 
@@ -3176,8 +3176,10 @@ __rec_write_err(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
      */
     if (page->disagg_info != NULL && r->multi_next == 1 &&
       !F_ISSET(r->multi, WT_MULTI_SKIP_WRITE) &&
-      r->multi->block_meta->page_id == page->disagg_info->block_meta.page_id)
+      r->multi->block_meta->page_id == page->disagg_info->block_meta.page_id) {
         page->disagg_info->block_meta.page_id = WT_BLOCK_INVALID_PAGE_ID;
+        WT_STAT_CONN_DSRC_INCR(session, rec_free_page_id_due_to_failed_replacement_reconciliation);
+    }
 
     WT_TRET(__wti_ovfl_track_wrapup_err(session, page));
 
@@ -3207,11 +3209,14 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
     session->reconcile_stats.hs_wrapup_next_prev_calls = 0;
 
     /*
-     * Sanity check: Can't insert updates into history store from the history store itself or from
-     * the metadata file.
+     * Sanity check: Can't insert updates into history store from the history store itself, the
+     * metadata file, or the disagg shared metadata file.
      */
-    WT_ASSERT_ALWAYS(session, !WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle),
-      "Attempting to write updates from the history store or metadata file into the history store");
+    WT_ASSERT_ALWAYS(session,
+      !WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle) &&
+        !WT_IS_DISAGG_META(btree->dhandle),
+      "Attempting to write updates from the history store, the metadata file, or the disagg shared "
+      "metadata file into the history store");
 
     /*
      * Delete the updates left in the history store by prepared rollback first before moving updates

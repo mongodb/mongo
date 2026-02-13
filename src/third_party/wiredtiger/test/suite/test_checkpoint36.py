@@ -31,7 +31,7 @@ import wttest, wiredtiger
 # test_checkpoint35.py
 #
 # Test precise checkpoint without checkpoint timestamp
-@wttest.skip_for_hook("tiered", "FIXME-WT-14937: this is crashing for disagg.")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint36(wttest.WiredTigerTestCase):
     conn_config = "precise_checkpoint=true"
 

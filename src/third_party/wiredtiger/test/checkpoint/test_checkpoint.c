@@ -125,8 +125,8 @@ main(int argc, char *argv[])
             strncpy(config_open, __wt_optarg, sizeof(config_open) - 1);
             break;
         case 'd': /* disaggregated storage options */
-            g.opts.disagg_storage = true;
-            g.opts.disagg_mode = __wt_optarg;
+            g.opts.disagg.is_enabled = true;
+            g.opts.disagg.mode = __wt_optarg;
             break;
         case 'D':
             g.debug_mode = true;
@@ -254,8 +254,8 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
 
-    if (g.opts.disagg_storage) {
-        if (enable_disagg(g.opts.disagg_mode) != 0)
+    if (g.opts.disagg.is_enabled) {
+        if (enable_disagg(g.opts.disagg.mode) != 0)
             return (usage());
 
         if (!g.use_timestamps) {
@@ -395,28 +395,28 @@ static int
 enable_disagg(const char *mode)
 {
     if (strcmp(mode, "leader") == 0) {
-        g.opts.disagg_switch_mode = false;
-        g.opts.disagg_mode = "leader";
-        g.opts.disagg_page_log = "palite";
+        g.opts.disagg.switch_mode = false;
+        g.opts.disagg.mode = "leader";
+        g.opts.disagg.page_log = "palite";
     } else if (strcmp(mode, "follower") == 0) {
-        g.opts.disagg_mode = "follower";
-        g.opts.disagg_switch_mode = false;
-        g.opts.disagg_page_log = "palite";
+        g.opts.disagg.mode = "follower";
+        g.opts.disagg.switch_mode = false;
+        g.opts.disagg.page_log = "palite";
     } else if (strcmp(mode, "switch") == 0) {
-        g.opts.disagg_switch_mode = true;
+        g.opts.disagg.switch_mode = true;
         /* For switch mode, randomly pick initial role */
         bool disagg_leader = (__wt_random(&g.opts.extra_rnd) % 2) == 0;
-        g.opts.disagg_mode = disagg_leader ? "leader" : "follower";
-        g.opts.disagg_page_log = "palite";
-        printf("Switch mode: starting as %s\n", g.opts.disagg_mode);
+        g.opts.disagg.mode = disagg_leader ? "leader" : "follower";
+        g.opts.disagg.page_log = "palite";
+        printf("Switch mode: starting as %s\n", g.opts.disagg.mode);
     } else {
         fprintf(stderr, "Invalid disaggregated mode: %s\n", mode);
         return EINVAL;
     }
 
-    g.opts.palm_map_size_mb = 2048;               /* Set 2GB map size for palm by default. */
-    g.opts.disagg_page_log_home = (char *)g.home; /* Set home directory for page log. */
-    g.opts.disagg_drain_threads = 8;              /* Set number of drain threads, 8 by default. */
+    g.opts.disagg.page_log_map_size_mb = 2048;    /* Set 2GB map size for palm by default. */
+    g.opts.disagg.page_log_home = (char *)g.home; /* Set home directory for page log. */
+    g.opts.disagg.drain_threads = 8;              /* Set number of drain threads, 8 by default. */
 
     return 0;
 }
@@ -441,7 +441,7 @@ wt_connect(const char *config_open)
      * Randomly decide on the eviction rate (fast or default). For disagg, skip fast eviction, as it
      * can cause cache-stuck scenarios.
      */
-    if ((__wt_random(&g.opts.extra_rnd) % 15) % 2 == 0 && !g.opts.disagg_storage)
+    if ((__wt_random(&g.opts.extra_rnd) % 15) % 2 == 0 && !g.opts.disagg.is_enabled)
         fast_eviction = true;
 
     /* Set up the basic configuration string first. */
@@ -616,10 +616,10 @@ log_print_err_worker(const char *func, int line, const char *m, int e, int fatal
 int
 disagg_switch_roles(void)
 {
-    testutil_assert(g.opts.disagg_storage);
-    testutil_assert(g.opts.disagg_switch_mode);
+    testutil_assert(g.opts.disagg.is_enabled);
+    testutil_assert(g.opts.disagg.switch_mode);
 
-    const char *disagg_role = strcmp(g.opts.disagg_mode, "leader") == 0 ? "follower" : "leader";
+    const char *disagg_role = strcmp(g.opts.disagg.mode, "leader") == 0 ? "follower" : "leader";
     char disagg_cfg[64];
     testutil_snprintf(disagg_cfg, sizeof(disagg_cfg), "disaggregated=(role=\"%s\")", disagg_role);
 

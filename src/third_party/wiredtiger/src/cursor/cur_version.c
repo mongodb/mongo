@@ -295,15 +295,6 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                         WT_ASSERT(session,
                           !__wt_txn_visible_all(session, version_cursor->upd_stop_txnid,
                             version_cursor->upd_durable_stop_ts));
-
-                        /* Ignore the update with the same transaction id and timestamps. */
-                        if (F_ISSET(version_cursor, WT_CURVERSION_TIMESTAMP_ORDER) &&
-                          next_upd->txnid == version_cursor->upd_stop_txnid &&
-                          next_upd->prepare_ts == version_cursor->upd_stop_prepare_ts &&
-                          next_upd->upd_start_ts == version_cursor->upd_stop_ts &&
-                          next_upd->upd_durable_ts == version_cursor->upd_durable_stop_ts)
-                            continue;
-
                         break;
                     }
                 }
@@ -375,12 +366,6 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                           cbt->upd_value->tw.start_ts > version_cursor->upd_stop_ts)
                             goto skip_on_page;
                     }
-
-                    if (cbt->upd_value->tw.start_txn == version_cursor->upd_stop_txnid &&
-                      cbt->upd_value->tw.start_prepare_ts == version_cursor->upd_stop_prepare_ts &&
-                      cbt->upd_value->tw.start_ts == version_cursor->upd_stop_ts &&
-                      cbt->upd_value->tw.durable_start_ts == version_cursor->upd_durable_stop_ts)
-                        goto skip_on_page;
                 }
                 durable_stop_ts = version_cursor->upd_durable_stop_ts;
                 stop_prepare_ts = version_cursor->upd_stop_prepare_ts;
