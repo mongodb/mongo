@@ -74,6 +74,8 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/db/ttl/ttl_gen.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -244,7 +246,22 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
 
 TTLMonitor::TTLMonitor()
     : BackgroundJob(false /* selfDelete */),
-      _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {}
+      _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = "TTLMonitorMetadataRefresh";
+    threadPoolOptions.threadNamePrefix = "TTLMonitorMetadataRefresh-";
+    threadPoolOptions.minThreads = 0;
+    threadPoolOptions.maxThreads = ttlMonitorMaxMetadataRecoveryThreads.load();
+    threadPoolOptions.onCreateThread = [](const std::string& name) {
+        Client::initThread(name, getGlobalServiceContext()->getService());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
+    };
+
+    _metadataRefreshTaskExecutor = executor::ThreadPoolTaskExecutor::create(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface("TTLMonitorMetadataRefreshNetwork"));
+    _metadataRefreshTaskExecutor->startup();
+}
 
 TTLMonitor* TTLMonitor::get(ServiceContext* serviceCtx) {
     return getTTLMonitor(serviceCtx).get();
@@ -346,6 +363,12 @@ void TTLMonitor::shutdown() {
         _shuttingDown = true;
         _notificationCV.notify_all();
     }
+
+    if (_metadataRefreshTaskExecutor) {
+        _metadataRefreshTaskExecutor->shutdown();
+        _metadataRefreshTaskExecutor->join();
+    }
+
     wait();
     LOGV2(3684101, "Finished shutting down TTL collection monitor thread");
 }
@@ -505,31 +528,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         // on the next attempt.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
             staleInfo && !staleInfo->getCriticalSectionSignal()) {
-            auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-            ExecutorFuture<void>(executor)
-                .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
-                    ThreadClient tc("TTLShardVersionRecovery",
-                                    serviceContext->getService(ClusterRole::ShardServer));
-                    auto uniqueOpCtx = tc->makeOperationContext();
-                    auto opCtx = uniqueOpCtx.get();
-
-                    // Updates version in cache in case index version is stale.
-                    if (staleInfo->getVersionWanted()) {
-                        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                            *nss, staleInfo->getVersionWanted());
-                    }
-
-                    FilteringMetadataCache::get(opCtx)
-                        ->onCollectionPlacementVersionMismatch(
-                            opCtx,
-                            *nss,
-                            staleInfo->getVersionWanted()
-                                ? boost::make_optional(
-                                      staleInfo->getVersionWanted()->placementVersion())
-                                : boost::none)
-                        .ignore();
-                })
-                .getAsync([](auto) {});
+            _scheduleMetadataRecovery(opCtx, staleInfo);
         }
         LOGV2_WARNING(6353000,
                       "Error running TTL job on collection: the shard should refresh "
@@ -818,6 +817,45 @@ long long TTLMonitor::getTTLSubPasses_forTest() {
 
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
     return ttlInvalidTTLIndexSkips.get();
+}
+
+void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,
+                                           std::shared_ptr<const StaleConfigInfo> staleInfo) {
+    invariant(staleInfo);
+
+    {
+        stdx::lock_guard lk(_stateMutex);
+        if (!_namespacesRequiringMetadataRefresh.insert(staleInfo->getNss()).second) {
+            // This nss already has a refresh scheduled.
+            return;
+        }
+    }
+
+    ExecutorFuture<void>(_metadataRefreshTaskExecutor)
+        .then([staleInfo] {
+            auto uniqueOpCtx = cc().makeOperationContext();
+            auto opCtx = uniqueOpCtx.get();
+
+            // Updates version in cache in case index version is stale.
+            if (staleInfo->getVersionWanted()) {
+                Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
+                    staleInfo->getNss(), staleInfo->getVersionWanted());
+            }
+
+            FilteringMetadataCache::get(opCtx)
+                ->onCollectionPlacementVersionMismatch(
+                    opCtx,
+                    staleInfo->getNss(),
+                    staleInfo->getVersionWanted()
+                        ? boost::make_optional(staleInfo->getVersionWanted()->placementVersion())
+                        : boost::none)
+                .ignore();
+        })
+        .onCompletion([this, staleInfo](const Status& s) {
+            stdx::lock_guard lk(_stateMutex);
+            _namespacesRequiringMetadataRefresh.erase(staleInfo->getNss());
+        })
+        .getAsync([](auto) {});
 }
 
 }  // namespace mongo
