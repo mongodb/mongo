@@ -115,16 +115,6 @@ void parseAndRegisterUpdateOp(OperationContext* opCtx,
         return;
     }
 
-    // TODO(SERVER-113688): Support recording query stats for pipeline updates containing
-    // $_internalApplyOplogUpdate.
-    if (modType == write_ops::UpdateModification::Type::kPipeline) {
-        if (parsedUpdate.getDriver()
-                ->getUpdateExecutor()
-                ->getCheckExistenceForDiffInsertOperations()) {
-            return;
-        }
-    }
-
     // Compute QueryShapeHash and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::UpdateCmdShape>(
