@@ -118,4 +118,9 @@ std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj
                               : boost::optional<DatabaseVersion>{});
 }
 
+bool isStaleShardingMetadataError(ErrorCodes::Error errorCode) {
+    return errorCode == ErrorCodes::StaleConfig || errorCode == ErrorCodes::StaleDbVersion ||
+        errorCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld;
+}
+
 }  // namespace mongo
