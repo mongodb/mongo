@@ -135,6 +135,14 @@ auto& networkByteStats = *MetricBuilder<Counter64>{"repl.network.bytes"};
 
 auto& readersCreatedStats = *MetricBuilder<Counter64>{"repl.network.readersCreated"};
 
+// The time difference between the highest OpTime obtained in a batch and the lastOpApplied on the
+// primary
+auto& oplogFetcherLagSeconds =
+    *MetricBuilder<Atomic64Metric>{"repl.network.oplogFetcherLagSeconds"};
+// highest OpTime obtained in the most recent batch
+auto& oplogFetcherHighestFetchedOptime =
+    *MetricBuilder<BSONObj>{"repl.network.oplogFetcherHighestFetchedOptime"};
+
 const Milliseconds maximumAwaitDataTimeoutMS = Seconds{30};
 
 /**
@@ -860,6 +868,11 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     auto info = validateResult.getValue();
     // If the batch is empty, set 'lastDocOpTime' to the lastFetched from the previous batch.
     auto lastDocOpTime = info.lastDocument.isNull() ? previousOpTimeFetched : info.lastDocument;
+    oplogFetcherHighestFetchedOptime = lastDocOpTime.toBSON();
+
+    const auto oplogLag = oqMetadata.getLastOpApplied().getSecs() - lastDocOpTime.getSecs();
+    oplogFetcherLagSeconds.set(oplogLag);
+
 
     // Process replset metadata.  It is important that this happen after we've validated the
     // first batch, so we don't progress our knowledge of the commit point from a
