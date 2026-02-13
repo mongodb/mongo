@@ -9,6 +9,8 @@
  *     # Uses $where operator
  *     requires_scripting,
  *     requires_getmore,
+ *     # TODO: SERVER-119660 Ensure server_status_with_time_out_cursors.js does not leak cursors.
+ *     can_leak_idle_cursors,
  * ]
  */
 export const $config = (function () {
