@@ -169,3 +169,36 @@ server_parameters:
         default: 16000
         validator: {gte: 0}
         redact: false
+
+    preAuthMaximumMessageSizeBytes:
+        description: >-
+            The maximum size of a message that can be sent before the session is authenticated.
+        set_at: [startup, runtime]
+        cpp_varname: gPreAuthMaximumMessageSizeBytes
+        cpp_vartype: Atomic<int32_t>
+        default: 16384 # 16KB
+        validator: {gte: 1024} # 1KB
+        redact: false
+
+    messageSizeErrorRateSec:
+        description: >-
+            The rate, in seconds, at which message size errors are logged at the Info level.
+        set_at: [startup]
+        cpp_varname: gMessageSizeErrorRateSec
+        cpp_vartype: int32_t
+        default: 5
+        validator: {gte: 0}
+        redact: false
+
+    capMemoryConsumptionForPreAuthBuffers:
+        description: >-
+            Adjusts the maximum number of connections accepted by the server, if needed, to ensure 
+            the total memory allocated to pre-auth buffers does not exceed X% of total memory 
+            available to the server, where X is set to 20 by default. Accepts values in percentages 
+            and setting it to 100 disables this limitation.
+        set_at: [startup]
+        cpp_varname: gMemoryCapPercentageForPreAuthBuffers
+        cpp_vartype: int
+        default: 20
+        validator: {gt: 0, lte: 100}
+        redact: false

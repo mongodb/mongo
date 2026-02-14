@@ -33,6 +33,8 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -40,6 +42,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
@@ -51,6 +54,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_compressed.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -77,6 +81,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <array>
@@ -1118,6 +1123,42 @@ TEST_F(StepRunnerSessionWorkflowTest, ExhaustLoop) {
 
 TEST_F(StepRunnerSessionWorkflowTest, MoreToComeLoop) {
     runSteps(moreToComeLoop());
+}
+
+TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
+    auto* authzManager = AuthorizationManager::get(getServiceContext()->getService());
+    authzManager->setAuthEnabled(true);
+    ScopeGuard resetAuth([authzManager] { authzManager->setAuthEnabled(false); });
+
+    auto& registry = MessageCompressorRegistry::get();
+    const auto& compressorNames = registry.getCompressorNames();
+    if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+        registry.setSupportedCompressors({"snappy"});
+        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        uassertStatusOK(registry.finalizeSupportedCompressors());
+    }
+
+    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
+
+    startSession();
+
+    const size_t bufferSize = MsgData::MsgDataHeaderSize + CompressionHeader::size();
+    auto buffer = SharedBuffer::allocate(bufferSize);
+    MsgData::View msgView(buffer.get());
+    msgView.setId(1);
+    msgView.setResponseToMsgId(0);
+    msgView.setOperation(dbCompressed);
+    msgView.setLen(bufferSize);
+
+    DataRangeCursor cursor(msgView.data(), msgView.data() + msgView.dataLen());
+    const auto snappyId = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+    CompressionHeader header(dbMsg, 2048, snappyId);
+    header.serialize(&cursor);
+
+    expect<Event::sessionSourceMessage>(StatusWith{Message(buffer)});
+
+    expect<Event::sepEndSession>();
+    joinSessions();
 }
 
 }  // namespace

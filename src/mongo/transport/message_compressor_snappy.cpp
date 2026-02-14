@@ -51,6 +51,14 @@ std::size_t SnappyMessageCompressor::getMaxCompressedSize(size_t inputSize) {
     return snappy::MaxCompressedLength(inputSize);
 }
 
+boost::optional<std::size_t> SnappyMessageCompressor::getMaxDecompressedSize(ConstDataRange input) {
+    size_t length = 0;
+    if (snappy::GetUncompressedLength(input.data(), input.length(), &length)) {
+        return length;
+    }
+    return boost::none;
+}
+
 StatusWith<std::size_t> SnappyMessageCompressor::compressData(ConstDataRange input,
                                                               DataRange output) {
     size_t outLength = output.length();
