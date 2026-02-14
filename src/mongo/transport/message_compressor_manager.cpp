@@ -124,7 +124,8 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
 }
 
 StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg,
-                                                                MessageCompressorId* compressorId) {
+                                                                MessageCompressorId* compressorId,
+                                                                size_t maxMessageSize) {
     auto inputHeader = msg.header();
     ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
     if (input.length() < CompressionHeader::size()) {
@@ -152,9 +153,15 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
     // avoid potential overflow.
     size_t bufferSize =
         static_cast<size_t>(compressionHeader.uncompressedSize) + MsgData::MsgDataHeaderSize;
-    if (bufferSize > MaxMessageSizeBytes) {
+    if (bufferSize > maxMessageSize) {
         return {ErrorCodes::BadValue,
                 "Decompressed message would be larger than maximum message size"};
+    }
+
+    auto maxDecompressedSize = compressor->getMaxDecompressedSize(input);
+    if (maxDecompressedSize &&
+        *maxDecompressedSize < static_cast<std::size_t>(compressionHeader.uncompressedSize)) {
+        return {ErrorCodes::BadValue, "Uncompressed message size does not match expected size"};
     }
 
     auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);

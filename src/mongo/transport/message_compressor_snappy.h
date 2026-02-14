@@ -29,6 +29,8 @@
 
 #include <cstddef>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
@@ -43,6 +45,8 @@ public:
     StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override;
 
     StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override;
+
+    boost::optional<std::size_t> getMaxDecompressedSize(ConstDataRange input) override;
 };
 
 

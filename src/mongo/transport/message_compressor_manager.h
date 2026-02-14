@@ -54,6 +54,32 @@ class MessageCompressorManager {
     MessageCompressorManager& operator=(const MessageCompressorManager&) = delete;
 
 public:
+    // TODO SERVER-106196 Replace this struct with a View/ConstView class
+    struct CompressionHeader {
+        int32_t originalOpCode;
+        int32_t uncompressedSize;
+        uint8_t compressorId;
+
+        void serialize(DataRangeCursor* cursor) {
+            cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode);
+            cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize);
+            cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId);
+        }
+
+        CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)
+            : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
+
+        CompressionHeader(ConstDataRangeCursor* cursor) {
+            originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
+            uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
+            compressorId = cursor->readAndAdvance<LittleEndian<uint8_t>>();
+        }
+
+        static size_t size() {
+            return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
+        }
+    };
+
     /*
      * Default constructor. Uses the global MessageCompressorRegistry.
      */
@@ -126,7 +152,8 @@ public:
      * compressMessage, ensuring that the same compressor is used on both sides of a conversation.
      */
     StatusWith<Message> decompressMessage(const Message& msg,
-                                          MessageCompressorId* compressorId = nullptr);
+                                          MessageCompressorId* compressorId = nullptr,
+                                          size_t maxMessageSize = MaxMessageSizeBytes);
 
     const std::vector<MessageCompressorBase*>& getNegotiatedCompressors() const;
 
