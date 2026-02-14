@@ -32,8 +32,12 @@ root.addHandler(stdout_handler)
 root.addHandler(file_handler)
 
 DOCKER_SYSTEMCTL_REPO = "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
-SYSTEMCTL_URL = DOCKER_SYSTEMCTL_REPO + "/master/files/docker/systemctl3.py"
-JOURNALCTL_URL = DOCKER_SYSTEMCTL_REPO + "/master/files/docker/journalctl3.py"
+SYSTEMCTL_URL = (
+    DOCKER_SYSTEMCTL_REPO + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/systemctl3.py"
+)
+JOURNALCTL_URL = (
+    DOCKER_SYSTEMCTL_REPO + "/eb2a963a7d8413119b432bcb6151af6076b65f84/files/docker/journalctl3.py"
+)
 
 TestArgs = Dict[str, Union[str, int, List[str]]]
 
