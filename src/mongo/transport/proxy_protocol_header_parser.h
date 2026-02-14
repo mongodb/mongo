@@ -52,7 +52,8 @@ namespace mongo::transport {
  * The maximum number of bytes ever needed by a proxy protocol header; represents
  * the minimum TCP MTU.
  */
-static constexpr size_t kProxyProtocolHeaderSizeUpperBound = 536;
+constexpr size_t kProxyProtocolHeaderSizeUpperBound = 536;
+constexpr uint8_t kProxyProtocolSSLTlvType = 0x20;
 
 /**
  * Represents the true endpoints that a proxy using the Proxy Protocol is proxying for us.
@@ -65,15 +66,26 @@ struct ProxiedEndpoints {
     // is listening on.
     SockAddr destinationAddress;
 };
-
+/**
+ * Represents the optional TLV (type-length-value) data in the V2 proxy protocol. See sections 2.2.X
+ * below for more information on the type and expected data.
+ * https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+ */
 struct ProxiedSupplementaryDataEntry {
-    // Types are defined below in sections 2.2.X:
-    // https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
     uint8_t type;
     std::string data;
 };
 
-using ProxiedSupplementaryData = std::vector<ProxiedSupplementaryDataEntry>;
+/**
+ * Represents the optional ssl TLV (type-length-value) data in the V2 proxy protocol. See
+ * section 2.2.6 below for more details on these fields.
+ * https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+ */
+struct ProxiedSSLData {
+    uint8_t clientFlags;
+    uint32_t verify;
+    std::vector<ProxiedSupplementaryDataEntry> subTLVs;
+};
 
 /**
  * Contains the results of parsing a Proxy Protocol header. bytesParsed contains the
@@ -84,9 +96,11 @@ struct ParserResults {
     // The endpoint metadata should be populated iff parsing is complete, the connection
     // is marked as remote, and the connection is not marked as UNKNOWN.
     boost::optional<ProxiedEndpoints> endpoints = {};
-    // Optional tlv vectors supplied by the client. This is only supported on V2 of the proxy
-    // protocol.
-    ProxiedSupplementaryData tlvs = {};
+    // Optional tlv vectors supplied by the client. This is only supported on V2
+    // of the proxy protocol.
+    std::vector<ProxiedSupplementaryDataEntry> tlvs;
+    boost::optional<ProxiedSSLData> sslTlvs;
+
     size_t bytesParsed = 0;
 };
 
