@@ -87,6 +87,7 @@ struct {
     {"portuguese"_sd, "pt"_sd},
     {"romanian"_sd, "ro"_sd},
     {"russian"_sd, "ru"_sd},
+    {"serbian"_sd, "sr"_sd},
     {"spanish"_sd, "es"_sd},
     {"swedish"_sd, "sv"_sd},
     {"turkish"_sd, "tr"_sd},
@@ -109,9 +110,9 @@ struct {
     {"it"_sd},         {"ita"_sd},     {"italian"_sd},   {"nl"_sd},       {"nld"_sd},
     {"no"_sd},         {"nor"_sd},     {"norwegian"_sd}, {"por"_sd},      {"porter"_sd},
     {"portuguese"_sd}, {"pt"_sd},      {"ro"_sd},        {"romanian"_sd}, {"ron"_sd},
-    {"ru"_sd},         {"rum"_sd},     {"rus"_sd},       {"russian"_sd},  {"spa"_sd},
-    {"spanish"_sd},    {"sv"_sd},      {"swe"_sd},       {"swedish"_sd},  {"tr"_sd},
-    {"tur"_sd},        {"turkish"_sd},
+    {"ru"_sd},         {"rum"_sd},     {"rus"_sd},       {"russian"_sd},  {"serbian"_sd},
+    {"spa"_sd},        {"spanish"_sd}, {"sr"_sd},        {"srp"_sd},      {"sv"_sd},
+    {"swe"_sd},        {"swedish"_sd}, {"tr"_sd},        {"tur"_sd},      {"turkish"_sd},
 };
 
 template <TextIndexVersion ver>

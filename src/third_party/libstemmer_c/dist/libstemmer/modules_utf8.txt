@@ -20,6 +20,7 @@ norwegian       UTF_8                   norwegian,no,nor
 portuguese      UTF_8                   portuguese,pt,por
 romanian        UTF_8                   romanian,ro,rum,ron
 russian         UTF_8                   russian,ru,rus
+serbian         UTF_8                   serbian,sr,srp
 spanish         UTF_8                   spanish,es,esl,spa
 swedish         UTF_8                   swedish,sv,swe
 turkish         UTF_8                   turkish,tr,tur
