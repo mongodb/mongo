@@ -331,6 +331,10 @@ struct TestV2Header {
     }
 };
 
+/**
+ * Address family used in the proxy protocol. This refers to the address family used for the
+ * connection between the client and the proxy, not the proxy and the server.
+ */
 enum class AddressFamily {
     TCP4,
     TCP6,
@@ -653,10 +657,7 @@ std::string buildTLV(uint8_t type, const std::string& data) {
 TEST(ProxyProtocolHeaderParser, TLVParsingZeroTLVs) {
     auto tlvData = "";
     forEachAddressFamily([&](AddressFamily type) {
-        auto result = parseWithTLV(type, tlvData);
-        ASSERT_TRUE(result);
-        ASSERT_TRUE(result->endpoints);
-        ASSERT_TRUE(result->tlvs.empty());
+        ASSERT_THROWS_CODE(parseWithTLV(type, tlvData), DBException, ErrorCodes::FailedToParse);
     });
 }
 
@@ -675,7 +676,7 @@ TEST(ProxyProtocolHeaderParser, TLVParsingOneTLV) {
 TEST(ProxyProtocolHeaderParser, TLVParsingManyTLVs) {
     auto tlvData = buildTLV(0x01, "alpn");
     tlvData += buildTLV(0x02, "authority.example.com");
-    tlvData += buildTLV(0x20, "ssl-info");
+    tlvData += buildTLV(0x04, "noop");
     tlvData += buildTLV(0xE0, "custom");
     tlvData += buildTLV(0xE0, "custom");
 
@@ -688,8 +689,8 @@ TEST(ProxyProtocolHeaderParser, TLVParsingManyTLVs) {
         ASSERT_EQ(result->tlvs[0].data, "alpn");
         ASSERT_EQ(result->tlvs[1].type, 0x02);
         ASSERT_EQ(result->tlvs[1].data, "authority.example.com");
-        ASSERT_EQ(result->tlvs[2].type, 0x20);
-        ASSERT_EQ(result->tlvs[2].data, "ssl-info");
+        ASSERT_EQ(result->tlvs[2].type, 0x04);
+        ASSERT_EQ(result->tlvs[2].data, "noop");
         ASSERT_EQ(result->tlvs[3].type, 0xE0);
         ASSERT_EQ(result->tlvs[3].data, "custom");
         ASSERT_EQ(result->tlvs[4].type, 0xE0);
@@ -727,10 +728,9 @@ TEST(ProxyProtocolHeaderParser, BufferIncludesDataAfterProxyProtocolNoTLV) {
         auto header = buildValidPP2Header(type);
         header.metadata = "Adding some junk data";
 
-        auto result = parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
-        ASSERT_TRUE(result);
-        ASSERT_TRUE(result->endpoints);
-        ASSERT_EQ(result->tlvs.size(), 0u);
+        ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */),
+                           DBException,
+                           ErrorCodes::FailedToParse);
     });
 }
 
@@ -746,6 +746,182 @@ TEST(ProxyProtocolHeaderParser, BufferIncludesDataAfterProxyProtocolTLV) {
         ASSERT_EQ(result->tlvs.size(), 1u);
         ASSERT_EQ(result->tlvs[0].type, 0x01);
         ASSERT_EQ(result->tlvs[0].data, "alpn");
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, UnixProxySocketWithV1ProtocolIsRejected) {
+    auto header = "PROXY TCP4 1.1.1.1 2.2.2.2 10 300\r\n";
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, true /* isProxyUnixSock */),
+                       DBException,
+                       ErrorCodes::FailedToParse);
+}
+
+// Helper to build the raw payload for an SSL TLV.
+// The payload format is: clientFlags (1 byte) + verify (4 bytes big-endian) + optional sub-TLVs.
+std::string buildSSLTLVPayload(uint8_t clientFlags,
+                               uint32_t verify,
+                               const std::string& subTlvData = "") {
+    std::string payload;
+    payload += static_cast<char>(clientFlags);
+    // verify in big-endian.
+    payload += static_cast<char>((verify >> 24) & 0xFF);
+    payload += static_cast<char>((verify >> 16) & 0xFF);
+    payload += static_cast<char>((verify >> 8) & 0xFF);
+    payload += static_cast<char>(verify & 0xFF);
+    payload += subTlvData;
+    return payload;
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsBasicNoSubTLVs) {
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x07, 0));
+    auto regularTlv = buildTLV(0x01, "data");
+    forEachAddressFamily([&](AddressFamily type) {
+        auto result = parseWithTLV(type, regularTlv + sslTlv);
+
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(result->endpoints);
+        ASSERT_TRUE(result->sslTlvs);
+        ASSERT_EQ(result->sslTlvs->clientFlags, 0x07);
+        ASSERT_EQ(result->sslTlvs->verify, 0u);
+        ASSERT_TRUE(result->sslTlvs->subTLVs.empty());
+        ASSERT_EQ(result->tlvs.size(), 1u);
+        ASSERT_EQ(result->tlvs[0].type, 0x01);
+        ASSERT_EQ(result->tlvs[0].data, "data");
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsWithOneSubTLV) {
+    auto subTlv = buildTLV(0x21, "TLSv1.3");
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x05, 0, subTlv));
+    auto regularTlv = buildTLV(0x01, "alpn");
+    forEachAddressFamily([&](AddressFamily type) {
+        auto result = parseWithTLV(type, regularTlv + sslTlv);
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(result->sslTlvs);
+        ASSERT_EQ(result->sslTlvs->clientFlags, 0x05);
+        ASSERT_EQ(result->sslTlvs->verify, 0u);
+        ASSERT_EQ(result->sslTlvs->subTLVs.size(), 1u);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].type, 0x21);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].data, "TLSv1.3");
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsWithMultipleSubTLVs) {
+    auto subTlvs = buildTLV(0x21, "TLSv1.3");
+    subTlvs += buildTLV(0x22, "example.com");
+    subTlvs += buildTLV(0x23, "ECDHE-RSA-AES128-GCM-SHA256");
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x07, 42, subTlvs));
+    auto regularTlv = buildTLV(0x01, "alpn");
+    forEachAddressFamily([&](AddressFamily type) {
+        auto result = parseWithTLV(type, regularTlv + sslTlv);
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(result->sslTlvs);
+        ASSERT_EQ(result->sslTlvs->clientFlags, 0x07);
+        ASSERT_EQ(result->sslTlvs->verify, 42u);
+        ASSERT_EQ(result->sslTlvs->subTLVs.size(), 3u);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].type, 0x21);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].data, "TLSv1.3");
+        ASSERT_EQ(result->sslTlvs->subTLVs[1].type, 0x22);
+        ASSERT_EQ(result->sslTlvs->subTLVs[1].data, "example.com");
+        ASSERT_EQ(result->sslTlvs->subTLVs[2].type, 0x23);
+        ASSERT_EQ(result->sslTlvs->subTLVs[2].data, "ECDHE-RSA-AES128-GCM-SHA256");
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsMixedWithRegularTLVs) {
+    auto regularTlv1 = buildTLV(0x01, "alpn");
+    auto subTlvs = buildTLV(0x21, "TLSv1.2");
+    subTlvs += buildTLV(0xE0, "custom");
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x03, 7, subTlvs));
+    auto regularTlv2 = buildTLV(0x02, "authority");
+    forEachAddressFamily([&](AddressFamily type) {
+        auto result = parseWithTLV(type, regularTlv1 + sslTlv + regularTlv2);
+        ASSERT_TRUE(result);
+
+        // Regular TLVs should be in tlvs, in order.
+        ASSERT_EQ(result->tlvs.size(), 2u);
+        ASSERT_EQ(result->tlvs[0].type, 0x01);
+        ASSERT_EQ(result->tlvs[0].data, "alpn");
+        ASSERT_EQ(result->tlvs[1].type, 0x02);
+        ASSERT_EQ(result->tlvs[1].data, "authority");
+
+        ASSERT_TRUE(result->sslTlvs);
+        ASSERT_EQ(result->sslTlvs->clientFlags, 0x03);
+        ASSERT_EQ(result->sslTlvs->verify, 7u);
+        ASSERT_EQ(result->sslTlvs->subTLVs.size(), 2u);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].type, 0x21);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].data, "TLSv1.2");
+        ASSERT_EQ(result->sslTlvs->subTLVs[1].type, 0xE0);
+        ASSERT_EQ(result->sslTlvs->subTLVs[1].data, "custom");
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsTooShort) {
+    auto regularTlv = buildTLV(0x01, "data");
+    forEachAddressFamily([&](AddressFamily type) {
+        // Empty payload.
+        {
+            auto emptySslTlv = buildTLV(kProxyProtocolSSLTlvType, "");
+            auto tlvs = regularTlv + emptySslTlv;
+            ASSERT_THROWS_CODE(parseWithTLV(type, tlvs), DBException, ErrorCodes::FailedToParse);
+        }
+
+        // Non-empty payload but still too small.
+        {
+            std::string shortPayload(4, '\x01');
+            auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, shortPayload);
+            ASSERT_THROWS_CODE(
+                parseWithTLV(type, regularTlv + sslTlv), DBException, ErrorCodes::FailedToParse);
+        }
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsInvalidSubTLVType) {
+    auto regularTlv = buildTLV(0x01, "data");
+    auto invalidSubTlv = buildTLV(0x00, "bad");
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x01, 0, invalidSubTlv));
+    forEachAddressFamily([&](AddressFamily type) {
+        ASSERT_THROWS_CODE(
+            parseWithTLV(type, regularTlv + sslTlv), DBException, ErrorCodes::FailedToParse);
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParseSubTLVVectorsSubTLVLengthExceedsBuffer) {
+    auto regularTlv = buildTLV(0x01, "data");
+
+    // Create a sub-TLV whose length field claims 200 bytes but only has 5 bytes of data.
+    std::string badSubTlv;
+    badSubTlv += static_cast<char>(0x21);  // valid sub-TLV type
+    badSubTlv += static_cast<char>(0x00);  // length high byte
+    badSubTlv += static_cast<char>(0xC8);  // length low byte = 200
+    badSubTlv += "hello";                  // only 5 bytes of data
+
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x01, 0, badSubTlv));
+    forEachAddressFamily([&](AddressFamily type) {
+        ASSERT_THROWS_CODE(
+            parseWithTLV(type, regularTlv + sslTlv), DBException, ErrorCodes::FailedToParse);
+    });
+}
+
+TEST(ProxyProtocolHeaderParser, ParserShouldNotParseSubTLVWithinSubTLV) {
+    auto subTlv = buildTLV(0x21, "TLSv1.3");
+
+    // Append another sub tlv onto a sub tlv vector.
+    auto subSubTlv = buildTLV(0x21, "TLSv1.2");
+    subTlv += buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x01, 0, subSubTlv));
+
+    auto sslTlv = buildTLV(kProxyProtocolSSLTlvType, buildSSLTLVPayload(0x05, 0, subTlv));
+    auto regularTlv = buildTLV(0x01, "alpn");
+    forEachAddressFamily([&](AddressFamily type) {
+        auto result = parseWithTLV(type, regularTlv + sslTlv);
+        // We only expect the top-most sub tlv to be parsed.
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(result->sslTlvs);
+        ASSERT_EQ(result->sslTlvs->clientFlags, 0x05);
+        ASSERT_EQ(result->sslTlvs->verify, 0u);
+        ASSERT_EQ(result->sslTlvs->subTLVs.size(), 1u);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].type, 0x21);
+        ASSERT_EQ(result->sslTlvs->subTLVs[0].data, "TLSv1.3");
     });
 }
 
