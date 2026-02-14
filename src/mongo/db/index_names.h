@@ -86,11 +86,6 @@ public:
      * Convert an index name to an IndexType.
      */
     static IndexType nameToType(StringData accessMethod);
-
-    /**
-     * Index is not intended to be user facing.
-     */
-    static bool isInternalOnly(const std::string& name);
 };
 
 /**

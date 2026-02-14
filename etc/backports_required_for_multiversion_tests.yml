@@ -498,8 +498,6 @@ last-continuous:
       ticket: SERVER-113887
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
-    - test_file: jstests/core/index/index_on_incorrect_collection.js
-      ticket: SERVER-113888
     - test_file: jstests/core_sharding/ddl/cannot_track_temporary_collection.js
       ticket: SERVER-114666
     - test_file: jstests/core/query/regex/regex_max_pattern_length.js
@@ -1077,8 +1075,6 @@ last-lts:
       ticket: SERVER-113887
     - test_file: jstests/sharding/disable_resumable_range_deleter.js
       ticket: SERVER-112357
-    - test_file: jstests/core/index/index_on_incorrect_collection.js
-      ticket: SERVER-113888
     - test_file: jstests/core_sharding/ddl/cannot_track_temporary_collection.js
       ticket: SERVER-114666
     - test_file: jstests/core/query/regex/regex_max_pattern_length.js
