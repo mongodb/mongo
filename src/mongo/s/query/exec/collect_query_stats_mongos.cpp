@@ -103,19 +103,4 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
     }
 }
 
-void collectQueryStatsMongosBatchWrites(OperationContext* opCtx) {
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.forEachQueryStatsInfoForBatchWrites([&](size_t opIndex, OpDebug::QueryStatsInfo& info) {
-        auto snapshot = query_stats::captureMetrics(
-            opCtx,
-            query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics(opIndex).executionTime),
-            opDebug.getAdditiveMetrics(opIndex));
-        query_stats::writeQueryStats(opCtx,
-                                     opDebug.getQueryStatsInfo(opIndex).keyHash,
-                                     std::move(opDebug.getQueryStatsInfo(opIndex).key),
-                                     snapshot,
-                                     query_stats::computeSupplementalQueryStatsMetrics(opDebug));
-    });
-}
-
 }  // namespace mongo

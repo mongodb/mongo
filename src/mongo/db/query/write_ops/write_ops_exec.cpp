@@ -1394,10 +1394,8 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     // registration. This ensures that we minimize the overhead of query stats collection for
     // updates even if it does not have query stats enabled.
     auto key = std::move(curOp.debug().getQueryStatsInfo().key);
-    if (key || curOp.debug().getQueryStatsInfo().metricsRequested) {
-        curOp.setEndOfOpMetrics(0 /* no documents returned */);
-    }
     if (key) {
+        curOp.setEndOfOpMetrics(0 /* no documents returned */);
         collectQueryStatsMongod(opCtx, canonicalUpdate.expCtx(), std::move(key));
     }
 

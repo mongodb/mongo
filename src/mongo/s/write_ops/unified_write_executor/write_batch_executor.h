@@ -60,7 +60,6 @@ struct BatchWriteCommandReply {
     std::vector<BulkWriteReplyItem> items;
     boost::optional<WriteConcernErrorDetail> wcErrors;
     std::vector<StmtId> retriedStmtIds;
-    std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
 };
 
 using CommandRequestVariant = std::

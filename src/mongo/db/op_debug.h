@@ -519,12 +519,6 @@ public:
         return _getQueryStatsInfoHelper(this, opIndex);
     }
 
-    // Returns true if there are any QueryStatsInfo entries for writes statements being processed on
-    // the router.
-    MONGO_MOD_PRIVATE bool hasBatchWriteMetrics() const {
-        return _queryStatsInfoForBatchWrites && !_queryStatsInfoForBatchWrites->empty();
-    }
-
     // Create a new default-constructed QueryStatsInfo for the given opIndex, and return a reference
     // to it.
     MONGO_MOD_PRIVATE void setQueryStatsInfoAtOpIndex(size_t opIndex,
@@ -539,18 +533,6 @@ public:
                 !_queryStatsInfoForBatchWrites->contains(opIndex));
 
         _queryStatsInfoForBatchWrites->emplace(opIndex, std::move(queryStatsInfo));
-    }
-
-    // If we have any write statements for which query stats are being collected in the router
-    // role, then execute the function passed in for each QueryStatsInfo instance.
-    template <typename Func>
-    MONGO_MOD_PRIVATE void forEachQueryStatsInfoForBatchWrites(Func&& fn) {
-        if (!_queryStatsInfoForBatchWrites) {
-            return;
-        }
-        for (auto& [opIndex, info] : *_queryStatsInfoForBatchWrites) {
-            fn(opIndex, info);
-        }
     }
 
     // The query framework that this operation used. Will be unknown for non query operations.

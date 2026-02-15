@@ -58,7 +58,6 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: modifierUpdateCommandObjSimple,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -139,7 +138,6 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: modifierUpdateCommandObjComplex,
                 shapeFields: queryShapeModifierUpdateFieldsComplex,
                 keyFields: updateKeyFieldsComplex,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -156,7 +154,6 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: modifierUpdateCommandObjSimple,
                 shapeFields: queryShapeUpdateFieldsRequiredWithArrayFilters,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -192,7 +189,6 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: modifierUpdateCommandObjNoop,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -260,7 +256,6 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: modifierUpdateCommandObjComplexDollarPrefix,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
     });
@@ -277,16 +272,19 @@ runModifierUpdateKeyTests(
     (fixture) => MongoRunner.stopMongod(fixture),
 );
 
-runModifierUpdateKeyTests(
-    "Sharded",
-    () => {
-        const st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
-        });
-        const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
-        return {fixture: st, testDB};
-    },
-    (st) => st.stop(),
-);
+// TODO SERVER-112050 Enable this when we support sharded clusters for update.
+describe.skip("Sharded", function () {
+    runModifierUpdateKeyTests(
+        "Sharded",
+        () => {
+            const st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            });
+            const testDB = st.s.getDB("test");
+            st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+            return {fixture: st, testDB};
+        },
+        (st) => st.stop(),
+    );
+});

@@ -193,16 +193,19 @@ runUpdateCmdMetricsTests(
     (fixture) => MongoRunner.stopMongod(fixture),
 );
 
-runUpdateCmdMetricsTests(
-    "Sharded",
-    () => {
-        const st = new ShardingTest({
-            shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
-        });
-        const testDB = st.s.getDB("test");
-        st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
-        return {fixture: st, testDB};
-    },
-    (st) => st.stop(),
-);
+// TODO SERVER-112050 Enable this when we support sharded clusters for update.
+describe.skip("Sharded", function () {
+    runUpdateCmdMetricsTests(
+        "Sharded",
+        () => {
+            const st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            });
+            const testDB = st.s.getDB("test");
+            st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
+            return {fixture: st, testDB};
+        },
+        (st) => st.stop(),
+    );
+});

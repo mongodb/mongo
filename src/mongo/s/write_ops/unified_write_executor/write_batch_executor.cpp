@@ -291,12 +291,6 @@ BatchWriteCommandReply BatchWriteCommandReply::make(const BatchedCommandResponse
         reply.retriedStmtIds = bcr.getRetriedStmtIds();
     }
 
-    if (bcr.areQueryStatsMetricsSet()) {
-        for (auto&& metrics : bcr.getQueryStatsMetrics()) {
-            reply.queryStatsMetrics.emplace_back(metrics);
-        }
-    }
-
     return reply;
 }
 

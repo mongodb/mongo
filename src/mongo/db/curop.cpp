@@ -559,20 +559,6 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     }
 }
 
-void CurOp::setEndOfOpMetricsForBatchWrites() {
-    if (_debug.hasBatchWriteMetrics()) {
-        auto elapsed = elapsedTimeExcludingPauses();
-        _debug.forEachQueryStatsInfoForBatchWrites(
-            [&](size_t opIndex, OpDebug::QueryStatsInfo& qsi) {
-                // TODO SERVER-118829 Decide how to handle router query stats metrics for writes
-                //
-                // For now, just use the total elapsed time for all batches for any write statements
-                // we are sampling for query stats.
-                qsi.additiveMetrics.executionTime = elapsed;
-            });
-    }
-}
-
 void CurOp::setMessage(WithLock, StringData message) {
     if (_progressMeter && _progressMeter->isActive()) {
         LOGV2_ERROR(
