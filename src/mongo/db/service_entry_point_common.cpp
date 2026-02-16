@@ -1497,6 +1497,10 @@ void ExecCommandDatabase::_initiateCommand() {
         apiVersionMetrics.update(appName, apiParams);
     }
 
+    // Start authz contract tracking before we evaluate failpoints.
+    auto authzSession = AuthorizationSession::get(client);
+    authzSession->startContractTracking();
+
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1508,8 +1512,6 @@ void ExecCommandDatabase::_initiateCommand() {
                                                      replCoord->getReplicationMode() ==
                                                          repl::ReplicationCoordinator::modeReplSet);
 
-    // Start authz contract tracking before we evaluate failpoints
-    auto authzSession = AuthorizationSession::get(client);
     authzSession->startContractTracking();
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());

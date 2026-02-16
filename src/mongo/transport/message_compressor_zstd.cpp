@@ -31,6 +31,8 @@
 
 #include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <zstd.h>
 
 #include "mongo/base/init.h"
@@ -75,8 +77,12 @@ StatusWith<std::size_t> ZstdMessageCompressor::decompressData(ConstDataRange inp
     return {ret};
 }
 
-std::size_t ZstdMessageCompressor::getMaxDecompressedSize(const void* src, size_t srcSize) {
-    auto maxDecompressedSize = ZSTD_getFrameContentSize(src, srcSize);
+boost::optional<std::size_t> ZstdMessageCompressor::getMaxDecompressedSize(ConstDataRange input) {
+    auto maxDecompressedSize = ZSTD_getFrameContentSize(input.data(), input.length());
+    if (maxDecompressedSize == ZSTD_CONTENTSIZE_UNKNOWN ||
+        maxDecompressedSize == ZSTD_CONTENTSIZE_ERROR) {
+        return boost::none;
+    }
     return static_cast<size_t>(maxDecompressedSize);
 }
 

@@ -7,6 +7,11 @@ function getDB(client) {
     return db;
 }
 
+function addPreAuth(params) {
+    params["preAuthMaximumMessageSizeBytes"] = 16 * 1024 * 1024;
+    return params;
+}
+
 function runTest(client, restartCommand) {
     let db = getDB(client);
 
@@ -19,26 +24,26 @@ function runTest(client, restartCommand) {
 
     if (!jsTest.isMongos(client)) {
         TestData.enableTestCommands = false;
-        client = restartCommand({
+        client = restartCommand(addPreAuth({
             trafficRecordingDirectory: path,
             AlwaysRecordTraffic: "notARealPath",
             enableTestCommands: 0,
-        });
+        }));
         TestData.enableTestCommands = true;
         assert.eq(null, client, "AlwaysRecordTraffic and not enableTestCommands should fail");
     }
 
-    client = restartCommand({
+    client = restartCommand(addPreAuth({
         trafficRecordingDirectory: path,
         AlwaysRecordTraffic: "notARealPath",
         enableTestCommands: 1
-    });
+    }));
     assert.neq(null, client, "AlwaysRecordTraffic and with enableTestCommands should suceed");
     db = getDB(client);
 
     assert(db.runCommand({"serverStatus": 1}).trafficRecording.running);
 
-    client = restartCommand({trafficRecordingDirectory: path});
+    client = restartCommand(addPreAuth({trafficRecordingDirectory: path}));
     db = getDB(client);
 
     res = db.runCommand({'startRecordingTraffic': 1, 'filename': 'notARealPath'});

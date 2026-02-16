@@ -47,33 +47,6 @@
 namespace mongo {
 namespace {
 
-// TODO(JBR): This should be changed so it 's closer to the MSGHEADER View/ConstView classes
-// than this little struct.
-struct CompressionHeader {
-    int32_t originalOpCode;
-    int32_t uncompressedSize;
-    uint8_t compressorId;
-
-    void serialize(DataRangeCursor* cursor) {
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode);
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize);
-        cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId);
-    }
-
-    CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)
-        : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
-
-    CompressionHeader(ConstDataRangeCursor* cursor) {
-        originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
-        uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
-        compressorId = cursor->readAndAdvance<LittleEndian<uint8_t>>();
-    }
-
-    static size_t size() {
-        return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
-    }
-};
-
 const transport::Session::Decoration<MessageCompressorManager> getForSession =
     transport::Session::declareDecoration<MessageCompressorManager>();
 }  // namespace
@@ -145,7 +118,8 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
 }
 
 StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg,
-                                                                MessageCompressorId* compressorId) {
+                                                                MessageCompressorId* compressorId,
+                                                                size_t maxMessageSize) {
     auto inputHeader = msg.header();
     ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
     if (input.length() < CompressionHeader::size()) {
@@ -177,9 +151,15 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
     // avoid potential overflow.
     size_t bufferSize =
         static_cast<size_t>(compressionHeader.uncompressedSize) + MsgData::MsgDataHeaderSize;
-    if (bufferSize > MaxMessageSizeBytes) {
+    if (bufferSize > maxMessageSize) {
         return {ErrorCodes::BadValue,
                 "Decompressed message would be larger than maximum message size"};
+    }
+
+    auto maxDecompressedSize = compressor->getMaxDecompressedSize(input);
+    if (maxDecompressedSize &&
+        *maxDecompressedSize < static_cast<std::size_t>(compressionHeader.uncompressedSize)) {
+        return {ErrorCodes::BadValue, "Uncompressed message size does not match expected size"};
     }
 
     auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
