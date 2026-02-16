@@ -7,7 +7,7 @@ set -x
 if [ $# -ne 2 ]
 then
     echo "Please supply an arch: x86_64, i386, etc and a platform: osx, linux, windows, etc"
-    exit 0;
+    exit 1;
 fi
 
 _BuiltPathPrefix="mozilla-release/js/src/_build/js/src"
