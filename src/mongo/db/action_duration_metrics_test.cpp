@@ -29,63 +29,51 @@
 
 #include "mongo/db/action_duration_metrics.h"
 
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/tick_source_mock.h"
 
 
 namespace mongo {
 namespace {
 
-class ActionDurationMetricsTest : public ClockSourceMockServiceContextTest {
-public:
-    void advanceTime(Milliseconds m) {
-        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(m);
-    }
-
-    void assertCounts(const ActionDurationMetrics& metrics,
-                      const std::string& action,
-                      Milliseconds lastDuration,
-                      Milliseconds totalDuration,
-                      int64_t count) {
-        BSONObjBuilder builder;
-        metrics.report(&builder);
-
-        BSONObj obj = builder.obj();
-        BSONObj actionObj = obj.getObjectField(action);
-
-        ASSERT_EQ(lastDuration.count(), actionObj.getField("lastDurationMillis").numberLong());
-        ASSERT_EQ(totalDuration.count(), actionObj.getField("totalDurationMillis").numberLong());
-        ASSERT_EQ(count, actionObj.getField("count").numberLong());
-    }
-};
-
-TEST_F(ActionDurationMetricsTest, ActionDurationTimer) {
-    auto opCtx = makeOperationContext();
-    const ActionDurationMetrics& metrics =
-        ActionDurationMetrics::getDecoration(opCtx->getServiceContext());
-    const std::string action = "TimerTest";
+TEST(ActionDurationMetricsTest, ActionDurationTimer) {
+    TickSourceMock<Milliseconds> tickSource;
+    Milliseconds counter = Milliseconds(0);
+    ActionDurationTimer<Milliseconds>::Callback callback = [&](Milliseconds duration) {
+        counter += duration;
+    };
 
     {
-        ActionDurationTimer actionTimer(opCtx.get(), action);
-        advanceTime(Milliseconds(10));
+        ActionDurationTimer<Milliseconds> actionTimer(&tickSource, callback);
+        tickSource.advance(Milliseconds(10));
 
         // Metrics are only advanced when the RAII type is destructed.
-        assertCounts(metrics, action, Milliseconds(0), Milliseconds(0), 0);
+        ASSERT_EQ(counter, Milliseconds(0));
     }
 
-    assertCounts(metrics, action, Milliseconds(10), Milliseconds(10), 1);
+    ASSERT_EQ(counter, Milliseconds(10));
 
     // Advancing time while there's no RAII type in scope has no effect.
-    advanceTime(Milliseconds(1000));
-    assertCounts(metrics, action, Milliseconds(10), Milliseconds(10), 1);
+    tickSource.advance(Milliseconds(1000));
+    ASSERT_EQ(counter, Milliseconds(10));
 
     {
-        ActionDurationTimer actionTimer(opCtx.get(), action);
-        advanceTime(Milliseconds(25));
-        assertCounts(metrics, action, Milliseconds(10), Milliseconds(10), 1);
+        ActionDurationTimer<Milliseconds> actionTimer(&tickSource, callback);
+        tickSource.advance(Milliseconds(25));
+        ASSERT_EQ(counter, Milliseconds(10));
     }
 
-    assertCounts(metrics, action, Milliseconds(25), Milliseconds(35), 2);
+    ASSERT_EQ(counter, Milliseconds(35));
+
+    {
+        // Dismissing doesn't execute the callback.
+        ActionDurationTimer<Milliseconds> actionTimer(&tickSource, callback);
+        tickSource.advance(Milliseconds(50));
+        ASSERT_EQ(counter, Milliseconds(35));
+        actionTimer.dismiss();
+    }
+
+    ASSERT_EQ(counter, Milliseconds(35));
 }
 
 }  // namespace

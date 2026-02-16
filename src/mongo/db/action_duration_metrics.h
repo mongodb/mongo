@@ -29,50 +29,17 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/time_support.h"
-
-#include <cstdint>
-#include <map>
-#include <string>
+#include "mongo/util/timer.h"
 
 MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
 /**
- * Tracks per-action duration metrics.
- *
- * This is a ServiceContext decoration.
+ * RAII helper that measures duration and invokes a callback on destruction.
  */
-class ActionDurationMetrics {
-public:
-    struct Entry {
-        Milliseconds last{0};
-        Milliseconds total{0};
-        int64_t count{0};
-    };
-
-    static const ActionDurationMetrics& getDecoration(ServiceContext* serviceContext);
-
-    void record(const std::string& action, Milliseconds millis);
-
-    void report(BSONObjBuilder* builder) const;
-
-private:
-    mutable stdx::mutex _mutex;
-
-    // Use an ordered map to prevent schema changes in FTDC.
-    std::map<std::string, Entry> _entries;
-};
-
-/**
- * RAII helper that measures the duration of a named action and records it into the
- * ActionDurationMetrics decoration.
- */
+template <typename DurationType>
 class ActionDurationTimer {
 public:
     ActionDurationTimer(const ActionDurationTimer&) = delete;
@@ -80,16 +47,30 @@ public:
     ActionDurationTimer(ActionDurationTimer&&) = delete;
     ActionDurationTimer& operator=(ActionDurationTimer&&) = delete;
 
-    // Caller is responsible for using the RAII within the OperationContext/ServiceContext lifetime.
-    ActionDurationTimer(OperationContext* opCtx, std::string action);
-    ActionDurationTimer(ServiceContext* serviceContext, std::string action);
+    using Callback = std::function<void(DurationType duration)>;
+    explicit ActionDurationTimer(Callback callback) : _callback(std::move(callback)) {}
+    ActionDurationTimer(TickSource* tickSource, Callback callback)
+        : _timer(tickSource), _callback(std::move(callback)) {}
 
-    ~ActionDurationTimer();
+    ~ActionDurationTimer() {
+        if (!_callback) {
+            return;
+        }
+
+        DurationType duration = duration_cast<DurationType>(_timer.elapsed());
+        _callback(duration);
+    }
+
+    /**
+     * Skip executing the callback on destruction.
+     */
+    void dismiss() {
+        _callback = nullptr;
+    }
 
 private:
-    ServiceContext* _serviceContext;
-    std::string _action;
-    Date_t _start;
+    Timer _timer;
+    Callback _callback;
 };
 
 }  // namespace mongo
