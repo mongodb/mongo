@@ -51,6 +51,7 @@ const string IndexNames::BTREE = "";
 const string IndexNames::WILDCARD = "wildcard";
 // We no longer support column store indexes. We use this value to reject creating them.
 const string IndexNames::COLUMN = "columnstore";
+// Encrypted range indexes are "pseudo-indexes", and as such, they cannot be created.
 const string IndexNames::ENCRYPTED_RANGE = "queryable_encrypted_range";
 // We no longer support geo haystack indexes. We use this value to reject creating them.
 const string IndexNames::GEO_HAYSTACK = "geoHaystack";
@@ -104,6 +105,19 @@ IndexType IndexNames::nameToType(StringData accessMethod) {
         return INDEX_BTREE;
     }
     return typeIt->second;
+}
+
+// static
+bool IndexNames::isVirtualIndexType(const std::string& name) {
+    if (isKnownName(name)) {
+        switch (nameToType(name)) {
+            case INDEX_ENCRYPTED_RANGE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    return false;
 }
 
 }  // namespace mongo
