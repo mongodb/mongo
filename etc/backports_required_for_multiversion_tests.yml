@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/core/filemd5.js
+    ticket: SERVER-119317
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
   - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
@@ -648,6 +650,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/core/filemd5.js
+    ticket: SERVER-119317
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
   - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js

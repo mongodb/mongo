@@ -309,6 +309,8 @@ static void md5_process(md5_state_t* pms, const md5_byte_t* data /*[64]*/) {
 }
 
 void md5_init(md5_state_t* pms) {
+    memset(pms, 0, sizeof(md5_state_t));
+
     pms->count[0] = pms->count[1] = 0;
     pms->abcd[0] = 0x67452301;
     pms->abcd[1] = /*0xefcdab89*/ T_MASK ^ 0x10325476;
