@@ -759,7 +759,6 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _as(original._as),
       _connectFromField(original._connectFromField),
       _connectToField(original._connectToField),
-      _startWith(original._startWith),
       _additionalFilter(original._additionalFilter),
       _depthField(original._depthField),
       _maxDepth(original._maxDepth),
@@ -772,6 +771,10 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _cache(pExpCtx->getValueComparator()),
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
+    if (original._startWith) {
+        // re-create startWith expression using newExpCtx.
+        _startWith = original._startWith->cloneUsingNewExpCtx(newExpCtx.get());
+    }
     if (original._unwind) {
         _unwind =
             static_cast<DocumentSourceUnwind*>(original._unwind.value()->clone(pExpCtx).get());

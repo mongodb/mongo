@@ -1590,6 +1590,42 @@ TEST_F(DocumentSourceLookUpTest, RedactsCorrectlyWithPipeline) {
         redact(*docSource));
 }
 
+static boost::intrusive_ptr<DocumentSourceLookUp> makeLookupWithLet(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, NamespaceString fromNs) {
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto spec =
+        BSON("$lookup" << BSON("from" << fromNs.coll() << "let" << BSON("v" << "$x") << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("y" << "$$v"))) << "as"
+                                      << "out"));
+    auto ds = DocumentSourceLookUp::createFromBson(spec.firstElement(), expCtx);
+    return boost::static_pointer_cast<DocumentSourceLookUp>(ds);
+}
+
+TEST_F(DocumentSourceLookUpTest, LetVariablesCloneRebindsExpressionContext) {
+    NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
+    auto opCtx = getOpCtx();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, nss);
+
+    // Build an original $lookup with a let expression
+    auto lookup = makeLookupWithLet(expCtx, nss);
+
+    // Sanity: expressions in _letVariables use original expCtx
+    for (auto& var : lookup->getLetVariables()) {
+        ASSERT_EQ(var.expression->getExpressionContext(), expCtx);
+    }
+
+    // Clone with a new top-level ExpressionContext
+    auto newExpCtx = make_intrusive<ExpressionContextForTest>(opCtx, nss);
+    auto lookupClone = static_pointer_cast<DocumentSourceLookUp>(lookup->clone(newExpCtx));
+
+    // Check that every let expression in the clone now points to the new context
+    for (auto& var : lookupClone->getLetVariables()) {
+        ASSERT_EQ(var.expression->getExpressionContext(), newExpCtx);
+    }
+}
+
 using DocumentSourceLookUpServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceLookUpServerlessTest,
