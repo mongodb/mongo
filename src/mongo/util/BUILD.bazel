@@ -584,14 +584,36 @@ mongo_cc_library(
     name = "procparser",
     srcs = [
         "procparser.cpp",
-        "procparser.h",
     ],
+    hdrs = ["procparser.h"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
         ":pcre_wrapper",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "procparser_parameters_gen",
+    src = "procparser_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "procparser_parameters",
+    srcs = [
+        "procparser_parameters.cpp",
+        ":procparser_parameters_gen",
+    ],
+    hdrs = ["procparser_parameters.h"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":procparser",
         "//src/mongo:base",
     ],
 )
