@@ -59,6 +59,11 @@ public:
         LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
             : name(std::move(name)), expression(std::move(expression)), id(id) {}
 
+        LetVariable cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const {
+            auto clonedExpr = expression ? expression->cloneUsingNewExpCtx(newExpCtx) : nullptr;
+            return {name, std::move(clonedExpr), id};
+        }
+
         std::string name;
         boost::intrusive_ptr<Expression> expression;
         Variables::Id id;
@@ -298,6 +303,12 @@ private:
      * Resolves let defined variables against 'localDoc' and stores the results in 'variables'.
      */
     void resolveLetVariables(const Document& localDoc, Variables* variables);
+
+    /**
+     * Clones the given vector of LetVariable objects using the newExpCtx.
+     */
+    void copyLetVariablesWithNewExpCtx(const std::vector<LetVariable>& src,
+                                       ExpressionContext* newExpCtx);
 
     /**
      * Builds a parsed pipeline for introspection (e.g. constraints, dependencies). Any sub-$lookup

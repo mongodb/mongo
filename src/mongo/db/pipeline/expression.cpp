@@ -75,6 +75,23 @@ using std::pair;
 using std::string;
 using std::vector;
 
+// Clone by serializing and reparsing.
+boost::intrusive_ptr<Expression> Expression::cloneUsingNewExpCtx(
+    ExpressionContext* newExpCtx) const {
+    // Serialize this expression to a generic Value.
+    SerializationOptions opts;
+    auto val = serialize(opts);
+
+    // Wrap it into a BSONObj as the value of a dummy field.
+    BSONObjBuilder bob;
+    val.addToBsonObj(&bob, "");
+    BSONObj obj = bob.obj();
+    BSONElement elem = obj.firstElement();
+
+    // Re-parse as an operand in the new ExpressionContext.
+    return Expression::parseOperand(newExpCtx, elem, newExpCtx->variablesParseState);
+}
+
 Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
                                             Value val,
                                             bool wrapRepresentativeValue) {
