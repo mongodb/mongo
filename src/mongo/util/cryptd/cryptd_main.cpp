@@ -46,6 +46,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -257,6 +258,18 @@ int CryptDMain(int argc, char** argv) {
     setupSignalHandlers();
     runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
+
+    // Because mongocryptd does not have auth and can only bind to localhost,
+    // we disable caps on pre-auth buffer sizes and we bump the percentage of memory that can
+    // be allocated to inbound connections to 100% (effectively disabling the limit on the
+    // number of connections that can be accepted by the server).
+    uassertStatusOK(ServerParameterSet::getNodeParameterSet()
+                        ->get("capMemoryConsumptionForPreAuthBuffers")
+                        ->set(BSON("" << 100).firstElement(), boost::none));
+    uassertStatusOK(
+        ServerParameterSet::getNodeParameterSet()
+            ->get("preAuthMaximumMessageSizeBytes")
+            ->set(BSON("" << int64_t(MaxMessageSizeBytes)).firstElement(), boost::none));
 
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));
