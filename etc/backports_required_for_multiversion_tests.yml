@@ -23,6 +23,8 @@ last-continuous:
   all:
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
+  - test_file: jstests/core/filemd5.js
+    ticket: SERVER-119317
   - test_file: jstests/core/json_schema/json_schema.js
     ticket: SERVER-98676
   - test_file: jstests/core/query/explain/explain_plan_cache.js
@@ -902,6 +904,8 @@ last-lts:
   all:
   - test_file: jstests/core/index/elemmatch_index.js
     ticket: SERVER-108945
+  - test_file: jstests/core/filemd5.js
+    ticket: SERVER-119317
   - test_file: jstests/core/json_schema/json_schema.js
     ticket: SERVER-98676
   - test_file: jstests/core/query/explain/explain_plan_cache.js
