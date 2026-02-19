@@ -36,9 +36,11 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_controller_gen.h"
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -104,6 +106,17 @@ public:
 
     std::string name() const final {
         return "MockFailCollector";
+    }
+};
+
+class MockBSONObjectTooLargeCollector : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext*, BSONObjBuilder&) final {
+        uasserted(ErrorCodes::BSONObjectTooLarge, "MockBSONObjectTooLargeCollector");
+    }
+
+    std::string name() const final {
+        return "MockBSONObjectTooLargeCollector";
     }
 };
 
@@ -510,6 +523,50 @@ TEST_F(FTDCControllerTest, TestStartStop) {
     releaseCheckpointAndStopController();
 }
 
+TEST_F(FTDCControllerTest, DiscardLargeSamplesWithBSONObjectTooLargeExceptionWhenEnabled) {
+    RAIIServerParameterControllerForTest discardLargeFTDCSamples(
+        "diagnosticDataCollectionDiscardLargeSamples", true);
+
+    FTDCConfig config;
+    config.period = Milliseconds(1);
+    setUpControllerAndCheckpoint(config);
+
+    auto collector = std::make_unique<MockBSONObjectTooLargeCollector>();
+    controller()->addPeriodicCollector(std::move(collector), ClusterRole::None);
+
+    startController();
+
+    for (int i = 0; i < 5; ++i) {
+        doCollection();
+    }
+
+    releaseCheckpointAndStopController();
+}
+
+TEST_F(FTDCControllerTest, DiscardLargeSamplesWithBufBuilderExceptionWhenEnabled) {
+    RAIIServerParameterControllerForTest discardLargeFTDCSamples(
+        "diagnosticDataCollectionDiscardLargeSamples", true);
+
+    FTDCConfig config;
+    config.period = Milliseconds(1);
+    setUpControllerAndCheckpoint(config);
+
+    auto collector1 = std::make_unique<MockLargeDataCollector>(50 * 1024 * 1024);
+    auto collector2 = std::make_unique<MockLargeDataCollector>(60 * 1024 * 1024);
+    auto collector3 = std::make_unique<MockLargeDataCollector>(70 * 1024 * 1024);
+    controller()->addPeriodicCollector(std::move(collector1), ClusterRole::None);
+    controller()->addPeriodicCollector(std::move(collector2), ClusterRole::None);
+    controller()->addPeriodicCollector(std::move(collector3), ClusterRole::None);
+
+    startController();
+
+    for (int i = 0; i < 5; ++i) {
+        doCollection();
+    }
+
+    releaseCheckpointAndStopController();
+}
+
 DEATH_TEST_REGEX_F(FTDCControllerTest,
                    LogAndTerminateWhenCollectionFails,
                    "Fatal assertion.*9399800") {
@@ -544,7 +601,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
 
 DEATH_TEST_REGEX_F(FTDCControllerTest,
                    LogAndTerminateWhenLargeDataCollectionFails,
-                   "10630200.*FTDC Entry.*name.*size") {
+                   "11558500.*Encountered an error while collecting an FTDC sample.*sectionSizes") {
     FTDCConfig config;
     config.period = Milliseconds(100);
     setUpControllerAndCheckpoint(config);
@@ -555,6 +612,21 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
     controller()->addPeriodicCollector(std::move(collector1), ClusterRole::None);
     controller()->addPeriodicCollector(std::move(collector2), ClusterRole::None);
     controller()->addPeriodicCollector(std::move(collector3), ClusterRole::None);
+
+    startController();
+
+    doCollection();
+}
+
+DEATH_TEST_REGEX_F(FTDCControllerTest,
+                   LogAndTerminateWhenBSONObjectTooLargeExceptionThrown,
+                   "11558500.*Encountered an error while collecting an FTDC sample.*sectionSizes") {
+    FTDCConfig config;
+    config.period = Milliseconds(100);
+    setUpControllerAndCheckpoint(config);
+
+    auto collector = std::make_unique<MockBSONObjectTooLargeCollector>();
+    controller()->addPeriodicCollector(std::move(collector), ClusterRole::None);
 
     startController();
 

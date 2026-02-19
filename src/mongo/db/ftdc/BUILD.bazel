@@ -18,6 +18,11 @@ idl_generator(
 )
 
 idl_generator(
+    name = "ftdc_controller_gen",
+    src = "ftdc_controller.idl",
+)
+
+idl_generator(
     name = "ftdc_commands_gen",
     src = "ftdc_commands.idl",
     deps = [
@@ -55,6 +60,7 @@ mongo_cc_library(
         "file_writer.cpp",
         "metadata_compressor.cpp",
         "util.cpp",
+        ":ftdc_controller_gen",
         ":ftdc_feature_flag_gen",
     ],
     hdrs = [
@@ -79,6 +85,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/admission:execution_admission_context",
+        "//src/mongo/db/commands:server_status_metric",
         "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/third_party/zlib",
@@ -208,6 +215,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_non_d",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
     ],
 )

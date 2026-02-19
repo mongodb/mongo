@@ -35,6 +35,7 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/ftdc/ftdc_feature_flag_gen.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -233,6 +234,9 @@ private:
      */
     void doLoop(Service* service);
 
+    void logCollectionError(Status error,
+                            const std::vector<std::pair<std::string, int>>& sectionSizes);
+
 private:
     /**
      * Private enum to track state.
@@ -315,6 +319,9 @@ private:
 
     // Whether or not to use the multiversion schema for FTDC files.
     UseMultiServiceSchema _multiServiceSchema;
+
+    logv2::SeveritySuppressor _serverStatusSectionsLogSeverity{
+        Minutes{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
 }  // namespace mongo
