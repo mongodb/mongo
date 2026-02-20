@@ -58,6 +58,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
 MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
+MONGO_FAIL_POINT_DEFINE(isConnectedToProxyUnixSocketOverride);
 
 namespace {
 
@@ -514,9 +515,11 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     return AsyncTry([this, buffer] {
                const auto bytesRead = peekASIOStream(
                    _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
-               // TODO(SERVER-119261): Update isProxyUnixSock argument.
-               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
-                                                          false);
+               // TODO(SERVER-119261): Update isProxyUnixSock argument to check if we are connected
+               // to the proxy socket.
+               return transport::parseProxyProtocolHeader(
+                   StringData(buffer->data(), bytesRead),
+                   isConnectedToProxyUnixSocketOverride.shouldFail());
            })
         .until([deadline, proxyHeaderTimeout, reactor](
                    StatusWith<boost::optional<ParserResults>> sw) {
@@ -542,6 +545,39 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                 const auto& dstEndpointAddr = results->endpoints->destinationAddress;
                 _proxiedDstEndpoint =
                     HostAndPort(dstEndpointAddr.getAddr(), dstEndpointAddr.getPort());
+
+                auto makeTLVString = [&results]() {
+                    std::ostringstream tlvStringStream;
+                    for (const auto& tlv : results->tlvs) {
+                        tlvStringStream << fmt::format("{:#04x}", tlv.type) << ":" << tlv.data
+                                        << ",";
+                    }
+                    if (results->sslTlvs) {
+                        for (const auto& sslTlv : results->sslTlvs->subTLVs) {
+                            tlvStringStream << fmt::format("{:#04X}", sslTlv.type) << ":"
+                                            << sslTlv.data << ",";
+                        }
+                    }
+
+                    auto tlvString = tlvStringStream.str();
+                    if (!tlvString.empty()) {
+                        // Pop off the last comma if we had any TLVs.
+                        tlvString.pop_back();
+                    }
+                    return tlvString;
+                };
+
+                // Log ParserResults for testing.
+                LOGV2_DEBUG(
+                    11978400,
+                    4,
+                    "Proxy protocol header parsed",
+                    "sourceAddress"_attr = results->endpoints->sourceAddress.toString(),
+                    "sourcePort"_attr = results->endpoints->sourceAddress.getPort(),
+                    "destinationAddress"_attr = results->endpoints->destinationAddress.toString(),
+                    "destinationPort"_attr = results->endpoints->destinationAddress.getPort(),
+                    "tlvs"_attr = makeTLVString(),
+                    "bytesParsed"_attr = results->bytesParsed);
             } else {
                 _proxiedSrcRemoteAddr = {};
                 _proxiedSrcEndpoint = {};

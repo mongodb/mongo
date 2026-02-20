@@ -2494,18 +2494,23 @@ files = [
 
 [[package]]
 name = "proxy-protocol"
-version = "0.7.5"
+version = "0.11.3"
 description = "PROXY protocol library with asyncio server implementation"
 optional = false
-python-versions = "~=3.7"
+python-versions = "~=3.8"
 groups = ["testing"]
 files = [
-    {file = "proxy-protocol-0.7.5.tar.gz", hash = "sha256:84bda89d65d31df2dd7088582dab3490a4bbbf7a44d1411c070c862319208cbf"},
-    {file = "proxy_protocol-0.7.5-py3-none-any.whl", hash = "sha256:e7691d766a15674e1bf36f822ec0e0149850f333aa9902633f7fa351106994ac"},
+    {file = "proxy_protocol-0.11.3-py3-none-any.whl", hash = "sha256:77d541828aed30c5d9eea9c4c9af1dd85c2c4a2f829e0ecb003cb978f738a3f1"},
+    {file = "proxy_protocol-0.11.3.tar.gz", hash = "sha256:a9a1bd7bd90bfa82444a6bfc7cf567fa0a4d4144c9cadf392b8736ba651a662c"},
 ]
 
 [package.dependencies]
 typing-extensions = "*"
+
+[package.extras]
+crc32c = ["crc32c (>=2.2,<3.0)"]
+dev = ["autopep8", "mypy", "pycodestyle", "pytest", "pytest-cov", "ruff"]
+doc = ["cloud-sptheme", "sphinx", "sphinx-autodoc-typehints"]
 
 [[package]]
 name = "psutil"
@@ -4602,4 +4607,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "788ff9b867ff983ca4544f1130137c872d40a7e56e441d041948a3a21c790b56"
+content-hash = "489c0bde94081a2fe720ce25b3390248724f86a6e97db7bd4fc1e40c110aa589"

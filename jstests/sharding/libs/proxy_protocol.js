@@ -21,8 +21,13 @@ export class ProxyProtocolServer {
         assert(version === 1 || version === 2);
         this.version = version;
 
-        this.ingress_address = '127.0.0.1';
-        this.egress_address = '127.0.0.1';
+        this.ingress_address = "127.0.0.1";
+        this.egress_address = "127.0.0.1";
+
+        // Optional runtime TLV control file. The Python proxy will load this file to read tlv
+        // values and will reload upon any change.
+        this.tlvFile =
+            MongoRunner.dataPath + `proxyprotocol_tlvs_${ingress_port}_${egress_port}.json`;
     }
 
     /**
@@ -68,6 +73,8 @@ export class ProxyProtocolServer {
             this.python,
             "-u",
             this.web_server_py,
+            "--pp2-tlv-file",
+            this.tlvFile,
             "--service",
             this.ingress_address + ':' + this.ingress_port,
             this.egress_address + ':' + this.egress_port + "?pp=v" + this.version,
@@ -100,6 +107,25 @@ export class ProxyProtocolServer {
         });
 
         print("Proxy Protocol Server sucessfully started.");
+    }
+
+    /**
+     * Update PROXY protocol v2 TLVs (type-length-value) for future connections.
+     *
+     * Input must be an array of objects representing the TLV.
+     *
+     * TLV object format:
+     * - type: hex string with 0x prefix (e.g. "0xE0")
+     * - value: UTF-8 string
+     *
+     * Ex. [{"type":"0xE1","value":"hello"}, {...}]
+     */
+    setTLVs(tlvs) {
+        const jsonString = JSON.stringify(tlvs);
+        // writeFile asserts that the file doesn't already exist so remove the file before writing.
+        // This will also allow us to update the tlvs multiple times within the same test.
+        removeFile(this.tlvFile);
+        writeFile(this.tlvFile, jsonString);
     }
 
     /**
@@ -147,5 +173,6 @@ export class ProxyProtocolServer {
      */
     stop() {
         stopMongoProgramByPid(this.pid);
+        removeFile(this.tlvFile);
     }
 }
