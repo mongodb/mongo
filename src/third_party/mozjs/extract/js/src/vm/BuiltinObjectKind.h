@@ -29,21 +29,16 @@ class GlobalObject;
 enum class BuiltinObjectKind : uint8_t {
   // Built-in constructors.
   Array,
-  ArrayBuffer,
-  Int32Array,
+  ListFormat,
   Map,
   Promise,
   RegExp,
   Set,
-  SharedArrayBuffer,
   Symbol,
 
   // Built-in prototypes.
   FunctionPrototype,
   IteratorPrototype,
-  ObjectPrototype,
-  RegExpPrototype,
-  StringPrototype,
 
   // Built-in Intl prototypes.
   DateTimeFormatPrototype,

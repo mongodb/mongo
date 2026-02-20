@@ -28,13 +28,14 @@ namespace js {
 namespace gc {
 class GCRuntime;
 }  // namespace gc
-class JS_PUBLIC_API SliceBudget;
 namespace gcstats {
 struct Statistics;
 }  // namespace gcstats
 }  // namespace js
 
 namespace JS {
+
+class JS_PUBLIC_API SliceBudget;
 
 // Options used when starting a GC.
 enum class GCOptions : uint32_t {
@@ -262,14 +263,6 @@ typedef enum JSGCParamKey {
   JSGC_MIN_EMPTY_CHUNK_COUNT = 21,
 
   /**
-   * We never keep more than this many unused chunks in the free chunk pool.
-   *
-   * Pref: javascript.options.mem.gc_max_empty_chunk_count
-   * Default: MaxEmptyChunkCount
-   */
-  JSGC_MAX_EMPTY_CHUNK_COUNT = 22,
-
-  /**
    * Whether compacting GC is enabled.
    *
    * Pref: javascript.options.mem.gc_compacting
@@ -488,6 +481,33 @@ typedef enum JSGCParamKey {
    */
   JSGC_SLICE_NUMBER = 54,
 
+  /**
+   * Whether the nursery is enabled.
+   *
+   * Pref: javascript.options.mem.gc_generational
+   * Default: true
+   */
+  JSGC_NURSERY_ENABLED = 55,
+
+  /*
+   * Whether we are in high frequency GC mode, where the time between
+   * collections is less than that specified by JSGC_HIGH_FREQUENCY_TIME_LIMIT.
+   */
+  JSGC_HIGH_FREQUENCY_MODE = 56,
+
+  /**
+   * The engine attempts to keep nursery collection time less than this limit by
+   * restricting the size of the nursery.
+   *
+   * This only happens in optimized builds. It does not happen during pageload
+   * (as indicated by js::gc::SetPerformanceHint).
+   *
+   * Setting this to zero disables this feature.
+   *
+   * Default: 4
+   * Pref: javascript.options.mem.nursery_max_time_goal_ms
+   */
+  JSGC_NURSERY_MAX_TIME_GOAL_MS = 57,
 } JSGCParamKey;
 
 /*
@@ -505,7 +525,7 @@ typedef void (*JSTraceDataOp)(JSTracer* trc, void* data);
  * While tracing this should check the budget and return false if it has been
  * exceeded. When passed an unlimited budget it should always return true.
  */
-typedef bool (*JSGrayRootsTracer)(JSTracer* trc, js::SliceBudget& budget,
+typedef bool (*JSGrayRootsTracer)(JSTracer* trc, JS::SliceBudget& budget,
                                   void* data);
 
 typedef enum JSGCStatus { JSGC_BEGIN, JSGC_END } JSGCStatus;
@@ -651,7 +671,7 @@ namespace JS {
   D(DOCSHELL, 54)                                                      \
   D(HTML_PARSER, 55)                                                   \
   D(DOM_TESTUTILS, 56)                                                 \
-  D(PREPARE_FOR_PAGELOAD, 57)                                          \
+  D(PREPARE_FOR_PAGELOAD, LAST_FIREFOX_REASON)                         \
                                                                        \
   /* Reasons reserved for embeddings. */                               \
   D(RESERVED1, FIRST_RESERVED_REASON)                                  \
@@ -666,6 +686,7 @@ namespace JS {
 
 enum class GCReason {
   FIRST_FIREFOX_REASON = 33,
+  LAST_FIREFOX_REASON = 57,
   FIRST_RESERVED_REASON = 90,
 
 #define MAKE_REASON(name, val) name = val,
@@ -691,6 +712,18 @@ extern JS_PUBLIC_API const char* ExplainGCReason(JS::GCReason reason);
  * Return true if the GC reason is internal to the JS engine.
  */
 extern JS_PUBLIC_API bool InternalGCReason(JS::GCReason reason);
+
+/**
+ * Get a statically allocated C string explaining the given Abort reason.
+ * Input is the integral value of the enum.
+ */
+extern JS_PUBLIC_API const char* ExplainGCAbortReason(uint32_t reason);
+
+/**
+ * Get a statically allocated C string describing the Phase.
+ * Input is the integral value of the enum.
+ */
+extern JS_PUBLIC_API const char* GetGCPhaseName(uint32_t phase);
 
 /*
  * Zone GC:
@@ -778,7 +811,7 @@ extern JS_PUBLIC_API void NonIncrementalGC(JSContext* cx, JS::GCOptions options,
 extern JS_PUBLIC_API void StartIncrementalGC(JSContext* cx,
                                              JS::GCOptions options,
                                              GCReason reason,
-                                             const js::SliceBudget& budget);
+                                             const JS::SliceBudget& budget);
 
 /**
  * Perform a slice of an ongoing incremental collection. When this function
@@ -789,7 +822,7 @@ extern JS_PUBLIC_API void StartIncrementalGC(JSContext* cx,
  *       shorter than the requested interval.
  */
 extern JS_PUBLIC_API void IncrementalGCSlice(JSContext* cx, GCReason reason,
-                                             const js::SliceBudget& budget);
+                                             const JS::SliceBudget& budget);
 
 /**
  * Return whether an incremental GC has work to do on the foreground thread and
@@ -957,7 +990,7 @@ typedef void (*DoCycleCollectionCallback)(JSContext* cx);
 extern JS_PUBLIC_API DoCycleCollectionCallback
 SetDoCycleCollectionCallback(JSContext* cx, DoCycleCollectionCallback callback);
 
-using CreateSliceBudgetCallback = js::SliceBudget (*)(JS::GCReason reason,
+using CreateSliceBudgetCallback = JS::SliceBudget (*)(JS::GCReason reason,
                                                       int64_t millis);
 
 /**
@@ -970,14 +1003,6 @@ using CreateSliceBudgetCallback = js::SliceBudget (*)(JS::GCReason reason,
  */
 extern JS_PUBLIC_API void SetCreateGCSliceBudgetCallback(
     JSContext* cx, CreateSliceBudgetCallback cb);
-
-/**
- * Incremental GC defaults to enabled, but may be disabled for testing or in
- * embeddings that have not yet implemented barriers on their native classes.
- * There is not currently a way to re-enable incremental GC once it has been
- * disabled on the runtime.
- */
-extern JS_PUBLIC_API void DisableIncrementalGC(JSContext* cx);
 
 /**
  * Returns true if incremental GC is enabled. Simply having incremental GC

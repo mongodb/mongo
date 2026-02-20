@@ -567,7 +567,8 @@ struct VariantIndex {
  * instead.
  */
 template <typename... Ts>
-class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
+class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS
+MOZ_NON_PARAM MOZ_GSL_OWNER Variant {
   friend struct IPC::ParamTraits<mozilla::Variant<Ts...>>;
   friend struct mozilla::ipc::IPDLParamTraits<mozilla::Variant<Ts...>>;
 
@@ -739,7 +740,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
 
   /** Mutable lvalue-reference. */
   template <typename T>
-  T& as() & {
+      T& as() & MOZ_LIFETIME_BOUND {
     static_assert(
         detail::SelectVariantType<T, Ts...>::count == 1,
         "provided a type not uniquely found in this Variant's type list");
@@ -748,7 +749,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
   }
 
   template <size_t N>
-  typename detail::Nth<N, Ts...>::Type& as() & {
+      typename detail::Nth<N, Ts...>::Type& as() & MOZ_LIFETIME_BOUND {
     static_assert(N < sizeof...(Ts),
                   "provided an index outside of this Variant's type list");
     MOZ_RELEASE_ASSERT(is<N>());
@@ -757,7 +758,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
 
   /** Immutable const lvalue-reference. */
   template <typename T>
-  const T& as() const& {
+  const T& as() const& MOZ_LIFETIME_BOUND {
     static_assert(detail::SelectVariantType<T, Ts...>::count == 1,
                   "provided a type not found in this Variant's type list");
     MOZ_RELEASE_ASSERT(is<T>());
@@ -765,7 +766,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
   }
 
   template <size_t N>
-  const typename detail::Nth<N, Ts...>::Type& as() const& {
+  const typename detail::Nth<N, Ts...>::Type& as() const& MOZ_LIFETIME_BOUND {
     static_assert(N < sizeof...(Ts),
                   "provided an index outside of this Variant's type list");
     MOZ_RELEASE_ASSERT(is<N>());
@@ -774,7 +775,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
 
   /** Mutable rvalue-reference. */
   template <typename T>
-  T&& as() && {
+      T&& as() && MOZ_LIFETIME_BOUND {
     static_assert(
         detail::SelectVariantType<T, Ts...>::count == 1,
         "provided a type not uniquely found in this Variant's type list");
@@ -783,7 +784,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
   }
 
   template <size_t N>
-  typename detail::Nth<N, Ts...>::Type&& as() && {
+      typename detail::Nth<N, Ts...>::Type&& as() && MOZ_LIFETIME_BOUND {
     static_assert(N < sizeof...(Ts),
                   "provided an index outside of this Variant's type list");
     MOZ_RELEASE_ASSERT(is<N>());
@@ -793,7 +794,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
 
   /** Immutable const rvalue-reference. */
   template <typename T>
-  const T&& as() const&& {
+  const T&& as() const&& MOZ_LIFETIME_BOUND {
     static_assert(detail::SelectVariantType<T, Ts...>::count == 1,
                   "provided a type not found in this Variant's type list");
     MOZ_RELEASE_ASSERT(is<T>());
@@ -801,7 +802,7 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant {
   }
 
   template <size_t N>
-  const typename detail::Nth<N, Ts...>::Type&& as() const&& {
+  const typename detail::Nth<N, Ts...>::Type&& as() const&& MOZ_LIFETIME_BOUND {
     static_assert(N < sizeof...(Ts),
                   "provided an index outside of this Variant's type list");
     MOZ_RELEASE_ASSERT(is<N>());

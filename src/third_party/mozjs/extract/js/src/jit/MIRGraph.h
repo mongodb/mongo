@@ -14,6 +14,7 @@
 #include "jit/FixedList.h"
 #include "jit/InlineScriptTree.h"
 #include "jit/JitAllocPolicy.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 
 namespace js {
@@ -30,7 +31,7 @@ using MInstructionReverseIterator = InlineListReverseIterator<MInstruction>;
 using MPhiIterator = InlineListIterator<MPhi>;
 
 #ifdef DEBUG
-typedef InlineForwardListIterator<MResumePoint> MResumePointIterator;
+using MResumePointIterator = InlineForwardListIterator<MResumePoint>;
 #endif
 
 class LBlock;
@@ -307,6 +308,12 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   // with multiple entries.
   void setLoopHeader(MBasicBlock* newBackedge);
 
+  // Marks this as a LOOP_HEADER block, but doesn't change anything else.
+  void setLoopHeader() {
+    MOZ_ASSERT(!isLoopHeader());
+    kind_ = LOOP_HEADER;
+  }
+
   // Propagates backedge slots into phis operands of the loop header.
   [[nodiscard]] bool inheritPhisFromBackedge(MBasicBlock* backedge);
 
@@ -394,6 +401,13 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   void setDomIndex(uint32_t d) { domIndex_ = d; }
 
   MBasicBlock* getPredecessor(uint32_t i) const { return predecessors_[i]; }
+  void setPredecessor(uint32_t i, MBasicBlock* p) { predecessors_[i] = p; }
+  [[nodiscard]]
+  bool appendPredecessor(MBasicBlock* p) {
+    return predecessors_.append(p);
+  }
+  void erasePredecessor(uint32_t i) { predecessors_.erase(&predecessors_[i]); }
+
   size_t indexForPredecessor(MBasicBlock* block) const {
     // This should only be called before critical edge splitting.
     MOZ_ASSERT(!block->successorWithPhis());
@@ -608,6 +622,29 @@ class MBasicBlock : public TempObject, public InlineListNode<MBasicBlock> {
   // bails out.
   MResumePoint* activeResumePoint(MInstruction* ins);
 
+#ifdef JS_JITSPEW
+  const char* nameOfKind() const {
+    switch (kind_) {
+      case MBasicBlock::Kind::NORMAL:
+        return "NORMAL";
+      case MBasicBlock::Kind::PENDING_LOOP_HEADER:
+        return "PENDING_LOOP_HEADER";
+      case MBasicBlock::Kind::LOOP_HEADER:
+        return "LOOP_HEADER";
+      case MBasicBlock::Kind::SPLIT_EDGE:
+        return "SPLIT_EDGE";
+      case MBasicBlock::Kind::FAKE_LOOP_PRED:
+        return "FAKE_LOOP_PRED";
+      case MBasicBlock::Kind::INTERNAL:
+        return "INTERNAL";
+      case MBasicBlock::Kind::DEAD:
+        return "DEAD";
+      default:
+        return "MBasicBlock::Kind::???";
+    }
+  }
+#endif
+
  private:
   MIRGraph& graph_;
   const CompileInfo& info_;  // Each block originates from a particular script.
@@ -661,7 +698,7 @@ using MBasicBlockIterator = InlineListIterator<MBasicBlock>;
 using ReversePostorderIterator = InlineListIterator<MBasicBlock>;
 using PostorderIterator = InlineListReverseIterator<MBasicBlock>;
 
-typedef Vector<MBasicBlock*, 1, JitAllocPolicy> MIRGraphReturns;
+using MIRGraphReturns = Vector<MBasicBlock*, 1, JitAllocPolicy>;
 
 class MIRGraph {
   InlineList<MBasicBlock> blocks_;
@@ -711,13 +748,15 @@ class MIRGraph {
 
   MBasicBlock* entryBlock() { return *blocks_.begin(); }
   MBasicBlockIterator begin() { return blocks_.begin(); }
-  MBasicBlockIterator begin(MBasicBlock* at) { return blocks_.begin(at); }
+  MBasicBlockIterator begin(const MBasicBlock* at) { return blocks_.begin(at); }
   MBasicBlockIterator end() { return blocks_.end(); }
   PostorderIterator poBegin() { return blocks_.rbegin(); }
-  PostorderIterator poBegin(MBasicBlock* at) { return blocks_.rbegin(at); }
+  PostorderIterator poBegin(const MBasicBlock* at) {
+    return blocks_.rbegin(at);
+  }
   PostorderIterator poEnd() { return blocks_.rend(); }
   ReversePostorderIterator rpoBegin() { return blocks_.begin(); }
-  ReversePostorderIterator rpoBegin(MBasicBlock* at) {
+  ReversePostorderIterator rpoBegin(const MBasicBlock* at) {
     return blocks_.begin(at);
   }
   ReversePostorderIterator rpoEnd() { return blocks_.end(); }

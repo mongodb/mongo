@@ -40,12 +40,12 @@ class MOZ_STACK_CLASS StringAsciiChars final {
 
   JS::AutoCheckCannotGC nogc_;
 
-  JSLinearString* str_;
+  const JSLinearString* str_;
 
   mozilla::Maybe<Vector<Latin1Char, InlineCapacity>> ownChars_;
 
  public:
-  explicit StringAsciiChars(JSLinearString* str) : str_(str) {
+  explicit StringAsciiChars(const JSLinearString* str) : str_(str) {
     MOZ_ASSERT(StringIsAscii(str));
   }
 

@@ -17,8 +17,9 @@
  *   2) They implement this functionality *safely*, without invoking signed
  *      integer overflow that has undefined behavior in C++.
  *   3) They play nice with compiler-based integer-overflow sanitizers (see
- *      build/autoconf/sanitize.m4), that in appropriately configured builds
- *      verify at runtime that integral arithmetic doesn't overflow.
+ *      build/moz.configure/toolchain.configure), that in appropriately
+ * configured builds verify at runtime that integral arithmetic doesn't
+ * overflow.
  */
 
 #ifndef mozilla_WrappingOperations_h

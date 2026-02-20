@@ -3,6 +3,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+#define MOZ_PRETEND_NO_JSRUST 1
+
 #include "mozilla/Latin1.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/TextUtils.h"
@@ -39,8 +41,8 @@ MFBT_API bool mozilla::detail::IsValidUtf8(const void* aCodeUnits,
 }
 
 #if !MOZ_HAS_JSRUST()
-#include <memory>          // for std::shared_ptr
-#include <unicode/ucnv.h>  // for UConverter
+#  include <memory>          // for std::shared_ptr
+#  include <unicode/ucnv.h>  // for UConverter
 
 std::tuple<UConverter*, UErrorCode> _getUConverter() {
   static thread_local UErrorCode uConverterErr = U_ZERO_ERROR;
@@ -105,7 +107,7 @@ std::tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
               break;
           }
           return std::make_tuple(static_cast<size_t>(srcPtr - srcOrigPtr),
-                                    static_cast<size_t>(dstPtr - dstOrigPtr));
+                                 static_cast<size_t>(dstPtr - dstOrigPtr));
         } else {
           // We do not need to handle it, as the problematic character will be
           // replaced with a REPLACEMENT CHARACTER.
@@ -121,7 +123,7 @@ std::tuple<size_t, size_t> mozilla::ConvertUtf16toUtf8Partial(
   }
 
   return std::make_tuple(static_cast<size_t>(srcPtr - srcOrigPtr),
-                            static_cast<size_t>(dstPtr - dstOrigPtr));
+                         static_cast<size_t>(dstPtr - dstOrigPtr));
 }
 
 size_t mozilla::ConvertUtf16toUtf8(mozilla::Span<const char16_t> aSource,

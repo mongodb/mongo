@@ -6,7 +6,6 @@
 
 #include "builtin/temporal/TimeZone.h"
 
-#include "mozilla/Array.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/intl/TimeZone.h"
 #include "mozilla/Likely.h"
@@ -18,16 +17,14 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <initializer_list>
 #include <iterator>
+#include <string_view>
 #include <utility>
 
-#include "jsnum.h"
-#include "jspubtd.h"
+#include "jsdate.h"
 #include "jstypes.h"
 #include "NamespaceImports.h"
 
-#include "builtin/Array.h"
 #include "builtin/intl/CommonFunctions.h"
 #include "builtin/intl/FormatBuffer.h"
 #include "builtin/intl/SharedIntlData.h"
@@ -40,66 +37,120 @@
 #include "builtin/temporal/TemporalParser.h"
 #include "builtin/temporal/TemporalTypes.h"
 #include "builtin/temporal/TemporalUnit.h"
-#include "builtin/temporal/Wrapped.h"
 #include "builtin/temporal/ZonedDateTime.h"
-#include "gc/AllocKind.h"
 #include "gc/Barrier.h"
 #include "gc/GCContext.h"
 #include "gc/GCEnum.h"
 #include "gc/Tracer.h"
 #include "js/AllocPolicy.h"
-#include "js/CallArgs.h"
-#include "js/CallNonGenericMethod.h"
 #include "js/Class.h"
-#include "js/ComparisonOperators.h"
-#include "js/Date.h"
 #include "js/ErrorReport.h"
-#include "js/ForOfIterator.h"
 #include "js/friend/ErrorMessages.h"
 #include "js/Printer.h"
-#include "js/PropertyDescriptor.h"
-#include "js/PropertySpec.h"
 #include "js/RootingAPI.h"
 #include "js/StableStringChars.h"
-#include "threading/ProtectedData.h"
-#include "vm/ArrayObject.h"
 #include "vm/BytecodeUtil.h"
 #include "vm/Compartment.h"
 #include "vm/DateTime.h"
-#include "vm/GlobalObject.h"
-#include "vm/Interpreter.h"
 #include "vm/JSAtomState.h"
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
-#include "vm/PlainObject.h"
 #include "vm/Runtime.h"
 #include "vm/StringType.h"
 
 #include "vm/JSObject-inl.h"
-#include "vm/NativeObject-inl.h"
-#include "vm/ObjectOperations-inl.h"
 
 using namespace js;
 using namespace js::temporal;
-
-static inline bool IsTimeZone(Handle<Value> v) {
-  return v.isObject() && v.toObject().is<TimeZoneObject>();
-}
 
 void js::temporal::TimeZoneValue::trace(JSTracer* trc) {
   TraceNullableRoot(trc, &object_, "TimeZoneValue::object");
 }
 
-void js::temporal::TimeZoneRecord::trace(JSTracer* trc) {
-  receiver_.trace(trc);
-  TraceNullableRoot(trc, &getOffsetNanosecondsFor_,
-                    "TimeZoneMethods::getOffsetNanosecondsFor");
-  TraceNullableRoot(trc, &getPossibleInstantsFor_,
-                    "TimeZoneMethods::getPossibleInstantsFor");
+/**
+ * FormatOffsetTimeZoneIdentifier ( offsetMinutes [ , style ] )
+ */
+static JSLinearString* FormatOffsetTimeZoneIdentifier(JSContext* cx,
+                                                      int32_t offsetMinutes) {
+  MOZ_ASSERT(std::abs(offsetMinutes) < UnitsPerDay(TemporalUnit::Minute));
+
+  // Step 1.
+  char sign = offsetMinutes >= 0 ? '+' : '-';
+
+  // Step 2.
+  int32_t absoluteMinutes = std::abs(offsetMinutes);
+
+  // Step 3.
+  int32_t hour = absoluteMinutes / 60;
+
+  // Step 4.
+  int32_t minute = absoluteMinutes % 60;
+
+  // Step 5. (Inlined FormatTimeString).
+  //
+  // Format: "sign hour{2} : minute{2}"
+  char result[] = {
+      sign, char('0' + (hour / 10)),   char('0' + (hour % 10)),
+      ':',  char('0' + (minute / 10)), char('0' + (minute % 10)),
+  };
+
+  // Step 6.
+  return NewStringCopyN<CanGC>(cx, result, std::size(result));
+}
+
+static TimeZoneObject* CreateTimeZoneObject(
+    JSContext* cx, Handle<JSLinearString*> identifier,
+    Handle<JSLinearString*> primaryIdentifier) {
+  // TODO: Implement a built-in time zone object cache.
+
+  auto* object = NewObjectWithGivenProto<TimeZoneObject>(cx, nullptr);
+  if (!object) {
+    return nullptr;
+  }
+
+  object->setFixedSlot(TimeZoneObject::IDENTIFIER_SLOT,
+                       StringValue(identifier));
+
+  object->setFixedSlot(TimeZoneObject::PRIMARY_IDENTIFIER_SLOT,
+                       StringValue(primaryIdentifier));
+
+  object->setFixedSlot(TimeZoneObject::OFFSET_MINUTES_SLOT, UndefinedValue());
+
+  return object;
+}
+
+static TimeZoneObject* CreateTimeZoneObject(JSContext* cx,
+                                            int32_t offsetMinutes) {
+  // TODO: It's unclear if offset time zones should also be cached. Real world
+  // experience will tell if a cache should be added.
+
+  MOZ_ASSERT(std::abs(offsetMinutes) < UnitsPerDay(TemporalUnit::Minute));
+
+  Rooted<JSLinearString*> identifier(
+      cx, FormatOffsetTimeZoneIdentifier(cx, offsetMinutes));
+  if (!identifier) {
+    return nullptr;
+  }
+
+  auto* object = NewObjectWithGivenProto<TimeZoneObject>(cx, nullptr);
+  if (!object) {
+    return nullptr;
+  }
+
+  object->setFixedSlot(TimeZoneObject::IDENTIFIER_SLOT,
+                       StringValue(identifier));
+
+  object->setFixedSlot(TimeZoneObject::PRIMARY_IDENTIFIER_SLOT,
+                       UndefinedValue());
+
+  object->setFixedSlot(TimeZoneObject::OFFSET_MINUTES_SLOT,
+                       Int32Value(offsetMinutes));
+
+  return object;
 }
 
 static mozilla::UniquePtr<mozilla::intl::TimeZone> CreateIntlTimeZone(
-    JSContext* cx, JSString* identifier) {
+    JSContext* cx, JSLinearString* identifier) {
   JS::AutoStableStringChars stableChars(cx);
   if (!stableChars.initTwoByte(cx, identifier)) {
     return nullptr;
@@ -115,20 +166,23 @@ static mozilla::UniquePtr<mozilla::intl::TimeZone> CreateIntlTimeZone(
 }
 
 static mozilla::intl::TimeZone* GetOrCreateIntlTimeZone(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone) {
+    JSContext* cx, Handle<TimeZoneValue> timeZone) {
+  MOZ_ASSERT(!timeZone.isOffset());
+
   // Obtain a cached mozilla::intl::TimeZone object.
-  if (auto* tz = timeZone->getTimeZone()) {
+  if (auto* tz = timeZone.getTimeZone()) {
     return tz;
   }
 
-  auto* tz = CreateIntlTimeZone(cx, timeZone->identifier()).release();
+  auto* tz = CreateIntlTimeZone(cx, timeZone.primaryIdentifier()).release();
   if (!tz) {
     return nullptr;
   }
-  timeZone->setTimeZone(tz);
 
-  intl::AddICUCellMemory(timeZone,
-                         TimeZoneObjectMaybeBuiltin::EstimatedMemoryUse);
+  auto* obj = timeZone.get().toTimeZoneObject();
+  obj->setTimeZone(tz);
+
+  intl::AddICUCellMemory(obj, TimeZoneObject::EstimatedMemoryUse);
   return tz;
 }
 
@@ -136,9 +190,8 @@ static mozilla::intl::TimeZone* GetOrCreateIntlTimeZone(
  * IsValidTimeZoneName ( timeZone )
  * IsAvailableTimeZoneName ( timeZone )
  */
-bool js::temporal::IsValidTimeZoneName(
-    JSContext* cx, Handle<JSString*> timeZone,
-    MutableHandle<JSAtom*> validatedTimeZone) {
+static bool IsValidTimeZoneName(JSContext* cx, Handle<JSLinearString*> timeZone,
+                                MutableHandle<JSAtom*> validatedTimeZone) {
   intl::SharedIntlData& sharedIntlData = cx->runtime()->sharedIntlData.ref();
 
   if (!sharedIntlData.validateTimeZoneName(cx, timeZone, validatedTimeZone)) {
@@ -158,7 +211,7 @@ bool js::temporal::IsValidTimeZoneName(
  *
  * ES2024 Intl draft rev 74ca7099f103d143431b2ea422ae640c6f43e3e6
  */
-JSString* js::temporal::CanonicalizeTimeZoneName(
+static JSLinearString* CanonicalizeTimeZoneName(
     JSContext* cx, Handle<JSLinearString*> timeZone) {
   // Step 1. (Not applicable, the input is already a valid IANA time zone.)
 #ifdef DEBUG
@@ -222,11 +275,9 @@ JSString* js::temporal::CanonicalizeTimeZoneName(
              "Unsupported canonical time zone");
 #endif
 
-  // Step 3.
-  if (StringEqualsLiteral(ianaTimeZone, "Etc/UTC") ||
-      StringEqualsLiteral(ianaTimeZone, "Etc/GMT")) {
-    return cx->names().UTC;
-  }
+  // Step 3. (Links to UTC are handled by SharedIntlData.)
+  MOZ_ASSERT(!StringEqualsLiteral(ianaTimeZone, "Etc/UTC"));
+  MOZ_ASSERT(!StringEqualsLiteral(ianaTimeZone, "Etc/GMT"));
 
   // We don't need to check against "GMT", because ICU uses the tzdata rearguard
   // format, where "GMT" is a link to "Etc/GMT".
@@ -241,11 +292,13 @@ JSString* js::temporal::CanonicalizeTimeZoneName(
  * IsAvailableTimeZoneName ( timeZone )
  * CanonicalizeTimeZoneName ( timeZone )
  */
-JSString* js::temporal::ValidateAndCanonicalizeTimeZoneName(
-    JSContext* cx, Handle<JSString*> timeZone) {
+static bool ValidateAndCanonicalizeTimeZoneName(
+    JSContext* cx, Handle<JSLinearString*> timeZone,
+    MutableHandle<JSLinearString*> identifier,
+    MutableHandle<JSLinearString*> primaryIdentifier) {
   Rooted<JSAtom*> validatedTimeZone(cx);
   if (!IsValidTimeZoneName(cx, timeZone, &validatedTimeZone)) {
-    return nullptr;
+    return false;
   }
 
   if (!validatedTimeZone) {
@@ -254,49 +307,139 @@ JSString* js::temporal::ValidateAndCanonicalizeTimeZoneName(
                                JSMSG_TEMPORAL_TIMEZONE_INVALID_IDENTIFIER,
                                chars.get());
     }
+    return false;
+  }
+
+  auto* canonical = CanonicalizeTimeZoneName(cx, validatedTimeZone);
+  if (!canonical) {
+    return false;
+  }
+
+  identifier.set(validatedTimeZone);
+  primaryIdentifier.set(canonical);
+  return true;
+}
+
+static bool SystemTimeZoneOffset(JSContext* cx, int32_t* offset) {
+  auto rawOffset =
+      DateTimeInfo::getRawOffsetMs(DateTimeInfo::forceUTC(cx->realm()));
+  if (rawOffset.isErr()) {
+    intl::ReportInternalError(cx);
+    return false;
+  }
+
+  *offset = rawOffset.unwrap();
+  return true;
+}
+
+/**
+ * SystemTimeZoneIdentifier ( )
+ *
+ * Returns the IANA time zone name for the host environment's current time zone.
+ */
+JSLinearString* js::temporal::SystemTimeZoneIdentifier(JSContext* cx) {
+  intl::FormatBuffer<char16_t, intl::INITIAL_CHAR_BUFFER_SIZE> formatBuffer(cx);
+  auto result = DateTimeInfo::timeZoneId(DateTimeInfo::forceUTC(cx->realm()),
+                                         formatBuffer);
+  if (result.isErr()) {
+    intl::ReportInternalError(cx, result.unwrapErr());
     return nullptr;
   }
 
-  return CanonicalizeTimeZoneName(cx, validatedTimeZone);
+  Rooted<JSLinearString*> timeZone(cx, formatBuffer.toString(cx));
+  if (!timeZone) {
+    return nullptr;
+  }
+
+  Rooted<JSAtom*> validTimeZone(cx);
+  if (!IsValidTimeZoneName(cx, timeZone, &validTimeZone)) {
+    return nullptr;
+  }
+  if (validTimeZone) {
+    return CanonicalizeTimeZoneName(cx, validTimeZone);
+  }
+
+  // See DateTimeFormat.js for the JS implementation.
+  // TODO: Move the JS implementation into C++.
+
+  // Before defaulting to "UTC", try to represent the system time zone using
+  // the Etc/GMT + offset format. This format only accepts full hour offsets.
+  int32_t offset;
+  if (!SystemTimeZoneOffset(cx, &offset)) {
+    return nullptr;
+  }
+
+  constexpr int32_t msPerHour = 60 * 60 * 1000;
+  int32_t offsetHours = std::abs(offset / msPerHour);
+  int32_t offsetHoursFraction = offset % msPerHour;
+  if (offsetHoursFraction == 0 && offsetHours < 24) {
+    // Etc/GMT + offset uses POSIX-style signs, i.e. a positive offset
+    // means a location west of GMT.
+    constexpr std::string_view etcGMT = "Etc/GMT";
+
+    char offsetString[etcGMT.length() + 3];
+
+    size_t n = etcGMT.copy(offsetString, etcGMT.length());
+    offsetString[n++] = offset < 0 ? '+' : '-';
+    if (offsetHours >= 10) {
+      offsetString[n++] = char('0' + (offsetHours / 10));
+    }
+    offsetString[n++] = char('0' + (offsetHours % 10));
+
+    MOZ_ASSERT(n == etcGMT.length() + 2 || n == etcGMT.length() + 3);
+
+    timeZone = NewStringCopyN<CanGC>(cx, offsetString, n);
+    if (!timeZone) {
+      return nullptr;
+    }
+
+    // Check if the fallback is valid.
+    if (!IsValidTimeZoneName(cx, timeZone, &validTimeZone)) {
+      return nullptr;
+    }
+    if (validTimeZone) {
+      return CanonicalizeTimeZoneName(cx, validTimeZone);
+    }
+  }
+
+  // Fallback to "UTC" if everything else fails.
+  return cx->names().UTC;
 }
 
-class EpochInstantList final {
-  // GetNamedTimeZoneEpochNanoseconds can return up-to two elements.
-  static constexpr size_t MaxLength = 2;
+/**
+ * SystemTimeZoneIdentifier ( )
+ */
+bool js::temporal::SystemTimeZone(JSContext* cx,
+                                  MutableHandle<TimeZoneValue> result) {
+  Rooted<JSLinearString*> identifier(cx, SystemTimeZoneIdentifier(cx));
+  if (!identifier) {
+    return false;
+  }
 
-  mozilla::Array<Instant, MaxLength> array_ = {};
-  size_t length_ = 0;
+  auto* timeZone = CreateTimeZoneObject(cx, identifier, identifier);
+  if (!timeZone) {
+    return false;
+  }
 
- public:
-  EpochInstantList() = default;
-
-  size_t length() const { return length_; }
-
-  void append(const Instant& instant) { array_[length_++] = instant; }
-
-  auto& operator[](size_t i) { return array_[i]; }
-  const auto& operator[](size_t i) const { return array_[i]; }
-
-  auto begin() const { return array_.begin(); }
-  auto end() const { return array_.begin() + length_; }
-};
+  result.set(TimeZoneValue(timeZone));
+  return true;
+}
 
 /**
- * GetNamedTimeZoneEpochNanoseconds ( timeZoneIdentifier, year, month, day,
- * hour, minute, second, millisecond, microsecond, nanosecond )
+ * GetNamedTimeZoneEpochNanoseconds ( timeZoneIdentifier, isoDateTime )
  */
-static bool GetNamedTimeZoneEpochNanoseconds(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone,
-    const PlainDateTime& dateTime, EpochInstantList& instants) {
-  MOZ_ASSERT(timeZone->offsetMinutes().isUndefined());
-  MOZ_ASSERT(IsValidISODateTime(dateTime));
-  MOZ_ASSERT(ISODateTimeWithinLimits(dateTime));
-  MOZ_ASSERT(instants.length() == 0);
+static bool GetNamedTimeZoneEpochNanoseconds(JSContext* cx,
+                                             Handle<TimeZoneValue> timeZone,
+                                             const ISODateTime& isoDateTime,
+                                             PossibleEpochNanoseconds* result) {
+  MOZ_ASSERT(!timeZone.isOffset());
+  MOZ_ASSERT(IsValidISODateTime(isoDateTime));
+  MOZ_ASSERT(ISODateTimeWithinLimits(isoDateTime));
 
   // FIXME: spec issue - assert ISODateTimeWithinLimits instead of
   // IsValidISODate
 
-  int64_t ms = MakeDate(dateTime);
+  int64_t ms = MakeDate(isoDateTime);
 
   auto* tz = GetOrCreateIntlTimeZone(cx, timeZone);
   if (!tz) {
@@ -332,9 +475,9 @@ static bool GetNamedTimeZoneEpochNanoseconds(
   }
 
   if (formerOffset == latterOffset) {
-    auto instant = GetUTCEpochNanoseconds(
-        dateTime, InstantSpan::fromMilliseconds(formerOffset));
-    instants.append(instant);
+    auto epochNs = GetUTCEpochNanoseconds(isoDateTime) -
+                   EpochDuration::fromMilliseconds(formerOffset);
+    *result = PossibleEpochNanoseconds{epochNs};
     return true;
   }
 
@@ -345,23 +488,22 @@ static bool GetNamedTimeZoneEpochNanoseconds(
 
   // Skipped time.
   if (disambiguationOffset == formerOffset) {
+    *result = {};
     return true;
   }
 
   // Repeated time.
-  for (auto offset : {formerOffset, latterOffset}) {
-    auto instant =
-        GetUTCEpochNanoseconds(dateTime, InstantSpan::fromMilliseconds(offset));
-    instants.append(instant);
+  auto formerInstant = GetUTCEpochNanoseconds(isoDateTime) -
+                       EpochDuration::fromMilliseconds(formerOffset);
+  auto latterInstant = GetUTCEpochNanoseconds(isoDateTime) -
+                       EpochDuration::fromMilliseconds(latterOffset);
+
+  // Ensure the returned epoch nanoseconds are sorted in numerical order.
+  if (formerInstant > latterInstant) {
+    std::swap(formerInstant, latterInstant);
   }
 
-  MOZ_ASSERT(instants.length() == 2);
-
-  // Ensure the returned instants are sorted in numerical order.
-  if (instants[0] > instants[1]) {
-    std::swap(instants[0], instants[1]);
-  }
-
+  *result = PossibleEpochNanoseconds{formerInstant, latterInstant};
   return true;
 }
 
@@ -369,12 +511,12 @@ static bool GetNamedTimeZoneEpochNanoseconds(
  * GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
  */
 static bool GetNamedTimeZoneOffsetNanoseconds(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone,
-    const Instant& epochInstant, int64_t* offset) {
-  MOZ_ASSERT(timeZone->offsetMinutes().isUndefined());
+    JSContext* cx, Handle<TimeZoneValue> timeZone,
+    const EpochNanoseconds& epochNanoseconds, int64_t* offset) {
+  MOZ_ASSERT(!timeZone.isOffset());
 
   // Round down (floor) to the previous full milliseconds.
-  int64_t millis = epochInstant.floorToMilliseconds();
+  int64_t millis = epochNanoseconds.floorToMilliseconds();
 
   auto* tz = GetOrCreateIntlTimeZone(cx, timeZone);
   if (!tz) {
@@ -398,11 +540,11 @@ static bool GetNamedTimeZoneOffsetNanoseconds(
 /**
  * GetNamedTimeZoneNextTransition ( timeZoneIdentifier, epochNanoseconds )
  */
-static bool GetNamedTimeZoneNextTransition(JSContext* cx,
-                                           Handle<TimeZoneObject*> timeZone,
-                                           const Instant& epochInstant,
-                                           mozilla::Maybe<Instant>* result) {
-  MOZ_ASSERT(timeZone->offsetMinutes().isUndefined());
+bool js::temporal::GetNamedTimeZoneNextTransition(
+    JSContext* cx, Handle<TimeZoneValue> timeZone,
+    const EpochNanoseconds& epochNanoseconds,
+    mozilla::Maybe<EpochNanoseconds>* result) {
+  MOZ_ASSERT(!timeZone.isOffset());
 
   // Round down (floor) to the previous full millisecond.
   //
@@ -410,7 +552,7 @@ static bool GetNamedTimeZoneNextTransition(JSContext* cx,
   // the default configuration doesn't enable it, therefore it's safe to round
   // to milliseconds here. In addition to that, ICU also only supports
   // transitions at millisecond precision.
-  int64_t millis = epochInstant.floorToMilliseconds();
+  int64_t millis = epochNanoseconds.floorToMilliseconds();
 
   auto* tz = GetOrCreateIntlTimeZone(cx, timeZone);
   if (!tz) {
@@ -429,8 +571,8 @@ static bool GetNamedTimeZoneNextTransition(JSContext* cx,
     return true;
   }
 
-  auto transitionInstant = Instant::fromMilliseconds(*transition);
-  if (!IsValidEpochInstant(transitionInstant)) {
+  auto transitionInstant = EpochNanoseconds::fromMilliseconds(*transition);
+  if (!IsValidEpochNanoseconds(transitionInstant)) {
     *result = mozilla::Nothing();
     return true;
   }
@@ -442,10 +584,11 @@ static bool GetNamedTimeZoneNextTransition(JSContext* cx,
 /**
  * GetNamedTimeZonePreviousTransition ( timeZoneIdentifier, epochNanoseconds )
  */
-static bool GetNamedTimeZonePreviousTransition(
-    JSContext* cx, Handle<TimeZoneObject*> timeZone,
-    const Instant& epochInstant, mozilla::Maybe<Instant>* result) {
-  MOZ_ASSERT(timeZone->offsetMinutes().isUndefined());
+bool js::temporal::GetNamedTimeZonePreviousTransition(
+    JSContext* cx, Handle<TimeZoneValue> timeZone,
+    const EpochNanoseconds& epochNanoseconds,
+    mozilla::Maybe<EpochNanoseconds>* result) {
+  MOZ_ASSERT(!timeZone.isOffset());
 
   // Round up (ceil) to the next full millisecond.
   //
@@ -453,7 +596,7 @@ static bool GetNamedTimeZonePreviousTransition(
   // the default configuration doesn't enable it, therefore it's safe to round
   // to milliseconds here. In addition to that, ICU also only supports
   // transitions at millisecond precision.
-  int64_t millis = epochInstant.ceilToMilliseconds();
+  int64_t millis = epochNanoseconds.ceilToMilliseconds();
 
   auto* tz = GetOrCreateIntlTimeZone(cx, timeZone);
   if (!tz) {
@@ -472,8 +615,8 @@ static bool GetNamedTimeZonePreviousTransition(
     return true;
   }
 
-  auto transitionInstant = Instant::fromMilliseconds(*transition);
-  if (!IsValidEpochInstant(transitionInstant)) {
+  auto transitionInstant = EpochNanoseconds::fromMilliseconds(*transition);
+  if (!IsValidEpochNanoseconds(transitionInstant)) {
     *result = mozilla::Nothing();
     return true;
   }
@@ -483,153 +626,53 @@ static bool GetNamedTimeZonePreviousTransition(
 }
 
 /**
- * FormatOffsetTimeZoneIdentifier ( offsetMinutes [ , style ] )
+ * GetStartOfDay ( timeZone, isoDate )
  */
-static JSString* FormatOffsetTimeZoneIdentifier(JSContext* cx,
-                                                int32_t offsetMinutes) {
-  MOZ_ASSERT(std::abs(offsetMinutes) < UnitsPerDay(TemporalUnit::Minute));
+bool js::temporal::GetStartOfDay(JSContext* cx, Handle<TimeZoneValue> timeZone,
+                                 const ISODate& isoDate,
+                                 EpochNanoseconds* result) {
+  MOZ_ASSERT(IsValidISODate(isoDate));
 
   // Step 1.
-  char sign = offsetMinutes >= 0 ? '+' : '-';
+  auto isoDateTime = ISODateTime{isoDate, {}};
 
   // Step 2.
-  int32_t absoluteMinutes = std::abs(offsetMinutes);
+  PossibleEpochNanoseconds possibleEpochNs;
+  if (!GetPossibleEpochNanoseconds(cx, timeZone, isoDateTime,
+                                   &possibleEpochNs)) {
+    return false;
+  }
+  MOZ_ASSERT(ISODateTimeWithinLimits(isoDateTime));
 
   // Step 3.
-  int32_t hour = absoluteMinutes / 60;
+  if (!possibleEpochNs.empty()) {
+    *result = possibleEpochNs[0];
+    return true;
+  }
 
   // Step 4.
-  int32_t minute = absoluteMinutes % 60;
+  MOZ_ASSERT(!timeZone.isOffset());
 
-  // Step 5. (Inlined FormatTimeString).
-  //
-  // Format: "sign hour{2} : minute{2}"
-  char result[] = {
-      sign, char('0' + (hour / 10)),   char('0' + (hour % 10)),
-      ':',  char('0' + (minute / 10)), char('0' + (minute % 10)),
-  };
+  constexpr auto oneDay = EpochDuration::fromDays(1);
+
+  // Step 5.
+  auto previousDayEpochNs = GetUTCEpochNanoseconds(isoDateTime) - oneDay;
+  mozilla::Maybe<EpochNanoseconds> transition{};
+  if (!GetNamedTimeZoneNextTransition(cx, timeZone, previousDayEpochNs,
+                                      &transition)) {
+    return false;
+  }
 
   // Step 6.
-  return NewStringCopyN<CanGC>(cx, result, std::size(result));
+  MOZ_ASSERT(transition, "time zone transition not found");
+
+  // Step 7.
+  *result = *transition;
+  return true;
 }
 
 /**
- * CreateTemporalTimeZone ( identifier [ , newTarget ] )
- */
-static TimeZoneObject* CreateTemporalTimeZone(JSContext* cx,
-                                              const CallArgs& args,
-                                              Handle<JSString*> identifier,
-                                              Handle<Value> offsetMinutes) {
-  MOZ_ASSERT(offsetMinutes.isUndefined() || offsetMinutes.isInt32());
-  MOZ_ASSERT_IF(offsetMinutes.isInt32(), std::abs(offsetMinutes.toInt32()) <
-                                             UnitsPerDay(TemporalUnit::Minute));
-
-  // Steps 1-2.
-  Rooted<JSObject*> proto(cx);
-  if (!GetPrototypeFromBuiltinConstructor(cx, args, JSProto_TimeZone, &proto)) {
-    return nullptr;
-  }
-
-  auto* timeZone = NewObjectWithClassProto<TimeZoneObject>(cx, proto);
-  if (!timeZone) {
-    return nullptr;
-  }
-
-  // Step 4.a. (Not applicable in our implementation.)
-
-  // Steps 3.a or 4.b.
-  timeZone->setFixedSlot(TimeZoneObject::IDENTIFIER_SLOT,
-                         StringValue(identifier));
-
-  // Step 3.b or 4.c.
-  timeZone->setFixedSlot(TimeZoneObject::OFFSET_MINUTES_SLOT, offsetMinutes);
-
-  // Step 5.
-  return timeZone;
-}
-
-static BuiltinTimeZoneObject* CreateBuiltinTimeZone(
-    JSContext* cx, Handle<JSString*> identifier) {
-  // TODO: Implement a built-in time zone object cache.
-
-  auto* object = NewObjectWithGivenProto<BuiltinTimeZoneObject>(cx, nullptr);
-  if (!object) {
-    return nullptr;
-  }
-
-  object->setFixedSlot(BuiltinTimeZoneObject::IDENTIFIER_SLOT,
-                       StringValue(identifier));
-
-  object->setFixedSlot(BuiltinTimeZoneObject::OFFSET_MINUTES_SLOT,
-                       UndefinedValue());
-
-  return object;
-}
-
-static BuiltinTimeZoneObject* CreateBuiltinTimeZone(JSContext* cx,
-                                                    int32_t offsetMinutes) {
-  // TODO: It's unclear if offset time zones should also be cached. Real world
-  // experience will tell if a cache should be added.
-
-  MOZ_ASSERT(std::abs(offsetMinutes) < UnitsPerDay(TemporalUnit::Minute));
-
-  Rooted<JSString*> identifier(
-      cx, FormatOffsetTimeZoneIdentifier(cx, offsetMinutes));
-  if (!identifier) {
-    return nullptr;
-  }
-
-  auto* object = NewObjectWithGivenProto<BuiltinTimeZoneObject>(cx, nullptr);
-  if (!object) {
-    return nullptr;
-  }
-
-  object->setFixedSlot(BuiltinTimeZoneObject::IDENTIFIER_SLOT,
-                       StringValue(identifier));
-
-  object->setFixedSlot(BuiltinTimeZoneObject::OFFSET_MINUTES_SLOT,
-                       Int32Value(offsetMinutes));
-
-  return object;
-}
-
-/**
- * CreateTemporalTimeZone ( identifier [ , newTarget ] )
- */
-static TimeZoneObject* CreateTemporalTimeZone(
-    JSContext* cx, Handle<BuiltinTimeZoneObject*> timeZone) {
-  // Steps 1-2.
-  auto* object = NewBuiltinClassInstance<TimeZoneObject>(cx);
-  if (!object) {
-    return nullptr;
-  }
-
-  // Step 4.a. (Not applicable in our implementation.)
-
-  // Steps 3.a or 4.b.
-  object->setFixedSlot(
-      TimeZoneObject::IDENTIFIER_SLOT,
-      timeZone->getFixedSlot(BuiltinTimeZoneObject::IDENTIFIER_SLOT));
-
-  // Step 3.b or 4.c.
-  object->setFixedSlot(
-      TimeZoneObject::OFFSET_MINUTES_SLOT,
-      timeZone->getFixedSlot(BuiltinTimeZoneObject::OFFSET_MINUTES_SLOT));
-
-  // Step 5.
-  return object;
-}
-
-/**
- * CreateTemporalTimeZone ( identifier [ , newTarget ] )
- */
-BuiltinTimeZoneObject* js::temporal::CreateTemporalTimeZone(
-    JSContext* cx, Handle<JSString*> identifier) {
-  return ::CreateBuiltinTimeZone(cx, identifier);
-}
-
-/**
- * ToTemporalTimeZoneSlotValue ( temporalTimeZoneLike )
+ * ToTemporalTimeZoneIdentifier ( temporalTimeZoneLike )
  */
 bool js::temporal::ToTemporalTimeZone(JSContext* cx,
                                       Handle<ParsedTimeZone> string,
@@ -637,18 +680,8 @@ bool js::temporal::ToTemporalTimeZone(JSContext* cx,
   // Steps 1-3. (Not applicable)
 
   // Steps 4-5.
-  if (string.name()) {
-    // Steps 4.a-c. (Not applicable in our implementation.)
-
-    // Steps 4.d-e.
-    Rooted<JSString*> timeZoneName(
-        cx, ValidateAndCanonicalizeTimeZoneName(cx, string.name()));
-    if (!timeZoneName) {
-      return false;
-    }
-
-    // Steps 4.f and 5.
-    auto* obj = ::CreateBuiltinTimeZone(cx, timeZoneName);
+  if (!string.name()) {
+    auto* obj = CreateTimeZoneObject(cx, string.offset());
     if (!obj) {
       return false;
     }
@@ -657,8 +690,16 @@ bool js::temporal::ToTemporalTimeZone(JSContext* cx,
     return true;
   }
 
-  // Steps 4.b-c and 8.
-  auto* obj = ::CreateBuiltinTimeZone(cx, string.offset());
+  // Steps 6-8.
+  Rooted<JSLinearString*> identifier(cx);
+  Rooted<JSLinearString*> primaryIdentifier(cx);
+  if (!ValidateAndCanonicalizeTimeZoneName(cx, string.name(), &identifier,
+                                           &primaryIdentifier)) {
+    return false;
+  }
+
+  // Step 9.
+  auto* obj = CreateTimeZoneObject(cx, identifier, primaryIdentifier);
   if (!obj) {
     return false;
   }
@@ -668,85 +709,29 @@ bool js::temporal::ToTemporalTimeZone(JSContext* cx,
 }
 
 /**
- * ObjectImplementsTemporalTimeZoneProtocol ( object )
- */
-static bool ObjectImplementsTemporalTimeZoneProtocol(JSContext* cx,
-                                                     Handle<JSObject*> object,
-                                                     bool* result) {
-  // Step 1. (Not applicable in our implementation.)
-  MOZ_ASSERT(!object->canUnwrapAs<TimeZoneObject>(),
-             "TimeZone objects handled in the caller");
-
-  // Step 2.
-  for (auto key : {
-           &JSAtomState::getOffsetNanosecondsFor,
-           &JSAtomState::getPossibleInstantsFor,
-           &JSAtomState::id,
-       }) {
-    // Step 2.a.
-    bool has;
-    if (!HasProperty(cx, object, cx->names().*key, &has)) {
-      return false;
-    }
-    if (!has) {
-      *result = false;
-      return true;
-    }
-  }
-
-  // Step 3.
-  *result = true;
-  return true;
-}
-
-/**
- * ToTemporalTimeZoneSlotValue ( temporalTimeZoneLike )
+ * ToTemporalTimeZoneIdentifier ( temporalTimeZoneLike )
  */
 bool js::temporal::ToTemporalTimeZone(JSContext* cx,
                                       Handle<Value> temporalTimeZoneLike,
                                       MutableHandle<TimeZoneValue> result) {
   // Step 1.
-  Rooted<Value> timeZoneLike(cx, temporalTimeZoneLike);
-  if (timeZoneLike.isObject()) {
-    Rooted<JSObject*> obj(cx, &timeZoneLike.toObject());
-
-    // Step 1.b. (Partial)
-    if (obj->canUnwrapAs<TimeZoneObject>()) {
-      result.set(TimeZoneValue(obj));
-      return true;
-    }
+  if (temporalTimeZoneLike.isObject()) {
+    JSObject* obj = &temporalTimeZoneLike.toObject();
 
     // Step 1.a.
     if (auto* zonedDateTime = obj->maybeUnwrapIf<ZonedDateTimeObject>()) {
       result.set(zonedDateTime->timeZone());
       return result.wrap(cx);
     }
-
-    // Step 1.b.
-    bool implementsTimeZoneProtocol;
-    if (!ObjectImplementsTemporalTimeZoneProtocol(
-            cx, obj, &implementsTimeZoneProtocol)) {
-      return false;
-    }
-    if (!implementsTimeZoneProtocol) {
-      JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
-                               JSMSG_TEMPORAL_INVALID_OBJECT,
-                               "Temporal.TimeZone", obj->getClass()->name);
-      return false;
-    }
-
-    // Step 1.c.
-    result.set(TimeZoneValue(obj));
-    return true;
   }
 
   // Step 2.
-  if (!timeZoneLike.isString()) {
+  if (!temporalTimeZoneLike.isString()) {
     ReportValueError(cx, JSMSG_UNEXPECTED_TYPE, JSDVG_IGNORE_STACK,
-                     timeZoneLike, nullptr, "not a string");
+                     temporalTimeZoneLike, nullptr, "not a string");
     return false;
   }
-  Rooted<JSString*> identifier(cx, timeZoneLike.toString());
+  Rooted<JSString*> identifier(cx, temporalTimeZoneLike.toString());
 
   // Step 3.
   Rooted<ParsedTimeZone> timeZoneName(cx);
@@ -754,207 +739,31 @@ bool js::temporal::ToTemporalTimeZone(JSContext* cx,
     return false;
   }
 
-  // Steps 4-8.
+  // Steps 4-9.
   return ToTemporalTimeZone(cx, timeZoneName, result);
 }
 
 /**
- * ToTemporalTimeZoneObject ( timeZoneSlotValue )
+ * GetOffsetNanosecondsFor ( timeZone, epochNs )
  */
-JSObject* js::temporal::ToTemporalTimeZoneObject(
-    JSContext* cx, Handle<TimeZoneValue> timeZone) {
-  // Step 1.
-  if (timeZone.isObject()) {
-    return timeZone.toObject();
-  }
+bool js::temporal::GetOffsetNanosecondsFor(JSContext* cx,
+                                           Handle<TimeZoneValue> timeZone,
+                                           const EpochNanoseconds& epochNs,
+                                           int64_t* offsetNanoseconds) {
+  // Step 1. (Not applicable)
 
   // Step 2.
-  return CreateTemporalTimeZone(cx, timeZone.toString());
-}
-
-/**
- * ToTemporalTimeZoneIdentifier ( timeZoneSlotValue )
- */
-JSString* js::temporal::ToTemporalTimeZoneIdentifier(
-    JSContext* cx, Handle<TimeZoneValue> timeZone) {
-  // Step 1.
-  if (timeZone.isString()) {
-    // Step 1.a. (Not applicable in our implementation.)
-
-    // Step 1.b.
-    return timeZone.toString()->identifier();
-  }
-
-  // Step 2.
-  Rooted<JSObject*> timeZoneObj(cx, timeZone.toObject());
-  Rooted<Value> identifier(cx);
-  if (!GetProperty(cx, timeZoneObj, timeZoneObj, cx->names().id, &identifier)) {
-    return nullptr;
-  }
-
-  // Step 3.
-  if (!identifier.isString()) {
-    ReportValueError(cx, JSMSG_UNEXPECTED_TYPE, JSDVG_IGNORE_STACK, identifier,
-                     nullptr, "not a string");
-    return nullptr;
-  }
-
-  // Step 4.
-  return identifier.toString();
-}
-
-static bool TimeZone_getOffsetNanosecondsFor(JSContext* cx, unsigned argc,
-                                             Value* vp);
-
-static bool TimeZone_getPossibleInstantsFor(JSContext* cx, unsigned argc,
-                                            Value* vp);
-
-/**
- * TimeZoneMethodsRecordLookup ( timeZoneRec, methodName )
- */
-static bool TimeZoneMethodsRecordLookup(JSContext* cx,
-                                        MutableHandle<TimeZoneRecord> timeZone,
-                                        TimeZoneMethod methodName) {
-  // Step 1. (Not applicable in our implementation.)
-
-  // Steps 2-4.
-  auto object = timeZone.receiver().toObject();
-
-  auto lookup = [&](Handle<PropertyName*> name, JSNative native,
-                    MutableHandle<JSObject*> result) {
-    auto* method = GetMethod(cx, object, name);
-    if (!method) {
-      return false;
-    }
-
-    // As an optimization we only store the method if the receiver is either
-    // a custom time zone object or if the method isn't the default, built-in
-    // time zone method.
-    if (!object->is<TimeZoneObject>() || !IsNativeFunction(method, native)) {
-      result.set(method);
-    }
-    return true;
-  };
-
-  switch (methodName) {
-    // Steps 2 and 4.
-    case TimeZoneMethod::GetOffsetNanosecondsFor:
-      return lookup(cx->names().getOffsetNanosecondsFor,
-                    TimeZone_getOffsetNanosecondsFor,
-                    timeZone.getOffsetNanosecondsFor());
-
-      // Steps 3 and 4.
-    case TimeZoneMethod::GetPossibleInstantsFor:
-      return lookup(cx->names().getPossibleInstantsFor,
-                    TimeZone_getPossibleInstantsFor,
-                    timeZone.getPossibleInstantsFor());
-  }
-
-  MOZ_CRASH("invalid time zone method");
-}
-
-/**
- * CreateTimeZoneMethodsRecord ( timeZone, methods )
- */
-bool js::temporal::CreateTimeZoneMethodsRecord(
-    JSContext* cx, Handle<TimeZoneValue> timeZone,
-    mozilla::EnumSet<TimeZoneMethod> methods,
-    MutableHandle<TimeZoneRecord> result) {
-  MOZ_ASSERT(!methods.isEmpty());
-
-  // Step 1.
-  result.set(TimeZoneRecord{timeZone});
-
-#ifdef DEBUG
-  // Remember the set of looked-up methods for assertions.
-  result.get().lookedUp() += methods;
-#endif
-
-  // Built-in time zones don't perform observable lookups.
-  if (timeZone.isString()) {
-    return true;
-  }
-
-  // Step 2.
-  for (auto method : methods) {
-    if (!TimeZoneMethodsRecordLookup(cx, result, method)) {
-      return false;
-    }
-  }
-
-  // Step 3.
-  return true;
-}
-
-bool js::temporal::WrapTimeZoneValueObject(JSContext* cx,
-                                           MutableHandle<JSObject*> timeZone) {
-  // First handle the common case when |timeZone| is TimeZoneObjectMaybeBuiltin
-  // from the current compartment.
-  if (MOZ_LIKELY(timeZone->is<TimeZoneObjectMaybeBuiltin>() &&
-                 timeZone->compartment() == cx->compartment())) {
-    return true;
-  }
-
-  // If it's not a built-in time zone, simply wrap the object into the current
-  // compartment.
-  auto* unwrappedTimeZone = timeZone->maybeUnwrapIf<BuiltinTimeZoneObject>();
-  if (!unwrappedTimeZone) {
-    return cx->compartment()->wrap(cx, timeZone);
-  }
-
-  // If this is a built-in time zone from a different compartment, create a
-  // fresh copy using the current compartment.
-  //
-  // We create a fresh copy, so we don't have to support the cross-compartment
-  // case, which makes detection of "string" time zones easier.
-
-  const auto& offsetMinutes = unwrappedTimeZone->offsetMinutes();
-  if (offsetMinutes.isInt32()) {
-    auto* obj = CreateBuiltinTimeZone(cx, offsetMinutes.toInt32());
-    if (!obj) {
-      return false;
-    }
-
-    timeZone.set(obj);
-    return true;
-  }
-  MOZ_ASSERT(offsetMinutes.isUndefined());
-
-  Rooted<JSString*> identifier(cx, unwrappedTimeZone->identifier());
-  if (!cx->compartment()->wrap(cx, &identifier)) {
-    return false;
-  }
-
-  auto* obj = ::CreateBuiltinTimeZone(cx, identifier);
-  if (!obj) {
-    return false;
-  }
-
-  timeZone.set(obj);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getOffsetNanosecondsFor ( instant )
- */
-static bool BuiltinGetOffsetNanosecondsFor(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone,
-    const Instant& instant, int64_t* offsetNanoseconds) {
-  // Steps 1-3. (Not applicable.)
-
-  // Step 4.
-  if (timeZone->offsetMinutes().isInt32()) {
-    int32_t offset = timeZone->offsetMinutes().toInt32();
+  if (timeZone.isOffset()) {
+    int32_t offset = timeZone.offsetMinutes();
     MOZ_ASSERT(std::abs(offset) < UnitsPerDay(TemporalUnit::Minute));
 
     *offsetNanoseconds = int64_t(offset) * ToNanoseconds(TemporalUnit::Minute);
     return true;
   }
-  MOZ_ASSERT(timeZone->offsetMinutes().isUndefined());
 
-  // Step 5.
+  // Step 3.
   int64_t offset;
-  if (!GetNamedTimeZoneOffsetNanoseconds(cx, timeZone, instant, &offset)) {
+  if (!GetNamedTimeZoneOffsetNanoseconds(cx, timeZone, epochNs, &offset)) {
     return false;
   }
   MOZ_ASSERT(std::abs(offset) < ToNanoseconds(TemporalUnit::Day));
@@ -964,872 +773,218 @@ static bool BuiltinGetOffsetNanosecondsFor(
 }
 
 /**
- * GetOffsetNanosecondsFor ( timeZoneRec, instant )
- */
-static bool GetOffsetNanosecondsForSlow(JSContext* cx,
-                                        Handle<TimeZoneRecord> timeZone,
-                                        Handle<Wrapped<InstantObject*>> instant,
-                                        int64_t* offsetNanoseconds) {
-  // Step 1. (Inlined call to TimeZoneMethodsRecordCall)
-  Rooted<Value> fval(cx, ObjectValue(*timeZone.getOffsetNanosecondsFor()));
-  auto thisv = timeZone.receiver().toObject();
-  Rooted<Value> instantVal(cx, ObjectValue(*instant));
-  Rooted<Value> rval(cx);
-  if (!Call(cx, fval, thisv, instantVal, &rval)) {
-    return false;
-  }
-
-  // Step 2. (Not applicable)
-
-  // Step 3.
-  if (!rval.isNumber()) {
-    ReportValueError(cx, JSMSG_UNEXPECTED_TYPE, JSDVG_IGNORE_STACK, rval,
-                     nullptr, "not a number");
-    return false;
-  }
-
-  // Steps 4-6.
-  double num = rval.toNumber();
-  if (!IsInteger(num) || std::abs(num) >= ToNanoseconds(TemporalUnit::Day)) {
-    ToCStringBuf cbuf;
-    const char* numStr = NumberToCString(&cbuf, num);
-
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_TEMPORAL_TIMEZONE_NANOS_RANGE, numStr);
-    return false;
-  }
-
-  // Step 7.
-  *offsetNanoseconds = int64_t(num);
-  return true;
-}
-
-/**
- * GetOffsetNanosecondsFor ( timeZoneRec, instant )
- */
-bool js::temporal::GetOffsetNanosecondsFor(
-    JSContext* cx, Handle<TimeZoneRecord> timeZone,
-    Handle<Wrapped<InstantObject*>> instant, int64_t* offsetNanoseconds) {
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
-
-  // Step 2. (Reordered)
-  auto getOffsetNanosecondsFor = timeZone.getOffsetNanosecondsFor();
-  if (!getOffsetNanosecondsFor) {
-    auto* unwrapped = instant.unwrap(cx);
-    if (!unwrapped) {
-      return false;
-    }
-    auto instant = ToInstant(unwrapped);
-    auto builtin = timeZone.receiver().toTimeZoneObjectMaybeBuiltin();
-
-    return BuiltinGetOffsetNanosecondsFor(cx, builtin, instant,
-                                          offsetNanoseconds);
-  }
-
-  // Steps 1 and 3-7.
-  return ::GetOffsetNanosecondsForSlow(cx, timeZone, instant,
-                                       offsetNanoseconds);
-}
-
-/**
- * GetOffsetNanosecondsFor ( timeZoneRec, instant )
- */
-bool js::temporal::GetOffsetNanosecondsFor(
-    JSContext* cx, Handle<TimeZoneValue> timeZone,
-    Handle<Wrapped<InstantObject*>> instant, int64_t* offsetNanoseconds) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  return GetOffsetNanosecondsFor(cx, timeZoneRec, instant, offsetNanoseconds);
-}
-
-/**
- * GetOffsetNanosecondsFor ( timeZoneRec, instant )
- */
-bool js::temporal::GetOffsetNanosecondsFor(JSContext* cx,
-                                           Handle<TimeZoneRecord> timeZone,
-                                           const Instant& instant,
-                                           int64_t* offsetNanoseconds) {
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
-
-  // Step 2. (Reordered)
-  auto getOffsetNanosecondsFor = timeZone.getOffsetNanosecondsFor();
-  if (!getOffsetNanosecondsFor) {
-    auto builtin = timeZone.receiver().toTimeZoneObjectMaybeBuiltin();
-    return BuiltinGetOffsetNanosecondsFor(cx, builtin, instant,
-                                          offsetNanoseconds);
-  }
-
-  // Steps 1 and 3-7.
-  Rooted<InstantObject*> obj(cx, CreateTemporalInstant(cx, instant));
-  if (!obj) {
-    return false;
-  }
-  return ::GetOffsetNanosecondsForSlow(cx, timeZone, obj, offsetNanoseconds);
-}
-
-/**
- * GetOffsetNanosecondsFor ( timeZoneRec, instant )
- */
-bool js::temporal::GetOffsetNanosecondsFor(JSContext* cx,
-                                           Handle<TimeZoneValue> timeZone,
-                                           const Instant& instant,
-                                           int64_t* offsetNanoseconds) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  return GetOffsetNanosecondsFor(cx, timeZoneRec, instant, offsetNanoseconds);
-}
-
-/**
- * FormatUTCOffsetNanoseconds ( offsetNanoseconds )
- */
-JSString* js::temporal::FormatUTCOffsetNanoseconds(JSContext* cx,
-                                                   int64_t offsetNanoseconds) {
-  MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
-
-  // Step 1.
-  char sign = offsetNanoseconds >= 0 ? '+' : '-';
-
-  // Step 2.
-  int64_t absoluteNanoseconds = std::abs(offsetNanoseconds);
-
-  // Step 6. (Reordered)
-  int32_t subSecondNanoseconds = int32_t(absoluteNanoseconds % 1'000'000'000);
-
-  // Step 5. (Reordered)
-  int32_t quotient = int32_t(absoluteNanoseconds / 1'000'000'000);
-  int32_t second = quotient % 60;
-
-  // Step 4. (Reordered)
-  quotient /= 60;
-  int32_t minute = quotient % 60;
-
-  // Step 3.
-  int32_t hour = quotient / 60;
-  MOZ_ASSERT(hour < 24, "time zone offset mustn't exceed 24-hours");
-
-  // Format: "sign hour{2} : minute{2} : second{2} . fractional{9}"
-  constexpr size_t maxLength = 1 + 2 + 1 + 2 + 1 + 2 + 1 + 9;
-  char result[maxLength];
-
-  size_t n = 0;
-
-  // Steps 7-8. (Inlined FormatTimeString).
-  result[n++] = sign;
-  result[n++] = char('0' + (hour / 10));
-  result[n++] = char('0' + (hour % 10));
-  result[n++] = ':';
-  result[n++] = char('0' + (minute / 10));
-  result[n++] = char('0' + (minute % 10));
-
-  if (second != 0 || subSecondNanoseconds != 0) {
-    result[n++] = ':';
-    result[n++] = char('0' + (second / 10));
-    result[n++] = char('0' + (second % 10));
-
-    if (uint32_t fractional = subSecondNanoseconds) {
-      result[n++] = '.';
-
-      uint32_t k = 100'000'000;
-      do {
-        result[n++] = char('0' + (fractional / k));
-        fractional %= k;
-        k /= 10;
-      } while (fractional);
-    }
-  }
-
-  MOZ_ASSERT(n <= maxLength);
-
-  // Step 9.
-  return NewStringCopyN<CanGC>(cx, result, n);
-}
-
-/**
- * GetOffsetStringFor ( timeZoneRec, instant )
- */
-JSString* js::temporal::GetOffsetStringFor(JSContext* cx,
-                                           Handle<TimeZoneValue> timeZone,
-                                           const Instant& instant) {
-  // Step 1.
-  int64_t offsetNanoseconds;
-  if (!GetOffsetNanosecondsFor(cx, timeZone, instant, &offsetNanoseconds)) {
-    return nullptr;
-  }
-  MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
-
-  // Step 2.
-  return FormatUTCOffsetNanoseconds(cx, offsetNanoseconds);
-}
-
-/**
- * GetOffsetStringFor ( timeZoneRec, instant )
- */
-JSString* js::temporal::GetOffsetStringFor(
-    JSContext* cx, Handle<TimeZoneRecord> timeZone,
-    Handle<Wrapped<InstantObject*>> instant) {
-  // Step 1.
-  int64_t offsetNanoseconds;
-  if (!GetOffsetNanosecondsFor(cx, timeZone, instant, &offsetNanoseconds)) {
-    return nullptr;
-  }
-  MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
-
-  // Step 2.
-  return FormatUTCOffsetNanoseconds(cx, offsetNanoseconds);
-}
-
-/**
  * TimeZoneEquals ( one, two )
  */
-bool js::temporal::TimeZoneEquals(JSContext* cx, Handle<JSString*> one,
-                                  Handle<JSString*> two, bool* equals) {
-  // Steps 1-3. (Not applicable)
+bool js::temporal::TimeZoneEquals(const TimeZoneValue& one,
+                                  const TimeZoneValue& two) {
+  // Steps 1-3. (Not applicable in our implementation.)
 
   // Step 4.
-  if (!EqualStrings(cx, one, two, equals)) {
-    return false;
-  }
-  if (*equals) {
-    return true;
+  if (!one.isOffset() && !two.isOffset()) {
+    return EqualStrings(one.primaryIdentifier(), two.primaryIdentifier());
   }
 
   // Step 5.
-  Rooted<ParsedTimeZone> timeZoneOne(cx);
-  if (!ParseTimeZoneIdentifier(cx, one, &timeZoneOne)) {
-    return false;
+  if (one.isOffset() && two.isOffset()) {
+    return one.offsetMinutes() == two.offsetMinutes();
   }
 
   // Step 6.
-  Rooted<ParsedTimeZone> timeZoneTwo(cx);
-  if (!ParseTimeZoneIdentifier(cx, two, &timeZoneTwo)) {
-    return false;
-  }
-
-  // Step 7.
-  if (timeZoneOne.name() && timeZoneTwo.name()) {
-    // Step 7.a.
-    Rooted<JSAtom*> validTimeZoneOne(cx);
-    if (!IsValidTimeZoneName(cx, timeZoneOne.name(), &validTimeZoneOne)) {
-      return false;
-    }
-    if (!validTimeZoneOne) {
-      *equals = false;
-      return true;
-    }
-
-    // Step 7.b.
-    Rooted<JSAtom*> validTimeZoneTwo(cx);
-    if (!IsValidTimeZoneName(cx, timeZoneTwo.name(), &validTimeZoneTwo)) {
-      return false;
-    }
-    if (!validTimeZoneTwo) {
-      *equals = false;
-      return true;
-    }
-
-    // Step 7.c and 9.
-    Rooted<JSString*> canonicalOne(
-        cx, CanonicalizeTimeZoneName(cx, validTimeZoneOne));
-    if (!canonicalOne) {
-      return false;
-    }
-
-    JSString* canonicalTwo = CanonicalizeTimeZoneName(cx, validTimeZoneTwo);
-    if (!canonicalTwo) {
-      return false;
-    }
-
-    return EqualStrings(cx, canonicalOne, canonicalTwo, equals);
-  }
-
-  // Step 8.a.
-  if (!timeZoneOne.name() && !timeZoneTwo.name()) {
-    *equals = (timeZoneOne.offset() == timeZoneTwo.offset());
-    return true;
-  }
-
-  // Step 9.
-  *equals = false;
-  return true;
+  return false;
 }
-
-/**
- * TimeZoneEquals ( one, two )
- */
-bool js::temporal::TimeZoneEquals(JSContext* cx, Handle<TimeZoneValue> one,
-                                  Handle<TimeZoneValue> two, bool* equals) {
-  // Step 1.
-  if (one.isObject() && two.isObject() && one.toObject() == two.toObject()) {
-    *equals = true;
-    return true;
-  }
-
-  // Step 2.
-  Rooted<JSString*> timeZoneOne(cx, ToTemporalTimeZoneIdentifier(cx, one));
-  if (!timeZoneOne) {
-    return false;
-  }
-
-  // Step 3.
-  Rooted<JSString*> timeZoneTwo(cx, ToTemporalTimeZoneIdentifier(cx, two));
-  if (!timeZoneTwo) {
-    return false;
-  }
-
-  // Steps 4-9.
-  return TimeZoneEquals(cx, timeZoneOne, timeZoneTwo, equals);
-}
-
-// ES2019 draft rev 0ceb728a1adbffe42b26972a6541fd7f398b1557
-// 5.2.5 Mathematical Operations
-static inline double PositiveModulo(double dividend, double divisor) {
-  MOZ_ASSERT(divisor > 0);
-  MOZ_ASSERT(std::isfinite(divisor));
-
-  double result = std::fmod(dividend, divisor);
-  if (result < 0) {
-    result += divisor;
-  }
-  return result + (+0.0);
-}
-
-/* ES5 15.9.1.10. */
-static double HourFromTime(double t) {
-  return PositiveModulo(std::floor(t / msPerHour), HoursPerDay);
-}
-
-static double MinFromTime(double t) {
-  return PositiveModulo(std::floor(t / msPerMinute), MinutesPerHour);
-}
-
-static double SecFromTime(double t) {
-  return PositiveModulo(std::floor(t / msPerSecond), SecondsPerMinute);
-}
-
-static double msFromTime(double t) { return PositiveModulo(t, msPerSecond); }
 
 /**
  * GetISOPartsFromEpoch ( epochNanoseconds )
  */
-static PlainDateTime GetISOPartsFromEpoch(const Instant& instant) {
-  // TODO: YearFromTime/MonthFromTime/DayFromTime recompute the same values
-  // multiple times. Consider adding a new function avoids this.
-
+static ISODateTime GetISOPartsFromEpoch(
+    const EpochNanoseconds& epochNanoseconds, int64_t offsetNanoseconds) {
   // Step 1.
-  MOZ_ASSERT(IsValidEpochInstant(instant));
+  MOZ_ASSERT(IsValidEpochNanoseconds(epochNanoseconds));
+  MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
+
+  auto totalNanoseconds =
+      epochNanoseconds + EpochDuration::fromNanoseconds(offsetNanoseconds);
 
   // Step 2.
-  int32_t remainderNs = instant.nanoseconds % 1'000'000;
+  int32_t remainderNs = totalNanoseconds.nanoseconds % 1'000'000;
+
+  // Step 10. (Reordered)
+  //
+  // Reordered so the compiler can merge the divisons in steps 2, 3, and 10.
+  int32_t millisecond = totalNanoseconds.nanoseconds / 1'000'000;
 
   // Step 3.
-  double epochMilliseconds = double(instant.floorToMilliseconds());
+  int64_t epochMilliseconds = totalNanoseconds.floorToMilliseconds();
 
-  // Step 4.
-  int32_t year = int32_t(JS::YearFromTime(epochMilliseconds));
+  // Steps 4-6.
+  auto [year, month, day] = ToYearMonthDay(epochMilliseconds);
 
-  // Step 5.
-  int32_t month = int32_t(JS::MonthFromTime(epochMilliseconds)) + 1;
+  // Steps 7-9.
+  auto [hour, minute, second] = ToHourMinuteSecond(epochMilliseconds);
 
-  // Step 6.
-  int32_t day = int32_t(JS::DayFromTime(epochMilliseconds));
+  // Step 10. (Moved above)
 
-  // Step 7.
-  int32_t hour = int32_t(HourFromTime(epochMilliseconds));
-
-  // Step 8.
-  int32_t minute = int32_t(MinFromTime(epochMilliseconds));
-
-  // Step 9.
-  int32_t second = int32_t(SecFromTime(epochMilliseconds));
-
-  // Step 10.
-  int32_t millisecond = int32_t(msFromTime(epochMilliseconds));
-
-  // Step 11.
+  // Steps 11-12.
   int32_t microsecond = remainderNs / 1000;
 
-  // Step 12.
+  // Step 13.
   int32_t nanosecond = remainderNs % 1000;
 
-  // Step 13.
-  PlainDateTime result = {
-      {year, month, day},
-      {hour, minute, second, millisecond, microsecond, nanosecond}};
+  // Step 14.
+  auto isoDate = ISODate{year, month + 1, day};
+  MOZ_ASSERT(IsValidISODate(isoDate));
 
-  // Always valid when the epoch nanoseconds are within the representable limit.
-  MOZ_ASSERT(IsValidISODateTime(result));
+  // Step 15.
+  auto time = Time{hour, minute, second, millisecond, microsecond, nanosecond};
+  MOZ_ASSERT(IsValidTime(time));
+
+  // Step 16.
+  auto result = ISODateTime{isoDate, time};
+
+  // Always within date-time limits when the epoch nanoseconds are within limit.
   MOZ_ASSERT(ISODateTimeWithinLimits(result));
 
   return result;
 }
 
 /**
- * BalanceISODateTime ( year, month, day, hour, minute, second, millisecond,
- * microsecond, nanosecond )
+ * GetISODateTimeFor ( timeZone, epochNs )
  */
-static PlainDateTime BalanceISODateTime(const PlainDateTime& dateTime,
-                                        int64_t nanoseconds) {
-  MOZ_ASSERT(IsValidISODateTime(dateTime));
-  MOZ_ASSERT(ISODateTimeWithinLimits(dateTime));
-  MOZ_ASSERT(std::abs(nanoseconds) < ToNanoseconds(TemporalUnit::Day));
-
-  const auto& [date, time] = dateTime;
-
-  // Step 1.
-  auto balancedTime = BalanceTime(time, nanoseconds);
-  MOZ_ASSERT(std::abs(balancedTime.days) <= 1);
-
-  // Step 2.
-  auto balancedDate =
-      BalanceISODate(date.year, date.month, date.day + balancedTime.days);
-
-  // Step 3.
-  return {balancedDate, balancedTime.time};
-}
-
-/**
- * GetPlainDateTimeFor ( timeZoneRec, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
- */
-static PlainDateTimeObject* GetPlainDateTimeFor(
-    JSContext* cx, Handle<TimeZoneValue> timeZone,
-    Handle<Wrapped<InstantObject*>> instant, Handle<CalendarValue> calendar) {
-  // Step 1. (Not applicable in our implementation.)
-
-  // Steps 2-3.
-  int64_t offsetNanoseconds;
-  if (!GetOffsetNanosecondsFor(cx, timeZone, instant, &offsetNanoseconds)) {
-    return nullptr;
-  }
-
-  // Step 4.
+ISODateTime js::temporal::GetISODateTimeFor(const EpochNanoseconds& epochNs,
+                                            int64_t offsetNanoseconds) {
+  MOZ_ASSERT(IsValidEpochNanoseconds(epochNs));
   MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
 
-  auto* unwrappedInstant = instant.unwrap(cx);
-  if (!unwrappedInstant) {
-    return nullptr;
-  }
-
-  // Steps 5-7.
-  auto dateTime =
-      GetPlainDateTimeFor(ToInstant(unwrappedInstant), offsetNanoseconds);
-  MOZ_ASSERT(ISODateTimeWithinLimits(dateTime));
-
-  return CreateTemporalDateTime(cx, dateTime, calendar);
-}
-
-/**
- * GetPlainDateTimeFor ( timeZoneRec, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
- */
-PlainDateTime js::temporal::GetPlainDateTimeFor(const Instant& instant,
-                                                int64_t offsetNanoseconds) {
-  // Steps 1-3. (Not applicable)
-
-  // Step 4.
-  MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
-
-  // TODO: Steps 5-6 can be combined into a single operation to improve perf.
-
-  // Step 5.
-  PlainDateTime dateTime = GetISOPartsFromEpoch(instant);
-
-  // Step 6.
-  auto balanced = BalanceISODateTime(dateTime, offsetNanoseconds);
-  MOZ_ASSERT(ISODateTimeWithinLimits(balanced));
-
-  // Step 7.
-  return balanced;
-}
-
-/**
- * GetPlainDateTimeFor ( timeZone, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
- */
-bool js::temporal::GetPlainDateTimeFor(JSContext* cx,
-                                       Handle<TimeZoneRecord> timeZone,
-                                       const Instant& instant,
-                                       PlainDateTime* result) {
-  MOZ_ASSERT(IsValidEpochInstant(instant));
-
-  // Step 1.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
+  // Step 1. (Not applicable)
 
   // Steps 2-3.
+  return GetISOPartsFromEpoch(epochNs, offsetNanoseconds);
+}
+
+/**
+ * GetISODateTimeFor ( timeZone, epochNs )
+ */
+bool js::temporal::GetISODateTimeFor(JSContext* cx,
+                                     Handle<TimeZoneValue> timeZone,
+                                     const EpochNanoseconds& epochNs,
+                                     ISODateTime* result) {
+  MOZ_ASSERT(IsValidEpochNanoseconds(epochNs));
+
+  // Step 1.
   int64_t offsetNanoseconds;
-  if (!GetOffsetNanosecondsFor(cx, timeZone, instant, &offsetNanoseconds)) {
+  if (!GetOffsetNanosecondsFor(cx, timeZone, epochNs, &offsetNanoseconds)) {
     return false;
   }
-
-  // Step 4.
   MOZ_ASSERT(std::abs(offsetNanoseconds) < ToNanoseconds(TemporalUnit::Day));
 
-  // Steps 5-7.
-  *result = GetPlainDateTimeFor(instant, offsetNanoseconds);
+  // Steps 2-3.
+  *result = GetISODateTimeFor(epochNs, offsetNanoseconds);
   return true;
 }
 
 /**
- * GetPlainDateTimeFor ( timeZone, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
+ * GetPossibleEpochNanoseconds ( timeZone, isoDateTime )
  */
-bool js::temporal::GetPlainDateTimeFor(JSContext* cx,
-                                       Handle<TimeZoneValue> timeZone,
-                                       const Instant& instant,
-                                       PlainDateTime* result) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                   },
-                                   &timeZoneRec)) {
+bool js::temporal::GetPossibleEpochNanoseconds(
+    JSContext* cx, Handle<TimeZoneValue> timeZone,
+    const ISODateTime& isoDateTime, PossibleEpochNanoseconds* result) {
+  // TODO: https://github.com/tc39/proposal-temporal/pull/3014
+  if (!ISODateTimeWithinLimits(isoDateTime)) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
+                              JSMSG_TEMPORAL_PLAIN_DATE_TIME_INVALID);
     return false;
   }
 
-  return GetPlainDateTimeFor(cx, timeZoneRec, instant, result);
-}
+  // Step 1. (Not applicable)
 
-/**
- * GetPlainDateTimeFor ( timeZone, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
- */
-PlainDateTimeObject* js::temporal::GetPlainDateTimeFor(
-    JSContext* cx, Handle<TimeZoneValue> timeZone, const Instant& instant,
-    Handle<CalendarValue> calendar) {
-  // Steps 1-6.
-  PlainDateTime dateTime;
-  if (!GetPlainDateTimeFor(cx, timeZone, instant, &dateTime)) {
-    return nullptr;
-  }
-  MOZ_ASSERT(ISODateTimeWithinLimits(dateTime));
-
-  // Step 7.
-  return CreateTemporalDateTime(cx, dateTime, calendar);
-}
-
-/**
- * GetPlainDateTimeFor ( timeZone, instant, calendar [ ,
- * precalculatedOffsetNanoseconds ] )
- */
-PlainDateTimeObject* js::temporal::GetPlainDateTimeFor(
-    JSContext* cx, const Instant& instant, Handle<CalendarValue> calendar,
-    int64_t offsetNanoseconds) {
-  MOZ_ASSERT(IsValidEpochInstant(instant));
-
-  // Steps 1-6.
-  auto dateTime = GetPlainDateTimeFor(instant, offsetNanoseconds);
-  MOZ_ASSERT(ISODateTimeWithinLimits(dateTime));
-
-  // Step 7.
-  return CreateTemporalDateTime(cx, dateTime, calendar);
-}
-
-/**
- * Temporal.TimeZone.prototype.getPossibleInstantsFor ( dateTime )
- */
-static bool BuiltinGetPossibleInstantsFor(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone,
-    const PlainDateTime& dateTime, EpochInstantList& possibleInstants) {
-  MOZ_ASSERT(possibleInstants.length() == 0);
-
-  // Steps 1-3. (Not applicable)
-
-  // Step 4.
-  if (timeZone->offsetMinutes().isInt32()) {
-    int32_t offsetMin = timeZone->offsetMinutes().toInt32();
+  // Step 2.
+  PossibleEpochNanoseconds possibleEpochNanoseconds;
+  if (timeZone.isOffset()) {
+    int32_t offsetMin = timeZone.offsetMinutes();
     MOZ_ASSERT(std::abs(offsetMin) < UnitsPerDay(TemporalUnit::Minute));
 
-    // Step 4.a.
-    auto epochInstant =
-        GetUTCEpochNanoseconds(dateTime, InstantSpan::fromMinutes(offsetMin));
+    // Step 2.a.
+    auto epochInstant = GetUTCEpochNanoseconds(isoDateTime) -
+                        EpochDuration::fromMinutes(offsetMin);
 
-    // Step 4.b.
-    possibleInstants.append(epochInstant);
+    // Step 2.b.
+    possibleEpochNanoseconds = PossibleEpochNanoseconds{epochInstant};
   } else {
-    // Step 5.
-    if (!GetNamedTimeZoneEpochNanoseconds(cx, timeZone, dateTime,
-                                          possibleInstants)) {
+    // Step 3.
+    if (!GetNamedTimeZoneEpochNanoseconds(cx, timeZone, isoDateTime,
+                                          &possibleEpochNanoseconds)) {
       return false;
     }
   }
 
-  MOZ_ASSERT(possibleInstants.length() <= 2);
+  MOZ_ASSERT(possibleEpochNanoseconds.length() <= 2);
 
-  // Step 7.b.
-  for (const auto& epochInstant : possibleInstants) {
-    if (!IsValidEpochInstant(epochInstant)) {
+  // Step 4.
+  for (const auto& epochInstant : possibleEpochNanoseconds) {
+    if (!IsValidEpochNanoseconds(epochInstant)) {
       JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                                 JSMSG_TEMPORAL_INSTANT_INVALID);
       return false;
     }
   }
 
-  // Steps 6-8. (Handled in the caller).
-  return true;
-}
-
-static bool BuiltinGetPossibleInstantsFor(
-    JSContext* cx, Handle<TimeZoneObjectMaybeBuiltin*> timeZone,
-    const PlainDateTime& dateTime, MutableHandle<InstantVector> list) {
-  // Temporal.TimeZone.prototype.getInstantFor, step 4.
-  EpochInstantList possibleInstants;
-  if (!BuiltinGetPossibleInstantsFor(cx, timeZone, dateTime,
-                                     possibleInstants)) {
-    return false;
-  }
-
-  // Temporal.TimeZone.prototype.getInstantFor, step 7.
-  for (const auto& possibleInstant : possibleInstants) {
-    auto* instant = CreateTemporalInstant(cx, possibleInstant);
-    if (!instant) {
-      return false;
-    }
-
-    if (!list.append(instant)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/**
- * GetPossibleInstantsFor ( timeZoneRec, dateTime )
- */
-static bool GetPossibleInstantsForSlow(
-    JSContext* cx, Handle<TimeZoneRecord> timeZone,
-    Handle<Wrapped<PlainDateTimeObject*>> dateTime,
-    MutableHandle<InstantVector> list) {
-  MOZ_ASSERT(list.empty());
-
-  // Step 1. (Inlined call to TimeZoneMethodsRecordCall)
-  Rooted<Value> fval(cx, ObjectValue(*timeZone.getPossibleInstantsFor()));
-  auto thisv = timeZone.receiver().toObject();
-  Rooted<Value> arg(cx, ObjectValue(*dateTime));
-  Rooted<Value> rval(cx);
-  if (!Call(cx, fval, thisv, arg, &rval)) {
-    return false;
-  }
-
-  // Step 2. (Not applicable)
-
-  // Step 3.
-  JS::ForOfIterator iterator(cx);
-  if (!iterator.init(rval)) {
-    return false;
-  }
-
-  // Step 4. (Not applicable in our implementation.)
-
   // Step 5.
-  auto min = Instant::max();
-  auto max = Instant::min();
-  Rooted<Value> nextValue(cx);
-  while (true) {
-    // Step 5.a.
-    bool done;
-    if (!iterator.next(&nextValue, &done)) {
-      return false;
-    }
-
-    // Step 5.b.
-    if (done) {
-      // Steps 5.b.i-ii.
-      if (list.length() > 1) {
-        // Steps 5.b.ii.1-4. (Not applicable in our implementation.)
-
-        // Step 5.b.ii.5.
-        constexpr auto nsPerDay =
-            InstantSpan::fromNanoseconds(ToNanoseconds(TemporalUnit::Day));
-        if ((max - min).abs() > nsPerDay) {
-          JS_ReportErrorNumberASCII(
-              cx, GetErrorMessage, nullptr,
-              JSMSG_TEMPORAL_TIMEZONE_OFFSET_SHIFT_ONE_DAY);
-          return false;
-        }
-      }
-
-      // Step 5.b.iii.
-      return true;
-    }
-
-    // Step 5.d. (Reordered)
-    if (nextValue.isObject()) {
-      JSObject* obj = &nextValue.toObject();
-      if (auto* unwrapped = obj->maybeUnwrapIf<InstantObject>()) {
-        auto instant = ToInstant(unwrapped);
-        min = std::min(min, instant);
-        max = std::max(max, instant);
-
-        if (!list.append(obj)) {
-          return false;
-        }
-        continue;
-      }
-    }
-
-    // Step 5.c.1.
-    ReportValueError(cx, JSMSG_UNEXPECTED_TYPE, JSDVG_IGNORE_STACK, nextValue,
-                     nullptr, "not an instant");
-
-    // Step 5.c.2.
-    iterator.closeThrow();
-    return false;
-  }
+  *result = possibleEpochNanoseconds;
+  return true;
 }
 
 /**
- * GetPossibleInstantsFor ( timeZoneRec, dateTime )
+ * AddTime ( time, timeDuration )
  */
-static bool GetPossibleInstantsFor(
-    JSContext* cx, Handle<TimeZoneRecord> timeZone,
-    Handle<Wrapped<PlainDateTimeObject*>> dateTimeObj,
-    const PlainDateTime& dateTime, MutableHandle<InstantVector> list) {
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetPossibleInstantsFor));
-
-  // Step 2. (Reordered)
-  auto getPossibleInstantsFor = timeZone.getPossibleInstantsFor();
-  if (!getPossibleInstantsFor) {
-    bool arrayIterationSane;
-    if (timeZone.receiver().isString()) {
-      // "String" time zones don't perform observable array iteration.
-      arrayIterationSane = true;
-    } else {
-      // "Object" time zones need to ensure array iteration is still sane.
-      if (!IsArrayIterationSane(cx, &arrayIterationSane)) {
-        return false;
-      }
-    }
-
-    if (arrayIterationSane) {
-      auto builtin = timeZone.receiver().toTimeZoneObjectMaybeBuiltin();
-      return BuiltinGetPossibleInstantsFor(cx, builtin, dateTime, list);
-    }
-  }
-
-  // Steps 1 and 3-5.
-  return GetPossibleInstantsForSlow(cx, timeZone, dateTimeObj, list);
-}
-
-/**
- * GetPossibleInstantsFor ( timeZoneRec, dateTime )
- */
-bool js::temporal::GetPossibleInstantsFor(
-    JSContext* cx, Handle<TimeZoneRecord> timeZone,
-    Handle<PlainDateTimeWithCalendar> dateTime,
-    MutableHandle<InstantVector> list) {
-  // Step 2. (Reordered)
-  auto getPossibleInstantsFor = timeZone.getPossibleInstantsFor();
-  if (!getPossibleInstantsFor) {
-    bool arrayIterationSane;
-    if (timeZone.receiver().isString()) {
-      // "String" time zones don't perform observable array iteration.
-      arrayIterationSane = true;
-    } else {
-      // "Object" time zones need to ensure array iteration is still sane.
-      if (!IsArrayIterationSane(cx, &arrayIterationSane)) {
-        return false;
-      }
-    }
-
-    if (arrayIterationSane) {
-      auto builtin = timeZone.receiver().toTimeZoneObjectMaybeBuiltin();
-      return BuiltinGetPossibleInstantsFor(cx, builtin,
-                                           ToPlainDateTime(dateTime), list);
-    }
-  }
-
-  Rooted<PlainDateTimeObject*> dateTimeObj(
-      cx, CreateTemporalDateTime(cx, ToPlainDateTime(dateTime),
-                                 dateTime.calendar()));
-  if (!dateTimeObj) {
-    return false;
-  }
-
-  // Steps 1 and 3-5.
-  return GetPossibleInstantsForSlow(cx, timeZone, dateTimeObj, list);
-}
-
-/**
- * AddTime ( hour, minute, second, millisecond, microsecond, nanosecond, hours,
- * minutes, seconds, milliseconds, microseconds, nanoseconds )
- */
-static auto AddTime(const PlainTime& time, int64_t nanoseconds) {
+static auto AddTime(const Time& time, int64_t nanoseconds) {
   MOZ_ASSERT(IsValidTime(time));
   MOZ_ASSERT(std::abs(nanoseconds) <= ToNanoseconds(TemporalUnit::Day));
 
-  // Steps 1-3.
+  // Steps 1-2.
   return BalanceTime(time, nanoseconds);
 }
 
 /**
- * DisambiguatePossibleInstants ( possibleInstants, timeZoneRec, dateTime,
- * disambiguation )
+ * DisambiguatePossibleEpochNanoseconds ( possibleEpochNs, timeZone,
+ * isoDateTime, disambiguation )
  */
-bool js::temporal::DisambiguatePossibleInstants(
-    JSContext* cx, Handle<InstantVector> possibleInstants,
-    Handle<TimeZoneRecord> timeZone, const PlainDateTime& dateTime,
-    TemporalDisambiguation disambiguation,
-    MutableHandle<Wrapped<InstantObject*>> result) {
-  // Step 1.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetPossibleInstantsFor));
+bool js::temporal::DisambiguatePossibleEpochNanoseconds(
+    JSContext* cx, const PossibleEpochNanoseconds& possibleEpochNs,
+    Handle<TimeZoneValue> timeZone, const ISODateTime& isoDateTime,
+    TemporalDisambiguation disambiguation, EpochNanoseconds* result) {
+  MOZ_ASSERT(IsValidISODateTime(isoDateTime));
 
-  // Step 2.
-  MOZ_ASSERT_IF(possibleInstants.empty() &&
-                    disambiguation != TemporalDisambiguation::Reject,
-                TimeZoneMethodsRecordHasLookedUp(
-                    timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
-
-  // Steps 3-4.
-  if (possibleInstants.length() == 1) {
-    result.set(possibleInstants[0]);
+  // Steps 1-2.
+  if (possibleEpochNs.length() == 1) {
+    *result = possibleEpochNs.front();
     return true;
   }
 
-  // Steps 5-6.
-  if (!possibleInstants.empty()) {
-    // Step 5.a.
+  // Steps 3-4.
+  if (!possibleEpochNs.empty()) {
+    // Step 3.a.
     if (disambiguation == TemporalDisambiguation::Earlier ||
         disambiguation == TemporalDisambiguation::Compatible) {
-      result.set(possibleInstants[0]);
+      *result = possibleEpochNs.front();
       return true;
     }
 
-    // Step 5.b.
+    // Step 3.b.
     if (disambiguation == TemporalDisambiguation::Later) {
-      size_t last = possibleInstants.length() - 1;
-      result.set(possibleInstants[last]);
+      *result = possibleEpochNs.back();
       return true;
     }
 
-    // Step 5.c.
+    // Step 3.c.
     MOZ_ASSERT(disambiguation == TemporalDisambiguation::Reject);
 
-    // Step 5.d.
+    // Step 3.d.
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_TEMPORAL_TIMEZONE_INSTANT_AMBIGUOUS);
     return false;
   }
 
-  // Step 7.
+  // Step 5.
   if (disambiguation == TemporalDisambiguation::Reject) {
     // TODO: Improve error message to say the date was skipped.
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
@@ -1837,820 +992,169 @@ bool js::temporal::DisambiguatePossibleInstants(
     return false;
   }
 
-  constexpr auto oneDay =
-      InstantSpan::fromNanoseconds(ToNanoseconds(TemporalUnit::Day));
+  constexpr auto oneDay = EpochDuration::fromDays(1);
 
-  // Step 8.
-  auto epochNanoseconds = GetUTCEpochNanoseconds(dateTime);
+  auto epochNanoseconds = GetUTCEpochNanoseconds(isoDateTime);
 
-  // Steps 9 and 11.
+  // Step 6 and 8-9.
   auto dayBefore = epochNanoseconds - oneDay;
+  MOZ_ASSERT(IsValidEpochNanoseconds(dayBefore));
 
-  // Step 10.
-  if (!IsValidEpochInstant(dayBefore)) {
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_TEMPORAL_INSTANT_INVALID);
-    return false;
-  }
-
-  // Step 12 and 14.
+  // Step 7 and 10-11.
   auto dayAfter = epochNanoseconds + oneDay;
+  MOZ_ASSERT(IsValidEpochNanoseconds(dayAfter));
 
-  // Step 13.
-  if (!IsValidEpochInstant(dayAfter)) {
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_TEMPORAL_INSTANT_INVALID);
-    return false;
-  }
-
-  // Step 15.
+  // Step 12.
   int64_t offsetBefore;
   if (!GetOffsetNanosecondsFor(cx, timeZone, dayBefore, &offsetBefore)) {
     return false;
   }
   MOZ_ASSERT(std::abs(offsetBefore) < ToNanoseconds(TemporalUnit::Day));
 
-  // Step 16.
+  // Step 13.
   int64_t offsetAfter;
   if (!GetOffsetNanosecondsFor(cx, timeZone, dayAfter, &offsetAfter)) {
     return false;
   }
   MOZ_ASSERT(std::abs(offsetAfter) < ToNanoseconds(TemporalUnit::Day));
 
-  // Step 17.
+  // Step 14.
   int64_t nanoseconds = offsetAfter - offsetBefore;
 
-  // Step 18.
-  if (std::abs(nanoseconds) > ToNanoseconds(TemporalUnit::Day)) {
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_TEMPORAL_TIMEZONE_OFFSET_SHIFT_ONE_DAY);
-    return false;
-  }
+  // Step 15.
+  MOZ_ASSERT(std::abs(nanoseconds) <= ToNanoseconds(TemporalUnit::Day));
 
-  // Step 19.
+  // Step 16.
   if (disambiguation == TemporalDisambiguation::Earlier) {
-    // Steps 19.a-b.
-    auto earlierTime = ::AddTime(dateTime.time, -nanoseconds);
+    // Steps 16.a-b.
+    auto earlierTime = ::AddTime(isoDateTime.time, -nanoseconds);
     MOZ_ASSERT(std::abs(earlierTime.days) <= 1,
                "subtracting nanoseconds is at most one day");
 
-    // Step 19.c.
-    auto earlierDate = BalanceISODate(dateTime.date.year, dateTime.date.month,
-                                      dateTime.date.day + earlierTime.days);
+    // Step 16.c.
+    auto earlierDate = BalanceISODate(isoDateTime.date, earlierTime.days);
 
-    // Step 19.d.
-    Rooted<CalendarValue> calendar(cx, CalendarValue(CalendarId::ISO8601));
-    Rooted<PlainDateTimeWithCalendar> earlierDateTime(
-        cx,
-        PlainDateTimeWithCalendar{{earlierDate, earlierTime.time}, calendar});
+    // Step 16.d.
+    auto earlierDateTime = ISODateTime{earlierDate, earlierTime.time};
 
-    // Step 19.e.
-    Rooted<InstantVector> earlierInstants(cx, InstantVector(cx));
-    if (!GetPossibleInstantsFor(cx, timeZone, earlierDateTime,
-                                &earlierInstants)) {
+    // Step 16.e.
+    PossibleEpochNanoseconds earlierEpochNs;
+    if (!GetPossibleEpochNanoseconds(cx, timeZone, earlierDateTime,
+                                     &earlierEpochNs)) {
       return false;
     }
 
-    // Step 19.f.
-    if (earlierInstants.empty()) {
-      JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                                JSMSG_TEMPORAL_TIMEZONE_INSTANT_AMBIGUOUS);
-      return false;
-    }
+    // Step 16.f.
+    MOZ_ASSERT(!earlierEpochNs.empty());
 
-    // Step 19.g.
-    result.set(earlierInstants[0]);
+    // Step 16.g.
+    *result = earlierEpochNs.front();
     return true;
   }
 
-  // Step 20.
+  // Step 17.
   MOZ_ASSERT(disambiguation == TemporalDisambiguation::Compatible ||
              disambiguation == TemporalDisambiguation::Later);
 
-  // Steps 21-22.
-  auto laterTime = ::AddTime(dateTime.time, nanoseconds);
+  // Steps 18-19.
+  auto laterTime = ::AddTime(isoDateTime.time, nanoseconds);
   MOZ_ASSERT(std::abs(laterTime.days) <= 1,
              "adding nanoseconds is at most one day");
 
-  // Step 23.
-  auto laterDate = BalanceISODate(dateTime.date.year, dateTime.date.month,
-                                  dateTime.date.day + laterTime.days);
+  // Step 20.
+  auto laterDate = BalanceISODate(isoDateTime.date, laterTime.days);
 
-  // Step 24.
-  Rooted<CalendarValue> calendar(cx, CalendarValue(CalendarId::ISO8601));
-  Rooted<PlainDateTimeWithCalendar> laterDateTime(
-      cx, PlainDateTimeWithCalendar{{laterDate, laterTime.time}, calendar});
+  // Step 21.
+  auto laterDateTime = ISODateTime{laterDate, laterTime.time};
+
+  // Step 22.
+  PossibleEpochNanoseconds laterEpochNs;
+  if (!GetPossibleEpochNanoseconds(cx, timeZone, laterDateTime,
+                                   &laterEpochNs)) {
+    return false;
+  }
+
+  // Steps 23-24.
+  MOZ_ASSERT(!laterEpochNs.empty());
 
   // Step 25.
-  Rooted<InstantVector> laterInstants(cx, InstantVector(cx));
-  if (!GetPossibleInstantsFor(cx, timeZone, laterDateTime, &laterInstants)) {
-    return false;
-  }
-
-  // Steps 26-27.
-  if (laterInstants.empty()) {
-    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                              JSMSG_TEMPORAL_TIMEZONE_INSTANT_AMBIGUOUS);
-    return false;
-  }
-
-  // Step 28.
-  size_t last = laterInstants.length() - 1;
-  result.set(laterInstants[last]);
+  *result = laterEpochNs.back();
   return true;
 }
 
 /**
- * GetInstantFor ( timeZoneRec, dateTime, disambiguation )
+ * GetEpochNanosecondsFor ( timeZone, isoDateTime, disambiguation )
  */
-static bool GetInstantFor(JSContext* cx, Handle<TimeZoneRecord> timeZone,
-                          Handle<Wrapped<PlainDateTimeObject*>> dateTime,
-                          TemporalDisambiguation disambiguation,
-                          MutableHandle<Wrapped<InstantObject*>> result) {
+bool js::temporal::GetEpochNanosecondsFor(JSContext* cx,
+                                          Handle<TimeZoneValue> timeZone,
+                                          const ISODateTime& isoDateTime,
+                                          TemporalDisambiguation disambiguation,
+                                          EpochNanoseconds* result) {
   // Step 1.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
-
-  // Step 2.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetPossibleInstantsFor));
-
-  auto* unwrappedDateTime = dateTime.unwrap(cx);
-  if (!unwrappedDateTime) {
-    return false;
-  }
-  auto plainDateTime = ToPlainDateTime(unwrappedDateTime);
-
-  // Step 3.
-  Rooted<InstantVector> possibleInstants(cx, InstantVector(cx));
-  if (!GetPossibleInstantsFor(cx, timeZone, dateTime, plainDateTime,
-                              &possibleInstants)) {
-    return false;
-  }
-
-  // Step 4.
-  return DisambiguatePossibleInstants(cx, possibleInstants, timeZone,
-                                      plainDateTime, disambiguation, result);
-}
-
-/**
- * GetInstantFor ( timeZoneRec, dateTime, disambiguation )
- */
-static bool GetInstantFor(JSContext* cx, Handle<TimeZoneValue> timeZone,
-                          Handle<Wrapped<PlainDateTimeObject*>> dateTime,
-                          TemporalDisambiguation disambiguation,
-                          MutableHandle<Wrapped<InstantObject*>> result) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                       TimeZoneMethod::GetPossibleInstantsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  return GetInstantFor(cx, timeZoneRec, dateTime, disambiguation, result);
-}
-
-/**
- * GetInstantFor ( timeZoneRec, dateTime, disambiguation )
- */
-bool js::temporal::GetInstantFor(JSContext* cx, Handle<TimeZoneValue> timeZone,
-                                 Handle<PlainDateTimeObject*> dateTime,
-                                 TemporalDisambiguation disambiguation,
-                                 Instant* result) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                       TimeZoneMethod::GetPossibleInstantsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  Rooted<Wrapped<InstantObject*>> instant(cx);
-  if (!::GetInstantFor(cx, timeZoneRec, dateTime, disambiguation, &instant)) {
-    return false;
-  }
-
-  auto* unwrappedInstant = instant.unwrap(cx);
-  if (!unwrappedInstant) {
-    return false;
-  }
-
-  *result = ToInstant(unwrappedInstant);
-  return true;
-}
-
-/**
- * GetInstantFor ( timeZoneRec, dateTime, disambiguation )
- */
-bool js::temporal::GetInstantFor(JSContext* cx, Handle<TimeZoneRecord> timeZone,
-                                 Handle<PlainDateTimeWithCalendar> dateTime,
-                                 TemporalDisambiguation disambiguation,
-                                 Instant* result) {
-  // Step 1.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetOffsetNanosecondsFor));
-
-  // Step 2.
-  MOZ_ASSERT(TimeZoneMethodsRecordHasLookedUp(
-      timeZone, TimeZoneMethod::GetPossibleInstantsFor));
-
-  // Step 3.
-  Rooted<InstantVector> possibleInstants(cx, InstantVector(cx));
-  if (!GetPossibleInstantsFor(cx, timeZone, dateTime, &possibleInstants)) {
-    return false;
-  }
-
-  // Step 4.
-  Rooted<Wrapped<InstantObject*>> instant(cx);
-  if (!DisambiguatePossibleInstants(cx, possibleInstants, timeZone,
-                                    ToPlainDateTime(dateTime), disambiguation,
-                                    &instant)) {
-    return false;
-  }
-
-  auto* unwrappedInstant = instant.unwrap(cx);
-  if (!unwrappedInstant) {
-    return false;
-  }
-
-  *result = ToInstant(unwrappedInstant);
-  return true;
-}
-
-/**
- * GetInstantFor ( timeZoneRec, dateTime, disambiguation )
- */
-bool js::temporal::GetInstantFor(JSContext* cx, Handle<TimeZoneValue> timeZone,
-                                 Handle<PlainDateTimeWithCalendar> dateTime,
-                                 TemporalDisambiguation disambiguation,
-                                 Instant* result) {
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                       TimeZoneMethod::GetPossibleInstantsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  return GetInstantFor(cx, timeZoneRec, dateTime, disambiguation, result);
-}
-
-/**
- * IsOffsetTimeZoneIdentifier ( offsetString )
- *
- * Return true if |offsetString| is the prefix of a time zone offset string.
- * Time zone offset strings are be parsed through the |TimeZoneUTCOffsetName|
- * production.
- *
- * TimeZoneUTCOffsetName :
- *   UTCOffsetMinutePrecision
- *
- * UTCOffsetMinutePrecision :
- *   Sign Hour[+Padded]
- *   Sign Hour[+Padded] TimeSeparator[+Extended] MinuteSecond
- *   Sign Hour[+Padded] TimeSeparator[~Extended] MinuteSecond
- *
- * Sign :
- *   ASCIISign
- *   U+2212
- *
- * ASCIISign : one of + -
- *
- * NOTE: IANA time zone identifiers can't start with |Sign|.
- */
-static bool IsOffsetTimeZoneIdentifierPrefix(JSLinearString* offsetString) {
-  // Empty string can't be the prefix of |TimeZoneUTCOffsetName|.
-  if (offsetString->empty()) {
-    return false;
-  }
-
-  // Return true iff |offsetString| starts with |Sign|.
-  char16_t ch = offsetString->latin1OrTwoByteChar(0);
-  return ch == '+' || ch == '-' || ch == 0x2212;
-}
-
-/**
- * Temporal.TimeZone ( identifier )
- */
-static bool TimeZoneConstructor(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-
-  // Step 1.
-  if (!ThrowIfNotConstructing(cx, args, "Temporal.TimeZone")) {
+  PossibleEpochNanoseconds possibleEpochNs;
+  if (!GetPossibleEpochNanoseconds(cx, timeZone, isoDateTime,
+                                   &possibleEpochNs)) {
     return false;
   }
 
   // Step 2.
-  if (!args.requireAtLeast(cx, "Temporal.TimeZone", 1)) {
-    return false;
+  return DisambiguatePossibleEpochNanoseconds(
+      cx, possibleEpochNs, timeZone, isoDateTime, disambiguation, result);
+}
+
+bool js::temporal::WrapTimeZoneValueObject(
+    JSContext* cx, MutableHandle<TimeZoneObject*> timeZone) {
+  // Handle the common case when |timeZone| is from the current compartment.
+  if (MOZ_LIKELY(timeZone->compartment() == cx->compartment())) {
+    return true;
   }
 
-  if (!args[0].isString()) {
-    ReportValueError(cx, JSMSG_UNEXPECTED_TYPE, JSDVG_SEARCH_STACK, args[0],
-                     nullptr, "not a string");
-    return false;
-  }
-
-  Rooted<JSLinearString*> identifier(cx, args[0].toString()->ensureLinear(cx));
-  if (!identifier) {
-    return false;
-  }
-
-  Rooted<JSString*> canonical(cx);
-  Rooted<Value> offsetMinutes(cx);
-  if (IsOffsetTimeZoneIdentifierPrefix(identifier)) {
-    // Step 3.
-    int32_t minutes;
-    if (!ParseTimeZoneOffsetString(cx, identifier, &minutes)) {
-      return false;
-    }
-    MOZ_ASSERT(std::abs(minutes) < UnitsPerDay(TemporalUnit::Minute));
-
-    canonical = FormatOffsetTimeZoneIdentifier(cx, minutes);
-    if (!canonical) {
+  if (timeZone->isOffset()) {
+    auto* obj = CreateTimeZoneObject(cx, timeZone->offsetMinutes());
+    if (!obj) {
       return false;
     }
 
-    offsetMinutes.setInt32(minutes);
-  } else {
-    // Step 4.
-    canonical = ValidateAndCanonicalizeTimeZoneName(cx, identifier);
-    if (!canonical) {
-      return false;
-    }
-
-    offsetMinutes.setUndefined();
+    timeZone.set(obj);
+    return true;
   }
 
-  // Step 5.
-  auto* timeZone = CreateTemporalTimeZone(cx, args, canonical, offsetMinutes);
-  if (!timeZone) {
+  Rooted<JSString*> identifier(cx, timeZone->identifier());
+  if (!cx->compartment()->wrap(cx, &identifier)) {
     return false;
   }
 
-  args.rval().setObject(*timeZone);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.from ( item )
- */
-static bool TimeZone_from(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-
-  // Step 1.
-  Rooted<TimeZoneValue> timeZone(cx);
-  if (!ToTemporalTimeZone(cx, args.get(0), &timeZone)) {
+  Rooted<JSString*> primaryIdentifier(cx, timeZone->primaryIdentifier());
+  if (!cx->compartment()->wrap(cx, &primaryIdentifier)) {
     return false;
   }
 
-  // Step 2.
-  auto* obj = ToTemporalTimeZoneObject(cx, timeZone);
+  Rooted<JSLinearString*> identifierLinear(cx, identifier->ensureLinear(cx));
+  if (!identifierLinear) {
+    return false;
+  }
+
+  Rooted<JSLinearString*> primaryIdentifierLinear(
+      cx, primaryIdentifier->ensureLinear(cx));
+  if (!primaryIdentifierLinear) {
+    return false;
+  }
+
+  auto* obj =
+      CreateTimeZoneObject(cx, identifierLinear, primaryIdentifierLinear);
   if (!obj) {
     return false;
   }
 
-  args.rval().setObject(*obj);
+  timeZone.set(obj);
   return true;
 }
 
-/**
- * Temporal.TimeZone.prototype.equals ( timeZoneLike )
- */
-static bool TimeZone_equals(JSContext* cx, const CallArgs& args) {
-  Rooted<TimeZoneValue> timeZone(cx, &args.thisv().toObject());
-
-  // Step 3.
-  Rooted<TimeZoneValue> other(cx);
-  if (!ToTemporalTimeZone(cx, args.get(0), &other)) {
-    return false;
-  }
-
-  // Step 4.
-  bool equals;
-  if (!TimeZoneEquals(cx, timeZone, other, &equals)) {
-    return false;
-  }
-
-  args.rval().setBoolean(equals);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.equals ( timeZoneLike )
- */
-static bool TimeZone_equals(JSContext* cx, unsigned argc, Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_equals>(cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getOffsetNanosecondsFor ( instant )
- */
-static bool TimeZone_getOffsetNanosecondsFor(JSContext* cx,
-                                             const CallArgs& args) {
-  Rooted<TimeZoneObject*> timeZone(
-      cx, &args.thisv().toObject().as<TimeZoneObject>());
-
-  // Step 3.
-  Instant instant;
-  if (!ToTemporalInstant(cx, args.get(0), &instant)) {
-    return false;
-  }
-
-  // Steps 4-5.
-  int64_t offset;
-  if (!BuiltinGetOffsetNanosecondsFor(cx, timeZone, instant, &offset)) {
-    return false;
-  }
-
-  args.rval().setNumber(offset);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getOffsetNanosecondsFor ( instant )
- */
-static bool TimeZone_getOffsetNanosecondsFor(JSContext* cx, unsigned argc,
-                                             Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getOffsetNanosecondsFor>(
-      cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getOffsetStringFor ( instant )
- */
-static bool TimeZone_getOffsetStringFor(JSContext* cx, const CallArgs& args) {
-  Rooted<TimeZoneValue> timeZone(cx, &args.thisv().toObject());
-
-  // Step 3.
-  Rooted<Wrapped<InstantObject*>> instant(cx,
-                                          ToTemporalInstant(cx, args.get(0)));
-  if (!instant) {
-    return false;
-  }
-
-  // Step 4.
-  Rooted<TimeZoneRecord> timeZoneRec(cx);
-  if (!CreateTimeZoneMethodsRecord(cx, timeZone,
-                                   {
-                                       TimeZoneMethod::GetOffsetNanosecondsFor,
-                                   },
-                                   &timeZoneRec)) {
-    return false;
-  }
-
-  // Step 5.
-  JSString* str = GetOffsetStringFor(cx, timeZoneRec, instant);
-  if (!str) {
-    return false;
-  }
-
-  args.rval().setString(str);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getOffsetStringFor ( instant )
- */
-static bool TimeZone_getOffsetStringFor(JSContext* cx, unsigned argc,
-                                        Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getOffsetStringFor>(cx,
-                                                                       args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getPlainDateTimeFor ( instant [, calendarLike ] )
- */
-static bool TimeZone_getPlainDateTimeFor(JSContext* cx, const CallArgs& args) {
-  Rooted<TimeZoneValue> timeZone(cx, &args.thisv().toObject());
-
-  // Step 3.
-  Rooted<Wrapped<InstantObject*>> instant(cx,
-                                          ToTemporalInstant(cx, args.get(0)));
-  if (!instant) {
-    return false;
-  }
-
-  // Step 4.
-  Rooted<CalendarValue> calendar(cx);
-  if (!ToTemporalCalendarWithISODefault(cx, args.get(1), &calendar)) {
-    return false;
-  }
-
-  // Steps 5-6.
-  auto* result = GetPlainDateTimeFor(cx, timeZone, instant, calendar);
-  if (!result) {
-    return false;
-  }
-
-  args.rval().setObject(*result);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getPlainDateTimeFor ( instant [, calendarLike ] )
- */
-static bool TimeZone_getPlainDateTimeFor(JSContext* cx, unsigned argc,
-                                         Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getPlainDateTimeFor>(cx,
-                                                                        args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getInstantFor ( dateTime [ , options ] )
- */
-static bool TimeZone_getInstantFor(JSContext* cx, const CallArgs& args) {
-  Rooted<TimeZoneValue> timeZone(cx, &args.thisv().toObject());
-
-  // Step 3.
-  Rooted<Wrapped<PlainDateTimeObject*>> dateTime(
-      cx, ToTemporalDateTime(cx, args.get(0)));
-  if (!dateTime) {
-    return false;
-  }
-
-  // Steps 4-5.
-  auto disambiguation = TemporalDisambiguation::Compatible;
-  if (args.hasDefined(1)) {
-    // Step 4.
-    Rooted<JSObject*> options(
-        cx, RequireObjectArg(cx, "options", "getInstantFor", args[1]));
-    if (!options) {
-      return false;
-    }
-
-    // Step 5.
-    if (!GetTemporalDisambiguationOption(cx, options, &disambiguation)) {
-      return false;
-    }
-  }
-
-  // Steps 6-7.
-  Rooted<Wrapped<InstantObject*>> result(cx);
-  if (!::GetInstantFor(cx, timeZone, dateTime, disambiguation, &result)) {
-    return false;
-  }
-
-  args.rval().setObject(*result);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getInstantFor ( dateTime [ , options ] )
- */
-static bool TimeZone_getInstantFor(JSContext* cx, unsigned argc, Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getInstantFor>(cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getPossibleInstantsFor ( dateTime )
- */
-static bool TimeZone_getPossibleInstantsFor(JSContext* cx,
-                                            const CallArgs& args) {
-  Rooted<TimeZoneObject*> timeZone(
-      cx, &args.thisv().toObject().as<TimeZoneObject>());
-
-  // Step 3.
-  PlainDateTime dateTime;
-  if (!ToTemporalDateTime(cx, args.get(0), &dateTime)) {
-    return false;
-  }
-
-  // Steps 4-5.
-  EpochInstantList possibleInstants;
-  if (!BuiltinGetPossibleInstantsFor(cx, timeZone, dateTime,
-                                     possibleInstants)) {
-    return false;
-  }
-
-  // Step 6.
-  size_t length = possibleInstants.length();
-  Rooted<ArrayObject*> result(cx, NewDenseFullyAllocatedArray(cx, length));
-  if (!result) {
-    return false;
-  }
-  result->ensureDenseInitializedLength(0, length);
-
-  // Step 7.
-  for (size_t i = 0; i < length; i++) {
-    // Step 7.a. (Already performed in step 4 in our implementation.)
-    MOZ_ASSERT(IsValidEpochInstant(possibleInstants[i]));
-
-    // Step 7.b.
-    auto* instant = CreateTemporalInstant(cx, possibleInstants[i]);
-    if (!instant) {
-      return false;
-    }
-
-    // Step 7.c.
-    result->initDenseElement(i, ObjectValue(*instant));
-  }
-
-  // Step 8.
-  args.rval().setObject(*result);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getPossibleInstantsFor ( dateTime )
- */
-static bool TimeZone_getPossibleInstantsFor(JSContext* cx, unsigned argc,
-                                            Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getPossibleInstantsFor>(
-      cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getNextTransition ( startingPoint )
- */
-static bool TimeZone_getNextTransition(JSContext* cx, const CallArgs& args) {
-  Rooted<TimeZoneObject*> timeZone(
-      cx, &args.thisv().toObject().as<TimeZoneObject>());
-
-  // Step 3.
-  Instant startingPoint;
-  if (!ToTemporalInstant(cx, args.get(0), &startingPoint)) {
-    return false;
-  }
-
-  // Step 4.
-  if (!timeZone->offsetMinutes().isUndefined()) {
-    args.rval().setNull();
-    return true;
-  }
-
-  // Step 5.
-  mozilla::Maybe<Instant> transition;
-  if (!GetNamedTimeZoneNextTransition(cx, timeZone, startingPoint,
-                                      &transition)) {
-    return false;
-  }
-
-  // Step 6.
-  if (!transition) {
-    args.rval().setNull();
-    return true;
-  }
-
-  // Step 7.
-  auto* instant = CreateTemporalInstant(cx, *transition);
-  if (!instant) {
-    return false;
-  }
-
-  args.rval().setObject(*instant);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getNextTransition ( startingPoint )
- */
-static bool TimeZone_getNextTransition(JSContext* cx, unsigned argc,
-                                       Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getNextTransition>(cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.getPreviousTransition ( startingPoint )
- */
-static bool TimeZone_getPreviousTransition(JSContext* cx,
-                                           const CallArgs& args) {
-  Rooted<TimeZoneObject*> timeZone(
-      cx, &args.thisv().toObject().as<TimeZoneObject>());
-
-  // Step 3.
-  Instant startingPoint;
-  if (!ToTemporalInstant(cx, args.get(0), &startingPoint)) {
-    return false;
-  }
-
-  // Step 4.
-  if (!timeZone->offsetMinutes().isUndefined()) {
-    args.rval().setNull();
-    return true;
-  }
-
-  // Step 5.
-  mozilla::Maybe<Instant> transition;
-  if (!GetNamedTimeZonePreviousTransition(cx, timeZone, startingPoint,
-                                          &transition)) {
-    return false;
-  }
-
-  // Step 6.
-  if (!transition) {
-    args.rval().setNull();
-    return true;
-  }
-
-  // Step 7.
-  auto* instant = CreateTemporalInstant(cx, *transition);
-  if (!instant) {
-    return false;
-  }
-
-  args.rval().setObject(*instant);
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.getPreviousTransition ( startingPoint )
- */
-static bool TimeZone_getPreviousTransition(JSContext* cx, unsigned argc,
-                                           Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_getPreviousTransition>(cx,
-                                                                          args);
-}
-
-/**
- * Temporal.TimeZone.prototype.toString ( )
- */
-static bool TimeZone_toString(JSContext* cx, const CallArgs& args) {
-  auto* timeZone = &args.thisv().toObject().as<TimeZoneObject>();
-
-  // Steps 3-4.
-  args.rval().setString(timeZone->identifier());
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.toString ( )
- */
-static bool TimeZone_toString(JSContext* cx, unsigned argc, Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_toString>(cx, args);
-}
-
-/**
- * Temporal.TimeZone.prototype.toJSON ( )
- */
-static bool TimeZone_toJSON(JSContext* cx, const CallArgs& args) {
-  auto* timeZone = &args.thisv().toObject().as<TimeZoneObject>();
-
-  // Steps 3-4.
-  args.rval().setString(timeZone->identifier());
-  return true;
-}
-
-/**
- * Temporal.TimeZone.prototype.toJSON ( )
- */
-static bool TimeZone_toJSON(JSContext* cx, unsigned argc, Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_toJSON>(cx, args);
-}
-
-/**
- * get Temporal.TimeZone.prototype.id
- */
-static bool TimeZone_id(JSContext* cx, const CallArgs& args) {
-  auto* timeZone = &args.thisv().toObject().as<TimeZoneObject>();
-
-  // Steps 3-4.
-  args.rval().setString(timeZone->identifier());
-  return true;
-}
-
-/**
- * get Temporal.TimeZone.prototype.id
- */
-static bool TimeZone_id(JSContext* cx, unsigned argc, Value* vp) {
-  // Steps 1-2.
-  CallArgs args = CallArgsFromVp(argc, vp);
-  return CallNonGenericMethod<IsTimeZone, TimeZone_id>(cx, args);
-}
-
-void js::temporal::TimeZoneObjectMaybeBuiltin::finalize(JS::GCContext* gcx,
-                                                        JSObject* obj) {
+void js::temporal::TimeZoneObject::finalize(JS::GCContext* gcx, JSObject* obj) {
   MOZ_ASSERT(gcx->onMainThread());
 
-  if (auto* timeZone = obj->as<TimeZoneObjectMaybeBuiltin>().getTimeZone()) {
-    intl::RemoveICUCellMemory(gcx, obj, TimeZoneObject::EstimatedMemoryUse);
+  if (auto* timeZone = obj->as<TimeZoneObject>().getTimeZone()) {
+    intl::RemoveICUCellMemory(gcx, obj, EstimatedMemoryUse);
     delete timeZone;
   }
 }
@@ -2671,66 +1175,6 @@ const JSClassOps TimeZoneObject::classOps_ = {
 const JSClass TimeZoneObject::class_ = {
     "Temporal.TimeZone",
     JSCLASS_HAS_RESERVED_SLOTS(TimeZoneObject::SLOT_COUNT) |
-        JSCLASS_HAS_CACHED_PROTO(JSProto_TimeZone) |
         JSCLASS_FOREGROUND_FINALIZE,
     &TimeZoneObject::classOps_,
-    &TimeZoneObject::classSpec_,
-};
-
-const JSClass& TimeZoneObject::protoClass_ = PlainObject::class_;
-
-static const JSFunctionSpec TimeZone_methods[] = {
-    JS_FN("from", TimeZone_from, 1, 0),
-    JS_FS_END,
-};
-
-static const JSFunctionSpec TimeZone_prototype_methods[] = {
-    JS_FN("equals", TimeZone_equals, 1, 0),
-    JS_FN("getOffsetNanosecondsFor", TimeZone_getOffsetNanosecondsFor, 1, 0),
-    JS_FN("getOffsetStringFor", TimeZone_getOffsetStringFor, 1, 0),
-    JS_FN("getPlainDateTimeFor", TimeZone_getPlainDateTimeFor, 1, 0),
-    JS_FN("getInstantFor", TimeZone_getInstantFor, 1, 0),
-    JS_FN("getPossibleInstantsFor", TimeZone_getPossibleInstantsFor, 1, 0),
-    JS_FN("getNextTransition", TimeZone_getNextTransition, 1, 0),
-    JS_FN("getPreviousTransition", TimeZone_getPreviousTransition, 1, 0),
-    JS_FN("toString", TimeZone_toString, 0, 0),
-    JS_FN("toJSON", TimeZone_toJSON, 0, 0),
-    JS_FS_END,
-};
-
-static const JSPropertySpec TimeZone_prototype_properties[] = {
-    JS_PSG("id", TimeZone_id, 0),
-    JS_STRING_SYM_PS(toStringTag, "Temporal.TimeZone", JSPROP_READONLY),
-    JS_PS_END,
-};
-
-const ClassSpec TimeZoneObject::classSpec_ = {
-    GenericCreateConstructor<TimeZoneConstructor, 1, gc::AllocKind::FUNCTION>,
-    GenericCreatePrototype<TimeZoneObject>,
-    TimeZone_methods,
-    nullptr,
-    TimeZone_prototype_methods,
-    TimeZone_prototype_properties,
-    nullptr,
-    ClassSpec::DontDefineConstructor,
-};
-
-const JSClassOps BuiltinTimeZoneObject::classOps_ = {
-    nullptr,                          // addProperty
-    nullptr,                          // delProperty
-    nullptr,                          // enumerate
-    nullptr,                          // newEnumerate
-    nullptr,                          // resolve
-    nullptr,                          // mayResolve
-    BuiltinTimeZoneObject::finalize,  // finalize
-    nullptr,                          // call
-    nullptr,                          // construct
-    nullptr,                          // trace
-};
-
-const JSClass BuiltinTimeZoneObject::class_ = {
-    "Temporal.BuiltinTimeZone",
-    JSCLASS_HAS_RESERVED_SLOTS(BuiltinTimeZoneObject::SLOT_COUNT) |
-        JSCLASS_FOREGROUND_FINALIZE,
-    &BuiltinTimeZoneObject::classOps_,
 };

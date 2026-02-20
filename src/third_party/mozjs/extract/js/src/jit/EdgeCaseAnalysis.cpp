@@ -6,6 +6,7 @@
 
 #include "jit/EdgeCaseAnalysis.h"
 
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
@@ -13,7 +14,7 @@
 using namespace js;
 using namespace js::jit;
 
-EdgeCaseAnalysis::EdgeCaseAnalysis(MIRGenerator* mir, MIRGraph& graph)
+EdgeCaseAnalysis::EdgeCaseAnalysis(const MIRGenerator* mir, MIRGraph& graph)
     : mir(mir), graph(graph) {}
 
 bool EdgeCaseAnalysis::analyzeLate() {

@@ -8,6 +8,7 @@
 
 #include "jit/LIR.h"
 #include "jit/Lowering.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/ScalarTypeUtils.h"
 
@@ -205,6 +206,10 @@ LSnapshot* LIRGeneratorShared::buildSnapshot(MResumePoint* rp,
     if (ins->isConstant() || ins->isUnused()) {
       *type = LAllocation();
       *payload = LAllocation();
+    } else if (ins->type() == MIRType::Int64) {
+      LInt64Allocation alloc = useInt64(ins, LUse::KEEPALIVE);
+      *type = *alloc.low().toUse();
+      *payload = *alloc.high().toUse();
     } else if (ins->type() != MIRType::Value) {
       *type = LAllocation();
       *payload = use(ins, LUse(LUse::KEEPALIVE));
@@ -299,11 +304,7 @@ void LIRGeneratorShared::assignSafepoint(LInstruction* ins, MInstruction* mir,
   }
 
   osiPoint_ = new (alloc()) LOsiPoint(ins->safepoint(), postSnapshot);
-
-  if (!lirGraph_.noteNeedsSafepoint(ins)) {
-    abort(AbortReason::Alloc, "noteNeedsSafepoint failed");
-    return;
-  }
+  lirGraph_.noteNeedsSafepoint(ins);
 }
 
 void LIRGeneratorShared::assignWasmSafepoint(LInstruction* ins) {
@@ -311,9 +312,5 @@ void LIRGeneratorShared::assignWasmSafepoint(LInstruction* ins) {
   MOZ_ASSERT(!ins->safepoint());
 
   ins->initSafepoint(alloc());
-
-  if (!lirGraph_.noteNeedsSafepoint(ins)) {
-    abort(AbortReason::Alloc, "noteNeedsSafepoint failed");
-    return;
-  }
+  lirGraph_.noteNeedsSafepoint(ins);
 }

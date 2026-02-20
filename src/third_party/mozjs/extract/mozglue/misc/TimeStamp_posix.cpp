@@ -197,8 +197,7 @@ void TimeStamp::Startup() {
   // sake of ToSecondsSigDigits()
   for (sResolutionSigDigs = 1; !(sResolutionSigDigs == sResolution ||
                                  10 * sResolutionSigDigs > sResolution);
-       sResolutionSigDigs *= 10)
-    ;
+       sResolutionSigDigs *= 10);
 
   gInitialized = true;
 }
@@ -321,14 +320,16 @@ uint64_t TimeStamp::ComputeProcessUptime() {
   }
 
   int mib[] = {
-    CTL_KERN,
-    KERN_PROC,
-    KERN_PROC_PID,
-    getpid(),
+      // clang-format off
+      CTL_KERN,
+      KERN_PROC,
+      KERN_PROC_PID,
+      getpid(),
 #  if defined(__NetBSD__) || defined(__OpenBSD__)
-    sizeof(KINFO_PROC),
-    1,
+      sizeof(KINFO_PROC),
+      1,
 #  endif
+      // clang-format on
   };
   u_int mibLen = sizeof(mib) / sizeof(mib[0]);
 

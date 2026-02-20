@@ -116,18 +116,15 @@ JSObject* InitRegExpClass(JSContext* cx, HandleObject obj);
                                        HandleValue flags,
                                        MutableHandleValue rval);
 
-[[nodiscard]] extern bool RegExpPrototypeOptimizable(JSContext* cx,
-                                                     unsigned argc, Value* vp);
+[[nodiscard]] extern bool IsRegExpPrototypeOptimizable(JSContext* cx,
+                                                       unsigned argc,
+                                                       Value* vp);
 
-[[nodiscard]] extern bool RegExpPrototypeOptimizableRaw(JSContext* cx,
-                                                        JSObject* proto);
+[[nodiscard]] extern bool IsOptimizableRegExpObject(JSObject* obj,
+                                                    JSContext* cx);
 
-[[nodiscard]] extern bool RegExpInstanceOptimizable(JSContext* cx,
+[[nodiscard]] extern bool IsOptimizableRegExpObject(JSContext* cx,
                                                     unsigned argc, Value* vp);
-
-[[nodiscard]] extern bool RegExpInstanceOptimizableRaw(JSContext* cx,
-                                                       JSObject* obj,
-                                                       JSObject* proto);
 
 [[nodiscard]] extern bool RegExpBuiltinExec(JSContext* cx,
                                             Handle<RegExpObject*> regexp,
@@ -156,12 +153,13 @@ JSObject* InitRegExpClass(JSContext* cx, HandleObject obj);
 [[nodiscard]] extern bool GetFirstDollarIndexRaw(JSContext* cx, JSString* str,
                                                  int32_t* index);
 
-extern int32_t GetFirstDollarIndexRawFlat(JSLinearString* text);
+extern int32_t GetFirstDollarIndexRawFlat(const JSLinearString* text);
 
 // RegExp ClassSpec members used in RegExpObject.cpp.
 [[nodiscard]] extern bool regexp_construct(JSContext* cx, unsigned argc,
                                            Value* vp);
 extern const JSPropertySpec regexp_static_props[];
+extern const JSFunctionSpec regexp_static_methods[];
 extern const JSPropertySpec regexp_properties[];
 extern const JSFunctionSpec regexp_methods[];
 

@@ -11,17 +11,23 @@
 #ifndef gc_ArenaList_h
 #define gc_ArenaList_h
 
+#include <utility>
+
 #include "ds/SinglyLinkedList.h"
 #include "gc/AllocKind.h"
+#include "gc/Memory.h"
 #include "js/GCAPI.h"
 #include "js/HeapAPI.h"
 #include "js/TypeDecls.h"
 #include "threading/ProtectedData.h"
 
+namespace JS {
+class SliceBudget;
+}
+
 namespace js {
 
 class Nursery;
-class SliceBudget;
 
 namespace gcstats {
 struct Statistics;
@@ -30,6 +36,8 @@ struct Statistics;
 namespace gc {
 
 class Arena;
+class ArenaIter;
+class ArenaIterInGC;
 class AutoGatherSweptArenas;
 class BackgroundUnmarkTask;
 struct FinalizePhase;
@@ -37,17 +45,34 @@ class FreeSpan;
 class TenuredCell;
 class TenuringTracer;
 
+// Whether or not to release empty arenas while sweeping.
+enum class ReleaseEmpty : bool { No = false, Yes = true };
+
 /*
- * Arena lists contain a singly linked lists of arenas starting from a head
- * pointer.
+ * Arena lists contain a singly linked lists of arenas.
  *
- * They also have a cursor, which conceptually lies on arena boundaries,
- * i.e. before the first arena, between two arenas, or after the last arena.
+ * Arenas with free space are positioned at the front of the list, sorted in
+ * order of increasing free space (which is the order we intend to use them):
  *
- * Arenas are sorted in order of increasing free space, with the cursor before
- * the first arena with any free space. This provides a convenient way of
- * getting the next arena with free space when allocating. The cursor is updated
- * when this happens to point to the following arena.
+ * For example, the following shows a possible arrangement of arenas with count
+ * of used cells on Y axis:
+ *
+ *   |                                       +----+----+----+----+----+
+ *   |                                       |    |    |    |    |    |
+ *   |                                       |    |    |    |    |    |
+ *   +----+----+                             |    |    |    |    |    |
+ *   |    |    +----+                        |    |    |    |    |    |
+ *   |    |    |    +----+                   |    |    |    |    |    |
+ *   |    |    |    |    |                   |    |    |    |    |    |
+ *   |    |    |    |    +----+              |    |    |    |    |    |
+ *   |    |    |    |    |    |              |    |    |    |    |    |
+ *   |    |    |    |    |    +----+----+    |    |    |    |    |    |
+ *   |    |    |    |    |    |    |    +----+    |    |    |    |    |
+ *   +----+----+----+----+----+----+----+----+----+----+----+----+----+
+ *
+ * This provides a convenient way of getting the next arena with free space when
+ * allocating: the arena at the front of the list is taken, marked as fully
+ * allocated and moved to the end of the list.
  *
  * The ordering is chosen to try and fill up arenas as much as possible and
  * leave more empty arenas to be reclaimed when their contents die.
@@ -56,85 +81,21 @@ class TenuringTracer;
  * lists may be cleared, leaving arenas previously used for allocation partially
  * full. Sorting order is restored during sweeping.
  */
-class ArenaList {
-  // The cursor is implemented via an indirect pointer, |cursorp_|, to allow
-  // for efficient list insertion at the cursor point and other list
-  // manipulations.
-  //
-  // - If the list is empty: |head| is null, |cursorp_| points to |head|, and
-  //   therefore |*cursorp_| is null.
-  //
-  // - If the list is not empty: |head| is non-null, and...
-  //
-  //   - If the cursor is at the start of the list: |cursorp_| points to
-  //     |head|, and therefore |*cursorp_| points to the first arena.
-  //
-  //   - If cursor is at the end of the list: |cursorp_| points to the |next|
-  //     field of the last arena, and therefore |*cursorp_| is null.
-  //
-  //   - If the cursor is at neither the start nor the end of the list:
-  //     |cursorp_| points to the |next| field of the arena preceding the
-  //     cursor, and therefore |*cursorp_| points to the arena following the
-  //     cursor.
-  //
-  // |cursorp_| is never null.
-  //
-  Arena* head_;
-  Arena** cursorp_;
-
-  // Transfers the contents of |other| to this list and clears |other|.
-  inline void moveFrom(ArenaList& other);
-
+class ArenaList : public SinglyLinkedList<Arena> {
  public:
-  inline ArenaList();
-  inline ArenaList(ArenaList&& other);
-  inline ~ArenaList();
+  inline bool hasNonFullArenas() const;
 
-  inline ArenaList& operator=(ArenaList&& other);
+  // This returns the first arena if it has any free space, moving it to the
+  // back of the list. If there are no arenas or if the first one is full then
+  // return nullptr.
+  inline Arena* takeInitialNonFullArena();
 
-  // It doesn't make sense for arenas to be present in more than one list, so
-  // list copy operations are not provided.
-  ArenaList(const ArenaList& other) = delete;
-  ArenaList& operator=(const ArenaList& other) = delete;
+  std::pair<Arena*, Arena*> pickArenasToRelocate(AllocKind kind,
+                                                 size_t& arenaTotalOut,
+                                                 size_t& relocTotalOut);
 
-  inline ArenaList(Arena* head, Arena* arenaBeforeCursor);
-
-  inline void check() const;
-
-  inline void clear();
-  inline bool isEmpty() const;
-
-  // This returns nullptr if the list is empty.
-  inline Arena* head() const;
-
-  inline bool isCursorAtHead() const;
-  inline bool isCursorAtEnd() const;
-
-  // This can return nullptr.
-  inline Arena* arenaAfterCursor() const;
-
-  // This returns the arena after the cursor and moves the cursor past it.
-  inline Arena* takeNextArena();
-
-  // This does two things.
-  // - Inserts |a| at the cursor.
-  // - Leaves the cursor sitting just before |a|, if |a| is not full, or just
-  //   after |a|, if |a| is full.
-  inline void insertAtCursor(Arena* a);
-
-  // Inserts |a| at the cursor, then moves the cursor past it.
-  inline void insertBeforeCursor(Arena* a);
-
-  // This inserts the contents of |other|, which must be full, at the cursor of
-  // |this| and clears |other|.
-  inline ArenaList& insertListWithCursorAtEnd(ArenaList& other);
-
-  inline Arena* takeFirstArena();
-
-  Arena* removeRemainingArenas(Arena** arenap);
-  Arena** pickArenasToRelocate(size_t& arenaTotalOut, size_t& relocTotalOut);
   Arena* relocateArenas(Arena* toRelocate, Arena* relocated,
-                        js::SliceBudget& sliceBudget,
+                        JS::SliceBudget& sliceBudget,
                         gcstats::Statistics& stats);
 
 #ifdef DEBUG
@@ -188,6 +149,8 @@ class SortedArenaList {
   // Inserts an arena, which has room for |nfree| more things, in its bucket.
   inline void insertAt(Arena* arena, size_t nfree);
 
+  inline bool hasEmptyArenas() const;
+
   // Remove any empty arenas and prepend them to the list pointed to by
   // |destListHeadPtr|.
   inline void extractEmptyTo(Arena** destListHeadPtr);
@@ -233,7 +196,7 @@ class MOZ_RAII AutoGatherSweptArenas {
   AutoGatherSweptArenas(JS::Zone* zone, AllocKind kind);
   ~AutoGatherSweptArenas();
 
-  Arena* sweptArenas() const;
+  ArenaList& sweptArenas() { return linked; }
 };
 
 enum class ShouldCheckThresholds {
@@ -278,10 +241,13 @@ class FreeLists {
 };
 
 class ArenaLists {
-  enum class ConcurrentUse : uint32_t { None, BackgroundFinalize };
+  enum class ConcurrentUse : uint32_t {
+    None,
+    BackgroundFinalize,
+    BackgroundFinalizeFinished
+  };
 
-  using ConcurrentUseState =
-      mozilla::Atomic<ConcurrentUse, mozilla::SequentiallyConsistent>;
+  using ConcurrentUseState = mozilla::Atomic<ConcurrentUse, mozilla::Relaxed>;
 
   JS::Zone* zone_;
 
@@ -321,12 +287,10 @@ class ArenaLists {
 
   inline Arena* getFirstArena(AllocKind thingKind) const;
   inline Arena* getFirstCollectingArena(AllocKind thingKind) const;
-  inline Arena* getArenaAfterCursor(AllocKind thingKind) const;
 
   inline bool arenaListsAreEmpty() const;
 
   inline bool doneBackgroundFinalize(AllocKind kind) const;
-  inline bool needBackgroundFinalizeWait(AllocKind kind) const;
 
   /* Clear the free lists so we won't try to allocate from swept arenas. */
   inline void clearFreeLists();
@@ -342,15 +306,23 @@ class ArenaLists {
   void checkEmptyArenaList(AllocKind kind);
 
   bool relocateArenas(Arena*& relocatedListOut, JS::GCReason reason,
-                      js::SliceBudget& sliceBudget, gcstats::Statistics& stats);
+                      JS::SliceBudget& sliceBudget, gcstats::Statistics& stats);
 
   void queueForegroundObjectsForSweep(JS::GCContext* gcx);
   void queueForegroundThingsForSweep();
 
+  bool foregroundFinalize(JS::GCContext* gcx, AllocKind thingKind,
+                          JS::SliceBudget& sliceBudget,
+                          SortedArenaList& sweepList);
+  template <ReleaseEmpty releaseEmpty>
+  void backgroundFinalize(JS::GCContext* gcx, AllocKind kind,
+                          Arena** empty = nullptr);
+
   Arena* takeSweptEmptyArenas();
 
-  void mergeFinalizedArenas(AllocKind thingKind,
-                            SortedArenaList& finalizedArenas);
+  void mergeBackgroundSweptArenas();
+  void maybeMergeSweptArenas(AllocKind thingKind);
+  void mergeSweptArenas(AllocKind thingKind, ArenaList& sweptArenas);
 
   void moveArenasToCollectingLists();
   void mergeArenasFromCollectingLists();
@@ -384,8 +356,11 @@ class ArenaLists {
   void initBackgroundSweep(AllocKind thingKind);
 
   void* refillFreeListAndAllocate(AllocKind thingKind,
-                                  ShouldCheckThresholds checkThresholds);
+                                  ShouldCheckThresholds checkThresholds,
+                                  StallAndRetry stallAndRetry);
 
+  friend class ArenaIter;
+  friend class ArenaIterInGC;
   friend class BackgroundUnmarkTask;
   friend class GCRuntime;
   friend class js::Nursery;

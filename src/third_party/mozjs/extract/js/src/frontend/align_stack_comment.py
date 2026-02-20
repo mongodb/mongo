@@ -49,18 +49,14 @@ def align_stack_comment(path):
 
                 if head_len > ALIGNMENT_COLUMN:
                     print(
-                        "Warning: line {} overflows from alignment column {}: {}".format(
-                            line_num, ALIGNMENT_COLUMN, head_len
-                        ),
+                        f"Warning: line {line_num} overflows from alignment column {ALIGNMENT_COLUMN}: {head_len}",
                         file=sys.stderr,
                     )
 
                 line_len = max(head_len, ALIGNMENT_COLUMN) + comment_len
                 if line_len > MAX_CHARS_PER_LINE:
                     print(
-                        "Warning: line {} overflows from {} chars: {}".format(
-                            line_num, MAX_CHARS_PER_LINE, line_len
-                        ),
+                        f"Warning: line {line_num} overflows from {MAX_CHARS_PER_LINE} chars: {line_len}",
                         file=sys.stderr,
                     )
 
@@ -78,15 +74,15 @@ def align_stack_comment(path):
                 lines.append(line)
 
         print(
-            "Info: Minimum column number for [stack]: {}".format(max_head_len),
+            f"Info: Minimum column number for [stack]: {max_head_len}",
             file=sys.stderr,
         )
         print(
-            "Info: Alignment column number for [stack]: {}".format(ALIGNMENT_COLUMN),
+            f"Info: Alignment column number for [stack]: {ALIGNMENT_COLUMN}",
             file=sys.stderr,
         )
         print(
-            "Info: Max length of stack transition comments: {}".format(max_comment_len),
+            f"Info: Max length of stack transition comments: {max_comment_len}",
             file=sys.stderr,
         )
 

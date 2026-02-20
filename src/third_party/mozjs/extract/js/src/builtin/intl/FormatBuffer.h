@@ -15,7 +15,6 @@
 #include <stdint.h>
 
 #include "js/AllocPolicy.h"
-#include "js/CharacterEncoding.h"
 #include "js/TypeDecls.h"
 #include "js/UniquePtr.h"
 #include "js/Vector.h"
@@ -99,23 +98,10 @@ class FormatBuffer {
 
   /**
    * Copies the buffer's data to a JSString.
-   *
-   * TODO(#1715842) - This should be more explicit on needing to handle OOM
-   * errors. In this case it returns a nullptr that must be checked, but it may
-   * not be obvious.
    */
   JSLinearString* toString(JSContext* cx) const {
-    if constexpr (std::is_same_v<CharT, uint8_t> ||
-                  std::is_same_v<CharT, unsigned char> ||
-                  std::is_same_v<CharT, char>) {
-      // Handle the UTF-8 encoding case.
-      return NewStringCopyUTF8N(
-          cx, JS::UTF8Chars(buffer_.begin(), buffer_.length()));
-    } else {
-      // Handle the UTF-16 encoding case.
-      static_assert(std::is_same_v<CharT, char16_t>);
-      return NewStringCopyN<CanGC>(cx, buffer_.begin(), buffer_.length());
-    }
+    static_assert(std::is_same_v<CharT, char16_t>);
+    return NewStringCopyN<CanGC>(cx, buffer_.begin(), buffer_.length());
   }
 
   /**

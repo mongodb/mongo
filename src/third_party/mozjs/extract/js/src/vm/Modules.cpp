@@ -25,12 +25,14 @@
 #include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
 #include "js/Context.h"                 // js::AssertHeapIsIdle
 #include "js/ErrorReport.h"             // JSErrorBase
+#include "js/friend/StackLimits.h"      // js::AutoCheckRecursionLimit
 #include "js/RootingAPI.h"              // JS::MutableHandle
 #include "js/Value.h"                   // JS::Value
 #include "vm/EnvironmentObject.h"       // js::ModuleEnvironmentObject
 #include "vm/JSAtomUtils.h"             // AtomizeString
 #include "vm/JSContext.h"               // CHECK_THREAD, JSContext
 #include "vm/JSObject.h"                // JSObject
+#include "vm/JSONParser.h"              // JSONParser
 #include "vm/List.h"                    // ListObject
 #include "vm/Runtime.h"                 // JSRuntime
 
@@ -133,23 +135,50 @@ JS_PUBLIC_API JSObject* JS::CompileModule(JSContext* cx,
 
 JS_PUBLIC_API JSObject* JS::CompileJsonModule(
     JSContext* cx, const ReadOnlyCompileOptions& options,
+    SourceText<mozilla::Utf8Unit>& srcBuf) {
+  size_t length = srcBuf.length();
+  auto chars =
+      UniqueTwoByteChars(UTF8CharsToNewTwoByteCharsZ(
+                             cx, JS::UTF8Chars(srcBuf.get(), srcBuf.length()),
+                             &length, js::MallocArena)
+                             .get());
+  if (!chars) {
+    return nullptr;
+  }
+
+  JS::SourceText<char16_t> source;
+  if (!source.init(cx, std::move(chars), length)) {
+    return nullptr;
+  }
+
+  return CompileJsonModule(cx, options, source);
+}
+
+JS_PUBLIC_API JSObject* JS::CompileJsonModule(
+    JSContext* cx, const ReadOnlyCompileOptions& options,
     SourceText<char16_t>& srcBuf) {
   MOZ_ASSERT(!cx->zone()->isAtomsZone());
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
 
-  JS::RootedValue jsonValue(cx);
   auto charRange =
       mozilla::Range<const char16_t>(srcBuf.get(), srcBuf.length());
-  if (!js::ParseJSONWithReviver(cx, charRange, NullHandleValue, &jsonValue)) {
+  Rooted<JSONParser<char16_t>> parser(
+      cx, cx, charRange, JSONParser<char16_t>::ParseType::JSONParse);
+
+  parser.reportLineNumbersFromParsedData(true);
+  parser.setFilename(options.filename());
+
+  JS::RootedValue jsonValue(cx);
+  if (!parser.parse(&jsonValue)) {
     return nullptr;
   }
 
   Rooted<ExportNameVector> exportNames(cx);
-  if (!exportNames.reserve(1)) {
+  if (!exportNames.append(cx->names().default_)) {
+    ReportOutOfMemory(cx);
     return nullptr;
   }
-  exportNames.infallibleAppend(cx->names().default_);
 
   Rooted<ModuleObject*> moduleObject(
       cx, ModuleObject::createSynthetic(cx, &exportNames));
@@ -157,11 +186,11 @@ JS_PUBLIC_API JSObject* JS::CompileJsonModule(
     return nullptr;
   }
 
-  Rooted<GCVector<Value>> exportValues(cx, GCVector<Value>(cx));
-  if (!exportValues.reserve(1)) {
+  RootedVector<Value> exportValues(cx);
+  if (!exportValues.append(jsonValue)) {
+    ReportOutOfMemory(cx);
     return nullptr;
   }
-  exportValues.infallibleAppend(jsonValue);
 
   if (!ModuleObject::createSyntheticEnvironment(cx, moduleObject,
                                                 exportValues)) {
@@ -184,6 +213,10 @@ JS_PUBLIC_API void JS::ClearModulePrivate(JSObject* module) {
 
 JS_PUBLIC_API JS::Value JS::GetModulePrivate(JSObject* module) {
   return module->as<ModuleObject>().scriptSourceObject()->getPrivate();
+}
+
+JS_PUBLIC_API bool JS::IsCyclicModule(JSObject* module) {
+  return module->as<ModuleObject>().hasCyclicModuleFields();
 }
 
 JS_PUBLIC_API bool JS::ModuleLink(JSContext* cx, Handle<JSObject*> moduleArg) {
@@ -239,8 +272,37 @@ JS_PUBLIC_API JSString* JS::GetRequestedModuleSpecifier(
   CHECK_THREAD(cx);
   cx->check(moduleRecord);
 
-  auto& module = moduleRecord->as<ModuleObject>();
-  return module.requestedModules()[index].moduleRequest()->specifier();
+  auto* moduleRequest = moduleRecord->as<ModuleObject>()
+                            .requestedModules()[index]
+                            .moduleRequest();
+
+  // This implements step 7.1.1 in HostLoadImportedModule.
+  // https://html.spec.whatwg.org/multipage/webappapis.html#hostloadimportedmodule
+  //
+  // If moduleRequest.[[Attributes]] contains a Record entry such that
+  // entry.[[Key]] is not "type",
+  if (moduleRequest->hasFirstUnsupportedAttributeKey()) {
+    UniqueChars printableKey = AtomToPrintableString(
+        cx, moduleRequest->getFirstUnsupportedAttributeKey());
+    JS_ReportErrorNumberASCII(
+        cx, GetErrorMessage, nullptr,
+        JSMSG_IMPORT_ATTRIBUTES_STATIC_IMPORT_UNSUPPORTED_ATTRIBUTE,
+        printableKey ? printableKey.get() : "");
+    return nullptr;
+  }
+
+  // This implements step 7.1.5 in HostLoadImportedModule.
+  // https://html.spec.whatwg.org/multipage/webappapis.html#validate-requested-module-specifiers
+  //
+  // If the result of running the module type allowed steps given moduleType and
+  // settings is false.
+  if (moduleRequest->moduleType() == JS::ModuleType::Unknown) {
+    JS_ReportErrorNumberASCII(cx, js::GetErrorMessage, nullptr,
+                              JSMSG_BAD_MODULE_TYPE);
+    return nullptr;
+  }
+
+  return moduleRequest->specifier();
 }
 
 JS_PUBLIC_API void JS::GetRequestedModuleSourcePos(
@@ -257,10 +319,27 @@ JS_PUBLIC_API void JS::GetRequestedModuleSourcePos(
   *columnNumber = module.requestedModules()[index].columnNumber();
 }
 
+JS_PUBLIC_API JS::ModuleType JS::GetRequestedModuleType(
+    JSContext* cx, Handle<JSObject*> moduleRecord, uint32_t index) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+  cx->check(moduleRecord);
+
+  auto& module = moduleRecord->as<ModuleObject>();
+  return module.requestedModules()[index].moduleRequest()->moduleType();
+}
+
 JS_PUBLIC_API JSScript* JS::GetModuleScript(JS::HandleObject moduleRecord) {
   AssertHeapIsIdle();
 
-  return moduleRecord->as<ModuleObject>().script();
+  auto& module = moduleRecord->as<ModuleObject>();
+
+  // A synthetic module does not have a script associated with it.
+  if (module.hasSyntheticModuleFields()) {
+    return nullptr;
+  }
+
+  return module.script();
 }
 
 JS_PUBLIC_API JSObject* JS::GetModuleObject(HandleScript moduleScript) {
@@ -300,8 +379,9 @@ JS_PUBLIC_API JSObject* JS::GetModuleEnvironment(JSContext* cx,
   return moduleObj->as<ModuleObject>().environment();
 }
 
-JS_PUBLIC_API JSObject* JS::CreateModuleRequest(
-    JSContext* cx, Handle<JSString*> specifierArg) {
+JS_PUBLIC_API JSObject* JS::CreateModuleRequest(JSContext* cx,
+                                                Handle<JSString*> specifierArg,
+                                                JS::ModuleType moduleType) {
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
 
@@ -310,9 +390,7 @@ JS_PUBLIC_API JSObject* JS::CreateModuleRequest(
     return nullptr;
   }
 
-  Rooted<UniquePtr<ImportAttributeVector>> attributes(cx);
-
-  return ModuleRequestObject::create(cx, specifierAtom, &attributes);
+  return ModuleRequestObject::create(cx, specifierAtom, moduleType);
 }
 
 JS_PUBLIC_API JSString* JS::GetModuleRequestSpecifier(
@@ -322,6 +400,15 @@ JS_PUBLIC_API JSString* JS::GetModuleRequestSpecifier(
   cx->check(moduleRequestArg);
 
   return moduleRequestArg->as<ModuleRequestObject>().specifier();
+}
+
+JS_PUBLIC_API JS::ModuleType JS::GetModuleRequestType(
+    JSContext* cx, Handle<JSObject*> moduleRequestArg) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+  cx->check(moduleRequestArg);
+
+  return moduleRequestArg->as<ModuleRequestObject>().moduleType();
 }
 
 JS_PUBLIC_API void JS::ClearModuleEnvironment(JSObject* moduleObj) {
@@ -582,6 +669,20 @@ static ModuleObject* HostResolveImportedModule(
   return requestedModule;
 }
 
+static bool ModuleResolveExportImpl(JSContext* cx, Handle<ModuleObject*> module,
+                                    Handle<JSAtom*> exportName,
+                                    MutableHandle<ResolveSet> resolveSet,
+                                    MutableHandle<Value> result,
+                                    ModuleErrorInfo* errorInfoOut = nullptr) {
+  if (module->hasSyntheticModuleFields()) {
+    return SyntheticModuleResolveExport(cx, module, exportName, result,
+                                        errorInfoOut);
+  }
+
+  return CyclicModuleResolveExport(cx, module, exportName, resolveSet, result,
+                                   errorInfoOut);
+}
+
 // https://tc39.es/ecma262/#sec-resolveexport
 // ES2023 16.2.1.6.3 ResolveExport
 //
@@ -602,16 +703,11 @@ static bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
                                 Handle<JSAtom*> exportName,
                                 MutableHandle<Value> result,
                                 ModuleErrorInfo* errorInfoOut = nullptr) {
-  if (module->hasSyntheticModuleFields()) {
-    return SyntheticModuleResolveExport(cx, module, exportName, result,
-                                        errorInfoOut);
-  }
-
   // Step 1. If resolveSet is not present, set resolveSet to a new empty List.
   Rooted<ResolveSet> resolveSet(cx);
 
-  return CyclicModuleResolveExport(cx, module, exportName, &resolveSet, result,
-                                   errorInfoOut);
+  return ModuleResolveExportImpl(cx, module, exportName, &resolveSet, result,
+                                 errorInfoOut);
 }
 
 static bool CreateResolvedBindingObject(JSContext* cx,
@@ -700,8 +796,9 @@ static bool CyclicModuleResolveExport(JSContext* cx,
         // importedModule.ResolveExport(e.[[ImportName]],
         //                 resolveSet).
         name = e.importName();
-        return CyclicModuleResolveExport(cx, importedModule, name, resolveSet,
-                                         result, errorInfoOut);
+
+        return ModuleResolveExportImpl(cx, importedModule, name, resolveSet,
+                                       result, errorInfoOut);
       }
     }
   }
@@ -1213,6 +1310,10 @@ static bool ModuleInitializeEnvironment(JSContext* cx,
 // https://tc39.es/ecma262/#sec-moduledeclarationlinking
 // ES2023 16.2.1.5.1 Link
 static bool ModuleLink(JSContext* cx, Handle<ModuleObject*> module) {
+  if (!module->hasCyclicModuleFields()) {
+    return true;
+  }
+
   // Step 1. Assert: module.[[Status]] is not linking or evaluating.
   ModuleStatus status = module->status();
   if (status == ModuleStatus::Linking || status == ModuleStatus::Evaluating) {
@@ -1255,31 +1356,6 @@ static bool ModuleLink(JSContext* cx, Handle<ModuleObject*> module) {
   MOZ_ASSERT(stack.empty());
 
   // Step 7. Return unused.
-  return true;
-}
-
-// https://tc39.es/proposal-import-attributes/#sec-AllImportAttributesSupported
-static bool AllImportAttributesSupported(
-    JSContext* cx, mozilla::Span<const ImportAttribute> attributes,
-    MutableHandle<JSAtom*> invalidKey) {
-  // Step 1. Let supported be HostGetSupportedImportAttributes().
-  //
-  // Note: This should be driven by a host hook
-  // (HostGetSupportedImportAttributes), however the infrastructure of said host
-  // hook is deeply unclear, and so right now embedders will not have the
-  // ability to alter or extend the set of supported attributes. See
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=1840723.
-
-  // Step 2. For each ImportAttribute Record attribute of attributes, do
-  for (const ImportAttribute& attribute : attributes) {
-    // Step 2.a. If supported does not contain attribute.[[Key]], return false.
-    if (attribute.key() != cx->names().type) {
-      invalidKey.set(attribute.key());
-      return false;
-    }
-  }
-
-  // Step 3. Return true.
   return true;
 }
 
@@ -1332,6 +1408,11 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
   // Step 7. Set index to index + 1.
   index++;
 
+  AutoCheckRecursionLimit recursion(cx);
+  if (!recursion.check(cx)) {
+    return false;
+  }
+
   // Step 9. For each String required that is an element of
   //         module.[[RequestedModules]], do:
   Rooted<ModuleRequestObject*> moduleRequest(cx);
@@ -1342,10 +1423,9 @@ static bool InnerModuleLinking(JSContext* cx, Handle<ModuleObject*> module,
     // According to the spec, this should be in InnerModuleLoading, but
     // currently, our module code is not aligned with the spec text.
     // https://bugzilla.mozilla.org/show_bug.cgi?id=1894729
-    Rooted<JSAtom*> invalidKey(cx);
-    if (!AllImportAttributesSupported(cx, moduleRequest->attributes(),
-                                      &invalidKey)) {
-      UniqueChars printableKey = AtomToPrintableString(cx, invalidKey);
+    if (moduleRequest->hasFirstUnsupportedAttributeKey()) {
+      UniqueChars printableKey = AtomToPrintableString(
+          cx, moduleRequest->getFirstUnsupportedAttributeKey());
       JS_ReportErrorNumberASCII(
           cx, GetErrorMessage, nullptr,
           JSMSG_IMPORT_ATTRIBUTES_STATIC_IMPORT_UNSUPPORTED_ATTRIBUTE,
@@ -1989,7 +2069,10 @@ void js::AsyncModuleExecutionFulfilled(JSContext* cx,
     } else if (m->hasTopLevelAwait()) {
       // Step 12.b. Else if m.[[HasTLA]] is true, then:
       // Step 12.b.i. Perform ExecuteAsyncModule(m).
-      MOZ_ALWAYS_TRUE(ExecuteAsyncModule(cx, m));
+      if (!ExecuteAsyncModule(cx, m)) {
+        MOZ_ASSERT(cx->isThrowingOutOfMemory() || cx->isThrowingOverRecursed());
+        cx->clearPendingException();
+      }
     } else {
       // Step 12.c. Else:
       // Step 12.c.i. Let result be m.ExecuteModule().

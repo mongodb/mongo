@@ -84,7 +84,7 @@ bool WhileEmitter::emitEnd() {
   return true;
 }
 
-#ifdef ENABLE_DECORATORS
+#if defined(ENABLE_DECORATORS) || defined(ENABLE_EXPLICIT_RESOURCE_MANAGEMENT)
 bool InternalWhileEmitter::emitCond() {
   MOZ_ASSERT(state_ == State::Start);
 

@@ -594,6 +594,9 @@ class Instruction {
   // Test for a nop instruction, which falls under type 1.
   inline bool IsNopType1() const { return Bits(24, 0) == 0x0120F000; }
 
+  // Test for a yield instruction, which falls under type 1.
+  inline bool IsYieldType1() const { return Bits(24, 0) == 0x0120F001; }
+
   // Test for a nop instruction, which falls under type 1.
   inline bool IsCsdbType1() const { return Bits(24, 0) == 0x0120F014; }
 

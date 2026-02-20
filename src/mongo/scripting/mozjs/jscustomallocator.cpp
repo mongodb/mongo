@@ -49,6 +49,8 @@
 #error "Unsupported platform"
 #endif
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 /**
  * This shim interface (which controls dynamic allocation within SpiderMonkey),
  * consciously uses std::malloc and friends over mongoMalloc. It does this
@@ -71,22 +73,55 @@ namespace {
  * maximum number of bytes we will consider handing out. They are set by
  * MozJSImplScope on start up.
  */
-thread_local size_t total_bytes = 0;
+thread_local size_t malloc_bytes = 0;
 thread_local size_t max_bytes = 0;
 
+// Allow disabling mmap tracking as a fallback in case counted memory goes too high
+thread_local bool track_mmap_bytes = true;
 }  // namespace
 
 size_t get_total_bytes() {
-    return total_bytes;
+    return get_malloc_bytes() + get_mmap_bytes();
 }
 
-void reset(size_t bytes) {
-    total_bytes = 0;
+size_t get_malloc_bytes() {
+    return malloc_bytes;
+}
+
+size_t get_mmap_bytes() {
+    return track_mmap_bytes ? js::gc::GetProfilerMemoryCounts().bytes : 0;
+}
+
+void reset(size_t bytes, bool track_mmap) {
+    malloc_bytes = 0;
     max_bytes = bytes;
+    track_mmap_bytes = track_mmap;
 }
 
 size_t get_max_bytes() {
     return max_bytes;
+}
+
+void signal_oom() {
+    auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
+    if (scope) {
+        scope->setOOM();
+    }
+}
+
+void check_oom_on_mmap_allocation(size_t bytes) {
+    // called after an mmap allocation to check whether an oom signal is required
+    // if track_mmap_bytes is disabled we fall back to legacy logic and completely bypass this path
+    size_t mb = get_max_bytes();
+    size_t tb = get_total_bytes();
+    if (track_mmap_bytes && mb > 0 && get_total_bytes() + bytes > mb) {
+        LOGV2(10920001,
+              "Out of memory on MozJS mmap allocation",
+              "bytes"_attr = bytes,
+              "totalBytes"_attr = tb,
+              "maxBytes"_attr = mb);
+        signal_oom();
+    }
 }
 
 size_t get_current(void* ptr);
@@ -99,12 +134,16 @@ size_t get_current(void* ptr);
 template <typename T>
 void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     size_t mb = get_max_bytes();
-    size_t tb = get_total_bytes();
+    size_t mlb = get_malloc_bytes();
+    size_t mmb = get_mmap_bytes();
 
-    if (mb && (tb + bytes > mb)) {
-        auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
-        if (scope)
-            scope->setOOM();
+    if (mb && bytes && (mlb + mmb + bytes > mb)) {
+        LOGV2(10920000,
+              "Out of memory on MozJS malloc allocation",
+              "bytes"_attr = bytes,
+              "totalBytes"_attr = mlb + mmb,
+              "maxBytes"_attr = mb);
+        signal_oom();
 
         // We fall through here because we want to let spidermonkey continue
         // with whatever it was doing.  Calling setOOM will fail the top level
@@ -140,7 +179,7 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
         return nullptr;
     }
 
-    total_bytes += mongo::sm::get_current(p);
+    malloc_bytes += mongo::sm::get_current(p);
     return p;
 }
 
@@ -164,6 +203,7 @@ size_t get_current(void* ptr) {
 }  // namespace mongo
 
 JS_PUBLIC_DATA arena_id_t js::MallocArena;
+JS_PUBLIC_DATA arena_id_t js::BackgroundMallocArena;
 JS_PUBLIC_DATA arena_id_t js::ArrayBufferContentsArena;
 JS_PUBLIC_DATA arena_id_t js::StringBufferArena;
 
@@ -188,11 +228,11 @@ void* mongo_arena_realloc(void* p, size_t bytes) {
 
     void* ptr = std::realloc(p, bytes);
     if (!ptr) {
-        // on failure the old ptr isn't freed, no need to adjust total_bytes
+        // on failure the old ptr isn't freed, no need to adjust malloc_bytes
         return nullptr;
     }
 
-    mongo::sm::total_bytes -= std::min(mongo::sm::total_bytes, current);
+    mongo::sm::malloc_bytes -= std::min(mongo::sm::malloc_bytes, current);
     return ptr;
 }
 
@@ -201,7 +241,7 @@ void* mongo_free(void* ptr) {
     // buffer, so this may result in undercounting
     size_t current = mongo::sm::get_current(ptr);
 
-    mongo::sm::total_bytes -= std::min(mongo::sm::total_bytes, current);
+    mongo::sm::malloc_bytes -= std::min(mongo::sm::malloc_bytes, current);
 
     std::free(ptr);
     return nullptr;
@@ -265,8 +305,9 @@ void js_free(void* p) {
 
 void js::InitMallocAllocator() {
     MallocArena = 0;
-    ArrayBufferContentsArena = 1;
-    StringBufferArena = 2;
+    BackgroundMallocArena = 1;
+    ArrayBufferContentsArena = 2;
+    StringBufferArena = 3;
 }
 
 void js::ShutDownMallocAllocator() {}

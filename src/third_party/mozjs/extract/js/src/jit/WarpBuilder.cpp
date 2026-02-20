@@ -12,6 +12,7 @@
 #include "jit/CacheIR.h"
 #include "jit/CompileInfo.h"
 #include "jit/InlineScriptTree.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGenerator.h"
 #include "jit/MIRGraph.h"
@@ -22,6 +23,9 @@
 #include "vm/Interpreter.h"
 #include "vm/Opcodes.h"
 #include "vm/TypeofEqOperand.h"  // TypeofEqOperand
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+#  include "vm/UsingHint.h"
+#endif
 
 #include "gc/ObjectKind-inl.h"
 #include "vm/BytecodeIterator-inl.h"
@@ -323,23 +327,31 @@ bool WarpBuilder::buildInline() {
 
 MInstruction* WarpBuilder::buildNamedLambdaEnv(MDefinition* callee,
                                                MDefinition* env,
-                                               NamedLambdaObject* templateObj) {
+                                               NamedLambdaObject* templateObj,
+                                               gc::Heap initialHeap) {
   MOZ_ASSERT(templateObj->numDynamicSlots() == 0);
 
-  MInstruction* namedLambda = MNewNamedLambdaObject::New(alloc(), templateObj);
+  MInstruction* namedLambda =
+      MNewNamedLambdaObject::New(alloc(), templateObj, initialHeap);
   current->add(namedLambda);
 
+  // Initialize the object's reserved slots.
+  if (initialHeap == gc::Heap::Default) {
+    // No post barrier is needed here: the object will be allocated in the
+    // nursery if possible, and if the tenured heap is used instead, a minor
+    // collection will have been performed that moved env/callee to the tenured
+    // heap.
 #ifdef DEBUG
-  // Assert in debug mode we can elide the post write barriers.
-  current->add(MAssertCanElidePostWriteBarrier::New(alloc(), namedLambda, env));
-  current->add(
-      MAssertCanElidePostWriteBarrier::New(alloc(), namedLambda, callee));
+    current->add(
+        MAssertCanElidePostWriteBarrier::New(alloc(), namedLambda, env));
+    current->add(
+        MAssertCanElidePostWriteBarrier::New(alloc(), namedLambda, callee));
 #endif
+  } else {
+    current->add(MPostWriteBarrier::New(alloc(), namedLambda, env));
+    current->add(MPostWriteBarrier::New(alloc(), namedLambda, callee));
+  }
 
-  // Initialize the object's reserved slots. No post barrier is needed here:
-  // the object will be allocated in the nursery if possible, and if the
-  // tenured heap is used instead, a minor collection will have been performed
-  // that moved env/callee to the tenured heap.
   size_t enclosingSlot = NamedLambdaObject::enclosingEnvironmentSlot();
   size_t lambdaSlot = NamedLambdaObject::lambdaSlot();
   current->add(MStoreFixedSlot::NewUnbarriered(alloc(), namedLambda,
@@ -352,20 +364,28 @@ MInstruction* WarpBuilder::buildNamedLambdaEnv(MDefinition* callee,
 
 MInstruction* WarpBuilder::buildCallObject(MDefinition* callee,
                                            MDefinition* env,
-                                           CallObject* templateObj) {
+                                           CallObject* templateObj,
+                                           gc::Heap initialHeap) {
   MConstant* templateCst = constant(ObjectValue(*templateObj));
 
-  MNewCallObject* callObj = MNewCallObject::New(alloc(), templateCst);
+  MNewCallObject* callObj =
+      MNewCallObject::New(alloc(), templateCst, initialHeap);
   current->add(callObj);
 
+  // Initialize the object's reserved slots.
+  if (initialHeap == gc::Heap::Default) {
+    // No post barrier is needed here, for the same reason as in
+    // buildNamedLambdaEnv.
 #ifdef DEBUG
-  // Assert in debug mode we can elide the post write barriers.
-  current->add(MAssertCanElidePostWriteBarrier::New(alloc(), callObj, env));
-  current->add(MAssertCanElidePostWriteBarrier::New(alloc(), callObj, callee));
+    current->add(MAssertCanElidePostWriteBarrier::New(alloc(), callObj, env));
+    current->add(
+        MAssertCanElidePostWriteBarrier::New(alloc(), callObj, callee));
 #endif
+  } else {
+    current->add(MPostWriteBarrier::New(alloc(), callObj, env));
+    current->add(MPostWriteBarrier::New(alloc(), callObj, callee));
+  }
 
-  // Initialize the object's reserved slots. No post barrier is needed here,
-  // for the same reason as in buildNamedLambdaEnv.
   size_t enclosingSlot = CallObject::enclosingEnvironmentSlot();
   size_t calleeSlot = CallObject::calleeSlot();
   current->add(
@@ -395,10 +415,10 @@ bool WarpBuilder::buildEnvironmentChain() {
         MInstruction* envDef = MFunctionEnvironment::New(alloc(), callee);
         current->add(envDef);
         if (NamedLambdaObject* obj = env.namedLambdaTemplate) {
-          envDef = buildNamedLambdaEnv(callee, envDef, obj);
+          envDef = buildNamedLambdaEnv(callee, envDef, obj, env.initialHeap);
         }
         if (CallObject* obj = env.callObjectTemplate) {
-          envDef = buildCallObject(callee, envDef, obj);
+          envDef = buildCallObject(callee, envDef, obj, env.initialHeap);
           if (!envDef) {
             return nullptr;
           }
@@ -1069,6 +1089,125 @@ bool WarpBuilder::build_StrictEq(BytecodeLocation loc) {
 bool WarpBuilder::build_StrictNe(BytecodeLocation loc) {
   return buildCompareOp(loc);
 }
+
+bool WarpBuilder::buildStrictConstantEqOp(BytecodeLocation loc,
+                                          JSOp compareOp) {
+  auto operand = loc.getConstantCompareOperand();
+  MDefinition* value = current->pop();
+  switch (operand.type()) {
+    case ConstantCompareOperand::EncodedType::Int32: {
+      if (value->type() == MIRType::Int32) {
+        MConstant* constant =
+            MConstant::New(alloc(), Int32Value(operand.toInt32()));
+        current->add(constant);
+
+        auto* compare = MCompare::New(alloc(), value, constant, compareOp,
+                                      MCompare::Compare_Int32);
+        current->add(compare);
+        current->push(compare);
+        return true;
+      }
+
+      auto* ins = MStrictConstantCompareInt32::New(
+          alloc(), value, operand.toInt32(), compareOp);
+      current->add(ins);
+      current->push(ins);
+      return true;
+    }
+
+    case ConstantCompareOperand::EncodedType::Boolean: {
+      if (value->type() == MIRType::Boolean) {
+        MConstant* constant =
+            MConstant::New(alloc(), Int32Value(operand.toBoolean()));
+        current->add(constant);
+
+        auto* toBoolToInt32 = MBooleanToInt32::New(alloc(), value);
+        current->add(toBoolToInt32);
+
+        auto* compare = MCompare::New(alloc(), toBoolToInt32, constant,
+                                      compareOp, MCompare::Compare_Int32);
+        current->add(compare);
+        current->push(compare);
+        return true;
+      }
+
+      auto* ins = MStrictConstantCompareBoolean::New(
+          alloc(), value, operand.toBoolean(), compareOp);
+      current->add(ins);
+      current->push(ins);
+      return true;
+    }
+
+    case ConstantCompareOperand::EncodedType::Null: {
+      MConstant* constant = MConstant::New(alloc(), NullValue());
+      current->add(constant);
+
+      auto* ins = MCompare::New(alloc(), value, constant, compareOp,
+                                MCompare::Compare_Null);
+      current->add(ins);
+      current->push(ins);
+      return true;
+    }
+
+    case ConstantCompareOperand::EncodedType::Undefined: {
+      MConstant* constant = MConstant::New(alloc(), UndefinedValue());
+      current->add(constant);
+
+      auto* ins = MCompare::New(alloc(), value, constant, compareOp,
+                                MCompare::Compare_Undefined);
+      current->add(ins);
+      current->push(ins);
+      return true;
+    }
+  }
+  return true;
+}
+
+bool WarpBuilder::build_StrictConstantEq(BytecodeLocation loc) {
+  return buildStrictConstantEqOp(loc, JSOp::StrictEq);
+}
+
+bool WarpBuilder::build_StrictConstantNe(BytecodeLocation loc) {
+  return buildStrictConstantEqOp(loc, JSOp::StrictNe);
+}
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+bool WarpBuilder::build_AddDisposable(BytecodeLocation loc) {
+  MOZ_ASSERT(usesEnvironmentChain());
+
+  UsingHint hint = loc.getUsingHint();
+  MDefinition* needsClosure = current->pop();
+  MDefinition* method = current->pop();
+  MDefinition* obj = current->pop();
+  MDefinition* env = current->environmentChain();
+
+  MAddDisposableResource* ins = MAddDisposableResource::New(
+      alloc(), env, obj, method, needsClosure, uint8_t(hint));
+  current->add(ins);
+  return resumeAfter(ins, loc);
+}
+
+bool WarpBuilder::build_TakeDisposeCapability(BytecodeLocation loc) {
+  MOZ_ASSERT(usesEnvironmentChain());
+  MDefinition* env = current->environmentChain();
+
+  MTakeDisposeCapability* ins = MTakeDisposeCapability::New(alloc(), env);
+  current->add(ins);
+  current->push(ins);
+  return resumeAfter(ins, loc);
+}
+
+bool WarpBuilder::build_CreateSuppressedError(BytecodeLocation loc) {
+  MDefinition* suppressed = current->pop();
+  MDefinition* error = current->pop();
+
+  MCreateSuppressedError* ins =
+      MCreateSuppressedError::New(alloc(), error, suppressed);
+  current->add(ins);
+  current->push(ins);
+  return true;
+}
+#endif
 
 // Returns true iff the MTest added for |op| has a true-target corresponding
 // with the join point in the bytecode.
@@ -1901,10 +2040,18 @@ bool WarpBuilder::build_BindName(BytecodeLocation loc) {
   return buildIC(loc, CacheKind::BindName, {env});
 }
 
-bool WarpBuilder::build_BindGName(BytecodeLocation loc) {
+bool WarpBuilder::build_BindUnqualifiedName(BytecodeLocation loc) {
+  MOZ_ASSERT(usesEnvironmentChain());
+
+  MDefinition* env = current->environmentChain();
+  env = unboxObjectInfallible(env, IsMovable::Yes);
+  return buildIC(loc, CacheKind::BindName, {env});
+}
+
+bool WarpBuilder::build_BindUnqualifiedGName(BytecodeLocation loc) {
   MOZ_ASSERT(!script_->hasNonSyntacticScope());
 
-  if (const auto* snapshot = getOpSnapshot<WarpBindGName>(loc)) {
+  if (const auto* snapshot = getOpSnapshot<WarpBindUnqualifiedGName>(loc)) {
     JSObject* globalEnv = snapshot->globalEnv();
     pushConstant(ObjectValue(*globalEnv));
     return true;
@@ -1915,6 +2062,11 @@ bool WarpBuilder::build_BindGName(BytecodeLocation loc) {
 }
 
 bool WarpBuilder::build_GetProp(BytecodeLocation loc) {
+  MDefinition* val = current->pop();
+  return buildIC(loc, CacheKind::GetProp, {val});
+}
+
+bool WarpBuilder::build_GetBoundName(BytecodeLocation loc) {
   MDefinition* val = current->pop();
   return buildIC(loc, CacheKind::GetProp, {val});
 }
@@ -2222,12 +2374,9 @@ bool WarpBuilder::build_PushVarEnv(BytecodeLocation loc) {
 }
 
 bool WarpBuilder::build_ImplicitThis(BytecodeLocation loc) {
-  MOZ_ASSERT(usesEnvironmentChain());
+  MDefinition* env = current->pop();
 
-  PropertyName* name = loc.getPropertyName(script_);
-  MDefinition* env = current->environmentChain();
-
-  auto* ins = MImplicitThis::New(alloc(), env, name);
+  auto* ins = MImplicitThis::New(alloc(), env);
   current->add(ins);
   current->push(ins);
   return resumeAfter(ins, loc);
@@ -2918,16 +3067,7 @@ bool WarpBuilder::build_InitElemInc(BytecodeLocation loc) {
 
 bool WarpBuilder::build_Lambda(BytecodeLocation loc) {
   MOZ_ASSERT(usesEnvironmentChain());
-
-  MDefinition* env = current->environmentChain();
-
-  JSFunction* fun = loc.getFunction(script_);
-  MConstant* funConst = constant(ObjectValue(*fun));
-
-  auto* ins = MLambda::New(alloc(), env, funConst);
-  current->add(ins);
-  current->push(ins);
-  return resumeAfter(ins, loc);
+  return buildIC(loc, CacheKind::Lambda, {});
 }
 
 bool WarpBuilder::build_FunWithProto(BytecodeLocation loc) {
@@ -3476,9 +3616,19 @@ bool WarpBuilder::buildIC(BytecodeLocation loc, CacheKind kind,
       current->push(ins);
       return resumeAfter(ins, loc);
     }
-    case CacheKind::GetIntrinsic:
+    case CacheKind::Lambda: {
+      MDefinition* env = current->environmentChain();
+      JSFunction* fun = loc.getFunction(script_);
+      MConstant* funConst = constant(ObjectValue(*fun));
+      auto* ins = MLambda::New(alloc(), env, funConst, gc::Heap::Default);
+      current->add(ins);
+      current->push(ins);
+      return resumeAfter(ins, loc);
+    }
+    case CacheKind::LazyConstant:
     case CacheKind::ToBool:
     case CacheKind::Call:
+    case CacheKind::GetImport:
       // We're currently not using an IC or transpiling CacheIR for these kinds.
       MOZ_CRASH("Unexpected kind");
   }
@@ -3502,7 +3652,8 @@ bool WarpBuilder::buildBailoutForColdIC(BytecodeLocation loc, CacheKind kind) {
     case CacheKind::GetElem:
     case CacheKind::GetPropSuper:
     case CacheKind::GetElemSuper:
-    case CacheKind::GetIntrinsic:
+    case CacheKind::GetImport:
+    case CacheKind::LazyConstant:
     case CacheKind::Call:
     case CacheKind::ToPropertyKey:
     case CacheKind::OptimizeSpreadCall:
@@ -3512,6 +3663,7 @@ bool WarpBuilder::buildBailoutForColdIC(BytecodeLocation loc, CacheKind kind) {
     case CacheKind::GetIterator:
     case CacheKind::NewArray:
     case CacheKind::NewObject:
+    case CacheKind::Lambda:
       resultType = MIRType::Object;
       break;
     case CacheKind::TypeOf:

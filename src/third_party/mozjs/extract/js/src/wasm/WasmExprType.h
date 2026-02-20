@@ -183,6 +183,19 @@ class ResultType {
     }
   }
 
+  // See also wasm::CheckIsSubtypeOf in WasmValidate.cpp.
+  static bool isSubTypeOf(ResultType subType, ResultType superType) {
+    if (subType.length() != superType.length()) {
+      return false;
+    }
+    for (size_t i = 0; i < subType.length(); i++) {
+      if (!ValType::isSubTypeOf(subType[i], superType[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // Polyfill the Span API, which is polyfilling the std library
   size_t size() const { return length(); }
 
@@ -197,24 +210,6 @@ class ResultType {
         MOZ_CRASH("bad resulttype");
     }
   }
-
-  bool operator==(ResultType rhs) const {
-    switch (kind()) {
-      case EmptyKind:
-      case SingleKind:
-      case InvalidKind:
-        return tagged_.bits() == rhs.tagged_.bits();
-      case VectorKind: {
-        if (rhs.kind() != VectorKind) {
-          return false;
-        }
-        return EqualContainers(values(), rhs.values());
-      }
-      default:
-        MOZ_CRASH("bad resulttype");
-    }
-  }
-  bool operator!=(ResultType rhs) const { return !(*this == rhs); }
 };
 
 // BlockType represents the WebAssembly spec's `blocktype`. Semantically, a

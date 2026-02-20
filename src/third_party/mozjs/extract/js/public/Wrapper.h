@@ -255,6 +255,9 @@ class JS_PUBLIC_API CrossCompartmentWrapper : public Wrapper {
 
   // Allocate CrossCompartmentWrappers in the nursery.
   virtual bool canNurseryAllocate() const override { return true; }
+  void finalize(JS::GCContext* gcx, JSObject* proxy) const final {
+    Wrapper::finalize(gcx, proxy);
+  }
 
   static const CrossCompartmentWrapper singleton;
   static const CrossCompartmentWrapper singletonWithPrototype;

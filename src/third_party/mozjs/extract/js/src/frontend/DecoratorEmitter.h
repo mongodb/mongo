@@ -74,7 +74,7 @@ class MOZ_STACK_CLASS DecoratorEmitter {
   using DecoratorsVector = js::Vector<ParseNode*, 2, js::SystemAllocPolicy>;
 
   [[nodiscard]] bool reverseDecoratorsToApplicationOrder(
-      const ListNode* decorators, DecoratorsVector& vec);
+      const ListNode* decorators, DecoratorsVector& vec) const;
 };
 
 } /* namespace js::frontend */

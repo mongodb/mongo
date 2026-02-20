@@ -27,20 +27,24 @@ static bool TryPreserveReflector(JSContext* cx, HandleObject obj) {
   return true;
 }
 
-static MOZ_ALWAYS_INLINE bool WeakCollectionPutEntryInternal(
+static MOZ_ALWAYS_INLINE bool EnsureObjectHasWeakMap(
+    JSContext* cx, WeakCollectionObject* obj) {
+  if (obj->getMap()) {
+    return true;
+  }
+  auto newMap = cx->make_unique<ValueValueWeakMap>(cx, obj);
+  if (!newMap) {
+    return false;
+  }
+  ValueValueWeakMap* map = newMap.release();
+  InitReservedSlot(obj, WeakCollectionObject::DataSlot, map,
+                   MemoryUse::WeakMapObject);
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool PreserveReflectorAndAssertValidEntry(
     JSContext* cx, Handle<WeakCollectionObject*> obj, HandleValue key,
     HandleValue value) {
-  ValueValueWeakMap* map = obj->getMap();
-  if (!map) {
-    auto newMap = cx->make_unique<ValueValueWeakMap>(cx, obj.get());
-    if (!newMap) {
-      return false;
-    }
-    map = newMap.release();
-    InitReservedSlot(obj, WeakCollectionObject::DataSlot, map,
-                     MemoryUse::WeakMapObject);
-  }
-
   if (key.isObject()) {
     RootedObject keyObj(cx, &key.toObject());
 
@@ -62,7 +66,21 @@ static MOZ_ALWAYS_INLINE bool WeakCollectionPutEntryInternal(
                     gc::ToMarkable(value)->zoneFromAnyThread()->isAtomsZone());
   MOZ_ASSERT_IF(value.isObject(),
                 value.toObject().compartment() == obj->compartment());
-  if (!map->put(key, value)) {
+  return true;
+}
+
+static MOZ_ALWAYS_INLINE bool WeakCollectionPutEntryInternal(
+    JSContext* cx, Handle<WeakCollectionObject*> obj, HandleValue key,
+    HandleValue value) {
+  if (!EnsureObjectHasWeakMap(cx, obj)) {
+    return false;
+  }
+
+  if (!PreserveReflectorAndAssertValidEntry(cx, obj, key, value)) {
+    return false;
+  }
+
+  if (!obj->getMap()->put(key, value)) {
     JS_ReportOutOfMemory(cx);
     return false;
   }

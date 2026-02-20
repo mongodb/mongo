@@ -83,7 +83,7 @@ class MOZ_IS_REFPTR RefPtr {
 
   // Constructors
 
-  RefPtr()
+  constexpr RefPtr()
       : mRawPtr(nullptr)
   // default constructor
   {}
@@ -431,7 +431,7 @@ inline void ImplCycleCollectionUnlink(RefPtr<T>& aField) {
 
 template <typename T>
 inline void ImplCycleCollectionTraverse(
-    nsCycleCollectionTraversalCallback& aCallback, RefPtr<T>& aField,
+    nsCycleCollectionTraversalCallback& aCallback, const RefPtr<T>& aField,
     const char* aName, uint32_t aFlags = 0) {
   CycleCollectionNoteChild(aCallback, aField.get(), aName, aFlags);
 }

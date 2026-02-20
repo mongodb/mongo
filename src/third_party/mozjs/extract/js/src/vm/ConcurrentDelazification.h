@@ -12,12 +12,13 @@
 #include <stddef.h>  // size_t
 #include <utility>   // std::pair
 
-#include "frontend/CompilationStencil.h"  // frontend::{CompilationStencil, ScriptStencilRef, CompilationStencilMerger}
-#include "frontend/ScriptIndex.h"  // frontend::ScriptIndex
-#include "js/AllocPolicy.h"        // SystemAllocPolicy
+#include "frontend/CompilationStencil.h"  // frontend::{InitialStencilAndDelazifications, CompilationStencil, ScriptStencilRef, CompilationStencilMerger}
+#include "frontend/ScriptIndex.h"         // frontend::ScriptIndex
+#include "js/AllocPolicy.h"               // SystemAllocPolicy
 #include "js/CompileOptions.h"  // JS::PrefableCompileOptions, JS::ReadOnlyCompileOptions
-#include "js/UniquePtr.h"  // UniquePtr
-#include "js/Vector.h"     // Vector
+#include "js/experimental/JSStencil.h"  // RefPtrTraits for InitialStencilAndDelazifications
+#include "js/UniquePtr.h"               // UniquePtr
+#include "js/Vector.h"                  // Vector
 
 namespace js {
 
@@ -110,6 +111,8 @@ class DelazificationContext {
   // even more functions.
   frontend::CompilationStencilMerger merger_;
 
+  RefPtr<frontend::InitialStencilAndDelazifications> stencils_;
+
   // Record any errors happening while parsing or generating bytecode.
   FrontendContext fc_;
 
@@ -125,7 +128,7 @@ class DelazificationContext {
         stackQuota_(stackQuota) {}
 
   bool init(const JS::ReadOnlyCompileOptions& options,
-            const frontend::CompilationStencil& stencil);
+            frontend::InitialStencilAndDelazifications* stencils);
   bool delazify();
 
   // This function is called by `delazify` function to know whether the

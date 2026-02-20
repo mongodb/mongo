@@ -63,6 +63,7 @@ struct EnumTypeFitsWithin
 
 /**
  * Get the underlying value of an enum, but typesafe.
+ * TODO: Replace with std::to_underlying when available.
  *
  * example:
  *

@@ -18,25 +18,30 @@
 
 #include "debugger/DebugAPI.h"
 #include "frontend/BytecodeCompiler.h"  // frontend::{CompileGlobalScript, CompileStandaloneFunction, CompileStandaloneFunctionInNonSyntacticScope}
-#include "frontend/CompilationStencil.h"  // for frontened::{CompilationStencil, BorrowingCompilationStencil, CompilationGCOutput}
+#include "frontend/CompilationStencil.h"  // for frontened::{CompilationStencil, BorrowingCompilationStencil, CompilationGCOutput, InitialStencilAndDelazifications}
 #include "frontend/FrontendContext.h"     // js::AutoReportFrontendContext
-#include "frontend/Parser.h"  // frontend::Parser, frontend::ParseGoal
+#include "frontend/Parser.h"      // frontend::Parser, frontend::ParseGoal
+#include "frontend/StencilXdr.h"  // js::XDRStencilEncoder
 #include "js/CharacterEncoding.h"  // JS::UTF8Chars, JS::ConstUTF8CharsZ, JS::UTF8CharsToNewTwoByteCharsZ
 #include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
+#include "js/EnvironmentChain.h"        // JS::EnvironmentChain
 #include "js/experimental/JSStencil.h"  // JS::Stencil
 #include "js/friend/ErrorMessages.h"    // js::GetErrorMessage, JSMSG_*
 #include "js/RootingAPI.h"              // JS::Rooted
 #include "js/SourceText.h"              // JS::SourceText
-#include "js/TypeDecls.h"          // JS::HandleObject, JS::MutableHandleScript
-#include "js/Utility.h"            // js::MallocArena, JS::UniqueTwoByteChars
-#include "js/Value.h"              // JS::Value
+#include "js/Transcoding.h"  // JS::TranscodeBuffer, JS::IsTranscodeFailureResult
+#include "js/TypeDecls.h"    // JS::HandleObject, JS::MutableHandleScript
+#include "js/Utility.h"      // js::MallocArena, JS::UniqueTwoByteChars
+#include "js/Value.h"        // JS::Value
 #include "util/CompleteFile.h"     // js::FileContents, js::ReadCompleteFile
 #include "util/Identifier.h"       // js::IsIdentifier
-#include "util/StringBuffer.h"     // js::StringBuffer
+#include "util/StringBuilder.h"    // js::StringBuilder
 #include "vm/EnvironmentObject.h"  // js::CreateNonSyntacticEnvironmentChain
 #include "vm/ErrorReporting.h"  // js::ErrorMetadata, js::ReportCompileErrorLatin1
 #include "vm/Interpreter.h"     // js::Execute
 #include "vm/JSContext.h"       // JSContext
+#include "vm/JSScript.h"        // js::ScriptSourceObject
+#include "vm/Xdr.h"             // XDRResult
 
 #include "vm/JSContext-inl.h"  // JSContext::check
 
@@ -109,31 +114,134 @@ JSScript* JS::Compile(JSContext* cx, const ReadOnlyCompileOptions& options,
   return CompileSourceBuffer(cx, options, srcBuf);
 }
 
-JS_PUBLIC_API bool JS::StartIncrementalEncoding(JSContext* cx,
-                                                RefPtr<JS::Stencil>&& stencil) {
-  MOZ_ASSERT(cx);
-  MOZ_ASSERT(!stencil->hasMultipleReference());
-
-  auto* source = stencil->source.get();
-
-  UniquePtr<frontend::ExtensibleCompilationStencil> initial;
-  if (stencil->hasOwnedBorrow()) {
-    initial.reset(stencil->takeOwnedBorrow());
-    stencil = nullptr;
-  } else {
-    initial = cx->make_unique<frontend::ExtensibleCompilationStencil>(
-        stencil->source);
-    if (!initial) {
-      return false;
-    }
-
-    AutoReportFrontendContext fc(cx);
-    if (!initial->steal(&fc, std::move(stencil))) {
-      return false;
-    }
+static bool StartCollectingDelazifications(JSContext* cx,
+                                           JS::Handle<ScriptSourceObject*> sso,
+                                           JS::Stencil* stencil,
+                                           bool& alreadyStarted) {
+  if (sso->isCollectingDelazifications()) {
+    alreadyStarted = true;
+    return true;
   }
 
-  return source->startIncrementalEncoding(cx, std::move(initial));
+  alreadyStarted = false;
+
+  // We don't support asm.js in XDR.
+  // Failures are reported by the FinishCollectingDelazifications function
+  // below.
+  if (stencil->getInitial()->hasAsmJS()) {
+    return true;
+  }
+
+  if (!sso->maybeGetStencils()) {
+    RefPtr stencils = stencil;
+    sso->setStencils(stencils.forget());
+  } else {
+    MOZ_ASSERT(sso->maybeGetStencils() == stencil);
+  }
+  sso->setCollectingDelazifications();
+  return true;
+}
+
+JS_PUBLIC_API bool JS::StartCollectingDelazifications(
+    JSContext* cx, JS::Handle<JSScript*> script, JS::Stencil* stencil,
+    bool& alreadyStarted) {
+  JS::Rooted<ScriptSourceObject*> sso(cx, script->sourceObject());
+  return ::StartCollectingDelazifications(cx, sso, stencil, alreadyStarted);
+}
+
+JS_PUBLIC_API bool JS::StartCollectingDelazifications(
+    JSContext* cx, JS::Handle<JSObject*> module, JS::Stencil* stencil,
+    bool& alreadyStarted) {
+  JS::Rooted<ScriptSourceObject*> sso(
+      cx, module->as<ModuleObject>().scriptSourceObject());
+  return ::StartCollectingDelazifications(cx, sso, stencil, alreadyStarted);
+}
+
+static bool FinishCollectingDelazifications(JSContext* cx,
+                                            JS::Handle<ScriptSourceObject*> sso,
+                                            JS::TranscodeBuffer& buffer) {
+  if (!sso->isCollectingDelazifications()) {
+    JS_ReportErrorASCII(cx, "Not collecting delazifications");
+    return false;
+  }
+
+  RefPtr<frontend::InitialStencilAndDelazifications> stencils =
+      sso->maybeGetStencils();
+  sso->unsetCollectingDelazifications();
+
+  AutoReportFrontendContext fc(cx);
+  UniquePtr<frontend::CompilationStencil> stencilHolder;
+  const frontend::CompilationStencil* stencil;
+
+  if (stencils->canLazilyParse()) {
+    stencilHolder.reset(stencils->getMerged(&fc));
+    if (!stencilHolder) {
+      return false;
+    }
+    stencil = stencilHolder.get();
+  } else {
+    stencil = stencils->getInitial();
+  }
+
+  XDRStencilEncoder encoder(&fc, buffer);
+  XDRResult res = encoder.codeStencil(sso->source(), *stencil);
+  if (res.isErr()) {
+    if (JS::IsTranscodeFailureResult(res.unwrapErr())) {
+      fc.clearAutoReport();
+      JS_ReportErrorASCII(cx, "XDR encoding failure");
+    }
+    return false;
+  }
+  return true;
+}
+
+static bool FinishCollectingDelazifications(JSContext* cx,
+                                            JS::Handle<ScriptSourceObject*> sso,
+                                            JS::Stencil** stencilOut) {
+  if (!sso->isCollectingDelazifications()) {
+    JS_ReportErrorASCII(cx, "Not collecting delazifications");
+    return false;
+  }
+
+  RefPtr<frontend::InitialStencilAndDelazifications> stencils =
+      sso->maybeGetStencils();
+  sso->unsetCollectingDelazifications();
+
+  stencils.forget(stencilOut);
+  return true;
+}
+
+JS_PUBLIC_API bool JS::FinishCollectingDelazifications(
+    JSContext* cx, JS::HandleScript script, JS::TranscodeBuffer& buffer) {
+  JS::Rooted<ScriptSourceObject*> sso(cx, script->sourceObject());
+  return ::FinishCollectingDelazifications(cx, sso, buffer);
+}
+
+JS_PUBLIC_API bool JS::FinishCollectingDelazifications(
+    JSContext* cx, JS::HandleScript script, JS::Stencil** stencilOut) {
+  JS::Rooted<ScriptSourceObject*> sso(cx, script->sourceObject());
+  return ::FinishCollectingDelazifications(cx, sso, stencilOut);
+}
+
+JS_PUBLIC_API bool JS::FinishCollectingDelazifications(
+    JSContext* cx, JS::Handle<JSObject*> module, JS::TranscodeBuffer& buffer) {
+  JS::Rooted<ScriptSourceObject*> sso(
+      cx, module->as<ModuleObject>().scriptSourceObject());
+  return ::FinishCollectingDelazifications(cx, sso, buffer);
+}
+
+JS_PUBLIC_API void JS::AbortCollectingDelazifications(JS::HandleScript script) {
+  if (!script) {
+    return;
+  }
+  script->sourceObject()->unsetCollectingDelazifications();
+}
+
+JS_PUBLIC_API void JS::AbortCollectingDelazifications(
+    JS::Handle<JSObject*> module) {
+  module->as<ModuleObject>()
+      .scriptSourceObject()
+      ->unsetCollectingDelazifications();
 }
 
 JSScript* JS::CompileUtf8File(JSContext* cx,
@@ -208,7 +316,6 @@ JS_PUBLIC_API bool JS_Utf8BufferIsCompilableUnit(JSContext* cx,
   fc.clearAutoReport();
 
   Parser<FullParseHandler, char16_t> parser(&fc, options, chars.get(), length,
-                                            /* foldConstants = */ true,
                                             compilationState,
                                             /* syntaxParser = */ nullptr);
   if (!parser.checkOptions() || parser.parse().isErr()) {
@@ -229,7 +336,7 @@ class FunctionCompiler {
  private:
   JSContext* const cx_;
   Rooted<JSAtom*> nameAtom_;
-  StringBuffer funStr_;
+  StringBuilder funStr_;
 
   uint32_t parameterListEnd_ = 0;
   bool nameIsIdentifier_ = true;
@@ -298,7 +405,7 @@ class FunctionCompiler {
     return funStr_.append(srcBuf.get(), srcBuf.length());
   }
 
-  JSFunction* finish(HandleObjectVector envChain,
+  JSFunction* finish(const JS::EnvironmentChain& envChain,
                      const ReadOnlyCompileOptions& optionsArg) {
     using js::frontend::FunctionSyntaxKind;
 
@@ -324,10 +431,11 @@ class FunctionCompiler {
       // A compiled function has a burned-in environment chain, so if no exotic
       // environment was requested, we can use the global lexical environment
       // directly and not need to worry about any potential non-syntactic scope.
-      enclosingEnv.set(&cx_->global()->lexicalEnvironment());
+      enclosingEnv = &cx_->global()->lexicalEnvironment();
       kind = ScopeKind::Global;
     } else {
-      if (!CreateNonSyntacticEnvironmentChain(cx_, envChain, &enclosingEnv)) {
+      enclosingEnv = CreateNonSyntacticEnvironmentChain(cx_, envChain);
+      if (!enclosingEnv) {
         return nullptr;
       }
       kind = ScopeKind::NonSyntactic;
@@ -337,7 +445,7 @@ class FunctionCompiler {
 
     // Make sure the static scope chain matches up when we have a
     // non-syntactic scope.
-    MOZ_ASSERT_IF(!IsGlobalLexicalEnvironment(enclosingEnv),
+    MOZ_ASSERT_IF(!enclosingEnv->is<GlobalLexicalEnvironmentObject>(),
                   kind == ScopeKind::NonSyntactic);
 
     CompileOptions options(cx_, optionsArg);
@@ -379,7 +487,7 @@ class FunctionCompiler {
 };
 
 JS_PUBLIC_API JSFunction* JS::CompileFunction(
-    JSContext* cx, HandleObjectVector envChain,
+    JSContext* cx, const EnvironmentChain& envChain,
     const ReadOnlyCompileOptions& options, const char* name, unsigned nargs,
     const char* const* argnames, SourceText<char16_t>& srcBuf) {
   ManualReportFrontendContext fc(cx);
@@ -395,7 +503,7 @@ JS_PUBLIC_API JSFunction* JS::CompileFunction(
 }
 
 JS_PUBLIC_API JSFunction* JS::CompileFunction(
-    JSContext* cx, HandleObjectVector envChain,
+    JSContext* cx, const EnvironmentChain& envChain,
     const ReadOnlyCompileOptions& options, const char* name, unsigned nargs,
     const char* const* argnames, SourceText<Utf8Unit>& srcBuf) {
   ManualReportFrontendContext fc(cx);
@@ -411,7 +519,7 @@ JS_PUBLIC_API JSFunction* JS::CompileFunction(
 }
 
 JS_PUBLIC_API JSFunction* JS::CompileFunctionUtf8(
-    JSContext* cx, HandleObjectVector envChain,
+    JSContext* cx, const EnvironmentChain& envChain,
     const ReadOnlyCompileOptions& options, const char* name, unsigned nargs,
     const char* const* argnames, const char* bytes, size_t length) {
   SourceText<Utf8Unit> srcBuf;
@@ -486,17 +594,17 @@ MOZ_NEVER_INLINE static bool ExecuteScript(JSContext* cx, HandleObject envChain,
   CHECK_THREAD(cx);
   cx->check(envChain, script);
 
-  if (!IsGlobalLexicalEnvironment(envChain)) {
+  if (!envChain->is<GlobalLexicalEnvironmentObject>()) {
     MOZ_RELEASE_ASSERT(script->hasNonSyntacticScope());
   }
 
   return Execute(cx, script, envChain, rval);
 }
 
-static bool ExecuteScript(JSContext* cx, HandleObjectVector envChain,
+static bool ExecuteScript(JSContext* cx, const JS::EnvironmentChain& envChain,
                           HandleScript script, MutableHandleValue rval) {
-  RootedObject env(cx);
-  if (!CreateNonSyntacticEnvironmentChain(cx, envChain, &env)) {
+  RootedObject env(cx, CreateNonSyntacticEnvironmentChain(cx, envChain));
+  if (!env) {
     return false;
   }
 
@@ -518,13 +626,14 @@ MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(JSContext* cx,
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(
-    JSContext* cx, HandleObjectVector envChain, HandleScript scriptArg,
+    JSContext* cx, const JS::EnvironmentChain& envChain, HandleScript scriptArg,
     MutableHandleValue rval) {
   return ExecuteScript(cx, envChain, scriptArg, rval);
 }
 
 MOZ_NEVER_INLINE JS_PUBLIC_API bool JS_ExecuteScript(
-    JSContext* cx, HandleObjectVector envChain, HandleScript scriptArg) {
+    JSContext* cx, const JS::EnvironmentChain& envChain,
+    HandleScript scriptArg) {
   RootedValue rval(cx);
   return ExecuteScript(cx, envChain, scriptArg, &rval);
 }
@@ -540,7 +649,7 @@ static bool EvaluateSourceBuffer(JSContext* cx, ScopeKind scopeKind,
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   cx->check(env);
-  MOZ_ASSERT_IF(!IsGlobalLexicalEnvironment(env),
+  MOZ_ASSERT_IF(!env->is<GlobalLexicalEnvironmentObject>(),
                 scopeKind == ScopeKind::NonSyntactic);
 
   options.setNonSyntacticScope(scopeKind == ScopeKind::NonSyntactic);
@@ -574,12 +683,12 @@ JS_PUBLIC_API bool JS::Evaluate(JSContext* cx,
                               srcBuf, rval);
 }
 
-JS_PUBLIC_API bool JS::Evaluate(JSContext* cx, HandleObjectVector envChain,
+JS_PUBLIC_API bool JS::Evaluate(JSContext* cx, const EnvironmentChain& envChain,
                                 const ReadOnlyCompileOptions& options,
                                 SourceText<char16_t>& srcBuf,
                                 MutableHandleValue rval) {
-  RootedObject env(cx);
-  if (!CreateNonSyntacticEnvironmentChain(cx, envChain, &env)) {
+  RootedObject env(cx, CreateNonSyntacticEnvironmentChain(cx, envChain));
+  if (!env) {
     return false;
   }
 

@@ -60,9 +60,18 @@ void HeapSlot::assertPreconditionForPostWriteBarrier(
   }
 }
 
+bool CurrentThreadIsBaselineCompiling() {
+  jit::JitContext* jcx = jit::MaybeGetJitContext();
+  return jcx && jcx->inBaselineBackend();
+}
+
 bool CurrentThreadIsIonCompiling() {
   jit::JitContext* jcx = jit::MaybeGetJitContext();
   return jcx && jcx->inIonBackend();
+}
+
+bool CurrentThreadIsOffThreadCompiling() {
+  return CurrentThreadIsBaselineCompiling() || CurrentThreadIsIonCompiling();
 }
 
 #endif  // DEBUG
@@ -74,8 +83,6 @@ template struct JS_PUBLIC_API StableCellHasher<JSScript*>;
 
 }  // namespace js
 
-// Post-write barrier, used by the C++ Heap<T> implementation.
-
 JS_PUBLIC_API void JS::HeapObjectPostWriteBarrier(JSObject** objp,
                                                   JSObject* prev,
                                                   JSObject* next) {
@@ -83,28 +90,7 @@ JS_PUBLIC_API void JS::HeapObjectPostWriteBarrier(JSObject** objp,
   js::InternalBarrierMethods<JSObject*>::postBarrier(objp, prev, next);
 }
 
-JS_PUBLIC_API void JS::HeapStringPostWriteBarrier(JSString** strp,
-                                                  JSString* prev,
-                                                  JSString* next) {
-  MOZ_ASSERT(strp);
-  js::InternalBarrierMethods<JSString*>::postBarrier(strp, prev, next);
-}
-
-JS_PUBLIC_API void JS::HeapBigIntPostWriteBarrier(JS::BigInt** bip,
-                                                  JS::BigInt* prev,
-                                                  JS::BigInt* next) {
-  MOZ_ASSERT(bip);
-  js::InternalBarrierMethods<JS::BigInt*>::postBarrier(bip, prev, next);
-}
-
-JS_PUBLIC_API void JS::HeapValuePostWriteBarrier(JS::Value* valuep,
-                                                 const Value& prev,
-                                                 const Value& next) {
-  MOZ_ASSERT(valuep);
-  js::InternalBarrierMethods<JS::Value>::postBarrier(valuep, prev, next);
-}
-
-// Combined pre- and post-write barriers, used by the rust Heap<T>
+// Combined pre- and post-write barriers, used by the C++ Heap<T>
 // implementation.
 
 JS_PUBLIC_API void JS::HeapObjectWriteBarriers(JSObject** objp, JSObject* prev,

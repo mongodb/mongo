@@ -42,22 +42,7 @@ struct InstanceComparator {
     if (instance == &target) {
       return 0;
     }
-
-    // Instances can share code, so the segments can be equal (though they
-    // can't partially overlap).  If the codeBases are equal, we sort by
-    // Instance address.  Thus a Code may map to many instances.
-
-    // Compare by the first tier, always.
-
-    Tier instanceTier = instance->code().stableTier();
-    Tier targetTier = target.code().stableTier();
-
-    if (instance->codeBase(instanceTier) == target.codeBase(targetTier)) {
-      return instance < &target ? -1 : 1;
-    }
-
-    return target.codeBase(targetTier) < instance->codeBase(instanceTier) ? -1
-                                                                          : 1;
+    return instance < &target ? -1 : 1;
   }
 };
 
@@ -132,7 +117,7 @@ void wasm::Realm::ensureProfilingLabels(bool profilingEnabled) {
   }
 }
 
-void wasm::Realm::addSizeOfExcludingThis(MallocSizeOf mallocSizeOf,
+void wasm::Realm::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf,
                                          size_t* realmTables) {
   *realmTables += instances_.sizeOfExcludingThis(mallocSizeOf);
 }

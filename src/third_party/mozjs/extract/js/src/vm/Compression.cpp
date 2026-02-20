@@ -72,7 +72,14 @@ bool Compressor::init() {
   // zlib is slow and we'd rather be done compression sooner
   // even if it means decompression is slower which penalizes
   // Function.toString()
-  int ret = deflateInit2(&zs, Z_BEST_SPEED, Z_DEFLATED, WindowBits, 8,
+  // zlib-ng/libz-rs is faster for compression, and its compression level 2,
+  // while still faster than zlib's level 1, is on par for compressed size.
+#ifdef USE_LIBZ_RS
+#  define COMPRESSION_LEVEL 2
+#else
+#  define COMPRESSION_LEVEL Z_BEST_SPEED
+#endif
+  int ret = deflateInit2(&zs, COMPRESSION_LEVEL, Z_DEFLATED, WindowBits, 8,
                          Z_DEFAULT_STRATEGY);
   if (ret != Z_OK) {
     MOZ_ASSERT(ret == Z_MEM_ERROR);

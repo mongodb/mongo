@@ -61,9 +61,11 @@ class EnumeratedArray {
   MOZ_IMPLICIT constexpr EnumeratedArray(Args&&... aArgs)
       : mArray{std::forward<Args>(aArgs)...} {}
 
-  ValueType& operator[](Enum aIndex) { return mArray[size_t(aIndex)]; }
+  constexpr ValueType& operator[](Enum aIndex) {
+    return mArray[size_t(aIndex)];
+  }
 
-  const ValueType& operator[](Enum aIndex) const {
+  constexpr const ValueType& operator[](Enum aIndex) const {
     return mArray[size_t(aIndex)];
   }
 
@@ -79,6 +81,9 @@ class EnumeratedArray {
   iterator end() { return mArray.end(); }
   const_iterator end() const { return mArray.end(); }
   const_iterator cend() const { return mArray.cend(); }
+
+  // Method for std::size.
+  constexpr size_t size() const { return mArray.size(); }
 
   // Methods for reverse iterating.
   reverse_iterator rbegin() { return mArray.rbegin(); }

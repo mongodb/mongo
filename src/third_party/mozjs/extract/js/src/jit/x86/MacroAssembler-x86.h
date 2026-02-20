@@ -175,6 +175,16 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared {
     xorl(Operand(HighWord(address)), dest.high);
   }
 
+  template <typename T1, typename T2>
+  inline void cmp64SetAliased(Condition cond, T1 lhs, T2 rhs, Register dest);
+
+  template <typename T1, typename T2>
+  inline void cmp64SetNonAliased(Condition cond, T1 lhs, T2 rhs, Register dest);
+
+  template <typename T1, typename T2>
+  inline void branch64Impl(Condition cond, T1 lhs, T2 rhs, Label* success,
+                           Label* fail);
+
   /////////////////////////////////////////////////////////////////
   // X86/X64-common interface.
   /////////////////////////////////////////////////////////////////
@@ -570,21 +580,25 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared {
   }
 
   void testNullSet(Condition cond, const ValueOperand& value, Register dest) {
+    bool destIsZero = maybeEmitSetZeroByteRegister(value, dest);
     cond = testNull(cond, value);
-    emitSet(cond, dest);
+    emitSet(cond, dest, destIsZero);
   }
 
   void testObjectSet(Condition cond, const ValueOperand& value, Register dest) {
+    bool destIsZero = maybeEmitSetZeroByteRegister(value, dest);
     cond = testObject(cond, value);
-    emitSet(cond, dest);
+    emitSet(cond, dest, destIsZero);
   }
 
   void testUndefinedSet(Condition cond, const ValueOperand& value,
                         Register dest) {
+    bool destIsZero = maybeEmitSetZeroByteRegister(value, dest);
     cond = testUndefined(cond, value);
-    emitSet(cond, dest);
+    emitSet(cond, dest, destIsZero);
   }
 
+  void cmpPtr(Register lhs, const Imm32 rhs) { cmpl(rhs, lhs); }
   void cmpPtr(Register lhs, const ImmWord rhs) { cmpl(Imm32(rhs.value), lhs); }
   void cmpPtr(Register lhs, const ImmPtr imm) {
     cmpPtr(lhs, ImmWord(uintptr_t(imm.value)));
@@ -727,6 +741,10 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared {
     return FaultingCodeOffsetPair(fco1, fco2);
   }
   void store64(Imm64 imm, Address address) {
+    movl(imm.low(), Operand(LowWord(address)));
+    movl(imm.hi(), Operand(HighWord(address)));
+  }
+  void store64(Imm64 imm, const BaseIndex& address) {
     movl(imm.low(), Operand(LowWord(address)));
     movl(imm.hi(), Operand(HighWord(address)));
   }
@@ -971,19 +989,6 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared {
     convertDoubleToInt32(src, dest, fail, negativeZeroCheck);
   }
 
-  void boolValueToDouble(const ValueOperand& operand, FloatRegister dest) {
-    convertInt32ToDouble(operand.payloadReg(), dest);
-  }
-  void boolValueToFloat32(const ValueOperand& operand, FloatRegister dest) {
-    convertInt32ToFloat32(operand.payloadReg(), dest);
-  }
-  void int32ValueToDouble(const ValueOperand& operand, FloatRegister dest) {
-    convertInt32ToDouble(operand.payloadReg(), dest);
-  }
-  void int32ValueToFloat32(const ValueOperand& operand, FloatRegister dest) {
-    convertInt32ToFloat32(operand.payloadReg(), dest);
-  }
-
   void loadConstantDouble(double d, FloatRegister dest);
   void loadConstantFloat32(float f, FloatRegister dest);
 
@@ -1165,20 +1170,17 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared {
     addl(Imm32(1), payloadOf(addr));
   }
 
-  inline void ensureDouble(const ValueOperand& source, FloatRegister dest,
-                           Label* failure);
-
  public:
   // Used from within an Exit frame to handle a pending exception.
-  void handleFailureWithHandlerTail(Label* profilerExitTail,
-                                    Label* bailoutTail);
+  void handleFailureWithHandlerTail(Label* profilerExitTail, Label* bailoutTail,
+                                    uint32_t* returnValueCheckOffset);
 
   // Instrumentation for entering and leaving the profiler.
   void profilerEnterFrame(Register framePtr, Register scratch);
   void profilerExitFrame();
 };
 
-typedef MacroAssemblerX86 MacroAssemblerSpecific;
+using MacroAssemblerSpecific = MacroAssemblerX86;
 
 }  // namespace jit
 }  // namespace js

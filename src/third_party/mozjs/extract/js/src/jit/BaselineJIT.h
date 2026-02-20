@@ -288,6 +288,11 @@ class alignas(uintptr_t) BaselineScript final
                              size_t retAddrEntries, size_t osrEntries,
                              size_t debugTrapEntries, size_t resumeEntries);
 
+  // Copies the given BaselineScript and all trailing arrays.
+  // Both BaselineScripts will refer to the same method and IonCompileTask (if
+  // any), but those objects won't be compiled.
+  static BaselineScript* Copy(JSContext* cx, BaselineScript* bs);
+
   static void Destroy(JS::GCContext* gcx, BaselineScript* script);
 
   void trace(JSTracer* trc);
@@ -330,6 +335,8 @@ class alignas(uintptr_t) BaselineScript final
   const RetAddrEntry& retAddrEntryFromReturnAddress(const uint8_t* returnAddr);
 
   uint8_t* nativeCodeForOSREntry(uint32_t pcOffset);
+
+  static uint8_t* OSREntryForFrame(BaselineFrame* frame);
 
   void copyRetAddrEntries(const RetAddrEntry* entries);
   void copyOSREntries(const OSREntry* entries);
@@ -454,8 +461,17 @@ enum class BailoutReason {
     BaselineBailoutInfo** bailoutInfo,
     const ExceptionBailoutInfo* exceptionInfo, BailoutReason reason);
 
+enum class BaselineOption : uint8_t {
+  ForceDebugInstrumentation = 1 << 0,
+  ForceMainThreadCompilation = 1 << 1,
+};
+
+using BaselineOptions = EnumFlags<BaselineOption>;
+
+bool DispatchOffThreadBaselineBatch(JSContext* cx);
+
 MethodStatus BaselineCompile(JSContext* cx, JSScript* script,
-                             bool forceDebugInstrumentation = false);
+                             BaselineOptions options);
 
 // Class storing the generated Baseline Interpreter code for the runtime.
 class BaselineInterpreter {
@@ -594,6 +610,14 @@ struct DeletePolicy<js::jit::BaselineScript> {
 
  private:
   JSRuntime* rt_;
+};
+
+template <>
+struct GCPolicy<js::jit::BaselineScript*> {
+  static void trace(JSTracer* trc, js::jit::BaselineScript** thingp,
+                    const char* name) {
+    (*thingp)->trace(trc);
+  }
 };
 
 }  // namespace JS

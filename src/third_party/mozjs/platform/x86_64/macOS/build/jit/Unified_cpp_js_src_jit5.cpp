@@ -1,4 +1,31 @@
 #define MOZ_UNIFIED_BUILD
+#include "jit/InlinableNatives.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/InlinableNatives.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/InlinableNatives.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "jit/InstructionReordering.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/InstructionReordering.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/InstructionReordering.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
+#include "jit/InterpreterEntryTrampoline.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "jit/InterpreterEntryTrampoline.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "jit/InterpreterEntryTrampoline.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "jit/Ion.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "jit/Ion.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
@@ -24,32 +51,5 @@
 #endif
 #ifdef INITGUID
 #error "jit/IonCacheIRCompiler.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/IonCompileTask.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonCompileTask.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/IonCompileTask.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/IonIC.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonIC.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/IonIC.cpp defines INITGUID, so it cannot be built in unified mode."
-#undef INITGUID
-#endif
-#include "jit/IonOptimizationLevels.cpp"
-#ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "jit/IonOptimizationLevels.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
-#undef PL_ARENA_CONST_ALIGN_MASK
-#endif
-#ifdef INITGUID
-#error "jit/IonOptimizationLevels.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

@@ -100,19 +100,6 @@ bool PrivateOpEmitter::emitReference() {
   return true;
 }
 
-bool PrivateOpEmitter::skipReference() {
-  MOZ_ASSERT(state_ == State::Start);
-
-  if (!init()) {
-    return false;
-  }
-
-#ifdef DEBUG
-  state_ = State::Reference;
-#endif
-  return true;
-}
-
 bool PrivateOpEmitter::emitGet() {
   MOZ_ASSERT(state_ == State::Reference);
 
@@ -250,7 +237,7 @@ bool PrivateOpEmitter::emitAssignment() {
       }
     }
 
-    JSOp setOp = isFieldInit() ? JSOp::InitElem : JSOp::StrictSetElem;
+    JSOp setOp = isFieldInit() ? JSOp::InitHiddenElem : JSOp::StrictSetElem;
     if (!bce_->emitElemOpBase(setOp)) {
       //            [stack] RHS
       return false;

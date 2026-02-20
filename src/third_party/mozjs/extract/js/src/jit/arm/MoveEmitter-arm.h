@@ -62,7 +62,7 @@ class MoveEmitterARM {
   void setScratchRegister(Register reg) {}
 };
 
-typedef MoveEmitterARM MoveEmitter;
+using MoveEmitter = MoveEmitterARM;
 
 }  // namespace jit
 }  // namespace js

@@ -27,6 +27,7 @@
 
 #include "jit/AtomicOperations.h"
 #include "jit/InlinableNatives.h"
+#include "jit/JitRuntime.h"
 #include "jit/MacroAssembler.h"
 #include "jit/ProcessExecutableMemory.h"
 #include "jit/Simulator.h"
@@ -56,8 +57,12 @@ using namespace js;
 using namespace jit;
 using namespace wasm;
 
+using mozilla::EnumeratedArray;
 using mozilla::HashGeneric;
 using mozilla::MakeEnumeratedRange;
+using mozilla::Maybe;
+using mozilla::Nothing;
+using mozilla::Some;
 
 static const unsigned BUILTIN_THUNK_LIFO_SIZE = 64 * 1024;
 
@@ -72,6 +77,7 @@ static const unsigned BUILTIN_THUNK_LIFO_SIZE = 64 * 1024;
 #define _I64 MIRType::Int64
 #define _PTR MIRType::Pointer
 #define _RoN MIRType::WasmAnyRef
+#define _WAD MIRType::WasmArrayData
 #define _VOID MIRType::None
 #define _END MIRType::None
 #define _Infallible FailureMode::Infallible
@@ -83,331 +89,350 @@ static const unsigned BUILTIN_THUNK_LIFO_SIZE = 64 * 1024;
 namespace js {
 namespace wasm {
 
-const SymbolicAddressSignature SASigSinNativeD = {
+constexpr SymbolicAddressSignature SASigSinNativeD = {
     SymbolicAddress::SinNativeD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigSinFdlibmD = {
+constexpr SymbolicAddressSignature SASigSinFdlibmD = {
     SymbolicAddress::SinFdlibmD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigCosNativeD = {
+constexpr SymbolicAddressSignature SASigCosNativeD = {
     SymbolicAddress::CosNativeD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigCosFdlibmD = {
+constexpr SymbolicAddressSignature SASigCosFdlibmD = {
     SymbolicAddress::CosFdlibmD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigTanNativeD = {
+constexpr SymbolicAddressSignature SASigTanNativeD = {
     SymbolicAddress::TanNativeD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigTanFdlibmD = {
+constexpr SymbolicAddressSignature SASigTanFdlibmD = {
     SymbolicAddress::TanFdlibmD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigASinD = {
+constexpr SymbolicAddressSignature SASigASinD = {
     SymbolicAddress::ASinD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigACosD = {
+constexpr SymbolicAddressSignature SASigACosD = {
     SymbolicAddress::ACosD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigATanD = {
+constexpr SymbolicAddressSignature SASigATanD = {
     SymbolicAddress::ATanD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigCeilD = {
+constexpr SymbolicAddressSignature SASigCeilD = {
     SymbolicAddress::CeilD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigCeilF = {
+constexpr SymbolicAddressSignature SASigCeilF = {
     SymbolicAddress::CeilF, _F32, _Infallible, 1, {_F32, _END}};
-const SymbolicAddressSignature SASigFloorD = {
+constexpr SymbolicAddressSignature SASigFloorD = {
     SymbolicAddress::FloorD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigFloorF = {
+constexpr SymbolicAddressSignature SASigFloorF = {
     SymbolicAddress::FloorF, _F32, _Infallible, 1, {_F32, _END}};
-const SymbolicAddressSignature SASigTruncD = {
+constexpr SymbolicAddressSignature SASigTruncD = {
     SymbolicAddress::TruncD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigTruncF = {
+constexpr SymbolicAddressSignature SASigTruncF = {
     SymbolicAddress::TruncF, _F32, _Infallible, 1, {_F32, _END}};
-const SymbolicAddressSignature SASigNearbyIntD = {
+constexpr SymbolicAddressSignature SASigNearbyIntD = {
     SymbolicAddress::NearbyIntD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigNearbyIntF = {
+constexpr SymbolicAddressSignature SASigNearbyIntF = {
     SymbolicAddress::NearbyIntF, _F32, _Infallible, 1, {_F32, _END}};
-const SymbolicAddressSignature SASigExpD = {
+constexpr SymbolicAddressSignature SASigExpD = {
     SymbolicAddress::ExpD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigLogD = {
+constexpr SymbolicAddressSignature SASigLogD = {
     SymbolicAddress::LogD, _F64, _Infallible, 1, {_F64, _END}};
-const SymbolicAddressSignature SASigPowD = {
+constexpr SymbolicAddressSignature SASigPowD = {
     SymbolicAddress::PowD, _F64, _Infallible, 2, {_F64, _F64, _END}};
-const SymbolicAddressSignature SASigATan2D = {
+constexpr SymbolicAddressSignature SASigATan2D = {
     SymbolicAddress::ATan2D, _F64, _Infallible, 2, {_F64, _F64, _END}};
-const SymbolicAddressSignature SASigMemoryGrowM32 = {
+constexpr SymbolicAddressSignature SASigArrayMemMove = {
+    SymbolicAddress::ArrayMemMove,
+    _VOID,
+    _Infallible,
+    6,
+    {_WAD, _I32, _WAD, _I32, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigArrayRefsMove = {
+    SymbolicAddress::ArrayRefsMove,
+    _VOID,
+    _Infallible,
+    5,
+    {_WAD, _I32, _WAD, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigMemoryGrowM32 = {
     SymbolicAddress::MemoryGrowM32,
     _I32,
     _Infallible,
     3,
     {_PTR, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigMemoryGrowM64 = {
+constexpr SymbolicAddressSignature SASigMemoryGrowM64 = {
     SymbolicAddress::MemoryGrowM64,
     _I64,
     _Infallible,
     3,
     {_PTR, _I64, _I32, _END}};
-const SymbolicAddressSignature SASigMemorySizeM32 = {
+constexpr SymbolicAddressSignature SASigMemorySizeM32 = {
     SymbolicAddress::MemorySizeM32, _I32, _Infallible, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigMemorySizeM64 = {
+constexpr SymbolicAddressSignature SASigMemorySizeM64 = {
     SymbolicAddress::MemorySizeM64, _I64, _Infallible, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigWaitI32M32 = {
+constexpr SymbolicAddressSignature SASigWaitI32M32 = {
     SymbolicAddress::WaitI32M32,
     _I32,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I32, _I64, _I32, _END}};
-const SymbolicAddressSignature SASigWaitI32M64 = {
+constexpr SymbolicAddressSignature SASigWaitI32M64 = {
     SymbolicAddress::WaitI32M64,
     _I32,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I32, _I64, _I32, _END}};
-const SymbolicAddressSignature SASigWaitI64M32 = {
+constexpr SymbolicAddressSignature SASigWaitI64M32 = {
     SymbolicAddress::WaitI64M32,
     _I32,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I64, _I64, _I32, _END}};
-const SymbolicAddressSignature SASigWaitI64M64 = {
+constexpr SymbolicAddressSignature SASigWaitI64M64 = {
     SymbolicAddress::WaitI64M64,
     _I32,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I64, _I64, _I32, _END}};
-const SymbolicAddressSignature SASigWakeM32 = {SymbolicAddress::WakeM32,
-                                               _I32,
-                                               _FailOnNegI32,
-                                               4,
-                                               {_PTR, _I32, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigWakeM64 = {SymbolicAddress::WakeM64,
-                                               _I32,
-                                               _FailOnNegI32,
-                                               4,
-                                               {_PTR, _I64, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigMemCopyM32 = {
+constexpr SymbolicAddressSignature SASigWakeM32 = {
+    SymbolicAddress::WakeM32,
+    _I32,
+    _FailOnNegI32,
+    4,
+    {_PTR, _I32, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigWakeM64 = {
+    SymbolicAddress::WakeM64,
+    _I32,
+    _FailOnNegI32,
+    4,
+    {_PTR, _I64, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigMemCopyM32 = {
     SymbolicAddress::MemCopyM32,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemCopySharedM32 = {
+constexpr SymbolicAddressSignature SASigMemCopySharedM32 = {
     SymbolicAddress::MemCopySharedM32,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemCopyM64 = {
+constexpr SymbolicAddressSignature SASigMemCopyM64 = {
     SymbolicAddress::MemCopyM64,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I64, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemCopySharedM64 = {
+constexpr SymbolicAddressSignature SASigMemCopySharedM64 = {
     SymbolicAddress::MemCopySharedM64,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I64, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemCopyAny = {
+constexpr SymbolicAddressSignature SASigMemCopyAny = {
     SymbolicAddress::MemCopyAny,
     _VOID,
     _FailOnNegI32,
     6,
     {_PTR, _I64, _I64, _I64, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigDataDrop = {
+constexpr SymbolicAddressSignature SASigDataDrop = {
     SymbolicAddress::DataDrop, _VOID, _FailOnNegI32, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigMemFillM32 = {
+constexpr SymbolicAddressSignature SASigMemFillM32 = {
     SymbolicAddress::MemFillM32,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemFillSharedM32 = {
+constexpr SymbolicAddressSignature SASigMemFillSharedM32 = {
     SymbolicAddress::MemFillSharedM32,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemFillM64 = {
+constexpr SymbolicAddressSignature SASigMemFillM64 = {
     SymbolicAddress::MemFillM64,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I32, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemFillSharedM64 = {
+constexpr SymbolicAddressSignature SASigMemFillSharedM64 = {
     SymbolicAddress::MemFillSharedM64,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I64, _I32, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemDiscardM32 = {
+constexpr SymbolicAddressSignature SASigMemDiscardM32 = {
     SymbolicAddress::MemDiscardM32,
     _VOID,
     _FailOnNegI32,
     4,
     {_PTR, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemDiscardSharedM32 = {
+constexpr SymbolicAddressSignature SASigMemDiscardSharedM32 = {
     SymbolicAddress::MemDiscardSharedM32,
     _VOID,
     _FailOnNegI32,
     4,
     {_PTR, _I32, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigMemDiscardM64 = {
+constexpr SymbolicAddressSignature SASigMemDiscardM64 = {
     SymbolicAddress::MemDiscardM64,
     _VOID,
     _FailOnNegI32,
     4,
     {_PTR, _I64, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemDiscardSharedM64 = {
+constexpr SymbolicAddressSignature SASigMemDiscardSharedM64 = {
     SymbolicAddress::MemDiscardSharedM64,
     _VOID,
     _FailOnNegI32,
     4,
     {_PTR, _I64, _I64, _PTR, _END}};
-const SymbolicAddressSignature SASigMemInitM32 = {
+constexpr SymbolicAddressSignature SASigMemInitM32 = {
     SymbolicAddress::MemInitM32,
     _VOID,
     _FailOnNegI32,
     6,
     {_PTR, _I32, _I32, _I32, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigMemInitM64 = {
+constexpr SymbolicAddressSignature SASigMemInitM64 = {
     SymbolicAddress::MemInitM64,
     _VOID,
     _FailOnNegI32,
     6,
     {_PTR, _I64, _I32, _I32, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigTableCopy = {
+constexpr SymbolicAddressSignature SASigTableCopy = {
     SymbolicAddress::TableCopy,
     _VOID,
     _FailOnNegI32,
     6,
     {_PTR, _I32, _I32, _I32, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigElemDrop = {
+constexpr SymbolicAddressSignature SASigElemDrop = {
     SymbolicAddress::ElemDrop, _VOID, _FailOnNegI32, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigTableFill = {
+constexpr SymbolicAddressSignature SASigTableFill = {
     SymbolicAddress::TableFill,
     _VOID,
     _FailOnNegI32,
     5,
     {_PTR, _I32, _RoN, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigTableGet = {SymbolicAddress::TableGet,
-                                                _RoN,
-                                                _FailOnInvalidRef,
-                                                3,
-                                                {_PTR, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigTableGrow = {
+constexpr SymbolicAddressSignature SASigTableGet = {SymbolicAddress::TableGet,
+                                                    _RoN,
+                                                    _FailOnInvalidRef,
+                                                    3,
+                                                    {_PTR, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigTableGrow = {
     SymbolicAddress::TableGrow,
     _I32,
     _Infallible,
     4,
     {_PTR, _RoN, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigTableInit = {
+constexpr SymbolicAddressSignature SASigTableInit = {
     SymbolicAddress::TableInit,
     _VOID,
     _FailOnNegI32,
     6,
     {_PTR, _I32, _I32, _I32, _I32, _I32, _END}};
-const SymbolicAddressSignature SASigTableSet = {SymbolicAddress::TableSet,
-                                                _VOID,
-                                                _FailOnNegI32,
-                                                4,
-                                                {_PTR, _I32, _RoN, _I32, _END}};
-const SymbolicAddressSignature SASigTableSize = {
+constexpr SymbolicAddressSignature SASigTableSet = {
+    SymbolicAddress::TableSet,
+    _VOID,
+    _FailOnNegI32,
+    4,
+    {_PTR, _I32, _RoN, _I32, _END}};
+constexpr SymbolicAddressSignature SASigTableSize = {
     SymbolicAddress::TableSize, _I32, _Infallible, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigRefFunc = {
+constexpr SymbolicAddressSignature SASigRefFunc = {
     SymbolicAddress::RefFunc, _RoN, _FailOnInvalidRef, 2, {_PTR, _I32, _END}};
-const SymbolicAddressSignature SASigPostBarrier = {
-    SymbolicAddress::PostBarrier, _VOID, _Infallible, 2, {_PTR, _PTR, _END}};
-const SymbolicAddressSignature SASigPostBarrierPrecise = {
-    SymbolicAddress::PostBarrierPrecise,
+constexpr SymbolicAddressSignature SASigPostBarrierEdge = {
+    SymbolicAddress::PostBarrierEdge,
+    _VOID,
+    _Infallible,
+    2,
+    {_PTR, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigPostBarrierEdgePrecise = {
+    SymbolicAddress::PostBarrierEdgePrecise,
     _VOID,
     _Infallible,
     3,
     {_PTR, _PTR, _RoN, _END}};
-const SymbolicAddressSignature SASigPostBarrierPreciseWithOffset = {
-    SymbolicAddress::PostBarrierPreciseWithOffset,
+constexpr SymbolicAddressSignature SASigPostBarrierWholeCell = {
+    SymbolicAddress::PostBarrierWholeCell,
     _VOID,
     _Infallible,
-    4,
-    {_PTR, _PTR, _I32, _RoN, _END}};
-const SymbolicAddressSignature SASigExceptionNew = {
+    2,
+    {_PTR, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigExceptionNew = {
     SymbolicAddress::ExceptionNew, _RoN, _FailOnNullPtr, 2, {_PTR, _RoN, _END}};
-const SymbolicAddressSignature SASigThrowException = {
+constexpr SymbolicAddressSignature SASigThrowException = {
     SymbolicAddress::ThrowException,
     _VOID,
     _FailOnNegI32,
     2,
     {_PTR, _RoN, _END}};
-const SymbolicAddressSignature SASigStructNewIL_true = {
+constexpr SymbolicAddressSignature SASigStructNewIL_true = {
     SymbolicAddress::StructNewIL_true,
     _RoN,
     _FailOnNullPtr,
-    2,
-    {_PTR, _PTR, _END}};
-const SymbolicAddressSignature SASigStructNewIL_false = {
+    3,
+    {_PTR, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigStructNewIL_false = {
     SymbolicAddress::StructNewIL_false,
     _RoN,
     _FailOnNullPtr,
-    2,
-    {_PTR, _PTR, _END}};
-const SymbolicAddressSignature SASigStructNewOOL_true = {
+    3,
+    {_PTR, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigStructNewOOL_true = {
     SymbolicAddress::StructNewOOL_true,
     _RoN,
     _FailOnNullPtr,
-    2,
-    {_PTR, _PTR, _END}};
-const SymbolicAddressSignature SASigStructNewOOL_false = {
+    3,
+    {_PTR, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigStructNewOOL_false = {
     SymbolicAddress::StructNewOOL_false,
     _RoN,
     _FailOnNullPtr,
-    2,
-    {_PTR, _PTR, _END}};
-const SymbolicAddressSignature SASigArrayNew_true = {
+    3,
+    {_PTR, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigArrayNew_true = {
     SymbolicAddress::ArrayNew_true,
     _RoN,
     _FailOnNullPtr,
-    3,
-    {_PTR, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigArrayNew_false = {
+    4,
+    {_PTR, _I32, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigArrayNew_false = {
     SymbolicAddress::ArrayNew_false,
     _RoN,
     _FailOnNullPtr,
-    3,
-    {_PTR, _I32, _PTR, _END}};
-const SymbolicAddressSignature SASigArrayNewData = {
+    4,
+    {_PTR, _I32, _I32, _PTR, _END}};
+constexpr SymbolicAddressSignature SASigArrayNewData = {
     SymbolicAddress::ArrayNewData,
     _RoN,
     _FailOnNullPtr,
-    5,
-    {_PTR, _I32, _I32, _PTR, _I32, _END}};
-const SymbolicAddressSignature SASigArrayNewElem = {
+    6,
+    {_PTR, _I32, _I32, _I32, _PTR, _I32, _END}};
+constexpr SymbolicAddressSignature SASigArrayNewElem = {
     SymbolicAddress::ArrayNewElem,
     _RoN,
     _FailOnNullPtr,
-    5,
-    {_PTR, _I32, _I32, _PTR, _I32, _END}};
-const SymbolicAddressSignature SASigArrayInitData = {
+    6,
+    {_PTR, _I32, _I32, _I32, _PTR, _I32, _END}};
+constexpr SymbolicAddressSignature SASigArrayInitData = {
     SymbolicAddress::ArrayInitData,
     _VOID,
     _FailOnNegI32,
-    7,
-    {_PTR, _RoN, _I32, _I32, _I32, _PTR, _I32, _END}};
-const SymbolicAddressSignature SASigArrayInitElem = {
+    6,
+    {_PTR, _RoN, _I32, _I32, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigArrayInitElem = {
     SymbolicAddress::ArrayInitElem,
     _VOID,
     _FailOnNegI32,
     7,
-    {_PTR, _RoN, _I32, _I32, _I32, _PTR, _I32, _END}};
-const SymbolicAddressSignature SASigArrayCopy = {
+    {_PTR, _RoN, _I32, _I32, _I32, _I32, _I32, _END}};
+constexpr SymbolicAddressSignature SASigArrayCopy = {
     SymbolicAddress::ArrayCopy,
     _VOID,
     _FailOnNegI32,
     7,
     {_PTR, _RoN, _I32, _RoN, _I32, _I32, _I32, _END}};
 
-#define VISIT_BUILTIN_FUNC(op, export, sa_name, ...)   \
-  const SymbolicAddressSignature SASig##sa_name = {    \
-      SymbolicAddress::sa_name,                        \
-      DECLARE_BUILTIN_MODULE_FUNC_RESULT_MIRTYPE_##op, \
-      DECLARE_BUILTIN_MODULE_FUNC_FAILMODE_##op,       \
+#define VISIT_BUILTIN_FUNC(op, export, sa_name, ...)    \
+  constexpr SymbolicAddressSignature SASig##sa_name = { \
+      SymbolicAddress::sa_name,                         \
+      DECLARE_BUILTIN_MODULE_FUNC_RESULT_MIRTYPE_##op,  \
+      DECLARE_BUILTIN_MODULE_FUNC_FAILMODE_##op,        \
       DECLARE_BUILTIN_MODULE_FUNC_PARAM_MIRTYPES_##op};
 
 FOR_EACH_BUILTIN_MODULE_FUNC(VISIT_BUILTIN_FUNC)
 #undef VISIT_BUILTIN_FUNC
 
 #ifdef ENABLE_WASM_JSPI
-const SymbolicAddressSignature SASigUpdateSuspenderState = {
+constexpr SymbolicAddressSignature SASigUpdateSuspenderState = {
     SymbolicAddress::UpdateSuspenderState,
     _VOID,
     _Infallible,
@@ -497,30 +522,50 @@ static JitActivation* CallingActivation(JSContext* cx) {
   return act->asJit();
 }
 
+template <typename Fn, typename... Ts>
+static bool ForwardToMainStack(Fn fn, JSContext* cx, Ts... args) {
+#ifdef ENABLE_WASM_JSPI
+  if (IsSuspendableStackActive(cx)) {
+    struct InvokeContext {
+      bool (*fn)(JSContext*, Ts...);
+      JSContext* cx;
+      std::tuple<Ts...> args;
+      static bool Run(InvokeContext* data) {
+        return data->fn(data->cx, std::get<Ts>(data->args)...);
+      }
+    } data = {fn, cx, std::make_tuple(args...)};
+    return CallOnMainStack(
+        cx, reinterpret_cast<CallOnMainStackFn>(InvokeContext::Run), &data);
+  }
+#endif
+  return fn(cx, args...);
+}
+
 static bool WasmHandleDebugTrap() {
   JSContext* cx = TlsContext.get();  // Cold code
   JitActivation* activation = CallingActivation(cx);
   Frame* fp = activation->wasmExitFP();
   Instance* instance = GetNearestEffectiveInstance(fp);
   const Code& code = instance->code();
-  MOZ_ASSERT(code.metadata().debugEnabled);
+  MOZ_ASSERT(code.debugEnabled());
 
   // The debug trap stub is the innermost frame. It's return address is the
   // actual trap site.
-  const CallSite* site = code.lookupCallSite(fp->returnAddress());
-  MOZ_ASSERT(site);
+  CallSite site;
+  MOZ_ALWAYS_TRUE(code.lookupCallSite(fp->returnAddress(), &site));
 
   // Advance to the actual trapping frame.
   fp = fp->wasmCaller();
   DebugFrame* debugFrame = DebugFrame::from(fp);
 
-  if (site->kind() == CallSite::EnterFrame) {
+  if (site.kind() == CallSiteKind::EnterFrame) {
     if (!instance->debug().enterFrameTrapsEnabled()) {
       return true;
     }
     debugFrame->setIsDebuggee();
     debugFrame->observe(cx);
-    if (!DebugAPI::onEnterFrame(cx, debugFrame)) {
+    if (!ForwardToMainStack(DebugAPI::onEnterFrame, cx,
+                            js::AbstractFramePtr(debugFrame))) {
       if (cx->isPropagatingForcedReturn()) {
         cx->clearPropagatingForcedReturn();
         // Ignoring forced return because changing code execution order is
@@ -533,24 +578,26 @@ static bool WasmHandleDebugTrap() {
     }
     return true;
   }
-  if (site->kind() == CallSite::LeaveFrame ||
-      site->kind() == CallSite::CollapseFrame) {
-    if (site->kind() == CallSite::LeaveFrame &&
+  if (site.kind() == CallSiteKind::LeaveFrame ||
+      site.kind() == CallSiteKind::CollapseFrame) {
+    if (site.kind() == CallSiteKind::LeaveFrame &&
         !debugFrame->updateReturnJSValue(cx)) {
       return false;
     }
-    if (site->kind() == CallSite::CollapseFrame) {
+    if (site.kind() == CallSiteKind::CollapseFrame) {
       debugFrame->discardReturnJSValue();
     }
-    bool ok = DebugAPI::onLeaveFrame(cx, debugFrame, nullptr, true);
+    bool ok = ForwardToMainStack(DebugAPI::onLeaveFrame, cx,
+                                 js::AbstractFramePtr(debugFrame),
+                                 (const jsbytecode*)nullptr, true);
     debugFrame->leave(cx);
     return ok;
   }
 
   DebugState& debug = instance->debug();
-  MOZ_ASSERT(debug.hasBreakpointTrapAtOffset(site->lineOrBytecode()));
+  MOZ_ASSERT(debug.hasBreakpointTrapAtOffset(site.lineOrBytecode()));
   if (debug.stepModeEnabled(debugFrame->funcIndex())) {
-    if (!DebugAPI::onSingleStep(cx)) {
+    if (!ForwardToMainStack(DebugAPI::onSingleStep, cx)) {
       if (cx->isPropagatingForcedReturn()) {
         cx->clearPropagatingForcedReturn();
         // TODO properly handle forced return.
@@ -560,8 +607,8 @@ static bool WasmHandleDebugTrap() {
       return false;
     }
   }
-  if (debug.hasBreakpointSite(site->lineOrBytecode())) {
-    if (!DebugAPI::onTrap(cx)) {
+  if (debug.hasBreakpointSite(site.lineOrBytecode())) {
+    if (!ForwardToMainStack(DebugAPI::onTrap, cx)) {
       if (cx->isPropagatingForcedReturn()) {
         cx->clearPropagatingForcedReturn();
         // TODO properly handle forced return.
@@ -639,14 +686,13 @@ static WasmExceptionObject* GetOrWrapWasmException(JitActivation* activation,
   return nullptr;
 }
 
-static const wasm::TryNote* FindNonDelegateTryNote(const wasm::Code& code,
-                                                   const uint8_t* pc,
-                                                   Tier* tier) {
-  const wasm::TryNote* tryNote = code.lookupTryNote((void*)pc, tier);
+static const wasm::TryNote* FindNonDelegateTryNote(
+    const wasm::Code& code, const uint8_t* pc, const CodeBlock** codeBlock) {
+  const wasm::TryNote* tryNote = code.lookupTryNote((void*)pc, codeBlock);
   while (tryNote && tryNote->isDelegate()) {
-    const wasm::CodeTier& codeTier = code.codeTier(*tier);
-    pc = codeTier.segment().base() + tryNote->delegateOffset();
-    const wasm::TryNote* delegateTryNote = code.lookupTryNote((void*)pc, tier);
+    pc = (*codeBlock)->base() + tryNote->delegateOffset();
+    const wasm::TryNote* delegateTryNote =
+        code.lookupTryNote((void*)pc, codeBlock);
     MOZ_RELEASE_ASSERT(delegateTryNote == nullptr ||
                        delegateTryNote->tryBodyBegin() <
                            tryNote->tryBodyBegin());
@@ -655,16 +701,96 @@ static const wasm::TryNote* FindNonDelegateTryNote(const wasm::Code& code,
   return tryNote;
 }
 
+// Request tier-2 compilation for the calling wasm function.
+
+static void WasmHandleRequestTierUp(Instance* instance) {
+  JSContext* cx = instance->cx();
+
+  // Don't turn this into a release assert - TlsContext.get() can be expensive.
+  MOZ_ASSERT(cx == TlsContext.get());
+
+  // Neither this routine nor the stub that calls it make any attempt to
+  // communicate roots to the GC.  This is OK because we will only be
+  // compiling code here, which shouldn't GC.  Nevertheless ..
+  JS::AutoAssertNoGC nogc(cx);
+
+  JitActivation* activation = CallingActivation(cx);
+  Frame* fp = activation->wasmExitFP();
+
+  // Similarly, don't turn this into a release assert.
+  MOZ_ASSERT(instance == GetNearestEffectiveInstance(fp));
+
+  // Figure out the requesting funcIndex.  We could add a field to the
+  // Instance and, in the slow path of BaseCompiler::addHotnessCheck, write it
+  // in there.  That would avoid having to call LookupCodeBlock here, but (1)
+  // LookupCodeBlock is pretty cheap and (2) this would make hotness checks
+  // larger.  It doesn't seem like a worthwhile tradeoff.
+  void* resumePC = fp->returnAddress();
+  const CodeRange* codeRange;
+  const CodeBlock* codeBlock = LookupCodeBlock(resumePC, &codeRange);
+  MOZ_RELEASE_ASSERT(codeBlock && codeRange);
+
+  uint32_t funcIndex = codeRange->funcIndex();
+
+  // See BaseCompiler::addHotnessCheck for rationale.  If this fails, and
+  // `counter` is a very large negative number (close to -2^31), it may be that
+  // a hotness check didn't have its step patched in.
+  int32_t counter = instance->readHotnessCounter(funcIndex);
+  MOZ_RELEASE_ASSERT(counter >= -127 && counter <= -1);
+
+  // Function `funcIndex` is requesting tier-up.  This can go one of three ways:
+  // - the request is a duplicate -- ignore
+  // - tier-up compilation succeeds -- we hope
+  // - tier-up compilation fails (eg, OOMs).
+  //   We have no feasible way to recover.
+  //
+  // Regardless of the outcome, we want to defer duplicate requests as long as
+  // possible.  So set the counter to "infinity" right now.
+  instance->resetHotnessCounter(funcIndex);
+
+  // Submit the collected profiling information for call_ref to be available
+  // for compilation.
+  instance->submitCallRefHints(funcIndex);
+
+  if (JS::Prefs::wasm_lazy_tiering_synchronous()) {
+    UniqueChars error;
+    UniqueCharsVector warnings;
+    mozilla::Atomic<bool> cancelled(false);
+    bool ok = CompilePartialTier2(*codeBlock->code, funcIndex, &error,
+                                  &warnings, &cancelled);
+    ReportTier2ResultsOffThread(cancelled, ok, mozilla::Some(funcIndex),
+                                codeBlock->code->codeMeta().scriptedCaller(),
+                                error, warnings);
+    return;
+  }
+
+  // Try to Ion-compile it.  Note that `ok == true` signifies either
+  // "duplicate request" or "not a duplicate, and compilation succeeded".
+  bool ok = codeBlock->code->requestTierUp(funcIndex);
+
+  // If compilation failed, there's no feasible way to recover. We use the
+  // 'off thread' logging mechanism to avoid possibly triggering a GC.
+  if (!ok) {
+    wasm::LogOffThread("Failed to tier-up function=%d in instance=%p.",
+                       funcIndex, instance);
+  }
+}
+
 // Unwind the activation in response to a thrown exception. This function is
 // responsible for notifying the debugger of each unwound frame.
 //
 // This function will look for try-catch handlers and, if not trapping or
 // throwing an uncatchable exception, will write the handler info in |*rfe|.
 //
-// If no try-catch handler is found, initialize |*rfe| for a return to the entry
-// frame that called into Wasm.
-void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
-                       jit::ResumeFromException* rfe) {
+// If no try-catch handler is found, return to the caller to continue unwinding
+// JS JIT frames.
+void wasm::HandleExceptionWasm(JSContext* cx, JitFrameIter& iter,
+                               jit::ResumeFromException* rfe) {
+  MOZ_ASSERT(iter.isWasm());
+  MOZ_ASSERT(CallingActivation(cx) == iter.activation());
+  MOZ_ASSERT(cx->activation()->asJit()->hasWasmExitFP());
+  MOZ_ASSERT(rfe->kind == ExceptionResumeKind::EntryFrame);
+
   // WasmFrameIter iterates down wasm frames in the activation starting at
   // JitActivation::wasmExitFP(). Calling WasmFrameIter::startUnwinding pops
   // JitActivation::wasmExitFP() once each time WasmFrameIter is incremented,
@@ -673,7 +799,6 @@ void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
   // we just called onLeaveFrame (which would lead to the frame being re-added
   // to the map of live frames, right as it becomes trash).
 
-  MOZ_ASSERT(CallingActivation(cx) == iter.activation());
 #ifdef DEBUG
   auto onExit = mozilla::MakeScopeExit([cx] {
     MOZ_ASSERT(!cx->activation()->asJit()->isWasmTrapping(),
@@ -684,56 +809,49 @@ void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
 #endif
 
   MOZ_ASSERT(!iter.done());
-  iter.setUnwind(WasmFrameIter::Unwind::True);
 
-  // Live wasm code on the stack is kept alive (in TraceJitActivation) by
-  // marking the instance of every wasm::Frame found by WasmFrameIter.
-  // However, as explained above, we're popping frames while iterating which
-  // means that a GC during this loop could collect the code of frames whose
-  // code is still on the stack. This is actually mostly fine: as soon as we
-  // return to the throw stub, the entire stack will be popped as a whole,
-  // returning to the C++ caller. However, we must keep the throw stub alive
-  // itself which is owned by the innermost instance.
-  Rooted<WasmInstanceObject*> keepAlive(cx, iter.instance()->object());
+  // Make the iterator adjust the JitActivation so that each popped frame
+  // will not be visible to other FrameIters that are created while we're
+  // unwinding (such as by debugging code).
+  iter.asWasm().setIsLeavingFrames();
 
   JitActivation* activation = CallingActivation(cx);
   Rooted<WasmExceptionObject*> wasmExn(cx,
                                        GetOrWrapWasmException(activation, cx));
 
-  for (; !iter.done(); ++iter) {
+  for (; !iter.done() && iter.isWasm(); ++iter) {
     // Wasm code can enter same-compartment realms, so reset cx->realm to
     // this frame's realm.
-    cx->setRealmForJitExceptionHandler(iter.instance()->realm());
+    WasmFrameIter& wasmFrame = iter.asWasm();
+    cx->setRealmForJitExceptionHandler(wasmFrame.instance()->realm());
 
     // Only look for an exception handler if there's a catchable exception.
     if (wasmExn) {
-      Tier tier;
-      const wasm::Code& code = iter.instance()->code();
-      const uint8_t* pc = iter.resumePCinCurrentFrame();
-      const wasm::TryNote* tryNote = FindNonDelegateTryNote(code, pc, &tier);
+      const wasm::Code& code = wasmFrame.instance()->code();
+      const uint8_t* pc = wasmFrame.resumePCinCurrentFrame();
+      const wasm::CodeBlock* codeBlock = nullptr;
+      const wasm::TryNote* tryNote =
+          FindNonDelegateTryNote(code, pc, &codeBlock);
 
       if (tryNote) {
-#ifdef ENABLE_WASM_TAIL_CALLS
         // Skip tryNote if pc is at return stub generated by
         // wasmCollapseFrameSlow.
-        const CallSite* site = code.lookupCallSite((void*)pc);
-        if (site && site->kind() == CallSite::ReturnStub) {
+        CallSite site;
+        if (code.lookupCallSite((void*)pc, &site) &&
+            site.kind() == CallSiteKind::ReturnStub) {
           continue;
         }
-#endif
 
         cx->clearPendingException();
-        MOZ_ASSERT(iter.instance() == iter.instance());
-        iter.instance()->setPendingException(wasmExn);
+        wasmFrame.instance()->setPendingException(wasmExn);
 
         rfe->kind = ExceptionResumeKind::WasmCatch;
-        rfe->framePointer = (uint8_t*)iter.frame();
-        rfe->instance = iter.instance();
+        rfe->framePointer = (uint8_t*)wasmFrame.frame();
+        rfe->instance = wasmFrame.instance();
 
         rfe->stackPointer =
             (uint8_t*)(rfe->framePointer - tryNote->landingPadFramePushed());
-        rfe->target =
-            iter.instance()->codeBase(tier) + tryNote->landingPadEntryPoint();
+        rfe->target = codeBlock->base() + tryNote->landingPadEntryPoint();
 
         // Make sure to clear trapping state if we got here due to a trap.
         if (activation->isWasmTrapping()) {
@@ -744,17 +862,18 @@ void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
       }
     }
 
-    if (!iter.debugEnabled()) {
+    if (!wasmFrame.debugEnabled()) {
       continue;
     }
 
-    DebugFrame* frame = iter.debugFrame();
+    DebugFrame* frame = wasmFrame.debugFrame();
     frame->clearReturnJSValue();
 
     // Assume ResumeMode::Terminate if no exception is pending --
     // no onExceptionUnwind handlers must be fired.
     if (cx->isExceptionPending()) {
-      if (!DebugAPI::onExceptionUnwind(cx, frame)) {
+      if (!ForwardToMainStack(DebugAPI::onExceptionUnwind, cx,
+                              AbstractFramePtr(frame))) {
         if (cx->isPropagatingForcedReturn()) {
           cx->clearPropagatingForcedReturn();
           // Unexpected trap return -- raising error since throw recovery
@@ -767,7 +886,9 @@ void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
       }
     }
 
-    bool ok = DebugAPI::onLeaveFrame(cx, frame, nullptr, false);
+    bool ok =
+        ForwardToMainStack(DebugAPI::onLeaveFrame, cx, AbstractFramePtr(frame),
+                           (const jsbytecode*)nullptr, false);
     if (ok) {
       // Unexpected success from the handler onLeaveFrame -- raising error
       // since throw recovery is not yet implemented in the wasm baseline.
@@ -790,24 +911,14 @@ void wasm::HandleThrow(JSContext* cx, WasmFrameIter& iter,
                        .isWrappedJSValue());
   }
 #endif
-
-  // In case of no handler, exit wasm via ret().
-  // FailInstanceReg signals to wasm stub to do a failure return.
-  rfe->kind = ExceptionResumeKind::Wasm;
-  rfe->framePointer = (uint8_t*)iter.unwoundCallerFP();
-  rfe->stackPointer = (uint8_t*)iter.unwoundAddressOfReturnAddress();
-  rfe->instance = (Instance*)FailInstanceReg;
-  rfe->target = nullptr;
 }
 
 static void* WasmHandleThrow(jit::ResumeFromException* rfe) {
-  JSContext* cx = TlsContext.get();  // Cold code
-  JitActivation* activation = CallingActivation(cx);
-  WasmFrameIter iter(activation);
-  // We can ignore the return result here because the throw stub code
-  // can just check the resume kind to see if a handler was found or not.
-  HandleThrow(cx, iter, rfe);
-  return rfe;
+  jit::HandleException(rfe);
+  // Return a pointer to the exception handler trampoline code to jump to from
+  // the throw stub.
+  JSContext* cx = TlsContext.get();
+  return cx->runtime()->jitRuntime()->getExceptionTailReturnValueCheck().value;
 }
 
 // Has the same return-value convention as HandleTrap().
@@ -960,14 +1071,12 @@ static void* BoxValue_Anyref(Value* rawVal) {
   return result.get().forCompiledCode();
 }
 
-static int32_t CoerceInPlace_JitEntry(int funcExportIndex, Instance* instance,
+static int32_t CoerceInPlace_JitEntry(int funcIndex, Instance* instance,
                                       Value* argv) {
   JSContext* cx = TlsContext.get();  // Cold code
 
   const Code& code = instance->code();
-  const FuncExport& fe =
-      code.metadata(code.stableTier()).funcExports[funcExportIndex];
-  const FuncType& funcType = code.metadata().getFuncExportType(fe);
+  const FuncType& funcType = code.codeMeta().getFuncType(funcIndex);
 
   for (size_t i = 0; i < funcType.args().length(); i++) {
     HandleValue arg = HandleValue::fromMarkedLocation(&argv[i]);
@@ -1139,6 +1248,29 @@ static float Uint64ToFloat32(int32_t x_hi, uint32_t x_lo) {
   return float(x);
 }
 
+static void WasmArrayMemMove(uint8_t* destArrayData, uint32_t destIndex,
+                             const uint8_t* srcArrayData, uint32_t srcIndex,
+                             uint32_t elementSize, uint32_t count) {
+  AutoUnsafeCallWithABI unsafe;
+  memmove(&destArrayData[size_t(elementSize) * destIndex],
+          &srcArrayData[size_t(elementSize) * srcIndex],
+          size_t(elementSize) * count);
+}
+
+static void WasmArrayRefsMove(GCPtr<AnyRef>* destArrayData, uint32_t destIndex,
+                              AnyRef* srcArrayData, uint32_t srcIndex,
+                              uint32_t count) {
+  AutoUnsafeCallWithABI unsafe;
+  GCPtr<AnyRef>* dstBegin = destArrayData + destIndex;
+  AnyRef* srcBegin = srcArrayData + srcIndex;
+  // The std::copy performs GCPtr::set() operation under the hood.
+  if (uintptr_t(dstBegin) < uintptr_t(srcBegin)) {
+    std::copy(srcBegin, srcBegin + count, dstBegin);
+  } else {
+    std::copy_backward(srcBegin, srcBegin + count, dstBegin + count);
+  }
+}
+
 template <class F>
 static inline void* FuncCast(F* funcPtr, ABIFunctionType abiType) {
   void* pf = JS_FUNC_TO_DATA_PTR(void*, funcPtr);
@@ -1166,6 +1298,9 @@ void* wasm::AddressOf(SymbolicAddress imm, ABIFunctionType* abiType) {
     case SymbolicAddress::HandleDebugTrap:
       *abiType = Args_General0;
       return FuncCast(WasmHandleDebugTrap, *abiType);
+    case SymbolicAddress::HandleRequestTierUp:
+      *abiType = Args_General1;
+      return FuncCast(WasmHandleRequestTierUp, *abiType);
     case SymbolicAddress::HandleThrow:
       *abiType = Args_General1;
       return FuncCast(WasmHandleThrow, *abiType);
@@ -1309,6 +1444,12 @@ void* wasm::AddressOf(SymbolicAddress imm, ABIFunctionType* abiType) {
     case SymbolicAddress::ATan2D:
       *abiType = Args_Double_DoubleDouble;
       return FuncCast(ecmaAtan2, *abiType);
+    case SymbolicAddress::ArrayMemMove:
+      *abiType = Args_Void_GeneralInt32GeneralInt32Int32Int32;
+      return FuncCast(WasmArrayMemMove, *abiType);
+    case SymbolicAddress::ArrayRefsMove:
+      *abiType = Args_Void_GeneralInt32GeneralInt32Int32;
+      return FuncCast(WasmArrayRefsMove, *abiType);
 
     case SymbolicAddress::MemoryGrowM32:
       *abiType = Args_Int32_GeneralInt32Int32;
@@ -1450,56 +1591,56 @@ void* wasm::AddressOf(SymbolicAddress imm, ABIFunctionType* abiType) {
       *abiType = Args_General_GeneralInt32;
       MOZ_ASSERT(*abiType == ToABIType(SASigRefFunc));
       return FuncCast(Instance::refFunc, *abiType);
-    case SymbolicAddress::PostBarrier:
+    case SymbolicAddress::PostBarrierEdge:
       *abiType = Args_Int32_GeneralGeneral;
-      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrier));
-      return FuncCast(Instance::postBarrier, *abiType);
-    case SymbolicAddress::PostBarrierPrecise:
+      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrierEdge));
+      return FuncCast(Instance::postBarrierEdge, *abiType);
+    case SymbolicAddress::PostBarrierEdgePrecise:
       *abiType = Args_Int32_GeneralGeneralGeneral;
-      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrierPrecise));
-      return FuncCast(Instance::postBarrierPrecise, *abiType);
-    case SymbolicAddress::PostBarrierPreciseWithOffset:
-      *abiType = Args_Int32_GeneralGeneralInt32General;
-      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrierPreciseWithOffset));
-      return FuncCast(Instance::postBarrierPreciseWithOffset, *abiType);
+      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrierEdgePrecise));
+      return FuncCast(Instance::postBarrierEdgePrecise, *abiType);
+    case SymbolicAddress::PostBarrierWholeCell:
+      *abiType = Args_Int32_GeneralGeneral;
+      MOZ_ASSERT(*abiType == ToABIType(SASigPostBarrierWholeCell));
+      return FuncCast(Instance::postBarrierWholeCell, *abiType);
     case SymbolicAddress::StructNewIL_true:
-      *abiType = Args_General2;
+      *abiType = Args_General_GeneralInt32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigStructNewIL_true));
       return FuncCast(Instance::structNewIL<true>, *abiType);
     case SymbolicAddress::StructNewIL_false:
-      *abiType = Args_General2;
+      *abiType = Args_General_GeneralInt32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigStructNewIL_false));
       return FuncCast(Instance::structNewIL<false>, *abiType);
     case SymbolicAddress::StructNewOOL_true:
-      *abiType = Args_General2;
+      *abiType = Args_General_GeneralInt32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigStructNewOOL_true));
       return FuncCast(Instance::structNewOOL<true>, *abiType);
     case SymbolicAddress::StructNewOOL_false:
-      *abiType = Args_General2;
+      *abiType = Args_General_GeneralInt32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigStructNewOOL_false));
       return FuncCast(Instance::structNewOOL<false>, *abiType);
     case SymbolicAddress::ArrayNew_true:
-      *abiType = Args_General_GeneralInt32General;
+      *abiType = Args_General_GeneralInt32Int32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayNew_true));
       return FuncCast(Instance::arrayNew<true>, *abiType);
     case SymbolicAddress::ArrayNew_false:
-      *abiType = Args_General_GeneralInt32General;
+      *abiType = Args_General_GeneralInt32Int32General;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayNew_false));
       return FuncCast(Instance::arrayNew<false>, *abiType);
     case SymbolicAddress::ArrayNewData:
-      *abiType = Args_General_GeneralInt32Int32GeneralInt32;
+      *abiType = Args_General_GeneralInt32Int32Int32GeneralInt32;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayNewData));
       return FuncCast(Instance::arrayNewData, *abiType);
     case SymbolicAddress::ArrayNewElem:
-      *abiType = Args_General_GeneralInt32Int32GeneralInt32;
+      *abiType = Args_General_GeneralInt32Int32Int32GeneralInt32;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayNewElem));
       return FuncCast(Instance::arrayNewElem, *abiType);
     case SymbolicAddress::ArrayInitData:
-      *abiType = Args_Int32_GeneralGeneralInt32Int32Int32GeneralInt32;
+      *abiType = Args_Int32_GeneralGeneralInt32Int32Int32Int32;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayInitData));
       return FuncCast(Instance::arrayInitData, *abiType);
     case SymbolicAddress::ArrayInitElem:
-      *abiType = Args_Int32_GeneralGeneralInt32Int32Int32GeneralInt32;
+      *abiType = Args_Int32_GeneralGeneralInt32Int32Int32Int32Int32;
       MOZ_ASSERT(*abiType == ToABIType(SASigArrayInitElem));
       return FuncCast(Instance::arrayInitElem, *abiType);
     case SymbolicAddress::ArrayCopy:
@@ -1588,7 +1729,8 @@ bool wasm::NeedsBuiltinThunk(SymbolicAddress sym) {
     // No thunk, because some work has to be done within the activation before
     // the activation exit: when called, arbitrary wasm registers are live and
     // must be saved, and the stack pointer may not be aligned for any ABI.
-    case SymbolicAddress::HandleDebugTrap:  // GenerateDebugTrapStub
+    case SymbolicAddress::HandleDebugTrap:      // GenerateDebugStub
+    case SymbolicAddress::HandleRequestTierUp:  // GenerateRequestTierUpStub
 
     // No thunk, because their caller manages the activation exit explicitly
     case SymbolicAddress::CallImport_General:      // GenerateImportInterpExit
@@ -1654,6 +1796,8 @@ bool wasm::NeedsBuiltinThunk(SymbolicAddress sym) {
     case SymbolicAddress::LogD:
     case SymbolicAddress::PowD:
     case SymbolicAddress::ATan2D:
+    case SymbolicAddress::ArrayMemMove:
+    case SymbolicAddress::ArrayRefsMove:
     case SymbolicAddress::MemoryGrowM32:
     case SymbolicAddress::MemoryGrowM64:
     case SymbolicAddress::MemorySizeM32:
@@ -1691,9 +1835,9 @@ bool wasm::NeedsBuiltinThunk(SymbolicAddress sym) {
     case SymbolicAddress::TableSet:
     case SymbolicAddress::TableSize:
     case SymbolicAddress::RefFunc:
-    case SymbolicAddress::PostBarrier:
-    case SymbolicAddress::PostBarrierPrecise:
-    case SymbolicAddress::PostBarrierPreciseWithOffset:
+    case SymbolicAddress::PostBarrierEdge:
+    case SymbolicAddress::PostBarrierEdgePrecise:
+    case SymbolicAddress::PostBarrierWholeCell:
     case SymbolicAddress::ExceptionNew:
     case SymbolicAddress::ThrowException:
     case SymbolicAddress::StructNewIL_true:
@@ -1897,10 +2041,16 @@ struct BuiltinThunks {
   }
 };
 
-Mutex initBuiltinThunks(mutexid::WasmInitBuiltinThunks);
-Atomic<const BuiltinThunks*> builtinThunks;
+MOZ_RUNINIT Mutex initBuiltinThunks(mutexid::WasmInitBuiltinThunks);
+mozilla::Atomic<const BuiltinThunks*> builtinThunks;
 
 bool wasm::EnsureBuiltinThunksInitialized() {
+  AutoMarkJitCodeWritableForThread writable;
+  return EnsureBuiltinThunksInitialized(writable);
+}
+
+bool wasm::EnsureBuiltinThunksInitialized(
+    AutoMarkJitCodeWritableForThread& writable) {
   LockGuard<Mutex> guard(initBuiltinThunks);
   if (builtinThunks) {
     return true;
@@ -1911,7 +2061,7 @@ bool wasm::EnsureBuiltinThunksInitialized() {
     return false;
   }
 
-  LifoAlloc lifo(BUILTIN_THUNK_LIFO_SIZE);
+  LifoAlloc lifo(BUILTIN_THUNK_LIFO_SIZE, js::MallocArena);
   TempAllocator tempAlloc(&lifo);
   WasmMacroAssembler masm(tempAlloc);
   AutoCreatedBy acb(masm, "wasm::EnsureBuiltinThunksInitialized");
@@ -2004,8 +2154,6 @@ bool wasm::EnsureBuiltinThunksInitialized() {
   if (!thunks->codeBase) {
     return false;
   }
-
-  AutoMarkJitCodeWritableForThread writable;
 
   masm.executableCopy(thunks->codeBase);
   memset(thunks->codeBase + masm.bytesNeeded(), 0,
@@ -2143,7 +2291,7 @@ void* wasm::MaybeGetBuiltinThunk(JSFunction* f, const FuncType& funcType) {
 }
 
 bool wasm::LookupBuiltinThunk(void* pc, const CodeRange** codeRange,
-                              uint8_t** codeBase) {
+                              const uint8_t** codeBase) {
   if (!builtinThunks) {
     return false;
   }

@@ -22,6 +22,7 @@
 #include "ds/Bitmap.h"
 #include "gc/ArenaList.h"
 #include "gc/Barrier.h"
+#include "gc/BufferAllocator.h"
 #include "gc/FindSCCs.h"
 #include "gc/GCMarker.h"
 #include "gc/NurseryAwareHashMap.h"
@@ -95,12 +96,14 @@ using StringWrapperMap =
     NurseryAwareHashMap<JSString*, JSString*, ZoneAllocPolicy,
                         DuplicatesPossible>;
 
-// Cache for NewMaybeExternalString. It has cache entries for both the
-// Latin1 JSInlineString path and JSExternalString.
+// Cache for NewMaybeExternalString and NewStringFromBuffer. It has separate
+// cache entries for the Latin1 JSThinInlineString fast path and for the generic
+// path where we allocate either a JSExternalString, an inline string, or a
+// string with a StringBuffer.
 class MOZ_NON_TEMPORARY_CLASS ExternalStringCache {
   static const size_t NumEntries = 4;
-  mozilla::Array<JSExternalString*, NumEntries> externalEntries_;
-  mozilla::Array<JSInlineString*, NumEntries> inlineEntries_;
+  mozilla::Array<JSInlineString*, NumEntries> inlineLatin1Entries_;
+  mozilla::Array<JSLinearString*, NumEntries> entries_;
 
  public:
   ExternalStringCache() { purge(); }
@@ -109,29 +112,29 @@ class MOZ_NON_TEMPORARY_CLASS ExternalStringCache {
   void operator=(const ExternalStringCache&) = delete;
 
   void purge() {
-    externalEntries_ = {};
-    inlineEntries_ = {};
+    inlineLatin1Entries_ = {};
+    entries_ = {};
   }
 
-  MOZ_ALWAYS_INLINE JSExternalString* lookupExternal(
-      const JS::Latin1Char* chars, size_t len) const;
-  MOZ_ALWAYS_INLINE JSExternalString* lookupExternal(const char16_t* chars,
-                                                     size_t len) const;
-  MOZ_ALWAYS_INLINE void putExternal(JSExternalString* s);
+  MOZ_ALWAYS_INLINE JSLinearString* lookup(const JS::Latin1Char* chars,
+                                           size_t len) const;
+  MOZ_ALWAYS_INLINE JSLinearString* lookup(const char16_t* chars,
+                                           size_t len) const;
+  MOZ_ALWAYS_INLINE void put(JSLinearString* s);
 
-  MOZ_ALWAYS_INLINE JSInlineString* lookupInline(const JS::Latin1Char* chars,
-                                                 size_t len) const;
-  MOZ_ALWAYS_INLINE JSInlineString* lookupInline(const char16_t* chars,
-                                                 size_t len) const;
-  MOZ_ALWAYS_INLINE void putInline(JSInlineString* s);
+  MOZ_ALWAYS_INLINE JSInlineString* lookupInlineLatin1(
+      const JS::Latin1Char* chars, size_t len) const;
+  MOZ_ALWAYS_INLINE JSInlineString* lookupInlineLatin1(const char16_t* chars,
+                                                       size_t len) const;
+  MOZ_ALWAYS_INLINE void putInlineLatin1(JSInlineString* s);
 
  private:
   template <typename CharT>
-  MOZ_ALWAYS_INLINE JSExternalString* lookupExternalImpl(const CharT* chars,
-                                                         size_t len) const;
+  MOZ_ALWAYS_INLINE JSLinearString* lookupImpl(const CharT* chars,
+                                               size_t len) const;
   template <typename CharT>
-  MOZ_ALWAYS_INLINE JSInlineString* lookupInlineImpl(const CharT* chars,
-                                                     size_t len) const;
+  MOZ_ALWAYS_INLINE JSInlineString* lookupInlineLatin1Impl(const CharT* chars,
+                                                           size_t len) const;
 };
 
 class MOZ_NON_TEMPORARY_CLASS FunctionToStringCache {
@@ -395,6 +398,8 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
  public:
   js::gc::ArenaLists arenas;
 
+  js::gc::BufferAllocator bufferAllocator;
+
   // Per-zone data for use by an embedder.
   js::MainThreadData<void*> data;
 
@@ -560,20 +565,19 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
 
   [[nodiscard]] bool findSweepGroupEdges(Zone* atomsZone);
 
-  struct DiscardOptions {
-    DiscardOptions() {}
+  struct JitDiscardOptions {
+    JitDiscardOptions() {}
     bool discardJitScripts = false;
     bool resetNurseryAllocSites = false;
     bool resetPretenuredAllocSites = false;
-    JSTracer* traceWeakJitScripts = nullptr;
   };
 
-  void discardJitCode(JS::GCContext* gcx,
-                      const DiscardOptions& options = DiscardOptions());
+  void maybeDiscardJitCode(JS::GCContext* gcx);
 
   // Discard JIT code regardless of isPreservingCode().
-  void forceDiscardJitCode(JS::GCContext* gcx,
-                           const DiscardOptions& options = DiscardOptions());
+  void forceDiscardJitCode(
+      JS::GCContext* gcx,
+      const JitDiscardOptions& options = JitDiscardOptions());
 
   void resetAllocSitesAndInvalidate(bool resetNurserySites,
                                     bool resetPretenuredSites);
@@ -679,8 +683,6 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
     return numRealmsWithAllocMetadataBuilder_ > 0;
   }
 
-  void prepareForCompacting();
-
   void traceRootsInMajorGC(JSTracer* trc);
 
   void sweepAfterMinorGC(JSTracer* trc);
@@ -727,7 +729,9 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
   void traceWeakCCWEdges(JSTracer* trc);
   static void fixupAllCrossCompartmentWrappersAfterMovingGC(JSTracer* trc);
 
+  void prepareForMovingGC();
   void fixupAfterMovingGC();
+
   void fixupScriptMapsAfterMovingGC(JSTracer* trc);
 
   void setNurseryAllocFlags(bool allocObjects, bool allocStrings,
@@ -794,7 +798,7 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
   // Perform all pending weakmap entry marking for this zone after
   // transitioning to weak marking mode.
   js::gc::IncrementalProgress enterWeakMarkingMode(js::GCMarker* marker,
-                                                   js::SliceBudget& budget);
+                                                   JS::SliceBudget& budget);
 
   // A set of edges from this zone to other zones used during GC to calculate
   // sweep groups.
@@ -866,8 +870,11 @@ class Zone : public js::ZoneAllocator, public js::gc::GraphNodeBase<JS::Zone> {
   js::gc::AllocSite* optimizedAllocSite() {
     return &pretenuring.optimizedAllocSite;
   }
-  uint32_t nurseryAllocCount(JS::TraceKind kind) const {
-    return pretenuring.nurseryAllocCount(kind);
+  js::gc::AllocSite* tenuringAllocSite() {
+    return &pretenuring.tenuringAllocSite;
+  }
+  uint32_t nurseryPromotedCount(JS::TraceKind kind) const {
+    return pretenuring.nurseryPromotedCount(kind);
   }
 
 #ifdef JSGC_HASH_TABLE_CHECKS

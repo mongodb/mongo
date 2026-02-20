@@ -117,6 +117,11 @@
  * the return address must be used to look up a CallSite structure that carries
  * that information.
  *
+ * (In Ion builds with full debug checks, we also write the callee instance to
+ * its usual slot regardless of the previous logic. This allows us to recover
+ * the current function's instance pointer at any time for debug checks. If it's
+ * an inter-instance call, this work is merely redundant.)
+ *
  * The stack area above the return address is owned by the caller, which may
  * deallocate the area on return or choose to reuse it for subsequent calls.
  * (The baseline compiler allocates and frees the stack args area and the

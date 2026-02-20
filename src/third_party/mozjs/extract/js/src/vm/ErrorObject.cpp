@@ -36,7 +36,8 @@
 #include "js/Utility.h"
 #include "js/Value.h"
 #include "js/Wrapper.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
+#include "vm/ErrorReporting.h"
 #include "vm/GlobalObject.h"
 #include "vm/Iteration.h"
 #include "vm/JSAtomUtils.h"  // ClassName
@@ -54,17 +55,16 @@
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/ObjectOperations-inl.h"
+#include "vm/Realm-inl.h"
 #include "vm/SavedStacks-inl.h"
 #include "vm/Shape-inl.h"
 
 using namespace js;
 
-#define IMPLEMENT_ERROR_PROTO_CLASS(name)                         \
-  {                                                               \
-    #name ".prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_##name), \
-        JS_NULL_CLASS_OPS,                                        \
-        &ErrorObject::classSpecs[JSProto_##name - JSProto_Error]  \
-  }
+#define IMPLEMENT_ERROR_PROTO_CLASS(name)                        \
+  {#name ".prototype", JSCLASS_HAS_CACHED_PROTO(JSProto_##name), \
+   JS_NULL_CLASS_OPS,                                            \
+   &ErrorObject::classSpecs[JSProto_##name - JSProto_Error]}
 
 const JSClass ErrorObject::protoClasses[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_ERROR_PROTO_CLASS(Error),
@@ -74,6 +74,9 @@ const JSClass ErrorObject::protoClasses[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_ERROR_PROTO_CLASS(EvalError),
     IMPLEMENT_ERROR_PROTO_CLASS(RangeError),
     IMPLEMENT_ERROR_PROTO_CLASS(ReferenceError),
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    IMPLEMENT_ERROR_PROTO_CLASS(SuppressedError),
+#endif
     IMPLEMENT_ERROR_PROTO_CLASS(SyntaxError),
     IMPLEMENT_ERROR_PROTO_CLASS(TypeError),
     IMPLEMENT_ERROR_PROTO_CLASS(URIError),
@@ -81,13 +84,29 @@ const JSClass ErrorObject::protoClasses[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_ERROR_PROTO_CLASS(DebuggeeWouldRun),
     IMPLEMENT_ERROR_PROTO_CLASS(CompileError),
     IMPLEMENT_ERROR_PROTO_CLASS(LinkError),
-    IMPLEMENT_ERROR_PROTO_CLASS(RuntimeError)};
+    IMPLEMENT_ERROR_PROTO_CLASS(RuntimeError),
+#ifdef ENABLE_WASM_JSPI
+    IMPLEMENT_ERROR_PROTO_CLASS(SuspendError),
+#endif
+};
 
 static bool exn_toSource(JSContext* cx, unsigned argc, Value* vp);
 
 static const JSFunctionSpec error_methods[] = {
     JS_FN("toSource", exn_toSource, 0, 0),
-    JS_SELF_HOSTED_FN("toString", "ErrorToString", 0, 0), JS_FS_END};
+    JS_SELF_HOSTED_FN("toString", "ErrorToString", 0, 0),
+    JS_FS_END,
+};
+
+static bool exn_isError(JSContext* cx, unsigned argc, Value* vp);
+
+static bool exn_captureStackTrace(JSContext* cx, unsigned argc, Value* vp);
+
+static const JSFunctionSpec error_static_methods[] = {
+    JS_FN("isError", exn_isError, 1, 0),
+    JS_FN("captureStackTrace", exn_captureStackTrace, 2, 0),
+    JS_FS_END,
+};
 
 // Error.prototype and NativeError.prototype have own .message and .name
 // properties.
@@ -98,7 +117,8 @@ static const JSPropertySpec error_properties[] = {
     COMMON_ERROR_PROPERTIES(Error),
     // Only Error.prototype has .stack!
     JS_PSGS("stack", ErrorObject::getStack, ErrorObject::setStack, 0),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 #define IMPLEMENT_NATIVE_ERROR_PROPERTIES(name)       \
   static const JSPropertySpec name##_properties[] = { \
@@ -109,6 +129,9 @@ IMPLEMENT_NATIVE_ERROR_PROPERTIES(AggregateError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(EvalError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(RangeError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(ReferenceError)
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+IMPLEMENT_NATIVE_ERROR_PROPERTIES(SuppressedError)
+#endif
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(SyntaxError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(TypeError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(URIError)
@@ -116,29 +139,42 @@ IMPLEMENT_NATIVE_ERROR_PROPERTIES(DebuggeeWouldRun)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(CompileError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(LinkError)
 IMPLEMENT_NATIVE_ERROR_PROPERTIES(RuntimeError)
+#ifdef ENABLE_WASM_JSPI
+IMPLEMENT_NATIVE_ERROR_PROPERTIES(SuspendError)
+#endif
 
-#define IMPLEMENT_NATIVE_ERROR_SPEC(name)                              \
-  {                                                                    \
-    ErrorObject::createConstructor, ErrorObject::createProto, nullptr, \
-        nullptr, nullptr, name##_properties, nullptr, JSProto_Error    \
-  }
+#define IMPLEMENT_NATIVE_ERROR_SPEC(name) \
+  {ErrorObject::createConstructor,        \
+   ErrorObject::createProto,              \
+   nullptr,                               \
+   nullptr,                               \
+   nullptr,                               \
+   name##_properties,                     \
+   nullptr,                               \
+   JSProto_Error}
 
-#define IMPLEMENT_NONGLOBAL_ERROR_SPEC(name)                           \
-  {                                                                    \
-    ErrorObject::createConstructor, ErrorObject::createProto, nullptr, \
-        nullptr, nullptr, name##_properties, nullptr,                  \
-        JSProto_Error | ClassSpec::DontDefineConstructor               \
-  }
+#define IMPLEMENT_NONGLOBAL_ERROR_SPEC(name) \
+  {ErrorObject::createConstructor,           \
+   ErrorObject::createProto,                 \
+   nullptr,                                  \
+   nullptr,                                  \
+   nullptr,                                  \
+   name##_properties,                        \
+   nullptr,                                  \
+   JSProto_Error | ClassSpec::DontDefineConstructor}
 
 const ClassSpec ErrorObject::classSpecs[JSEXN_ERROR_LIMIT] = {
-    {ErrorObject::createConstructor, ErrorObject::createProto, nullptr, nullptr,
-     error_methods, error_properties},
+    {ErrorObject::createConstructor, ErrorObject::createProto,
+     error_static_methods, nullptr, error_methods, error_properties},
 
     IMPLEMENT_NATIVE_ERROR_SPEC(InternalError),
     IMPLEMENT_NATIVE_ERROR_SPEC(AggregateError),
     IMPLEMENT_NATIVE_ERROR_SPEC(EvalError),
     IMPLEMENT_NATIVE_ERROR_SPEC(RangeError),
     IMPLEMENT_NATIVE_ERROR_SPEC(ReferenceError),
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    IMPLEMENT_NATIVE_ERROR_SPEC(SuppressedError),
+#endif
     IMPLEMENT_NATIVE_ERROR_SPEC(SyntaxError),
     IMPLEMENT_NATIVE_ERROR_SPEC(TypeError),
     IMPLEMENT_NATIVE_ERROR_SPEC(URIError),
@@ -146,17 +182,19 @@ const ClassSpec ErrorObject::classSpecs[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_NONGLOBAL_ERROR_SPEC(DebuggeeWouldRun),
     IMPLEMENT_NONGLOBAL_ERROR_SPEC(CompileError),
     IMPLEMENT_NONGLOBAL_ERROR_SPEC(LinkError),
-    IMPLEMENT_NONGLOBAL_ERROR_SPEC(RuntimeError)};
+    IMPLEMENT_NONGLOBAL_ERROR_SPEC(RuntimeError),
+#ifdef ENABLE_WASM_JSPI
+    IMPLEMENT_NONGLOBAL_ERROR_SPEC(SuspendError),
+#endif
+};
 
-#define IMPLEMENT_ERROR_CLASS_CORE(name, reserved_slots)         \
-  {                                                              \
-    #name,                                                       \
-        JSCLASS_HAS_CACHED_PROTO(JSProto_##name) |               \
-            JSCLASS_HAS_RESERVED_SLOTS(reserved_slots) |         \
-            JSCLASS_BACKGROUND_FINALIZE,                         \
-        &ErrorObjectClassOps,                                    \
-        &ErrorObject::classSpecs[JSProto_##name - JSProto_Error] \
-  }
+#define IMPLEMENT_ERROR_CLASS_CORE(name, reserved_slots) \
+  {#name,                                                \
+   JSCLASS_HAS_CACHED_PROTO(JSProto_##name) |            \
+       JSCLASS_HAS_RESERVED_SLOTS(reserved_slots) |      \
+       JSCLASS_BACKGROUND_FINALIZE,                      \
+   &ErrorObjectClassOps,                                 \
+   &ErrorObject::classSpecs[JSProto_##name - JSProto_Error]}
 
 #define IMPLEMENT_ERROR_CLASS(name) \
   IMPLEMENT_ERROR_CLASS_CORE(name, ErrorObject::RESERVED_SLOTS)
@@ -185,14 +223,25 @@ static const JSClassOps ErrorObjectClassOps = {
 const JSClass ErrorObject::classes[JSEXN_ERROR_LIMIT] = {
     IMPLEMENT_ERROR_CLASS(Error),
     IMPLEMENT_ERROR_CLASS_MAYBE_WASM_TRAP(InternalError),
-    IMPLEMENT_ERROR_CLASS(AggregateError), IMPLEMENT_ERROR_CLASS(EvalError),
-    IMPLEMENT_ERROR_CLASS(RangeError), IMPLEMENT_ERROR_CLASS(ReferenceError),
-    IMPLEMENT_ERROR_CLASS(SyntaxError), IMPLEMENT_ERROR_CLASS(TypeError),
+    IMPLEMENT_ERROR_CLASS(AggregateError),
+    IMPLEMENT_ERROR_CLASS(EvalError),
+    IMPLEMENT_ERROR_CLASS(RangeError),
+    IMPLEMENT_ERROR_CLASS(ReferenceError),
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    IMPLEMENT_ERROR_CLASS(SuppressedError),
+#endif
+    IMPLEMENT_ERROR_CLASS(SyntaxError),
+    IMPLEMENT_ERROR_CLASS(TypeError),
     IMPLEMENT_ERROR_CLASS(URIError),
     // These Error subclasses are not accessible via the global object:
     IMPLEMENT_ERROR_CLASS(DebuggeeWouldRun),
-    IMPLEMENT_ERROR_CLASS(CompileError), IMPLEMENT_ERROR_CLASS(LinkError),
-    IMPLEMENT_ERROR_CLASS_MAYBE_WASM_TRAP(RuntimeError)};
+    IMPLEMENT_ERROR_CLASS(CompileError),
+    IMPLEMENT_ERROR_CLASS(LinkError),
+    IMPLEMENT_ERROR_CLASS_MAYBE_WASM_TRAP(RuntimeError),
+#ifdef ENABLE_WASM_JSPI
+    IMPLEMENT_ERROR_CLASS(SuspendError),
+#endif
+};
 
 static void exn_finalize(JS::GCContext* gcx, JSObject* obj) {
   if (JSErrorReport* report = obj->as<ErrorObject>().getErrorReport()) {
@@ -293,6 +342,11 @@ static bool Error(JSContext* cx, unsigned argc, Value* vp) {
   MOZ_ASSERT(exnType != JSEXN_AGGREGATEERR,
              "AggregateError has its own constructor function");
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+  MOZ_ASSERT(exnType != JSEXN_SUPPRESSEDERR,
+             "SuppressedError has its own constuctor function");
+#endif
+
   JSProtoKey protoKey =
       JSCLASS_CACHED_PROTO_KEY(&ErrorObject::classes[exnType]);
 
@@ -358,6 +412,60 @@ static bool AggregateError(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+// Explicit Resource Management Proposal
+// SuppressedError ( error, suppressed, message )
+// https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-suppressederror
+static bool SuppressedError(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  mozilla::DebugOnly<JSExnType> exnType =
+      JSExnType(args.callee().as<JSFunction>().getExtendedSlot(0).toInt32());
+
+  MOZ_ASSERT(exnType == JSEXN_SUPPRESSEDERR);
+
+  // Step 1. If NewTarget is undefined, let newTarget be the active function
+  // object; else let newTarget be NewTarget.
+  // Step 2. Let O be ? OrdinaryCreateFromConstructor(newTarget,
+  // "%SuppressedError.prototype%", « [[ErrorData]] »).
+  JS::Rooted<JSObject*> proto(cx);
+
+  if (!GetPrototypeFromBuiltinConstructor(cx, args, JSProto_SuppressedError,
+                                          &proto)) {
+    return false;
+  }
+
+  // Step 3. If message is not undefined, then
+  // Step 3.a. Let messageString be ? ToString(message).
+  // Step 3.b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message",
+  // messageString).
+  JS::Rooted<ErrorObject*> obj(
+      cx, CreateErrorObject(cx, args, 2, JSEXN_SUPPRESSEDERR, proto));
+
+  if (!obj) {
+    return false;
+  }
+
+  // Step 4. Perform CreateNonEnumerableDataPropertyOrThrow(O, "error", error).
+  JS::Rooted<JS::Value> errorVal(cx, args.get(0));
+  if (!NativeDefineDataProperty(cx, obj, cx->names().error, errorVal, 0)) {
+    return false;
+  }
+
+  // Step 5. Perform CreateNonEnumerableDataPropertyOrThrow(O, "suppressed",
+  // suppressed).
+  JS::Rooted<JS::Value> suppressedVal(cx, args.get(1));
+  if (!NativeDefineDataProperty(cx, obj, cx->names().suppressed, suppressedVal,
+                                0)) {
+    return false;
+  }
+
+  // Step 6. Return O.
+  args.rval().setObject(*obj);
+  return true;
+}
+#endif
+
 /* static */
 JSObject* ErrorObject::createProto(JSContext* cx, JSProtoKey key) {
   JSExnType type = ExnTypeFromProtoKey(key);
@@ -397,7 +505,14 @@ JSObject* ErrorObject::createConstructor(JSContext* cx, JSProtoKey key) {
     if (type == JSEXN_AGGREGATEERR) {
       native = AggregateError;
       nargs = 2;
-    } else {
+    }
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+    else if (type == JSEXN_SUPPRESSEDERR) {
+      native = SuppressedError;
+      nargs = 3;
+    }
+#endif
+    else {
       native = Error;
       nargs = 1;
     }
@@ -649,6 +764,30 @@ static bool FindErrorInstanceOrPrototype(JSContext* cx, HandleObject obj,
 
 static MOZ_ALWAYS_INLINE bool IsObject(HandleValue v) { return v.isObject(); }
 
+// This is a helper method for telemetry to provide feedback for
+// proposal-error-stack-accessor and can be removed (Bug 1943623).
+// It is based upon the implementation of exn_isError.
+static bool HasErrorDataSlot(JSContext* cx, HandleObject obj) {
+  JSObject* unwrappedObject = CheckedUnwrapStatic(obj);
+  if (!unwrappedObject) {
+    return false;
+  }
+
+  if (JS_IsDeadWrapper(unwrappedObject)) {
+    return false;
+  }
+
+  if (unwrappedObject->is<ErrorObject>()) {
+    return true;
+  }
+  if (unwrappedObject->getClass()->isDOMClass()) {
+    return cx->runtime()->DOMcallbacks->instanceClassIsError(
+        unwrappedObject->getClass());
+  }
+
+  return false;
+}
+
 /* static */
 bool js::ErrorObject::getStack(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
@@ -659,6 +798,14 @@ bool js::ErrorObject::getStack(JSContext* cx, unsigned argc, Value* vp) {
 /* static */
 bool js::ErrorObject::getStack_impl(JSContext* cx, const CallArgs& args) {
   RootedObject thisObj(cx, &args.thisv().toObject());
+
+  // This telemetry to provide feedback for proposal-error-stack-accessor and
+  // can later be removed (Bug 1943623).
+  cx->runtime()->setUseCounter(cx->global(), JSUseCounter::ERRORSTACK_GETTER);
+  if (!HasErrorDataSlot(cx, thisObj)) {
+    cx->runtime()->setUseCounter(cx->global(),
+                                 JSUseCounter::ERRORSTACK_GETTER_NO_ERRORDATA);
+  }
 
   RootedObject obj(cx);
   if (!FindErrorInstanceOrPrototype(cx, thisObj, &obj)) {
@@ -719,6 +866,17 @@ bool js::ErrorObject::setStack_impl(JSContext* cx, const CallArgs& args) {
   }
   RootedValue val(cx, args[0]);
 
+  // This telemetry to provide feedback for proposal-error-stack-accessor and
+  // can later be removed (Bug 1943623).
+  cx->runtime()->setUseCounter(cx->global(), JSUseCounter::ERRORSTACK_SETTER);
+  if (!val.isString()) {
+    cx->runtime()->setUseCounter(cx->global(),
+                                 JSUseCounter::ERRORSTACK_SETTER_NONSTRING);
+  }
+  if (!HasErrorDataSlot(cx, thisObj)) {
+    cx->runtime()->setUseCounter(cx->global(),
+                                 JSUseCounter::ERRORSTACK_SETTER_NO_ERRORDATA);
+  }
   return DefineDataProperty(cx, thisObj, cx->names().stack, val);
 }
 
@@ -729,6 +887,14 @@ void js::ErrorObject::setFromWasmTrap() {
 }
 
 JSString* js::ErrorToSource(JSContext* cx, HandleObject obj) {
+  AutoCycleDetector detector(cx, obj);
+  if (!detector.init()) {
+    return nullptr;
+  }
+  if (detector.foundCycle()) {
+    return NewStringCopyZ<CanGC>(cx, "{}");
+  }
+
   RootedValue nameVal(cx);
   RootedString name(cx);
   if (!GetProperty(cx, obj, obj, cx->names().name, &nameVal) ||
@@ -750,6 +916,17 @@ JSString* js::ErrorToSource(JSContext* cx, HandleObject obj) {
     return nullptr;
   }
 
+  RootedValue errorsVal(cx);
+  RootedString errors(cx);
+  bool isAggregateError = obj->is<ErrorObject>() &&
+                          obj->as<ErrorObject>().type() == JSEXN_AGGREGATEERR;
+  if (isAggregateError) {
+    if (!GetProperty(cx, obj, obj, cx->names().errors, &errorsVal) ||
+        !(errors = ValueToSource(cx, errorsVal))) {
+      return nullptr;
+    }
+  }
+
   RootedValue linenoVal(cx);
   uint32_t lineno;
   if (!GetProperty(cx, obj, obj, cx->names().lineNumber, &linenoVal) ||
@@ -760,6 +937,12 @@ JSString* js::ErrorToSource(JSContext* cx, HandleObject obj) {
   JSStringBuilder sb(cx);
   if (!sb.append("(new ") || !sb.append(name) || !sb.append("(")) {
     return nullptr;
+  }
+
+  if (isAggregateError) {
+    if (!sb.append(errors) || !sb.append(", ")) {
+      return nullptr;
+    }
   }
 
   if (!sb.append(message)) {
@@ -814,5 +997,135 @@ static bool exn_toSource(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   args.rval().setString(str);
+  return true;
+}
+
+/**
+ * Error.isError Proposal
+ * Error.isError ( arg )
+ * https://tc39.es/proposal-is-error/#sec-error.iserror
+ * IsError ( argument )
+ * https://tc39.es/proposal-is-error/#sec-iserror
+ */
+static bool exn_isError(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+
+  // Error.isError ( arg )
+  // Step 1. Return IsError(arg).
+
+  // IsError ( argument )
+  // Step 1. If argument is not an Object, return false.
+  if (!args.get(0).isObject()) {
+    args.rval().setBoolean(false);
+    return true;
+  }
+
+  JSObject* unwrappedObject = CheckedUnwrapStatic(&args.get(0).toObject());
+  if (!unwrappedObject) {
+    JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                             JSMSG_OBJECT_ACCESS_DENIED);
+    return false;
+  }
+
+  if (JS_IsDeadWrapper(unwrappedObject)) {
+    JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DEAD_OBJECT);
+    return false;
+  }
+
+  // Step 2. If argument has an [[ErrorData]] internal slot, return true.
+  if (unwrappedObject->is<ErrorObject>()) {
+    args.rval().setBoolean(true);
+    return true;
+  }
+  if (unwrappedObject->getClass()->isDOMClass()) {
+    args.rval().setBoolean(cx->runtime()->DOMcallbacks->instanceClassIsError(
+        unwrappedObject->getClass()));
+    return true;
+  }
+
+  // Step 3. Return false
+  args.rval().setBoolean(false);
+  return true;
+}
+
+// The below is the "documentation" from https://v8.dev/docs/stack-trace-api
+//
+//  ## Stack trace collection for custom exceptions
+//
+//  The stack trace mechanism used for built-in errors is implemented using a
+//  general stack trace collection API that is also available to user scripts.
+//  The function
+//
+//   Error.captureStackTrace(error, constructorOpt)
+//
+//  adds a stack property to the given error object that yields the stack trace
+//  at the time captureStackTrace was called. Stack traces collected through
+//  Error.captureStackTrace are immediately collected, formatted, and attached
+//  to the given error object.
+//
+//  The optional constructorOpt parameter allows you to pass in a function
+//  value. When collecting the stack trace all frames above the topmost call to
+//  this function, including that call, are left out of the stack trace. This
+//  can be useful to hide implementation details that won’t be useful to the
+//  user. The usual way of defining a custom error that captures a stack trace
+//  would be:
+//
+//   function MyError() {
+//     Error.captureStackTrace(this, MyError);
+//     // Any other initialization goes here.
+//   }
+//
+//  Passing in MyError as a second argument means that the constructor call to
+//  MyError won’t show up in the stack trace.
+
+static bool exn_captureStackTrace(JSContext* cx, unsigned argc, Value* vp) {
+  CallArgs args = CallArgsFromVp(argc, vp);
+  const char* callerName = "Error.captureStackTrace";
+
+  if (!args.requireAtLeast(cx, callerName, 1)) {
+    return false;
+  }
+
+  Rooted<JSObject*> obj(cx,
+                        RequireObjectArg(cx, "`target`", callerName, args[0]));
+  if (!obj) {
+    return false;
+  }
+
+  Rooted<JSObject*> caller(cx, nullptr);
+  if (args.length() > 1 && args[1].isObject() &&
+      args[1].toObject().isCallable()) {
+    caller = CheckedUnwrapStatic(&args[1].toObject());
+    if (!caller) {
+      ReportAccessDenied(cx);
+      return false;
+    }
+  }
+
+  RootedObject stack(cx);
+  if (!CaptureCurrentStack(
+          cx, &stack, JS::StackCapture(JS::MaxFrames(MAX_REPORTED_STACK_DEPTH)),
+          caller)) {
+    return false;
+  }
+
+  RootedString stackString(cx);
+
+  // Do frame filtering based on the current realm, to filter out any
+  // chrome frames which could exist on the stack.
+  JSPrincipals* principals = cx->realm()->principals();
+  if (!BuildStackString(cx, principals, stack, &stackString)) {
+    return false;
+  }
+
+  // V8 installs a non-enumerable, configurable getter-setter on the object.
+  // JSC installs a non-enumerable, configurable, writable value on the
+  // object. We are following JSC here, not V8.
+  RootedValue string(cx, StringValue(stackString));
+  if (!DefineDataProperty(cx, obj, cx->names().stack, string, 0)) {
+    return false;
+  }
+
+  args.rval().setUndefined();
   return true;
 }

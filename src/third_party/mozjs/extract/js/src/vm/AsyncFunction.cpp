@@ -70,10 +70,15 @@ static const ClassSpec AsyncFunctionClassSpec = {
     nullptr,
     nullptr,
     AsyncFunctionClassFinish,
-    ClassSpec::DontDefineConstructor};
+    ClassSpec::DontDefineConstructor,
+};
 
-const JSClass js::AsyncFunctionClass = {"AsyncFunction", 0, JS_NULL_CLASS_OPS,
-                                        &AsyncFunctionClassSpec};
+const JSClass js::AsyncFunctionClass = {
+    "AsyncFunction",
+    0,
+    JS_NULL_CLASS_OPS,
+    &AsyncFunctionClassSpec,
+};
 
 enum class ResumeKind { Normal, Throw };
 

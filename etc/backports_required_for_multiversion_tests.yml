@@ -895,6 +895,8 @@ last-continuous:
     ticket: SERVER-115594
   - test_file: jstests/change_streams/filter_excludes_resume_point.js
     ticket: SERVER-112849
+  - test_file: jstests/sharding/query/javascript_heap_limit.js
+    ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
   suites: null
@@ -1854,6 +1856,8 @@ last-lts:
     ticket: SERVER-115594
   - test_file: jstests/change_streams/filter_excludes_resume_point.js
     ticket: SERVER-112849
+  - test_file: jstests/sharding/query/javascript_heap_limit.js
+    ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
   suites: null

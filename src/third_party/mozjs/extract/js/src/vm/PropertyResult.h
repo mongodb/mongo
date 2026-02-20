@@ -21,6 +21,11 @@ class PropertyResult {
     DenseElement,
     TypedArrayElement,
   };
+  enum class IgnoreProtoChain : uint8_t {
+    No,
+    RecursiveResolve,
+    TypedArrayOutOfRange,
+  };
   union {
     // Set if kind is NativeProperty.
     PropertyInfo propInfo_;
@@ -30,7 +35,7 @@ class PropertyResult {
     size_t typedArrayIndex_;
   };
   Kind kind_ = Kind::NotFound;
-  bool ignoreProtoChain_ = false;
+  IgnoreProtoChain ignoreProtoChain_ = IgnoreProtoChain::No;
 
  public:
   // Note: because PropertyInfo does not have a default constructor, we can't
@@ -44,7 +49,11 @@ class PropertyResult {
   bool isNotFound() const { return kind_ == Kind::NotFound; }
   bool shouldIgnoreProtoChain() const {
     MOZ_ASSERT(isNotFound());
-    return ignoreProtoChain_;
+    return ignoreProtoChain_ != IgnoreProtoChain::No;
+  }
+  bool isTypedArrayOutOfRange() const {
+    MOZ_ASSERT(isNotFound());
+    return ignoreProtoChain_ == IgnoreProtoChain::TypedArrayOutOfRange;
   }
 
   bool isFound() const { return kind_ != Kind::NotFound; }
@@ -75,7 +84,6 @@ class PropertyResult {
     propInfo_ = prop;
   }
 
-  void setWasmGcProperty() { kind_ = Kind::NonNativeProperty; }
   void setProxyProperty() { kind_ = Kind::NonNativeProperty; }
 
   void setDenseElement(uint32_t index) {
@@ -90,11 +98,11 @@ class PropertyResult {
 
   void setTypedArrayOutOfRange() {
     kind_ = Kind::NotFound;
-    ignoreProtoChain_ = true;
+    ignoreProtoChain_ = IgnoreProtoChain::TypedArrayOutOfRange;
   }
   void setRecursiveResolve() {
     kind_ = Kind::NotFound;
-    ignoreProtoChain_ = true;
+    ignoreProtoChain_ = IgnoreProtoChain::RecursiveResolve;
   }
 };
 

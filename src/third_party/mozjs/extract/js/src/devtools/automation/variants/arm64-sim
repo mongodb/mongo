@@ -2,9 +2,9 @@
     "configure-args": "--enable-simulator=arm64 --enable-rust-simd",
     "optimize": true,
     "debug": true,
-    "env": {
-        "JSTESTS_EXTRA_ARGS": "--exclude-file={DIR}/arm64-jstests-slow.txt",
-        "JITTEST_EXTRA_ARGS": "--ignore-timeouts={DIR}/arm64-jittests-timeouts.txt --jitflags=none --args=--baseline-eager -x ion/ -x asm.js/"
+    "extra-args": {
+        "jstests": ["--exclude-file={DIR}/arm64-jstests-slow.txt"],
+        "jit-test": ["--ignore-timeouts={DIR}/arm64-jittests-timeouts.txt", "--jitflags=none", "--args=--baseline-eager", "-x", "ion/", "-x", "asm.js/"]
     },
     "bits": 64
 }

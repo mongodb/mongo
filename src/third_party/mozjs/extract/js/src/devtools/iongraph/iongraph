@@ -71,10 +71,11 @@ class Graph(GraphWidget):
         print(self.type, '{', file=f)
 
         # Use the pass name as the graph title (at the top).
+        legend = '<font color="blue">movable</font>, <u>guard</u>, <font color="red">in worklist</font>, <font color="gray50">recovered on bailout</font>'
         print('labelloc = t;', file=f)
         print('labelfontsize = 30;', file=f)
-        print('label = "%s -  %s";' % (self.func['name'], self.name), file=f)
-        
+        print('label = <<b>%s - %s</b><br/>%s<br/>&nbsp;>;' % (self.func['name'], self.name, legend), file=f)
+
         # Output graph properties.
         for p in self.props:
             print('  ' + str(p) + '=' + str(self.props[p]), file=f)
@@ -148,7 +149,8 @@ def getInstructionRow(inst):
     instLabel = '<td align="right" port="i%s">%s</td>' % (instId, instId)
 
     # Middle column: instruction name.
-    instName = html.escape(inst['opcode'])
+    instName = inst['opcode'].replace('->', '→').replace('<-', '←')
+    instName = html.escape(instName)
     if 'attributes' in inst:
         if 'RecoveredOnBailout' in inst['attributes']:
             instName = '<font color="gray50">%s</font>' % instName
@@ -163,20 +165,29 @@ def getInstructionRow(inst):
     # Right column: instruction MIRType.
     instType = ''
     if 'type' in inst and inst['type'] != "None":
-        instType = '<td align="left">%s</td>' % html.escape(inst['type'])
+        instType = '<td align="right">%s</td>' % html.escape(inst['type'])
 
     return '<tr>%s%s%s</tr>' % (instLabel, instName, instType)
 
 # block obj -> HTML-formatted string
 def getBlockLabel(b):
-    s =  '<<table border="0" cellborder="0" cellpadding="1">'
+    s = '<<table border="0" cellborder="0" cellpadding="1">'
 
     if 'blockUseCount' in b:
-        blockUseCount = "(Count: %s)" % str(b['blockUseCount'])
+        blockUseCount = " (Count: %s)" % str(b['blockUseCount'])
     else:
         blockUseCount = ""
 
-    blockTitle = '<font color="white">Block %s %s</font>' % (str(b['number']), blockUseCount)
+    blockAttr = ""
+    if 'attributes' in b:
+        if 'backedge' in b['attributes']:
+            blockAttr = ' <font color="lightpink">(backedge)</font>'
+        if 'loopheader' in b['attributes']:
+            blockAttr = ' <font color="lightgreen">(loop header)</font>'
+        if 'splitedge' in b['attributes']:
+            blockAttr = " (split edge)"
+
+    blockTitle = '<font color="white">Block %s%s%s</font>' % (str(b['number']), blockUseCount, blockAttr)
     blockTitle = '<td align="center" bgcolor="black" colspan="3">%s</td>' % blockTitle
     s += '<tr>%s</tr>' % blockTitle
     
@@ -217,9 +228,9 @@ def buildGraphForIR(name, func, ir, mir):
         node.addprops({'shape':'box', 'label':getBlockLabel(bactive)})
         
         if 'backedge' in b['attributes']:
-            node.addprops({'color':'red'})
+            node.addprops({'color':'crimson'})
         if 'loopheader' in b['attributes']:
-            node.addprops({'color':'green'})
+            node.addprops({'color':'limegreen'})
         if 'splitedge' in b['attributes']:
             node.addprops({'style':'dashed'})
 
@@ -346,6 +357,10 @@ def parsenums(numstr):
     return [int(x) for x in numstr.split(',')]
 
 
+def parsenames(namestr):
+    return namestr and namestr.split(',')
+
+
 def validate(args):
     if not shutil.which('dot'):
         sys.stderr.write("ERROR: graphviz (dot) is not installed\n")
@@ -372,12 +387,15 @@ def gen(args):
     sys.stderr.write("generating graphviz...\n")
 
     funcnums = parsenums(args.funcnum)
+    funcnames = parsenames(args.funcname)
     passnums = parsenums(args.passnum)
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(0, len(ion['functions'])):
             func = ion['functions'][i]
 
             if funcnums and i not in funcnums:
+                continue
+            if funcnames and func['name'] not in funcnames:
                 continue
 
             gtl = buildOnlyFinalPass(func) if args.final else buildGraphs(func)
@@ -446,10 +464,29 @@ def js_and_gen(args):
     gen(args)
 
 
+def jittest_and_gen(args):
+    validate(args)
+
+    testargs = args.remaining[1:]
+    testenv = os.environ.copy()
+    flags = (testenv['IONFLAGS'] if 'IONFLAGS' in testenv else 'logs').split(',')
+    if 'logs' not in flags:
+        flags.append('logs')
+    testenv['IONFLAGS'] = ','.join(flags)
+    jittest_path = os.path.join("js", "src", "jit-test", "jit_test.py")
+    cmd = " ".join([sys.executable, jittest_path, shutil.which("js"), "--one", *testargs])
+    print("Command:", cmd)
+    subprocess.run(cmd, env=testenv, shell=True, check=True)
+
+    args.input = '/tmp/ion.json'
+    gen(args)
+
+
 def add_main_arguments(parser):
     parser.add_argument('-o', '--outdir', help='The directory in which to store the output file(s).',
                                           default='.')
     parser.add_argument('-f', '--funcnum', help='Only operate on the specified function(s), by index. Multiple functions can be separated by commas, e.g. `1,5,234`.')
+    parser.add_argument('-n', '--funcname', help='Only operate on the specified function(s), by name. Multiple functions can be separated by commas, e.g. `foo,bar,baz`.')
     parser.add_argument('-p', '--passnum', help='Only operate on the specified pass(es), by index. Multiple passes can be separated by commas, e.g. `1,5,234`.')
     parser.add_argument('--format', help='The output file format (pdf by default). `pdf` will merge all the graphs for each function into a single PDF; all other formats will produce a single file per graph.',
                                     choices=['gv', 'pdf', 'pdfs', 'png', 'svg'], default='pdf')
@@ -467,7 +504,10 @@ def main():
     js = subparsers.add_parser('js', formatter_class=argparse.RawDescriptionHelpFormatter,
                                      help='Subcommand: Run js and iongraph together in one call.',
                                      description='Run js and iongraph together in one call. Arguments before the -- separator are for iongraph, while arguments after the -- will be passed to js.\n\nexample:\n  iongraph js --funcnum 1 -- -m mymodule.mjs')
-    
+    jittest = subparsers.add_parser('jit-test', formatter_class=argparse.RawDescriptionHelpFormatter,
+                                                help='Subcommand: Run jit-test and iongraph together in one call.',
+                                                description='Run jit-test and iongraph together in one call. Arguments before the -- separator are for iongraph, while arguments after the -- will be passed to jit-test.\n\nexample:\n  iongraph jit-test --funcnum 1 -- category/test.js')
+
     add_main_arguments(parser)
     parser.add_argument('input', help='The JSON log file generated by IonMonkey. (Default: /tmp/ion.json)',
                                  nargs='?', default='/tmp/ion.json')
@@ -477,6 +517,10 @@ def main():
     add_main_arguments(js)
     js.add_argument('remaining', nargs=argparse.REMAINDER)
     js.set_defaults(func=js_and_gen)
+
+    add_main_arguments(jittest)
+    jittest.add_argument('remaining', nargs=argparse.REMAINDER)
+    jittest.set_defaults(func=jittest_and_gen)
 
     args = parser.parse_args()
     args.func(args)

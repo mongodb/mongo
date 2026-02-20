@@ -17,6 +17,7 @@
 #include "jit/JSONSpewer.h"
 #include "js/Printer.h"
 #include "js/TypeDecls.h"
+#include "wasm/WasmTypeDecls.h"
 
 enum JSValueType : uint8_t;
 
@@ -71,6 +72,12 @@ namespace jit {
   _(MarkLoadsUsedAsPropertyKeys)           \
   /* Output a list of MIR expressions */   \
   _(MIRExpressions)                        \
+  /* Summary info about loop unrolling */  \
+  _(Unroll)                                \
+  /* Detailed info about loop unrolling */ \
+  _(UnrollDetails)                         \
+  /* Information about stub folding */     \
+  _(StubFolding)                           \
                                            \
   /* BASELINE COMPILER SPEW */             \
                                            \
@@ -132,6 +139,8 @@ class MIRGenerator;
 class MIRGraph;
 class TempAllocator;
 
+const char* ValTypeToString(JSValueType type);
+
 // The JitSpewer is only available on debug builds.
 // None of the global functions have effect on non-debug builds.
 #ifdef JS_JITSPEW
@@ -144,7 +153,8 @@ class GraphSpewer {
   JSONSpewer jsonSpewer_;
 
  public:
-  explicit GraphSpewer(TempAllocator* alloc);
+  explicit GraphSpewer(TempAllocator* alloc,
+                       const wasm::CodeMetadata* wasmCodeMeta = nullptr);
 
   bool isSpewing() const { return graph_; }
   void init(MIRGraph* graph, JSScript* function);
@@ -188,7 +198,23 @@ void JitSpewCont(JitSpewChannel channel, const char* fmt, ...)
     MOZ_FORMAT_PRINTF(2, 3);
 void JitSpewFin(JitSpewChannel channel);
 void JitSpewHeader(JitSpewChannel channel);
-bool JitSpewEnabled(JitSpewChannel channel);
+
+}  // namespace jit
+
+namespace jitspew::detail {
+extern bool LoggingChecked;
+extern uint64_t LoggingBits;
+extern mozilla::Atomic<uint32_t, mozilla::Relaxed> filteredOutCompilations;
+}  // namespace jitspew::detail
+
+namespace jit {
+
+static inline bool JitSpewEnabled(JitSpewChannel channel) {
+  MOZ_ASSERT(jitspew::detail::LoggingChecked);
+  return (jitspew::detail::LoggingBits & (uint64_t(1) << uint32_t(channel))) &&
+         !jitspew::detail::filteredOutCompilations;
+}
+
 void JitSpewVA(JitSpewChannel channel, const char* fmt, va_list ap)
     MOZ_FORMAT_PRINTF(2, 0);
 void JitSpewStartVA(JitSpewChannel channel, const char* fmt, va_list ap)
@@ -202,8 +228,6 @@ void DisableChannel(JitSpewChannel channel);
 void EnableIonDebugSyncLogging();
 void EnableIonDebugAsyncLogging();
 
-const char* ValTypeToString(JSValueType type);
-
 #  define JitSpewIfEnabled(channel, fmt, ...) \
     do {                                      \
       if (JitSpewEnabled(channel)) {          \
@@ -215,7 +239,8 @@ const char* ValTypeToString(JSValueType type);
 
 class GraphSpewer {
  public:
-  explicit GraphSpewer(TempAllocator* alloc) {}
+  explicit GraphSpewer(TempAllocator* alloc,
+                       const wasm::CodeMetadata* wasmCodeMeta = nullptr) {}
 
   bool isSpewing() { return false; }
   void init(MIRGraph* graph, JSScript* function) {}

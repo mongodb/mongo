@@ -132,8 +132,7 @@ void TimeStamp::Startup() {
   // sake of ToSecondsSigDigits()
   for (sResolutionSigDigs = 1; !(sResolutionSigDigs == sResolution ||
                                  10 * sResolutionSigDigs > sResolution);
-       sResolutionSigDigs *= 10)
-    ;
+       sResolutionSigDigs *= 10);
 
   gInitialized = true;
 }

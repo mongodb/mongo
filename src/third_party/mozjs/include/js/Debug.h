@@ -11,7 +11,9 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/BaseProfilerUtils.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Vector.h"
 
 #include <utility>
 
@@ -28,6 +30,136 @@ class Debugger;
 /* Defined in vm/Debugger.cpp. */
 extern JS_PUBLIC_API bool JS_DefineDebuggerObject(JSContext* cx,
                                                   JS::HandleObject obj);
+
+// If the JS execution tracer is running, this will generate a
+// ENTRY_KIND_LABEL_ENTER entry with the specified label.
+// The consumer of the trace can then, for instance, correlate all code running
+// after this entry and before the corresponding ENTRY_KIND_LABEL_LEAVE with the
+// provided label.
+// If the tracer is not running, this does nothing.
+extern JS_PUBLIC_API void JS_TracerEnterLabelLatin1(JSContext* cx,
+                                                    const char* label);
+extern JS_PUBLIC_API void JS_TracerEnterLabelTwoByte(JSContext* cx,
+                                                     const char16_t* label);
+
+extern JS_PUBLIC_API bool JS_TracerIsTracing(JSContext* cx);
+
+// If the JS execution tracer is running, this will generate a
+// ENTRY_KIND_LABEL_LEAVE entry with the specified label.
+// It is up to the consumer to decide what to do with a ENTRY_KIND_LABEL_LEAVE
+// entry is encountered without a corresponding ENTRY_KIND_LABEL_ENTER.
+// If the tracer is not running, this does nothing.
+extern JS_PUBLIC_API void JS_TracerLeaveLabelLatin1(JSContext* cx,
+                                                    const char* label);
+extern JS_PUBLIC_API void JS_TracerLeaveLabelTwoByte(JSContext* cx,
+                                                     const char16_t* label);
+
+#ifdef MOZ_EXECUTION_TRACING
+
+// This will begin execution tracing for the JSContext, i.e., this will begin
+// recording every entrance into / exit from a function for the given context.
+// The trace can be read via JS_TracerSnapshotTrace, and populates the
+// ExecutionTrace struct defined below.
+//
+// This throws if the code coverage is active for any realm in the context.
+extern JS_PUBLIC_API bool JS_TracerBeginTracing(JSContext* cx);
+
+// This ends execution tracing for the JSContext, discards the tracing
+// buffers, and clears some caches used for tracing. JS_TracerSnapshotTrace
+// should be called *before* JS_TracerEndTracing if you want to read the trace
+// data for this JSContext.
+extern JS_PUBLIC_API bool JS_TracerEndTracing(JSContext* cx);
+
+namespace JS {
+
+// This is populated by JS_TracerSnapshotTrace and just represent a minimal
+// structure for natively representing an execution trace across a range of
+// JSContexts (see below). The core of the trace is an array of events, each of
+// which is a tagged union with data corresponding to that event. Events can
+// also point into various tables, and store all of their string data in a
+// contiguous UTF-8 stringBuffer (each string is null-terminated within the
+// buffer.)
+struct ExecutionTrace {
+  enum class EventKind : uint8_t {
+    FunctionEnter = 0,
+    FunctionLeave = 1,
+    LabelEnter = 2,
+    LabelLeave = 3,
+
+    // NOTE: the `Error` event has no TracedEvent payload, and will always
+    // represent the end of the trace when encountered.
+    Error = 4,
+  };
+
+  enum class ImplementationType : uint8_t {
+    Interpreter = 0,
+    Baseline = 1,
+    Ion = 2,
+    Wasm = 3,
+  };
+
+  struct TracedEvent {
+    EventKind kind;
+    union {
+      // For FunctionEnter / FunctionLeave
+      struct {
+        ImplementationType implementation;
+
+        // 1-origin line number of the function
+        uint32_t lineNumber;
+
+        // 1-origin column of the function
+        uint32_t column;
+
+        // Keys into the thread's scriptUrls HashMap. This key can be missing
+        // from the HashMap, although ideally that situation is rare (it is
+        // more likely in long running traces with *many* unique functions
+        // and/or scripts)
+        uint32_t scriptId;
+
+        // ID to the realm that the frame was in. It's used for finding which
+        // frame comes from which window/page.
+        uint64_t realmID;
+
+        // Keys into the thread's atoms HashMap. This key can be missing from
+        // the HashMap as well (see comment above scriptId)
+        uint32_t functionNameId;
+      } functionEvent;
+
+      // For LabelEnter / LabelLeave
+      struct {
+        size_t label;  // Indexes directly into the trace's stringBuffer
+      } labelEvent;
+    };
+    // Milliseconds since process creation
+    double time;
+  };
+
+  struct TracedJSContext {
+    mozilla::baseprofiler::BaseProfilerThreadId id;
+
+    // Maps ids to indices into the trace's stringBuffer
+    mozilla::HashMap<uint32_t, size_t> scriptUrls;
+
+    // Similar to scriptUrls
+    mozilla::HashMap<uint32_t, size_t> atoms;
+
+    mozilla::Vector<TracedEvent> events;
+  };
+
+  mozilla::Vector<char> stringBuffer;
+
+  // This will be populated with an entry for each context which had tracing
+  // enabled via JS_TracerBeginTracing.
+  mozilla::Vector<TracedJSContext> contexts;
+};
+}  // namespace JS
+
+// Captures the trace for all JSContexts in the process which are currently
+// tracing.
+extern JS_PUBLIC_API bool JS_TracerSnapshotTrace(JS::ExecutionTrace& trace);
+
+#endif /* MOZ_EXECUTION_TRACING */
 
 namespace JS {
 namespace dbg {
@@ -301,52 +433,6 @@ JS_PUBLIC_API bool IsDebugger(JSObject& obj);
 // |dbgObj| to |vector|. Returns true on success, false on failure.
 JS_PUBLIC_API bool GetDebuggeeGlobals(JSContext* cx, JSObject& dbgObj,
                                       MutableHandleObjectVector vector);
-
-// Hooks for reporting where JavaScript execution began.
-//
-// Our performance tools would like to be able to label blocks of JavaScript
-// execution with the function name and source location where execution began:
-// the event handler, the callback, etc.
-//
-// Construct an instance of this class on the stack, providing a JSContext
-// belonging to the runtime in which execution will occur. Each time we enter
-// JavaScript --- specifically, each time we push a JavaScript stack frame that
-// has no older JS frames younger than this AutoEntryMonitor --- we will
-// call the appropriate |Entry| member function to indicate where we've begun
-// execution.
-
-class MOZ_STACK_CLASS JS_PUBLIC_API AutoEntryMonitor {
-  JSContext* cx_;
-  AutoEntryMonitor* savedMonitor_;
-
- public:
-  explicit AutoEntryMonitor(JSContext* cx);
-  ~AutoEntryMonitor();
-
-  // SpiderMonkey reports the JavaScript entry points occuring within this
-  // AutoEntryMonitor's scope to the following member functions, which the
-  // embedding is expected to override.
-  //
-  // It is important to note that |asyncCause| is owned by the caller and its
-  // lifetime must outlive the lifetime of the AutoEntryMonitor object. It is
-  // strongly encouraged that |asyncCause| be a string constant or similar
-  // statically allocated string.
-
-  // We have begun executing |function|. Note that |function| may not be the
-  // actual closure we are running, but only the canonical function object to
-  // which the script refers.
-  virtual void Entry(JSContext* cx, JSFunction* function,
-                     HandleValue asyncStack, const char* asyncCause) = 0;
-
-  // Execution has begun at the entry point of |script|, which is not a
-  // function body. (This is probably being executed by 'eval' or some
-  // JSAPI equivalent.)
-  virtual void Entry(JSContext* cx, JSScript* script, HandleValue asyncStack,
-                     const char* asyncCause) = 0;
-
-  // Execution of the function or script has ended.
-  virtual void Exit(JSContext* cx) {}
-};
 
 // Returns true if there's any debugger attached to the given context where
 // the debugger's "shouldAvoidSideEffects" property is true.

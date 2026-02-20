@@ -79,7 +79,7 @@ class RegExpFlags {
   using Flag = uint8_t;
 
  private:
-  Flag flags_;
+  Flag flags_ = 0;
 
  public:
   RegExpFlags() = default;
@@ -159,7 +159,7 @@ inline RegExpFlags& operator^=(RegExpFlags& flags, RegExpFlags::Flag flag) {
 inline RegExpFlags operator&(const RegExpFlags& lhs, const RegExpFlags& rhs) {
   RegExpFlags result = lhs;
   result &= rhs;
-  return lhs;
+  return result;
 }
 
 inline RegExpFlags operator|(const RegExpFlags& lhs, const RegExpFlags& rhs) {

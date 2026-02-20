@@ -16,8 +16,6 @@
 #  include "jit/arm/Architecture-arm.h"
 #elif defined(JS_CODEGEN_ARM64)
 #  include "jit/arm64/Architecture-arm64.h"
-#elif defined(JS_CODEGEN_MIPS32)
-#  include "jit/mips32/Architecture-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/Architecture-mips64.h"
 #elif defined(JS_CODEGEN_LOONG64)
@@ -195,7 +193,9 @@ struct Register64 {
   constexpr bool operator==(Register64 other) const { return reg == other.reg; }
   constexpr bool operator!=(Register64 other) const { return reg != other.reg; }
   Register scratchReg() { return reg; }
-  static Register64 Invalid() { return Register64(Register::Invalid()); }
+  static constexpr Register64 Invalid() {
+    return Register64(Register::Invalid());
+  }
 #else
   constexpr Register64(Register h, Register l) : high(h), low(l) {}
   constexpr bool operator==(Register64 other) const {
@@ -206,7 +206,7 @@ struct Register64 {
   }
   Register scratchReg() { return high; }
   Register secondScratchReg() { return low; }
-  static Register64 Invalid() {
+  static constexpr Register64 Invalid() {
     return Register64(Register::Invalid(), Register::Invalid());
   }
 #endif
@@ -214,10 +214,9 @@ struct Register64 {
 
 class RegisterDump {
  public:
-  typedef mozilla::Array<Registers::RegisterContent, Registers::Total> GPRArray;
-  typedef mozilla::Array<FloatRegisters::RegisterContent,
-                         std::max<uint32_t>(FloatRegisters::TotalPhys, 1)>
-      FPUArray;
+  using GPRArray = mozilla::Array<Registers::RegisterContent, Registers::Total>;
+  using FPUArray = mozilla::Array<FloatRegisters::RegisterContent,
+                                  std::max<uint32_t>(FloatRegisters::TotalPhys, 1)>;
 
  protected:  // Silence Clang warning.
   GPRArray regs_;

@@ -259,7 +259,7 @@ class LIRGeneratorShared {
 
   // Returns an int64 allocation for an Int64-typed instruction.
   inline LInt64Allocation useInt64(MDefinition* mir, LUse::Policy policy,
-                                   bool useAtStart);
+                                   bool useAtStart = false);
   inline LInt64Allocation useInt64(MDefinition* mir, bool useAtStart = false);
   inline LInt64Allocation useInt64AtStart(MDefinition* mir);
   inline LInt64Allocation useInt64OrConstant(MDefinition* mir,
@@ -276,6 +276,14 @@ class LIRGeneratorShared {
   inline LInt64Allocation useInt64RegisterAtStart(MDefinition* mir);
   inline LInt64Allocation useInt64RegisterOrConstantAtStart(MDefinition* mir);
   inline LInt64Allocation useInt64OrConstantAtStart(MDefinition* mir);
+
+#ifdef JS_NUNBOX32
+  // Returns a non-int64 allocation for an Int64-typed instruction.
+  inline LUse useLowWord(MDefinition* mir, LUse policy);
+  inline LUse useLowWordRegister(MDefinition* mir);
+  inline LUse useLowWordRegisterAtStart(MDefinition* mir);
+  inline LUse useLowWordFixed(MDefinition* mir, Register reg);
+#endif
 
   // Rather than defining a new virtual register, sets |ins| to have the same
   // virtual register as |as|.

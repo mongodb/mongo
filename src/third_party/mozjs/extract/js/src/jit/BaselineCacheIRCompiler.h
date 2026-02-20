@@ -99,11 +99,14 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   void updateReturnValue();
 
   enum class NativeCallType { Native, ClassHook };
-  bool emitCallNativeShared(NativeCallType callType, ObjOperandId calleeId,
-                            Int32OperandId argcId, CallFlags flags,
-                            uint32_t argcFixed,
-                            mozilla::Maybe<bool> ignoresReturnValue,
-                            mozilla::Maybe<uint32_t> targetOffset);
+  enum class ClearLocalAllocSite { No, Yes };
+  bool emitCallNativeShared(
+      NativeCallType callType, ObjOperandId calleeId, Int32OperandId argcId,
+      CallFlags flags, uint32_t argcFixed,
+      mozilla::Maybe<bool> ignoresReturnValue,
+      mozilla::Maybe<uint32_t> targetOffset,
+      ClearLocalAllocSite clearLocalAllocSite = ClearLocalAllocSite::No);
+  void loadAllocSiteIntoContext(uint32_t siteOffset);
 
   enum class StringCode { CodeUnit, CodePoint };
   bool emitStringFromCodeResult(Int32OperandId codeId, StringCode stringCode);

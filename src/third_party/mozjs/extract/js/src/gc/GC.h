@@ -31,7 +31,7 @@ class Nursery;
 namespace gc {
 
 class Arena;
-class TenuredChunk;
+class ArenaChunk;
 
 } /* namespace gc */
 
@@ -65,8 +65,8 @@ class TenuredChunk;
   _("smallHeapIncrementalLimit", JSGC_SMALL_HEAP_INCREMENTAL_LIMIT, true)   \
   _("largeHeapIncrementalLimit", JSGC_LARGE_HEAP_INCREMENTAL_LIMIT, true)   \
   _("minEmptyChunkCount", JSGC_MIN_EMPTY_CHUNK_COUNT, true)                 \
-  _("maxEmptyChunkCount", JSGC_MAX_EMPTY_CHUNK_COUNT, true)                 \
   _("compactingEnabled", JSGC_COMPACTING_ENABLED, true)                     \
+  _("nurseryEnabled", JSGC_NURSERY_ENABLED, true)                           \
   _("parallelMarkingEnabled", JSGC_PARALLEL_MARKING_ENABLED, true)          \
   _("parallelMarkingThresholdMB", JSGC_PARALLEL_MARKING_THRESHOLD_MB, true) \
   _("minLastDitchGCPeriod", JSGC_MIN_LAST_DITCH_GC_PERIOD, true)            \
@@ -76,6 +76,7 @@ class TenuredChunk;
     JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_PERCENT, true)                  \
   _("nurseryEagerCollectionTimeoutMS",                                      \
     JSGC_NURSERY_EAGER_COLLECTION_TIMEOUT_MS, true)                         \
+  _("nurseryMaxTimeGoalMS", JSGC_NURSERY_MAX_TIME_GOAL_MS, true)            \
   _("zoneAllocDelayKB", JSGC_ZONE_ALLOC_DELAY_KB, true)                     \
   _("mallocThresholdBase", JSGC_MALLOC_THRESHOLD_BASE, true)                \
   _("urgentThreshold", JSGC_URGENT_THRESHOLD_MB, true)                      \
@@ -87,7 +88,8 @@ class TenuredChunk;
   _("markingThreadCount", JSGC_MARKING_THREAD_COUNT, false)                 \
   _("systemPageSizeKB", JSGC_SYSTEM_PAGE_SIZE_KB, false)                    \
   _("semispaceNurseryEnabled", JSGC_SEMISPACE_NURSERY_ENABLED, true)        \
-  _("generateMissingAllocSites", JSGC_GENERATE_MISSING_ALLOC_SITES, true)
+  _("generateMissingAllocSites", JSGC_GENERATE_MISSING_ALLOC_SITES, true)   \
+  _("highFrequencyMode", JSGC_HIGH_FREQUENCY_MODE, false)
 
 // Get the key and writability give a GC parameter name.
 extern bool GetGCParameterInfo(const char* name, JSGCParamKey* keyOut,
@@ -110,7 +112,7 @@ extern unsigned NotifyGCPreSwap(JSObject* a, JSObject* b);
 
 extern void NotifyGCPostSwap(JSObject* a, JSObject* b, unsigned removedFlags);
 
-using IterateChunkCallback = void (*)(JSRuntime*, void*, gc::TenuredChunk*,
+using IterateChunkCallback = void (*)(JSRuntime*, void*, gc::ArenaChunk*,
                                       const JS::AutoRequireNoGC&);
 using IterateZoneCallback = void (*)(JSRuntime*, void*, JS::Zone*,
                                      const JS::AutoRequireNoGC&);
@@ -167,7 +169,7 @@ void FinishGC(JSContext* cx, JS::GCReason = JS::GCReason::FINISH_GC);
 
 void WaitForBackgroundTasks(JSContext* cx);
 
-enum VerifierType { PreBarrierVerifier };
+enum VerifierType { PreBarrierVerifier, PostBarrierVerifier };
 
 #ifdef JS_GC_ZEAL
 

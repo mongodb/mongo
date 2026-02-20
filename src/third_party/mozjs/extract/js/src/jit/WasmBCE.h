@@ -25,7 +25,7 @@ namespace jit {
 class MIRGenerator;
 class MIRGraph;
 
-bool EliminateBoundsChecks(MIRGenerator* mir, MIRGraph& graph);
+bool EliminateBoundsChecks(const MIRGenerator* mir, MIRGraph& graph);
 
 }  // namespace jit
 }  // namespace js

@@ -169,7 +169,7 @@ class StoreBuffer {
 
   struct WholeCellBuffer {
     UniquePtr<LifoAlloc> storage_;
-    ArenaCellSet* head_ = nullptr;
+    ArenaCellSet* sweepHead_ = nullptr;
     const Cell* last_ = nullptr;
 
     WholeCellBuffer() = default;
@@ -179,9 +179,9 @@ class StoreBuffer {
 
     WholeCellBuffer(WholeCellBuffer&& other)
         : storage_(std::move(other.storage_)),
-          head_(other.head_),
+          sweepHead_(other.sweepHead_),
           last_(other.last_) {
-      other.head_ = nullptr;
+      other.sweepHead_ = nullptr;
       other.last_ = nullptr;
     }
     WholeCellBuffer& operator=(WholeCellBuffer&& other) {
@@ -210,20 +210,9 @@ class StoreBuffer {
       return storage_ ? storage_->sizeOfIncludingThis(mallocSizeOf) : 0;
     }
 
-    bool isEmpty() const {
-      MOZ_ASSERT_IF(!head_, !storage_ || storage_->isEmpty());
-      return !head_;
-    }
+    bool isEmpty() const { return !storage_ || storage_->isEmpty(); }
 
     const Cell** lastBufferedPtr() { return &last_; }
-
-    CellSweepSet releaseCellSweepSet() {
-      CellSweepSet set;
-      std::swap(storage_, set.storage_);
-      std::swap(head_, set.head_);
-      last_ = nullptr;
-      return set;
-    }
 
    private:
     ArenaCellSet* allocateCellSet(Arena* arena);
@@ -393,33 +382,31 @@ class StoreBuffer {
 
     bool operator!=(const SlotsEdge& other) const { return !(*this == other); }
 
-    // True if this SlotsEdge range overlaps with the other SlotsEdge range,
-    // false if they do not overlap.
-    bool overlaps(const SlotsEdge& other) const {
+    // True if this SlotsEdge range is adjacent to or overlaps with the other
+    // SlotsEdge range. The adjacency case will coalesce a series of increasing
+    // or decreasing single index writes 0, 1, 2, ..., N into a SlotsEdge range
+    // of elements [0, N].
+    bool touches(const SlotsEdge& other) const {
       if (objectAndKind_ != other.objectAndKind_) {
         return false;
       }
 
-      // Widen our range by one on each side so that we consider
-      // adjacent-but-not-actually-overlapping ranges as overlapping. This
-      // is particularly useful for coalescing a series of increasing or
-      // decreasing single index writes 0, 1, 2, ..., N into a SlotsEdge
-      // range of elements [0, N].
-      uint32_t end = start_ + count_ + 1;
-      uint32_t start = start_ > 0 ? start_ - 1 : 0;
-      MOZ_ASSERT(start < end);
+      if (other.start_ < start_) {
+        // If the other range starts before this one, then it touches if its
+        // (exclusive) end is at or after this range.
+        return other.start_ + other.count_ >= start_;
+      }
 
-      uint32_t otherEnd = other.start_ + other.count_;
-      MOZ_ASSERT(other.start_ <= otherEnd);
-      return (start <= other.start_ && other.start_ <= end) ||
-             (start <= otherEnd && otherEnd <= end);
+      // Otherwise, the other range touches if it starts before or at
+      // the exclusive end of this range.
+      return other.start_ <= start_ + count_;
     }
 
     // Destructively make this SlotsEdge range the union of the other
     // SlotsEdge range and this one. A precondition is that the ranges must
     // overlap.
     void merge(const SlotsEdge& other) {
-      MOZ_ASSERT(overlaps(other));
+      MOZ_ASSERT(touches(other));
       uint32_t end = std::max(start_ + count_, other.start_ + other.count_);
       start_ = std::min(start_, other.start_);
       count_ = end - start_;
@@ -585,7 +572,7 @@ class StoreBuffer {
 
   void putSlot(NativeObject* obj, int kind, uint32_t start, uint32_t count) {
     SlotsEdge edge(obj, kind, start, count);
-    if (bufferSlot.last_.overlaps(edge)) {
+    if (bufferSlot.last_.touches(edge)) {
       bufferSlot.last_.merge(edge);
     } else {
       put(bufferSlot, edge, JS::GCReason::FULL_SLOT_BUFFER);
@@ -600,6 +587,7 @@ class StoreBuffer {
     unput(bufferWasmAnyRef, WasmAnyRefEdge(vp));
   }
 
+  static inline bool isInWholeCellBuffer(Cell* cell);
   inline void putWholeCell(Cell* cell);
   inline void putWholeCellDontCheckLast(Cell* cell);
   const void* addressOfLastBufferedWholeCell() {
@@ -630,10 +618,6 @@ class StoreBuffer {
   }
   void traceGenericEntries(JSTracer* trc) { bufferGeneric.trace(trc, this); }
 
-  gc::CellSweepSet releaseCellSweepSet() {
-    return bufferWholeCell.releaseCellSweepSet();
-  }
-
   /* For use by our owned buffers and for testing. */
   void setAboutToOverflow(JS::GCReason);
 
@@ -651,10 +635,11 @@ class ArenaCellSet {
   using ArenaCellBits = BitArray<MaxArenaCellIndex>;
 
   // The arena this relates to.
-  Arena* arena;
+  Arena* arena = nullptr;
 
-  // Pointer to next set forming a linked list.
-  ArenaCellSet* next;
+  // Pointer to next set forming a linked list. Used to form the list of cell
+  // sets to sweep.
+  ArenaCellSet* next = nullptr;
 
   // Bit vector for each possible cell start position.
   ArenaCellBits bits;
@@ -662,26 +647,18 @@ class ArenaCellSet {
 #ifdef DEBUG
   // The minor GC number when this was created. This object should not survive
   // past the next minor collection.
-  const uint64_t minorGCNumberAtCreation;
+  const uint64_t minorGCNumberAtCreation = 0;
 #endif
 
   // Construct the empty sentinel object.
-  constexpr ArenaCellSet()
-      : arena(nullptr),
-        next(nullptr)
-#ifdef DEBUG
-        ,
-        minorGCNumberAtCreation(0)
-#endif
-  {
-  }
+  constexpr ArenaCellSet() = default;
 
  public:
   using WordT = ArenaCellBits::WordT;
-  const size_t BitsPerWord = ArenaCellBits::bitsPerElement;
-  const size_t NumWords = ArenaCellBits::numSlots;
+  static constexpr size_t BitsPerWord = ArenaCellBits::bitsPerElement;
+  static constexpr size_t NumWords = ArenaCellBits::numSlots;
 
-  ArenaCellSet(Arena* arena, ArenaCellSet* next);
+  explicit ArenaCellSet(Arena* arena);
 
   bool hasCell(const TenuredCell* cell) const {
     return hasCell(getCellIndex(cell));
@@ -703,13 +680,8 @@ class ArenaCellSet {
     bits.setWord(wordIndex, value);
   }
 
-  // Returns the list of ArenaCellSets that need to be swept.
-  ArenaCellSet* trace(TenuringTracer& mover);
-
-  // At the end of a minor GC, sweep through all tenured dependent strings that
-  // may point to nursery-allocated chars to update their pointers in case the
-  // base string moved its chars.
-  void sweepDependentStrings();
+  // Sweep this set, returning whether it also needs to be swept later.
+  bool trace(TenuringTracer& mover);
 
   // Sentinel object used for all empty sets.
   //

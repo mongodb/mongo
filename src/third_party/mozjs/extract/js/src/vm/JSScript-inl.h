@@ -160,6 +160,10 @@ inline bool js::BaseScript::hasBaselineScript() const {
   return hasJitScript() && jitScript()->hasBaselineScript();
 }
 
+inline bool JSScript::isBaselineCompilingOffThread() const {
+  return hasJitScript() && jitScript()->isBaselineCompiling();
+}
+
 inline bool js::BaseScript::hasIonScript() const {
   return hasJitScript() && jitScript()->hasIonScript();
 }

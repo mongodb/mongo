@@ -56,14 +56,9 @@ class LIRGeneratorARM : public LIRGeneratorShared {
       MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
   void lowerForMulInt64(LMulI64* ins, MMul* mir, MDefinition* lhs,
                         MDefinition* rhs);
-  template <size_t Temps>
-  void lowerForShiftInt64(
-      LInstructionHelper<INT64_PIECES, INT64_PIECES + 1, Temps>* ins,
-      MDefinition* mir, MDefinition* lhs, MDefinition* rhs);
-
-  void lowerForCompareI64AndBranch(MTest* mir, MCompare* comp, JSOp op,
-                                   MDefinition* left, MDefinition* right,
-                                   MBasicBlock* ifTrue, MBasicBlock* ifFalse);
+  template <class LInstr>
+  void lowerForShiftInt64(LInstr* ins, MDefinition* mir, MDefinition* lhs,
+                          MDefinition* rhs);
 
   void lowerForFPU(LInstructionHelper<1, 1, 0>* ins, MDefinition* mir,
                    MDefinition* src);
@@ -73,8 +68,6 @@ class LIRGeneratorARM : public LIRGeneratorShared {
 
   void lowerBuiltinInt64ToFloatingPoint(MBuiltinInt64ToFloatingPoint* ins);
   void lowerWasmBuiltinTruncateToInt64(MWasmBuiltinTruncateToInt64* ins);
-  void lowerForBitAndAndBranch(LBitAndAndBranch* baab, MInstruction* mir,
-                               MDefinition* lhs, MDefinition* rhs);
   void lowerWasmBuiltinTruncateToInt32(MWasmBuiltinTruncateToInt32* ins);
   void lowerTruncateDToInt32(MTruncateToInt32* ins);
   void lowerTruncateFToInt32(MTruncateToInt32* ins);
@@ -94,23 +87,22 @@ class LIRGeneratorARM : public LIRGeneratorShared {
   void lowerWasmSelectI(MWasmSelect* select);
   void lowerWasmSelectI64(MWasmSelect* select);
 
-  void lowerBigIntLsh(MBigIntLsh* ins);
-  void lowerBigIntRsh(MBigIntRsh* ins);
-  void lowerBigIntDiv(MBigIntDiv* ins);
-  void lowerBigIntMod(MBigIntMod* ins);
+  void lowerBigIntPtrLsh(MBigIntPtrLsh* ins);
+  void lowerBigIntPtrRsh(MBigIntPtrRsh* ins);
+  void lowerBigIntPtrDiv(MBigIntPtrDiv* ins);
+  void lowerBigIntPtrMod(MBigIntPtrMod* ins);
 
   void lowerAtomicLoad64(MLoadUnboxedScalar* ins);
   void lowerAtomicStore64(MStoreUnboxedScalar* ins);
 
   LTableSwitch* newLTableSwitch(const LAllocation& in,
-                                const LDefinition& inputCopy,
-                                MTableSwitch* ins);
-  LTableSwitchV* newLTableSwitchV(MTableSwitch* ins);
+                                const LDefinition& inputCopy);
+  LTableSwitchV* newLTableSwitchV(const LBoxAllocation& in);
 
   void lowerPhi(MPhi* phi);
 };
 
-typedef LIRGeneratorARM LIRGeneratorSpecific;
+using LIRGeneratorSpecific = LIRGeneratorARM;
 
 }  // namespace jit
 }  // namespace js

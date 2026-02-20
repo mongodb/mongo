@@ -7,6 +7,7 @@
 #ifndef jit_AliasAnalysis_h
 #define jit_AliasAnalysis_h
 
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/MIRGraph.h"
 
@@ -16,7 +17,7 @@ namespace jit {
 class LoopAliasInfo;
 
 class AliasAnalysis {
-  MIRGenerator* mir;
+  const MIRGenerator* mir;
   MIRGraph& graph_;
   LoopAliasInfo* loop_;
 
@@ -25,7 +26,7 @@ class AliasAnalysis {
   TempAllocator& alloc() const { return graph_.alloc(); }
 
  public:
-  AliasAnalysis(MIRGenerator* mir, MIRGraph& graph)
+  AliasAnalysis(const MIRGenerator* mir, MIRGraph& graph)
       : mir(mir), graph_(graph), loop_(nullptr) {}
 
   [[nodiscard]] bool analyze();

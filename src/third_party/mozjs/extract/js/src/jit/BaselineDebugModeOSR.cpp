@@ -402,7 +402,7 @@ static void SkipInterpreterFrameEntries(
   *start = entryIndex;
 }
 
-static bool RecompileBaselineScriptForDebugMode(
+bool js::jit::RecompileBaselineScriptForDebugMode(
     JSContext* cx, JSScript* script, DebugAPI::IsObserving observing) {
   // If a script is on the stack multiple times, it may have already
   // been recompiled.
@@ -419,8 +419,11 @@ static bool RecompileBaselineScriptForDebugMode(
   BaselineScript* oldBaselineScript =
       script->jitScript()->clearBaselineScript(cx->gcContext(), script);
 
-  MethodStatus status =
-      BaselineCompile(cx, script, /* forceDebugMode = */ observing);
+  BaselineOptions options({BaselineOption::ForceMainThreadCompilation});
+  if (observing) {
+    options.setFlag(BaselineOption::ForceDebugInstrumentation);
+  }
+  MethodStatus status = BaselineCompile(cx, script, options);
   if (status != Method_Compiled) {
     // We will only fail to recompile for debug mode due to OOM. Restore
     // the old baseline script in case something doesn't properly

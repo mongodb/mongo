@@ -12,60 +12,20 @@ namespace jit {
 
 // Given an untyped input, guards on whether it's a specific type and returns
 // the unboxed payload.
-class LUnboxBase : public LInstructionHelper<1, 1, 0> {
+class LUnbox : public LInstructionHelper<1, BOX_PIECES, 0> {
  public:
-  LUnboxBase(LNode::Opcode op, const LAllocation& input)
-      : LInstructionHelper<1, 1, 0>(op) {
+  LIR_HEADER(Unbox)
+
+  explicit LUnbox(const LAllocation& input) : LInstructionHelper(classOpcode) {
     setOperand(0, input);
   }
 
   static const size_t Input = 0;
 
+  LBoxAllocation input() const { return getBoxOperand(Input); }
+
   MUnbox* mir() const { return mir_->toUnbox(); }
-};
-
-class LUnbox : public LUnboxBase {
- public:
-  LIR_HEADER(Unbox)
-
-  explicit LUnbox(const LAllocation& input) : LUnboxBase(classOpcode, input) {}
-
   const char* extraName() const { return StringFromMIRType(mir()->type()); }
-};
-
-class LUnboxFloatingPoint : public LUnboxBase {
-  MIRType type_;
-
- public:
-  LIR_HEADER(UnboxFloatingPoint)
-
-  LUnboxFloatingPoint(const LAllocation& input, MIRType type)
-      : LUnboxBase(classOpcode, input), type_(type) {}
-
-  MIRType type() const { return type_; }
-  const char* extraName() const { return StringFromMIRType(type_); }
-};
-
-// Convert a 32-bit unsigned integer to a double.
-class LWasmUint32ToDouble : public LInstructionHelper<1, 1, 0> {
- public:
-  LIR_HEADER(WasmUint32ToDouble)
-
-  explicit LWasmUint32ToDouble(const LAllocation& input)
-      : LInstructionHelper(classOpcode) {
-    setOperand(0, input);
-  }
-};
-
-// Convert a 32-bit unsigned integer to a float32.
-class LWasmUint32ToFloat32 : public LInstructionHelper<1, 1, 0> {
- public:
-  LIR_HEADER(WasmUint32ToFloat32)
-
-  explicit LWasmUint32ToFloat32(const LAllocation& input)
-      : LInstructionHelper(classOpcode) {
-    setOperand(0, input);
-  }
 };
 
 class LDivOrModI64 : public LBinaryMath<1> {
@@ -98,12 +58,12 @@ class LDivOrModI64 : public LBinaryMath<1> {
     }
     return mir_->toDiv()->canBeNegativeOverflow();
   }
-  wasm::BytecodeOffset bytecodeOffset() const {
+  const wasm::TrapSiteDesc& trapSiteDesc() const {
     MOZ_ASSERT(mir_->isDiv() || mir_->isMod());
     if (mir_->isMod()) {
-      return mir_->toMod()->bytecodeOffset();
+      return mir_->toMod()->trapSiteDesc();
     }
-    return mir_->toDiv()->bytecodeOffset();
+    return mir_->toDiv()->trapSiteDesc();
   }
 };
 
@@ -140,28 +100,13 @@ class LUDivOrModI64 : public LBinaryMath<1> {
     return mir_->toDiv()->canBeDivideByZero();
   }
 
-  wasm::BytecodeOffset bytecodeOffset() const {
+  const wasm::TrapSiteDesc& trapSiteDesc() const {
     MOZ_ASSERT(mir_->isDiv() || mir_->isMod());
     if (mir_->isMod()) {
-      return mir_->toMod()->bytecodeOffset();
+      return mir_->toMod()->trapSiteDesc();
     }
-    return mir_->toDiv()->bytecodeOffset();
+    return mir_->toDiv()->trapSiteDesc();
   }
-};
-
-class LWasmTruncateToInt64 : public LInstructionHelper<1, 1, 1> {
- public:
-  LIR_HEADER(WasmTruncateToInt64);
-
-  LWasmTruncateToInt64(const LAllocation& in, const LDefinition& temp)
-      : LInstructionHelper(classOpcode) {
-    setOperand(0, in);
-    setTemp(0, temp);
-  }
-
-  MWasmTruncateToInt64* mir() const { return mir_->toWasmTruncateToInt64(); }
-
-  const LDefinition* temp() { return getTemp(0); }
 };
 
 }  // namespace jit

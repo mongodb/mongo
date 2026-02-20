@@ -13,10 +13,10 @@ function IteratorNext(iteratorRecord, value) {
     ArgumentsLength() < 2
       ? callContentFunction(iteratorRecord.nextMethod, iteratorRecord.iterator)
       : callContentFunction(
-          iteratorRecord.nextMethod,
-          iteratorRecord.iterator,
-          value
-        );
+        iteratorRecord.nextMethod,
+        iteratorRecord.iterator,
+        value
+      );
   // Step 3.
   if (!IsObject(result)) {
     ThrowTypeError(JSMSG_OBJECT_REQUIRED, result);
@@ -215,6 +215,29 @@ function WrapForValidIteratorReturn() {
   // Step 7.
   return callContentFunction(returnMethod, iterator);
 }
+
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+/**
+ * Explicit Resource Management Proposal
+ * 27.1.2.1 %IteratorPrototype% [ @@dispose ] ( )
+ * https://arai-a.github.io/ecma262-compare/?pr=3000&id=sec-%25iteratorprototype%25-%40%40dispose
+ */
+function IteratorDispose() {
+  // Step 1. Let O be the this value.
+  var O = this;
+
+  // Step 2. Let return be ? GetMethod(O, "return").
+  var returnMethod = GetMethod(O, "return");
+
+  // Step 3. If return is not undefined, then
+  if (returnMethod !== undefined) {
+    // Step 3.a. Perform ? Call(return, O, « »).
+    callContentFunction(returnMethod, O);
+  }
+
+  // Step 4. Return NormalCompletion(empty). (implicit)
+}
+#endif
 
 /**
  * %IteratorHelperPrototype%.next ( )
@@ -939,3 +962,351 @@ function IteratorFind(predicate) {
     }
   }
 }
+
+#ifdef NIGHTLY_BUILD
+/**
+ * Iterator.concat ( ...items )
+ *
+ * https://tc39.es/proposal-iterator-sequencing/
+ */
+function IteratorConcat() {
+  // Step 1.
+  //
+  // Stored in reversed order to simplify removing processed items.
+  var index = ArgumentsLength() * 2;
+  var iterables = std_Array(index);
+
+  // Step 2.
+  for (var i = 0; i < ArgumentsLength(); i++) {
+    var item = GetArgument(i);
+
+    // Step 2.a.
+    if (!IsObject(item)) {
+      ThrowTypeError(JSMSG_OBJECT_REQUIRED, typeof item);
+    }
+
+    // Step 2.b. (Inlined GetMethod)
+    var method = item[GetBuiltinSymbol("iterator")];
+
+    // Step 2.c.
+    if (!IsCallable(method)) {
+      ThrowTypeError(JSMSG_NOT_ITERABLE, ToSource(item));
+    }
+
+    // Step 2.d.
+    DefineDataProperty(iterables, --index, item);
+    DefineDataProperty(iterables, --index, method);
+  }
+  assert(index === 0, "all items stored");
+
+  // Steps 3-5.
+  var result = NewIteratorHelper();
+  var generator = IteratorConcatGenerator(iterables);
+  UnsafeSetReservedSlot(
+    result,
+    ITERATOR_HELPER_GENERATOR_SLOT,
+    generator
+  );
+
+  // Step 6.
+  return result;
+}
+
+/**
+ * Iterator.concat ( ...items )
+ *
+ * https://tc39.es/proposal-iterator-sequencing/
+ */
+function* IteratorConcatGenerator(iterables) {
+  assert(IsArray(iterables), "iterables is an array");
+  assert(iterables.length % 2 === 0, "iterables contains pairs (item, method)");
+
+  // Step 3.a.
+  for (var i = iterables.length; i > 0;) {
+    var item = iterables[--i];
+    var method = iterables[--i];
+
+    // Remove processed items to avoid keeping them alive.
+    iterables.length -= 2;
+
+    // Steps 3.a.i-v.
+    for (var innerValue of allowContentIterWith(item, method)) {
+      // Steps 3.a.v.1-3. (Implicit through for-of loop)
+
+      yield innerValue;
+    }
+  }
+}
+
+/**
+ * Iterator.zip (iterables [, options])
+ *
+ * https://tc39.es/proposal-joint-iteration/#sec-iterator.zip
+ */
+function IteratorZip(predicate) {
+  return false;
+}
+
+/**
+ * Iterator.zipKeyed ( iterables [, options] )
+ *
+ * https://tc39.es/proposal-joint-iteration/#sec-iterator.zipkeyed
+ */
+function IteratorZipKeyed(predicate) {
+  return false;
+}
+
+
+/**
+ * CreateNumericRangeIterator (start, end, optionOrStep, type)
+ * Step 18 
+ * 
+ * https://tc39.es/proposal-iterator.range/#sec-create-numeric-range-iterator
+ */
+function IteratorRangeNext() {
+  var obj = this;
+  // Step 18. Let closure be a new Abstract Closure with no parameters 
+  // that captures start, end, step, inclusiveEnd, zero, one and performs the following steps when called:
+
+  if (!IsObject(obj) || (obj = GuardToIteratorRange(obj)) === null) {
+    return callFunction(
+      CallIteratorRangeMethodIfWrapped,
+      this,
+      "IteratorRangeNext"
+    );
+  }
+
+  // Retrieve values from reserved slots
+  var start = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_START);
+  var end = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_END);
+  var step = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_STEP);
+  var inclusiveEnd = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_INCLUSIVE_END);
+  var zero = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_ZERO);
+  var one = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_ONE);
+  var currentCount = UnsafeGetReservedSlot(obj, ITERATOR_RANGE_SLOT_CURRENT_COUNT);
+
+  // Step 18.a: If end > start, let ifIncrease be true
+  // Step 18.b: Else let ifIncrease be false
+  var ifIncrease = end > start;
+
+  // Step 18.c: If step > zero, let ifStepIncrease be true
+  // Step 18.d: Else let ifStepIncrease be false
+  var ifStepIncrease = step > zero;
+
+  // Step 18.e: If ifIncrease is not ifStepIncrease, return undeﬁned.
+  if (ifIncrease !== ifStepIncrease) {
+    return { value: undefined, done: true };
+  }
+
+  // Step 18.f: Let hitsEnd be false
+  var hitsEnd = false;
+
+  // Step 18.g: Let currentCount be zero (already handled via slots)
+
+  // Step 18.i.i: Let currentYieldingValue be start + (step × currentCount)
+  var currentYieldingValue = start + (step * currentCount);
+
+  // Step 18.i.ii: If currentYieldingValue is equal to end, set hitsEnd to true
+  hitsEnd = currentYieldingValue === end && !inclusiveEnd;
+
+
+  // Step 18.i.iii: Set currentCount to currentCount + one
+  currentCount = currentCount + one;
+
+  // Step 18.i.iv: If ifIncrease is true, then
+  if (ifIncrease) {
+    // Step 18.i.iv.1: If inclusiveEnd is true, then 
+    if (inclusiveEnd) {
+      // Step 18.i.iv.1.a: If currentYieldingValue > end, return undefined.
+      if (currentYieldingValue > end) {
+        return { value: undefined, done: true };
+      }
+    } else {
+      // Step 18.i.iv.2: If currentYieldingValue >= end, return undefined
+      if (currentYieldingValue >= end) {
+        return { value: undefined, done: true };
+      }
+    }
+  } else {
+    // Step 18.i.v: Else
+    // Step 18.i.v.1: If inclusiveEnd is true, then
+    if (inclusiveEnd) {
+      //Step 18.i.v.1.a.a. If end > currentYieldingValue, return undefined.
+      if (end > currentYieldingValue) {
+        return { value: undefined, done: true };
+      }
+    } else {
+      // Step 18.i.v.2: Else
+      if (end >= currentYieldingValue) {
+        // Step 18i.v.2.a: If end >= currentYieldingValue, return undefined
+        return { value: undefined, done: true };
+      }
+    }
+  }
+
+  // Step 18.i.vi: Yield currentYieldingValue
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_CURRENT_COUNT, currentCount);
+
+  // Step 18.j: Return undefined if the loop completes
+  if (hitsEnd) {
+    return { value: undefined, done: true };
+  }
+
+  // Return the current value
+  return { value: currentYieldingValue, done: false };
+}
+
+
+
+/**
+ * CreateNumericRangeIterator (start, end, optionOrStep, type)
+ * 
+ * https://tc39.es/proposal-iterator.range/#sec-create-numeric-range-iterator
+ */
+function CreateNumericRangeIterator(start, end, optionOrStep, isNumberRange) {
+
+  // Step 1: If start is NaN, throw a RangeError exception.
+  if (isNumberRange && Number_isNaN(start)) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_INVALID_START_RANGEERR);
+  }
+
+  // Step 2: If end is NaN, throw a RangeError exception.
+  if (isNumberRange && Number_isNaN(end)) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_INVALID_END_RANGEERR);
+  }
+
+  // Step 3: If type is NUMBER-RANGE, then
+  if (isNumberRange) {
+    // Step 3.a. Assert: start is a Number.
+    assert(typeof start === 'number', "The 'start' argument must be a number");
+
+    // Step 3.b. If end is not a Number, throw a TypeError exception.
+    if (typeof end !== 'number') {
+      ThrowTypeError(JSMSG_ITERATOR_RANGE_INVALID_END);
+    }
+
+    // Step 3.c. Let zero be 0ℤ.
+    var zero = 0;
+
+    // Step 3.d. Let one be 1ℤ.
+    var one = 1;
+    // 4: Else,
+  } else {
+    // 4.a. Assert: start is a BigInt.
+    assert(typeof start === 'bigint', "The 'start' argument must be a bigint");
+
+    // 4.b. If end is not +∞𝔽 or -∞𝔽 and end is not a BigInt, throw a TypeError exception.
+    if (typeof end !== 'bigint' && !(Number_isFinite(end))) {
+      ThrowTypeError(JSMSG_ITERATOR_RANGE_INVALID_END);
+    }
+
+    // 4.c. Let zero be 0𝔽.
+    var zero = 0n;
+
+    // 4.d. Let one be 1𝔽.
+    var one = 1n;
+  }
+  // Step 5: If start is +∞ or -∞, throw a RangeError exception.
+  if (typeof start === 'number' && !Number_isFinite(start)) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_START_INFINITY);
+  }
+  // Step 6: Let inclusiveEnd be false.
+  var inclusiveEnd = false;
+
+  // Step 7: If optionOrStep is undefined or null, then
+  // Step 7.a. Let step be undefined.
+  var step;
+
+  // Step 8: Else if optionOrStep is an Object, then
+  if (optionOrStep !== null && typeof optionOrStep === 'object') {
+    // Step 8.a. Let step be ? Get(optionOrStep, "step").
+    step = optionOrStep.step;
+
+    // Step 8.b. Set inclusiveEnd to ToBoolean(? Get(optionOrStep, "inclusive")).
+    inclusiveEnd = ToBoolean(optionOrStep.inclusiveEnd);
+  }
+  // Step 9: Else if type is NUMBER-RANGE and optionOrStep is a Number, then
+  else if (isNumberRange && typeof optionOrStep === 'number') {
+    // Step 9.a. Let step be optionOrStep.
+    step = optionOrStep;
+  }
+
+  // Step 10: Else if type is BIGINT-RANGE and optionOrStep is a BigInt, then
+  // Step 10.a. Let step be optionOrStep.
+  else if (!isNumberRange && typeof optionOrStep === 'bigint') {
+    step = optionOrStep;
+  }
+  // Step 11: Else, throw a TypeError exception.
+  else if (optionOrStep !== undefined && optionOrStep !== null) {
+    ThrowTypeError(JSMSG_ITERATOR_RANGE_INVALID_STEP);
+  }
+
+  // Step 12: If step is undefined or null, then
+  if (step === undefined || step === null) {
+    // Step 12.a. If end > start, let step be one.
+    // Step 12.b. Else let step be -one.
+    step = end > start ? one : -one;
+  }
+
+  // Step 13: If step is NaN, throw a RangeError exception.
+  if (typeof step === "number" && Number_isNaN(step)) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_STEP_NAN);
+  }
+
+  // Step 14: If type is NUMBER-RANGE and step is not a Number, throw a TypeError exception.
+  if (isNumberRange && typeof step !== 'number') {
+    ThrowTypeError(JSMSG_ITERATOR_RANGE_STEP_NOT_NUMBER);
+  }
+
+  // Step 15: Else if type is BIGINT-RANGE and step is not a BigInt, throw a TypeError exception
+  else if (!isNumberRange && typeof step !== 'bigint') {
+    ThrowTypeError(JSMSG_ITERATOR_RANGE_STEP_NOT_BIGINT);
+  }
+
+  // Step 16: If step is +∞ or -∞, throw a RangeError exception.
+  if (typeof step === 'number' && !Number_isFinite(step)) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_STEP_NOT_FINITE);
+  }
+
+  // Step 17: If step is zero and start is not end, throw a RangeError exception.
+  if (step === zero && start !== end) {
+    ThrowRangeError(JSMSG_ITERATOR_RANGE_STEP_ZERO);
+  }
+  // Step 19: Return CreateIteratorFromClosure(closure, "%NumericRangeIteratorPrototype%", %NumericRangeIteratorPrototype%).
+
+  var obj = NewIteratorRange();
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_START, start);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_END, end);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_STEP, step);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_INCLUSIVE_END, inclusiveEnd);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_ZERO, zero);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_ONE, one);
+  UnsafeSetReservedSlot(obj, ITERATOR_RANGE_SLOT_CURRENT_COUNT, zero);
+
+  return obj;
+}
+
+
+
+/**
+ *  Iterator.range ( start, end, optionOrStep )
+ *
+ * https://tc39.es/proposal-iterator.range/#sec-iterator.range
+ */
+function IteratorRange(start, end, optionOrStep) {
+
+  // Step 1. If start is a Number, return ? CreateNumericRangeIterator(start, end, optionOrStep, NUMBER-RANGE)
+  if (typeof start === 'number') {
+    return CreateNumericRangeIterator(start, end, optionOrStep, true);
+  }
+
+  // Step 2. If start is a BigInt, return ? CreateNumericRangeIterator(start, end, optionOrStep, BIGINT-RANGE)
+  if (typeof start === 'bigint') {
+    return CreateNumericRangeIterator(start, end, optionOrStep, false);
+  }
+
+  // Step 3. Throw a TypeError exception.
+  ThrowTypeError(JSMSG_ITERATOR_RANGE_INVALID_START);
+
+}
+#endif

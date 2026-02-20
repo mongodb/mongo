@@ -45,7 +45,7 @@ namespace js {
 class AtomSet;
 class JS_PUBLIC_API GenericPrinter;
 class LifoAlloc;
-class StringBuffer;
+class StringBuilder;
 
 namespace frontend {
 
@@ -786,7 +786,7 @@ class ParserAtomsTable {
   JSAtom* toWellKnownJSAtom(JSContext* cx, TaggedParserAtomIndex index) const;
 
  public:
-  bool appendTo(StringBuffer& buffer, TaggedParserAtomIndex index) const;
+  bool appendTo(StringBuilder& sb, TaggedParserAtomIndex index) const;
 
  public:
 #if defined(DEBUG) || defined(JS_JITSPEW)

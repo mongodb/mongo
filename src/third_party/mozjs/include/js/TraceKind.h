@@ -22,6 +22,9 @@ class PropMap;
 class RegExpShared;
 class Shape;
 class Scope;
+namespace gc {
+class SmallBuffer;
+}  // namespace gc
 namespace jit {
 class JitCode;
 }  // namespace jit
@@ -63,6 +66,7 @@ enum class TraceKind {
   RegExpShared,
   GetterSetter,
   PropMap,
+  SmallBuffer
 };
 
 // GCCellPtr packs the trace kind into the low bits of the pointer for common
@@ -88,20 +92,21 @@ struct MapTypeToTraceKind {
 //            also means they can be used as a keys in WeakMap.
 
 // clang-format off
-#define JS_FOR_EACH_TRACEKIND(D)                                 \
-  /* name         type              canBeGray       inCCGraph */ \
-  D(BaseShape,    js::BaseShape,    true,           false)       \
-  D(JitCode,      js::jit::JitCode, true,           false)       \
-  D(Scope,        js::Scope,        true,           true)        \
-  D(Object,       JSObject,         true,           true)        \
-  D(Script,       js::BaseScript,   true,           true)        \
-  D(Shape,        js::Shape,        true,           false)       \
-  D(String,       JSString,         false,          false)       \
-  D(Symbol,       JS::Symbol,       false,          false)       \
-  D(BigInt,       JS::BigInt,       false,          false)       \
-  D(RegExpShared, js::RegExpShared, true,           true)        \
-  D(GetterSetter, js::GetterSetter, true,           true)        \
-  D(PropMap,      js::PropMap,      false,          false)
+#define JS_FOR_EACH_TRACEKIND(D)                               \
+  /* name         type                 canBeGray  inCCGraph */ \
+  D(BaseShape,    js::BaseShape,       true,      false)       \
+  D(JitCode,      js::jit::JitCode,    true,      false)       \
+  D(Scope,        js::Scope,           true,      true)        \
+  D(Object,       JSObject,            true,      true)        \
+  D(Script,       js::BaseScript,      true,      true)        \
+  D(Shape,        js::Shape,           true,      false)       \
+  D(String,       JSString,            false,     false)       \
+  D(Symbol,       JS::Symbol,          false,     false)       \
+  D(BigInt,       JS::BigInt,          false,     false)       \
+  D(RegExpShared, js::RegExpShared,    true,      true)        \
+  D(GetterSetter, js::GetterSetter,    true,      true)        \
+  D(PropMap,      js::PropMap,         false,     false)       \
+  D(SmallBuffer,  js::gc::SmallBuffer, false,     false)
 // clang-format on
 
 // Returns true if the JS::TraceKind is represented as a node in cycle collector

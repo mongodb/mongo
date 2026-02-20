@@ -22,14 +22,15 @@ class PlainYearMonthObject;
 class TimeZoneValue;
 class ZonedDateTime;
 
-struct PlainDateTime;
-struct PlainTime;
+struct EpochNanoseconds;
+struct ISODateTime;
+struct Time;
 
 /**
  * TemporalInstantToString ( instant, timeZone, precision )
  */
 JSString* TemporalInstantToString(JSContext* cx,
-                                  JS::Handle<InstantObject*> instant,
+                                  const EpochNanoseconds& epochNs,
                                   JS::Handle<TimeZoneValue> timeZone,
                                   Precision precision);
 
@@ -41,20 +42,17 @@ JSString* TemporalDateToString(JSContext* cx,
                                ShowCalendar showCalendar);
 
 /**
- * TemporalDateTimeToString ( isoYear, isoMonth, isoDay, hour, minute, second,
- * millisecond, microsecond, nanosecond, calendar, precision, showCalendar )
+ * ISODateTimeToString ( isoDateTime, calendar, precision, showCalendar )
  */
-JSString* TemporalDateTimeToString(JSContext* cx, const PlainDateTime& dateTime,
-                                   JS::Handle<CalendarValue> calendar,
-                                   Precision precision,
-                                   ShowCalendar showCalendar);
+JSString* ISODateTimeToString(JSContext* cx, const ISODateTime& isoDateTime,
+                              JS::Handle<CalendarValue> calendar,
+                              Precision precision, ShowCalendar showCalendar);
 
 /**
- * TemporalTimeToString ( hour, minute, second, millisecond, microsecond,
- * nanosecond, precision )
+ * TimeRecordToString ( time, precision )
  */
-JSString* TemporalTimeToString(JSContext* cx, const PlainTime& time,
-                               Precision precision);
+JSString* TimeRecordToString(JSContext* cx, const Time& time,
+                             Precision precision);
 
 /**
  * TemporalMonthDayToString ( monthDay, showCalendar )

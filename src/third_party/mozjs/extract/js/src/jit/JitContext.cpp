@@ -103,7 +103,7 @@ bool jit::InitializeJit() {
 #endif
 
 #if defined(JS_CODEGEN_ARM)
-  InitARMFlags();
+  ARMFlags::Init();
 #endif
 
 #ifdef JS_CODEGEN_ARM64
@@ -115,7 +115,7 @@ bool jit::InitializeJit() {
   MOZ_ASSERT(js::jit::CPUFlagsHaveBeenComputed());
 #endif
 
-  // Note: jit flags need to be initialized after the InitARMFlags call above.
+  // Note: jit flags need to be initialized after the ARMFlags::Init call above.
   // This is the final point where we can set disableJitBackend = true, before
   // we use this flag below with the HasJitBackend call.
   if (!MacroAssembler::SupportsFloatingPoint()) {
@@ -154,7 +154,7 @@ bool jit::JitSupportsAtomics() {
   // operations on ARM only when the CPU has byte, halfword, and
   // doubleword load-exclusive and store-exclusive instructions,
   // until we can add support for systems that don't have those.
-  return js::jit::HasLDSTREXBHD();
+  return js::jit::ARMFlags::HasLDSTREXBHD();
 #else
   return true;
 #endif

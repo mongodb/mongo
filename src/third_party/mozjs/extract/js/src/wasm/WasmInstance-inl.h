@@ -14,17 +14,15 @@
 namespace js {
 namespace wasm {
 
-const CodeTier& Instance::code(Tier t) const { return code_->codeTier(t); }
-
-uint8_t* Instance::codeBase(Tier t) const { return code_->segment(t).base(); }
-
-const MetadataTier& Instance::metadata(Tier t) const {
-  return code_->metadata(t);
+const CodeMetadata& Instance::codeMeta() const { return code_->codeMeta(); }
+const CodeTailMetadata& Instance::codeTailMeta() const {
+  return code_->codeTailMeta();
+}
+const CodeMetadataForAsmJS* Instance::codeMetaForAsmJS() const {
+  return code_->codeMetaForAsmJS();
 }
 
-const Metadata& Instance::metadata() const { return code_->metadata(); }
-
-bool Instance::isAsmJS() const { return metadata().isAsmJS(); }
+bool Instance::isAsmJS() const { return codeMeta().isAsmJS(); }
 
 }  // namespace wasm
 }  // namespace js

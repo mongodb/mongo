@@ -1302,11 +1302,12 @@ class BaseAssembler : public GenericAssembler {
     m_formatter.oneByteOp(OP_SUB_EvGv, offset, base, index, scale, src);
   }
 
-  void subl_ir(int32_t imm, RegisterID dst) {
+  size_t subl_ir(int32_t imm, RegisterID dst) {
     spew("subl       $%d, %s", imm, GPReg32Name(dst));
     if (CAN_SIGN_EXTEND_8_32(imm)) {
       m_formatter.oneByteOp(OP_GROUP1_EvIb, dst, GROUP1_OP_SUB);
       m_formatter.immediate8s(imm);
+      return 1;
     } else {
       if (dst == rax) {
         m_formatter.oneByteOp(OP_SUB_EAXIv);
@@ -1314,6 +1315,7 @@ class BaseAssembler : public GenericAssembler {
         m_formatter.oneByteOp(OP_GROUP1_EvIz, dst, GROUP1_OP_SUB);
       }
       m_formatter.immediate32(imm);
+      return 4;
     }
   }
 
@@ -1333,14 +1335,16 @@ class BaseAssembler : public GenericAssembler {
     }
   }
 
-  void subl_im(int32_t imm, int32_t offset, RegisterID base) {
+  size_t subl_im(int32_t imm, int32_t offset, RegisterID base) {
     spew("subl       $%d, " MEM_ob, imm, ADDR_ob(offset, base));
     if (CAN_SIGN_EXTEND_8_32(imm)) {
       m_formatter.oneByteOp(OP_GROUP1_EvIb, offset, base, GROUP1_OP_SUB);
       m_formatter.immediate8s(imm);
+      return 1;
     } else {
       m_formatter.oneByteOp(OP_GROUP1_EvIz, offset, base, GROUP1_OP_SUB);
       m_formatter.immediate32(imm);
+      return 4;
     }
   }
 
@@ -1356,17 +1360,19 @@ class BaseAssembler : public GenericAssembler {
     }
   }
 
-  void subl_im(int32_t imm, int32_t offset, RegisterID base, RegisterID index,
-               int scale) {
+  size_t subl_im(int32_t imm, int32_t offset, RegisterID base, RegisterID index,
+                 int scale) {
     spew("subl       $%d, " MEM_obs, imm, ADDR_obs(offset, base, index, scale));
     if (CAN_SIGN_EXTEND_8_32(imm)) {
       m_formatter.oneByteOp(OP_GROUP1_EvIb, offset, base, index, scale,
                             GROUP1_OP_SUB);
       m_formatter.immediate8s(imm);
+      return 1;
     } else {
       m_formatter.oneByteOp(OP_GROUP1_EvIz, offset, base, index, scale,
                             GROUP1_OP_SUB);
       m_formatter.immediate32(imm);
+      return 1;
     }
   }
 
@@ -1832,24 +1838,24 @@ class BaseAssembler : public GenericAssembler {
 
   void cmpb_rr(RegisterID rhs, RegisterID lhs) {
     spew("cmpb       %s, %s", GPReg8Name(rhs), GPReg8Name(lhs));
-    m_formatter.oneByteOp(OP_CMP_GbEb, rhs, lhs);
+    m_formatter.oneByteOp8(OP_CMP_GbEb, rhs, lhs);
   }
 
   void cmpb_rm(RegisterID rhs, int32_t offset, RegisterID base) {
     spew("cmpb       %s, " MEM_ob, GPReg8Name(rhs), ADDR_ob(offset, base));
-    m_formatter.oneByteOp(OP_CMP_EbGb, offset, base, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, offset, base, rhs);
   }
 
   void cmpb_rm(RegisterID rhs, int32_t offset, RegisterID base,
                RegisterID index, int scale) {
     spew("cmpb       %s, " MEM_obs, GPReg8Name(rhs),
          ADDR_obs(offset, base, index, scale));
-    m_formatter.oneByteOp(OP_CMP_EbGb, offset, base, index, scale, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, offset, base, index, scale, rhs);
   }
 
   void cmpb_rm(RegisterID rhs, const void* addr) {
     spew("cmpb       %s, %p", GPReg8Name(rhs), addr);
-    m_formatter.oneByteOp(OP_CMP_EbGb, addr, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, addr, rhs);
   }
 
   void cmpb_ir(int32_t rhs, RegisterID lhs) {
@@ -1860,9 +1866,9 @@ class BaseAssembler : public GenericAssembler {
 
     spew("cmpb       $0x%x, %s", uint32_t(rhs), GPReg8Name(lhs));
     if (lhs == rax) {
-      m_formatter.oneByteOp(OP_CMP_EAXIb);
+      m_formatter.oneByteOp8(OP_CMP_EAXIb);
     } else {
-      m_formatter.oneByteOp(OP_GROUP1_EbIb, lhs, GROUP1_OP_CMP);
+      m_formatter.oneByteOp8(OP_GROUP1_EbIb, lhs, GROUP1_OP_CMP);
     }
     m_formatter.immediate8(rhs);
   }
@@ -2048,7 +2054,7 @@ class BaseAssembler : public GenericAssembler {
 
   void testb_rr(RegisterID rhs, RegisterID lhs) {
     spew("testb      %s, %s", GPReg8Name(rhs), GPReg8Name(lhs));
-    m_formatter.oneByteOp(OP_TEST_EbGb, lhs, rhs);
+    m_formatter.oneByteOp8(OP_TEST_EbGb, lhs, rhs);
   }
 
   void testl_ir(int32_t rhs, RegisterID lhs) {
@@ -4414,6 +4420,42 @@ class BaseAssembler : public GenericAssembler {
                     offset, base, index, scale, invalid_xmm, dst);
   }
 
+  void vpsignd_rr(XMMRegisterID src1, XMMRegisterID src0, XMMRegisterID dst) {
+    threeByteOpSimd("vpsignd", VEX_PD, OP3_PSIGND_PdqQdq, ESCAPE_38, src1, src0,
+                    dst);
+  }
+
+  // F16C instructions:
+
+  void vcvtph2ps_rr(XMMRegisterID src, XMMRegisterID dst) {
+    spew("vcvtph2ps  %s, %s", XMMRegName(src), XMMRegName(dst));
+    m_formatter.threeByteOpVex(VEX_PD, OP3_VCVTPH2PS_VxWxIb, ESCAPE_38,
+                               RegisterID(src), invalid_xmm, dst);
+  }
+
+  void vcvtps2ph_rr(XMMRegisterID src, XMMRegisterID dst) {
+    // Use MXCSR.RC for rounding.
+    //
+    // An explicit rounding mode can be given to this instruction, but using
+    // MXCSR.RC is the default option.
+    constexpr int8_t roundingMode = 4;
+
+    spew("vcvtps2ph  $0x%x, %s, %s", roundingMode, XMMRegName(src),
+         XMMRegName(dst));
+    m_formatter.threeByteOpVex(VEX_PD, OP3_VCVTPS2PH_WxVxIb, ESCAPE_3A,
+                               RegisterID(dst), invalid_xmm, src);
+    m_formatter.immediate8(roundingMode);
+  }
+
+  void vcvtps2ph_rr(XMMRegisterID src, XMMRegisterID dst,
+                    RoundingMode roundingMode) {
+    spew("vcvtps2ph  $0x%x, %s, %s", roundingMode, XMMRegName(src),
+         XMMRegName(dst));
+    m_formatter.threeByteOpVex(VEX_PD, OP3_VCVTPS2PH_WxVxIb, ESCAPE_3A,
+                               RegisterID(dst), invalid_xmm, src);
+    m_formatter.immediate8(roundingMode);
+  }
+
   // BMI instructions:
 
   void sarxl_rrr(RegisterID src, RegisterID shift, RegisterID dst) {
@@ -4517,6 +4559,12 @@ class BaseAssembler : public GenericAssembler {
   void mfence() {
     spew("mfence");
     m_formatter.twoByteOp(OP_FENCE, (RegisterID)0, 0b110);
+  }
+
+  void pause() {
+    spew("pause");
+    m_formatter.oneByteOp(PRE_REP);
+    m_formatter.oneByteOp(OP_NOP);
   }
 
   // Assembler admin methods:
@@ -6047,6 +6095,13 @@ class BaseAssembler : public GenericAssembler {
       m_buffer.putByteUnchecked(opcode + (r & 7));
     }
 
+    void oneByteOp8(OneByteOpcodeID opcode, RegisterID rm, RegisterID reg) {
+      m_buffer.ensureSpace(MaxInstructionSize);
+      emitRexIf(byteRegRequiresRex(reg) || byteRegRequiresRex(rm), reg, 0, rm);
+      m_buffer.putByteUnchecked(opcode);
+      registerModRM(rm, reg);
+    }
+
     void oneByteOp8(OneByteOpcodeID opcode, RegisterID rm,
                     GroupOpcodeID groupOp) {
       m_buffer.ensureSpace(MaxInstructionSize);
@@ -6461,7 +6516,7 @@ class BaseAssembler : public GenericAssembler {
       m_buffer.putByteUnchecked(opcode);
     }
 
-    AssemblerBuffer m_buffer;
+    x86_shared::AssemblerBuffer m_buffer;
   } m_formatter;
 
   bool useVEX_;

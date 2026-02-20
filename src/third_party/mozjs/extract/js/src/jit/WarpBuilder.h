@@ -11,6 +11,7 @@
 
 #include "ds/InlineTable.h"
 #include "jit/JitContext.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/WarpBuilderShared.h"
 #include "jit/WarpSnapshot.h"
@@ -20,45 +21,32 @@ namespace js {
 namespace jit {
 
 // JSOps not yet supported by WarpBuilder. See warning at the end of the list.
-#define WARP_UNSUPPORTED_OPCODE_LIST(_)                  \
-  /* Intentionally not implemented */                    \
-  _(ForceInterpreter)                                    \
-  /* With */                                             \
-  _(EnterWith)                                           \
-  _(LeaveWith)                                           \
-  /* Eval */                                             \
-  _(Eval)                                                \
-  _(StrictEval)                                          \
-  _(SpreadEval)                                          \
-  _(StrictSpreadEval)                                    \
-  /* Super */                                            \
-  _(SetPropSuper)                                        \
-  _(SetElemSuper)                                        \
-  _(StrictSetPropSuper)                                  \
-  _(StrictSetElemSuper)                                  \
-  /* Compound assignment */                              \
-  _(GetBoundName)                                        \
-  /* Generators / Async (bug 1317690) */                 \
-  _(IsGenClosing)                                        \
-  _(Resume)                                              \
-  /* Misc */                                             \
-  _(DelName)                                             \
-  _(SetIntrinsic)                                        \
-  /* Private Fields */                                   \
-  _(GetAliasedDebugVar)                                  \
-  /* Non-syntactic scope */                              \
-  _(NonSyntacticGlobalThis)                              \
-  /* TODO: To be implemented (Bug 1899501) */            \
-  IF_EXPLICIT_RESOURCE_MANAGEMENT(_(AddDisposable))      \
-  IF_EXPLICIT_RESOURCE_MANAGEMENT(_(DisposeDisposables)) \
-  /* Records and Tuples */                               \
-  IF_RECORD_TUPLE(_(InitRecord))                         \
-  IF_RECORD_TUPLE(_(AddRecordProperty))                  \
-  IF_RECORD_TUPLE(_(AddRecordSpread))                    \
-  IF_RECORD_TUPLE(_(FinishRecord))                       \
-  IF_RECORD_TUPLE(_(InitTuple))                          \
-  IF_RECORD_TUPLE(_(AddTupleElement))                    \
-  IF_RECORD_TUPLE(_(FinishTuple))                        \
+#define WARP_UNSUPPORTED_OPCODE_LIST(_)  \
+  /* Intentionally not implemented */    \
+  _(ForceInterpreter)                    \
+  /* With */                             \
+  _(EnterWith)                           \
+  _(LeaveWith)                           \
+  /* Eval */                             \
+  _(Eval)                                \
+  _(StrictEval)                          \
+  _(SpreadEval)                          \
+  _(StrictSpreadEval)                    \
+  /* Super */                            \
+  _(SetPropSuper)                        \
+  _(SetElemSuper)                        \
+  _(StrictSetPropSuper)                  \
+  _(StrictSetElemSuper)                  \
+  /* Generators / Async (bug 1317690) */ \
+  _(IsGenClosing)                        \
+  _(Resume)                              \
+  /* Misc */                             \
+  _(DelName)                             \
+  _(SetIntrinsic)                        \
+  /* Private Fields */                   \
+  _(GetAliasedDebugVar)                  \
+  /* Non-syntactic scope */              \
+  _(NonSyntacticGlobalThis)              \
   // === !! WARNING WARNING WARNING !! ===
   // Do you really want to sacrifice performance by not implementing this
   // operation in the optimizing compiler?
@@ -259,9 +247,10 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
 
   [[nodiscard]] bool buildEnvironmentChain();
   MInstruction* buildNamedLambdaEnv(MDefinition* callee, MDefinition* env,
-                                    NamedLambdaObject* templateObj);
+                                    NamedLambdaObject* templateObj,
+                                    gc::Heap initialHeap);
   MInstruction* buildCallObject(MDefinition* callee, MDefinition* env,
-                                CallObject* templateObj);
+                                CallObject* templateObj, gc::Heap initialHeap);
   MInstruction* buildLoadSlot(MDefinition* obj, uint32_t numFixedSlots,
                               uint32_t slot);
 
@@ -271,6 +260,7 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
   [[nodiscard]] bool buildUnaryOp(BytecodeLocation loc);
   [[nodiscard]] bool buildBinaryOp(BytecodeLocation loc);
   [[nodiscard]] bool buildCompareOp(BytecodeLocation loc);
+  [[nodiscard]] bool buildStrictConstantEqOp(BytecodeLocation loc, JSOp op);
   [[nodiscard]] bool buildTestOp(BytecodeLocation loc);
   [[nodiscard]] bool buildCallOp(BytecodeLocation loc);
 

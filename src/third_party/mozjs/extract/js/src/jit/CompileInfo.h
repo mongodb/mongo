@@ -84,7 +84,9 @@ class CompileInfo {
         isDerivedClassConstructor_(script->isDerivedClassConstructor()),
         inlineScriptTree_(inlineScriptTree),
         hasSeenObjectEmulateUndefinedFuseIntact_(
-            runtime->hasSeenObjectEmulateUndefinedFuseIntact()) {
+            runtime->hasSeenObjectEmulateUndefinedFuseIntact()),
+        hasSeenArrayExceedsInt32LengthFuseIntact_(
+            runtime->hasSeenArrayExceedsInt32LengthFuseIntact()) {
     MOZ_ASSERT_IF(osrPc, JSOp(*osrPc) == JSOp::LoopHead);
 
     // The function here can flow in from anywhere so look up the canonical
@@ -152,7 +154,8 @@ class CompileInfo {
         inlineScriptTree_(nullptr),
         needsBodyEnvironmentObject_(false),
         funNeedsSomeEnvironmentObject_(false),
-        hasSeenObjectEmulateUndefinedFuseIntact_(false) {
+        hasSeenObjectEmulateUndefinedFuseIntact_(false),
+        hasSeenArrayExceedsInt32LengthFuseIntact_(false) {
     nimplicit_ = 0;
     nargs_ = 0;
     nlocals_ = nlocals;
@@ -355,6 +358,10 @@ class CompileInfo {
     return hasSeenObjectEmulateUndefinedFuseIntact_;
   }
 
+  bool hasSeenArrayExceedsInt32LengthFuseIntact() const {
+    return hasSeenArrayExceedsInt32LengthFuseIntact_;
+  }
+
  private:
   unsigned nimplicit_;
   unsigned nargs_;
@@ -392,6 +399,7 @@ class CompileInfo {
   bool funNeedsSomeEnvironmentObject_;
 
   bool hasSeenObjectEmulateUndefinedFuseIntact_;
+  bool hasSeenArrayExceedsInt32LengthFuseIntact_;
 };
 
 }  // namespace jit

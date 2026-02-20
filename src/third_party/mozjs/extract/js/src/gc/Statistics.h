@@ -61,14 +61,14 @@ enum Count {
 
 // Stats can be set with Statistics::setStat(). They're not reset automatically.
 enum Stat {
-  // Number of strings tenured.
-  STAT_STRINGS_TENURED,
+  // Number of strings promoted.
+  STAT_STRINGS_PROMOTED,
 
   // Number of strings deduplicated.
   STAT_STRINGS_DEDUPLICATED,
 
-  // Number of BigInts tenured.
-  STAT_BIGINTS_TENURED,
+  // Number of BigInts promoted.
+  STAT_BIGINTS_PROMOTED,
 
   STAT_LIMIT
 };
@@ -178,7 +178,7 @@ struct Statistics {
   void resumePhases();
 
   void beginSlice(const ZoneGCStats& zoneStats, JS::GCOptions options,
-                  const SliceBudget& budget, JS::GCReason reason,
+                  const JS::SliceBudget& budget, JS::GCReason reason,
                   bool budgetWasIncreased);
   void endSlice();
 
@@ -196,7 +196,7 @@ struct Statistics {
     }
   }
 
-  void measureInitialHeapSize();
+  void measureInitialHeapSizes();
 
   void nonincremental(GCAbortReason reason) {
     MOZ_ASSERT(reason != GCAbortReason::None);
@@ -253,11 +253,11 @@ struct Statistics {
   static const size_t MAX_SUSPENDED_PHASES = MAX_PHASE_NESTING * 3;
 
   struct SliceData {
-    SliceData(const SliceBudget& budget, mozilla::Maybe<Trigger> trigger,
+    SliceData(const JS::SliceBudget& budget, mozilla::Maybe<Trigger> trigger,
               JS::GCReason reason, TimeStamp start, size_t startFaults,
               gc::State initialState);
 
-    SliceBudget budget;
+    JS::SliceBudget budget;
     JS::GCReason reason = JS::GCReason::NO_REASON;
     mozilla::Maybe<Trigger> trigger;
     gc::State initialState = gc::State::NotActive;
@@ -295,7 +295,7 @@ struct Statistics {
   TimeStamp creationTime() const { return creationTime_; }
 
   TimeDuration totalGCTime() const { return totalGCTime_; }
-  size_t initialCollectedBytes() const { return preCollectedHeapBytes; }
+  size_t initialCollectedBytes() const { return preCollectedGCHeapBytes; }
 
   // File to write profiling information to, either stderr or file specified
   // with JS_GC_PROFILE_FILE.
@@ -322,11 +322,13 @@ struct Statistics {
   // Return JSON for the previous nursery collection.
   UniqueChars renderNurseryJson() const;
 
+  bool bufferAllocStatsEnabled() const { return enableBufferAllocStats_; }
+
 #ifdef DEBUG
   // Print a logging message.
   void log(const char* fmt, ...);
 #else
-  void log(const char* fmt, ...){};
+  void log(const char* fmt, ...) {};
 #endif
 
  private:
@@ -384,11 +386,15 @@ struct Statistics {
   uint32_t tenuredAllocsSinceMinorGC;
 
   /* Total GC heap size before and after the GC ran. */
-  size_t preTotalHeapBytes;
-  size_t postTotalHeapBytes;
+  size_t preTotalGCHeapBytes;
+  size_t postTotalGCHeapBytes;
 
   /* GC heap size for collected zones before GC ran. */
-  size_t preCollectedHeapBytes;
+  size_t preCollectedGCHeapBytes;
+
+  /* Total malloc heap size before and after the GC ran. */
+  size_t preTotalMallocHeapBytes;
+  size_t postTotalMallocHeapBytes;
 
   /*
    * If a GC slice was triggered by exceeding some threshold, record the
@@ -444,6 +450,7 @@ struct Statistics {
 
   bool enableProfiling_ = false;
   bool profileWorkers_ = false;
+  bool enableBufferAllocStats_ = false;
   TimeDuration profileThreshold_;
   ProfileDurations totalTimes_;
   uint64_t sliceCount_;
@@ -471,8 +478,9 @@ struct Statistics {
   void sccDurations(TimeDuration* total, TimeDuration* maxPause) const;
   void printStats();
 
-  template <typename Fn>
-  void reportLongestPhaseInMajorGC(PhaseKind longest, Fn reportFn);
+  template <typename LegacyFn, typename GleanFn>
+  void reportLongestPhaseInMajorGC(PhaseKind longest, LegacyFn legacyReportFn,
+                                   GleanFn gleanReportFn);
 
   UniqueChars formatCompactSlicePhaseTimes(const PhaseTimes& phaseTimes) const;
 
@@ -497,13 +505,21 @@ struct Statistics {
   const char* formatGCFlags(const SliceData& slice);
   const char* formatBudget(const SliceData& slice);
   const char* formatTotalSlices();
+
+  size_t getMallocHeapSize();
+
+  void getBufferedAllocatorStats(Zone* zone, size_t& mediumChunks,
+                                 size_t& mediumTenuredChunks,
+                                 size_t& largeNurseryAllocs,
+                                 size_t& largeTenuredAllocs);
+
   static void printProfileTimes(const ProfileDurations& times,
                                 Sprinter& sprinter);
 };
 
 struct MOZ_RAII AutoGCSlice {
   AutoGCSlice(Statistics& stats, const ZoneGCStats& zoneStats,
-              JS::GCOptions options, const SliceBudget& budget,
+              JS::GCOptions options, const JS::SliceBudget& budget,
               JS::GCReason reason, bool budgetWasIncreased)
       : stats(stats) {
     stats.beginSlice(zoneStats, options, budget, reason, budgetWasIncreased);

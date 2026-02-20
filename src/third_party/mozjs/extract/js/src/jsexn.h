@@ -36,6 +36,10 @@ UniquePtr<JSErrorNotes::Note> CopyErrorNote(JSContext* cx,
 
 UniquePtr<JSErrorReport> CopyErrorReport(JSContext* cx, JSErrorReport* report);
 
+// Cut off the stack if it gets too deep (most commonly for infinite recursion
+// errors).
+static const size_t MAX_REPORTED_STACK_DEPTH = 1u << 7;
+
 bool CaptureStack(JSContext* cx, MutableHandleObject stack);
 
 JSString* ComputeStackString(JSContext* cx);
@@ -77,6 +81,9 @@ static_assert(
         JSProto_Error + int(JSEXN_EVALERR) == JSProto_EvalError &&
         JSProto_Error + int(JSEXN_RANGEERR) == JSProto_RangeError &&
         JSProto_Error + int(JSEXN_REFERENCEERR) == JSProto_ReferenceError &&
+#ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
+        JSProto_Error + int(JSEXN_SUPPRESSEDERR) == JSProto_SuppressedError &&
+#endif
         JSProto_Error + int(JSEXN_SYNTAXERR) == JSProto_SyntaxError &&
         JSProto_Error + int(JSEXN_TYPEERR) == JSProto_TypeError &&
         JSProto_Error + int(JSEXN_URIERR) == JSProto_URIError &&
@@ -85,7 +92,12 @@ static_assert(
         JSProto_Error + int(JSEXN_WASMCOMPILEERROR) == JSProto_CompileError &&
         JSProto_Error + int(JSEXN_WASMLINKERROR) == JSProto_LinkError &&
         JSProto_Error + int(JSEXN_WASMRUNTIMEERROR) == JSProto_RuntimeError &&
+#ifdef ENABLE_WASM_JSPI
+        JSProto_Error + int(JSEXN_WASMSUSPENDERROR) == JSProto_SuspendError &&
+        JSEXN_WASMSUSPENDERROR + 1 == JSEXN_WARN &&
+#else
         JSEXN_WASMRUNTIMEERROR + 1 == JSEXN_WARN &&
+#endif
         JSEXN_WARN + 1 == JSEXN_NOTE && JSEXN_NOTE + 1 == JSEXN_LIMIT,
     "GetExceptionProtoKey and ExnTypeFromProtoKey require that "
     "each corresponding JSExnType and JSProtoKey value be separated "
@@ -118,6 +130,8 @@ class AutoClearPendingException {
   ~AutoClearPendingException() { JS_ClearPendingException(cx); }
 };
 
+// Convert the given value to a string for use in an error message. This
+// function never returns nullptr and never reports an exception.
 extern const char* ValueToSourceForError(JSContext* cx, HandleValue val,
                                          JS::UniqueChars& bytes);
 

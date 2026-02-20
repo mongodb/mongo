@@ -21,15 +21,22 @@ class GlobalHelperThreadState;
 class SourceCompressionTask;
 
 namespace jit {
+class BaselineCompileTask;
 class IonCompileTask;
 class IonFreeTask;
 }  // namespace jit
 namespace wasm {
-struct Tier2GeneratorTask;
+struct CompleteTier2GeneratorTask;
+struct PartialTier2CompileTask;
 }  // namespace wasm
 
 template <typename T>
 struct MapTypeToThreadType {};
+
+template <>
+struct MapTypeToThreadType<jit::BaselineCompileTask> {
+  static const ThreadType threadType = THREAD_TYPE_BASELINE;
+};
 
 template <>
 struct MapTypeToThreadType<jit::IonCompileTask> {
@@ -37,8 +44,14 @@ struct MapTypeToThreadType<jit::IonCompileTask> {
 };
 
 template <>
-struct MapTypeToThreadType<wasm::Tier2GeneratorTask> {
-  static const ThreadType threadType = THREAD_TYPE_WASM_GENERATOR_TIER2;
+struct MapTypeToThreadType<wasm::CompleteTier2GeneratorTask> {
+  static const ThreadType threadType =
+      THREAD_TYPE_WASM_GENERATOR_COMPLETE_TIER2;
+};
+
+template <>
+struct MapTypeToThreadType<wasm::PartialTier2CompileTask> {
+  static const ThreadType threadType = THREAD_TYPE_WASM_COMPILE_PARTIAL_TIER2;
 };
 
 template <>
@@ -65,6 +78,8 @@ class HelperThreadTask {
   virtual void runHelperThreadTask(js::AutoLockHelperThreadState& locked) = 0;
   virtual js::ThreadType threadType() = 0;
   virtual ~HelperThreadTask() = default;
+
+  virtual const char* getName() = 0;
 
   template <typename T>
   bool is() {

@@ -17,8 +17,7 @@
 #include "jstypes.h"
 
 #ifdef XP_WIN
-#  include <windef.h>
-#  include <winbase.h>
+#  include "util/WindowsWrapper.h"
 #  include <crtdbg.h> /* for _CrtSetReportMode */
 #  include <stdlib.h> /* for _set_invalid_parameter_handler */
 #endif

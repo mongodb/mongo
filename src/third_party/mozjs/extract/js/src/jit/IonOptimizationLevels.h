@@ -86,11 +86,6 @@ class OptimizationInfo {
   // Describes which register allocator to use.
   IonRegisterAllocator registerAllocator_;
 
-  uint32_t baseCompilerWarmUpThreshold() const {
-    MOZ_ASSERT(level_ == OptimizationLevel::Normal);
-    return JitOptions.normalIonWarmUpThreshold;
-  }
-
  public:
   constexpr OptimizationInfo()
       : level_(OptimizationLevel::Normal),
@@ -111,8 +106,44 @@ class OptimizationInfo {
         scalarReplacement_(false),
         registerAllocator_(RegisterAllocator_Backtracking) {}
 
-  void initNormalOptimizationInfo();
-  void initWasmOptimizationInfo();
+  constexpr void initNormalOptimizationInfo() {
+    level_ = OptimizationLevel::Normal;
+
+    autoTruncate_ = true;
+    eaa_ = true;
+    edgeCaseAnalysis_ = true;
+    eliminateRedundantChecks_ = true;
+    eliminateRedundantShapeGuards_ = true;
+    eliminateRedundantGCBarriers_ = true;
+    inlineInterpreted_ = true;
+    inlineNative_ = true;
+    licm_ = true;
+    gvn_ = true;
+    rangeAnalysis_ = true;
+    reordering_ = true;
+    scalarReplacement_ = true;
+    sink_ = true;
+
+    registerAllocator_ = RegisterAllocator_Backtracking;
+  }
+  constexpr void initWasmOptimizationInfo() {
+    // The Wasm optimization level
+    // Disables some passes that don't work well with wasm.
+
+    // Take normal option values for not specified values.
+    initNormalOptimizationInfo();
+
+    level_ = OptimizationLevel::Wasm;
+
+    ama_ = true;
+    autoTruncate_ = false;
+    edgeCaseAnalysis_ = false;
+    eliminateRedundantChecks_ = false;
+    eliminateRedundantShapeGuards_ = false;
+    eliminateRedundantGCBarriers_ = false;
+    scalarReplacement_ = true;
+    sink_ = false;
+  }
 
   OptimizationLevel level() const { return level_; }
 
@@ -124,11 +155,9 @@ class OptimizationInfo {
     return inlineNative_ && !JitOptions.disableInlining;
   }
 
-  uint32_t compilerWarmUpThreshold(JSContext* cx, JSScript* script,
-                                   jsbytecode* pc = nullptr) const;
-
-  uint32_t recompileWarmUpThreshold(JSContext* cx, JSScript* script,
-                                    jsbytecode* pc) const;
+  static uint32_t baseWarmUpThresholdForScript(JSContext* cx, JSScript* script);
+  static uint32_t warmUpThresholdForPC(JSScript* script, jsbytecode* pc,
+                                       uint32_t baseThreshold);
 
   bool gvnEnabled() const { return gvn_ && !JitOptions.disableGvn; }
 
@@ -170,9 +199,7 @@ class OptimizationInfo {
            !JitOptions.disableRedundantGCBarriers;
   }
 
-  IonRegisterAllocator registerAllocator() const {
-    return JitOptions.forcedRegisterAllocator.valueOr(registerAllocator_);
-  }
+  IonRegisterAllocator registerAllocator() const;
 
   bool scalarReplacementEnabled() const {
     return scalarReplacement_ && !JitOptions.disableScalarReplacement;
@@ -186,7 +213,10 @@ class OptimizationLevelInfo {
       infos_;
 
  public:
-  OptimizationLevelInfo();
+  constexpr OptimizationLevelInfo() {
+    infos_[OptimizationLevel::Normal].initNormalOptimizationInfo();
+    infos_[OptimizationLevel::Wasm].initWasmOptimizationInfo();
+  }
 
   const OptimizationInfo* get(OptimizationLevel level) const {
     return &infos_[level];
@@ -196,7 +226,7 @@ class OptimizationLevelInfo {
                                    jsbytecode* pc = nullptr) const;
 };
 
-extern const OptimizationLevelInfo IonOptimizations;
+constexpr OptimizationLevelInfo IonOptimizations;
 
 }  // namespace jit
 }  // namespace js

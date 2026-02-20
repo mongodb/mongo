@@ -7,7 +7,6 @@
 #include "vm/Shape-inl.h"
 
 #include "mozilla/MathAlgorithms.h"
-#include "mozilla/PodOperations.h"
 
 #include "gc/HashUtil.h"
 #include "js/friend/WindowProxy.h"  // js::IsWindow
@@ -25,11 +24,6 @@
 #include "vm/NativeObject-inl.h"
 
 using namespace js;
-
-using mozilla::CeilingLog2Size;
-using mozilla::PodZero;
-
-using JS::AutoCheckCannotGC;
 
 /* static */
 bool Shape::replaceShape(JSContext* cx, HandleObject obj,
@@ -105,33 +99,58 @@ bool js::NativeObject::toDictionaryMode(JSContext* cx,
   MOZ_ASSERT(!obj->inDictionaryMode());
   MOZ_ASSERT(cx->isInsideCurrentCompartment(obj));
 
-  Rooted<NativeShape*> shape(cx, obj->shape());
+  RootedTuple<NativeShape*, SharedPropMap*, DictionaryPropMap*, BaseShape*>
+      roots(cx);
+
+  RootedField<NativeShape*> shape(roots, obj->shape());
   uint32_t span = obj->slotSpan();
 
   uint32_t mapLength = shape->propMapLength();
-  MOZ_ASSERT(mapLength > 0, "shouldn't convert empty object to dictionary");
 
   // Clone the shared property map to an unshared dictionary map.
-  Rooted<SharedPropMap*> map(cx, shape->propMap()->asShared());
-  Rooted<DictionaryPropMap*> dictMap(
-      cx, SharedPropMap::toDictionaryMap(cx, map, mapLength));
+  RootedField<DictionaryPropMap*> dictMap(roots);
+
+  if (mapLength > 0) {
+    RootedField<SharedPropMap*> map(roots, shape->propMap()->asShared());
+    dictMap = SharedPropMap::toDictionaryMap(cx, map, mapLength);
+  } else {
+    // Create an empty dictMap
+    dictMap = DictionaryPropMap::createEmpty(cx);
+  }
+
   if (!dictMap) {
     return false;
   }
 
   // Allocate and use a new dictionary shape.
-  Rooted<BaseShape*> base(cx, shape->base());
+  RootedField<BaseShape*> base(roots, shape->base());
   shape = DictionaryShape::new_(cx, base, shape->objectFlags(),
                                 shape->numFixedSlots(), dictMap, mapLength);
   if (!shape) {
     return false;
   }
+
   obj->setShape(shape);
 
   MOZ_ASSERT(obj->inDictionaryMode());
   obj->setDictionaryModeSlotSpan(span);
 
   return true;
+}
+
+bool JSObject::reshapeForTeleporting(JSContext* cx, JS::HandleObject obj) {
+  MOZ_ASSERT(obj->isUsedAsPrototype());
+  MOZ_ASSERT(obj->hasStaticPrototype(),
+             "teleporting as a concept is only applicable to static "
+             "(not dynamically-computed) prototypes");
+  MOZ_ASSERT(obj->is<NativeObject>());
+
+  Handle<NativeObject*> nobj = obj.as<NativeObject>();
+  if (!nobj->inDictionaryMode()) {
+    return NativeObject::toDictionaryMode(cx, nobj);
+  }
+
+  return NativeObject::generateNewDictionaryShape(cx, nobj);
 }
 
 namespace js {
@@ -313,12 +332,7 @@ bool NativeObject::addProperty(JSContext* cx, Handle<NativeObject*> obj,
   MOZ_ASSERT(!obj->containsPure(id));
   MOZ_ASSERT_IF(!id.isPrivateName(),
                 obj->isExtensible() ||
-                    (id.isInt() && obj->containsDenseElement(id.toInt())) ||
-                    // R&T wrappers are non-extensible, but we still want to be
-                    // able to lazily resolve their properties. We can
-                    // special-case them to allow doing so.
-                    IF_RECORD_TUPLE(IsExtendedPrimitiveWrapper(*obj), false));
-
+                    (id.isInt() && obj->containsDenseElement(id.toInt())));
   if (!Watchtower::watchPropertyAdd(cx, obj, id)) {
     return false;
   }
@@ -516,10 +530,6 @@ bool NativeObject::changeProperty(JSContext* cx, Handle<NativeObject*> obj,
   MOZ_ASSERT(!flags.isCustomDataProperty(),
              "Use changeCustomDataPropAttributes for custom data properties");
 
-  if (!Watchtower::watchPropertyChange(cx, obj, id, flags)) {
-    return false;
-  }
-
   Rooted<PropMap*> map(cx, obj->shape()->propMap());
   uint32_t mapLength = obj->shape()->propMapLength();
 
@@ -531,6 +541,12 @@ bool NativeObject::changeProperty(JSContext* cx, Handle<NativeObject*> obj,
 
   PropertyInfo oldProp = propMap->getPropertyInfo(propIndex);
   AssertCanChangeFlags(oldProp, flags);
+
+  if (oldProp.flags() != flags) {
+    if (!Watchtower::watchPropertyFlagsChange(cx, obj, id, oldProp, flags)) {
+      return false;
+    }
+  }
 
   if (oldProp.isAccessorProperty()) {
     objectFlags.setFlag(ObjectFlag::HadGetterSetterChange);
@@ -635,10 +651,6 @@ bool NativeObject::changeCustomDataPropAttributes(JSContext* cx,
   AssertValidArrayIndex(obj, id);
   AssertValidCustomDataProp(obj, flags);
 
-  if (!Watchtower::watchPropertyChange(cx, obj, id, flags)) {
-    return false;
-  }
-
   Rooted<PropMap*> map(cx, obj->shape()->propMap());
   uint32_t mapLength = obj->shape()->propMapLength();
 
@@ -653,6 +665,10 @@ bool NativeObject::changeCustomDataPropAttributes(JSContext* cx,
   // If the property flags are not changing, we're done.
   if (oldProp.flags() == flags) {
     return true;
+  }
+
+  if (!Watchtower::watchPropertyFlagsChange(cx, obj, id, oldProp, flags)) {
+    return false;
   }
 
   const JSClass* clasp = obj->shape()->getObjectClass();
@@ -934,7 +950,7 @@ bool NativeObject::freezeOrSealProperties(JSContext* cx,
                                           IntegrityLevel level) {
   AutoCheckShapeConsistency check(obj);
 
-  if (!Watchtower::watchFreezeOrSeal(cx, obj)) {
+  if (!Watchtower::watchFreezeOrSeal(cx, obj, level)) {
     return false;
   }
 

@@ -112,8 +112,8 @@ class SavedFrame : public NativeObject {
   struct Lookup;
   struct HashPolicy;
 
-  typedef JS::GCHashSet<WeakHeapPtr<SavedFrame*>, HashPolicy, SystemAllocPolicy>
-      Set;
+  using Set =
+      JS::GCHashSet<WeakHeapPtr<SavedFrame*>, HashPolicy, SystemAllocPolicy>;
 
  private:
   static SavedFrame* create(JSContext* cx);
@@ -199,9 +199,9 @@ inline void AssertObjectIsSavedFrameOrWrapper(JSContext* cx,
 // to the subsumes callback, and should be special cased with a shortcut before
 // that.
 struct ReconstructedSavedFramePrincipals : public JSPrincipals {
-  explicit ReconstructedSavedFramePrincipals() {
+  explicit constexpr ReconstructedSavedFramePrincipals()
+      : JSPrincipals(JSPrincipals::RefCount(1)) {
     MOZ_ASSERT(is(this));
-    this->refcount = 1;
   }
 
   [[nodiscard]] bool write(JSContext* cx,
@@ -224,7 +224,7 @@ struct ReconstructedSavedFramePrincipals : public JSPrincipals {
 
   // Return true if the given JSPrincipals* points to one of the
   // ReconstructedSavedFramePrincipals singletons, false otherwise.
-  static bool is(JSPrincipals* p) {
+  static constexpr bool is(JSPrincipals* p) {
     return p == &IsSystem || p == &IsNotSystem;
   }
 

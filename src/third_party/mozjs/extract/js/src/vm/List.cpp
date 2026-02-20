@@ -8,4 +8,6 @@
 
 using namespace js;
 
-const JSClass ListObject::class_ = {"List"};
+const JSClass ListObject::class_ = {
+    "List",
+};

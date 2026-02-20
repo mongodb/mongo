@@ -721,6 +721,10 @@ ICScript* TrialInliner::createInlinedICScript(JSFunction* target,
   }
   MOZ_ASSERT(result->numICEntries() == targetScript->numICEntries());
 
+  if (targetScript->needsFunctionEnvironmentObjects()) {
+    result->ensureEnvAllocSite(root->owningScript());
+  }
+
   root->addToTotalBytecodeSize(targetScript->length());
 
   JitSpewIndent spewIndent(JitSpew_WarpTrialInlining);

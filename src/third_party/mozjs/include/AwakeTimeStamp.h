@@ -23,12 +23,16 @@ class AwakeTimeDuration;
 //
 // Some arithmetic and ordering operations are supported, when they make sense.
 //
-// This timestamp shouldn't be considered to be high-resolution, and is suitable
-// to measure time from a hundred of milliseconds (because of Windows
-// limitations).
+// When using NowLoRes(), the timestamp shouldn't be considered to be
+// high-resolution, and is suitable to measure time from a hundred of
+// milliseconds (because of Windows limitations).
+// Now() can be a bit more expensive on Windows, and is precise. Both
+// methods are equivalent on non-Windows.
 class AwakeTimeStamp {
  public:
+  using DurationType = AwakeTimeDuration;
   MFBT_API static AwakeTimeStamp NowLoRes();
+  MFBT_API static AwakeTimeStamp Now();
   MFBT_API void operator+=(const AwakeTimeDuration& aOther);
   MFBT_API void operator-=(const AwakeTimeDuration& aOther);
   MFBT_API bool operator<(const AwakeTimeStamp& aOther) const {
@@ -50,6 +54,7 @@ class AwakeTimeStamp {
     return !(*this == aOther);
   }
   MFBT_API AwakeTimeDuration operator-(AwakeTimeStamp const& aOther) const;
+  MFBT_API AwakeTimeStamp operator-(AwakeTimeDuration const& aOther) const;
   MFBT_API AwakeTimeStamp operator+(const AwakeTimeDuration& aDuration) const;
 
  private:
@@ -71,6 +76,9 @@ class AwakeTimeDuration {
   MFBT_API double ToSeconds() const;
   MFBT_API double ToMilliseconds() const;
   MFBT_API double ToMicroseconds() const;
+  static MFBT_API AwakeTimeDuration FromSeconds(uint64_t aSeconds);
+  static MFBT_API AwakeTimeDuration FromMilliseconds(uint64_t aMilliseconds);
+  static MFBT_API AwakeTimeDuration FromMicroseconds(uint64_t aMicroseconds);
   MFBT_API void operator+=(const AwakeTimeDuration& aDuration) {
     mValueUs += aDuration.mValueUs;
   }

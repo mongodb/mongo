@@ -33,7 +33,7 @@ class ValueNumberer {
       static void rekey(Key& k, Key newKey);
     };
 
-    typedef HashSet<MDefinition*, ValueHasher, JitAllocPolicy> ValueSet;
+    using ValueSet = HashSet<MDefinition*, ValueHasher, JitAllocPolicy>;
 
     ValueSet set_;  // Set of visible values
 
@@ -54,10 +54,10 @@ class ValueNumberer {
 #endif
   };
 
-  typedef Vector<MBasicBlock*, 4, JitAllocPolicy> BlockWorklist;
-  typedef Vector<MDefinition*, 4, JitAllocPolicy> DefWorklist;
+  using BlockWorklist = Vector<MBasicBlock*, 4, JitAllocPolicy>;
+  using DefWorklist = Vector<MDefinition*, 4, JitAllocPolicy>;
 
-  MIRGenerator* const mir_;
+  const MIRGenerator* const mir_;
   MIRGraph& graph_;
   VisibleValues values_;           // Numbered values
   DefWorklist deadDefs_;           // Worklist for deleting values
@@ -107,7 +107,7 @@ class ValueNumberer {
   [[nodiscard]] bool cleanupOSRFixups();
 
  public:
-  ValueNumberer(MIRGenerator* mir, MIRGraph& graph);
+  ValueNumberer(const MIRGenerator* mir, MIRGraph& graph);
 
   enum UpdateAliasAnalysisFlag { DontUpdateAliasAnalysis, UpdateAliasAnalysis };
 

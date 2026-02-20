@@ -32,19 +32,25 @@
 namespace js {
 namespace wasm {
 
-// Limits are parameterized by an IndexType which is used to index the
+// Limits are parameterized by an AddressType which is used to index the
 // underlying resource (either a Memory or a Table). Tables are restricted to
 // I32, while memories may use I64 when memory64 is enabled.
 
-enum class IndexType : uint8_t { I32, I64 };
+enum class AddressType : uint8_t { I32, I64 };
 
-inline ValType ToValType(IndexType it) {
-  return it == IndexType::I64 ? ValType::I64 : ValType::I32;
+inline ValType ToValType(AddressType at) {
+  return at == AddressType::I64 ? ValType::I64 : ValType::I32;
 }
 
-extern bool ToIndexType(JSContext* cx, HandleValue value, IndexType* indexType);
+inline AddressType MinAddressType(AddressType a, AddressType b) {
+  return (a == AddressType::I32 || b == AddressType::I32) ? AddressType::I32
+                                                          : AddressType::I64;
+}
 
-extern const char* ToString(IndexType indexType);
+extern bool ToAddressType(JSContext* cx, HandleValue value,
+                          AddressType* addressType);
+
+extern const char* ToString(AddressType addressType);
 
 // Pages is a typed unit representing a multiple of wasm::PageSize. We
 // generally use pages as the unit of length when representing linear memory
@@ -120,10 +126,10 @@ struct Pages {
 };
 
 // The largest number of pages the application can request.
-extern Pages MaxMemoryPages(IndexType t);
+extern Pages MaxMemoryPages(AddressType t);
 
 // The byte value of MaxMemoryPages(t).
-static inline size_t MaxMemoryBytes(IndexType t) {
+static inline size_t MaxMemoryBytes(AddressType t) {
   return MaxMemoryPages(t).byteLength();
 }
 
@@ -131,16 +137,21 @@ static inline size_t MaxMemoryBytes(IndexType t) {
 // bounds check limit on the system.  (It can be larger than MaxMemoryBytes()
 // because bounds check limits are rounded up to fit formal requirements on some
 // platforms.  Also see ComputeMappedSize().)
-extern size_t MaxMemoryBoundsCheckLimit(IndexType t);
+extern size_t MaxMemoryBoundsCheckLimit(AddressType t);
 
-static inline uint64_t MaxMemoryLimitField(IndexType indexType) {
-  return indexType == IndexType::I32 ? MaxMemory32LimitField
-                                     : MaxMemory64LimitField;
+static inline uint64_t MaxMemoryPagesValidation(AddressType addressType) {
+  return addressType == AddressType::I32 ? MaxMemory32PagesValidation
+                                         : MaxMemory64PagesValidation;
+}
+
+static inline uint64_t MaxTableElemsValidation(AddressType addressType) {
+  return addressType == AddressType::I32 ? MaxTable32ElemsValidation
+                                         : MaxTable64ElemsValidation;
 }
 
 // Compute the 'clamped' maximum size of a memory. See
 // 'WASM Linear Memory structure' in ArrayBufferObject.cpp for background.
-extern Pages ClampedMaxPages(IndexType t, Pages initialPages,
+extern Pages ClampedMaxPages(AddressType t, Pages initialPages,
                              const mozilla::Maybe<Pages>& sourceMaxPages,
                              bool useHugeMemory);
 
@@ -150,7 +161,7 @@ extern Pages ClampedMaxPages(IndexType t, Pages initialPages,
 // vm/ArrayBufferObject.cpp.
 extern size_t ComputeMappedSize(Pages clampedMaxPages);
 
-extern size_t GetMaxOffsetGuardLimit(bool hugeMemory);
+extern uint64_t GetMaxOffsetGuardLimit(bool hugeMemory);
 
 // Return whether the given immediate satisfies the constraints of the platform.
 extern bool IsValidBoundsCheckImmediate(uint32_t i);

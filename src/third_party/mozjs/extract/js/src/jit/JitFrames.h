@@ -113,9 +113,8 @@ enum class ExceptionResumeKind : int32_t {
   // Jump to the bailout tail stub.
   Bailout,
 
-  // The innermost frame was a wasm frame.
-  // Return to the wasm entry frame.
-  Wasm,
+  // Return to the wasm interpreter entry frame.
+  WasmInterpEntry,
 
   // The exception was caught by a wasm catch handler.
   // Restore state and jump to it.
@@ -199,7 +198,7 @@ static inline uint32_t MakeFrameDescriptorForJitCall(FrameType type,
 // Returns the JSScript associated with the topmost JIT frame.
 JSScript* GetTopJitJSScript(JSContext* cx);
 
-#if defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_ARM64)
+#if defined(JS_CODEGEN_ARM64)
 uint8_t* alignDoubleSpill(uint8_t* pointer);
 #else
 inline uint8_t* alignDoubleSpill(uint8_t* pointer) {
@@ -381,24 +380,10 @@ class ExitFooterFrame {
     return static_cast<VMFunctionId>(data_ - size_t(ExitFrameType::VMFunction));
   }
 
-#ifdef JS_CODEGEN_MIPS32
-  uint8_t* alignedForABI() {
-    // See: MacroAssemblerMIPSCompat::alignStackPointer()
-    uint8_t* address = reinterpret_cast<uint8_t*>(this);
-    address -= sizeof(intptr_t);
-    return alignDoubleSpill(address);
-  }
-#else
-  uint8_t* alignedForABI() {
-    // This is NO-OP on non-MIPS platforms.
-    return reinterpret_cast<uint8_t*>(this);
-  }
-#endif
-
   // This should only be called for function()->outParam == Type_Handle
   template <typename T>
   T* outParam() {
-    uint8_t* address = alignedForABI();
+    uint8_t* address = reinterpret_cast<uint8_t*>(this);
     return reinterpret_cast<T*>(address - sizeof(T));
   }
 };
@@ -414,8 +399,8 @@ class ExitFrameLayout : public CommonFrameLayout {
   inline uint8_t* top() { return reinterpret_cast<uint8_t*>(this + 1); }
 
  public:
-  static inline size_t Size() { return sizeof(ExitFrameLayout); }
-  static inline size_t SizeWithFooter() {
+  static constexpr size_t Size() { return sizeof(ExitFrameLayout); }
+  static constexpr size_t SizeWithFooter() {
     return Size() + ExitFooterFrame::Size();
   }
 

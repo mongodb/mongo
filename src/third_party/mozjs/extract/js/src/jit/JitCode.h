@@ -47,6 +47,10 @@ class JitCode : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   // Raw code pointer, stored in the cell header.
   uint8_t* raw() const { return headerPtr(); }
 
+  // Raw pointer to the allocated memory to be able to modify the JitCodePointer
+  // which is stored above the code.
+  uint8_t* allocatedMemory() const { return headerPtr() - headerSize_; }
+
  protected:
   ExecutablePool* pool_;
   uint32_t bufferSize_;  // Total buffer size. Does not include headerSize_.
@@ -96,6 +100,7 @@ class JitCode : public gc::TenuredCellWithNonGCPointer<uint8_t> {
   size_t instructionsSize() const { return insnSize_; }
   size_t bufferSize() const { return bufferSize_; }
   size_t headerSize() const { return headerSize_; }
+  size_t allocatedSize() const { return bufferSize_ + headerSize_; }
 
   void traceChildren(JSTracer* trc);
   void finalize(JS::GCContext* gcx);

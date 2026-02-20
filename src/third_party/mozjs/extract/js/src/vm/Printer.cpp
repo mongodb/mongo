@@ -41,7 +41,7 @@ class GenericPrinterPrintfTarget : public mozilla::PrintfTarget {
 
 namespace js {
 
-void GenericPrinter::reportOutOfMemory() {
+void GenericPrinter::setPendingOutOfMemory() {
   if (hadOOM_) {
     return;
   }
@@ -64,7 +64,7 @@ void GenericPrinter::put(mozilla::Span<const char16_t> str) {
 void GenericPrinter::putString(JSContext* cx, JSString* str) {
   StringSegmentRange iter(cx);
   if (!iter.init(str)) {
-    reportOutOfMemory();
+    setPendingOutOfMemory();
     return;
   }
   JS::AutoCheckCannotGC nogc;
@@ -76,7 +76,7 @@ void GenericPrinter::putString(JSContext* cx, JSString* str) {
       put(linear->twoByteRange(nogc));
     }
     if (!iter.popFront()) {
-      reportOutOfMemory();
+      setPendingOutOfMemory();
       return;
     }
   }
@@ -109,7 +109,11 @@ bool StringPrinter::realloc_(size_t newSize) {
   }
   char* newBuf = (char*)js_arena_realloc(arena, base, newSize);
   if (!newBuf) {
-    reportOutOfMemory();
+    // NOTE: The consumer of this method shouldn't directly propagate the error
+    //       mode to the outside of this class.
+    //       The OOM flag set here should be forwarded to the JSContext with
+    //       the releaseChars etc.
+    setPendingOutOfMemory();
     return false;
   }
   base = newBuf;
@@ -144,7 +148,7 @@ bool StringPrinter::init() {
   MOZ_ASSERT(!initialized);
   base = js_pod_arena_malloc<char>(arena, DefaultSize);
   if (!base) {
-    reportOutOfMemory();
+    setPendingOutOfMemory();
     forwardOutOfMemory();
     return false;
   }
@@ -331,6 +335,18 @@ static const char JSONEscapeMap[] = {
     // clang-format on
 };
 
+static const char WATEscapeMap[] = {
+    // clang-format off
+    '\t', 't',
+    '\n', 'n',
+    '\r', 'r',
+    '"',  '"',
+    '\'',  '\'',
+    '\\', '\\',
+    '\0'
+    // clang-format on
+};
+
 template <QuoteTarget target, typename CharT>
 JS_PUBLIC_API void QuoteString(Sprinter* sp,
                                const mozilla::Range<const CharT>& chars,
@@ -441,14 +457,14 @@ void Fprinter::put(const char* s, size_t len) {
   MOZ_ASSERT(file_);
   int i = fwrite(s, /*size=*/1, /*nitems=*/len, file_);
   if (size_t(i) != len) {
-    reportOutOfMemory();
+    setPendingOutOfMemory();
     return;
   }
 #ifdef XP_WIN
   if ((file_ == stderr) && (IsDebuggerPresent())) {
     UniqueChars buf = DuplicateString(s, len);
     if (!buf) {
-      reportOutOfMemory();
+      setPendingOutOfMemory();
       return;
     }
     OutputDebugStringA(buf.get());
@@ -505,7 +521,7 @@ void LSprinter::put(const char* s, size_t len) {
     LifoAlloc::AutoFallibleScope fallibleAllocator(alloc_);
     last = reinterpret_cast<Chunk*>(alloc_->alloc(allocLength));
     if (!last) {
-      reportOutOfMemory();
+      setPendingOutOfMemory();
       return;
     }
   }
@@ -582,11 +598,161 @@ void StringEscape::convertInto(GenericPrinter& out, char16_t c) {
   }
 }
 
-void IndentedPrinter::putIndent() {
+bool WATStringEscape::isSafeChar(char16_t c) {
+  return js::IsAsciiPrintable(c) && c != '"' && c != '\\';
+}
+
+void WATStringEscape::convertInto(GenericPrinter& out, char16_t c) {
+  const char* escape = nullptr;
+  if (!(c >> 8) && c != 0 &&
+      (escape = strchr(WATEscapeMap, int(c))) != nullptr) {
+    out.printf("\\%c", escape[1]);
+  } else {
+    out.printf("\\%02X", c);
+  }
+}
+
+void StructuredPrinter::pushScope() {
+  if (hadOutOfMemory()) {
+    return;
+  }
+
+  // MONGODB MODIFICATION: Compound literal syntax not supported by MSVC
+  bool ok = scopes_.append(ScopeInfo{
+      .startPos = uint32_t(buffer_.length()),
+      .indent = scopeDepth() + 1,
+  });
+  if (!ok) {
+    setPendingOutOfMemory();
+  }
+}
+
+void StructuredPrinter::popScope() {
+  // If we previously ran out of memory, we may have failed to push a scope, and
+  // this logic may fail.
+  if (hadOutOfMemory()) {
+    return;
+  }
+
+  // If the scope remained collapsed, flag all its breaks as collapsed.
+  if (!isExpanded()) {
+    const ScopeInfo& scope = scopes_.back();
+    for (Break& brk : breaks_) {
+      if (scope.startPos <= brk.bufferPos) {
+        brk.isCollapsed = true;
+      }
+    }
+  }
+
+  scopes_.popBack();
+  if (scopeDepth() < expandedDepth_) {
+    expandedDepth_ = scopeDepth();
+  }
+
+  // If we are back to a depth where we are printing expanded, flush the buffer
+  // to get back into our expected expanded state.
+  if (isExpanded()) {
+    flush();
+  }
+}
+
+void StructuredPrinter::flush() {
+  uint32_t cursor = 0;
+
+  // Output any initial breaks.
+  while (!breaks_.empty() && breaks_[0].bufferPos == 0) {
+    putBreak(breaks_[0]);
+    breaks_.erase(&breaks_[0]);
+  }
+
+  // Output all chunks from the buffer, split by scopes and breaks.
+  while (cursor < buffer_.length()) {
+    int indent = 0;
+    mozilla::Maybe<const ScopeInfo&> nextScope;
+    for (const ScopeInfo& scope : scopes_) {
+      if (cursor < scope.startPos) {
+        nextScope.emplace(scope);
+        break;
+      }
+      indent = scope.indent;
+    }
+
+    // Find the next break(s) or start of the next scope.
+    size_t len = buffer_.length() - cursor;
+    mozilla::Maybe<size_t> nextBreaksIndex;
+    size_t numBreaks = 0;
+    for (size_t i = 0; i < breaks_.length(); i++) {
+      const Break& brk = breaks_[i];
+      if (nextScope.isSome() && nextScope->startPos < brk.bufferPos) {
+        len = nextScope->startPos - cursor;
+        break;
+      }
+      if (cursor < brk.bufferPos) {
+        len = brk.bufferPos - cursor;
+        nextBreaksIndex.emplace(i);
+        // There can be more than one break at the same cursor position;
+        // grab them all.
+        for (size_t j = i; j < breaks_.length(); j++) {
+          if (breaks_[i].bufferPos == breaks_[j].bufferPos) {
+            numBreaks += 1;
+          }
+        }
+        break;
+      }
+    }
+
+    putWithMaybeIndent(&buffer_[cursor], len, indent);
+    cursor += len;
+
+    if (nextBreaksIndex.isSome()) {
+      for (size_t i = 0; i < numBreaks; i++) {
+        putBreak(breaks_[nextBreaksIndex.value() + i]);
+      }
+    }
+  }
+
+  // Clear the buffer, clear all breaks, and reset scope positions.
+  buffer_.clear();
+  breaks_.clear();
+  for (ScopeInfo& scope : scopes_) {
+    scope.startPos = 0;
+  }
+}
+
+void StructuredPrinter::brk(const char* whenCollapsed,
+                            const char* whenExpanded) {
+  // MONGODB MODIFICATION: Compound literal syntax not supported by MSVC
+  Break b = Break{
+      .bufferPos = uint32_t(buffer_.length()),
+      .collapsed = whenCollapsed,
+      .expanded = whenExpanded,
+  };
+  if (isExpanded()) {
+    putBreak(b);
+  } else {
+    bool ok = breaks_.append(b);
+    if (!ok) {
+      setPendingOutOfMemory();
+    }
+  }
+}
+
+void StructuredPrinter::expand() {
+  expandedDepth_ = scopeDepth();
+  flush();
+}
+
+bool StructuredPrinter::isExpanded() { return expandedDepth_ == scopeDepth(); }
+
+void StructuredPrinter::putIndent(int level) {
   // Allocate a static buffer of 16 spaces (plus null terminator) and use that
   // in batches for the total number of spaces we need to put.
   static const char spaceBuffer[17] = "                ";
-  size_t remainingSpaces = indentLevel_ * indentAmount_;
+
+  if (level < 0) {
+    level = scopeDepth();
+  }
+  size_t remainingSpaces = level * indentAmount_;
   while (remainingSpaces > 16) {
     out_.put(spaceBuffer, 16);
     remainingSpaces -= 16;
@@ -596,22 +762,39 @@ void IndentedPrinter::putIndent() {
   }
 }
 
-void IndentedPrinter::putWithMaybeIndent(const char* s, size_t len) {
+void StructuredPrinter::putBreak(const Break& brk) {
+  const char* s = brk.isCollapsed ? brk.collapsed : brk.expanded;
+  size_t len = strlen(s);
+  if (len > 0) {
+    out_.put(s, len);
+    pendingIndent_ = s[len - 1] == '\n';
+  }
+}
+
+void StructuredPrinter::putWithMaybeIndent(const char* s, size_t len,
+                                           int level) {
   if (len == 0) {
     return;
   }
   if (pendingIndent_) {
-    putIndent();
+    putIndent(level);
     pendingIndent_ = false;
   }
   out_.put(s, len);
 }
 
-void IndentedPrinter::put(const char* s, size_t len) {
+void StructuredPrinter::put(const char* s, size_t len) {
   const char* current = s;
-  // Split the text into lines and output each with an indent
+
+  // Split the text into lines and output each with the appropriate indent
   while (const char* nextLineEnd = (const char*)memchr(current, '\n', len)) {
-    // Put this line (including the new-line)
+    // Newlines mean we must expand.
+    expand();
+
+    // For the rest of this loop we can assume that we are expanded and buffer
+    // nothing.
+
+    // Put this line (including the newline)
     size_t lineWithNewLineSize = nextLineEnd - current + 1;
     putWithMaybeIndent(current, lineWithNewLineSize);
 
@@ -623,8 +806,15 @@ void IndentedPrinter::put(const char* s, size_t len) {
     len -= lineWithNewLineSize;
   }
 
-  // Put any remaining text
-  putWithMaybeIndent(current, len);
+  // The rest of the text is newline-free. We buffer it if we are collapsed, and
+  // output it directly if expanded.
+  if (isExpanded()) {
+    putWithMaybeIndent(current, len);
+  } else {
+    if (!buffer_.append(current, len)) {
+      setPendingOutOfMemory();
+    }
+  }
 }
 
 }  // namespace js

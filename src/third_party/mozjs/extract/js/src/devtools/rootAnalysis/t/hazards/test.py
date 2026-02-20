@@ -119,3 +119,10 @@ assert "Cell* refptr_test10()" in haz_functions
 
 assert "void aggr_init_safe()" not in haz_functions
 assert "void aggr_init_unsafe()" in haz_functions
+
+# stack_array tests.
+
+assert "void stack_array()" in haz_functions
+haz_vars = byfunc["void stack_array()"]
+assert "array" in haz_vars
+assert "array2" not in haz_vars

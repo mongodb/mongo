@@ -61,6 +61,7 @@ void mongoToJSException(JSContext* cx) {
             JS_SetPendingException(cx, val);
         }
     } else {
+        JS::ReportUncatchableException(cx);
         // If a JSAPI callback returns false without setting a pending exception, SpiderMonkey will
         // treat it as an uncatchable error.
         auto scope = getScope(cx);

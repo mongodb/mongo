@@ -282,6 +282,7 @@
 #include "jit/BaselineFrame.h"
 #include "jit/BaselineIC.h"
 #include "jit/JitContext.h"
+#include "jit/JitRuntime.h"
 #include "jit/JitScript.h"
 #include "vm/Interpreter.h"
 #include "vm/Stack.h"
@@ -329,23 +330,15 @@ enum class PBIResult {
   UnwindRet,
 };
 
-PBIResult PortableBaselineInterpret(JSContext* cx_, State& state, Stack& stack,
-                                    StackVal* sp, JSObject* envChain,
-                                    Value* ret);
+template <bool IsRestart, bool HybridICs>
+PBIResult PortableBaselineInterpret(
+    JSContext* cx_, State& state, Stack& stack, StackVal* sp,
+    JSObject* envChain, Value* ret, jsbytecode* pc, ImmutableScriptData* isd,
+    jsbytecode* restartEntryPC, jit::BaselineFrame* restartFrame,
+    StackVal* restartEntryFrame, PBIResult restartCode);
 
-enum class ICInterpretOpResult {
-  NextIC,
-  Return,
-  Error,
-  Unwind,
-  UnwindError,
-  UnwindRet,
-};
-
-ICInterpretOpResult MOZ_ALWAYS_INLINE
-ICInterpretOps(jit::BaselineFrame* frame, VMFrameManager& frameMgr,
-               State& state, ICRegs& icregs, Stack& stack, StackVal* sp,
-               jit::ICCacheIRStub* cstub, jsbytecode* pc);
+uint8_t* GetPortableFallbackStub(jit::BaselineICFallbackKind kind);
+uint8_t* GetICInterpreter();
 
 } /* namespace pbl */
 } /* namespace js */

@@ -15,7 +15,7 @@
 
 namespace js {
 
-class StringBuffer;
+class StringBuilder;
 
 extern const JSClass JSONClass;
 
@@ -50,7 +50,7 @@ enum class StringifyBehavior {
  * not try to invoke .toJSON on things as it goes.
  */
 extern bool Stringify(JSContext* cx, js::MutableHandleValue vp,
-                      JSObject* replacer, const Value& space, StringBuffer& sb,
+                      JSObject* replacer, const Value& space, StringBuilder& sb,
                       StringifyBehavior stringifyBehavior);
 
 template <typename CharT>

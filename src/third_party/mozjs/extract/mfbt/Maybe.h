@@ -249,7 +249,7 @@ struct MaybeStorage<T, false> : MaybeStorageBase<T> {
  protected:
   char mIsSome = false;  // not bool -- guarantees minimal space consumption
 
-  MaybeStorage() = default;
+  constexpr MaybeStorage() = default;
   explicit MaybeStorage(const T& aVal)
       : MaybeStorageBase<T>{aVal}, mIsSome{true} {}
   explicit MaybeStorage(T&& aVal)
@@ -364,7 +364,7 @@ constexpr Maybe<U> Some(T&& aValue);
  *     functions |Some()| and |Nothing()|.
  */
 template <class T>
-class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
+class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_GSL_OWNER Maybe
     : private detail::MaybeStorage<T>,
       public detail::Maybe_CopyMove_Enabler<T> {
   template <typename, bool, bool, bool>
@@ -579,23 +579,24 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
   constexpr const T* operator->() const;
 
   /* Returns the contents of this Maybe<T> by ref. Unsafe unless |isSome()|. */
-  constexpr T& ref() &;
-  constexpr const T& ref() const&;
-  constexpr T&& ref() &&;
-  constexpr const T&& ref() const&&;
+  constexpr T& ref() & MOZ_LIFETIME_BOUND;
+  constexpr const T& ref() const& MOZ_LIFETIME_BOUND;
+  constexpr T&& ref() && MOZ_LIFETIME_BOUND;
+  constexpr const T&& ref() const&& MOZ_LIFETIME_BOUND;
 
   /*
    * Returns the contents of this Maybe<T> by ref. If |isNothing()|, returns
    * the default value provided.
    */
-  constexpr T& refOr(T& aDefault) {
+  constexpr T& refOr(T& aDefault MOZ_LIFETIME_BOUND) MOZ_LIFETIME_BOUND {
     if (isSome()) {
       return ref();
     }
     return aDefault;
   }
 
-  constexpr const T& refOr(const T& aDefault) const {
+  constexpr const T& refOr(const T& aDefault MOZ_LIFETIME_BOUND) const
+      MOZ_LIFETIME_BOUND {
     if (isSome()) {
       return ref();
     }
@@ -622,10 +623,10 @@ class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Maybe
     return aFunc();
   }
 
-  constexpr T& operator*() &;
-  constexpr const T& operator*() const&;
-  constexpr T&& operator*() &&;
-  constexpr const T&& operator*() const&&;
+  constexpr T& operator*() & MOZ_LIFETIME_BOUND;
+  constexpr const T& operator*() const& MOZ_LIFETIME_BOUND;
+  constexpr T&& operator*() && MOZ_LIFETIME_BOUND;
+  constexpr const T&& operator*() const&& MOZ_LIFETIME_BOUND;
 
   /* If |isSome()|, runs the provided function or functor on the contents of
    * this Maybe. */

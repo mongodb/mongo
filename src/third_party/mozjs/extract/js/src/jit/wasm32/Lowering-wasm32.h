@@ -62,14 +62,6 @@ class LIRGeneratorWasm32 : public LIRGeneratorShared {
                           MDefinition* v = nullptr) {
     MOZ_CRASH();
   }
-  void lowerForBitAndAndBranch(LBitAndAndBranch*, MInstruction*, MDefinition*,
-                               MDefinition*) {
-    MOZ_CRASH();
-  }
-  void lowerForCompareI64AndBranch(MTest*, MCompare*, JSOp, MDefinition*,
-                                   MDefinition*, MBasicBlock*, MBasicBlock*) {
-    MOZ_CRASH();
-  }
 
   void lowerConstantDouble(double, MInstruction*) { MOZ_CRASH(); }
   void lowerConstantFloat32(float, MInstruction*) { MOZ_CRASH(); }
@@ -107,21 +99,19 @@ class LIRGeneratorWasm32 : public LIRGeneratorShared {
     MOZ_CRASH();
   }
 
-  void lowerBigIntLsh(MBigIntLsh*) { MOZ_CRASH(); }
-  void lowerBigIntRsh(MBigIntRsh*) { MOZ_CRASH(); }
-  void lowerBigIntDiv(MBigIntDiv*) { MOZ_CRASH(); }
-  void lowerBigIntMod(MBigIntMod*) { MOZ_CRASH(); }
+  void lowerBigIntPtrLsh(MBigIntPtrLsh*) { MOZ_CRASH(); }
+  void lowerBigIntPtrRsh(MBigIntPtrRsh*) { MOZ_CRASH(); }
+  void lowerBigIntPtrDiv(MBigIntPtrDiv*) { MOZ_CRASH(); }
+  void lowerBigIntPtrMod(MBigIntPtrMod*) { MOZ_CRASH(); }
 
   void lowerAtomicLoad64(MLoadUnboxedScalar*) { MOZ_CRASH(); }
   void lowerAtomicStore64(MStoreUnboxedScalar*) { MOZ_CRASH(); }
 
-  LTableSwitch* newLTableSwitch(LAllocation, LDefinition, MTableSwitch*) {
-    MOZ_CRASH();
-  }
-  LTableSwitchV* newLTableSwitchV(MTableSwitch*) { MOZ_CRASH(); }
+  LTableSwitch* newLTableSwitch(LAllocation, LDefinition) { MOZ_CRASH(); }
+  LTableSwitchV* newLTableSwitchV(const LBoxAllocation&) { MOZ_CRASH(); }
 };
 
-typedef LIRGeneratorWasm32 LIRGeneratorSpecific;
+using LIRGeneratorSpecific = LIRGeneratorWasm32;
 
 }  // namespace js::jit
 

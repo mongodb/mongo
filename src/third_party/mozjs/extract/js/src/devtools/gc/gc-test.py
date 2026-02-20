@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
     if OPTIONS.baseline_path:
         baseline_map = []
-        fh = open(OPTIONS.baseline_path, "r")
+        fh = open(OPTIONS.baseline_path)
         baseline_map = json.load(fh)
         fh.close()
         compare(current=bench_map, baseline=baseline_map)

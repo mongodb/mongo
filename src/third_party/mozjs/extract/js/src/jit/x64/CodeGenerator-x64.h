@@ -12,18 +12,19 @@
 namespace js {
 namespace jit {
 
+class OutOfLineTruncate;
+
 class CodeGeneratorX64 : public CodeGeneratorX86Shared {
  protected:
-  CodeGeneratorX64(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm);
+  CodeGeneratorX64(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm,
+                   const wasm::CodeMetadata* wasmCodeMeta);
 
   Operand ToOperand64(const LInt64Allocation& a);
-  ValueOperand ToValue(LInstruction* ins, size_t pos);
-  ValueOperand ToTempValue(LInstruction* ins, size_t pos);
 
-  void emitBigIntDiv(LBigIntDiv* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
-  void emitBigIntMod(LBigIntMod* ins, Register dividend, Register divisor,
-                     Register output, Label* fail);
+  void emitBigIntPtrDiv(LBigIntPtrDiv* ins, Register dividend, Register divisor,
+                        Register output);
+  void emitBigIntPtrMod(LBigIntPtrMod* ins, Register dividend, Register divisor,
+                        Register output);
 
   void wasmStore(const wasm::MemoryAccessDesc& access, const LAllocation* value,
                  Operand dstAddr);
@@ -31,6 +32,9 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared {
   void emitWasmLoad(T* ins);
   template <typename T>
   void emitWasmStore(T* ins);
+
+ public:
+  void visitOutOfLineTruncate(OutOfLineTruncate* ool);
 };
 
 using CodeGeneratorSpecific = CodeGeneratorX64;

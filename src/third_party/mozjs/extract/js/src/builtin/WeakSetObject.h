@@ -16,6 +16,10 @@ class WeakSetObject : public WeakCollectionObject {
   static const JSClass class_;
   static const JSClass protoClass_;
 
+  [[nodiscard]] static bool add(JSContext* cx, unsigned argc, Value* vp);
+  [[nodiscard]] static bool delete_(JSContext* cx, unsigned argc, Value* vp);
+  [[nodiscard]] static bool has(JSContext* cx, unsigned argc, Value* vp);
+
  private:
   static const ClassSpec classSpec_;
 
@@ -25,19 +29,18 @@ class WeakSetObject : public WeakCollectionObject {
   static WeakSetObject* create(JSContext* cx, HandleObject proto = nullptr);
   [[nodiscard]] static bool construct(JSContext* cx, unsigned argc, Value* vp);
 
+  [[nodiscard]] static bool tryOptimizeCtorWithIterable(
+      JSContext* cx, Handle<WeakSetObject*> obj, Handle<Value> iterableVal,
+      bool* optimized);
+
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool is(HandleValue v);
 
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool add_impl(JSContext* cx,
                                                        const CallArgs& args);
-  [[nodiscard]] static bool add(JSContext* cx, unsigned argc, Value* vp);
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool delete_impl(JSContext* cx,
                                                           const CallArgs& args);
-  [[nodiscard]] static bool delete_(JSContext* cx, unsigned argc, Value* vp);
   [[nodiscard]] static MOZ_ALWAYS_INLINE bool has_impl(JSContext* cx,
                                                        const CallArgs& args);
-  [[nodiscard]] static bool has(JSContext* cx, unsigned argc, Value* vp);
-
-  static bool isBuiltinAdd(HandleValue add);
 };
 
 }  // namespace js

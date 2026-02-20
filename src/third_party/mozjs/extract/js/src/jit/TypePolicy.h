@@ -17,8 +17,8 @@ class MInstruction;
 class MDefinition;
 class TempAllocator;
 
-extern MDefinition* AlwaysBoxAt(TempAllocator& alloc, MInstruction* at,
-                                MDefinition* operand);
+extern MDefinition* BoxAt(TempAllocator& alloc, MInstruction* at,
+                          MDefinition* operand);
 
 // A type policy directs the type analysis phases, which insert conversion,
 // boxing, unboxing, and type changes as necessary.
@@ -259,6 +259,20 @@ class Int32OrIntPtrPolicy final : private TypePolicy {
   }
 };
 
+// Expect an IntPtr for operand Op.
+template <unsigned Op>
+class IntPtrPolicy final : private TypePolicy {
+ public:
+  constexpr IntPtrPolicy() = default;
+  EMPTY_DATA_;
+  [[nodiscard]] static bool staticAdjustInputs(TempAllocator& alloc,
+                                               MInstruction* def);
+  [[nodiscard]] bool adjustInputs(TempAllocator& alloc,
+                                  MInstruction* def) const override {
+    return staticAdjustInputs(alloc, def);
+  }
+};
+
 // Expect an Int for operand Op. Else a ToInt32 instruction is inserted.
 template <unsigned Op>
 class ConvertToInt32Policy final : public TypePolicy {
@@ -273,12 +287,12 @@ class ConvertToInt32Policy final : public TypePolicy {
   }
 };
 
-// Expect either an Int or BigInt for operand Op. Else a TruncateToInt32 or
-// ToBigInt instruction is inserted.
+// Expect either an Int32 or Int64 for operand Op. Else a TruncateToInt32 or
+// ToInt64 instruction is inserted.
 template <unsigned Op>
-class TruncateToInt32OrToBigIntPolicy final : public TypePolicy {
+class TruncateToInt32OrToInt64Policy final : public TypePolicy {
  public:
-  constexpr TruncateToInt32OrToBigIntPolicy() = default;
+  constexpr TruncateToInt32OrToInt64Policy() = default;
   EMPTY_DATA_;
   [[nodiscard]] static bool staticAdjustInputs(TempAllocator& alloc,
                                                MInstruction* def);

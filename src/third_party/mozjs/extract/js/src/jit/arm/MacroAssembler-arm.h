@@ -120,13 +120,23 @@ class MacroAssemblerARM : public Assembler {
   void convertInt32ToFloat32(Register src, FloatRegister dest);
   void convertInt32ToFloat32(const Address& src, FloatRegister dest);
 
+  void convertDoubleToFloat16(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat16ToDouble(FloatRegister src, FloatRegister dest) {
+    MOZ_CRASH("Not supported for this target");
+  }
+  void convertFloat32ToFloat16(FloatRegister src, FloatRegister dest);
+  void convertFloat16ToFloat32(FloatRegister src, FloatRegister dest);
+  void convertInt32ToFloat16(Register src, FloatRegister dest);
+
   void wasmTruncateToInt32(FloatRegister input, Register output,
                            MIRType fromType, bool isUnsigned, bool isSaturating,
                            Label* oolEntry);
   void outOfLineWasmTruncateToIntCheck(FloatRegister input, MIRType fromType,
                                        MIRType toType, TruncFlags flags,
                                        Label* rejoin,
-                                       wasm::BytecodeOffset trapOffset);
+                                       const wasm::TrapSiteDesc& trapSiteDesc);
 
   // Somewhat direct wrappers for the low-level assembler funcitons
   // bitops. Attempt to encode a virtual alu instruction using two real
@@ -621,6 +631,7 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void mov(ImmPtr imm, Register dest) {
     mov(ImmWord(uintptr_t(imm.value)), dest);
   }
+  void mov(CodeLabel* label, Register dest);
 
   void branch(JitCode* c) {
     BufferOffset bo = m_buffer.nextOffset();
@@ -663,7 +674,10 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
       ma_push(reg);
     }
   }
-  void push(FloatRegister reg) { ma_vpush(VFPRegister(reg)); }
+  void push(FloatRegister reg) {
+    MOZ_ASSERT(reg.isFloat(), "simd128 not supported");
+    ma_vpush(VFPRegister(reg));
+  }
   void pushWithPadding(Register reg, const Imm32 extraSpace) {
     ScratchRegisterScope scratch(asMasm());
     Imm32 totSpace = Imm32(extraSpace.value + 4);
@@ -678,7 +692,10 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   }
 
   void pop(Register reg) { ma_pop(reg); }
-  void pop(FloatRegister reg) { ma_vpop(VFPRegister(reg)); }
+  void pop(FloatRegister reg) {
+    MOZ_ASSERT(reg.isFloat(), "simd128 not supported");
+    ma_vpop(VFPRegister(reg));
+  }
 
   void popN(Register reg, Imm32 extraSpace) {
     ScratchRegisterScope scratch(asMasm());
@@ -925,8 +942,6 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
     return value.typeReg();
   }
 
-  void boolValueToDouble(const ValueOperand& operand, FloatRegister dest);
-  void int32ValueToDouble(const ValueOperand& operand, FloatRegister dest);
   void loadInt32OrDouble(const Address& src, FloatRegister dest);
   void loadInt32OrDouble(Register base, Register index, FloatRegister dest,
                          int32_t shift = defaultShift);
@@ -939,8 +954,6 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   Condition testStringTruthy(bool truthy, const ValueOperand& value);
   Condition testBigIntTruthy(bool truthy, const ValueOperand& value);
 
-  void boolValueToFloat32(const ValueOperand& operand, FloatRegister dest);
-  void int32ValueToFloat32(const ValueOperand& operand, FloatRegister dest);
   void loadConstantFloat32(float f, FloatRegister dest);
 
   void loadUnboxedValue(Address address, MIRType type, AnyRegister dest) {
@@ -1120,8 +1133,8 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void storeTypeTag(ImmTag tag, const Address& dest);
   void storeTypeTag(ImmTag tag, const BaseIndex& dest);
 
-  void handleFailureWithHandlerTail(Label* profilerExitTail,
-                                    Label* bailoutTail);
+  void handleFailureWithHandlerTail(Label* profilerExitTail, Label* bailoutTail,
+                                    uint32_t* returnValueCheckOffset);
 
   /////////////////////////////////////////////////////////////////
   // Common interface.
@@ -1217,12 +1230,13 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   FaultingCodeOffset loadDouble(const Address& addr, FloatRegister dest);
   FaultingCodeOffset loadDouble(const BaseIndex& src, FloatRegister dest);
 
-  // Load a float value into a register, then expand it to a double.
-  void loadFloatAsDouble(const Address& addr, FloatRegister dest);
-  void loadFloatAsDouble(const BaseIndex& src, FloatRegister dest);
-
   FaultingCodeOffset loadFloat32(const Address& addr, FloatRegister dest);
   FaultingCodeOffset loadFloat32(const BaseIndex& src, FloatRegister dest);
+
+  FaultingCodeOffset loadFloat16(const Address& addr, FloatRegister dest,
+                                 Register scratch);
+  FaultingCodeOffset loadFloat16(const BaseIndex& src, FloatRegister dest,
+                                 Register scratch);
 
   FaultingCodeOffset store8(Register src, const Address& address);
   void store8(Imm32 imm, const Address& address);
@@ -1313,6 +1327,16 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void cmpPtr(const Address& lhs, ImmGCPtr rhs);
   void cmpPtr(const Address& lhs, Imm32 rhs);
 
+  template <typename T1, typename T2>
+  inline void cmp64SetAliased(Condition cond, T1 lhs, T2 rhs, Register dest);
+
+  template <typename T1, typename T2>
+  inline void cmp64SetNonAliased(Condition cond, T1 lhs, T2 rhs, Register dest);
+
+  template <typename T1, typename T2>
+  inline void branch64Impl(Condition cond, T1 lhs, T2 rhs, Label* success,
+                           Label* fail);
+
   void setStackArg(Register reg, uint32_t arg);
 
   void breakpoint();
@@ -1336,11 +1360,6 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void compareFloat(FloatRegister lhs, FloatRegister rhs);
 
   void checkStackAlignment();
-
-  // If source is a double, load it into dest. If source is int32, convert it
-  // to double. Else, branch to failure.
-  void ensureDouble(const ValueOperand& source, FloatRegister dest,
-                    Label* failure);
 
   void emitSet(Assembler::Condition cond, Register dest) {
     ma_mov(Imm32(0), dest);
@@ -1408,7 +1427,7 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM {
   void profilerExitFrame();
 };
 
-typedef MacroAssemblerARMCompat MacroAssemblerSpecific;
+using MacroAssemblerSpecific = MacroAssemblerARMCompat;
 
 }  // namespace jit
 }  // namespace js

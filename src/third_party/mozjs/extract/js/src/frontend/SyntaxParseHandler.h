@@ -346,12 +346,6 @@ class SyntaxParseHandler {
     return NodeUnparenthesizedObject;
   }
 
-#ifdef ENABLE_RECORD_TUPLE
-  ListNodeResult newRecordLiteral(uint32_t begin) { return NodeGeneric; }
-
-  ListNodeResult newTupleLiteral(uint32_t begin) { return NodeGeneric; }
-#endif
-
   ListNodeResult newClassMemberList(uint32_t begin) { return NodeGeneric; }
   ClassNamesResult newClassNames(Node outer, Node inner, const TokenPos& pos) {
     return NodeGeneric;
@@ -695,6 +689,7 @@ class SyntaxParseHandler {
     MOZ_ASSERT(kind != ParseNodeKind::ParamsBody);
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
     MOZ_ASSERT(kind != ParseNodeKind::UsingDecl);
+    MOZ_ASSERT(kind != ParseNodeKind::AwaitUsingDecl);
 #endif
     return NodeGeneric;
   }
@@ -711,7 +706,8 @@ class SyntaxParseHandler {
     MOZ_ASSERT(kind == ParseNodeKind::LetDecl ||
                kind == ParseNodeKind::ConstDecl
 #ifdef ENABLE_EXPLICIT_RESOURCE_MANAGEMENT
-               || kind == ParseNodeKind::UsingDecl
+               || kind == ParseNodeKind::UsingDecl ||
+               kind == ParseNodeKind::AwaitUsingDecl
 #endif
     );
     return NodeLexicalDeclaration;

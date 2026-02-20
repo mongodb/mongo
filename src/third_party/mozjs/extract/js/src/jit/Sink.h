@@ -14,7 +14,7 @@ namespace jit {
 class MIRGenerator;
 class MIRGraph;
 
-[[nodiscard]] bool Sink(MIRGenerator* mir, MIRGraph& graph);
+[[nodiscard]] bool Sink(const MIRGenerator* mir, MIRGraph& graph);
 
 }  // namespace jit
 }  // namespace js

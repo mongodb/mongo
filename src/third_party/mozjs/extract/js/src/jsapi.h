@@ -822,9 +822,8 @@ extern JS_PUBLIC_API JSObject* JS_NewObjectForConstructor(
 
 /************************************************************************/
 
-extern JS_PUBLIC_API void JS_SetParallelParsingEnabled(JSContext* cx,
-                                                       bool enabled);
-
+extern JS_PUBLIC_API void JS_SetOffthreadBaselineCompilationEnabled(
+    JSContext* cx, bool enabled);
 extern JS_PUBLIC_API void JS_SetOffthreadIonCompilationEnabled(JSContext* cx,
                                                                bool enabled);
 
@@ -862,7 +861,8 @@ extern JS_PUBLIC_API void JS_SetOffthreadIonCompilationEnabled(JSContext* cx,
   Register(WASM_DELAY_TIER2, "wasm.delay-tier2") \
   Register(WASM_JIT_BASELINE, "wasm.baseline") \
   Register(WASM_JIT_OPTIMIZING, "wasm.optimizing") \
-  Register(REGEXP_DUPLICATE_NAMED_GROUPS, "regexp.duplicate-named-groups")  // clang-format on
+  Register(REGEXP_DUPLICATE_NAMED_GROUPS, "regexp.duplicate-named-groups") \
+  Register(REGEXP_MODIFIERS, "regexp.modifiers")  // clang-format on
 
 typedef enum JSJitCompilerOption {
 #define JIT_COMPILER_DECLARE(key, str) JSJITCOMPILER_##key,
@@ -951,9 +951,11 @@ class MOZ_RAII JS_PUBLIC_API AutoFilename {
  *
  * If a the embedding has hidden the scripted caller for the topmost activation
  * record, this will also return false.
+ *
+ * This never throws an exception.
  */
 extern JS_PUBLIC_API bool DescribeScriptedCaller(
-    JSContext* cx, AutoFilename* filename = nullptr, uint32_t* lineno = nullptr,
+    AutoFilename* filename, JSContext* cx, uint32_t* lineno = nullptr,
     JS::ColumnNumberOneOrigin* column = nullptr);
 
 extern JS_PUBLIC_API JSObject* GetScriptedCallerGlobal(JSContext* cx);

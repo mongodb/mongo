@@ -13,8 +13,6 @@
 #  include "jit/arm/MoveEmitter-arm.h"
 #elif defined(JS_CODEGEN_ARM64)
 #  include "jit/arm64/MoveEmitter-arm64.h"
-#elif defined(JS_CODEGEN_MIPS32)
-#  include "jit/mips32/MoveEmitter-mips32.h"
 #elif defined(JS_CODEGEN_MIPS64)
 #  include "jit/mips64/MoveEmitter-mips64.h"
 #elif defined(JS_CODEGEN_LOONG64)

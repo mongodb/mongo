@@ -107,8 +107,6 @@ class FunctionBox;
   F(NullExpr, NullLiteral)                                                \
   F(RawUndefinedExpr, RawUndefinedLiteral)                                \
   F(ThisExpr, UnaryNode)                                                  \
-  IF_RECORD_TUPLE(F(RecordExpr, ListNode))                                \
-  IF_RECORD_TUPLE(F(TupleExpr, ListNode))                                 \
   F(Function, FunctionNode)                                               \
   F(Module, ModuleNode)                                                   \
   F(IfStmt, TernaryNode)                                                  \
@@ -1292,17 +1290,13 @@ class ListNode : public ParseNode {
 
   void setHasNonConstInitializer() {
     MOZ_ASSERT(isKind(ParseNodeKind::ArrayExpr) ||
-               isKind(ParseNodeKind::ObjectExpr) ||
-               IF_RECORD_TUPLE(isKind(ParseNodeKind::TupleExpr), false) ||
-               IF_RECORD_TUPLE(isKind(ParseNodeKind::RecordExpr), false));
+               isKind(ParseNodeKind::ObjectExpr));
     xflags |= hasNonConstInitializerBit;
   }
 
   void unsetHasNonConstInitializer() {
     MOZ_ASSERT(isKind(ParseNodeKind::ArrayExpr) ||
-               isKind(ParseNodeKind::ObjectExpr) ||
-               IF_RECORD_TUPLE(isKind(ParseNodeKind::TupleExpr), false) ||
-               IF_RECORD_TUPLE(isKind(ParseNodeKind::RecordExpr), false));
+               isKind(ParseNodeKind::ObjectExpr));
     xflags &= ~hasNonConstInitializerBit;
   }
 
@@ -1648,13 +1642,10 @@ class NumericLiteral : public ParseNode {
 
 class BigIntLiteral : public ParseNode {
   BigIntIndex index_;
-  bool isZero_;
 
  public:
-  BigIntLiteral(BigIntIndex index, bool isZero, const TokenPos& pos)
-      : ParseNode(ParseNodeKind::BigIntExpr, pos),
-        index_(index),
-        isZero_(isZero) {}
+  BigIntLiteral(BigIntIndex index, const TokenPos& pos)
+      : ParseNode(ParseNodeKind::BigIntExpr, pos), index_(index) {}
 
   static bool test(const ParseNode& node) {
     return node.isKind(ParseNodeKind::BigIntExpr);
@@ -1673,8 +1664,6 @@ class BigIntLiteral : public ParseNode {
 #endif
 
   BigIntIndex index() { return index_; }
-
-  bool isZero() const { return isZero_; }
 };
 
 template <ParseNodeKind NodeKind, typename ScopeType>

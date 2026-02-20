@@ -11,13 +11,15 @@
 
 #include "js/shadow/String.h"  // JS::shadow::String
 
-#include "mozilla/Assertions.h"  // MOZ_ASSERT
-#include "mozilla/Attributes.h"  // MOZ_ALWAYS_INLINE
-#include "mozilla/Likely.h"      // MOZ_LIKELY
-#include "mozilla/Maybe.h"       // mozilla::Maybe
-#include "mozilla/Range.h"       // mozilla::Range
-#include "mozilla/Span.h"        // mozilla::Span
-                                 // std::tuple
+#include "mozilla/Assertions.h"    // MOZ_ASSERT
+#include "mozilla/Attributes.h"    // MOZ_ALWAYS_INLINE
+#include "mozilla/Likely.h"        // MOZ_LIKELY
+#include "mozilla/Maybe.h"         // mozilla::Maybe
+#include "mozilla/Range.h"         // mozilla::Range
+#include "mozilla/RefPtr.h"        // RefPtr
+#include "mozilla/Span.h"          // mozilla::Span
+                                   // std::tuple
+#include "mozilla/StringBuffer.h"  // mozilla::StringBuffer
 
 #include <algorithm>  // std::copy_n
 #include <stddef.h>   // size_t
@@ -101,6 +103,63 @@ extern JS_PUBLIC_API JSString* JS_NewUCStringCopyN(JSContext* cx,
 
 extern JS_PUBLIC_API JSString* JS_NewUCStringCopyZ(JSContext* cx,
                                                    const char16_t* s);
+
+namespace JS {
+
+/**
+ * Create a new JSString possibly backed by |buffer|. The contents of |buffer|
+ * will be interpreted as an array of Latin1 characters.
+ *
+ * Note that the returned string is not guaranteed to use |buffer|: as an
+ * optimization, this API can return an inline string or a previously allocated
+ * string.
+ *
+ * Increments the buffer's refcount iff the JS string holds a reference to it.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromLatin1Buffer(
+    JSContext* cx, RefPtr<mozilla::StringBuffer> buffer, size_t length);
+
+/**
+ * Like NewStringFromLatin1Buffer, but can be used to avoid refcounting overhead
+ * in cases where the returned string doesn't use the buffer. The caller must
+ * ensure the buffer outlives this call.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromKnownLiveLatin1Buffer(
+    JSContext* cx, mozilla::StringBuffer* buffer, size_t length);
+
+/**
+ * Similar to NewStringFromLatin1Buffer but for char16_t buffers.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromTwoByteBuffer(
+    JSContext* cx, RefPtr<mozilla::StringBuffer> buffer, size_t length);
+
+/**
+ * Similar to NewStringFromKnownLiveLatin1Buffer but for char16_t buffers.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromKnownLiveTwoByteBuffer(
+    JSContext* cx, mozilla::StringBuffer* buffer, size_t length);
+
+/**
+ * Similar to NewStringFromLatin1Buffer but for UTF8 buffers.
+ *
+ * This can create a Latin1 string backed by |buffer| iff the utf8 buffer
+ * contains only ASCII chars. If there are non-ASCII chars, |buffer| can't be
+ * used so this API will copy and inflate the characters for the new JS string.
+ *
+ * Note that |length| must be the (byte) length of the UTF8 buffer.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromUTF8Buffer(
+    JSContext* cx, RefPtr<mozilla::StringBuffer> buffer, size_t length);
+
+/**
+ * Like NewStringFromUTF8Buffer, but can be used to avoid refcounting overhead
+ * in cases where the returned string doesn't use the buffer. The caller must
+ * ensure the buffer outlives this call.
+ */
+extern JS_PUBLIC_API JSString* NewStringFromKnownLiveUTF8Buffer(
+    JSContext* cx, mozilla::StringBuffer* buffer, size_t length);
+
+}  // namespace JS
 
 extern JS_PUBLIC_API JSString* JS_AtomizeUCStringN(JSContext* cx,
                                                    const char16_t* s,
@@ -427,6 +486,46 @@ MOZ_ALWAYS_INLINE bool IsExternalUCString(
 
   *callbacks = s->externalCallbacks;
   *chars = s->nonInlineCharsTwoByte;
+  return true;
+}
+
+/**
+ * If the provided string is backed by a StringBuffer for latin-1 storage,
+ * return true and set |*buffer| to the string buffer.
+ *
+ * Note: this function doesn't increment the buffer's refcount. The buffer
+ * remains valid as long as the provided string is kept alive.
+ */
+MOZ_ALWAYS_INLINE bool IsLatin1StringWithStringBuffer(
+    JSString* str, mozilla::StringBuffer** buffer) {
+  shadow::String* s = shadow::AsShadowString(str);
+
+  if (!s->hasStringBuffer() || !s->hasLatin1Chars()) {
+    return false;
+  }
+
+  void* data = const_cast<JS::Latin1Char*>(s->nonInlineCharsLatin1);
+  *buffer = mozilla::StringBuffer::FromData(data);
+  return true;
+}
+
+/**
+ * If the provided string is backed by a StringBuffer for char16_t storage,
+ * return true and set |*buffer| to the string buffer.
+ *
+ * Note: this function doesn't increment the buffer's refcount. The buffer
+ * remains valid as long as the provided string is kept alive.
+ */
+MOZ_ALWAYS_INLINE bool IsTwoByteStringWithStringBuffer(
+    JSString* str, mozilla::StringBuffer** buffer) {
+  shadow::String* s = shadow::AsShadowString(str);
+
+  if (!s->hasStringBuffer() || s->hasLatin1Chars()) {
+    return false;
+  }
+
+  void* data = const_cast<char16_t*>(s->nonInlineCharsTwoByte);
+  *buffer = mozilla::StringBuffer::FromData(data);
   return true;
 }
 

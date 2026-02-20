@@ -33,9 +33,6 @@ else:
         inputs=["ReservedWords.h"],
     )
 
-if CONFIG["JS_ENABLE_SMOOSH"]:
-    CbindgenHeader("smoosh_generated.h", inputs=["/js/src/frontend/smoosh"])
-
 UNIFIED_SOURCES += [
     "AbstractScopePtr.cpp",
     "AsyncEmitter.cpp",
@@ -45,7 +42,6 @@ UNIFIED_SOURCES += [
     "BytecodeSection.cpp",
     "CallOrNewEmitter.cpp",
     "CForEmitter.cpp",
-    "CompileScript.cpp",
     "DefaultEmitter.cpp",
     "DoWhileEmitter.cpp",
     "ElemOpEmitter.cpp",
@@ -82,11 +78,6 @@ UNIFIED_SOURCES += [
     "TryEmitter.cpp",
     "WhileEmitter.cpp",
 ]
-
-if CONFIG["JS_ENABLE_SMOOSH"]:
-    UNIFIED_SOURCES += [
-        "Frontend2.cpp",
-    ]
 
 if CONFIG["ENABLE_DECORATORS"]:
     UNIFIED_SOURCES += [

@@ -156,12 +156,16 @@ void rvalue_ref_arg_not_ok(World::NS::Unsafe&& unsafe4) {
 
 void shared_ptr_hazard() {
   Cell* unsafe5 = f();
-  { auto p = std::make_shared<GCOnDestruction>(); }
+  {
+    auto p = std::make_shared<GCOnDestruction>();
+  }
   usecell(unsafe5);
 }
 
 void shared_ptr_no_hazard() {
   Cell* safe6 = f();
-  { auto p = std::make_shared<NoGCOnDestruction>(); }
+  {
+    auto p = std::make_shared<NoGCOnDestruction>();
+  }
   usecell(safe6);
 }

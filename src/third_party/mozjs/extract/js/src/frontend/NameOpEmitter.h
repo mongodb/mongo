@@ -9,6 +9,8 @@
 
 #include "mozilla/Attributes.h"
 
+#include <stddef.h>
+
 #include "frontend/NameAnalysisTypes.h"
 #include "frontend/ParserAtom.h"  // TaggedParserAtomIndex
 #include "vm/SharedStencil.h"     // GCThingIndex
@@ -165,6 +167,8 @@ class MOZ_STACK_CLASS NameOpEmitter {
 
   [[nodiscard]] bool isInitialize() const { return kind_ == Kind::Initialize; }
 
+  JSOp strictifySetNameOp(JSOp op) const;
+
  public:
   [[nodiscard]] bool emittedBindOp() const { return emittedBindOp_; }
 
@@ -174,6 +178,8 @@ class MOZ_STACK_CLASS NameOpEmitter {
   [[nodiscard]] bool prepareForRhs();
   [[nodiscard]] bool emitAssignment();
   [[nodiscard]] bool emitIncDec(ValueUsage valueUsage);
+
+  size_t numReferenceSlots() const { return emittedBindOp(); }
 };
 
 } /* namespace frontend */

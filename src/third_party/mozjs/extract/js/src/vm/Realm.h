@@ -19,6 +19,8 @@
 #include "builtin/Array.h"
 #include "ds/IdValuePair.h"
 #include "gc/Barrier.h"
+#include "gc/WeakMap.h"
+#include "jit/BaselineCompileQueue.h"
 #include "js/GCVariant.h"
 #include "js/RealmOptions.h"
 #include "js/TelemetryTimers.h"
@@ -27,7 +29,6 @@
 #include "vm/GuardFuse.h"
 #include "vm/InvalidatingFuse.h"
 #include "vm/JSContext.h"
-#include "vm/PromiseLookup.h"  // js::PromiseLookup
 #include "vm/RealmFuses.h"
 #include "vm/SavedStacks.h"
 #include "wasm/WasmRealm.h"
@@ -37,6 +38,10 @@ namespace js {
 namespace coverage {
 class LCovRealm;
 }  // namespace coverage
+
+namespace jit {
+class BaselineCompileQueue;
+}  // namespace jit
 
 class AutoRestoreRealmDebugMode;
 class Debugger;
@@ -224,7 +229,8 @@ struct IteratorHashPolicy {
 };
 
 class DebugEnvironments;
-class ObjectWeakMap;
+class NonSyntacticVariablesObject;
+class WithEnvironmentObject;
 
 // ObjectRealm stores various tables and other state associated with particular
 // objects in a realm. To make sure the correct ObjectRealm is used for an
@@ -264,15 +270,28 @@ class ObjectRealm {
                               size_t* objectMetadataTablesArg,
                               size_t* nonSyntacticLexicalEnvironmentsArg);
 
-  js::NonSyntacticLexicalEnvironmentObject*
+  NonSyntacticLexicalEnvironmentObject*
+  getOrCreateNonSyntacticLexicalEnvironment(
+      JSContext* cx, Handle<NonSyntacticVariablesObject*> enclosing);
+
+  NonSyntacticLexicalEnvironmentObject*
+  getOrCreateNonSyntacticLexicalEnvironment(
+      JSContext* cx, Handle<WithEnvironmentObject*> enclosing);
+
+  NonSyntacticLexicalEnvironmentObject*
+  getOrCreateNonSyntacticLexicalEnvironment(
+      JSContext* cx, Handle<WithEnvironmentObject*> enclosing,
+      Handle<NonSyntacticVariablesObject*> key);
+
+ private:
+  NonSyntacticLexicalEnvironmentObject*
   getOrCreateNonSyntacticLexicalEnvironment(JSContext* cx,
-                                            js::HandleObject enclosing);
-  js::NonSyntacticLexicalEnvironmentObject*
-  getOrCreateNonSyntacticLexicalEnvironment(JSContext* cx,
-                                            js::HandleObject enclosing,
-                                            js::HandleObject key,
-                                            js::HandleObject thisv);
-  js::NonSyntacticLexicalEnvironmentObject* getNonSyntacticLexicalEnvironment(
+                                            HandleObject enclosing,
+                                            HandleObject key,
+                                            HandleObject thisv);
+
+ public:
+  NonSyntacticLexicalEnvironmentObject* getNonSyntacticLexicalEnvironment(
       JSObject* key) const;
 };
 
@@ -306,6 +325,8 @@ class JS::Realm : public JS::shadow::Realm {
   mozilla::non_crypto::XorShift128PlusRNG randomKeyGenerator_;
 
   JSPrincipals* principals_ = nullptr;
+
+  js::jit::BaselineCompileQueue baselineCompileQueue_;
 
   // Bookkeeping information for debug scope objects.
   js::UniquePtr<js::DebugEnvironments> debugEnvs_;
@@ -378,6 +399,12 @@ class JS::Realm : public JS::shadow::Realm {
   bool allocatedDuringIncrementalGC_;
   bool initializingGlobal_ = true;
 
+  // Indicates that we are tracing all execution within this realm, i.e.,
+  // recording every entrance into exit from each function, among other
+  // things. See ExecutionTracer.h for where the bulk of this work
+  // happens.
+  bool isTracingExecution_ = false;
+
   js::UniquePtr<js::coverage::LCovRealm> lcovRealm_ = nullptr;
 
  public:
@@ -388,8 +415,6 @@ class JS::Realm : public JS::shadow::Realm {
   js::NewProxyCache newProxyCache;
   js::NewPlainObjectWithPropsCache newPlainObjectWithPropsCache;
   js::PlainObjectAssignCache plainObjectAssignCache;
-  js::ArraySpeciesLookup arraySpeciesLookup;
-  js::PromiseLookup promiseLookup;
 
   // Last time at which an animation was played for this realm.
   js::MainThreadData<mozilla::TimeStamp> lastAnimationTime;
@@ -592,6 +617,9 @@ class JS::Realm : public JS::shadow::Realm {
   }
 
 #ifdef DEBUG
+  bool hasActiveAutoSetNewObjectMetadata() const {
+    return numActiveAutoSetNewObjectMetadata_ > 0;
+  }
   void incNumActiveAutoSetNewObjectMetadata() {
     numActiveAutoSetNewObjectMetadata_++;
   }
@@ -676,6 +704,30 @@ class JS::Realm : public JS::shadow::Realm {
   void setIsDebuggee();
   void unsetIsDebuggee();
 
+  bool isTracingExecution() { return isTracingExecution_; }
+
+  void enableExecutionTracing() {
+    MOZ_ASSERT(!debuggerObservesCoverage());
+
+    isTracingExecution_ = true;
+    setIsDebuggee();
+    updateDebuggerObservesAllExecution();
+  }
+
+  void disableExecutionTracing() {
+    if (!isTracingExecution_) {
+      return;
+    }
+
+    isTracingExecution_ = false;
+    // updateDebuggerObservesAllExecution always wants isDebuggee to be true,
+    // so we just have weird ordering here to play nicely with it
+    updateDebuggerObservesAllExecution();
+    if (!hasDebuggers()) {
+      unsetIsDebuggee();
+    }
+  }
+
   DebuggerVector& getDebuggers(const JS::AutoRequireNoGC& nogc) {
     return debuggers_;
   };
@@ -757,6 +809,14 @@ class JS::Realm : public JS::shadow::Realm {
 
   mozilla::HashCodeScrambler randomHashCodeScrambler();
 
+  js::jit::BaselineCompileQueue& baselineCompileQueue() {
+    return baselineCompileQueue_;
+  }
+  static constexpr size_t offsetOfBaselineCompileQueue() {
+    return offsetof(Realm, baselineCompileQueue_);
+  }
+  void removeFromCompileQueue(JSScript* script);
+
   js::DebugEnvironments* debugEnvs() { return debugEnvs_.get(); }
   js::UniquePtr<js::DebugEnvironments>& debugEnvsRef() { return debugEnvs_; }
 
@@ -794,8 +854,15 @@ class JS::Realm : public JS::shadow::Realm {
 
   js::RealmFuses realmFuses;
 
- private:
-  void purgeForOfPicChain();
+  // Allocation site used by binding code to provide feedback
+  // on allocation heap for DOM allocation functions.
+  //
+  // See  CallIRGenerator::tryAttachCallNative
+  js::gc::AllocSite* localAllocSite = nullptr;
+
+  static size_t offsetOfLocalAllocSite() {
+    return offsetof(JS::Realm, localAllocSite);
+  }
 };
 
 inline js::Handle<js::GlobalObject*> JSContext::global() const {

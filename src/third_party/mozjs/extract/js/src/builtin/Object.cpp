@@ -25,7 +25,7 @@
 #include "js/PropertySpec.h"
 #include "js/UniquePtr.h"
 #include "util/Identifier.h"  // js::IsIdentifier
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "util/Text.h"
 #include "vm/BooleanObject.h"
 #include "vm/DateObject.h"
@@ -40,12 +40,6 @@
 #include "vm/StringType.h"
 #include "vm/ToSource.h"  // js::ValueToSource
 #include "vm/Watchtower.h"
-
-#ifdef ENABLE_RECORD_TUPLE
-#  include "builtin/RecordObject.h"
-#  include "builtin/TupleObject.h"
-#endif
-
 #include "vm/GeckoProfiler-inl.h"
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -311,17 +305,6 @@ JSString* js::ObjectToSource(JSContext* cx, HandleObject obj) {
   if (!GetPropertyKeys(cx, obj, JSITER_OWNONLY | JSITER_SYMBOLS, &idv)) {
     return nullptr;
   }
-
-#ifdef ENABLE_RECORD_TUPLE
-  if (IsExtendedPrimitiveWrapper(*obj)) {
-    if (obj->is<TupleObject>()) {
-      Rooted<TupleType*> tup(cx, &obj->as<TupleObject>().unbox());
-      return TupleToSource(cx, tup);
-    }
-    MOZ_ASSERT(obj->is<RecordObject>());
-    return RecordToSource(cx, obj->as<RecordObject>().unbox());
-  }
-#endif
 
   bool comma = false;
 
@@ -745,7 +728,7 @@ bool js::obj_toString(JSContext* cx, unsigned argc, Value* vp) {
   }
 
   // Step 17.
-  StringBuffer sb(cx);
+  StringBuilder sb(cx);
   if (!sb.append("[object ") || !sb.append(tag.toString()) || !sb.append(']')) {
     return false;
   }
@@ -842,8 +825,8 @@ static bool CanAddNewPropertyExcludingProtoFast(PlainObject* obj) {
     return false;
   }
 
-  // Don't fastpath assign if we're watching for property modification.
-  if (Watchtower::watchesPropertyModification(obj)) {
+  // Don't fastpath assign if we're watching for property value changes.
+  if (Watchtower::watchesPropertyValueChange(obj)) {
     return false;
   }
 
@@ -1204,9 +1187,10 @@ JS_PUBLIC_API bool JS_AssignObject(JSContext* cx, JS::HandleObject target,
 static bool obj_assign(JSContext* cx, unsigned argc, Value* vp) {
   AutoJSMethodProfilerEntry pseudoFrame(cx, "Object", "assign");
   CallArgs args = CallArgsFromVp(argc, vp);
+  RootedTuple<JSObject*, JSObject*> roots(cx);
 
   // Step 1.
-  RootedObject to(cx, ToObject(cx, args.get(0)));
+  RootedField<JSObject*, 0> to(roots, ToObject(cx, args.get(0)));
   if (!to) {
     return false;
   }
@@ -1215,7 +1199,6 @@ static bool obj_assign(JSContext* cx, unsigned argc, Value* vp) {
   // there's 1 argument, the loop below is a no-op.
 
   // Step 4.
-  RootedObject from(cx);
   for (size_t i = 1; i < args.length(); i++) {
     // Step 4.a.
     if (args[i].isNullOrUndefined()) {
@@ -1223,7 +1206,7 @@ static bool obj_assign(JSContext* cx, unsigned argc, Value* vp) {
     }
 
     // Step 4.b.i.
-    from = ToObject(cx, args[i]);
+    RootedField<JSObject*, 1> from(roots, ToObject(cx, args[i]));
     if (!from) {
       return false;
     }
@@ -1541,16 +1524,6 @@ static bool TryEnumerableOwnPropertiesNative(JSContext* cx, HandleObject obj,
     return true;
   }
 
-#ifdef ENABLE_RECORD_TUPLE
-  if (obj->is<TupleObject>()) {
-    Rooted<TupleType*> tup(cx, &obj->as<TupleObject>().unbox());
-    return TryEnumerableOwnPropertiesNative<kind>(cx, tup, rval, optimized);
-  } else if (obj->is<RecordObject>()) {
-    Rooted<RecordType*> tup(cx, obj->as<RecordObject>().unbox());
-    return TryEnumerableOwnPropertiesNative<kind>(cx, tup, rval, optimized);
-  }
-#endif
-
   Handle<NativeObject*> nobj = obj.as<NativeObject>();
 
   // Resolve lazy properties on |nobj|.
@@ -1694,74 +1667,18 @@ static bool TryEnumerableOwnPropertiesNative(JSContext* cx, HandleObject obj,
       properties[i].set(value);
     }
   }
-#ifdef ENABLE_RECORD_TUPLE
-  else if (obj->is<RecordType>()) {
-    RecordType* rec = &obj->as<RecordType>();
-    Rooted<ArrayObject*> keys(cx, rec->keys());
-    RootedId keyId(cx);
-    RootedString keyStr(cx);
-
-    MOZ_ASSERT(properties.empty(), "records cannot have dense elements");
-    if (!properties.resize(keys->length())) {
-      return false;
-    }
-
-    for (size_t i = 0; i < keys->length(); i++) {
-      MOZ_ASSERT(keys->getDenseElement(i).isString());
-      if (kind == EnumerableOwnPropertiesKind::Keys ||
-          kind == EnumerableOwnPropertiesKind::Names) {
-        value.set(keys->getDenseElement(i));
-      } else if (kind == EnumerableOwnPropertiesKind::Values) {
-        keyStr.set(keys->getDenseElement(i).toString());
-
-        if (!JS_StringToId(cx, keyStr, &keyId)) {
-          return false;
-        }
-        MOZ_ALWAYS_TRUE(rec->getOwnProperty(cx, keyId, &value));
-      } else {
-        MOZ_ASSERT(kind == EnumerableOwnPropertiesKind::KeysAndValues);
-
-        key.set(keys->getDenseElement(i));
-        keyStr.set(key.toString());
-
-        if (!JS_StringToId(cx, keyStr, &keyId)) {
-          return false;
-        }
-        MOZ_ALWAYS_TRUE(rec->getOwnProperty(cx, keyId, &value));
-
-        if (!NewValuePair(cx, key, value, &value, gcHeap)) {
-          return false;
-        }
-      }
-
-      properties[i].set(value);
-    }
-
-    // Uh, goto... When using records, we already get the (sorted) properties
-    // from its sorted keys, so we don't read them again as "own properties".
-    // We could use an `if` or some refactoring to skip the next logic, but
-    // goto makes it easer to keep the logic separated in
-    // "#ifdef ENABLE_RECORD_TUPLE" blocks.
-    // This should be refactored when the #ifdefs are removed.
-    goto end;
-  }
-#endif
 
   // Up to this point no side-effects through accessor properties are
   // possible which could have replaced |obj| with a non-native object.
   MOZ_ASSERT(obj->is<NativeObject>());
   MOZ_ASSERT(obj.as<NativeObject>() == nobj);
 
-  {
-    // This new scope exists to support the goto end used by
-    // ENABLE_RECORD_TUPLE builds, and can be removed when said goto goes away.
-    size_t approximatePropertyCount =
-        nobj->shape()->propMap()
-            ? nobj->shape()->propMap()->approximateEntryCount()
-            : 0;
-    if (!properties.reserve(properties.length() + approximatePropertyCount)) {
-      return false;
-    }
+  size_t approximatePropertyCount =
+      nobj->shape()->propMap()
+          ? nobj->shape()->propMap()->approximateEntryCount()
+          : 0;
+  if (!properties.reserve(properties.length() + approximatePropertyCount)) {
+    return false;
   }
 
   if (kind == EnumerableOwnPropertiesKind::Keys ||
@@ -1880,10 +1797,6 @@ static bool TryEnumerableOwnPropertiesNative(JSContext* cx, HandleObject obj,
     }
   }
 
-#ifdef ENABLE_RECORD_TUPLE
-end:
-#endif
-
   JSObject* array =
       NewDenseCopiedArray(cx, properties.length(), properties.begin());
   if (!array) {
@@ -1914,13 +1827,6 @@ static bool CountEnumerableOwnPropertiesNative(JSContext* cx, HandleObject obj,
       obj->getClass()->getNewEnumerate() || obj->is<StringObject>()) {
     return true;
   }
-
-#ifdef ENABLE_RECORD_TUPLE
-  // Skip the optimized path in case of record and tuples.
-  if (obj->is<TupleObject>() || obj->is<RecordObject>()) {
-    return true;
-  }
-#endif
 
   Handle<NativeObject*> nobj = obj.as<NativeObject>();
 
@@ -2009,8 +1915,7 @@ static bool EnumerableOwnProperties(JSContext* cx, const JS::CallArgs& args) {
                 "Only implemented for Object.keys and Object.entries");
 
   // Step 1. (Step 1 of Object.{keys,values,entries}, really.)
-  RootedObject obj(cx, IF_RECORD_TUPLE(ToObjectOrGetObjectPayload, ToObject)(
-                           cx, args.get(0)));
+  RootedObject obj(cx, ToObject(cx, args.get(0)));
   if (!obj) {
     return false;
   }
@@ -2122,8 +2027,7 @@ bool js::obj_keys(JSContext* cx, unsigned argc, Value* vp) {
   CallArgs args = CallArgsFromVp(argc, vp);
 
   // Step 1.
-  RootedObject obj(cx, IF_RECORD_TUPLE(ToObjectOrGetObjectPayload, ToObject)(
-                           cx, args.get(0)));
+  RootedObject obj(cx, ToObject(cx, args.get(0)));
   if (!obj) {
     return false;
   }
@@ -2447,12 +2351,14 @@ static const JSFunctionSpec object_methods[] = {
     JS_SELF_HOSTED_FN("__defineSetter__", "ObjectDefineSetter", 2, 0),
     JS_SELF_HOSTED_FN("__lookupGetter__", "ObjectLookupGetter", 1, 0),
     JS_SELF_HOSTED_FN("__lookupSetter__", "ObjectLookupSetter", 1, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static const JSPropertySpec object_properties[] = {
     JS_SELF_HOSTED_GETSET("__proto__", "$ObjectProtoGetter",
                           "$ObjectProtoSetter", 0),
-    JS_PS_END};
+    JS_PS_END,
+};
 
 static const JSFunctionSpec object_static_methods[] = {
     JS_FN("assign", obj_assign, 2, 0),
@@ -2480,7 +2386,8 @@ static const JSFunctionSpec object_static_methods[] = {
     JS_SELF_HOSTED_FN("fromEntries", "ObjectFromEntries", 1, 0),
     JS_SELF_HOSTED_FN("hasOwn", "ObjectHasOwn", 2, 0),
     JS_SELF_HOSTED_FN("groupBy", "ObjectGroupBy", 2, 0),
-    JS_FS_END};
+    JS_FS_END,
+};
 
 static JSObject* CreateObjectConstructor(JSContext* cx, JSProtoKey key) {
   Rooted<GlobalObject*> self(cx, cx->global());
@@ -2557,10 +2464,14 @@ static const ClassSpec PlainObjectClassSpec = {
     CreateObjectConstructor, CreateObjectPrototype,
     object_static_methods,   nullptr,
     object_methods,          object_properties,
-    FinishObjectClassInit};
+    FinishObjectClassInit,
+};
 
-const JSClass PlainObject::class_ = {"Object",
-                                     JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
-                                     JS_NULL_CLASS_OPS, &PlainObjectClassSpec};
+const JSClass PlainObject::class_ = {
+    "Object",
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
+    JS_NULL_CLASS_OPS,
+    &PlainObjectClassSpec,
+};
 
 const JSClass* const js::ObjectClassPtr = &PlainObject::class_;

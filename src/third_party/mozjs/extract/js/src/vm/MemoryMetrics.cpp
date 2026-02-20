@@ -10,6 +10,7 @@
 
 #include <algorithm>
 
+#include "gc/BufferAllocator.h"
 #include "gc/GC.h"
 #include "gc/Memory.h"
 #include "gc/Nursery.h"
@@ -34,7 +35,6 @@
 #include "wasm/WasmInstance-inl.h"
 
 using mozilla::MallocSizeOf;
-using mozilla::PodCopy;
 
 using namespace js;
 
@@ -171,14 +171,15 @@ NotableScriptSourceInfo::NotableScriptSourceInfo(const char* filename,
 
 }  // namespace JS
 
-typedef HashSet<ScriptSource*, DefaultHasher<ScriptSource*>, SystemAllocPolicy>
-    SourceSet;
+using SourceSet =
+    HashSet<ScriptSource*, DefaultHasher<ScriptSource*>, SystemAllocPolicy>;
 
 struct StatsClosure {
   RuntimeStats* rtStats;
   ObjectPrivateVisitor* opv;
   SourceSet seenSources;
-  wasm::Metadata::SeenSet wasmSeenMetadata;
+  wasm::CodeMetadata::SeenSet wasmSeenCodeMetadata;
+  js::CodeMetadataForAsmJS::SeenSet wasmSeenCodeMetadataForAsmJS;
   wasm::Code::SeenSet wasmSeenCode;
   wasm::Table::SeenSet wasmSeenTables;
   bool anonymize;
@@ -188,14 +189,10 @@ struct StatsClosure {
 };
 
 static void DecommittedPagesChunkCallback(JSRuntime* rt, void* data,
-                                          gc::TenuredChunk* chunk,
+                                          gc::ArenaChunk* chunk,
                                           const JS::AutoRequireNoGC& nogc) {
-  size_t n = 0;
-  for (uint32_t word : chunk->decommittedPages.Storage()) {
-    n += mozilla::CountPopulation32(word);
-  }
-
-  *static_cast<size_t*>(data) += n * gc::PageSize;
+  auto* gcHeapDecommittedPages = static_cast<size_t*>(data);
+  *gcHeapDecommittedPages += chunk->decommittedPages.Count() * gc::PageSize;
 }
 
 static void StatsZoneCallback(JSRuntime* rt, void* data, Zone* zone,
@@ -217,6 +214,9 @@ static void StatsZoneCallback(JSRuntime* rt, void* data, Zone* zone,
       &rtStats->runtime.atomsMarkBitmaps, &zStats.compartmentObjects,
       &zStats.crossCompartmentWrappersTables, &zStats.compartmentsPrivateData,
       &zStats.scriptCountsMap);
+  zone->bufferAllocator.addSizeOfExcludingThis(&zStats.gcBuffers.usedBytes,
+                                               &zStats.gcBuffers.freeBytes,
+                                               &zStats.gcBuffers.adminBytes);
 }
 
 static void StatsRealmCallback(JSContext* cx, void* data, Realm* realm,
@@ -345,22 +345,30 @@ static void StatsCellCallback(JSRuntime* rt, void* data, JS::GCCellPtr cellptr,
       // we must be careful not to report twice.
       if (obj->is<WasmModuleObject>()) {
         const wasm::Module& module = obj->as<WasmModuleObject>().module();
-        if (ScriptSource* ss = module.metadata().maybeScriptSource()) {
+        ScriptSource* ss = module.codeMetaForAsmJS()
+                               ? module.codeMetaForAsmJS()->maybeScriptSource()
+                               : nullptr;
+        if (ss) {
           CollectScriptSourceStats<granularity>(closure, ss);
         }
-        module.addSizeOfMisc(rtStats->mallocSizeOf_, &closure->wasmSeenMetadata,
-                             &closure->wasmSeenCode,
-                             &info.objectsNonHeapCodeWasm,
-                             &info.objectsMallocHeapMisc);
+        module.addSizeOfMisc(
+            rtStats->mallocSizeOf_, &closure->wasmSeenCodeMetadata,
+            &closure->wasmSeenCodeMetadataForAsmJS, &closure->wasmSeenCode,
+            &info.objectsNonHeapCodeWasm, &info.objectsMallocHeapMisc);
       } else if (obj->is<WasmInstanceObject>()) {
         wasm::Instance& instance = obj->as<WasmInstanceObject>().instance();
-        if (ScriptSource* ss = instance.metadata().maybeScriptSource()) {
+        ScriptSource* ss =
+            instance.codeMetaForAsmJS()
+                ? instance.codeMetaForAsmJS()->maybeScriptSource()
+                : nullptr;
+        if (ss) {
           CollectScriptSourceStats<granularity>(closure, ss);
         }
         instance.addSizeOfMisc(
-            rtStats->mallocSizeOf_, &closure->wasmSeenMetadata,
-            &closure->wasmSeenCode, &closure->wasmSeenTables,
-            &info.objectsNonHeapCodeWasm, &info.objectsMallocHeapMisc);
+            rtStats->mallocSizeOf_, &closure->wasmSeenCodeMetadata,
+            &closure->wasmSeenCodeMetadataForAsmJS, &closure->wasmSeenCode,
+            &closure->wasmSeenTables, &info.objectsNonHeapCodeWasm,
+            &info.objectsMallocHeapMisc);
       }
 
       realmStats.classInfo.add(info);
@@ -515,6 +523,13 @@ static void StatsCellCallback(JSRuntime* rt, void* data, JS::GCCellPtr cellptr,
       zStats->regExpSharedsGCHeap += thingSize;
       zStats->regExpSharedsMallocHeap +=
           regexp->sizeOfExcludingThis(rtStats->mallocSizeOf_);
+      break;
+    }
+
+    case JS::TraceKind::SmallBuffer: {
+      // Note that this overlaps with memory that is also reported as part of
+      // the owning cell.
+      zStats->smallBuffersGCHeap += thingSize;
       break;
     }
 
@@ -723,7 +738,7 @@ static bool CollectRuntimeStatsHelper(JSContext* cx, RuntimeStats* rtStats,
   size_t numDirtyChunks =
       (rtStats->gcHeapChunkTotal - rtStats->gcHeapUnusedChunks) / gc::ChunkSize;
   size_t perChunkAdmin =
-      sizeof(gc::TenuredChunk) - (sizeof(gc::Arena) * gc::ArenasPerChunk);
+      sizeof(gc::ArenaChunk) - (sizeof(gc::Arena) * gc::ArenasPerChunk);
   rtStats->gcHeapChunkAdmin = numDirtyChunks * perChunkAdmin;
 
   // |gcHeapUnusedArenas| is the only thing left.  Compute it in terms of

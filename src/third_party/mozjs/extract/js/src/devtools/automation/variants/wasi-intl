@@ -4,8 +4,8 @@
     "debug": false,
     "nspr": false,
     "compiler": "clang",
-    "env": {
-        "JITTEST_EXTRA_ARGS": "--jitflags=none"
+    "extra-args": {
+        "jit-test": ["--jitflags=none"]
     },
     "skip-tests": {
         "all": ["jstests", "jittest", "jsapitests"]

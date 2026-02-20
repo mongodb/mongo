@@ -933,6 +933,11 @@ class DictionaryPropMap final : public PropMap {
   // compacting heuristics.
   uint32_t holeCount_ = 0;
 
+  // Empty Dictionary prop map used during reshape.
+  explicit DictionaryPropMap(std::nullptr_t) : linkedData_(nullptr) {
+    setHeaderFlagBits(IsDictionaryFlag | CanHaveTableFlag);
+  }
+
   DictionaryPropMap(JS::Handle<DictionaryPropMap*> prev, PropertyKey key,
                     PropertyInfo prop)
       : linkedData_(prev) {
@@ -1011,6 +1016,9 @@ class DictionaryPropMap final : public PropMap {
     MOZ_ASSERT(hasKey(index));
     return linkedData_.propInfos[index];
   }
+
+  // Create an empty prop map for dictionary mode teleporting
+  static DictionaryPropMap* createEmpty(JSContext* cx);
 
   // Add a new property to this map. Returns the new map/mapLength and object
   // flags. The caller is responsible for generating a new dictionary shape.

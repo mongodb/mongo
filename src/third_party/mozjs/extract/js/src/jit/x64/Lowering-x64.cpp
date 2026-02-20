@@ -6,7 +6,10 @@
 
 #include "jit/x64/Lowering-x64.h"
 
+#include "mozilla/CheckedInt.h"
+
 #include "jit/Lowering.h"
+#include "jit/MIR-wasm.h"
 #include "jit/MIR.h"
 #include "jit/x64/Assembler-x64.h"
 
@@ -60,10 +63,10 @@ void LIRGeneratorX64::lowerForALUInt64(
 void LIRGeneratorX64::lowerForMulInt64(LMulI64* ins, MMul* mir,
                                        MDefinition* lhs, MDefinition* rhs) {
   // X64 doesn't need a temp for 64bit multiplication.
-  ins->setInt64Operand(0, useInt64RegisterAtStart(lhs));
-  ins->setInt64Operand(INT64_PIECES, willHaveDifferentLIRNodes(lhs, rhs)
-                                         ? useInt64OrConstant(rhs)
-                                         : useInt64OrConstantAtStart(rhs));
+  ins->setLhs(useInt64RegisterAtStart(lhs));
+  ins->setRhs(willHaveDifferentLIRNodes(lhs, rhs)
+                  ? useInt64OrConstant(rhs)
+                  : useInt64OrConstantAtStart(rhs));
   defineInt64ReuseInput(ins, mir, 0);
 }
 
@@ -89,10 +92,10 @@ void LIRGenerator::visitUnbox(MUnbox* unbox) {
   MDefinition* box = unbox->getOperand(0);
   MOZ_ASSERT(box->type() == MIRType::Value);
 
-  LUnboxBase* lir;
+  LInstructionHelper<1, BOX_PIECES, 0>* lir;
   if (IsFloatingPointType(unbox->type())) {
-    lir = new (alloc())
-        LUnboxFloatingPoint(useRegisterAtStart(box), unbox->type());
+    MOZ_ASSERT(unbox->type() == MIRType::Double);
+    lir = new (alloc()) LUnboxFloatingPoint(useBoxAtStart(box));
   } else if (unbox->fallible()) {
     // If the unbox is fallible, load the Value in a register first to
     // avoid multiple loads.
@@ -139,15 +142,12 @@ void LIRGenerator::visitCompareExchangeTypedArrayElement(
     LUse elements = useRegister(ins->elements());
     LAllocation index =
         useRegisterOrIndexConstant(ins->index(), ins->arrayType());
-    LUse oldval = useRegister(ins->oldval());
-    LUse newval = useRegister(ins->newval());
-    LInt64Definition temp1 = tempInt64Fixed(Register64(rax));
-    LInt64Definition temp2 = tempInt64();
+    LInt64Allocation oldval = useInt64Register(ins->oldval());
+    LInt64Allocation newval = useInt64Register(ins->newval());
 
-    auto* lir = new (alloc()) LCompareExchangeTypedArrayElement64(
-        elements, index, oldval, newval, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+    auto* lir = new (alloc())
+        LCompareExchangeTypedArrayElement64(elements, index, oldval, newval);
+    defineInt64Fixed(lir, ins, LInt64Allocation(LAllocation(AnyRegister(rax))));
     return;
   }
 
@@ -164,14 +164,11 @@ void LIRGenerator::visitAtomicExchangeTypedArrayElement(
     LUse elements = useRegister(ins->elements());
     LAllocation index =
         useRegisterOrIndexConstant(ins->index(), ins->arrayType());
-    LAllocation value = useRegister(ins->value());
-    LInt64Definition temp1 = tempInt64();
-    LDefinition temp2 = temp();
+    LInt64Allocation value = useInt64Register(ins->value());
 
-    auto* lir = new (alloc()) LAtomicExchangeTypedArrayElement64(
-        elements, index, value, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+    auto* lir = new (alloc())
+        LAtomicExchangeTypedArrayElement64(elements, index, value);
+    defineInt64(lir, ins);
     return;
   }
 
@@ -187,17 +184,14 @@ void LIRGenerator::visitAtomicTypedArrayElementBinop(
     LUse elements = useRegister(ins->elements());
     LAllocation index =
         useRegisterOrIndexConstant(ins->index(), ins->arrayType());
-    LAllocation value = useRegister(ins->value());
 
     // Case 1: the result of the operation is not used.
-    //
-    // We can omit allocating the result BigInt.
 
     if (ins->isForEffect()) {
-      LInt64Definition temp = tempInt64();
+      LInt64Allocation value = useInt64Register(ins->value());
 
-      auto* lir = new (alloc()) LAtomicTypedArrayElementBinopForEffect64(
-          elements, index, value, temp);
+      auto* lir = new (alloc())
+          LAtomicTypedArrayElementBinopForEffect64(elements, index, value);
       add(lir, ins);
       return;
     }
@@ -206,23 +200,29 @@ void LIRGenerator::visitAtomicTypedArrayElementBinop(
     //
     // For ADD and SUB we'll use XADD.
     //
-    // For AND/OR/XOR we need to use a CMPXCHG loop with rax as a temp register.
+    // For AND/OR/XOR we need to use a CMPXCHG loop with rax as the output.
 
     bool bitOp = !(ins->operation() == AtomicOp::Add ||
                    ins->operation() == AtomicOp::Sub);
 
-    LInt64Definition temp1 = tempInt64();
-    LInt64Definition temp2;
+    LInt64Allocation value;
+    LInt64Definition temp;
     if (bitOp) {
-      temp2 = tempInt64Fixed(Register64(rax));
+      value = useInt64Register(ins->value());
+      temp = tempInt64();
     } else {
-      temp2 = tempInt64();
+      value = useInt64RegisterAtStart(ins->value());
+      temp = LInt64Definition::BogusTemp();
     }
 
     auto* lir = new (alloc())
-        LAtomicTypedArrayElementBinop64(elements, index, value, temp1, temp2);
-    define(lir, ins);
-    assignSafepoint(lir, ins);
+        LAtomicTypedArrayElementBinop64(elements, index, value, temp);
+    if (bitOp) {
+      defineInt64Fixed(lir, ins,
+                       LInt64Allocation(LAllocation(AnyRegister(rax))));
+    } else {
+      defineInt64ReuseInput(lir, ins, 2);
+    }
     return;
   }
 
@@ -234,18 +234,17 @@ void LIRGeneratorX64::lowerAtomicLoad64(MLoadUnboxedScalar* ins) {
   const LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->storageType());
 
-  auto* lir = new (alloc()) LAtomicLoad64(elements, index, temp(), tempInt64());
-  define(lir, ins);
-  assignSafepoint(lir, ins);
+  auto* lir = new (alloc()) LAtomicLoad64(elements, index);
+  defineInt64(lir, ins);
 }
 
 void LIRGeneratorX64::lowerAtomicStore64(MStoreUnboxedScalar* ins) {
   LUse elements = useRegister(ins->elements());
   LAllocation index =
       useRegisterOrIndexConstant(ins->index(), ins->writeType());
-  LAllocation value = useRegister(ins->value());
+  LInt64Allocation value = useInt64Register(ins->value());
 
-  add(new (alloc()) LAtomicStore64(elements, index, value, tempInt64()), ins);
+  add(new (alloc()) LAtomicStore64(elements, index, value), ins);
 }
 
 void LIRGenerator::visitWasmUnsignedToDouble(MWasmUnsignedToDouble* ins) {
@@ -284,6 +283,19 @@ void LIRGenerator::visitWasmLoad(MWasmLoad* ins) {
   defineInt64(lir, ins);
 }
 
+static bool CanUseInt32OrInt64Constant(MDefinition* value) {
+  MOZ_ASSERT(IsIntType(value->type()));
+  if (!value->isConstant()) {
+    return false;
+  }
+  if (value->type() == MIRType::Int64) {
+    // Immediate needs to fit into int32 for direct to memory move on x64.
+    return mozilla::CheckedInt32(value->toConstant()->toInt64()).isValid();
+  }
+  MOZ_ASSERT(value->type() == MIRType::Int32);
+  return true;
+}
+
 void LIRGenerator::visitWasmStore(MWasmStore* ins) {
   MDefinition* base = ins->base();
   // See comment in visitWasmLoad re the type of 'base'.
@@ -301,8 +313,7 @@ void LIRGenerator::visitWasmStore(MWasmStore* ins) {
       valueAlloc = useRegisterOrConstantAtStart(value);
       break;
     case Scalar::Int64:
-      // No way to encode an int64-to-memory move on x64.
-      if (value->isConstant() && value->type() != MIRType::Int64) {
+      if (CanUseInt32OrInt64Constant(value)) {
         valueAlloc = useOrConstantAtStart(value);
       } else {
         valueAlloc = useRegisterAtStart(value);
@@ -398,9 +409,8 @@ void LIRGenerator::visitWasmAtomicBinopHeap(MWasmAtomicBinopHeap* ins) {
   if (!ins->hasUses()) {
     LAllocation value = canTakeConstant ? useRegisterOrConstant(ins->value())
                                         : useRegister(ins->value());
-    LWasmAtomicBinopHeapForEffect* lir =
-        new (alloc()) LWasmAtomicBinopHeapForEffect(
-            useRegister(base), value, LDefinition::BogusTemp(), memoryBase);
+    auto* lir = new (alloc())
+        LWasmAtomicBinopHeapForEffect(useRegister(base), value, memoryBase);
     add(lir, ins);
     return;
   }
@@ -441,12 +451,12 @@ void LIRGenerator::visitWasmAtomicBinopHeap(MWasmAtomicBinopHeap* ins) {
     value = useRegisterAtStart(ins->value());
   }
 
-  auto* lir = new (alloc()) LWasmAtomicBinopHeap(
-      useRegister(base), value, bitOp ? temp() : LDefinition::BogusTemp(),
-      LDefinition::BogusTemp(), memoryBase);
+  auto* lir = new (alloc())
+      LWasmAtomicBinopHeap(useRegister(base), value, memoryBase,
+                           bitOp ? temp() : LDefinition::BogusTemp());
 
   if (reuseInput) {
-    defineReuseInput(lir, ins, LWasmAtomicBinopHeap::valueOp);
+    defineReuseInput(lir, ins, LWasmAtomicBinopHeap::ValueIndex);
   } else if (bitOp) {
     defineFixed(lir, ins, LAllocation(AnyRegister(rax)));
   } else {
@@ -504,18 +514,37 @@ void LIRGeneratorX64::lowerUModI64(MMod* mod) {
   defineInt64Fixed(lir, mod, LInt64Allocation(LAllocation(AnyRegister(rdx))));
 }
 
-void LIRGeneratorX64::lowerBigIntDiv(MBigIntDiv* ins) {
-  auto* lir = new (alloc()) LBigIntDiv(
-      useRegister(ins->lhs()), useRegister(ins->rhs()), tempFixed(rax), temp());
-  defineFixed(lir, ins, LAllocation(AnyRegister(rdx)));
-  assignSafepoint(lir, ins);
+void LIRGeneratorX64::lowerBigIntPtrDiv(MBigIntPtrDiv* ins) {
+  auto* lir = new (alloc())
+      LBigIntPtrDiv(useRegister(ins->lhs()), useRegister(ins->rhs()),
+                    tempFixed(rdx), LDefinition::BogusTemp());
+  assignSnapshot(lir, ins->bailoutKind());
+  defineFixed(lir, ins, LAllocation(AnyRegister(rax)));
 }
 
-void LIRGeneratorX64::lowerBigIntMod(MBigIntMod* ins) {
-  auto* lir = new (alloc()) LBigIntMod(
-      useRegister(ins->lhs()), useRegister(ins->rhs()), tempFixed(rax), temp());
+void LIRGeneratorX64::lowerBigIntPtrMod(MBigIntPtrMod* ins) {
+  auto* lir = new (alloc())
+      LBigIntPtrMod(useRegister(ins->lhs()), useRegister(ins->rhs()),
+                    tempFixed(rax), LDefinition::BogusTemp());
+  if (ins->canBeDivideByZero()) {
+    assignSnapshot(lir, ins->bailoutKind());
+  }
   defineFixed(lir, ins, LAllocation(AnyRegister(rdx)));
-  assignSafepoint(lir, ins);
+}
+
+void LIRGeneratorX64::lowerTruncateDToInt32(MTruncateToInt32* ins) {
+  MDefinition* opd = ins->input();
+  MOZ_ASSERT(opd->type() == MIRType::Double);
+
+  define(new (alloc()) LTruncateDToInt32(useRegister(opd), tempShift()), ins);
+}
+
+void LIRGeneratorX64::lowerTruncateFToInt32(MTruncateToInt32* ins) {
+  MDefinition* opd = ins->input();
+  MOZ_ASSERT(opd->type() == MIRType::Float32);
+
+  LDefinition maybeTemp = LDefinition::BogusTemp();
+  define(new (alloc()) LTruncateFToInt32(useRegister(opd), maybeTemp), ins);
 }
 
 void LIRGenerator::visitWasmTruncateToInt64(MWasmTruncateToInt64* ins) {
@@ -540,6 +569,24 @@ void LIRGenerator::visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins) {
 
   LDefinition maybeTemp = ins->isUnsigned() ? temp() : LDefinition::BogusTemp();
   define(new (alloc()) LInt64ToFloatingPoint(useInt64Register(opd), maybeTemp),
+         ins);
+}
+
+void LIRGeneratorX64::lowerWasmBuiltinTruncateToInt32(
+    MWasmBuiltinTruncateToInt32* ins) {
+  MDefinition* opd = ins->input();
+  MOZ_ASSERT(opd->type() == MIRType::Double || opd->type() == MIRType::Float32);
+
+  if (opd->type() == MIRType::Double) {
+    define(new (alloc()) LWasmBuiltinTruncateDToInt32(
+               useRegister(opd), LAllocation(), tempShift()),
+           ins);
+    return;
+  }
+
+  LDefinition maybeTemp = LDefinition::BogusTemp();
+  define(new (alloc()) LWasmBuiltinTruncateFToInt32(useRegister(opd),
+                                                    LAllocation(), maybeTemp),
          ins);
 }
 
@@ -576,7 +623,7 @@ void LIRGeneratorShared::lowerWasmCompareAndSelect(MWasmSelect* ins,
                                                    JSOp jsop) {
   MOZ_ASSERT(canSpecializeWasmCompareAndSelect(compTy, ins->type()));
   auto* lir = new (alloc()) LWasmCompareAndSelect(
-      useRegister(lhs), useAny(rhs), compTy, jsop,
-      useRegisterAtStart(ins->trueExpr()), useAny(ins->falseExpr()));
+      useRegister(lhs), useAny(rhs), useRegisterAtStart(ins->trueExpr()),
+      useAny(ins->falseExpr()), compTy, jsop);
   defineReuseInput(lir, ins, LWasmCompareAndSelect::IfTrueExprIndex);
 }

@@ -6,11 +6,6 @@
 
 #include "wasm/WasmGcObject-inl.h"
 
-#include "mozilla/ArrayUtils.h"
-#include "mozilla/Casting.h"
-#include "mozilla/CheckedInt.h"
-#include "mozilla/DebugOnly.h"
-
 #include <algorithm>
 
 #include "gc/Marking.h"
@@ -19,7 +14,7 @@
 #include "js/PropertySpec.h"
 #include "js/ScalarType.h"  // js::Scalar::Type
 #include "js/Vector.h"
-#include "util/StringBuffer.h"
+#include "util/StringBuilder.h"
 #include "vm/GlobalObject.h"
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
@@ -34,12 +29,6 @@
 #include "gc/GCContext-inl.h"  // GCContext::removeCellMemory
 #include "gc/ObjectKind-inl.h"
 #include "vm/JSContext-inl.h"
-
-using mozilla::AssertedCast;
-using mozilla::CheckedUint32;
-using mozilla::IsPowerOfTwo;
-using mozilla::PodCopy;
-using mozilla::PointerRangeSize;
 
 using namespace js;
 using namespace wasm;
@@ -262,12 +251,16 @@ bool WasmGcObject::lookUpProperty(JSContext* cx, Handle<WasmGcObject*> obj,
       }
       uint32_t numElements = obj->as<WasmArrayObject>().numElements_;
       if (index >= numElements) {
+        JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                                 JSMSG_WASM_OUT_OF_BOUNDS);
         return false;
       }
       uint64_t scaledIndex =
           uint64_t(index) * uint64_t(arrayType.elementType().size());
       if (scaledIndex >= uint64_t(UINT32_MAX)) {
-        // It's unrepresentable as an WasmGcObject::PropOffset.  Give up.
+        // It's unrepresentable as an WasmGcObject::PropOffset. Give up.
+        JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
+                                 JSMSG_WASM_OUT_OF_BOUNDS);
         return false;
       }
       offset->set(uint32_t(scaledIndex));
@@ -396,7 +389,9 @@ void WasmArrayObject::obj_finalize(JS::GCContext* gcx, JSObject* object) {
     // been freed.
     const TypeDef& typeDef = arrayObj.typeDef();
     MOZ_ASSERT(typeDef.isArrayType());
-    size_t trailerSize = calcStorageBytes(
+    // arrayObj.numElements_ was validated to not overflow when constructing the
+    // array
+    size_t trailerSize = calcStorageBytesUnchecked(
         typeDef.arrayType().elementType().size(), arrayObj.numElements_);
     // Ensured by WasmArrayObject::createArrayNonEmpty.
     MOZ_RELEASE_ASSERT(trailerSize <= size_t(MaxArrayPayloadBytes));
@@ -425,7 +420,9 @@ size_t WasmArrayObject::obj_moved(JSObject* obj, JSObject* old) {
     if (!arrayObj.isDataInline()) {
       const TypeDef& typeDef = arrayObj.typeDef();
       MOZ_ASSERT(typeDef.isArrayType());
-      size_t trailerSize = calcStorageBytes(
+      // arrayObj.numElements_ was validated not to overflow when constructing
+      // the array
+      size_t trailerSize = calcStorageBytesUnchecked(
           typeDef.arrayType().elementType().size(), arrayObj.numElements_);
       // Ensured by WasmArrayObject::createArrayOOL.
       MOZ_RELEASE_ASSERT(trailerSize <= size_t(MaxArrayPayloadBytes));
@@ -471,7 +468,7 @@ static const JSClassOps WasmArrayObjectClassOps = {
     WasmArrayObject::obj_trace,
 };
 static const ClassExtension WasmArrayObjectClassExt = {
-    WasmArrayObject::obj_moved /* objectMovedOp */
+    WasmArrayObject::obj_moved, /* objectMovedOp */
 };
 const JSClass WasmArrayObject::class_ = {
     "WasmArrayObject",
@@ -480,7 +477,8 @@ const JSClass WasmArrayObject::class_ = {
     &WasmArrayObjectClassOps,
     JS_NULL_CLASS_SPEC,
     &WasmArrayObjectClassExt,
-    &WasmGcObject::objectOps_};
+    &WasmGcObject::objectOps_,
+};
 
 //=========================================================================
 // WasmStructObject
@@ -616,7 +614,7 @@ static const JSClassOps WasmStructObjectOutlineClassOps = {
     WasmStructObject::obj_trace,
 };
 static const ClassExtension WasmStructObjectOutlineClassExt = {
-    WasmStructObject::obj_moved /* objectMovedOp */
+    WasmStructObject::obj_moved, /* objectMovedOp */
 };
 const JSClass WasmStructObject::classOutline_ = {
     "WasmStructObject",
@@ -625,7 +623,8 @@ const JSClass WasmStructObject::classOutline_ = {
     &WasmStructObjectOutlineClassOps,
     JS_NULL_CLASS_SPEC,
     &WasmStructObjectOutlineClassExt,
-    &WasmGcObject::objectOps_};
+    &WasmGcObject::objectOps_,
+};
 
 // Structs that only have inline data get a different class without a
 // finalizer. This class should otherwise be identical to the class for
@@ -643,7 +642,7 @@ static const JSClassOps WasmStructObjectInlineClassOps = {
     WasmStructObject::obj_trace,
 };
 static const ClassExtension WasmStructObjectInlineClassExt = {
-    nullptr /* objectMovedOp */
+    nullptr, /* objectMovedOp */
 };
 const JSClass WasmStructObject::classInline_ = {
     "WasmStructObject",
@@ -651,4 +650,5 @@ const JSClass WasmStructObject::classInline_ = {
     &WasmStructObjectInlineClassOps,
     JS_NULL_CLASS_SPEC,
     &WasmStructObjectInlineClassExt,
-    &WasmGcObject::objectOps_};
+    &WasmGcObject::objectOps_,
+};

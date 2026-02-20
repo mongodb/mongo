@@ -260,12 +260,6 @@ RegI32 BaseCompiler::maybeHighPart(RegI64 r) {
 #endif
 }
 
-void BaseCompiler::maybeClearHighPart(RegI64 r) {
-#if !defined(JS_PUNBOX64)
-  moveImm32(0, RegI32(r.high));
-#endif
-}
-
 // TODO: We want these to be inlined for sure; do we need an `inline` somewhere?
 
 template <>

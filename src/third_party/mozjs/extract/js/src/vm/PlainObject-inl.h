@@ -30,9 +30,9 @@
   MOZ_ASSERT(shape->getObjectClass() == &PlainObject::class_);
   gc::Heap heap = GetInitialHeap(newKind, &PlainObject::class_);
 
-  MOZ_ASSERT(gc::CanChangeToBackgroundAllocKind(kind, &PlainObject::class_));
-  kind = gc::ForegroundToBackgroundAllocKind(kind);
-
+  MOZ_ASSERT(!IsFinalizedKind(kind));
+  MOZ_ASSERT(gc::GetObjectFinalizeKind(&PlainObject::class_) ==
+             gc::FinalizeKind::None);
   return NativeObject::create<PlainObject>(cx, kind, heap, shape);
 }
 
@@ -50,9 +50,10 @@
 
 inline js::gc::AllocKind js::PlainObject::allocKindForTenure() const {
   gc::AllocKind kind = gc::GetGCObjectFixedSlotsKind(numFixedSlots());
-  MOZ_ASSERT(!gc::IsBackgroundFinalized(kind));
-  MOZ_ASSERT(gc::CanChangeToBackgroundAllocKind(kind, getClass()));
-  return gc::ForegroundToBackgroundAllocKind(kind);
+  MOZ_ASSERT(!IsFinalizedKind(kind));
+  MOZ_ASSERT(gc::GetObjectFinalizeKind(&PlainObject::class_) ==
+             gc::FinalizeKind::None);
+  return kind;
 }
 
 namespace js {

@@ -12,7 +12,6 @@
 #include <stdint.h>
 
 #include "builtin/temporal/TemporalTypes.h"
-#include "builtin/temporal/Wrapped.h"
 #include "js/TypeDecls.h"
 #include "js/Value.h"
 #include "vm/NativeObject.h"
@@ -32,28 +31,22 @@ class InstantObject : public NativeObject {
   static constexpr uint32_t NANOSECONDS_SLOT = 1;
   static constexpr uint32_t SLOT_COUNT = 2;
 
-  int64_t seconds() const {
+  /**
+   * Extract the epoch nanoseconds fields from this ZonedDateTime object.
+   */
+  EpochNanoseconds epochNanoseconds() const {
     double seconds = getFixedSlot(SECONDS_SLOT).toNumber();
     MOZ_ASSERT(-8'640'000'000'000 <= seconds && seconds <= 8'640'000'000'000);
-    return int64_t(seconds);
-  }
 
-  int32_t nanoseconds() const {
     int32_t nanoseconds = getFixedSlot(NANOSECONDS_SLOT).toInt32();
     MOZ_ASSERT(0 <= nanoseconds && nanoseconds <= 999'999'999);
-    return nanoseconds;
+
+    return {{int64_t(seconds), nanoseconds}};
   }
 
  private:
   static const ClassSpec classSpec_;
 };
-
-/**
- * Extract the instant fields from the Instant object.
- */
-inline Instant ToInstant(const InstantObject* instant) {
-  return {instant->seconds(), instant->nanoseconds()};
-}
 
 class Increment;
 enum class TemporalUnit;
@@ -67,76 +60,59 @@ bool IsValidEpochNanoseconds(const JS::BigInt* epochNanoseconds);
 /**
  * IsValidEpochNanoseconds ( epochNanoseconds )
  */
-bool IsValidEpochInstant(const Instant& instant);
+bool IsValidEpochNanoseconds(const EpochNanoseconds& epochNanoseconds);
 
 #ifdef DEBUG
 /**
- * Return true if the input is within the valid instant span limits.
+ * Return true if the input is within the valid epoch duration limits.
  */
-bool IsValidInstantSpan(const InstantSpan& span);
+bool IsValidEpochDuration(const EpochDuration& duration);
 #endif
 
 /**
- * Convert a BigInt to an instant. The input must be a valid epoch nanoseconds
- * value.
+ * Convert a BigInt to epoch nanoseconds. The input must be a valid epoch
+ * nanoseconds value.
  */
-Instant ToInstant(const JS::BigInt* epochNanoseconds);
+EpochNanoseconds ToEpochNanoseconds(const JS::BigInt* epochNanoseconds);
 
 /**
- * Convert an instant to a BigInt. The input must be a valid epoch instant.
+ * Convert epoch nanoseconds to a BigInt. The input must be valid epoch
+ * nanoseconds.
  */
-JS::BigInt* ToEpochNanoseconds(JSContext* cx, const Instant& instant);
-
-/**
- * ToTemporalInstant ( item )
- */
-Wrapped<InstantObject*> ToTemporalInstant(JSContext* cx,
-                                          JS::Handle<JS::Value> item);
-
-/**
- * ToTemporalInstant ( item )
- */
-bool ToTemporalInstant(JSContext* cx, JS::Handle<JS::Value> item,
-                       Instant* result);
+JS::BigInt* ToBigInt(JSContext* cx, const EpochNanoseconds& epochNanoseconds);
 
 /**
  * CreateTemporalInstant ( epochNanoseconds [ , newTarget ] )
  */
-InstantObject* CreateTemporalInstant(JSContext* cx, const Instant& instant);
+InstantObject* CreateTemporalInstant(JSContext* cx,
+                                     const EpochNanoseconds& epochNanoseconds);
 
 /**
- * GetUTCEpochNanoseconds ( year, month, day, hour, minute, second, millisecond,
- * microsecond, nanosecond [ , offsetNanoseconds ] )
+ * GetUTCEpochNanoseconds ( isoDateTime )
  */
-Instant GetUTCEpochNanoseconds(const PlainDateTime& dateTime);
-
-/**
- * GetUTCEpochNanoseconds ( year, month, day, hour, minute, second, millisecond,
- * microsecond, nanosecond [ , offsetNanoseconds ] )
- */
-Instant GetUTCEpochNanoseconds(const PlainDateTime& dateTime,
-                               const InstantSpan& offsetNanoseconds);
+EpochNanoseconds GetUTCEpochNanoseconds(const ISODateTime& isoDateTime);
 
 /**
  * RoundTemporalInstant ( ns, increment, unit, roundingMode )
  */
-Instant RoundTemporalInstant(const Instant& ns, Increment increment,
-                             TemporalUnit unit,
-                             TemporalRoundingMode roundingMode);
+EpochNanoseconds RoundTemporalInstant(const EpochNanoseconds& ns,
+                                      Increment increment, TemporalUnit unit,
+                                      TemporalRoundingMode roundingMode);
 
 /**
  * AddInstant ( epochNanoseconds, norm )
  */
-bool AddInstant(JSContext* cx, const Instant& instant,
-                const NormalizedTimeDuration& duration, Instant* result);
+bool AddInstant(JSContext* cx, const EpochNanoseconds& epochNanoseconds,
+                const TimeDuration& duration, EpochNanoseconds* result);
 
 /**
  * DifferenceInstant ( ns1, ns2, roundingIncrement, smallestUnit, roundingMode )
  */
-NormalizedTimeDuration DifferenceInstant(const Instant& ns1, const Instant& ns2,
-                                         Increment roundingIncrement,
-                                         TemporalUnit smallestUnit,
-                                         TemporalRoundingMode roundingMode);
+TimeDuration DifferenceInstant(const EpochNanoseconds& ns1,
+                               const EpochNanoseconds& ns2,
+                               Increment roundingIncrement,
+                               TemporalUnit smallestUnit,
+                               TemporalRoundingMode roundingMode);
 
 } /* namespace js::temporal */
 

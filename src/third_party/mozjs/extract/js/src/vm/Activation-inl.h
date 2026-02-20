@@ -14,42 +14,12 @@
 #include "mozilla/Maybe.h"       // mozilla::Maybe
 
 #include "jit/CalleeToken.h"   // js::jit::CalleeToken
-#include "js/Debug.h"          // JS::dbg::AutoEntryMonitor
 #include "vm/FrameIter.h"      // js::FrameIter
 #include "vm/JitActivation.h"  // js::jit::JitActivation
 #include "vm/JSContext.h"      // JSContext
 #include "vm/Stack.h"          // js::AbstractFramePtr
 
 namespace js {
-
-inline ActivationEntryMonitor::ActivationEntryMonitor(JSContext* cx)
-    : cx_(cx), entryMonitor_(cx->entryMonitor) {
-  cx->entryMonitor = nullptr;
-}
-
-inline ActivationEntryMonitor::ActivationEntryMonitor(
-    JSContext* cx, InterpreterFrame* entryFrame)
-    : ActivationEntryMonitor(cx) {
-  if (MOZ_UNLIKELY(entryMonitor_)) {
-    init(cx, entryFrame);
-  }
-}
-
-inline ActivationEntryMonitor::ActivationEntryMonitor(
-    JSContext* cx, jit::CalleeToken entryToken)
-    : ActivationEntryMonitor(cx) {
-  if (MOZ_UNLIKELY(entryMonitor_)) {
-    init(cx, entryToken);
-  }
-}
-
-inline ActivationEntryMonitor::~ActivationEntryMonitor() {
-  if (entryMonitor_) {
-    entryMonitor_->Exit(cx_);
-  }
-
-  cx_->entryMonitor = entryMonitor_;
-}
 
 inline Activation::Activation(JSContext* cx, Kind kind)
     : cx_(cx),

@@ -284,7 +284,7 @@ static void VisitLoop(MIRGraph& graph, MBasicBlock* header) {
   }
 }
 
-bool jit::LICM(MIRGenerator* mir, MIRGraph& graph) {
+bool jit::LICM(const MIRGenerator* mir, MIRGraph& graph) {
   JitSpew(JitSpew_LICM, "Beginning LICM pass");
 
   // Iterate in RPO to visit outer loops before inner loops. We'd hoist the

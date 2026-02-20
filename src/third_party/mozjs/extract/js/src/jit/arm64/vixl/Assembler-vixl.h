@@ -1661,6 +1661,7 @@ class Assembler : public MozBaseAssembler {
 
   // Load word with sign extension from pc + imm19 << 2.
   void ldrsw(const Register& rt, int imm19);
+  static void ldrsw(Instruction* at, const CPURegister& rt, int imm19);
 
   // Store exclusive byte.
   void stxrb(const Register& rs, const Register& rt, const MemOperand& dst);
