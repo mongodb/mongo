@@ -128,3 +128,6 @@ patch_aliases:
   - alias: cluster_scalability
     variant_tags: ["cluster_scalability_only"]
     task_tags: ["cluster_scalability_only"]
+  - alias: coverity_scan
+    variant: bv_coverity_analysis
+    task: run_coverity
