@@ -1,11 +1,14 @@
 /**
- * Confirms that the limit on number of aggregragation pipeline stages is respected.
+ * Confirms that the limit on number of aggregation pipeline stages is respected.
  * @tags: [
- *   requires_fcv_71,
+ *  # We perform an additional pipeline validation after a $lookup cache optimization.
+ *  requires_fcv_80,
  * ]
  */
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getExpectedPipelineLimit} from "jstests/libs/optimizer_utils.js";
+
+const kPreParseErrCode = 7749501;
+const kPostParseErrCode = 5054701;
 
 function testLimits(testDB, lengthLimit) {
     let maxLength = lengthLimit;
@@ -14,9 +17,6 @@ function testLimits(testDB, lengthLimit) {
     // Test that the enforced pre-parse length limit is the same as the post-parse limit.
     // We use $count because it is desugared into two separate stages, so it will pass the pre-parse
     // limit but fail after.
-    let kPreParseErrCode = 7749501;
-    let kPostParseErrCode = 5054701;
-
     // 1. This test case will pass the pre-parse enforcer but fail after.
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: "test",
@@ -134,38 +134,55 @@ function testLimits(testDB, lengthLimit) {
     // Same test, but these to stages get replaced by 2 stages under the hood.
     [{$bucket: {groupBy: "$nonExistentField", boundaries: [0, 1], default: 2}},
      {$sortByCount: "$_id"}]
-        .forEach((stage) => assert.commandWorked(testDB.runCommand({
-            aggregate: collname,
-            cursor: {},
-            pipeline: new Array(parseInt(maxLength / 2)).fill(stage)
-        })));
+        .forEach(
+            (stage) => assert.commandWorked(
+                testDB.runCommand({
+                    aggregate: collname,
+                    cursor: {},
+                    pipeline: new Array(parseInt(maxLength / 2)).fill(stage),
+                }),
+                ),
+        );
+}
+
+function testLimitsWithLookupCache(testDB, lengthLimit) {
+    let maxLength = lengthLimit;
+    let tooLarge = lengthLimit + 1;
+
+    const kPreParseErrCode = 7749501;
+    const kPostParseErrCode = 5054701;
 
     // $lookup inserts a DocumentSourceSequentialDocumentCache stage in the subpipeline to perform
-    // cacheing optimizations, so the subpipeline can have at most 'maxLength - 1' user-specified
-    // stages. When we connect directly to a shard without mongos, it is treated as a standalone
-    // and will not perform pipeline length validation after the cache stage is added.
-    if (FixtureHelpers.isMongos(testDB)) {
-        maxLength = maxLength - 1;
-        tooLarge = tooLarge - 1;
-    }
+    // caching optimizations. We perform pipeline validation again after this, so the
+    // subpipeline can have at most 'maxLength - 1' user-specified stages.
+    maxLength = maxLength - 1;
+    tooLarge = tooLarge - 1;
 
-    assert.commandWorked(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: [{
-            $lookup:
-                {from: "test", as: "as", pipeline: new Array(maxLength).fill({$project: {_id: 1}})}
-        }]
-    }));
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: "test",
-        cursor: {},
-        pipeline: [{
-            $lookup:
-                {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})}
-        }]
-    }),
-                                 [kPostParseErrCode, kPreParseErrCode]);
+    assert.commandWorked(
+        testDB.runCommand({
+            aggregate: "test",
+            cursor: {},
+            pipeline: [
+                {
+                    $lookup: {from: "test", as: "as", pipeline: new Array(maxLength).fill({$project: {_id: 1}})},
+                },
+            ],
+            comment: "lookup maxLength",
+        }),
+    );
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: "test",
+            cursor: {},
+            pipeline: [
+                {
+                    $lookup: {from: "test", as: "as", pipeline: new Array(tooLarge).fill({$project: {_id: 1}})},
+                },
+            ],
+            comment: "lookup tooLarge",
+        }),
+        [kPostParseErrCode, kPreParseErrCode],
+    );
 }
 
 function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
@@ -178,13 +195,50 @@ function runTest(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
     let mongosDB = st.s0.getDB("test");
     assert.commandWorked(mongosDB.test.insert([{}, {}, {}, {}]));
 
-    // Run test against mongos.
+    jsTestLog("Running test against mongos");
     testLimits(mongosDB, lengthLimit);
 
-    // Run test against shard.
+    jsTestLog("Running test against shard");
     let shard0DB = st.rs0.getPrimary().getDB("test");
     testLimits(shard0DB, lengthLimit);
 
+    st.stop();
+}
+
+function runTestWithLookupCache(lengthLimit, mongosConfig = {}, mongodConfig = {}) {
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: 1},
+        other: {mongosOptions: mongosConfig, rsOptions: mongodConfig},
+    });
+
+    // Setup sharded collection with predictable document distribution across shards.
+    // This ensures that both shard0 and shard1 have documents to process, which is
+    // required for $lookup to execute its subpipeline logic.
+    assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
+    assert.commandWorked(st.s0.adminCommand({shardCollection: "test.test", key: {_id: 1}}));
+    assert.commandWorked(st.s0.adminCommand({split: "test.test", middle: {_id: 2}}));
+
+    const mongosDB = st.s0.getDB("test");
+    mongosDB.test.insertOne({_id: 1, field: "test1"});
+    mongosDB.test.insertOne({_id: 2, field: "test2"});
+    mongosDB.test.insertOne({_id: 3, field: "test3"});
+    mongosDB.test.insertOne({_id: 4, field: "test4"});
+
+    // Explicitly move chunks to ensure predictable shard distribution:
+    // - Shard0 gets documents with _id: 1 (chunk [MinKey, 2))
+    // - Shard1 gets documents with _id: 2, 3, 4 (chunk [2, MaxKey))
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: "test.test", find: {_id: 0}, to: st.rs0.getURL()}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: "test.test", find: {_id: 2}, to: st.rs1.getURL()}));
+
+    jsTestLog("Running test against mongos");
+    testLimitsWithLookupCache(mongosDB, lengthLimit);
+
+    jsTestLog("Running test against shard");
+    const shard0DB = st.rs0.getPrimary().getDB("test");
+    testLimitsWithLookupCache(shard0DB, lengthLimit);
     st.stop();
 }
 
@@ -206,3 +260,8 @@ st.stop();
 runTest(50,
         {setParameter: {internalPipelineLengthLimit: 50}},
         {setParameter: {internalPipelineLengthLimit: 50}});
+runTestWithLookupCache(
+    50,
+    {setParameter: {internalPipelineLengthLimit: 50}},
+    {setParameter: {internalPipelineLengthLimit: 50}},
+);

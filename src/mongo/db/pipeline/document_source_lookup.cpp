@@ -759,6 +759,12 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
 
     addCacheStageAndOptimize(*pipeline);
 
+    // We perform pipeline validation again after adding the cache stage, given that stages with
+    // a stage constraint of PositionRequirement::kCustom will only perform validation checks
+    // when 'alreadyOptimized' is true. If we avoid this check we could potentially try to
+    // execute invalid pipelines.
+    pipeline->validateCommon(true /* alreadyOptimized */);
+
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
         auto shardTargetingPolicy = allowForeignShardedColl ? ShardTargetingPolicy::kAllowed
