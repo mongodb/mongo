@@ -111,7 +111,7 @@ buildvariants:
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_large_host #!.incompatible_all_feature_flags
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant .requires_large_host #!.incompatible_all_feature_flags
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2023-arm64-atlas-latest-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant #!.incompatible_all_feature_flags
 
 - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template

@@ -64,7 +64,7 @@ variables:
 # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-- &amazon_linux2_arm64_dynamic_expansions
+- &amazon_linux2023_arm64_dynamic_expansions
   <<: *linux_arm64_generic_expansions
   compile_variant: *amazon_linux2023_arm64_dynamic_compile_variant_name
   multiversion_platform: amazon2023
@@ -110,7 +110,7 @@ buildvariants:
     - name: .development_critical_single_variant !.requires_large_host
     - name: .development_critical_single_variant .requires_large_host
       distros:
-      - amazon2-arm64-latest-xlarge
+      - amazon2023-arm64-latest-xlarge
     - name: .release_critical .requires_compile_variant !.incompatible_development_variant !.stitch !.crypt
     - name: .default .requires_compile_variant !.incompatible_development_variant
 
@@ -123,7 +123,7 @@ buildvariants:
     - amazon2023-arm64-atlas-latest-small
   stepback: true
   expansions: &enterprise-amazon-linux2-arm64-expansions
-    <<: *amazon_linux2_arm64_dynamic_expansions
+    <<: *amazon_linux2023_arm64_dynamic_expansions
     has_packages: false
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
@@ -138,7 +138,7 @@ buildvariants:
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags !.requires_large_host
   - name: .release_critical !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags .requires_large_host
     distros:
-    - amazon2-arm64-latest-large
+    - amazon2023-arm64-atlas-latest-large
   - name: .default !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
 
 - <<: *amazon_linux2023_arm64_dynamic_compile_variant_dependency
@@ -209,7 +209,7 @@ buildvariants:
   - amazon2023-arm64-latest-small
   stepback: true
   expansions:
-    <<: *amazon_linux2_arm64_dynamic_expansions
+    <<: *amazon_linux2023_arm64_dynamic_expansions
     # Diagnostic latches are disabled by default, and we match that behavior here. We also need to
     # exclude tests with 'requires_latch_analyzer'.
     bazel_compile_flags: >-
