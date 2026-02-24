@@ -221,12 +221,16 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
     auto* as = AuthorizationSession::get(opCtx->getClient());
 
     UserName userName(request.getCommandParameter(), dbname);
+    bool canChangePassword = isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
+        as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                             ActionType::changePassword);
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to change password of user: " << userName,
-            (request.getPwd() == boost::none) ||
-                isAuthorizedToChangeOwnPasswordAsUser(as, userName) ||
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                     ActionType::changePassword));
+            (request.getPwd() == boost::none) || canChangePassword);
+
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to change mechanisms of user: " << userName,
+            (request.getMechanisms() == boost::none) || canChangePassword);
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to change customData of user: " << userName,

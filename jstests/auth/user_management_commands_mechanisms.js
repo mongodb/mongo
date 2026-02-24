@@ -65,8 +65,18 @@ function checkUser(userid, passwd, haveSCRAMSHA1, haveSCRAMSHA256) {
     }
 }
 
-admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
-assert(admin.auth('admin', 'pass'));
+admin.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+assert(admin.auth("admin", "pass"));
+test.createRole({
+    role: "setOwnMechsRole",
+    privileges: [{resource: {db: "test", collection: ""}, actions: ["changeOwnPassword"]}],
+    roles: jsTest.readOnlyUserRoles,
+});
+test.createRole({
+    role: "setMechsRole",
+    privileges: [{resource: {db: "test", collection: ""}, actions: ["changePassword"]}],
+    roles: jsTest.readOnlyUserRoles,
+});
 
 function createUser(db, user) {
     assert(admin.auth('admin', 'pass'));
@@ -79,6 +89,15 @@ function createUserThrows(db, user) {
     assert.throws(() => db.createUser(user));
     admin.logout();
 }
+
+const kReadOnlyUser = "readOnlyUser";
+createUser(test, {user: kReadOnlyUser, pwd: "pass", roles: jsTest.readOnlyUserRoles});
+
+const kSetOwnMechsUser = "setOwnMechsUser";
+createUser(test, {user: kSetOwnMechsUser, pwd: "pass", roles: ["setOwnMechsRole"]});
+
+const kSetMechsUser = "setMechsUser";
+createUser(test, {user: kSetMechsUser, pwd: "pass", roles: ["setMechsRole"]});
 
 // Unknown mechanism.
 createUserThrows(test, {
@@ -131,39 +150,68 @@ createUserThrows(test, {
     passwordDigestor: 'client'
 });
 
-function updateUser(db, user, props) {
-    assert(admin.auth('admin', 'pass'));
+function updateUserAsAdmin(db, user, props) {
+    // Log in as root on admin
+    assert(admin.auth("admin", "pass"));
     db.updateUser(user, props);
     admin.logout();
 }
 
-function updateUserThrows(db, user, props) {
-    assert(admin.auth('admin', 'pass'));
+function updateUserThrowsAsAdmin(db, user, props) {
+    assert(admin.auth("admin", "pass"));
     assert.throws(() => db.updateUser(user, props));
     admin.logout();
 }
 
+function updateUserAsUser(db, user, props, actingUser) {
+    // Log in as given user on db
+    assert(db.auth(actingUser, "pass"));
+    db.updateUser(user, props);
+    db.logout();
+}
+
+function updateUserThrowsAsUser(db, user, props, actingUser) {
+    assert(db.auth(actingUser, "pass"));
+    assert.throws(() => db.updateUser(user, props));
+    db.logout();
+}
+
 // Update original 1/256 user to just sha-1.
-updateUser(test, 'user', {pwd: 'pass1', mechanisms: ['SCRAM-SHA-1']});
-checkUser('user', 'pass1', true, false);
+updateUserAsAdmin(test, "user", {pwd: "pass1", mechanisms: ["SCRAM-SHA-1"]});
+checkUser("user", "pass1", true, false);
 
 // Then flip to 256-only
-updateUser(test, 'user', {pwd: 'pass256', mechanisms: ['SCRAM-SHA-256']});
-checkUser('user', 'pass256', false, true);
+updateUserAsAdmin(test, "user", {pwd: "pass256", mechanisms: ["SCRAM-SHA-256"]});
+checkUser("user", "pass256", false, true);
 
 // And back to (default) all.
-updateUser(test, 'user', {pwd: 'passAll'});
-checkUser('user', 'passAll', true, true);
+updateUserAsAdmin(test, "user", {pwd: "passAll"});
+checkUser("user", "passAll", true, true);
 
 // Trim out mechanisms without changing password.
-updateUser(test, 'user', {mechanisms: ['SCRAM-SHA-256']});
-checkUser('user', 'passAll', false, true);
+updateUserAsAdmin(test, "user", {mechanisms: ["SCRAM-SHA-256"]});
+checkUser("user", "passAll", false, true);
 
 // Fail when mechanisms is not a subset of the current user.
-updateUserThrows(test, 'user', {mechanisms: ['SCRAM-SHA-1']});
+updateUserThrowsAsAdmin(test, "user", {mechanisms: ["SCRAM-SHA-1"]});
 
 // Fail when passing an empty mechanisms field.
-updateUserThrows(test, 'user', {pwd: 'passEmpty', mechanisms: []});
+updateUserThrowsAsAdmin(test, "user", {pwd: "passEmpty", mechanisms: []});
+
+// Fail when changing a different user's mechanisms field if cannot changePassword.
+updateUserAsAdmin(test, "user", {mechanisms: ["SCRAM-SHA-256"]});
+checkUser("user", "passAll", false, true);
+updateUserAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kSetMechsUser);
+checkUser("user", "passAll", false, true);
+updateUserThrowsAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kReadOnlyUser);
+updateUserThrowsAsUser(test, "user", {mechanisms: ["SCRAM-SHA-256"]}, kSetOwnMechsUser);
+
+// Succeed when changing own user's mechanisms field if can changeOwnPassword or changePassword
+updateUserAsUser(test, kSetMechsUser, {mechanisms: ["SCRAM-SHA-256"]}, kSetMechsUser);
+checkUser(kSetMechsUser, "pass", false, true);
+updateUserThrowsAsUser(test, kReadOnlyUser, {mechanisms: ["SCRAM-SHA-256"]}, kReadOnlyUser);
+updateUserAsUser(test, kSetOwnMechsUser, {mechanisms: ["SCRAM-SHA-256"]}, kSetOwnMechsUser);
+checkUser(kSetOwnMechsUser, "pass", false, true);
 
 // Succeed if we're using SHA-1 only.
 createUser(
@@ -195,7 +243,7 @@ let foundUsers = [];
 allSCRAMSHA1UsersInfo.users.forEach(function(userObj) {
     foundUsers.push(userObj.user);
 });
-assert.eq(["sha1user", "sha1user2", "\u2168"], foundUsers);
+assert.eq([kReadOnlyUser, "sha1user", "sha1user2", "\u2168"], foundUsers);
 
 // Demonstrate that usersInfo can find SCRAM-SHA-256 users
 const allSCRAMSHA256UsersInfo =
@@ -204,7 +252,7 @@ foundUsers = [];
 allSCRAMSHA256UsersInfo.users.forEach(function(userObj) {
     foundUsers.push(userObj.user);
 });
-assert.eq(["sha256user", "user"], foundUsers);
+assert.eq([kReadOnlyUser, kSetMechsUser, kSetOwnMechsUser, "sha256user", "user"], foundUsers);
 
 MongoRunner.stopMongod(mongod);
 
