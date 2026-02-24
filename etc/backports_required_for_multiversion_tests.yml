@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/core/json_schema/json_schema.js
+    ticket: SERVER-98676
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
   - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
@@ -627,6 +629,8 @@ last-continuous:
     ticket: SERVER-108341
   - test_file: jstests/core/query/update/update_set_unset.js
     ticket: SERVER-103960
+  - test_file: jstests/core/write/update/updatea.js
+    ticket: SERVER-103960
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js
     ticket: SERVER-84081
   - test_file: jstests/aggregation/expressions/reduce_overflow.js
@@ -648,6 +652,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/core/json_schema/json_schema.js
+    ticket: SERVER-98676
   - test_file: jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     ticket: SERVER-95869
   - test_file: jstests/change_streams/change_streams_dynamic_match_expressions.js
@@ -1323,6 +1329,8 @@ last-lts:
   - test_file: jstests/sharding/query/union_with_doubly_nested_lookup.js
     ticket: SERVER-108341
   - test_file: jstests/core/query/update/update_set_unset.js
+    ticket: SERVER-103960
+  - test_file: jstests/core/write/update/updatea.js
     ticket: SERVER-103960
   - test_file: jstests/core/txns/multi_statement_transaction_abort.js
     ticket: SERVER-84081
