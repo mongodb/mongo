@@ -472,6 +472,9 @@ common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:local_build=True
 common:public-release --stamp
 
+# Experimental flag to collect system network usage metrics during build
+common --experimental_collect_system_network_usage
+
 --config=fission
 common:fission --fission=yes
 common:fission --remote_download_regex=.*\.dwo$
