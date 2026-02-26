@@ -15,6 +15,7 @@ buildvariants:
     run_on:
       - amazon2023-latest-small
     expansions:
+      skip_debug_link: true
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
         --additionalFeatureFlags=featureFlagStreams
@@ -81,6 +82,7 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-m8g-xlarge
     expansions:
+      skip_debug_link: true
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_ldap_pool
         --additionalFeatureFlags=featureFlagStreams
