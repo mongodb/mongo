@@ -16,6 +16,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getAggPlanStage, getPlanStages, getRejectedPlan, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const generateTest = (useHint) => {
     return (insert) => {
@@ -53,7 +54,12 @@ const generateTest = (useHint) => {
          * Finally, deletes the created index.
          */
         const testQueryUsesIndex = function (filter, numMatches, indexSpec, indexOpts = {}, queryOpts = {}) {
-            assert.commandWorked(coll.createIndex(indexSpec, Object.assign({name: "testIndexName"}, indexOpts)));
+            assert.commandWorked(
+                coll.createIndex(
+                    indexSpec,
+                    add2dsphereVersionIfNeeded(Object.assign({name: "testIndexName"}, indexOpts)),
+                ),
+            );
 
             let query = coll.find(filter);
             if (useHint) query = query.hint(indexSpec);
@@ -93,7 +99,12 @@ const generateTest = (useHint) => {
             stageType = "IXSCAN",
             indexOpts = {},
         ) {
-            assert.commandWorked(coll.createIndex(indexSpec, Object.assign({name: "testIndexName"}, indexOpts)));
+            assert.commandWorked(
+                coll.createIndex(
+                    indexSpec,
+                    add2dsphereVersionIfNeeded(Object.assign({name: "testIndexName"}, indexOpts)),
+                ),
+            );
 
             let aggregation = coll.aggregate(pipeline);
             assert.eq(numMatches, aggregation.itcount());
