@@ -206,11 +206,14 @@ mongo_cc_library(
 
 render_template(
     name = "icu_init_cpp",
-    srcs = select({
+    srcs = [
+        "generate_icu_init_cpp.py",
+    ] + select({
         "@platforms//cpu:s390x": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat"],
         "//conditions:default": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat"],
     }),
     cmd = [
+        "$(location generate_icu_init_cpp.py)",
         "-o",
         "$(location icu_init.cpp)",
         "-i",
@@ -219,7 +222,6 @@ render_template(
         "//conditions:default": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat)"],
     }),
     output = "icu_init.cpp",
-    python_file = "generate_icu_init_cpp.py",
 )
 
 # When using ICU from third_party, icu_init.cpp will load a subset of

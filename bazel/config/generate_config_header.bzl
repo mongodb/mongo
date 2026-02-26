@@ -61,6 +61,9 @@ def generate_config_header_impl(ctx):
         "cpp_defines": " ".join(ctx.attr.cpp_defines),
     }
 
+    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    generator_script = ctx.attr.generator_script.files.to_list()[0].path
+
     additional_inputs = []
     additional_inputs_depsets = []
     for additional_input in ctx.attr.additional_inputs:
@@ -71,15 +74,18 @@ def generate_config_header_impl(ctx):
             additional_inputs.append(file.path)
 
     ctx.actions.run(
-        executable = ctx.executable.generator_script,
+        executable = python.interpreter.path,
         outputs = [ctx.outputs.output, ctx.outputs.logfile],
         mnemonic = "ConfigHeaderGen",
         inputs = depset(transitive = [
             cc_toolchain.all_files,
+            python.files,
+            ctx.attr.generator_script.files,
             ctx.attr.template.files,
             ctx.attr.checks.files,
         ] + additional_inputs_depsets),
         arguments = [
+                        generator_script,  # bazel/config/mongo_config_header.py
                         "--output-path",
                         ctx.outputs.output.path,
                         "--template-path",
@@ -142,9 +148,8 @@ generate_config_header_rule = rule(
         ),
         "generator_script": attr.label(
             doc = "The python generator script to use.",
-            default = "//bazel/config:generate_config_header",
-            executable = True,
-            cfg = "exec",
+            default = "//bazel/config:generate_config_header.py",
+            allow_single_file = True,
         ),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_sdkroot": attr.label(default = "//bazel/config:sdkroot"),

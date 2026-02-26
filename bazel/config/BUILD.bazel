@@ -82,11 +82,10 @@ config_setting(
     ],
 )
 
-py_binary(
-    name = "generate_config_header",
-    srcs = ["generate_config_header.py"],
-    main = "generate_config_header.py",
-)
+# Expose script for external usage through bazel.
+exports_files([
+    "generate_config_header.py",
+])
 
 # --------------------------------------
 # Compiler types

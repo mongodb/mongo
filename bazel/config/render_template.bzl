@@ -1,22 +1,26 @@
 load("//bazel:utils.bzl", "write_target")
-load("@rules_python//python:defs.bzl", "py_binary")
 
 def render_template_impl(ctx):
+    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python_libs = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.python_libs]
+
+    python_path = []
+    for py_dep in ctx.attr.python_libs:
+        for path in py_dep[PyInfo].imports.to_list():
+            if path not in python_path:
+                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+
     expanded_args = [
         ctx.expand_make_variables("render_template_expand", ctx.expand_location(arg, ctx.attr.srcs), ctx.var)
         for arg in ctx.attr.cmd
     ]
 
-    # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
-    runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = {"PYTHONPATH": runfiles_package_dir}
-
     ctx.actions.run(
-        executable = ctx.executable.python_binary,
+        executable = python.interpreter.path,
         outputs = [ctx.outputs.output],
-        inputs = depset(transitive = [depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])]),
+        inputs = depset(transitive = [python.files, depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])] + python_libs),
         arguments = expanded_args,
-        env = env,
+        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
         mnemonic = "TemplateRenderer",
     )
 
@@ -36,49 +40,43 @@ render_template_rule = rule(
         "cmd": attr.string_list(
             doc = "The command line arguments to pass to python",
         ),
-        "python_binary": attr.label(
-            executable = True,
-            cfg = "exec",
+        "python_libs": attr.label_list(
+            providers = [PyInfo],
+            default = [],
         ),
     },
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
     output_to_genfiles = True,
 )
 
-def render_template(name, srcs, cmd, output, python_file, python_libs = [], tags = [], **kwargs):
-    py_binary(
-        name = name + "_python",
-        srcs = [python_file],
-        main = python_file,
-        tags = tags + ["gen_source"],
-        deps = python_libs,
-    )
+def render_template(name, tags = [], **kwargs):
     render_template_rule(
         name = name,
-        srcs = srcs,
-        cmd = cmd,
-        output = output,
-        python_binary = name + "_python",
         tags = tags + ["gen_source"],
         **kwargs
     )
 
 def render_templates_impl(ctx):
+    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python_libs = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.python_libs]
+
+    python_path = []
+    for py_dep in ctx.attr.python_libs:
+        for path in py_dep[PyInfo].imports.to_list():
+            if path not in python_path:
+                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+
     expanded_args = [
         ctx.expand_make_variables("render_template_expand", ctx.expand_location(arg, ctx.attr.srcs), ctx.var)
         for arg in ctx.attr.cmd
     ]
 
-    # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
-    runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = {"PYTHONPATH": runfiles_package_dir}
-
     ctx.actions.run(
-        executable = ctx.executable.python_binary,
+        executable = python.interpreter.path,
         outputs = ctx.outputs.outputs,
-        inputs = depset(transitive = [depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])]),
+        inputs = depset(transitive = [python.files, depset([arg.files.to_list()[0] for arg in ctx.attr.srcs])] + python_libs),
         arguments = expanded_args,
-        env = env,
+        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
         mnemonic = "TemplateRenderer",
     )
 
@@ -98,29 +96,18 @@ render_templates_rule = rule(
         "cmd": attr.string_list(
             doc = "The command line arguments to pass to python",
         ),
-        "python_binary": attr.label(
-            executable = True,
-            cfg = "exec",
+        "python_libs": attr.label_list(
+            providers = [PyInfo],
+            default = [],
         ),
     },
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
     output_to_genfiles = True,
 )
 
-def render_templates(name, srcs, cmd, outputs, python_file, python_libs = [], tags = [], **kwargs):
-    py_binary(
-        name = name + "_python",
-        srcs = [python_file],
-        main = python_file,
-        tags = tags + ["gen_source"],
-        deps = python_libs,
-    )
+def render_templates(name, tags = [], **kwargs):
     render_templates_rule(
         name = name,
-        srcs = srcs,
-        cmd = cmd,
-        outputs = outputs,
-        python_binary = name + "_python",
         tags = tags + ["gen_source"],
         **kwargs
     )

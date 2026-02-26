@@ -149,14 +149,15 @@ pkg_name = "//" + package_name() + "/"
         name = extension_name + "_conf",
         srcs = [
             "configurations.yml",
+            ":gen_conf.py",
         ],
         cmd = [
+            "$(location :gen_conf.py)",
             "$(location " + extension_name + ".conf)",
             "$(location configurations.yml)",
             extension_name,
         ],
         output = extension_name + ".conf",
-        python_file = ":gen_conf.py",
         python_libs = [
             dependency(
                 "pyyaml",

@@ -19,14 +19,15 @@ render_template(
     srcs = [
         "error_codes.tpl.cpp",
         "error_codes.yml",
+        "generate_error_codes.py",
     ],
     cmd = [
+        "$(location generate_error_codes.py)",
         "$(location error_codes.yml)",
         "$(location error_codes.tpl.cpp)",
         "$(location error_codes.cpp)",
     ],
     output = "error_codes.cpp",
-    python_file = "generate_error_codes.py",
     python_libs = [
         dependency(
             "ct3",
@@ -44,14 +45,15 @@ render_template(
     srcs = [
         "error_codes.tpl.h",
         "error_codes.yml",
+        "generate_error_codes.py",
     ],
     cmd = [
+        "$(location generate_error_codes.py)",
         "$(location error_codes.yml)",
         "$(location error_codes.tpl.h)",
         "$(location error_codes.h)",
     ],
     output = "error_codes.h",
-    python_file = "generate_error_codes.py",
     python_libs = [
         dependency(
             "ct3",
