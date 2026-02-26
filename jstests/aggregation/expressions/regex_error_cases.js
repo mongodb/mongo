@@ -2,6 +2,10 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {executeAggregationTestCase} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// In case of multiple mongos, disable random dispatching of command by enforcing pinToSingleMongos and route against a single mongos.
+TestData.pinToSingleMongos = true;
+
 const coll = db.regex_error_cases;
 coll.drop();
 

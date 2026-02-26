@@ -9,9 +9,6 @@
 import {assertArrayEq, getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// TODO SERVER-120020: Remove this line.
-TestData.pinToSingleMongos = true;
-
 // TODO(SERVER-18047): Remove database creation once explain behavior is unified between replica
 // sets and sharded clusters.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {

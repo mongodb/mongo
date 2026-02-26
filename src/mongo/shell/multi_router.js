@@ -206,6 +206,9 @@ function assertIsSupportedCommand(cmd) {
     if (cmd.getLog) {
         throwCommandNotSupportedError("getLog", "It targets a specific mongos instance", cmd);
     }
+    if (cmd.configureFailPoint) {
+        throwCommandNotSupportedError("configureFailPoint", "It targets a specific mongos instance", cmd);
+    }
 }
 
 // Returns whether the command either set or remove a query settings commands.
@@ -308,9 +311,7 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     for (const mongo of this._mongoConnections) {
         const res = assert.commandWorked(mongo._getDefaultSession().getClient().adminCommand("ismaster"));
         if ("isdbgrid" !== res.msg) {
-            throw new Error(
-                "Multi-Router Mongo connector failed. Connection against " + mongo.host + "is not a mongos",
-            );
+            throw Error("Multi-Router Mongo connector failed. Connection against " + mongo.host + "is not a mongos");
         }
     }
 

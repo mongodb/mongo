@@ -170,6 +170,12 @@
       fixture:
         num_mongos: 1
 
+- name: sharding_enforce_1_mongos
+  value:
+    executor:
+      fixture:
+        num_mongos: 1
+
 - name: test_data_cursor_hints_to_query_settings
   value:
     executor:

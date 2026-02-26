@@ -10,3 +10,7 @@ eval:
 overrides:
   - "query_settings.index_filters_to_query_settings_selector"
   - "query_settings.test_data_index_filters_to_query_settings"
+  # Explicitly deploy 1 mongos to have a predictable execution order.
+  # The suite specifically aims at verifying the correctness of the query settings application
+  # via failpoint and it doesn't represent a real-world use case.
+  - "query_settings.sharding_enforce_1_mongos"

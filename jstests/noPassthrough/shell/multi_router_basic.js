@@ -1026,45 +1026,67 @@ testCase("Testing encrypted inserts are routed randomly", () => {
 // Test unsupported commands
 // ============================================================================
 
+function stringContains(msg, keyword) {
+    return msg.indexOf(keyword) != -1;
+}
+
 testCase("Testing unsupported commands throw errors", () => {
     const uri = getMongosesURI();
     const conn = connect(uri).getMongo();
     const db = conn.getDB("test");
 
     // Test releaseMemory with multiple targets
-    assert.throws(() => {
+    let msg = assert.throws(() => {
         db.runCommand({releaseMemory: ["target1", "target2"]});
-    });
+    }).message;
+    assert(stringContains(msg, "releaseMemory"), "The error should be about releaseMemory, but found: " + msg);
 
     // Test killCursors with multiple cursors
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({killCursors: "collection", cursors: [NumberLong(1), NumberLong(2)]});
-    });
+    }).message;
+    assert(stringContains(msg, "killCursors"), "The error should be about killCursors, but found: " + msg);
 
     // Test aggregate with $currentOp and localOps: true
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({aggregate: 1, pipeline: [{$currentOp: {localOps: true}}], cursor: {}});
-    });
+    }).message;
+    assert(stringContains(msg, "currentOp"), "The error should be about currentOp, but found: " + msg);
 
     // Test aggregate with $listLocalSessions
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}});
-    });
+    }).message;
+    assert(stringContains(msg, "listLocalSessions"), "The error should be about listLocalSessions, but found: " + msg);
 
     // Test getShardVersion
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({getShardVersion: "test.collection"});
-    });
+    }).message;
+    assert(stringContains(msg, "getShardVersion"), "The error should be about getShardVersion, but found: " + msg);
 
     // Test getDatabaseVersion
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({getDatabaseVersion: "test.collection"});
-    });
+    }).message;
+    assert(
+        stringContains(msg, "getDatabaseVersion"),
+        "The error should be about getDatabaseVersion, but found: " + msg,
+    );
 
     // Test getLog
-    assert.throws(() => {
+    msg = assert.throws(() => {
         db.runCommand({getLog: "global"});
-    });
+    }).message;
+    assert(stringContains(msg, "getLog"), "The error should be about getLog, but found: " + msg);
+    // Test configureFailPoint
+    msg = assert.throws(() => {
+        db.runCommand({configureFailPoint: "failCommand", mode: "alwaysOn", data: {failCommands: ["ping"]}});
+    }).message;
+    assert(
+        stringContains(msg, "configureFailPoint"),
+        "The error should be about configureFailPoint, but found: " + msg,
+    );
 });
 
 // ============================================================================

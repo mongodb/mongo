@@ -12,6 +12,11 @@
 //   no_selinux,
 //   requires_scripting,
 // ]
+
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// In case of multiple mongos, disable random dispatching of command by enforcing pinToSingleMongos and route against a single mongos.
+TestData.pinToSingleMongos = true;
+
 const source = db.jstests_mr_killop;
 source.drop();
 const out = db.jstests_mr_killop_out;
