@@ -194,6 +194,7 @@ class CoreAnalysisTaskGenerator(ABC):
             "disagg_concurrency_sharded_replication_with_balancer",
             "disagg_concurrency_sharded_causal_consistency",
             "disagg_concurrency_sharded_causal_consistency_with_balancer",
+            "disagg_retryable_writes_jscore_passthrough",
         ]
 
         current_task_name = task.display_name
