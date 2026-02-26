@@ -137,6 +137,16 @@ BSONObj BatchedCommandResponse::toBSON() const {
         builder.append(retriedStmtIds(), _retriedStmtIds);
     }
 
+    if (areQueryStatsMetricsSet()) {
+        BSONArrayBuilder queryStatsMetricsBuilder(
+            builder.subarrayStart(write_ops::UpdateCommandReply::kQueryStatsMetricsFieldName));
+        for (auto&& metrics : *_queryStatsMetrics) {
+            BSONObjBuilder subObjBuilder(queryStatsMetricsBuilder.subobjStart());
+            metrics.serialize(&subObjBuilder);
+        }
+        queryStatsMetricsBuilder.done();
+    }
+
     return builder.obj();
 }
 
@@ -236,6 +246,19 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, std::string* errMs
         return false;
     _retriedStmtIds = std::move(tempRetriedStmtIds);
 
+    if (auto queryStatsMetricsElem =
+            source[write_ops::UpdateCommandReply::kQueryStatsMetricsFieldName]) {
+        auto elems = queryStatsMetricsElem.Array();
+        if (size_t nElems = elems.size(); nElems > 0) {
+            _queryStatsMetrics.emplace();
+            _queryStatsMetrics->reserve(nElems);
+            for (const auto& queryStatsMetrics : elems) {
+                _queryStatsMetrics->emplace_back(
+                    write_ops::QueryStatsMetrics::parse(queryStatsMetrics.Obj()));
+            }
+        }
+    }
+
     return true;
 }
 
@@ -267,6 +290,8 @@ void BatchedCommandResponse::clear() {
     _writeErrors.reset();
 
     _wcErrDetails.reset();
+
+    _queryStatsMetrics.reset();
 }
 
 void BatchedCommandResponse::setStatus(Status status) {
@@ -475,6 +500,20 @@ const std::vector<StmtId>& BatchedCommandResponse::getRetriedStmtIds() const {
 
 void BatchedCommandResponse::setRetriedStmtIds(std::vector<StmtId> retriedStmtIds) {
     _retriedStmtIds = std::move(retriedStmtIds);
+}
+
+bool BatchedCommandResponse::areQueryStatsMetricsSet() const {
+    return _queryStatsMetrics.has_value() && !_queryStatsMetrics->empty();
+}
+
+const std::vector<write_ops::QueryStatsMetrics>& BatchedCommandResponse::getQueryStatsMetrics()
+    const {
+    return *_queryStatsMetrics;
+}
+
+void BatchedCommandResponse::setQueryStatsMetrics(
+    std::vector<write_ops::QueryStatsMetrics>&& queryStatsMetrics) {
+    _queryStatsMetrics.emplace(queryStatsMetrics);
 }
 
 std::shared_ptr<const ErrorExtraInfo> MultipleErrorsOccurredInfo::parse(const BSONObj& obj) {

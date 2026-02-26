@@ -152,6 +152,10 @@ public:
     const std::vector<StmtId>& getRetriedStmtIds() const;
     void setRetriedStmtIds(std::vector<StmtId> retriedStmtIds);
 
+    bool areQueryStatsMetricsSet() const;
+    const std::vector<write_ops::QueryStatsMetrics>& getQueryStatsMetrics() const;
+    void setQueryStatsMetrics(std::vector<write_ops::QueryStatsMetrics>&& queryStatsMetrics);
+
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -196,6 +200,9 @@ private:
 
     // (O)  Array containing the retried statement ids from the response.
     std::vector<StmtId> _retriedStmtIds;
+
+    // (O)  Array of item-level QueryStatsMetrics
+    boost::optional<std::vector<write_ops::QueryStatsMetrics>> _queryStatsMetrics;
 };
 
 /**

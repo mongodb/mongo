@@ -588,6 +588,20 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
               }),
           response.getReply());
 
+    // If we are collecting query stats for any of the ops in this write batch, aggregate them into
+    // OpDebug now.
+    if (auto* batchReply = get_if<BatchWriteCommandReply>(&response.getReply())) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        for (const auto& metrics : batchReply->queryStatsMetrics) {
+            tassert(11205000,
+                    str::stream() << "QueryStatsInfo must have been created for op index: "
+                                  << metrics.getOriginalOpIndex(),
+                    opDebug.hasQueryStatsInfo(metrics.getOriginalOpIndex()));
+            opDebug.getQueryStatsInfo(metrics.getOriginalOpIndex())
+                .additiveMetrics.aggregateCursorMetrics(metrics.getMetrics());
+        }
+    }
+
     return result;
 }
 
