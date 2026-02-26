@@ -55,73 +55,74 @@ buildvariants:
       - name: .streams_release_test
       - name: generate_buildid_to_debug_symbols_mapping
 
-  - name: enterprise-amazon2023-streams-tsan
-    display_name: "TSAN Amazon Linux 2023 arm64 enterprise streams"
-    # TODO(SERVER-120347): Re-enable once we are ready to switch to using arm64.
-    activate: false
-    modules: ["asp-js-engine"]
-    run_on:
-      - amazon2023-arm64-latest-m8g-xlarge
-    stepback: false
-    expansions:
-      test_flags: >-
-        --excludeWithAnyTags=tsan_incompatible
-        --additionalFeatureFlags=featureFlagStreams
-      lang_environment: LANG=C
-      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
-      bazel_compile_flags: >-
-        --config=dbg_tsan
-        --define=MONGO_DISTMOD=amazon2023
-        --opt=on
-        --fission=no
-        --streams_release_build=True
-        --jobs=800
-      resmoke_jobs_factor: 0.3
-      multiversion_platform: amazon2023
-      multiversion_edition: enterprise
-      compile_variant: enterprise-amazon2023-streams-tsan
-      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
-      xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
-    tasks:
-      - name: compile_and_archive_dist_test_TG
-        distros:
-          - amazon2023-arm64-latest-m8g-8xlarge
-      - name: .streams_release_test
-      - name: generate_buildid_to_debug_symbols_mapping
-
-  - name: enterprise-amazon2023-streams-aubsan
-    display_name: "{A,UB}SAN Amazon Linux 2023 arm64 enterprise streams"
-    # TODO(SERVER-120347): Re-enable once we are ready to switch to using arm64.
-    activate: false
-    modules: ["asp-js-engine"]
-    run_on:
-      - amazon2023-arm64-latest-m8g-xlarge
-    stepback: false
-    expansions:
-      test_flags: >-
-        --excludeWithAnyTags=incompatible_aubsan
-        --additionalFeatureFlags=featureFlagStreams
-      lang_environment: LANG=C
-      san_options: >-
-        UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
-        LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-        ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
-      bazel_compile_flags: >-
-        --config=dbg_aubsan
-        --define=MONGO_DISTMOD=amazon2023
-        --opt=on
-        --fission=no
-        --streams_release_build=True
-      resmoke_jobs_factor: 0.3
-      hang_analyzer_dump_core: false
-      multiversion_platform: amazon2023
-      multiversion_edition: enterprise
-      compile_variant: enterprise-amazon2023-streams-aubsan
-      large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
-      xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
-    tasks:
-      - name: compile_and_archive_dist_test_TG
-        distros:
-          - amazon2023-arm64-latest-m8g-8xlarge
-      - name: .streams_release_test
-      - name: generate_buildid_to_debug_symbols_mapping
+  # TODO(SERVER-120489): There are issues with these variants that need to be investigated/fixed
+  # - name: enterprise-amazon2023-streams-tsan
+  #   display_name: "TSAN Amazon Linux 2023 arm64 enterprise streams"
+  #   # TODO(SERVER-120347): Re-enable once we are ready to switch to using arm64.
+  #   activate: false
+  #   modules: ["asp-js-engine"]
+  #   run_on:
+  #     - amazon2023-arm64-latest-m8g-xlarge
+  #   stepback: false
+  #   expansions:
+  #     test_flags: >-
+  #       --excludeWithAnyTags=tsan_incompatible
+  #       --additionalFeatureFlags=featureFlagStreams
+  #     lang_environment: LANG=C
+  #     san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+  #     bazel_compile_flags: >-
+  #       --config=dbg_tsan
+  #       --define=MONGO_DISTMOD=amazon2023
+  #       --opt=on
+  #       --fission=no
+  #       --streams_release_build=True
+  #       --jobs=800
+  #     resmoke_jobs_factor: 0.3
+  #     multiversion_platform: amazon2023
+  #     multiversion_edition: enterprise
+  #     compile_variant: enterprise-amazon2023-streams-tsan
+  #     large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+  #     xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+  #   tasks:
+  #     - name: compile_and_archive_dist_test_TG
+  #       distros:
+  #         - amazon2023-arm64-latest-m8g-8xlarge
+  #     - name: .streams_release_test
+  #     - name: generate_buildid_to_debug_symbols_mapping
+  #
+  # - name: enterprise-amazon2023-streams-aubsan
+  #   display_name: "{A,UB}SAN Amazon Linux 2023 arm64 enterprise streams"
+  #   # TODO(SERVER-120347): Re-enable once we are ready to switch to using arm64.
+  #   activate: false
+  #   modules: ["asp-js-engine"]
+  #   run_on:
+  #     - amazon2023-arm64-latest-m8g-xlarge
+  #   stepback: false
+  #   expansions:
+  #     test_flags: >-
+  #       --excludeWithAnyTags=incompatible_aubsan
+  #       --additionalFeatureFlags=featureFlagStreams
+  #     lang_environment: LANG=C
+  #     san_options: >-
+  #       UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+  #       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+  #       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+  #     bazel_compile_flags: >-
+  #       --config=dbg_aubsan
+  #       --define=MONGO_DISTMOD=amazon2023
+  #       --opt=on
+  #       --fission=no
+  #       --streams_release_build=True
+  #     resmoke_jobs_factor: 0.3
+  #     hang_analyzer_dump_core: false
+  #     multiversion_platform: amazon2023
+  #     multiversion_edition: enterprise
+  #     compile_variant: enterprise-amazon2023-streams-aubsan
+  #     large_distro_name: amazon2023-arm64-latest-m8g-8xlarge
+  #     xlarge_distro_name: amazon2023-arm64-latest-m8g-16xlarge
+  #   tasks:
+  #     - name: compile_and_archive_dist_test_TG
+  #       distros:
+  #         - amazon2023-arm64-latest-m8g-8xlarge
+  #     - name: .streams_release_test
+  #     - name: generate_buildid_to_debug_symbols_mapping
