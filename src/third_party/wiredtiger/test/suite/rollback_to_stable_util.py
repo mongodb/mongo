@@ -40,7 +40,7 @@ def get_rts_verify_path():
     try:
         root = get_git_root()
         return os.path.join(root, rel_path)
-    except:
+    except Exception:
         pass
 
     this_dir = pathlib.Path(__file__).parent.resolve()

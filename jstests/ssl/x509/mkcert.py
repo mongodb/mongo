@@ -31,7 +31,7 @@ try:
         b"mongoClusterMembership",
         b"Name of MongoDB cluster this cert is a member of",
     )
-except:
+except Exception:
     pass
 
 CONFIGFILE = "jstests/ssl/x509/certs.yml"
@@ -123,7 +123,7 @@ def load_authority_file(issuer):
         certificate = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, pem)
         signing_key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, pem)
         return (certificate, signing_key)
-    except:
+    except Exception:
         pass
 
     return (None, None)

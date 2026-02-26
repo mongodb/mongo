@@ -42,7 +42,7 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
 
     try:
         from pyzstd import ZstdFile
-    except:
+    except Exception:
         pass
 
     print(f"Creating tarball: {output_filename}")

@@ -74,7 +74,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
             self.logger.info("Dropping database %s", db_name)
             try:
                 with_naive_retry(lambda: client.drop_database(db_name))
-            except:
+            except Exception:
                 self.logger.exception("Encountered an error while dropping database %s.", db_name)
                 raise
 
@@ -89,7 +89,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:
                     with_naive_retry(lambda: client[same_db_name].drop_collection(coll))
-                except:
+                except Exception:
                     self.logger.exception(
                         "Encountered an error while dropping db % collection %s.",
                         same_db_name,

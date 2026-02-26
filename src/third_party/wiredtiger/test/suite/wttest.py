@@ -552,7 +552,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         try:
             self.conn = self.setUpConnectionOpen(".")
             self.session = self.setUpSessionOpen(self.conn)
-        except:
+        except Exception:
             self.tearDown()
             raise
 
@@ -626,7 +626,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             for action in self.teardown_actions:
                 try:
                     tmp = action()
-                except:
+                except Exception:
                     e = sys.exc_info()
                     self.prexception(e)
                     tmp = (-1, str(e[1]))
@@ -645,7 +645,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
 
         try:
             self.platform_api.tearDown(self)
-        except:
+        except Exception:
             self.pr('ERROR: failed to tear down the platform API')
             self.prexception(sys.exc_info())
 
@@ -656,7 +656,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
                 (not passed or WiredTigerTestCase._preserveFiles):
                     self.pr('downloading object files')
                     self.download_objects(self.bucket, self.bucket_prefix)
-        except:
+        except Exception:
             self.pr('ERROR: failed to download objects')
             self.prexception(sys.exc_info())
 
@@ -682,7 +682,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
                     close_failed = True
                     dumped_error_log = True
                     passed = False
-            except:
+            except Exception:
                 pass
         self._connections = []
         try:
@@ -703,7 +703,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         if (passed and (not WiredTigerTestCase._preserveFiles)) or self.skipped:
             try:
                 shutil.rmtree(self.testdir, ignore_errors=True)
-            except:
+            except Exception:
                 self.pr('ERROR: failed to delete the test directory: ' + self.testdir)
                 self.prexception(sys.exc_info())
         else:

@@ -110,7 +110,7 @@ def fork_for_tests(concurrency_num=CPU_COUNT):
                     # Set the pid tag for the parent to log with this information.
                     subunit_result.tags(["pid:" + str(os.getpid())], [])
                     process_suite.run(subunit_result)
-                except:
+                except Exception:
                     # Try and report traceback on stream, but exit with error
                     # even if stream couldn't be created or something else
                     # goes wrong.  The traceback is formatted to a string and

@@ -191,7 +191,7 @@ class RunTest:
         """
         try:
             return fn(*args, **kwargs)
-        except:
+        except Exception:
             return self._got_user_exception(sys.exc_info())
 
     def _got_user_exception(self, exc_info, tb_label='traceback'):

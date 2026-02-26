@@ -56,7 +56,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
         """
         try:
             self.session.create(name, args)
-        except:
+        except Exception:
             print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
             raise
 

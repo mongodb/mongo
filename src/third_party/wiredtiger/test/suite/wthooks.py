@@ -165,7 +165,7 @@ class WiredTigerHookManager(object):
                 for hook in imported.initialize(arg):
                     hook._initialize(name, self)
                     self.hooks.append(hook)
-            except:
+            except Exception:
                 print('Cannot import hook: ' + name + ', check file ' + modname + '.py')
                 raise
         self.hook_names = tuple(names_seen)
@@ -259,7 +259,7 @@ class HookCreatorProxy(object):
         try:
             hooktype = int(value[0])
             fcn = value[1]
-        except:
+        except Exception:
             raise ValueError('value must be (HOOK_xxxx, function)')
         self.hookmgr.add_hook(self.clazz, name, hooktype, fcn)
 

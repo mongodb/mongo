@@ -101,7 +101,7 @@ class DockerComposeImageBuilder:
     @staticmethod
     def get_resmoke_run_command() -> str:
         """Construct the supported resmoke `run` command to test against an external system under test."""
-        # The supported `run` command should keep all of the same args except:
+        # The supported `run` command should keep all of the same args except Exception:
         # (1) it should remove the `--dockerComposeBuildImages` option and value
         # (2) it should add the `--externalSUT` flag
         command = sys.argv

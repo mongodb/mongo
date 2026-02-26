@@ -205,7 +205,7 @@ class TestErrorHolder(TestCase):
     def makeException(self):
         try:
             raise RuntimeError("danger danger")
-        except:
+        except Exception:
             return sys.exc_info()
 
     def makePlaceHolder(self, test_id="foo", error=None,

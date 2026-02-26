@@ -41,7 +41,7 @@ def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length
         import snappy
         global have_snappy
         have_snappy = True
-    except:
+    except Exception:
         # Try to install it automatically
         logger.warning('python-snappy not found, attempting to install...')
         try:
@@ -81,7 +81,7 @@ def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length
                     decompressed = snappy.uncompress(compressed_data)
                     if not lengths_match:
                         logger.info(f'  Successfully decompressed using stored length ({compressed_byte_count} bytes)')
-                except:
+                except Exception:
                     pass
 
         # If that failed and lengths differ, try calculated length
@@ -92,7 +92,7 @@ def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length
                 try:
                     decompressed = snappy.uncompress(compressed_data)
                     logger.info(f'  Successfully decompressed using calculated length ({calculated_length} bytes)')
-                except:
+                except Exception:
                     pass
 
         # If any attempt succeeded, use the result
@@ -107,7 +107,7 @@ def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length
             compressed_data = compressed_data_full[:min(compressed_byte_count, len(compressed_data_full))]
             print_snappy_diagnostics(compressed_data, compressed_byte_count, page_header, compress_skip)
             return payload_data
-    except:
+    except Exception:
         logger.error('? The page failed to uncompress')
         if opts.debug:
             traceback.print_exception(*sys.exc_info())

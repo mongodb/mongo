@@ -120,7 +120,7 @@ class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
             # Perform inter-node validation (if the running fixture provides a method to run it).
             if getattr(self.fixture, "internode_validation", None):
                 self.fixture.internode_validation()
-        except:
+        except Exception:
             self.logger.exception("Uncaught exception while validating collections")
             raise
 
@@ -175,7 +175,7 @@ def validate_node(
             ):
                 raise RuntimeError(f"Internal error while validating database: {db_name}")
         return True
-    except:
+    except Exception:
         logger.exception(
             f"Unknown exception while validating node {node.get_driver_connection_url()}"
         )
@@ -274,7 +274,7 @@ def validate_database(
                 )
             )
         return True
-    except:
+    except Exception:
         logger.exception("Unknown exception while validating database")
         return False
 

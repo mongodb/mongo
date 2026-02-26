@@ -330,12 +330,12 @@ def wiredtiger_compare_uri(args):
 
     try:
         cc1 = get_compare_cursor(conn1, timestamp1, uri1, arg1)
-    except:
+    except Exception:
         print('Failed opening {} in {} at timestamp {}'.format(uri1, wtdir1, timestamp1))
         raise
     try:
         cc2 = get_compare_cursor(conn2, timestamp2, uri2, arg2)
-    except:
+    except Exception:
         print('Failed opening {} in {} at timestamp {}'.format(uri2, wtdir2, timestamp2))
         raise
 

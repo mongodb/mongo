@@ -72,7 +72,7 @@ class FixtureSetupTestCase(FixtureTestCase):
         except errors.ServerFailure as err:
             self.logger.error("An error occurred during the setup of %s: %s", self.fixture, err)
             raise
-        except:
+        except Exception:
             self.logger.exception("An error occurred during the setup of %s.", self.fixture)
             raise
 
@@ -99,7 +99,7 @@ class FixtureTeardownTestCase(FixtureTestCase):
         except errors.ServerFailure as err:
             self.logger.error("An error occurred during the teardown of %s: %s", self.fixture, err)
             raise
-        except:
+        except Exception:
             self.logger.exception("An error occurred during the teardown of %s.", self.fixture)
             raise
 
@@ -130,6 +130,6 @@ class FixtureAbortTestCase(FixtureTestCase):
             # If the server wasn't already running, we can't exactly fail to abort it.
             self.logger.info("Finished aborting %s.", self.fixture)
             self.return_code = 0
-        except:
+        except Exception:
             self.logger.exception("An error occurred while aborting %s.", self.fixture)
             raise

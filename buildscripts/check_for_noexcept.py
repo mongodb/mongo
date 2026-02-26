@@ -219,14 +219,14 @@ class Alert:
     identifier: str | None
 
     def get_title(self) -> str:
-        if self.kind == AlertKind.Noexcept:
+        if self.kind == AlertKind.Noexcept Exception:
             return ANNOTATION_TITLE_TEXT_NOEXCEPT_CHANGE
         else:
             assert self.kind == AlertKind.NonNoexceptMove
             return ANNOTATION_TITLE_TEXT_NON_NOEXCEPT_MOVE
 
     def get_message(self) -> str:
-        if self.kind == AlertKind.Noexcept:
+        if self.kind == AlertKind.Noexcept Exception:
             return ANNOTATION_MESSAGE_TEXT_NOEXCEPT_CHANGE
         else:
             assert self.kind == AlertKind.NonNoexceptMove

@@ -83,7 +83,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
             else:
                 yield
             got = self.SUCCESS
-        except:
+        except Exception:
             got = self.FAILURE
             self.cleanStderr()
 

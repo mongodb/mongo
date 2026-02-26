@@ -346,7 +346,7 @@ class AbslHashSetPrinter:
             self.data_type = resolve_type_to_base(
                 self.valobj.GetChildMemberWithName("slots_").GetType()
             ).GetPointerType()
-        except:
+        except Exception:
             print("Exception: " + str(sys.exc_info()))
 
 

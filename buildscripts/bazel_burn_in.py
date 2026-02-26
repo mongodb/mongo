@@ -107,7 +107,7 @@ def create_burn_in_target(target_original: str, target_burn_in: str, test: str):
         # If the label is present, and buildozer fails for another reason, the build
         # of the burn-in target produces a clear message that it is duplicated.
         buildozer.bd_remove([target_burn_in], "data", [test_label])
-    except:
+    except Exception:
         pass
     buildozer.bd_set([target_burn_in], "srcs", test_label)
     buildozer.bd_set([target_burn_in], "shard_count", "1")

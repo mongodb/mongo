@@ -320,7 +320,7 @@ class TrackedComplexDataSet(ComplexDataSet):
     def store_count(self, i):
         try:
             return self.track_values[i]
-        except:
+        except Exception:
             return 0
 
     # override
@@ -376,7 +376,7 @@ class TrackedSimpleDataSet(SimpleDataSet):
     def store_count(self, i):
         try:
             return self.track_values[i]
-        except:
+        except Exception:
             return 0
 
     # override

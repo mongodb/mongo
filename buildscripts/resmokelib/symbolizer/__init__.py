@@ -192,7 +192,7 @@ class Symbolizer(Subcommand):
             self.logger.info("Applying patch diff (if any)...")
             self._patch_diff_by_id()
 
-        except:
+        except Exception:
             if self.dest_dir is not None:
                 self.logger.warning(
                     "Removing downloaded directory due to error, directory to be removed: %s",

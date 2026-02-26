@@ -95,7 +95,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         """
         try:
             self.session.create(name, args)
-        except:
+        except Exception:
             print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
             raise
 
@@ -438,11 +438,11 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def cur_dump_here(self, cursor, prefix):
         try:
             k = self._cursor_key_to_string(cursor.get_key())
-        except:
+        except Exception:
             k = '[invalid]'
         try:
             v = self._cursor_value_to_string(cursor.get_value())
-        except:
+        except Exception:
             v = '[invalid]'
         print(prefix + k + ' ' + v)
 

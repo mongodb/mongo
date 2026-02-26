@@ -77,7 +77,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             password_input_box = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.ID, "passwordEntry"))
             )
-        except:
+        except Exception:
             password_input_box = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.ID, "i0118"))
             )
@@ -86,7 +86,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
             verify_button = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.XPATH, "//button[@data-testid='primaryButton']"))
             )
-        except:
+        except Exception:
             verify_button = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.ID, "idSIButton9"))
             )

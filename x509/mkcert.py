@@ -165,7 +165,7 @@ def get_oid(cn_or_oid):
         return NAME_TO_OID[cn_or_oid]
     try:
         return ObjectIdentifier(cn_or_oid)
-    except:
+    except Exception:
         raise CertificateGenerationError(f"Name attribute {cn_or_oid} not recognized")
 
 
@@ -541,7 +541,7 @@ def process_normal_cert(cert):
                 issuer_ski = issuer_cert.extensions.get_extension_for_class(
                     x509.SubjectKeyIdentifier
                 )
-            except:
+            except Exception:
                 issuer_ski = None
 
         # Set all fields of the certificate.
