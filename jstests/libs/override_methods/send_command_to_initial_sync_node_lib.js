@@ -34,6 +34,9 @@ export function shouldSkipCommand(_commandName, commandObj) {
         "fsync": true,
         "fsyncUnlock": true,
         "flushRouterConfig": true,
+        // This override causes commands directly targeted to the initial sync node to swallow the
+        // return value, which makes persistenceProviderProperties checking non-functional, so skip it.
+        "persistenceProviderProperties": true,
     };
 
     if (_commandName in skippedCommands) {

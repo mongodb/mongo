@@ -12,6 +12,7 @@
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const collName = "changeStreamPreAndPostImages";
 
@@ -20,8 +21,14 @@ if (!TestData.testingReplicaSetEndpoint) {
     const localDB = db.getSiblingDB("local");
     const configDB = db.getSiblingDB("config");
 
-    // Only ASC supports 'local' database.
-    const dbsToTest = TestData.notASC ? [adminDB, configDB] : [localDB, adminDB, configDB];
+    // Some persistence providers do not support the 'local' database.
+    const supportsLocalCollections = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+        db,
+        "supportsLocalCollections",
+        true,
+    );
+
+    const dbsToTest = supportsLocalCollections ? [localDB, adminDB, configDB] : [adminDB, configDB];
 
     // Check that we cannot set 'changeStreamPreAndPostImages' on the local, admin and config
     // databases.

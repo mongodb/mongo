@@ -5,13 +5,14 @@
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const runTest = (db, coll) => {
     // Test that explain is legal with all readConcern levels.
     let readConcernLevels = ["local", "majority", "available", "snapshot"];
 
     // TODO SLS-2089: always include linearizable in readConcernLevels.
-    if (!TestData.notASC) {
+    if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsReadConcernLevel.linearizable", true)) {
         readConcernLevels.push("linearizable");
     }
 

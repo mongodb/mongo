@@ -12,6 +12,7 @@
 //  # TODO(SERVER-113808): Check txn errors on replicaset running as --shardsvr
 //  transitioning_replicaset_incompatible,
 // ]
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const collName = "banned_txn_dbs";
@@ -41,8 +42,7 @@ if (!TestData.testingReplicaSetEndpoint) {
     runTest(session.getDatabase("config"));
 }
 
-if (!TestData.notASC) {
-    // Only test local database in attached storage cluster.
+if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", true)) {
     runTest(session.getDatabase("local"));
 }
 

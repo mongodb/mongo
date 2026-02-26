@@ -6,6 +6,8 @@
 //   # we have to make sure it wont be moved anywhere by the balancer
 //   assumes_balancer_off
 // ]
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+
 const session = db.getMongo().startSession();
 
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
@@ -46,7 +48,8 @@ session.startTransaction({readConcern: {level: "snapshot"}});
 assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-if (!TestData.notASC) {
+// Some persistence providers do not support unreplicated collections.
+if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", true)) {
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(
         testDB.getCollection("system.profile").insert({name: "new"}),

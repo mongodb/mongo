@@ -292,6 +292,7 @@ const skippedAuthTestingCommands = [
     "mapReduce",
     "mergeAllChunksOnShard",
     "multicast",
+    "persistenceProviderProperties",
     "pinHistoryReplicated",
     "planCacheListFilters",
     "planCacheSetFilter",

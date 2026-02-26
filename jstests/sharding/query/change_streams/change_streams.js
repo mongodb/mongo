@@ -6,6 +6,7 @@
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {assertChangeStreamEventEq, canonicalizeEventForTesting} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 function runTest(collName, shardKey) {
     const st = new ShardingTest({
@@ -30,7 +31,7 @@ function runTest(collName, shardKey) {
     //
     // Note that we only test this for ASC fixtures, as non ASC fixtures do this with a different parameter.
     //
-    if (!TestData.notASC) {
+    if (PersistenceProviderUtil.allNodesHavePropertyWithValue(st.s0, "supportsLocalCollections", true)) {
         const noopPeriod = assert.commandWorked(
             st.configRS.getPrimary().adminCommand({getParameter: 1, periodicNoopIntervalSecs: 1}),
         );

@@ -27,6 +27,7 @@ import {
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const isMultiversion =
     Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
@@ -348,7 +349,13 @@ function bsonUnorderedFieldArrayEquals(a, b) {
     return a.length === b.length && a.every((item, index) => bsonUnorderedFieldsCompare(item, b[index]) === 0);
 }
 
-function validateListCatalogToListCollectionsConsistency(listCatalog, listCollections, isDbReadOnly, shouldAssert) {
+function validateListCatalogToListCollectionsConsistency(
+    listCatalog,
+    listCollections,
+    isDbReadOnly,
+    ignoreRecordIdsReplicatedOption,
+    shouldAssert,
+) {
     // Sorting function to ignore irrelevant ordering differences while comparing.
     function sortCollectionsInPlace(collectionList) {
         return collectionList.sort((a, b) => a.name.localeCompare(b.name));
@@ -377,7 +384,7 @@ function validateListCatalogToListCollectionsConsistency(listCatalog, listCollec
         });
     }
     // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
-    if (!TestData.notASC) {
+    if (ignoreRecordIdsReplicatedOption) {
         listCollectionsFromListCatalog.forEach((e) => delete e.options.recordIdsReplicated);
         sortedListCollections.forEach((e) => delete e.options.recordIdsReplicated);
     }
@@ -472,11 +479,17 @@ function validateCatalogListOperationsConsistency(
     listCollections,
     listIndexes,
     isDbReadOnly,
+    ignoreRecordIdsReplicatedOption,
     shouldAssert,
 ) {
     return (
-        validateListCatalogToListCollectionsConsistency(listCatalog, listCollections, isDbReadOnly, shouldAssert) &&
-        validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, shouldAssert)
+        validateListCatalogToListCollectionsConsistency(
+            listCatalog,
+            listCollections,
+            isDbReadOnly,
+            ignoreRecordIdsReplicatedOption,
+            shouldAssert,
+        ) && validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, shouldAssert)
     );
 }
 
@@ -515,6 +528,10 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
     // The database is read only when using standalone recovery options like --queryableBackupMode,
     // so we can assume that the database is not read-only when running a sharded cluster.
     const isDbReadOnly = !FixtureHelpers.isMongos(db) && db.serverStatus().storageEngine.readOnly;
+    // Skip checking the persistence provider when test commands are disabled, as this requires test commands.
+    const ignoreRecordIdsReplicatedOption =
+        !TestData.enableTestCommands ||
+        !PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
 
     const originalHideImplicitlyCreatedIndexesFromListIndexes = TestData.hideImplicitlyCreatedIndexesFromListIndexes;
     try {
@@ -535,7 +552,14 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
 
         listCatalog = filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog);
 
-        validateCatalogListOperationsConsistency(listCatalog, listCollections, listIndexes, isDbReadOnly, true);
+        validateCatalogListOperationsConsistency(
+            listCatalog,
+            listCollections,
+            listIndexes,
+            isDbReadOnly,
+            ignoreRecordIdsReplicatedOption,
+            true,
+        );
     } finally {
         TestData.hideImplicitlyCreatedIndexesFromListIndexes = originalHideImplicitlyCreatedIndexesFromListIndexes;
     }
@@ -606,6 +630,11 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
                 changeStreamPreImages: 0,
             }),
         ).storageEngine.readOnly;
+
+    // Skip checking the persistence provider when test commands are disabled, as this requires test commands.
+    const ignoreRecordIdsReplicatedOption =
+        !TestData.enableTestCommands ||
+        !PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedRecordIds", true);
 
     // Don't check these DBs on mongos since it will mirror them from the config server for
     // listCollections & listIndexes, but will return the data from the shards on $listCatalog.
@@ -722,7 +751,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         // So, we may need to retry a few times until we converge to a consistent result set.
         // But, if we repeatedly fail, don't stall the test for too long but fail fast instead.
         const shouldAssert = consistencyCheckAttempts++ > 20;
-        if (!validateListCatalogToListCollectionsConsistency(catalogInfo, collInfo, isDbReadOnly, shouldAssert)) {
+        if (
+            !validateListCatalogToListCollectionsConsistency(
+                catalogInfo,
+                collInfo,
+                isDbReadOnly,
+                ignoreRecordIdsReplicatedOption,
+                shouldAssert,
+            )
+        ) {
             jsTest.log.info("$listCatalog/listCollections consistency check failed, retrying...");
             return false;
         }

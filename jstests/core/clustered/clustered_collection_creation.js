@@ -14,6 +14,7 @@
  */
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
@@ -292,9 +293,12 @@ assert.commandFailedWithCode(
 // include the cluster key as one of the fields.
 validateCompoundSecondaryIndexes(replicatedDB, replicatedColl, {_id: 1});
 
-if (FixtureHelpers.isMongos(db) || TestData.notASC) {
-    // Using the local database is not supported through mongos, so end the test here.
-    // Only ASC nodes support the local database.
+if (
+    FixtureHelpers.isMongos(db) ||
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", false)
+) {
+    // Using the local database is not supported through mongos or some persistence providers, so
+    // end the test here.
     quit();
 }
 

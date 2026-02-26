@@ -936,6 +936,9 @@ const allCommands = {
         // Skipping this command as it requires OIDC/OpenSSL setup.
         skip: "requires additional OIDC/OpenSSL setup",
     },
+    persistenceProviderProperties: {
+        skip: isAnInternalCommand,
+    },
     pinHistoryReplicated: {
         skip: isAnInternalCommand,
     },

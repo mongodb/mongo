@@ -8,6 +8,7 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const session = db.getMongo().startSession();
 
@@ -24,7 +25,8 @@ assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}
 ]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-if (!TestData.notASC) {
+// Some persistence providers do not support unreplicated collections.
+if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", true)) {
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(
         testDB.runCommand({find: "system.profile", filter: {}}),

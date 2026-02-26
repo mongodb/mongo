@@ -53,6 +53,7 @@
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/intent_registry.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -412,5 +413,113 @@ boost::optional<Timestamp> TestingDurableHistoryPin::calculatePin(OperationConte
 
     return ret;
 }
+
+/**
+ * Generates a description of the persistence provider capabilities of this node (based on the
+ * information exposed by the PersistenceProvider).
+ */
+class PersistenceProviderPropertiesTestCmd : public BasicCommand {
+public:
+    PersistenceProviderPropertiesTestCmd() : BasicCommand("persistenceProviderProperties") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    bool requiresAuth() const override {
+        return false;
+    }
+
+    // No auth needed because it only works when enabled via command line.
+    Status checkAuthForOperation(OperationContext*,
+                                 const DatabaseName&,
+                                 const BSONObj&) const override {
+        return Status::OK();
+    }
+
+    bool requiresAuthzChecks() const override {
+        return false;
+    }
+
+    bool maintenanceOk() const override {
+        return true;
+    }
+
+    std::string help() const override {
+        return "returns the list of features a persistence provider may support and whether this "
+               "mongod's provider supports the feature";
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+
+#define BUILD_DESCRIPTOR_FOR_BOOL_CAPABILITIES(BOOL_FIELD_BUILDER_FN)        \
+    BOOL_FIELD_BUILDER_FN(mustUsePrimaryDrivenIndexBuilds)                   \
+    BOOL_FIELD_BUILDER_FN(shouldAvoidDuplicateCheckpoints)                   \
+    BOOL_FIELD_BUILDER_FN(shouldDelayDataAccessDuringStartup)                \
+    BOOL_FIELD_BUILDER_FN(shouldDisableTransactionUpdateCoalescing)          \
+    BOOL_FIELD_BUILDER_FN(shouldStepDownForShutdown)                         \
+    BOOL_FIELD_BUILDER_FN(shouldTimestampTableCreations)                     \
+    BOOL_FIELD_BUILDER_FN(shouldUseOplogWritesForFlowControlSampling)        \
+    BOOL_FIELD_BUILDER_FN(shouldUseReplicatedCatalogIdentifiers)             \
+    BOOL_FIELD_BUILDER_FN(shouldUseReplicatedFastCount)                      \
+    BOOL_FIELD_BUILDER_FN(shouldUseReplicatedRecordIds)                      \
+    BOOL_FIELD_BUILDER_FN(shouldUseReplicatedTruncates)                      \
+    BOOL_FIELD_BUILDER_FN(supportsCompaction)                                \
+    BOOL_FIELD_BUILDER_FN(supportsCrossShardTransactions)                    \
+    BOOL_FIELD_BUILDER_FN(supportsCursorReuseForExpressPathQueries)          \
+    BOOL_FIELD_BUILDER_FN(supportsFindAndModifyImageCollection)              \
+    BOOL_FIELD_BUILDER_FN(supportsLocalCollections)                          \
+    BOOL_FIELD_BUILDER_FN(supportsOplogSampling)                             \
+    BOOL_FIELD_BUILDER_FN(supportsPreservingPreparedTxnInPreciseCheckpoints) \
+    BOOL_FIELD_BUILDER_FN(supportsTableLogging)                              \
+    BOOL_FIELD_BUILDER_FN(supportsUnstableCheckpoints)
+
+        // For each method listed in PERSISTENCE_PROVIDER_BOOL_CAPABILITIES, call the method and
+        // append the result with the method name.
+#define ADD_BOOL_FIELD(fieldName) result.append(#fieldName, provider.fieldName());
+        BUILD_DESCRIPTOR_FOR_BOOL_CAPABILITIES(ADD_BOOL_FIELD);
+
+        // Enumerate ReadConcern level support.
+        // e.g.
+        // "supportsReadConcernLevel" : {
+        //     "local"        : true,
+        //     "majority"     : true,
+        //     "available"    : true,
+        //     "linearizable" : false,
+        //     "snapshot"     : true
+        // }
+        constexpr repl::ReadConcernLevel kAllReadConcernLevels[] = {
+            repl::ReadConcernLevel::kLocalReadConcern,
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReadConcernLevel::kAvailableReadConcern,
+            repl::ReadConcernLevel::kLinearizableReadConcern,
+            repl::ReadConcernLevel::kSnapshotReadConcern,
+        };
+        {
+            BSONObjBuilder rcSubObj(result.subobjStart("supportsReadConcernLevel"));
+            for (auto level : kAllReadConcernLevels) {
+                rcSubObj.append(repl::readConcernLevels::toString(level),
+                                provider.supportsReadConcernLevel(level));
+            }
+        }
+
+        return true;
+    }
+};
+
+MONGO_REGISTER_COMMAND(PersistenceProviderPropertiesTestCmd).testOnly().forShard();
 
 }  // namespace mongo

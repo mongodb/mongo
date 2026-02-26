@@ -674,6 +674,7 @@ let testCases = {
     netstat: {skip: "internal command"},
     oidcListKeys: {skip: "does not accept read or write concern"},
     oidcRefreshKeys: {skip: "does not accept read or write concern"},
+    persistenceProviderProperties: {skip: "internal command"},
     pinHistoryReplicated: {skip: "internal command"},
     ping: {skip: "does not accept read or write concern"},
     planCacheClear: {skip: "does not accept read or write concern"},

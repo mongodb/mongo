@@ -381,6 +381,7 @@ const allCommands = {
     moveRange: {skip: isPrimaryOnly},
     oidcListKeys: {skip: isNotAUserDataRead},
     oidcRefreshKeys: {skip: isNotAUserDataRead},
+    persistenceProviderProperties: {skip: isAnInternalCommand},
     pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {skip: isNotAUserDataRead},
     planCacheClear: {skip: isNotAUserDataRead},

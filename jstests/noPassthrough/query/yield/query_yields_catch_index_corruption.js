@@ -2,6 +2,7 @@
 //   requires_persistence,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 const dbName = "test";
 const collName = "query_yields_catch_index_corruption";
@@ -25,6 +26,12 @@ let coll = db.getCollection(collName);
 assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
+const shouldDelayDataAccessDuringStartup = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+    db,
+    "shouldDelayDataAccessDuringStartup",
+    true,
+);
+
 // Corrupt the collection by inserting a document and then deleting it without deleting its index
 // entry (thanks to the "skipUnindexingDocumentWhenDeleted" failpoint).
 function createDanglingIndexEntry(doc) {
@@ -39,7 +46,7 @@ function createDanglingIndexEntry(doc) {
     // Server logs for failed validation command should contain oplog entries related to corrupted
     // index entry.
     // TODO SERVER-118626: Investigate why we can't open a WT Debug Cursor inside of 'validate'.
-    if (!TestData.notASC) {
+    if (!shouldDelayDataAccessDuringStartup) {
         let foundInsert = false;
         let foundDelete = false;
 
@@ -94,6 +101,7 @@ function createDanglingIndexEntry(doc) {
     session2.abortTransaction_forTesting();
 }
 
+// Create a dangling index entry.
 createDanglingIndexEntry({a: 1, b: 1});
 
 // Fix the index by rebuilding it, and ensure that it validates.
@@ -105,7 +113,7 @@ assert.eq(true, validateRes.valid, tojson(validateRes));
 
 // TODO SERVER-118625 SERVER-115491: Consider enabling this portion of the test to not depend on
 // reusing the same dbpath across test fixtures.
-if (!TestData.notASC) {
+if (!shouldDelayDataAccessDuringStartup) {
     // Reintroduce the dangling index entry, and this time fix it using the "repair" flag.
     createDanglingIndexEntry({a: 1, b: 1});
 

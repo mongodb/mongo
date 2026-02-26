@@ -123,3 +123,6 @@ filters:
   - "cluster_server_parameter_utils.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "persistence_provider_util.js":
+    approvers:
+      - 10gen/server-rss

@@ -587,6 +587,7 @@ let viewsCommandTests = {
     netstat: {skip: isAnInternalCommand},
     oidcListKeys: {skip: isUnrelated},
     oidcRefreshKeys: {skip: isUnrelated},
+    persistenceProviderProperties: {skip: isAnInternalCommand},
     pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {command: {ping: 1}},
     planCacheClear: {command: {planCacheClear: "view"}, expectFailure: true},

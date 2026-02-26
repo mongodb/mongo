@@ -33,6 +33,7 @@ import {
 } from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 
 export class PreImageTruncateAfterShutdownTest {
     constructor(testName) {
@@ -596,7 +597,13 @@ export class PreImageTruncateAfterShutdownTest {
 
     isRunningReplicatedPreImageTruncation() {
         // DSC only supports replicated truncates.
-        if (TestData.notASC) {
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(
+                this._rst.getPrimary(),
+                "shouldUseReplicatedTruncates",
+                true,
+            )
+        ) {
             return true;
         }
         return FeatureFlagUtil.isPresentAndEnabled(this._rst.getPrimary(), "UseReplicatedTruncatesForDeletions");

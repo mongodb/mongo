@@ -7,28 +7,43 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var FixtureHelpers = (function () {
-    function _getHostStringForReplSet(connectionToNodeInSet) {
-        const isMaster = assert.commandWorked(connectionToNodeInSet.getDB("test").isMaster());
-        assert(
-            isMaster.hasOwnProperty("setName"),
-            "Attempted to get replica set connection to a node that is not part of a replica set",
-        );
-        return isMaster.setName + "/" + isMaster.hosts.join(",");
-    }
-
     /**
      * Returns an array of connections to each data-bearing replica set in the fixture (not
-     * including the config servers).
+     * including the config servers). Specify 'includeConfigServers' to also include the config server
+     * replica set.
      */
-    function getAllReplicas(db) {
+    function getAllReplicas(db, includeConfigServers = false) {
         let replicas = [];
         if (isMongos(db)) {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1});
             replicas = shardObjs.map((shardObj) => new ReplSetTest(shardObj.host));
+
+            if (includeConfigServers) {
+                const configConnString = getConfigServerConnString(db);
+                replicas.push(new ReplSetTest(configConnString));
+            }
         } else {
-            replicas = [new ReplSetTest(_getHostStringForReplSet(db.getMongo()))];
+            replicas = [new ReplSetTest(db.getMongo().host)];
         }
         return replicas;
+    }
+
+    /**
+     * Returns an array of connections to all mongod nodes in the fixture, including config servers if present.
+     * @param {*} db - The database connection.
+     * @returns {Array} - An array of connections to all nodes.
+     */
+    function getAllNodes(db) {
+        if (isStandalone(db)) {
+            return [db.getMongo()];
+        }
+
+        const replicas = getAllReplicas(db, true /* includeConfigServers */);
+        let nodes = [];
+        for (const replSet of replicas) {
+            nodes = nodes.concat(replSet.nodes);
+        }
+        return nodes;
     }
 
     /**
@@ -170,8 +185,9 @@ export var FixtureHelpers = (function () {
 
     /**
      * Runs the function given by 'func' passing the database given by 'db' from each shard nodes in
-     * the fixture (besides the config servers). Returns the array of return values from executed
-     * functions. If the fixture is a standalone, will run the function on the database directly.
+     * the fixture (besides the config servers, unless it is a config shard). Returns the array of
+     * return values from executed functions. If the fixture is a standalone, will run the function
+     * on the database directly.
      */
     function mapOnEachShardNode({db, func, primaryNodeOnly}) {
         function getRequestedConns(conn) {
@@ -289,6 +305,7 @@ export var FixtureHelpers = (function () {
         runCommandOnAllShards: runCommandOnAllShards,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getAllReplicas: getAllReplicas,
+        getAllNodes: getAllNodes,
         getConfigServerConnString: getConfigServerConnString,
         getPrimaries: getPrimaries,
         getSecondaries: getSecondaries,

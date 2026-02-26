@@ -1265,6 +1265,7 @@ const allTestCases = {
         mapReduce: {skip: "TODO"},
         oidcListKeys: {skip: "TODO", conditional: true},
         oidcRefreshKeys: {skip: "TODO", conditional: true},
+        persistenceProviderProperties: {skip: "test command"},
         pinHistoryReplicated: {skip: "TODO"},
         ping: {skip: "TODO"},
         planCacheClear: {skip: "TODO"},
