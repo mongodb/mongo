@@ -79,21 +79,21 @@ const authStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).secu
 jsTest.log("Authenticated stats: " + tojson(authStats));
 
 // Got and succeeded an additional speculation.
-const initSpec = initialStats.speculativeAuthenticate;
-const authSpec = authStats.speculativeAuthenticate;
-assert.eq(authSpec.received, initSpec.received + 2);
+const initSpec = initialStats.ingress.speculativeAuthenticate;
+const authSpec = authStats.ingress.speculativeAuthenticate;
+assert.eq(authSpec.total, initSpec.total + 2);
 assert.eq(authSpec.successful, initSpec.successful + 2);
 
 // Got and succeeded an additional auth.
-const initAuth = initialStats.authenticate;
-const authAuth = authStats.authenticate;
-assert.eq(authAuth.received, initAuth.received + 2);
+const initAuth = initialStats.ingress.authenticate;
+const authAuth = authStats.ingress.authenticate;
+assert.eq(authAuth.total, initAuth.total + 2);
 assert.eq(authAuth.successful, initAuth.successful + 2);
 
 // Got and succeeded intra-cluster auth.
-const initCluster = initialStats.clusterAuthenticate;
-const authCluster = authStats.clusterAuthenticate;
-assert.eq(authCluster.received, initCluster.received + 1);
+const initCluster = initialStats.ingress.clusterAuthenticate;
+const authCluster = authStats.ingress.clusterAuthenticate;
+assert.eq(authCluster.total, initCluster.total + 1);
 assert.eq(authCluster.successful, initCluster.successful + 1);
 
 /////////////////////////////////////////////////////////////////////////////

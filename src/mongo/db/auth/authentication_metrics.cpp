@@ -41,7 +41,7 @@ void AuthMetricsRecorder::appendMetric(const BSONObj& metric) {
 BSONObj AuthMetricsRecorder::captureIngress() {
     Duration<std::micro> _duration = _timer.elapsed();
 
-    authCounter.incAuthenticationCumulativeTime(_duration.count());
+    authCounter.incIngressAuthenticationCumulativeTime(_duration.count());
 
     return BSON("conversation_duration"
                 << BSON("micros" << _duration.count() << "summary" << _appendedMetrics.done()));
@@ -50,7 +50,7 @@ BSONObj AuthMetricsRecorder::captureIngress() {
 BSONObj AuthMetricsRecorder::captureEgress() {
     Duration<std::micro> _duration = _timer.elapsed();
 
-    // TODO SERVER-116025: Increment the egress version of authCounter
+    authCounter.incEgressAuthenticationCumulativeTime(_duration.count());
 
     return BSON("conversation_duration"
                 << BSON("micros" << _duration.count() << "summary" << _appendedMetrics.done()));

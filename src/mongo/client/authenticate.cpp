@@ -48,6 +48,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -69,6 +70,14 @@
 
 namespace mongo {
 namespace auth {
+
+const std::vector<std::string> kAllMechanisms{std::string(kMechanismMongoX509),
+                                              std::string(kMechanismSaslPlain),
+                                              std::string(kMechanismGSSAPI),
+                                              std::string(kMechanismScramSha1),
+                                              std::string(kMechanismScramSha256),
+                                              std::string(kMechanismMongoAWS),
+                                              std::string(kMechanismMongoOIDC)};
 
 using executor::RemoteCommandRequest;
 
@@ -150,7 +159,11 @@ Future<void> authX509(RunCommandHook runCommand,
     }
     auto targetDb = std::move(swTargetDb.getValue());
 
-    auto argsBlock = std::make_tuple(hostname, params, std::string(clientName), targetDb);
+    auto mechCounter = authCounter.getMechanismCounter(kMechanismMongoX509);
+    mechCounter.incAuthenticateSent();
+
+    auto argsBlock =
+        std::make_tuple(hostname, params, std::string(clientName), targetDb, mechCounter);
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(std::move(argsBlock));
 
     auto metricsRecorder = std::make_shared<AuthMetricsRecorder>();
@@ -160,8 +173,9 @@ Future<void> authX509(RunCommandHook runCommand,
     // into a Future<void>
     return runCommand(swAuthRequest.getValue())
         .then([metricsRecorder, sharedBlock](const BSONObj& obj) {
-            auto [hostname, params, clientName, targetDb] = *sharedBlock.get();
             BSONObj metrics = metricsRecorder->captureEgress();
+            auto [hostname, params, clientName, targetDb, mechCounter] = *sharedBlock.get();
+            mechCounter.incEgressAuthenticateSuccessful();
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748708,
                       "Authentication to remote host succeeded using MONGODB-X509",
@@ -175,8 +189,8 @@ Future<void> authX509(RunCommandHook runCommand,
             }
         })
         .onError([metricsRecorder, sharedBlock](const Status& status) {
-            auto [hostname, params, clientName, targetDb] = *sharedBlock.get();
             BSONObj metrics = metricsRecorder->captureEgress();
+            auto [hostname, params, clientName, targetDb, _] = *sharedBlock.get();
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748707,
                       "Authentication to remote host failed using MONGODB-X509",
@@ -377,6 +391,11 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
     }
 
     std::string payload;
+
+    auto mechCounter = authCounter.getMechanismCounter(mechanism);
+    mechCounter.incAuthenticateSent();
+    mechCounter.incSpeculativeAuthenticateSent();
+
     AuthMetricsRecorder metricsRecorder;
     status = session->step("", &payload);
     if (!status.isOK()) {
@@ -395,6 +414,8 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
         }
         return status;
     }
+    mechCounter.incEgressAuthenticateSuccessful();
+    mechCounter.incEgressSpeculativeAuthenticateSuccessful();
     auto metrics = metricsRecorder.captureEgress();
     if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
         LOGV2(10748710,

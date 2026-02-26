@@ -54,8 +54,8 @@ function assertStats(cb) {
 // No speculative auth attempts yet.
 assertStats(function (mechStats) {
     Object.keys(mechStats).forEach(function (mech) {
-        const stats = mechStats[mech].speculativeAuthenticate;
-        assert.eq(stats.received, 0);
+        const stats = mechStats[mech].ingress.speculativeAuthenticate;
+        assert.eq(stats.total, 0);
         assert.eq(stats.successful, 0);
     });
 });
@@ -64,34 +64,34 @@ assertStats(function (mechStats) {
 const baseURI = "mongodb://localhost:" + mongod.port + "/admin";
 test(baseURI + "?authMechanism=MONGODB-X509");
 assertStats(function (mechStats) {
-    const stats = mechStats["MONGODB-X509"].speculativeAuthenticate;
-    assert.eq(stats.received, 1);
+    const stats = mechStats["MONGODB-X509"].ingress.speculativeAuthenticate;
+    assert.eq(stats.total, 1);
     assert.eq(stats.successful, 1);
 });
 
 // Connect without speculation and still have 1/1 result.
 test(baseURI);
 assertStats(function (mechStats) {
-    const stats = mechStats["MONGODB-X509"].speculativeAuthenticate;
-    assert.eq(stats.received, 1);
+    const stats = mechStats["MONGODB-X509"].ingress.speculativeAuthenticate;
+    assert.eq(stats.total, 1);
     assert.eq(stats.successful, 1);
 });
 
 // We haven't done any cluster auth yet, so clusterAuthenticate counts should be 0
 assertStats(function (mechStats) {
-    const stats = mechStats["MONGODB-X509"].clusterAuthenticate;
-    assert.eq(stats.received, 0);
+    const stats = mechStats["MONGODB-X509"].ingress.clusterAuthenticate;
+    assert.eq(stats.total, 0);
     assert.eq(stats.successful, 0);
 });
 
 // Connect intra-cluster with speculation.
 testInternal(baseURI + "?authMechanism=MONGODB-X509");
 assertStats(function (mechStats) {
-    const specStats = mechStats["MONGODB-X509"].speculativeAuthenticate;
-    const clusterStats = mechStats["MONGODB-X509"].clusterAuthenticate;
-    assert.eq(specStats.received, 2);
+    const specStats = mechStats["MONGODB-X509"].ingress.speculativeAuthenticate;
+    const clusterStats = mechStats["MONGODB-X509"].ingress.clusterAuthenticate;
+    assert.eq(specStats.total, 2);
     assert.eq(specStats.successful, 2);
-    assert.eq(clusterStats.received, 1);
+    assert.eq(clusterStats.total, 1);
     assert.eq(clusterStats.successful, 1);
 });
 

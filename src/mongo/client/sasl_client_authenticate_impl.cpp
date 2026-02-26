@@ -53,6 +53,7 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
@@ -343,7 +344,11 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
 
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
 
-    auto argsBlock = std::make_tuple(hostname, saslParameters, username, targetDatabase, mechanism);
+    auto mechCounter = authCounter.getMechanismCounter(mechanism);
+    mechCounter.incAuthenticateSent();
+
+    auto argsBlock =
+        std::make_tuple(hostname, saslParameters, username, targetDatabase, mechanism, mechCounter);
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(std::move(argsBlock));
 
     session->metrics()->restart();
@@ -351,9 +356,9 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
     return asyncSaslConversation(
                runCommand, session, saslFirstCommandPrefix, inputObj, targetDatabase, saslLogLevel)
         .onError([session, sharedBlock](Status status) {
-            auto [hostname, saslParameters, username, targetDatabase, mechanism] =
-                *sharedBlock.get();
             BSONObj metrics = session->metrics()->captureEgress();
+            auto [hostname, saslParameters, username, targetDatabase, mechanism, _] =
+                *sharedBlock.get();
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748700,
                       "Authentication to remote host failed using SASL",
@@ -369,9 +374,10 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
             return status;
         })
         .then([session, sharedBlock]() {
-            auto [hostname, saslParameters, username, targetDatabase, mechanism] =
-                *sharedBlock.get();
             BSONObj metrics = session->metrics()->captureEgress();
+            auto [hostname, saslParameters, username, targetDatabase, mechanism, mechCounter] =
+                *sharedBlock.get();
+            mechCounter.incEgressAuthenticateSuccessful();
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748701,
                       "Authentication to remote host succeeded using SASL",

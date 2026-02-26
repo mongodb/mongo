@@ -12,7 +12,7 @@ function authnSuccessIncrementsServerStatusTotalAuthTime(mongodRunner) {
     admin.auth("admin", "pwd");
 
     const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalAuthenticationTimeMicros;
+        .totalIngressAuthenticationTimeMicros;
 
     assert.gte(expected, 0);
 
@@ -21,7 +21,7 @@ function authnSuccessIncrementsServerStatusTotalAuthTime(mongodRunner) {
     admin.auth("admin", "pwd");
 
     const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalAuthenticationTimeMicros;
+        .totalIngressAuthenticationTimeMicros;
 
     assert.gt(nextExpected, expected);
 
@@ -38,14 +38,14 @@ function authnFailureIncrementsServerStatusTotalAuthTime(mongodRunner) {
 
     // Count the number of authentications performed during setup
     const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalAuthenticationTimeMicros;
+        .totalIngressAuthenticationTimeMicros;
 
     assert.gte(expected, 0);
 
     admin.auth("admin", "wrong");
 
     const nextExpected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication
-        .totalAuthenticationTimeMicros;
+        .totalIngressAuthenticationTimeMicros;
 
     assert.gt(nextExpected, expected);
 

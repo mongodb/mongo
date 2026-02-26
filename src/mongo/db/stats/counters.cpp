@@ -236,32 +236,52 @@ void AuthCounter::incSaslSupportedMechanismsReceived() {
     _saslSupportedMechanismsReceived.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::incAuthenticationCumulativeTime(long long micros) {
-    _authenticationCumulativeMicros.fetchAndAddRelaxed(micros);
+void AuthCounter::incIngressAuthenticationCumulativeTime(long long micros) {
+    _ingressAuthenticationCumulativeMicros.fetchAndAddRelaxed(micros);
+}
+
+void AuthCounter::incEgressAuthenticationCumulativeTime(long long micros) {
+    _egressAuthenticationCumulativeMicros.fetchAndAddRelaxed(micros);
+}
+
+void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateSent() {
+    _data->egress.speculativeAuthenticate.total.fetchAndAddRelaxed(1);
 }
 
 void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateReceived() {
-    _data->speculativeAuthenticate.received.fetchAndAddRelaxed(1);
+    _data->ingress.speculativeAuthenticate.total.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateSuccessful() {
-    _data->speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+void AuthCounter::MechanismCounterHandle::incIngressSpeculativeAuthenticateSuccessful() {
+    _data->ingress.speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::MechanismCounterHandle::incEgressSpeculativeAuthenticateSuccessful() {
+    _data->egress.speculativeAuthenticate.successful.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::MechanismCounterHandle::incAuthenticateSent() {
+    _data->egress.authenticate.total.fetchAndAddRelaxed(1);
 }
 
 void AuthCounter::MechanismCounterHandle::incAuthenticateReceived() {
-    _data->authenticate.received.fetchAndAddRelaxed(1);
+    _data->ingress.authenticate.total.fetchAndAddRelaxed(1);
 }
 
-void AuthCounter::MechanismCounterHandle::incAuthenticateSuccessful() {
-    _data->authenticate.successful.fetchAndAddRelaxed(1);
+void AuthCounter::MechanismCounterHandle::incIngressAuthenticateSuccessful() {
+    _data->ingress.authenticate.successful.fetchAndAddRelaxed(1);
+}
+
+void AuthCounter::MechanismCounterHandle::incEgressAuthenticateSuccessful() {
+    _data->egress.authenticate.successful.fetchAndAddRelaxed(1);
 }
 
 void AuthCounter::MechanismCounterHandle::incClusterAuthenticateReceived() {
-    _data->clusterAuthenticate.received.fetchAndAddRelaxed(1);
+    _data->ingress.clusterAuthenticate.total.fetchAndAddRelaxed(1);
 }
 
 void AuthCounter::MechanismCounterHandle::incClusterAuthenticateSuccessful() {
-    _data->clusterAuthenticate.successful.fetchAndAddRelaxed(1);
+    _data->ingress.clusterAuthenticate.successful.fetchAndAddRelaxed(1);
 }
 
 auto AuthCounter::getMechanismCounter(StringData mechanism) -> MechanismCounterHandle {
@@ -274,17 +294,28 @@ auto AuthCounter::getMechanismCounter(StringData mechanism) -> MechanismCounterH
     return MechanismCounterHandle(&data);
 }
 
+void AuthCounter::SuccessCounter::appendAsSubobj(BSONObjBuilder& bob, StringData fieldName) const {
+    BSONObjBuilder subBob(bob.subobjStart(fieldName));
+    subBob.append("total", total.load());
+    subBob.append("successful", successful.load());
+    subBob.done();
+}
+
 /**
  * authentication: {
  *   "mechanisms": {
  *     "SCRAM-SHA-256": {
- *       "speculativeAuthenticate": { received: ###, successful: ### },
- *       "authenticate": { received: ###, successful: ### },
+ *       "ingress": {
+ *         "speculativeAuthenticate": { total: ###, successful: ### },
+ *         "clusterAuthenticate": { total: ###, successful: ### },
+ *         "authenticate": { total: ###, successful: ### },
+ *       },
+ *       "egress": {
+ *         "speculativeAuthenticate": { total: ###, successful: ### },
+ *         "authenticate": { total: ###, successful: ### },
+ *       },
  *     },
- *     "MONGODB-X509": {
- *       "speculativeAuthenticate": { received: ###, successful: ### },
- *       "authenticate": { received: ###, successful: ### },
- *     },
+ *     ...
  *   },
  * }
  */
@@ -297,43 +328,29 @@ void AuthCounter::append(BSONObjBuilder* b) {
     for (const auto& it : _mechanisms) {
         BSONObjBuilder mechBuilder(mechsBuilder.subobjStart(it.first));
 
-        {
-            const auto received = it.second.speculativeAuthenticate.received.load();
-            const auto successful = it.second.speculativeAuthenticate.successful.load();
+        BSONObjBuilder ingressBuilder(mechBuilder.subobjStart("ingress"));
+        it.second.ingress.speculativeAuthenticate.appendAsSubobj(ingressBuilder,
+                                                                 auth::kSpeculativeAuthenticate);
+        it.second.ingress.clusterAuthenticate.appendAsSubobj(ingressBuilder,
+                                                             auth::kClusterAuthenticate);
+        it.second.ingress.authenticate.appendAsSubobj(ingressBuilder, auth::kAuthenticateCommand);
+        ingressBuilder.done();
 
-            BSONObjBuilder specAuthBuilder(mechBuilder.subobjStart(auth::kSpeculativeAuthenticate));
-            specAuthBuilder.append("received", received);
-            specAuthBuilder.append("successful", successful);
-            specAuthBuilder.done();
-        }
-
-        {
-            const auto received = it.second.clusterAuthenticate.received.load();
-            const auto successful = it.second.clusterAuthenticate.successful.load();
-
-            BSONObjBuilder clusterAuthBuilder(mechBuilder.subobjStart(auth::kClusterAuthenticate));
-            clusterAuthBuilder.append("received", received);
-            clusterAuthBuilder.append("successful", successful);
-            clusterAuthBuilder.done();
-        }
-
-        {
-            const auto received = it.second.authenticate.received.load();
-            const auto successful = it.second.authenticate.successful.load();
-
-            BSONObjBuilder authBuilder(mechBuilder.subobjStart(auth::kAuthenticateCommand));
-            authBuilder.append("received", received);
-            authBuilder.append("successful", successful);
-            authBuilder.done();
-        }
+        BSONObjBuilder egressBuilder(mechBuilder.subobjStart("egress"));
+        it.second.egress.speculativeAuthenticate.appendAsSubobj(egressBuilder,
+                                                                auth::kSpeculativeAuthenticate);
+        it.second.egress.authenticate.appendAsSubobj(egressBuilder, auth::kAuthenticateCommand);
+        egressBuilder.done();
 
         mechBuilder.done();
     }
 
     mechsBuilder.done();
 
-    const auto totalAuthenticationTimeMicros = _authenticationCumulativeMicros.load();
-    b->append("totalAuthenticationTimeMicros", totalAuthenticationTimeMicros);
+    const auto totalIngressAuthenticationTimeMicros = _ingressAuthenticationCumulativeMicros.load();
+    b->append("totalIngressAuthenticationTimeMicros", totalIngressAuthenticationTimeMicros);
+    const auto totalEgressAuthenticationTimeMicros = _egressAuthenticationCumulativeMicros.load();
+    b->append("totalEgressAuthenticationTimeMicros", totalEgressAuthenticationTimeMicros);
 }
 
 OpCounters& serviceOpCounters(ClusterRole role) {

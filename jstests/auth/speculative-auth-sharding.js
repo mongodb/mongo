@@ -29,19 +29,19 @@ function test(uri, incrMech, isClusterAuth = false) {
             const inc = mech === incrMech ? 1 : 0;
             const clusterInc = mech === incrMech && isClusterAuth ? 1 : 0;
 
-            const specBefore = lastStats[mech].speculativeAuthenticate;
-            const specAfter = stats[mech].speculativeAuthenticate;
-            assert.eq(specAfter.received, specBefore.received + inc);
+            const specBefore = lastStats[mech].ingress.speculativeAuthenticate;
+            const specAfter = stats[mech].ingress.speculativeAuthenticate;
+            assert.eq(specAfter.total, specBefore.total + inc);
             assert.eq(specAfter.successful, specBefore.successful + inc);
 
-            const clusterBefore = lastStats[mech].clusterAuthenticate;
-            const clusterAfter = stats[mech].clusterAuthenticate;
-            assert.eq(clusterAfter.received, clusterBefore.received + clusterInc);
+            const clusterBefore = lastStats[mech].ingress.clusterAuthenticate;
+            const clusterAfter = stats[mech].ingress.clusterAuthenticate;
+            assert.eq(clusterAfter.total, clusterBefore.total + clusterInc);
             assert.eq(clusterAfter.successful, clusterBefore.successful + clusterInc);
 
-            const allBefore = lastStats[mech].authenticate;
-            const allAfter = stats[mech].authenticate;
-            assert.eq(allAfter.received, allBefore.received + inc);
+            const allBefore = lastStats[mech].ingress.authenticate;
+            const allAfter = stats[mech].ingress.authenticate;
+            assert.eq(allAfter.total, allBefore.total + inc);
             assert.eq(allAfter.successful, allBefore.successful + inc);
         });
     } catch (e) {

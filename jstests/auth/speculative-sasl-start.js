@@ -25,8 +25,8 @@ function assertStats(cb) {
 // No speculative auth attempts yet.
 assertStats(function (mechStats) {
     Object.keys(mechStats).forEach(function (mech) {
-        const stats = mechStats[mech].speculativeAuthenticate;
-        assert.eq(stats.received, 0);
+        const stats = mechStats[mech].ingress.speculativeAuthenticate;
+        assert.eq(stats.total, 0);
         assert.eq(stats.successful, 0);
     });
 });
@@ -34,18 +34,18 @@ assertStats(function (mechStats) {
 // No "intra-cluster" auth attempts yet.
 assertStats(function (mechStats) {
     Object.keys(mechStats).forEach(function (mech) {
-        const stats = mechStats[mech].clusterAuthenticate;
-        assert.eq(stats.received, 0);
+        const stats = mechStats[mech].ingress.clusterAuthenticate;
+        assert.eq(stats.total, 0);
         assert.eq(stats.successful, 0);
     });
 });
 
 function expectN(mechStats, mech, N1, M1, N2 = 0, M2 = 0) {
-    const specStats = mechStats[mech].speculativeAuthenticate;
-    const clusterStats = mechStats[mech].clusterAuthenticate;
-    assert.eq(N1, specStats.received);
+    const specStats = mechStats[mech].ingress.speculativeAuthenticate;
+    const clusterStats = mechStats[mech].ingress.clusterAuthenticate;
+    assert.eq(N1, specStats.total);
     assert.eq(M1, specStats.successful);
-    assert.eq(N2, clusterStats.received);
+    assert.eq(N2, clusterStats.total);
     assert.eq(M2, clusterStats.successful);
 }
 

@@ -27,16 +27,24 @@ admin.logout();
 function assertStats() {
     // Need to be authenticated to run serverStatus.
     assert(admin.auth("admin", "pwd"));
-    ++expected["SCRAM-SHA-256"].authenticate.successful;
-    ++expected["SCRAM-SHA-256"].authenticate.received;
+    ++expected["SCRAM-SHA-256"].ingress.authenticate.successful;
+    ++expected["SCRAM-SHA-256"].ingress.authenticate.total;
 
     const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
     Object.keys(expected).forEach(function (mech) {
         try {
-            assert.eq(mechStats[mech].authenticate.received, expected[mech].authenticate.received);
-            assert.eq(mechStats[mech].authenticate.successful, expected[mech].authenticate.successful);
-            assert.eq(mechStats[mech].clusterAuthenticate.received, expected[mech].clusterAuthenticate.received);
-            assert.eq(mechStats[mech].clusterAuthenticate.successful, expected[mech].clusterAuthenticate.successful);
+            assert.eq(mechStats[mech].ingress.authenticate.total, expected[mech].ingress.authenticate.total);
+            assert.eq(mechStats[mech].ingress.authenticate.successful, expected[mech].ingress.authenticate.successful);
+            assert.eq(
+                mechStats[mech].ingress.clusterAuthenticate.total,
+                expected[mech].ingress.clusterAuthenticate.total,
+            );
+            assert.eq(
+                mechStats[mech].ingress.clusterAuthenticate.successful,
+                expected[mech].ingress.clusterAuthenticate.successful,
+            );
+            assert.eq(mechStats[mech].egress.authenticate.total, expected[mech].egress.authenticate.total);
+            assert.eq(mechStats[mech].egress.authenticate.successful, expected[mech].egress.authenticate.successful);
         } catch (e) {
             print("Mechanism: " + mech);
             print("mechStats: " + tojson(mechStats));
@@ -51,14 +59,14 @@ function assertStats() {
 function assertSuccess(creds, mech, db = test) {
     assert.eq(db.auth(creds), true);
     db.logout();
-    ++expected[mech].authenticate.received;
-    ++expected[mech].authenticate.successful;
+    ++expected[mech].ingress.authenticate.total;
+    ++expected[mech].ingress.authenticate.successful;
     assertStats();
 }
 
 function assertFailure(creds, mech, db = test) {
     assert.eq(db.auth(creds), false);
-    ++expected[mech].authenticate.received;
+    ++expected[mech].ingress.authenticate.total;
     assertStats();
 }
 
@@ -69,10 +77,10 @@ function assertSuccessInternal() {
         authutil.asCluster(replTest.nodes, keyfile, () => true),
         true,
     );
-    ++expected[mech].authenticate.received;
-    ++expected[mech].authenticate.successful;
-    ++expected[mech].clusterAuthenticate.received;
-    ++expected[mech].clusterAuthenticate.successful;
+    ++expected[mech].ingress.authenticate.total;
+    ++expected[mech].ingress.authenticate.successful;
+    ++expected[mech].ingress.clusterAuthenticate.total;
+    ++expected[mech].ingress.clusterAuthenticate.successful;
     // we have to re-auth as admin to get stats, which are validated at the end of assertSuccess
     assertSuccess({user: "admin", pwd: "pwd"}, "SCRAM-SHA-256", admin);
 }
@@ -84,8 +92,8 @@ function assertFailureInternal() {
     const mech = "SCRAM-SHA-256";
     // If asCluster fails, it explodes.
     assert.throws(authutil.asCluster, [replTest.nodes, badKeyfile, () => true]);
-    ++expected[mech].authenticate.received;
-    ++expected[mech].clusterAuthenticate.received;
+    ++expected[mech].ingress.authenticate.total;
+    ++expected[mech].ingress.clusterAuthenticate.total;
     // we have to re-auth as admin to get stats, which are validated at the end of assertSuccess
     assertSuccess({user: "admin", pwd: "pwd"}, "SCRAM-SHA-256", admin);
     assertStats();

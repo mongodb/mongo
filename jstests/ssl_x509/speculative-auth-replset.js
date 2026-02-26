@@ -51,19 +51,19 @@ assert(initialMechStats["MONGODB-X509"] !== undefined);
 // because we authenticated as `admin` using the shell helpers with SCRAM.
 // Because of the simple cluster topology, we should have no intracluster authentication attempts.
 Object.keys(initialMechStats).forEach(function (mech) {
-    const specStats = initialMechStats[mech].speculativeAuthenticate;
-    const clusterStats = initialMechStats[mech].clusterAuthenticate;
+    const specStats = initialMechStats[mech].ingress.speculativeAuthenticate;
+    const clusterStats = initialMechStats[mech].ingress.clusterAuthenticate;
 
     if (mech === "MONGODB-X509") {
-        assert.eq(clusterStats.received, 1);
+        assert.eq(clusterStats.total, 1);
     }
 
     // No speculation has occured
-    assert.eq(specStats.received, 0);
+    assert.eq(specStats.total, 0);
 
     // Statistics should be consistent for all mechanisms
-    assert.eq(specStats.received, specStats.successful);
-    assert.eq(clusterStats.received, clusterStats.successful);
+    assert.eq(specStats.total, specStats.successful);
+    assert.eq(clusterStats.total, clusterStats.successful);
 });
 
 {
@@ -88,22 +88,22 @@ Object.keys(initialMechStats).forEach(function (mech) {
     const newMechStats = getMechStats(admin);
     printjson(newMechStats);
     assert.eq(
-        newMechStats["MONGODB-X509"].speculativeAuthenticate.received,
-        newMechStats["MONGODB-X509"].speculativeAuthenticate.successful,
+        newMechStats["MONGODB-X509"].ingress.speculativeAuthenticate.total,
+        newMechStats["MONGODB-X509"].ingress.speculativeAuthenticate.successful,
     );
     assert.eq(
-        newMechStats["MONGODB-X509"].clusterAuthenticate.received,
-        newMechStats["MONGODB-X509"].clusterAuthenticate.successful,
+        newMechStats["MONGODB-X509"].ingress.clusterAuthenticate.total,
+        newMechStats["MONGODB-X509"].ingress.clusterAuthenticate.successful,
     );
 
     // Speculative and cluster statistics should be incremented by intracluster auth.
     assert.gt(
-        newMechStats["MONGODB-X509"].speculativeAuthenticate.received,
-        initialMechStats["MONGODB-X509"].speculativeAuthenticate.successful,
+        newMechStats["MONGODB-X509"].ingress.speculativeAuthenticate.total,
+        initialMechStats["MONGODB-X509"].ingress.speculativeAuthenticate.successful,
     );
     assert.gt(
-        newMechStats["MONGODB-X509"].clusterAuthenticate.received,
-        initialMechStats["MONGODB-X509"].clusterAuthenticate.successful,
+        newMechStats["MONGODB-X509"].ingress.clusterAuthenticate.total,
+        initialMechStats["MONGODB-X509"].ingress.clusterAuthenticate.successful,
     );
 }
 
