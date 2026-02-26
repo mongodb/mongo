@@ -166,3 +166,6 @@ filters:
   - "swallow_unnecessary_uuid_mismatch_error.js":
     approvers:
       - 10gen/query-execution-router
+  - "heal_config_shards_on_fcv_upgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

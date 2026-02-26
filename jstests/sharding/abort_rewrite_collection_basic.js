@@ -1,8 +1,10 @@
 /**
  * Tests for basic functionality of the abort rewrite collection feature.
  *
+ * TODO (SERVER-120392): remove does_not_support_stepdowns.
  * @tags: [
  *  requires_fcv_83,
+ *  does_not_support_stepdowns,
  * ]
  */
 

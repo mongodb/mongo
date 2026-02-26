@@ -2,10 +2,11 @@
  * Tests the fix-up mechanism added to the upgrade path on setFCV(9.0), which adds a topologyTime
  * field to config.shards entries which do not have one due to originating from a pre-5.0 cluster.
  *
- * TODO (SERVER-102087): remove after 9.0 is branched.
- *
+ * TODO (SERVER-102087): remove multiversion_incompatible after 9.0 is branched.
+ * TODO (SERVER-120391): remove does_not_support_stepdowns.
  *  @tags: [
  *      multiversion_incompatible,
+ *      does_not_support_stepdowns,
  *  ]
  * */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
