@@ -30,10 +30,12 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -43,18 +45,22 @@
 namespace mongo {
 namespace {
 
+using FCV = multiversion::FeatureCompatibilityVersion;
+
 class FeatureCompatibilityVersionTestFixture : public CatalogTestFixture {
     void setUp() override {
         CatalogTestFixture::setUp();
-        repl::ReplicationCoordinator::set(getServiceContext(),
-                                          std::make_unique<repl::ReplicationCoordinatorMock>(
-                                              getServiceContext(), repl::ReplSettings()));
+
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(),
+                                                                            repl::ReplSettings());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
         // Unit test framework sets FCV to latest. Reset it to test FCV initialization logic.
         serverGlobalParams.mutableFCV.reset();
     }
 
 protected:
-    void doStartupFCVSequence(const multiversion::FeatureCompatibilityVersion& minimumRequiredFCV) {
+    void doStartupFCVSequence(FCV minimumRequiredFCV) {
         Lock::GlobalWrite lock(operationContext());
         FeatureCompatibilityVersion::setIfCleanStartup(
             operationContext(), storageInterface(), minimumRequiredFCV);
@@ -202,6 +208,115 @@ TEST_F(FeatureCompatibilityVersionTestFixture,
     const auto currentFcv =
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     ASSERT_EQ(currentFcv, multiversion::GenericFCV::kLatest);
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
+    const Timestamp lastChangeTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kLastLTS,
+        lastChangeTimestamp,
+        false /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
+    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+        operationContext(), request, multiversion::GenericFCV::kLastLTS);
+
+    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, ResolveResumeInterruptedUpgradeBeforeCommit) {
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    const Timestamp lastChangeTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        lastChangeTimestamp,
+        false /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
+    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, ResolveResumeInterruptedUpgradeDuringCommit) {
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    const Timestamp lastChangeTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        lastChangeTimestamp,
+        true /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
+    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVBeforeCommitSucceeds) {
+    const Timestamp lastChangeTimestamp =
+        VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        lastChangeTimestamp,
+        false /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLastLTS);
+    auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+        operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
+
+    ASSERT_EQ(result.transitionalVersion,
+              multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
+    ASSERT_EQ(result.startPhase, SetFCVPhaseEnum::kStart);
+    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
+    ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringCommitFails) {
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        Timestamp(10, 10),
+        true /* isCleaningServerMetadata */);
+
+    SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLastLTS);
+    ASSERT_THROWS_CODE(
+        FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
+            operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest),
+        DBException,
+        10778001);
 }
 
 }  // namespace

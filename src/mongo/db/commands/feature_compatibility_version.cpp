@@ -63,6 +63,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -170,39 +171,97 @@ public:
      * returns either the corresponding transitional FCV, or none if the transition can not be done.
      * Some transitions can only be done if the request is from a config server.
      */
-    boost::optional<ResolvedFCVTransition> resolveTransition(FCV actualVersion,
-                                                             FCV requestedVersion,
-                                                             bool isFromConfigServer) const {
-        FCV originalVersion;
-        if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(actualVersion)) {
-            // Starting a new upgrade/downgrade.
-            originalVersion = actualVersion;
-        } else {
+    boost::optional<ResolvedFCVTransition> resolveTransition(
+        ServiceContext* serviceContext,
+        const FeatureCompatibilityVersionDocument& fcvDoc,
+        FCV requestedVersion,
+        bool isFromConfigServer) const {
+        // Determine the direction and starting phase of the requested transition.
+        struct RequestedTransitionOrigin {
+            FCV originalVersion;
+            SetFCVPhaseEnum startPhase;
+            bool isNewTransition;
+        };
+
+        auto origin = [&]() -> boost::optional<RequestedTransitionOrigin> {
+            FCV actualVersion =
+                uassertStatusOK(FeatureCompatibilityVersionParser::parse(fcvDoc.toBSON()));
+
+            if (!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(actualVersion)) {
+                // Starting a new upgrade/downgrade.
+                return RequestedTransitionOrigin{.originalVersion = actualVersion,
+                                                 .startPhase = SetFCVPhaseEnum::kStart,
+                                                 .isNewTransition = true};
+            }
+
             auto transitionInfo = getTransitionFCVInfo(actualVersion);
             if (transitionInfo.to == requestedVersion) {
                 // Resuming an upgrade/downgrade after it was interrupted.
-                originalVersion = transitionInfo.from;
-            } else if (transitionInfo.from == requestedVersion) {
+                if (!gFeatureFlagSymmetricFCV.isEnabled()) {
+                    // Legacy behavior: Retrying an interrupted setFCV runs all phases again.
+                    return RequestedTransitionOrigin{.originalVersion = transitionInfo.from,
+                                                     .startPhase = SetFCVPhaseEnum::kStart,
+                                                     .isNewTransition = true};
+                }
+
+                // TODO(SERVER-119479): Persist phase in the FCV document instead of guessing.
+                // - If we got interrupted during kStart/kPrepare then isCleaningServerMetadata
+                //   is not set. Pessimisically resume from kStart.
+                // - If isCleaningServerMetadata is set, we were at least on kComplete.
+                return RequestedTransitionOrigin{
+                    .originalVersion = transitionInfo.from,
+                    .startPhase = fcvDoc.getIsCleaningServerMetadata().value_or(false)
+                        ? SetFCVPhaseEnum::kComplete
+                        : SetFCVPhaseEnum::kStart,
+                    .isNewTransition = false,
+                };
+            }
+
+            if (transitionInfo.from == requestedVersion) {
+                // Returning back to the original FCV after a failed upgrade/downgrade. This is
+                // accomplished via a downgrade/upgrade towards the original FCV, going through all
+                // phases ("upgrading to downgrading" / "downgrading to upgrading" transition).
                 if (!repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled() &&
                     requestedVersion < actualVersion) {
                     return boost::none;
                 }
 
-                // Returning back to the original FCV after a failed upgrade/downgrade
-                // (upgrading to downgrading / downgrading to upgrading transition).
-                originalVersion = transitionInfo.to;
-            } else {
-                return boost::none;
+                return RequestedTransitionOrigin{
+                    .originalVersion = transitionInfo.to,
+                    .startPhase = SetFCVPhaseEnum::kStart,
+                    .isNewTransition = true,
+                };
             }
+
+            // Impossible transition (requested FCV is "C", but we're a "A" -> "B" transition).
+            return boost::none;
+        }();
+        if (!origin.has_value()) {
+            return boost::none;
         }
+
+        const auto& [originalVersion, startPhase, isNewTransition] = *origin;
         invariant(!ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(originalVersion));
 
+        // Check if the requested transition is supported.
         auto it = _transitions.find({originalVersion, requestedVersion});
         if (it == _transitions.end() || (it->second.onlyFromConfigServer && !isFromConfigServer)) {
             return boost::none;
         }
 
-        return ResolvedFCVTransition{it->second.transitionalVersion};
+        // On sharded clusters, the config server generates a timestamp when it starts an upgrade
+        // or downgrade, which is included in requests to other shards for replay protection.
+        boost::optional<Timestamp> changeTimestamp;
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            auto now = VectorClock::get(serviceContext)->getTime();
+            changeTimestamp =
+                isNewTransition ? now.clusterTime().asTimestamp() : fcvDoc.getChangeTimestamp();
+        }
+
+        return ResolvedFCVTransition{it->second.transitionalVersion,
+                                     startPhase,
+                                     SetFCVPhaseEnum::kComplete,
+                                     changeTimestamp};
     }
 
     /**
@@ -297,15 +356,6 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
     auto newVersion = setFCVRequest.getCommandParameter();
     auto isFromConfigServer = setFCVRequest.getFromConfigServer().value_or(false);
 
-    auto resolvedTransition =
-        fcvTransitions.resolveTransition(fromVersion, newVersion, isFromConfigServer);
-    uassert(5147403,
-            fmt::format("cannot set featureCompatibilityVersion to '{}' while "
-                        "featureCompatibilityVersion is '{}'",
-                        multiversion::toString(newVersion),
-                        multiversion::toString(fromVersion)),
-            resolvedTransition.has_value());
-
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
     if (!fcvObj.isOK()) {
         Status status = fcvObj.getStatus();
@@ -319,6 +369,15 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
 
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
         fcvObj.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+
+    auto resolvedTransition = fcvTransitions.resolveTransition(
+        opCtx->getServiceContext(), fcvDoc, newVersion, isFromConfigServer);
+    uassert(5147403,
+            fmt::format("cannot set featureCompatibilityVersion to '{}' while "
+                        "featureCompatibilityVersion is '{}'",
+                        multiversion::toString(newVersion),
+                        multiversion::toString(fromVersion)),
+            resolvedTransition.has_value());
 
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
     auto downgradeInProgress = fcvDoc.getPreviousVersion().has_value();
@@ -352,7 +411,11 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
     }
 
     auto changeTimestamp = setFCVRequest.getChangeTimestamp();
-    invariant(changeTimestamp);
+    uassert(5563500,
+            "The 'changeTimestamp' field is missing even though the node is running as a "
+            "shard. This may indicate that the 'setFeatureCompatibilityVersion' command "
+            "was invoked directly against the shard.",
+            changeTimestamp);
     auto previousTimestamp = fcvDoc.getChangeTimestamp();
 
     if (setFCVPhase == SetFCVPhaseEnum::kStart) {
@@ -385,6 +448,19 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
                 "example, was temporarily stuck on network.",
                 previousTimestamp == changeTimestamp);
     }
+
+    uassert(11947900,
+            "Shard received a request to run a phase of the 'setFeatureCompatibilityVersion' "
+            "command that was already done, so the request is discarded. This could indicate, "
+            "for example, that the request is related to a previous invocation of the "
+            "'setFeatureCompatibilityVersion' command which, for example, was temporarily stuck "
+            "on network.",
+            *setFCVPhase >= resolvedTransition->startPhase);
+
+    // Sharded cluster FCV protocol: Only run the specified phase.
+    resolvedTransition->startPhase = *setFCVPhase;
+    resolvedTransition->endPhase = *setFCVPhase;
+    resolvedTransition->changeTimestamp = changeTimestamp;
 
     return *resolvedTransition;
 }

@@ -78,7 +78,8 @@ function runReplicaSetTest() {
     rst.stopSet();
 }
 
-function testConfigServerFCVTimestampIsAlwaysNewer() {
+// Check that resuming the same interrupted setFCV transition reuses the same changeTimestamp.
+function testConfigServerFCVTimestampIsSameOnResume() {
     const st = new ShardingTest({shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}]}}});
     const mongosAdminDB = st.s.getDB("admin");
     const configPrimary = st.configRS.getPrimary();
@@ -87,7 +88,6 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
 
     runTests(configPrimary, mongosAdminDB);
 
-    // Check that a new timestamp is always generated with each setFCV call.
     let fcvDoc;
     let newFcvDoc;
     // 1) Calling downgrade twice (one with failpoint).
@@ -98,8 +98,13 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     checkFCV(mongosAdminDB, lastLTSFCV);
-    // Timestamp from fcvDoc should be less than the timestamp from newFcvDoc.
-    assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == -1);
+    if (FeatureFlagUtil.isEnabled(st.s, "SymmetricFCV")) {
+        // Resuming the same interrupted transition should reuse the same changeTimestamp.
+        assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == 0);
+    } else {
+        // setFCV re-runs all phases rather than resuming, so it generates a new timestamp.
+        assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == -1);
+    }
 
     // 2) Calling upgrade twice (one with failpoint).
     assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failUpgrading", mode: "alwaysOn"}));
@@ -109,8 +114,13 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     newFcvDoc = mongosAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     checkFCV(mongosAdminDB, latestFCV);
-    // Timestamp from fcvDoc should be less than the timestamp from newFcvDoc.
-    assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == -1);
+    if (FeatureFlagUtil.isEnabled(st.s, "SymmetricFCV")) {
+        // Resuming the same interrupted transition should reuse the same changeTimestamp.
+        assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == 0);
+    } else {
+        // setFCV re-runs all phases rather than resuming, so it generates a new timestamp.
+        assert(timestampCmp(fcvDoc.changeTimestamp, newFcvDoc.changeTimestamp) == -1);
+    }
 
     st.stop();
 }
@@ -255,5 +265,5 @@ function runShardingTests() {
 
 runStandaloneTest();
 runReplicaSetTest();
-testConfigServerFCVTimestampIsAlwaysNewer();
+testConfigServerFCVTimestampIsSameOnResume();
 runShardingTests();

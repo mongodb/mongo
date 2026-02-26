@@ -45,23 +45,34 @@
 
 namespace MONGO_MOD_PUB mongo {
 
-/**
- * Represents the resolved transitional FCV based on the actual and the requested version.
- *
- * Example - New FCV upgrade:
- *   actualVersion: "8.0", requestedVersion: "8.3"
- *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
- *
- * Example - Resume interrupted FCV upgrade:
- *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.3"
- *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
- *
- * Example - Return to original FCV after failed FCV upgrade ("upgrading to downgrading"):
- *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.0"
- *   => Resolved transitionalVersion: "downgrading from 8.3 to 8.0"
- */
 struct ResolvedFCVTransition {
+    /**
+     * Represents the resolved transitional FCV based on the actual and the requested version.
+     *
+     * Example - New FCV upgrade:
+     *   actualVersion: "8.0", requestedVersion: "8.3"
+     *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
+     *
+     * Example - Resume interrupted FCV upgrade:
+     *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.3"
+     *   => Resolved transitionalVersion: "upgrading from 8.0 to 8.3"
+     *
+     * Example - Return to original FCV after failed FCV upgrade ("upgrading to downgrading"):
+     *   actualVersion: "upgrading from 8.0 to 8.3", requestedVersion: "8.0"
+     *   => Resolved transitionalVersion: "downgrading from 8.3 to 8.0"
+     */
     multiversion::FeatureCompatibilityVersion transitionalVersion;
+
+    // Range of phases [startPhase, endPhase] to run.
+    SetFCVPhaseEnum startPhase;
+    SetFCVPhaseEnum endPhase;
+
+    bool shouldRun(SetFCVPhaseEnum phase) {
+        return startPhase <= phase && phase <= endPhase;
+    }
+
+    // Timestamp for the FCV transition. Only generated in sharded clusters for replay protection.
+    boost::optional<Timestamp> changeTimestamp;
 };
 
 class FeatureCompatibilityVersion {

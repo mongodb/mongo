@@ -41,7 +41,10 @@ function transitionFailsDuringIsCleaningServerMetadata(
     configureFailPointFn("failTransitionDuringIsCleaningServerMetadata", "alwaysOn");
 
     // Fail while cleaning server metadata during the initial transition to the target FCV.
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+    assert.commandFailedWithCode(
+        adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+        10778000,
+    );
     let fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog("1. Current FCV should be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
     checkFCV(adminDB, lastLTSFCV, targetFCV, true /* isCleaningServerMetadata */);
@@ -52,14 +55,20 @@ function transitionFailsDuringIsCleaningServerMetadata(
         cannotTransitionDuringMetadataCleanupErrorCode,
     );
 
+    // setFCV resumes from isCleaningServerMetadata so it can't fail at an earlier point.
+    const earlierFailPoint = isOriginallyDowngradeTest ? "failDowngrading" : "failUpgrading";
+    jsTestLog(`Test that retrying ${originalTransitionType} can't fail earlier than isCleaningServerMetadata.`);
+    configureFailPointFn(earlierFailPoint, "alwaysOn");
+    assert.commandFailedWithCode(
+        adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}),
+        FeatureFlagUtil.isEnabled(conn, "SymmetricFCV")
+            ? 10778000 /* interrupted at failTransitionDuringIsCleaningServerMetadata */
+            : [549180, 549181] /* interrupted at failUpgrading/failDowngrading */,
+    );
+    configureFailPointFn(earlierFailPoint, "off");
+
     configureFailPointFn("failTransitionDuringIsCleaningServerMetadata", "off");
 
-    // We are still in isCleaningServerMetadata even if retrying transition fails at an earlier
-    // point.
-    const earlierFailPoint = isOriginallyDowngradeTest ? "failDowngrading" : "failUpgrading";
-    jsTestLog(`Test that retrying ${originalTransitionType} and failing at an earlier point still keeps the error.`);
-    configureFailPointFn(earlierFailPoint, "alwaysOn");
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
     fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog("2. Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
     checkFCV(adminDB, lastLTSFCV, targetFCV, true /* isCleaningServerMetadata */);
