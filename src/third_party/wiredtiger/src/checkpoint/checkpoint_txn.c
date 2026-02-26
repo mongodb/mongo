@@ -1591,7 +1591,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * Copy any updated metadata to the shared metadata table.
      */
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
-        WT_WITH_SCHEMA_LOCK(session, ret = __wt_disagg_update_metadata_process(session));
+        WT_WITH_SCHEMA_LOCK(session, ret = __wt_disagg_shared_metadata_queue_process(session));
         WT_ERR(ret);
     }
 

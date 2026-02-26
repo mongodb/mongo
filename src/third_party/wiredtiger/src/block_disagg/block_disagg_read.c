@@ -287,6 +287,10 @@ corrupt:
 
     /* The cumulative size from the cookie must match the sum of all individual block sizes. */
     if (!from_cache)
+        /*
+         * Since the Victim Cache stores compressed variant of in-memory page representation rather
+         * than what we have in SLS, these numbers will not match.
+         */
         WT_ASSERT(session, block_meta->cumulative_size == block_size_sum);
 
 err:

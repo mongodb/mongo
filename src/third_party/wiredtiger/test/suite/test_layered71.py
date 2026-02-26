@@ -118,6 +118,14 @@ class test_layered71(wttest.WiredTigerTestCase):
         cursor.close()
         self.assertEqual(item_count, 0)
 
+        # Check that the table doesn't exist in the follower on subsequent checkpoint.
+        self.session.checkpoint()
+        self.disagg_advance_checkpoint(conn_follow)
+
+        # Test that we can't open a cursor on the table.
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.open_cursor(self.uri, None))
+
         # Clean up
         session_follow.close()
         conn_follow.close()

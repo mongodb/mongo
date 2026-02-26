@@ -758,6 +758,7 @@ encryptors
 endian
 endptr
 enomem
+enqueue
 enum
 env
 eof
