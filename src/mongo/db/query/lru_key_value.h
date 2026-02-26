@@ -34,6 +34,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <cstddef>
 #include <functional>
@@ -105,6 +106,10 @@ public:
 
     size_t currentBudget() const {
         return _current;
+    }
+
+    size_t maxBudget() const {
+        return _max;
     }
 
     void reset(size_t newMaxSize) {
@@ -205,6 +210,7 @@ public:
             _budgetTracker.onRemove(key, found->second);
             _kvMap.erase(i);
             _kvList.erase(found);
+            _verifyBudget();
         }
 
         _budgetTracker.onAdd(key, entry);
@@ -243,6 +249,7 @@ public:
         _budgetTracker.onRemove(key, found->second);
         _kvMap.erase(i);
         _kvList.erase(found);
+        _verifyBudget();
         return true;
     }
 
@@ -263,6 +270,7 @@ public:
                 ++it;
             }
         }
+        _verifyBudget();
         return removed;
     }
 
@@ -316,9 +324,7 @@ private:
      */
     size_t evict() {
         size_t nEvicted = 0;
-        while (_budgetTracker.isOverBudget()) {
-            invariant(!_kvList.empty());
-
+        while (_verifyBudget(), _budgetTracker.isOverBudget()) {
             _budgetTracker.onRemove(_kvList.back().first, _kvList.back().second);
             _kvMap.erase(&_kvList.back().first);
             _kvList.pop_back();
@@ -327,6 +333,28 @@ private:
         }
 
         return nEvicted;
+    }
+
+    /**
+     * This function calls tasserted() if the container is empty and budget is not zero. This would
+     * indicate an inconsistent state. We don't propagate the exception; we just correct the state
+     * by setting the current budget to zero, and allow the current operation to continue.
+     */
+    void _verifyBudget() {
+        size_t currentBudget = _budgetTracker.currentBudget();
+        if (_kvList.empty() && currentBudget > 0) {
+            // Repair: there are no entries, so the current budget really should be zero.
+            _budgetTracker.onClear();
+            try {
+                tasserted(12000000,
+                          str::stream()
+                              << "LRUKeyValue has an empty list but a positive budget ("
+                              << currentBudget << " / " << _budgetTracker.maxBudget() << ")");
+            } catch (const DBException&) {
+                // No need to propagate this exception: a message will be logged and we will have
+                // the tripwire behavior on server shutdown.
+            }
+        }
     }
 
     LRUBudgetTracker<K, V, KeyValueBudgetEstimator, InsertionEvictionListener> _budgetTracker;
