@@ -1358,7 +1358,8 @@ void initScope(Scope& scope) {
     if (shellGlobalParams.jsDebugMode) {
         // Inject debugger initialization function (internal use)
         // Pass the scope as data parameter so it can access JSContext
-        scope.injectNative("_initDebuggerGlobal", mongo::mozjs::initDebuggerGlobal, &scope);
+        scope.injectNative(
+            "_initDebuggerGlobal", mongo::mozjs::debugger::initDebuggerGlobal, &scope);
         try {
             scope.exec("_initDebuggerGlobal()", "(debugger-init)", false, true, false);
         } catch (const DBException& e) {

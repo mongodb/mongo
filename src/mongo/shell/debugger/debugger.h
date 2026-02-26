@@ -31,11 +31,16 @@
 
 #include "mongo/base/status.h"
 #include "mongo/shell/debugger/adapter.h"
+#include "mongo/shell/debugger/protocol.h"
 
 #include <jsapi.h>
 
 namespace mongo {
 namespace mozjs {
+namespace debugger {
+
+
+using namespace protocol;
 
 // Main entrypoint for the shell to initialize when in debug mode
 BSONObj initDebuggerGlobal(const BSONObj& args, void* data);
@@ -127,5 +132,6 @@ public:
     static bool breakpointHandler(JSContext* cx, unsigned argc, JS::Value* vp);
 };
 
+}  // namespace debugger
 }  // namespace mozjs
 }  // namespace mongo

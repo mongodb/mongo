@@ -31,73 +31,24 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/shell/debugger/protocol.h"
 
 #include <string>
 
 namespace mongo {
 namespace mozjs {
+namespace debugger {
 
-/**
- * https://microsoft.github.io/debug-adapter-protocol//specification.html
- */
+using namespace protocol;
 
-// Base Protocol
-class Message {
-public:
-    int seq;
-};
-
-class Request : public Message {
-public:
-    std::string command;
-    BSONObj arguments;
-
-    static Request fromJSON(std::string json);
-};
-
-class Response : public Message {
-public:
-    int request_seq;
-    bool success;
-    std::string message;
-    std::string body;
-};
-
-class SetBreakpointsRequest {
-public:
-    int seq;
-    std::string source;
-    std::vector<int> lines;
-
-    SetBreakpointsRequest(Request msg);
-    void respond();
-};
-
-class ContinueRequest {
-public:
-    int seq;
-    ContinueRequest(Request req);
-    void respond();
-};
-
-class StackTraceRequest {
-public:
-    int seq;
-    StackTraceRequest(Request req);
-    void respond();
-};
-
-class StoppedEvent {
-public:
-    void send();
-};
-
-class DebugAdapter {
+class DebugAdapter : public RequestHandler {
 
 public:
     static Status connect();
     static void disconnect();
     static void sendMessage(std::string json);
+    static void sendMessage(const Response& response);
+    static void sendMessage(const Event& event);
 
     static void handleMessagesThread();
 
@@ -106,12 +57,14 @@ public:
 
     static void sendPause();
 
-    static void handleRequest(Request request);
-    static void handleRequest(SetBreakpointsRequest request);
-    static void handleRequest(ContinueRequest request);
-    static void handleRequest(StackTraceRequest request);
+    // visitors
+    void handleRequest(SetBreakpointsRequest& request) override;
+    void handleRequest(ContinueRequest& request) override;
+    void handleRequest(StackTraceRequest& request) override;
+    void handleRequest(UnknownRequest& request) override;
 };
 
 
+}  // namespace debugger
 }  // namespace mozjs
 }  // namespace mongo

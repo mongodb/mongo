@@ -45,6 +45,9 @@
 
 namespace mongo {
 namespace mozjs {
+namespace debugger {
+
+using namespace protocol;
 
 // Execution state
 static AtomicWord<bool> _paused{false};
@@ -696,5 +699,6 @@ BSONObj initDebuggerGlobal(const BSONObj& args, void* data) {
 }
 
 
+}  // namespace debugger
 }  // namespace mozjs
 }  // namespace mongo

@@ -98,3 +98,13 @@ foo
 JSDEBUG@jstests/my_test.js:5> dbcont
 [js_test:my_test] Test Passed!
 ```
+
+## Architecture
+
+- `debugger.cpp` is the main shell logic to invoke/wait in response to breakpoints and the UI. It interacts with the SpiderMonkey Debugger API.
+- `adapter.cpp` is the Debug Adapter Protocol (DAP) message handler and TCP client. This connects to the VSCode extension, specifically `./vscode/session.js`.
+  - This should _not_ handle any BSON/JSON directly, and only interface with the protocol.
+- `protocol.cpp` is the relevant implementation of the [DAP specification](https://microsoft.github.io/debug-adapter-protocol//specification.html).
+  - This should stand on its own _without_ the adapter, and encapsulate all BSON/JSON manipulation.
+
+The VSCode client code is in `./vscode`, see more in its [README.md](./vscode/README.md).

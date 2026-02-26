@@ -48,6 +48,7 @@
 
 namespace mongo {
 namespace mozjs {
+namespace debugger {
 
 constexpr int INVALID_SOCKET_VALUE = -1;
 
@@ -62,117 +63,28 @@ stdx::condition_variable _configCV;
 
 
 /**
- * Request
- */
-
-Request Request::fromJSON(std::string line) {
-    BSONObj obj = fromjson(line);
-
-    Request msg;
-    msg.seq = obj.getIntField("seq");
-    msg.command = std::string(toStdStringViewForInterop(obj.getStringField("command")));
-    msg.arguments = obj.getObjectField("arguments").getOwned();
-
-    return msg;
-}
-
-/**
- * SetBreakpointsRequest
- */
-
-SetBreakpointsRequest::SetBreakpointsRequest(Request request) {
-    seq = request.seq;
-
-    // Get source from arguments
-    source = std::string(toStdStringViewForInterop(request.arguments.getStringField("source")));
-
-    // Get lines array from arguments and extract line numbers
-    std::vector<BSONElement> linesArr = request.arguments.getField("lines").Array();
-    for (const auto& lineElem : linesArr) {
-        BSONObj lineObj = lineElem.Obj();
-        int lineNum = lineObj.getIntField("line");
-        lines.push_back(lineNum);
-    }
-}
-
-void SetBreakpointsRequest::respond() {
-    // STUB response for now, simply match the "seq" for DAP to sync
-    DebugAdapter::sendMessage("{\"type\":\"response\",\"seq\":" + std::to_string(seq) +
-                              ",\"body\":{\"breakpoints\":[{\"id\":\"1\","
-                              "\"verified\":true,\"line\":\"12\","
-                              "\"column\":\"0\"}]}}");
-}
-
-/**
- * ContinueRequest
- */
-
-ContinueRequest::ContinueRequest(Request request) {
-    seq = request.seq;
-}
-
-void ContinueRequest::respond() {
-    DebugAdapter::sendMessage("{\"type\":\"response\",\"seq\":" + std::to_string(seq) +
-                              ",\"command\":\"continue\",\"success\":true}");
-}
-
-/**
- * StackTraceRequest
- */
-
-StackTraceRequest::StackTraceRequest(Request request) {
-    seq = request.seq;
-}
-
-void StackTraceRequest::respond() {
-    DebugAdapter::sendMessage(
-        "{\"type\":\"response\",\"seq\":" + std::to_string(seq) +
-        ",\"body\":{\"stackFrames\":[{\"id\":1,\"name\":\"" + DebuggerGlobal::getPausedScript() +
-        "\",\"source\":{\"path\":\"" + DebuggerGlobal::getPausedScript() +
-        "\"},\"line\":" + std::to_string(DebuggerGlobal::getPausedLine()) + ",\"column\":0}]}}");
-}
-
-/**
- * StoppedEvent
- */
-
-void StoppedEvent::send() {
-    // Send a "stopped" event to the DAP adapter
-    DebugAdapter::sendMessage(
-        "{\"type\":\"event\",\"event\":\"stopped\","
-        "\"body\":{\"reason\":\"breakpoint\"}}");
-}
-
-/**
  * DebugAdapter
  */
 
-void DebugAdapter::handleRequest(Request request) {
-    if (request.command == "setBreakpoints") {
-        SetBreakpointsRequest req(request);
-        DebugAdapter::handleRequest(req);
-    } else if (request.command == "continue") {
-        ContinueRequest req(request);
-        DebugAdapter::handleRequest(req);
-    } else if (request.command == "stackTrace") {
-        StackTraceRequest req(request);
-        DebugAdapter::handleRequest(req);
-    }
-    // TODO: Add other commands: scopes, variables, next, stepIn, stepOut
-}
-
-void DebugAdapter::handleRequest(SetBreakpointsRequest request) {
+void DebugAdapter::handleRequest(SetBreakpointsRequest& request) {
     DebuggerGlobal::setBreakpoints(request);
-    request.respond();
+    sendMessage(request.response());
 }
 
-void DebugAdapter::handleRequest(ContinueRequest request) {
+void DebugAdapter::handleRequest(ContinueRequest& request) {
     DebuggerGlobal::unpause();
-    request.respond();
+    sendMessage(request.response());
 }
 
-void DebugAdapter::handleRequest(StackTraceRequest request) {
-    request.respond();
+void DebugAdapter::handleRequest(StackTraceRequest& request) {
+    auto script = DebuggerGlobal::getPausedScript();
+    auto line = DebuggerGlobal::getPausedLine();
+    auto response = request.response(script, line);
+    sendMessage(response);
+}
+
+void DebugAdapter::handleRequest(UnknownRequest& request) {
+    std::cerr << "Unknown request for command '" << request.command << "'" << std::endl;
 }
 
 void DebugAdapter::waitForHandshake() {
@@ -187,7 +99,7 @@ void DebugAdapter::waitForHandshake() {
 
 void DebugAdapter::sendPause() {
     StoppedEvent e;
-    e.send();
+    sendMessage(e);
 }
 
 void DebugAdapter::sendMessage(std::string json) {
@@ -196,9 +108,17 @@ void DebugAdapter::sendMessage(std::string json) {
     send(_clientSocket, json.c_str(), json.length(), 0);
 }
 
+void DebugAdapter::sendMessage(const Response& response) {
+    sendMessage(response.getJson());
+}
+void DebugAdapter::sendMessage(const Event& event) {
+    sendMessage(event.getJson());
+}
+
 void DebugAdapter::handleMessagesThread() {
     char buffer[4096];
     std::string msgBuffer;
+    DebugAdapter adapter;
 
     while (_running.load() && _clientSocket >= 0) {
         auto n = recv(_clientSocket, buffer, sizeof(buffer), 0);
@@ -216,14 +136,13 @@ void DebugAdapter::handleMessagesThread() {
 
             if (!line.empty()) {
                 // Parse and handle message
-                Request req;
                 try {
-                    req = Request::fromJSON(line);
+                    auto req = Request::fromJSON(line);
+                    req->handleRequest(adapter);  // double-dispatch
                 } catch (const std::exception& e) {
                     std::cout << "[ERROR] Failed to parse JSON: " << e.what() << "\nLine: " << line
                               << std::endl;
                 }
-                handleRequest(req);
             }
         }
     }
@@ -279,5 +198,6 @@ void DebugAdapter::disconnect() {
     _clientSocket = INVALID_SOCKET_VALUE;
 }
 
+}  // namespace debugger
 }  // namespace mozjs
 }  // namespace mongo
