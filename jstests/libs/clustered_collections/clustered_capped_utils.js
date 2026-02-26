@@ -345,13 +345,30 @@ export var ClusteredCappedUtils = class {
                 // The batch got split in two separate executions.
                 const pendingId =
                     ops[0].o.applyOps[0].o._id.getTime() === tenDaysAgo.getTime() ? earlierTenDaysAgo : tenDaysAgo;
-                assert.eq(1, db.getSiblingDB("local").oplog.rs.find({op: "d", ns: ns, "o._id": pendingId}).itcount());
+                assert.eq(
+                    1,
+                    db
+                        .getSiblingDB("local")
+                        .oplog.rs.find({op: "d", ns: ns, "o._id": pendingId})
+                        .sort({$natural: -1})
+                        .itcount(),
+                );
             }
         } else {
-            assert.eq(1, db.getSiblingDB("local").oplog.rs.find({op: "d", ns: ns, "o._id": tenDaysAgo}).itcount());
             assert.eq(
                 1,
-                db.getSiblingDB("local").oplog.rs.find({op: "d", ns: ns, "o._id": earlierTenDaysAgo}).itcount(),
+                db
+                    .getSiblingDB("local")
+                    .oplog.rs.find({op: "d", ns: ns, "o._id": tenDaysAgo})
+                    .sort({$natural: -1})
+                    .itcount(),
+            );
+            assert.eq(
+                1,
+                db
+                    .getSiblingDB("local")
+                    .oplog.rs.find({op: "d", ns: ns, "o._id": earlierTenDaysAgo}.sort({$natural: -1}))
+                    .itcount(),
             );
         }
 
