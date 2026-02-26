@@ -6,7 +6,10 @@
  * This test also verifies that the $disallowViews extension stage correctly uasserts when
  * used in a view context.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionStubParsers,
+ * ]
  */
 import {before, describe, it} from "jstests/libs/mochalite.js";
 

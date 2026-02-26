@@ -8,7 +8,10 @@
  * In sharded environments, extension stages may run on mongos or on shards depending on
  * pipeline position. The test aggregates metrics from all nodes to verify correct tracking.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionStubParsers,
+ * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

@@ -2,7 +2,7 @@
  * Tests that $testFoo and $testBar (no-op extension stages) work E2E after mongod is started with
  * libfoo_mongo_extension.so and libbar_mongo_extension.so successfully loaded.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionStubParsers]
  */
 
 import {assertArrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";

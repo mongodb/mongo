@@ -9,6 +9,7 @@
  *
  * @tags: [
  *   featureFlagExtensionsAPI,
+ *   featureFlagExtensionStubParsers,
  *   requires_replication,
  *   requires_sharding,
  *   uses_transactions,

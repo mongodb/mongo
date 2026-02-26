@@ -3,6 +3,8 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionStubParsers,
+ *  assumes_unsharded_collection,
  * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";

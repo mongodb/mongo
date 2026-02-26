@@ -7,7 +7,8 @@
  *    majority)
  *
  * @tags: [
- *   featureFlagExtensionsAPI,
+ *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionStubParsers,
  * ]
  */
 

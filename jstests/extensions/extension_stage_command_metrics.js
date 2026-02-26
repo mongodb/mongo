@@ -22,7 +22,10 @@
  * - serverStatus.metrics.commands.aggregate.extensions.succeeded
  * - serverStatus.metrics.commands.aggregate.extensions.failed
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *  featureFlagExtensionsAPI,
+ *  featureFlagExtensionStubParsers,
+ * ]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

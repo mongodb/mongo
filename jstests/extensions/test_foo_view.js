@@ -1,7 +1,7 @@
 /**
  * This test checks that $testFoo works in a view definition, on a view, and both in and on a view.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionStubParsers]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
