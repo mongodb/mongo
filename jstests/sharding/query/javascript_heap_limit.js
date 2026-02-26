@@ -17,6 +17,8 @@ assert.commandWorked(mongosColl.insert([{x: 0}, {x: 2}]));
 const tooSmallHeapSizeMB = 10;
 const sufficentHeapSizeMB = 100;
 
+const expectedOOMErrorCodes = [ErrorCodes.JSInterpreterFailure, ErrorCodes.ExceededMemoryLimit];
+
 function setHeapSizeLimitMBOneNode({db, queryLimit, globalLimit}) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryJavaScriptHeapSizeLimitMB: queryLimit}));
@@ -129,22 +131,16 @@ function runCommonTests(db) {
     // The aggregate command is expected to fail when the aggregation specific heap size limit is
     // too low.
     setHeapSizeLimitMB({db: db, queryLimit: tooSmallHeapSizeMB, globalLimit: sufficentHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction), expectedOOMErrorCodes);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce), expectedOOMErrorCodes);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator), expectedOOMErrorCodes);
 
     // All commands are expected to fail when the global heap size limit is too low, regardless
     // of the aggregation limit.
     setHeapSizeLimitMB({db: db, queryLimit: sufficentHeapSizeMB, globalLimit: tooSmallHeapSizeMB});
-    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce),
-                                 ErrorCodes.JSInterpreterFailure);
-    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator),
-                                 ErrorCodes.JSInterpreterFailure);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithJSFunction), expectedOOMErrorCodes);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithInternalJsReduce), expectedOOMErrorCodes);
+    assert.commandFailedWithCode(db.runCommand(aggregateWithUserDefinedAccumulator), expectedOOMErrorCodes);
 
     // Enabling legacy memory tracking doesn't count large buffers, so queries should pass that
     // otherwise fail
