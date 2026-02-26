@@ -471,6 +471,79 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
     }
 }
 
+void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
+    auto elapsed = elapsedTimeExcludingPauses();
+    // We don't strictly need to record executionTime unless keyHash is non-none, but there's
+    // no harm in recording it since we've already computed the value.
+    metrics.executionTime = elapsed;
+    auto workingMillis =
+        duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart));
+    metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
+        std::max(Milliseconds(0), workingMillis);
+
+    calculateCpuTime();
+    metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
+
+    if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
+        !opCtx()->inMultiDocumentTransaction() && !parent()) {
+        if (admCtx.getDelinquentAcquisitions() > 0) {
+
+            // Note that we don't record delinquency stats around ticketing when in a
+            // multi-document transaction, since operations within multi-document
+            // transactions hold tickets for a long time by design and reporting them as
+            // delinquent will just create noise in the data.
+
+            metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
+                static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
+            metrics.totalAcquisitionDelinquency =
+                metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
+                Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
+            metrics.maxAcquisitionDelinquency = Milliseconds{
+                std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
+                         admCtx.getMaxAcquisitionDelinquencyMillis())};
+        }
+
+        if (admCtx.getAdmissions() > 0) {
+            metrics.totalTimeQueuedMicros =
+                metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
+                admCtx.totalTimeQueuedMicros();
+            metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
+            metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
+            metrics.wasDeprioritized =
+                metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
+        }
+    }
+
+    if (!parent()) {
+        metrics.numInterruptChecks = opCtx()->numInterruptChecks();
+        if (const auto* stats = opCtx()->overdueInterruptCheckStats();
+            stats && stats->overdueInterruptChecks.loadRelaxed() > 0) {
+            metrics.overdueInterruptApproxMax =
+                std::max(metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)),
+                         stats->overdueMaxTime.loadRelaxed());
+        }
+    }
+
+    try {
+        // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
+        // but the lock acquisition could still be interrupted, which we catch and log.
+        // We need to be careful of the priority, it has to match that of this operation.
+        // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
+        // be lower than the operation's current priority, which would cause an exception to be
+        // thrown.
+        _fetchStorageStatsIfNecessary(Date_t::max(), true);
+    } catch (DBException& ex) {
+        LOGV2(8457400,
+              "Failed to gather storage statistics for query stats",
+              "opId"_attr = opCtx()->getOpID(),
+              "error"_attr = redact(ex));
+    }
+
+    if (_debug.storageStats) {
+        metrics.aggregateStorageStats(*_debug.storageStats);
+    }
+}
+
 void CurOp::setEndOfOpMetrics(long long nreturned) {
     _debug.getAdditiveMetrics().nreturned = nreturned;
     // A non-none queryStatsInfo.keyHash indicates the current query is being tracked locally for
@@ -484,91 +557,15 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     // completeAndLogOperation.
     const auto& info = _debug.getQueryStatsInfo();
     if (info.keyHash || info.metricsRequested) {
-        auto& metrics = _debug.getAdditiveMetrics();
-        auto elapsed = elapsedTimeExcludingPauses();
-        // We don't strictly need to record executionTime unless keyHash is non-none, but there's
-        // no harm in recording it since we've already computed the value.
-        metrics.executionTime = elapsed;
-        auto workingMillis =
-            duration_cast<Milliseconds>(elapsed - (_sumBlockedTimeTotal() - _blockedTimeAtStart));
-        metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
-            std::max(Milliseconds(0), workingMillis);
-
-        calculateCpuTime();
-        metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
-
-        if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
-            !opCtx()->inMultiDocumentTransaction() && !parent()) {
-            if (admCtx.getDelinquentAcquisitions() > 0) {
-
-                // Note that we don't record delinquency stats around ticketing when in a
-                // multi-document transaction, since operations within multi-document
-                // transactions hold tickets for a long time by design and reporting them as
-                // delinquent will just create noise in the data.
-
-                metrics.delinquentAcquisitions = metrics.delinquentAcquisitions.value_or(0) +
-                    static_cast<uint64_t>(admCtx.getDelinquentAcquisitions());
-                metrics.totalAcquisitionDelinquency =
-                    metrics.totalAcquisitionDelinquency.value_or(Milliseconds(0)) +
-                    Milliseconds(admCtx.getTotalAcquisitionDelinquencyMillis());
-                metrics.maxAcquisitionDelinquency = Milliseconds{
-                    std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
-                             admCtx.getMaxAcquisitionDelinquencyMillis())};
-            }
-
-            if (admCtx.getAdmissions() > 0) {
-                metrics.totalTimeQueuedMicros =
-                    metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
-                    admCtx.totalTimeQueuedMicros();
-                metrics.totalAdmissions =
-                    metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
-                metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
-                metrics.wasDeprioritized =
-                    metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
-            }
-        }
-
-        if (!parent()) {
-            metrics.numInterruptChecks = opCtx()->numInterruptChecks();
-            if (const auto* stats = opCtx()->overdueInterruptCheckStats();
-                stats && stats->overdueInterruptChecks.loadRelaxed() > 0) {
-                metrics.overdueInterruptApproxMax =
-                    std::max(metrics.overdueInterruptApproxMax.value_or(Milliseconds(0)),
-                             stats->overdueMaxTime.loadRelaxed());
-            }
-        }
-
-        try {
-            // If we need them, try to fetch the storage stats. We use an unlimited timeout here,
-            // but the lock acquisition could still be interrupted, which we catch and log.
-            // We need to be careful of the priority, it has to match that of this operation.
-            // If we choose a fixed priority other than kExempt (e.g., kNormal), it may
-            // be lower than the operation's current priority, which would cause an exception to be
-            // thrown.
-            _fetchStorageStatsIfNecessary(Date_t::max(), true);
-        } catch (DBException& ex) {
-            LOGV2(8457400,
-                  "Failed to gather storage statistics for query stats",
-                  "opId"_attr = opCtx()->getOpID(),
-                  "error"_attr = redact(ex));
-        }
-
-        if (_debug.storageStats) {
-            metrics.aggregateStorageStats(*_debug.storageStats);
-        }
+        _setEndOfOpMetrics(_debug.getAdditiveMetrics());
     }
 }
 
 void CurOp::setEndOfOpMetricsForBatchWrites() {
     if (_debug.hasBatchWriteMetrics()) {
-        auto elapsed = elapsedTimeExcludingPauses();
         _debug.forEachQueryStatsInfoForBatchWrites(
             [&](size_t opIndex, OpDebug::QueryStatsInfo& qsi) {
-                // TODO SERVER-118829 Decide how to handle router query stats metrics for writes
-                //
-                // For now, just use the total elapsed time for all batches for any write statements
-                // we are sampling for query stats.
-                qsi.additiveMetrics.executionTime = elapsed;
+                _setEndOfOpMetrics(qsi.additiveMetrics);
             });
     }
 }

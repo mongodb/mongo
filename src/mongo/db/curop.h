@@ -832,6 +832,11 @@ private:
      */
     void _fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal);
 
+    /**
+     * A helper function that collects end of op metrics into the provided AdditiveMetrics struct.
+     */
+    void _setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics);
+
     /*
      * Checks if the current operation is eligible for long-running query logging and, if so,
      * determines whether it meets the criteria for logging as a slow in-progress query. Ensures
