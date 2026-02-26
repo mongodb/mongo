@@ -141,14 +141,14 @@ def get_resmoke_configs():
         return yaml.safe_load(f)
 
 
-def query_targets_to_burn_in(origin_rev: str) -> list[BurnInTargetInfo]:
+def query_targets_to_burn_in(origin_rev: str) -> set[BurnInTargetInfo]:
     change_detector = LocalFileChangeDetector(origin_rev)
     tests_changed = change_detector.find_changed_tests([Repo(".")])
 
     with open(SELECTOR_FILE, "r") as f:
         exclusions = yaml.safe_load(f)
 
-    targets = []
+    targets = set()
     for config_label, config_path in get_resmoke_configs().items():
         test_label = config_label.removeprefix("@@").removesuffix("_config")
         with open(config_path, "r") as f:
@@ -173,7 +173,7 @@ def query_targets_to_burn_in(origin_rev: str) -> list[BurnInTargetInfo]:
                 + test.replace("/", "_").replace("\\", "_").removeprefix("_")
             )
 
-            targets.append(
+            targets.add(
                 BurnInTargetInfo(
                     burn_in_target=burn_in_target, original_target=test_label, test=test
                 )
@@ -315,6 +315,7 @@ def generate_tasks(origin_rev: str, outfile: Annotated[str, typer.Option()]):
     shrub_project = ShrubProject.empty()
 
     results_tasks = []
+    seen_targets = set()
     for variant_name in evg_conf.variant_names:
         variant = evg_conf.get_variant(variant_name)
         if not (variant.is_required_variant() or variant.is_suggested_variant()):
@@ -334,9 +335,10 @@ def generate_tasks(origin_rev: str, outfile: Annotated[str, typer.Option()]):
             if burn_in_targets_to_run:
                 burn_in_task = make_task(burn_in_targets_to_run, variant_name)
 
-                results_tasks.extend(
-                    [make_results_task(target) for target in burn_in_targets_to_run]
-                )
+                for target in burn_in_targets_to_run:
+                    if target not in seen_targets:
+                        seen_targets.add(target)
+                        results_tasks.append(make_results_task(target))
 
                 build_variant = BuildVariant(name=variant_name)
                 build_variant.add_task_group(burn_in_task)
