@@ -3,8 +3,7 @@
  * a limit, only if the secondary has not yet voted for commit.
  *
  * @tags: [
- *   # This test uses a failpoint that is only available for hybrid index builds.
- *   primary_driven_index_builds_incompatible,
+ *   requires_commit_quorum,
  *   requires_fcv_71,
  *   requires_replication,
  * ]

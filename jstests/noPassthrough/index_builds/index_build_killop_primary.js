@@ -1,8 +1,6 @@
 /**
  * Confirms that background index builds on a primary can be aborted using killop.
  * @tags: [
- *   # This test uses a failpoint that is only available for hybrid index builds.
- *   primary_driven_index_builds_incompatible,
  *   requires_replication,
  * ]
  */

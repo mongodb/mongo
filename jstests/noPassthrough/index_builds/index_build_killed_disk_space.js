@@ -3,8 +3,6 @@
  * limit,only if the primary has not yet voted for commit.
  *
  * @tags: [
- *   # This test uses a failpoint that is only available for hybrid index builds.
- *   primary_driven_index_builds_incompatible,
  *   requires_fcv_71,
  *   requires_replication,
  * ]
@@ -46,8 +44,8 @@ function killBeforeVoteCommitSucceeds(rst) {
     });
 
     jsTestLog("Waiting for the index build to be killed");
-    // "Index build: joined after abort".
-    checkLog.containsJson(primary, 20655);
+    // "Index build: joined after forceful abort".
+    checkLog.containsJson(primary, 7419401);
 
     jsTestLog("Waiting for threads to join");
     createIdx();

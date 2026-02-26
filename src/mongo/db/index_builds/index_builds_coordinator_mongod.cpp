@@ -847,6 +847,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
               "buildUUID"_attr = replState->buildUUID,
               logAttrs(replState->dbName),
               "collectionUUID"_attr = replState->collectionUUID);
+        replState->setVotedForCommitReadiness(opCtx);
         hangIndexBuildAfterSignalPrimaryForCommitReadiness.pauseWhileSet();
         return;
     }
