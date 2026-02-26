@@ -126,3 +126,80 @@ buildvariants:
   #         - amazon2023-arm64-latest-m8g-8xlarge
   #     - name: .streams_release_test
   #     - name: generate_buildid_to_debug_symbols_mapping
+
+  # Temporary rhel8-based TSAN and AUBSAN streams variants while amazon2023 issues
+  # (SERVER-120489) are being investigated/fixed.
+  - name: enterprise-rhel8-streams-tsan
+    display_name: "TSAN RHEL 8 enterprise streams"
+    activate: false
+    modules: ["asp-js-engine"]
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=tsan_incompatible
+        --additionalFeatureFlags=featureFlagStreams
+      lang_environment: LANG=C
+      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: >-
+        --config=dbg_tsan
+        --opt=on
+        --fission=no
+        --streams_release_build=True
+        --jobs=800
+      resmoke_jobs_factor: 0.3
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      compile_variant: enterprise-rhel8-streams-tsan
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: streams_gen
+      - name: streams_https
+      - name: generate_buildid_to_debug_symbols_mapping
+
+  - name: enterprise-rhel8-streams-aubsan
+    display_name: "{A,UB}SAN RHEL 8 enterprise streams"
+    activate: false
+    modules: ["asp-js-engine"]
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_aubsan
+        --additionalFeatureFlags=featureFlagStreams
+      lang_environment: LANG=C
+      san_options: >-
+        UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+        LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+        ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v5/bin/llvm-symbolizer"
+      bazel_compile_flags: >-
+        --config=dbg_aubsan
+        --opt=on
+        --fission=no
+        --streams_release_build=True
+      resmoke_jobs_factor: 0.3
+      hang_analyzer_dump_core: false
+      multiversion_platform: rhel8
+      multiversion_edition: enterprise
+      compile_variant: enterprise-rhel8-streams-aubsan
+      large_distro_name: rhel8.8-xlarge
+      xlarge_distro_name: rhel8.8-xxlarge
+    tasks:
+      - name: compile_and_archive_dist_test_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: run_unit_tests_TG
+        distros:
+          - rhel8.8-xlarge
+      - name: streams_gen
+      - name: streams_https
+      - name: generate_buildid_to_debug_symbols_mapping
