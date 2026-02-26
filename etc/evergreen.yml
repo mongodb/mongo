@@ -122,6 +122,11 @@ commit_queue_aliases:
     task: ".*"
     variant_tags: []
     task_tags: []
+  # Monguard
+  - variant: "^(amazon-linux2023-arm|Lint)$"
+    task: "^(.*)$"
+    variant_tags: []
+    task_tags: []
 
 github_pr_aliases:
   - variant: "^(commit-queue)$"
@@ -138,6 +143,7 @@ github_pr_aliases:
     task: ".*"
     variant_tags: []
     task_tags: []
+  # Monguard
   - variant: "^(amazon-linux2023-arm|Lint)$"
     task: "^(.*)$"
     variant_tags: []
