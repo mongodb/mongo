@@ -563,6 +563,7 @@ tasks:
             --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test
             --//bazel/resmoke:test_timeout=960
             --test_timeout=1500
+            --config=evg
           # Timeouts are 16 minutes (960s) for individual tests, the same as the default idle timeout.
           # Each bazel test's timeout is 25 minutes.
           # The bazel test command is given a timeout of 30 minutes total, including build time.
@@ -573,7 +574,7 @@ tasks:
             --verbose_failures
             --simple_build_id=True
             --define=MONGO_VERSION=${version}
-            --config=evg
+            --linkstatic=True
             --features=strip_debug
             --separate_debug=False
             --remote_download_outputs=minimal
