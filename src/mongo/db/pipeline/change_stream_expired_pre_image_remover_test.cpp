@@ -37,7 +37,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mock_periodic_runner.h"
 
@@ -103,19 +102,14 @@ TEST_F(ChangeStreamExpiredPreImageRemoverTest, ReplicatedTruncatesNotPopulatedIn
     ASSERT_FALSE(_preImagesRemover->useReplicatedTruncates_forTest().has_value());
 }
 
-using ChangeStreamExpiredPreImageRemoverDeathTest = ChangeStreamExpiredPreImageRemoverTest;
-
-DEATH_TEST_REGEX_F(ChangeStreamExpiredPreImageRemoverDeathTest,
-                   FCVSnapshotNotInitialized,
-                   "Tripwire assertion.*11410300") {
+TEST_F(ChangeStreamExpiredPreImageRemoverTest, FCVSnapshotNotInitialized) {
     setPersistenceProviderWithFlag(false);
 
     // Deliberately un-initialize FCV snapshot.
     serverGlobalParams.mutableFCV.reset();
 
-    ASSERT_THROWS_CODE(_preImagesRemover->onStepUpComplete(_opCtx.get(), 1 /* term */),
-                       AssertionException,
-                       11410300);
+    _preImagesRemover->onStepUpComplete(_opCtx.get(), 1 /* term */);
+    ASSERT_FALSE(_preImagesRemover->useReplicatedTruncates_forTest().value());
 }
 
 TEST_F(ChangeStreamExpiredPreImageRemoverTest,
