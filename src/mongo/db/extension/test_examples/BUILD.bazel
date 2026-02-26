@@ -67,6 +67,44 @@ extensions_with_config(
     ],
 )
 
+# Extension .so's used by load_extension_test.cpp. Built with extensions_transition so they
+# are linked statically like jstest extensions.
+extensions_with_config(
+    name = "load_extension_test_extensions",
+    srcs = [
+        ":bar_mongo_extension_signed_lib",
+        ":duplicate_stage_descriptor_bad_extension_signed_lib",
+        ":duplicate_version_bad_extension_signed_lib",
+        ":explain_mongo_extension_signed_lib",
+        ":extension_errors_mongo_extension_signed_lib",
+        ":foo_mongo_extension_signed_lib",
+        ":host_version_fails_bad_extension_signed_lib",
+        ":host_version_succeeds_mongo_extension_signed_lib",
+        ":initialize_version_fails_bad_extension_signed_lib",
+        ":limit_mongo_extension_signed_lib",
+        ":load_highest_compatible_version_mongo_extension_signed_lib",
+        ":load_two_stages_mongo_extension_signed_lib",
+        ":major_version_max_int_bad_extension_signed_lib",
+        ":major_version_too_high_bad_extension_signed_lib",
+        ":major_version_too_low_bad_extension_signed_lib",
+        ":match_topN_mongo_extension_signed_lib",
+        ":minor_version_too_high_bad_extension_signed_lib",
+        ":mongothost_extension_signed_lib",
+        ":native_vector_search_mongo_extension_signed_lib",
+        ":no_compatible_version_bad_extension_signed_lib",
+        ":no_symbol_bad_extension_signed_lib",
+        ":null_initialize_function_bad_extension_signed_lib",
+        ":null_mongo_extension_bad_extension_signed_lib",
+        ":null_stage_descriptor_bad_extension_signed_lib",
+        ":parse_options_mongo_extension_signed_lib",
+        ":read_n_documents_mongo_extension_signed_lib",
+        ":sharded_execution_serialization_mongo_extension_signed_lib",
+        ":test_options_mongo_extension_signed_lib",
+        ":toaster_mongo_extension_signed_lib",
+        ":vector_search_optimization_mongo_extension_signed_lib",
+    ],
+)
+
 pkg_name = "//" + package_name() + "/"
 
 ############################## EXTENSIONS FOR PASSTHROUGH TESTS ##############################

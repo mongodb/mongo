@@ -81,17 +81,6 @@ const ObservabilityContext* getGlobalObservabilityContext() noexcept {
     return _getGlobalObservabilityContext().get();
 }
 
-std::unique_ptr<ObservabilityContext> releaseGlobalObservabilityContext() {
-    tassert(11569605,
-            "Attempted to releaseGlobalObservabilityContext from non-unit test context!",
-            mongo::TestingProctor::instance().isInitialized() &&
-                mongo::TestingProctor::instance().isEnabled());
-    auto& currObsCtx = _getGlobalObservabilityContext();
-    std::unique_ptr<ObservabilityContext> tmp{nullptr};
-    currObsCtx.swap(tmp);
-    return tmp;
-}
-
 void setGlobalObservabilityContext(std::unique_ptr<ObservabilityContext> obsCtx) {
     auto& currObsCtx = _getGlobalObservabilityContext();
     tassert(11569601,

@@ -377,39 +377,6 @@ const ObservabilityContext* getGlobalObservabilityContext() noexcept;
  */
 void setGlobalObservabilityContext(std::unique_ptr<ObservabilityContext> obsCtx);
 
-/**
- *
- * Note: This function is only used to allow a workaround for unit tests. It should only be called
- * from a unit test context. Any other use is strictly forbidden and not supported.
- *
- * When extensions are built as part of a unit test, or for a unit test (i.e
- * load_extension_test.cpp), they are not yet statically linked. Ideally, we want to prevent the
- * ObservabilityContext from being set twice. However, due to the linking limitation in unit testing
- * scenarios, we need to provide a workaround for us to manually set the ObservabilityContext to
- * null temporarily when using the $assert extension stage (i.e extension_errors.cpp).
- *
- * This is because the $assert extension performs a sanity check at parse time which checks that
- * the ObservabilityContext is always null. This sanity check is valuable for us when running
- * integration tests directly on the mongod/mongos binaries, but problematic in unit test
- * scenarios.
- *
- * As a workaround, in the $assert extension, we conditionally skip the sanity check if a
- * TestingProctor is initialized and enabled as this indicates the test extension was built into
- * a unit test. This does not work for load_extension_test.cpp, because in that case, the
- * $assert extension does not see the same TestingProctor::instance as the unit test executable,
- * and incorrectly assumes it is not running in a unit test. This is due to the the visibility
- * of the symbols exported by the extension.
- *
- * For this reason, we provide this function to conditionally allow releasing the global
- * ObservabilityContext within the context of a unit test. This works in the case of
- * load_extension_test.cpp because the calls to the TestingProctor within the unit test
- * executable's libraries - with the exception of the extensions - resolve to the same symbol.
- *
- * TODO SERVER-117648: Once we statically link extensions even when they are part of unit tests,
- * remove releaseGlobalObservabilityContext() and all its references.
- */
-std::unique_ptr<ObservabilityContext> releaseGlobalObservabilityContext();
-
 enum class MetricsGuardMode : int { kHostSide = 0, kExtensionSide = 1 };
 
 template <MetricsGuardMode GuardMode>
