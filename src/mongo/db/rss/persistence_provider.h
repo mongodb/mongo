@@ -218,6 +218,13 @@ public:
      * Set minimum number of seconds of snapshot history to maintain.
      */
     virtual void setMinSnapshotHistoryWindowInSeconds(int seconds) = 0;
+
+    /**
+     * Whether the current settings provide guarantees of a journal / write ahead log even if not
+     * explicitly asked for.
+     */
+    virtual bool settingsProvideMajorityWriteJournalDurability(
+        bool writeConcernMajorityShouldJournal) const = 0;
 };
 
 }  // namespace rss

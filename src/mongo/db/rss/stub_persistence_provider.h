@@ -196,6 +196,12 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider method not implemented");
     }
+
+    bool settingsProvideMajorityWriteJournalDurability(
+        bool writeConcernMajorityShouldJournal) const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider method not implemented");
+    }
 };
 
 }  // namespace mongo::rss

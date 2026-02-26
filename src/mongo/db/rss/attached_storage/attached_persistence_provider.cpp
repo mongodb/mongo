@@ -194,4 +194,9 @@ void AttachedPersistenceProvider::setMinSnapshotHistoryWindowInSeconds(int secon
     minSnapshotHistoryWindowInSeconds.store(seconds);
 }
 
+bool AttachedPersistenceProvider::settingsProvideMajorityWriteJournalDurability(
+    bool writeConcernMajorityShouldJournal) const {
+    return writeConcernMajorityShouldJournal;
+}
+
 }  // namespace mongo::rss

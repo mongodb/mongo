@@ -1185,10 +1185,12 @@ void TransactionParticipant::Participant::beginOrContinue(
         // Disallow multi-statement transactions on shard servers that have
         // writeConcernMajorityJournalDefault=false unless enableTestCommands=true. But allow
         // retryable writes (autocommit == boost::none).
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Transactions are not allowed on shard servers when "
                 "writeConcernMajorityJournalDefault=false",
-                replCoord->getWriteConcernMajorityShouldJournal() ||
+                provider.settingsProvideMajorityWriteJournalDurability(
+                    replCoord->getWriteConcernMajorityShouldJournal()) ||
                     !serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) || !autocommit ||
                     getTestCommandsEnabled());
     }
