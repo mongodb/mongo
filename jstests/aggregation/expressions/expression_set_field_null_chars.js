@@ -37,23 +37,9 @@ function assertSetFieldFailsWithCode({field, codes}) {
             codes,
             errorMsg,
         );
-        assert.commandFailedWithCode(
-            db.runCommand({
-                aggregate: coll.getName(),
-                pipeline: [
-                    {
-                        $merge: {
-                            into: coll.getName(),
-                            whenMatched: [{$replaceWith: setFieldExpression}],
-                            whenNotMatched: "discard",
-                        },
-                    },
-                ],
-                cursor: {},
-            }),
-            codes,
-            errorMsg,
-        );
+        // TODO SERVER-96515: Move the $merge assertion back here from
+        // jstests/noPassthrough/query/queryStats/merge_pipeline_validation.js once
+        // query stats no longer interferes with $merge pipeline validation.
         assert.commandFailedWithCode(
             db.runCommand({
                 update: coll.getName(),
