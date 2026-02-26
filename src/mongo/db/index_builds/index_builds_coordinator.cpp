@@ -57,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_recovery.h"
@@ -298,7 +299,16 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
 
     // In magic restore we finish in-progress index builds unlike in standalone recovery, so we
     // should not halt execution for magic restore.
-    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+    // However, when running magic restore in Disagg, magic restore is to strictly follow
+    // the oplog it's receiving, and so should not independently remove the entry from
+    // the config.system.indexBuilds unless it sees explicit oplog (a delete) for it. For that
+    // reason magic restore returns early if running with primary driven index builds here,
+    // because in primary driven index builds + Disagg magic restore everything is explicit.
+    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone() ||
+        (storageGlobalParams.magicRestore &&
+         !rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+              .getPersistenceProvider()
+              .supportsClassicMagicRestore())) {
         // Writes to the 'config.system.indexBuilds' collection are replicated and the index entry
         // will be removed when the delete oplog entry is replayed at a later time.
         return;
@@ -353,8 +363,15 @@ void onCommitIndexBuild(OperationContext* opCtx,
 
     // Since two phase index builds are allowed to survive replication state transitions, we should
     // check if the node is currently a primary before attempting to write to the oplog.
+    // If we're running Disagg PIT Restore, we don't want to run 'onCommitIndexBuild()' below
+    // because that creates an oplog entry for the commit. We already have an oplog entry that was
+    // written so we want to exit early, as a standby would.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
+    if (!replCoord->canAcceptWritesFor(opCtx, nss) ||
+        (storageGlobalParams.magicRestore &&
+         !rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+              .getPersistenceProvider()
+              .supportsClassicMagicRestore())) {
         invariant(!shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp().isNull(),
                   str::stream() << "commitIndexBuild: " << buildUUID);
         return;
@@ -2621,7 +2638,8 @@ StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiv
             LOGV2_DEBUG(7866200,
                         (*logSeveritySuppressor)().toInt(),
                         "Index build: collection lock acquisition timeout, retrying",
-                        "retries"_attr = retryCount);
+                        "retries"_attr = retryCount,
+                        "status"_attr = ex.toStatus());
         }
     }
 }
@@ -3470,7 +3488,11 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
         isPrimary = true;
     }
 
-    if (isPrimary) {
+    // When in Disagg magic restore, although technically the node is in the primary state, it is
+    // processing oplog entries that it has fetched, as a standby would. For that reason when we're
+    // in Disagg magic restore we take the codepath that a standby would take as we want
+    // standby-like behavior.
+    if (isPrimary && !storageGlobalParams.magicRestore) {
         // The collection scan might read with a kMajorityCommitted read source, but will restore
         // kNoTimestamp afterwards.
         _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);

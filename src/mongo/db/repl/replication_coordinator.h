@@ -1072,7 +1072,7 @@ public:
     /**
      * Returns true if logOp() should not append an entry to the oplog for this operation.
      */
-    bool isOplogDisabledFor(OperationContext* opCtx, const NamespaceString& nss) const;
+    virtual bool isOplogDisabledFor(OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
      * Returns true if logOp() should never append an entry to the oplog for this namespace. logOp()

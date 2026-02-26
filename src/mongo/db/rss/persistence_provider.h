@@ -205,6 +205,11 @@ public:
     virtual bool supportsCompaction() const = 0;
 
     /**
+     * If true, the provider supports using magic restore in classic mode.
+     */
+    virtual bool supportsClassicMagicRestore() const = 0;
+
+    /**
      * If true, this persistence provider expects collection/index table creation to be timestamped.
      */
     virtual bool shouldTimestampTableCreations() const = 0;

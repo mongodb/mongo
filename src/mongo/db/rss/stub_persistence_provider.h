@@ -182,6 +182,11 @@ public:
                   "StubPersistenceProvider method not implemented");
     }
 
+    bool supportsClassicMagicRestore() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider method not implemented");
+    }
+
     bool shouldTimestampTableCreations() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider method not implemented");

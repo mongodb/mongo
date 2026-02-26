@@ -182,6 +182,10 @@ bool AttachedPersistenceProvider::supportsCompaction() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsClassicMagicRestore() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::shouldTimestampTableCreations() const {
     return false;
 }

@@ -171,6 +171,11 @@ public:
     bool supportsCompaction() const override;
 
     /**
+     * We support using magic restore in classic mode.
+     */
+    bool supportsClassicMagicRestore() const override;
+
+    /**
      * Table creation won't be timestamped.
      */
     bool shouldTimestampTableCreations() const override;
