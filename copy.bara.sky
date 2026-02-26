@@ -26,6 +26,7 @@ def make_workflow(workflow_name, destination_url, source_ref, destination_ref):
             "buildscripts/modules/**",
             ".github/workflows/**",
             "src/third_party/private/**",
+            "sbom.private.json",
             ".augment/**",
             ".cursor/**",
             "AGENTS.md",
