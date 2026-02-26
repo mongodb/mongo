@@ -52,11 +52,9 @@ render_template(
     name = "feature_flag_test_tpl",
     srcs = [
         "feature_flag_test.idl.tpl",
-        "//buildscripts:cheetah_source_generator.py",
         "//src/mongo/util/version:releases.yml",
     ],
     cmd = [
-        "$(location //buildscripts:cheetah_source_generator.py)",
         "-o",
         "$(location feature_flag_test.idl)",
         "$(location feature_flag_test.idl.tpl)",
@@ -64,6 +62,7 @@ render_template(
         "$(MONGO_VERSION)",
     ],
     output = "feature_flag_test.idl",
+    python_file = "//buildscripts:cheetah_source_generator.py",
     python_libs = [
         dependency(
             "ct3",

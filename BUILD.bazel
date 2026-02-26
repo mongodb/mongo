@@ -100,29 +100,27 @@ render_template(
     name = "clang_tidy_config",
     srcs = [
         ".clang-tidy.in",
-        "//buildscripts:clang_tidy_config_gen.py",
     ],
     cmd = [
-        "$(location //buildscripts:clang_tidy_config_gen.py)",
         "--input=$(location .clang-tidy.in)",
         "--output=$(location .clang-tidy)",
     ],
     output = ".clang-tidy",
+    python_file = "//buildscripts:clang_tidy_config_gen.py",
 )
 
 render_template(
     name = "clang_tidy_config_strict",
     srcs = [
         ".clang-tidy.in",
-        "//buildscripts:clang_tidy_config_gen.py",
     ],
     cmd = [
-        "$(location //buildscripts:clang_tidy_config_gen.py)",
         "--input=$(location .clang-tidy.in)",
         "--output=$(location .clang-tidy.strict)",
         "--warnings-as-errors",
     ],
     output = ".clang-tidy.strict",
+    python_file = "//buildscripts:clang_tidy_config_gen.py",
 )
 
 genrule(

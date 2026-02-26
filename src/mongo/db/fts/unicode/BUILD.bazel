@@ -13,46 +13,43 @@ exports_files(
 render_template(
     name = "codepoints_casefold_gen",
     srcs = [
-        "gen_casefold_map.py",
-        "gen_helper.py",
         "//src/third_party/unicode-8.0.0:CaseFolding.txt",
     ],
     cmd = [
-        "$(location gen_casefold_map.py)",
         "$(location //src/third_party/unicode-8.0.0:CaseFolding.txt)",
         "$(location codepoints_casefold.cpp)",
     ],
     output = "codepoints_casefold.cpp",
+    python_file = "gen_casefold_map.py",
+    python_libs = [":gen_helper"],
 )
 
 render_template(
     name = "codepoints_delimiter_list_gen",
     srcs = [
-        "gen_delimiter_list.py",
-        "gen_helper.py",
         "//src/third_party/unicode-8.0.0:PropList.txt",
     ],
     cmd = [
-        "$(location gen_delimiter_list.py)",
         "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
         "$(location codepoints_delimiter_list.cpp)",
     ],
     output = "codepoints_delimiter_list.cpp",
+    python_file = "gen_delimiter_list.py",
+    python_libs = [":gen_helper"],
 )
 
 render_template(
     name = "codepoints_diacritic_list_gen",
     srcs = [
-        "gen_diacritic_list.py",
-        "gen_helper.py",
         "//src/third_party/unicode-8.0.0:PropList.txt",
     ],
     cmd = [
-        "$(location gen_diacritic_list.py)",
         "$(location //src/third_party/unicode-8.0.0:PropList.txt)",
         "$(location codepoints_diacritic_list.cpp)",
     ],
     output = "codepoints_diacritic_list.cpp",
+    python_file = "gen_diacritic_list.py",
+    python_libs = [":gen_helper"],
 )
 
 mongo_cc_library(
@@ -81,6 +78,11 @@ mongo_cc_unit_test(
     deps = [
         ":unicode",
     ],
+)
+
+py_library(
+    name = "gen_helper",
+    srcs = ["gen_helper.py"],
 )
 
 py_binary(

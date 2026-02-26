@@ -33,14 +33,13 @@ render_template(
     name = "mongohelpers_js_cpp",
     srcs = [
         "mongohelpers.js",
-        "//buildscripts:jstoh.py",
     ],
     cmd = [
-        "$(location //buildscripts:jstoh.py)",
         "$(location mongohelpers_js.cpp)",
         "$(location mongohelpers.js)",
     ],
     output = "mongohelpers_js.cpp",
+    python_file = "//buildscripts:jstoh.py",
 )
 
 mongo_js_library(
