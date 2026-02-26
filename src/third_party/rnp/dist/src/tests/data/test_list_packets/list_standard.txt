@@ -1,0 +1,77 @@
+:armored input
+:off 0: packet header 0x9852 (tag 6, len 82)
+Public key packet
+    version: 4
+    creation time: 1522762293 (??? ??? ?? ??:??:?? 2018)
+    public key algorithm: 19 (ECDSA)
+    public key material:
+        ecc p: 515 bits
+        ecc curve: NIST P-256
+    keyid: 0x23674f21b2441527
+:off 84: packet header 0xb408 (tag 13, len 8)
+UserID packet
+    id: ecc-p256
+:off 94: packet header 0x8894 (tag 2, len 148)
+Signature packet
+    version: 4
+    type: 19 (Positive User ID certification)
+    public key algorithm: 19 (ECDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 27, len 1
+        key flags: 0x03 ( certify sign )
+        :type 11, len 4
+        preferred symmetric algorithms: AES-256, AES-192, AES-128, TripleDES (9, 8, 7, 2)
+        :type 34, len 2
+        preferred aead algorithms: OCB, EAX (2, 1)
+        :type 21, len 5
+        preferred hash algorithms: SHA512, SHA384, SHA256, SHA224, SHA1 (10, 9, 8, 11, 2)
+        :type 22, len 3
+        preferred compression algorithms: ZLib, BZip2, ZIP (2, 3, 1)
+        :type 30, len 1
+        features: 0x03 ( mdc aead )
+        :type 23, len 1
+        key server preferences
+        no-modify: 1
+        :type 33, len 21
+        issuer fingerprint: 0xb54fdebbb673423a5d0aa54423674f21b2441527 (20 bytes)
+        :type 2, len 4
+        signature creation time: 1549119463 (??? ??? ?? ??:??:?? 2019)
+    unhashed subpackets:
+        :type 16, len 8
+        issuer key ID: 0x23674f21b2441527
+    lbits: 0xd727
+    signature material:
+        ecc r: 251 bits
+        ecc s: 256 bits
+:off 244: packet header 0xb856 (tag 14, len 86)
+Public subkey packet
+    version: 4
+    creation time: 1522762293 (??? ??? ?? ??:??:?? 2018)
+    public key algorithm: 18 (ECDH)
+    public key material:
+        ecdh p: 515 bits
+        ecdh curve: NIST P-256
+        ecdh hash algorithm: 8 (SHA256)
+        ecdh key wrap algorithm: 7
+    keyid: 0x37e285e9e9851491
+:off 332: packet header 0x8878 (tag 2, len 120)
+Signature packet
+    version: 4
+    type: 24 (Subkey Binding Signature)
+    public key algorithm: 19 (ECDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 27, len 1
+        key flags: 0x0c ( encrypt_comm encrypt_storage )
+        :type 33, len 21
+        issuer fingerprint: 0xb54fdebbb673423a5d0aa54423674f21b2441527 (20 bytes)
+        :type 2, len 4
+        signature creation time: 1549119471 (??? ??? ?? ??:??:?? 2019)
+    unhashed subpackets:
+        :type 16, len 8
+        issuer key ID: 0x23674f21b2441527
+    lbits: 0x64aa
+    signature material:
+        ecc r: 256 bits
+        ecc s: 256 bits

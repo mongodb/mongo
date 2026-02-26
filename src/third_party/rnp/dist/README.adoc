@@ -1,0 +1,66 @@
+= RNP
+
+image:https://github.com/rnpgp/rnp/workflows/macos/badge.svg["macOS Build Status", link="https://github.com/rnpgp/rnp/actions?workflow=macos"]
+image:https://github.com/rnpgp/rnp/workflows/ubuntu/badge.svg["Ubuntu Build Status", link="https://github.com/rnpgp/rnp/actions?workflow=ubuntu"]
+image:https://github.com/rnpgp/rnp/workflows/windows-native/badge.svg["Windows Native Build Status", link="https://github.com/rnpgp/rnp/actions?workflow=windows-native"]
+image:https://github.com/rnpgp/rnp/workflows/windows-msys2/badge.svg["Windows MSys2 Build Status", link="https://github.com/rnpgp/rnp/actions?workflow=windows-msys2"]
+image:https://github.com/rnpgp/rnp/workflows/nix/badge.svg["Nix Build Status", link="https://github.com/rnpgp/rnp/actions?workflow=nix"]
+image:https://img.shields.io/cirrus/github/rnpgp/rnp?label=freebsd&logo=cirrus%20ci["FreeBSD Build Status", link="https://cirrus-ci.com/github/rnpgp/rnp"]
+
+image:https://img.shields.io/coverity/scan/12616.svg["Coverity Scan Build Status", link="https://scan.coverity.com/projects/rnpgp-rnp"]
+image:https://codecov.io/gh/rnpgp/rnp/branch/main/graph/badge.svg["Code coverage", link="https://codecov.io/gh/rnpgp/rnp"]
+
+== Introduction
+
+RNP is a set of OpenPGP (RFC4880) tools that works on Linux, macOS, Windows and
+*BSD built with C++.
+
+`librnp` is the library used by RNP for all OpenPGP functions, useful
+for developers to build against, different from GPGME.
+
+
+== Supported Platforms
+
+Currently supported platforms:
+
+* Fedora
+* RHEL/CentOS
+* Ubuntu
+* NixOS / Nix
+* Gentoo
+* FreeBSD
+* MacOS
+* Windows
+* Debian
+* openSUSE Leap, openSUSE Tumbleweed
+* SLES
+
+== link:docs/installation.adoc[Installation]
+
+== link:docs/cli-usage.adoc[Using CLI tool]
+
+== link:docs/c-usage.adoc[Using the RNP C API in your projects]
+
+== link:docs/signing-keys.adoc[PGP keys used for signing source code]
+
+== Versioning
+
+RNP follows the http://semver.org/[semantic versioning] syntax.
+
+=== Checking versions
+
+The output of `rnp --version` contains the `git` hash of
+the version the binary was built from, which value is generated when
+`cmake` runs. Consequently, a release tarball generated with `make
+dist` will contain this hash version.
+
+=== Historic information
+
+The first version of rnp started at `0.8.0` to indicate its development
+completeness (or lack thereof).
+
+RNP originated as an attempt to modernize the NetPGP codebase originally
+created by Alistair Crooks of NetBSD in 2016. RNP has been heavily rewritten,
+and carries minimal if any code from the original codebase.
+
+== link:docs/code-of-conduct.adoc[Code of Conduct]

@@ -1,0 +1,10 @@
+2 keys found
+
+pub   2048/RSA 4be147bb22df1e60 2017-09-30 [SC] [EXPIRES 2069-09-28]
+      4f2e62b74e6a4cd333bc19004be147bb22df1e60
+uid           test1
+sig           4be147bb22df1e60 2019-10-11 test1
+sub   2048/RSA a49bae05c16e8bc8 2017-09-30 [E] [EXPIRES 2069-09-28]
+      10793e367ee867c32e358f2aa49bae05c16e8bc8
+sig           4be147bb22df1e60 2019-10-11 test1
+

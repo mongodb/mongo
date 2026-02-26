@@ -1,0 +1,55 @@
+BasedOnStyle:  LLVM
+# If true, clang-format will attempt to re-flow comments
+ReflowComments: false
+# The column limit.
+ColumnLimit: 100
+# Indent width for line continuations.
+ContinuationIndentWidth: 4
+# The number of columns to use for indentation.
+IndentWidth: 8
+# The number of columns used for tab stops.
+TabWidth: 8
+UseTab: ForIndentation
+
+# Options for aligning backslashes in escaped newlines.
+AlignEscapedNewlines: Left
+# Short Block Style
+AllowShortBlocksOnASingleLine:  true
+# If true, short case labels will be contracted to a single line.
+AllowShortCaseLabelsOnASingleLine: true
+# Dependent on the value, int f() { return 0; } can be put on a single line.
+AllowShortFunctionsOnASingleLine:  Empty
+# The brace breaking style to use.
+BreakBeforeBraces: Custom
+# Control of individual brace wrapping cases.
+BraceWrapping:
+  # Wrap brackets inside of a case
+  AfterCaseLabel: true
+  # Wrap class definition.
+  AfterClass: true
+  # Wrap control statements
+  AfterControlStatement: true
+  # Wrap enum definitions.
+  AfterEnum: true
+  # Wrap function definitions.
+  AfterFunction: true
+  # Wrap namespace definitions.
+  AfterNamespace: true
+  # Wrap struct definitions.
+  AfterStruct: true
+  # Wrap union definitions.
+  AfterUnion: true
+  # Wrap extern blocks.
+  AfterExternBlock: false
+  # Wrap before catch.
+  BeforeCatch: true
+  # Wrap before else.
+  BeforeElse: true
+  # Indent the wrapped braces themselves.
+  IndentBraces:  false
+  # If false, empty function body can be put on a single line.
+  SplitEmptyFunction:  false
+  # If false, empty record (e.g. class, struct or union) body can be put on a single line.
+  SplitEmptyRecord:  false
+  # If false, empty namespace body can be put on a single line.
+  SplitEmptyNamespace:  false

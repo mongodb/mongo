@@ -1,0 +1,1 @@
+Th1s is detached signed sample file for test_stream_signatures.

@@ -1,0 +1,5 @@
+/* Define to 1 if you have the <inttypes.h> header file. */
+#cmakedefine JSON_C_HAVE_INTTYPES_H @JSON_C_HAVE_INTTYPES_H@
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#cmakedefine JSON_C_HAVE_STDINT_H @JSON_C_HAVE_STDINT_H@

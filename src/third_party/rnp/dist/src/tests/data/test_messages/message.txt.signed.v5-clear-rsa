@@ -1,0 +1,20 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+This is test message to be signed, and/or encrypted, cleartext signed and detached signed.
+It will use keys from keyrings/1.
+End of message.
+-----BEGIN PGP SIGNATURE-----
+
+iQG1BQEBCAApIiEFuFakGXET1DGSe5JSSPAmYV+fOQsmvBZ26B8HLHD1OekFAmS5
+INYAABcDC/9lYOIe0QmlAewi4+vL7qmu4U5O9JRyKPIx9p/l5uiJ5KyyzcugL1EC
+gsoeYBftOVWqzelF6ndDy3ke3qqSdOdUfGdT3HeiYzV+icfIhwbPsa0ZzH/nM7Df
+V+iQ9hlMtLqpxHbx9WaIbKQ4gBzcgmQQtfqbfBz29bC84g8tfzAORdIs8nrbjb79
+UhW9uftMs8opABEuoTKpzCG7VOgwb6NATHCSsB6UtQmE4vNGVNM9m/TOp9d7EvVq
+TdZtdyRL7Ji/fH3QgSZkwFOn3uDlbZrjRyKRuWMQm63SPkFiLtGXgx570jm/JCWh
+uTXrfz9UFjwYC+Wh4LQCebajbdnfjLaBG3MF1HKTaI6ep4sL1Qy4GZv3kuqsZzd2
+FoaFwPNxAeTN4ONQ0q40vIgoBIn3Huu650jIrFXLSMCj97sDE1GE331prxHzDEMw
+JBWPx/FJ1OmP6zaAb46UZM4p5ALfcf5KAIVjJ7Fx/Hp9bDGRgZUmpD4gNtRk3NM8
+3Fk3IxgrcBI=
+=CPPf
+-----END PGP SIGNATURE-----

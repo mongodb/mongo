@@ -1,0 +1,15 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+This is test message to be signed, and/or encrypted, cleartext signed and detached signed.
+It will use keys from keyrings/1.
+End of message.
+-----BEGIN PGP SIGNATURE-----
+Version: rnp 0.9.0+git20191024.471.5201802
+
+wrkEAQEIACMWIQTpWjy/WDqoCizMU6p7xnCbFcI6SgUCXbK6xwUDAAAAAAAKCRB7xnCbFcI6SjvL
+A/9OOzkgc3JwM2X4uykxu4kvmRWuhKY4hZegu7Nt/eBQm24aNZbHt6z1ZOfMBJGzDzJjAtFdDZ5O
+9LqAvWEf1kqLT2u5v2TB5LHA2GWFNK3WxTapceeWOo+3Q2Ssky0tUBxazHBE14WOdM+MPQevTwtw
+C2Q+p06E1lE+SiIa+KP1Og==
+=AFtl
+-----END PGP SIGNATURE-----

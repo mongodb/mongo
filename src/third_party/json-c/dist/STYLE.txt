@@ -1,0 +1,31 @@
+In general:
+For minor changes to a function, copy the existing formatting.
+When changing the style, commit that separately from other changes.
+For new code and major changes to a function, switch to the official json-c style.
+
+Official json-c style:
+
+Aim for readability, not strict conformance to fixed style rules.
+Formatting is tab based; previous attempts at proper alignment with
+spaces for continuation lines have been abandoned in favor of the
+convenience of using clang-format.
+Refer to the .clang-format file for details, and run the tool before commit:
+
+    clang-format -i somefile.c foo.h
+
+For sections of code that would be significantly negatively impacted, surround
+them with magic comments to disable formatting:
+
+    /* clang-format off */
+    ...code...
+    /* clang-format on */
+
+
+Naming:
+Words within function and variable names are separated with underscores.  Avoid camel case.
+Prefer longer, more descriptive names, but not excessively so.  No single letter variable names.
+
+Other:
+Variables should be defined for the smallest scope needed.
+Functions should be defined static when possible.
+When possible, avoid exposing internals in the public API.

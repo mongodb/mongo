@@ -1,0 +1,11 @@
+{
+  "primary": {
+      "type": "DSA",
+      "length": 1024,
+      "userid": "test0"
+   },
+   "sub": {
+      "type": "Elgamal",
+      "length": 1536
+   }
+}

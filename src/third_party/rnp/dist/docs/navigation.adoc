@@ -1,0 +1,18 @@
+---
+items:
+- { title: Installation, path: installation/ }
+- { title: Command-line usage, path: cli-usage/ }
+- { title: C API usage, path: c-usage/ }
+- title: Developing RNP
+  path: develop/
+  items:
+  - { title: "C++ usage", path: develop/cpp-usage/ }
+  - { title: "Packaging", path: develop/packaging/ }
+  - { title: "Release workflow", path: develop/release-workflow/ }
+  # - title: "Acceptance tests"
+  #   path: develop/acceptance-tests/
+  #   items:
+  #   - { title: "rnpkeys-generate-key", path: develop/acceptance-tests/rnpkeys-generate-key }
+---
+
+= Navigation

@@ -1,0 +1,147 @@
+language: cpp
+matrix:
+  include:
+
+#   ubuntu xenial 16.04
+#   gcc 5 is the default on xenial
+    - os: linux
+      dist: xenial
+      compiler: gcc
+      addons:
+        apt:
+          packages:
+            - valgrind
+            - cppcheck
+            - doxygen
+            - cmake
+      env: CHECK="true"
+
+#   ubuntu bionic 18.04
+#   gcc 7 is the default on bionic
+    - os: linux
+      dist: bionic
+      compiler: gcc
+      addons:
+        apt:
+          packages:
+            - valgrind
+            - cppcheck
+            - doxygen
+            - cmake
+      env: CHECK="true"
+
+#   ubuntu focal fossa 20.04
+#   gcc 9 is the default on bionic
+    - os: linux
+      dist: focal
+      compiler: gcc
+      addons:
+        apt:
+          packages:
+            - valgrind
+            - cppcheck
+            - doxygen
+            - cmake
+      env: CHECK="true"
+
+# clang
+#   xenial
+    - os: linux
+      dist: xenial
+      compiler: clang
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-xenial-6.0
+          packages:
+            - clang-6.0
+            - cmake
+      env: MATRIX_EVAL="CC=clang-6.0 && CXX=clang++-6.0"
+
+    # clang-7 is the default on focal, xenial and bionic
+    - os: linux
+      dist: focal
+      compiler: clang
+      addons:
+        apt:
+          packages:
+            - valgrind
+            - cppcheck
+            - doxygen
+            - cmake
+      env: CHECK="true"
+
+# osx
+    - os: osx
+      osx_image: xcode13.4
+      env: XCODE="true" CHECK="true"
+
+# run coveralls
+    - os: linux
+      dist: xenial
+      compiler: gcc
+      addons:
+        apt:
+          packages:
+            - lcov
+      env: CHECK="true"
+      before_install:
+        - sudo gem install coveralls-lcov
+        - echo $CC
+        - echo $LANG
+        - echo $LC_ALL
+        - set -e
+        - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+            eval "${MATRIX_EVAL}";
+            if [ -n "$MATRIX_EVAL" ] && [ "$TRAVIS_COMPILER" != "clang" ]; then
+              sudo apt-get install -y $CC;
+            fi;
+          fi
+      before_script:
+        - export CFLAGS="-fprofile-arcs -ftest-coverage"
+        - mkdir build && cd build && cmake ..
+      script:
+        - make
+        - make test
+      after_success:
+        - cd ..
+        - lcov -d build/ -b . -c -o build/all_coverage.info
+        - lcov -r build/all_coverage.info '/usr/*' '*CMakeFiles*' '*fuzz*' '*test*' -o build/coverage.info
+        - coveralls-lcov --verbose build/coverage.info
+
+#  allow_failures:
+#    - os: osx
+
+before_install:
+  - echo $CC
+  - echo $LANG
+  - echo $LC_ALL
+  - set -e
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+      eval "${MATRIX_EVAL}";
+      if [ -n "$MATRIX_EVAL" ] && [ "$TRAVIS_COMPILER" != "clang" ]; then
+        sudo apt-get install -y $CC;
+      fi;
+    fi
+
+before_script:
+  # XXX osx on travis doesn't work w/ set -e, so turn it off :(
+  - set +e
+  - mkdir -p build || echo "Failed to mkdir build"
+  - cd build || echo "Failed to cd build"
+  - cmake .. || echo "Failed to run cmake"
+
+script:
+  - make
+  # when using bionic, Travis seems to ignore the "addons" section, so installing the packages with apt-get...
+  - if [ -n "$CHECK" ]; then
+      if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+        brew install doxygen;
+      else
+        if [ "$TRAVIS_DIST" = "bionic" ]; then
+          sudo apt-get install -y valgrind cppcheck doxygen;
+        fi;
+      fi;
+      make distcheck;
+      if type cppcheck &> /dev/null ; then cppcheck --error-exitcode=1 --quiet *.h *.c tests/ ; fi;
+    fi

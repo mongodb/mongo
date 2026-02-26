@@ -1,0 +1,19 @@
+(certificate
+ (issuer
+  (name
+   (public-key
+    rsa-with-md5
+    (e |NFGq/E3wh9f4rJIQVXhS|)
+    (n |d738/4ghP9rFZ0gAIYZ5q9y6iskDJwASi5rEQpEQq8ZyMZeIZzIAR2I5iGE=|))
+   aid-committee))
+ (subject
+  (ref
+   (public-key
+    rsa-with-md5
+    (e |NFGq/E3wh9f4rJIQVXhS|)
+    (n |d738/4ghP9rFZ0gAIYZ5q9y6iskDJwASi5rEQpEQq8ZyMZeIZzIAR2I5iGE=|))
+   tom
+   mother))
+ (not-before "1997-01-01_09:00:00")
+ (not-after "1998-01-01_09:00:00")
+ (tag (spend (account "12345678") (* numeric range "1" "1000"))))

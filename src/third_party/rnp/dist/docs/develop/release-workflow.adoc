@@ -1,0 +1,122 @@
+= Releases
+
+== General notes
+
+* Avoid tagging commits in the `main` branch.
+* Release branches should have annotated tags and a CHANGELOG.md.
+* The steps below detail creation of a brand new 1.0.0 release.
+  Some steps would be omitted for minor releases.
+
+== Creating an initial release
+
+=== Update documentation
+
+Update references to version numbers in relevant documentation to the new
+version you intend to release.
+
+[source,console]
+----
+git checkout main
+vim docs/installation.adoc
+git add docs/installation.adoc
+git commit
+git push
+----
+
+=== Create branch
+
+Release branches have names of the form `release/N.x`, where N is the major
+version (and `x` is a literal -- not a placeholder).
+
+[source,console]
+----
+git checkout -b release/1.x main
+----
+
+[[update-changelog-and-version]]
+=== Update CHANGELOG and version
+
+[source,console]
+----
+vim CHANGELOG.md
+# Add/update CHANGELOG entry for the new version
+git add CHANGELOG.md
+
+echo 1.0.0 > version.txt
+git add -f version.txt
+
+git commit
+----
+
+=== Create tag
+
+An initial release would be tagged as follows:
+
+[source,console]
+----
+git tag -a v1.0.0 -m ''
+----
+
+=== Push branch and tag
+
+[source,console]
+----
+# push the branch
+git push origin release/1.x
+
+# push the tag
+git push origin v1.0.0
+----
+
+=== Edit tagged release description on GitHub
+
+. Navigate to the link:#https://github.com/rnpgp/rnp/releases[Releases] page;
+
+. Edit the tag that was just pushed;
+
+. Fill the tag's description with data from the corresponding `CHANGELOG`
+  entries of the same tag version;
+
+. Publish the release.
+
+
+== Creating a new release
+
+Maintaining a release branch involves cherry-picking hotfixes and
+similar commits from the `main` branch, while following the rules for
+Semantic Versioning.
+
+The steps below will show the release of version 1.0.1.
+
+=== Add desired changes
+
+Cherry-pick the appropriate commits into the appropriate `release/N.x` branch.
+
+To see what commits are in `main` that are not in the release branch, you
+can observe the lines starting with `+` in:
+
+[source,console]
+----
+git cherry -v release/1.x main
+----
+
+It is often useful to pick a range of commits. For example:
+
+[source,console]
+----
+git checkout release/0.x
+git cherry-pick a57b36f^..e23352c
+----
+
+If there are merge commits in this range, this will not work.
+Instead, try:
+
+[source,console]
+----
+git checkout release/0.x
+git cherry release/0.x main | grep '^+ ' | cut -c 3-9 | \
+  while read commit; do git cherry-pick $commit; done
+----
+
+From here, you can follow the steps for an initial release,
+starting with <<update-changelog-and-version>>.

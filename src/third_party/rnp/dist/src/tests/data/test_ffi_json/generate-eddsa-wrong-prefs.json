@@ -1,0 +1,14 @@
+{
+    "primary": {
+        "type": "EdDSA",
+        "userid": "test-eddsa",
+        "usage": ["sign"],
+        "expiration": 0,
+        "preferences" : {
+          "hashes": ["SHA512", "SHA256"],
+          "ciphers": ["Wrong", "AES128"],
+          "compression": ["Zlib"]
+        }
+    }
+}
+  

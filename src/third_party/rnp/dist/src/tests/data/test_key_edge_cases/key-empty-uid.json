@@ -1,0 +1,170 @@
+[
+  {
+    "header":{
+      "offset":0,
+      "tag":6,
+      "tag.str":"Public Key",
+      "raw":"9833",
+      "length":51,
+      "partial":false,
+      "indeterminate":false
+    },
+    "version":4,
+    "creation time":1590071668,
+    "algorithm":22,
+    "algorithm.str":"EdDSA",
+    "material":{
+      "p.bits":263,
+      "curve":"Ed25519"
+    },
+    "keyid":"c972affd358bf887"
+  },
+  {
+    "header":{
+      "offset":53,
+      "tag":13,
+      "tag.str":"User ID",
+      "raw":"b400",
+      "length":0,
+      "partial":false,
+      "indeterminate":false
+    },
+    "userid":""
+  },
+  {
+    "header":{
+      "offset":55,
+      "tag":2,
+      "tag.str":"Signature",
+      "raw":"8890",
+      "length":144,
+      "partial":false,
+      "indeterminate":false
+    },
+    "version":4,
+    "type":19,
+    "type.str":"Positive User ID certification",
+    "algorithm":22,
+    "algorithm.str":"EdDSA",
+    "hash algorithm":8,
+    "hash algorithm.str":"SHA256",
+    "subpackets":[
+      {
+        "type":33,
+        "type.str":"issuer fingerprint",
+        "length":21,
+        "hashed":true,
+        "critical":false,
+        "fingerprint":"753d5b947e9a2b2e01147c1fc972affd358bf887"
+      },
+      {
+        "type":2,
+        "type.str":"signature creation time",
+        "length":4,
+        "hashed":true,
+        "critical":false,
+        "creation time":1590071668
+      },
+      {
+        "type":27,
+        "type.str":"key flags",
+        "length":1,
+        "hashed":true,
+        "critical":false,
+        "flags":3,
+        "flags.str":[
+          "certify",
+          "sign"
+        ]
+      },
+      {
+        "type":11,
+        "type.str":"preferred symmetric algorithms",
+        "length":4,
+        "hashed":true,
+        "critical":false,
+        "algorithms":[
+          9,
+          8,
+          7,
+          2
+        ],
+        "algorithms.str":[
+          "AES-256",
+          "AES-192",
+          "AES-128",
+          "TripleDES"
+        ]
+      },
+      {
+        "type":21,
+        "type.str":"preferred hash algorithms",
+        "length":5,
+        "hashed":true,
+        "critical":false,
+        "algorithms":[
+          10,
+          9,
+          8,
+          11,
+          2
+        ],
+        "algorithms.str":[
+          "SHA512",
+          "SHA384",
+          "SHA256",
+          "SHA224",
+          "SHA1"
+        ]
+      },
+      {
+        "type":22,
+        "type.str":"preferred compression algorithms",
+        "length":3,
+        "hashed":true,
+        "critical":false,
+        "algorithms":[
+          2,
+          3,
+          1
+        ],
+        "algorithms.str":[
+          "ZLib",
+          "BZip2",
+          "ZIP"
+        ]
+      },
+      {
+        "type":30,
+        "type.str":"features",
+        "length":1,
+        "hashed":true,
+        "critical":false,
+        "mdc":true,
+        "aead":false,
+        "v5 keys":false
+      },
+      {
+        "type":23,
+        "type.str":"key server preferences",
+        "length":1,
+        "hashed":true,
+        "critical":false,
+        "no-modify":true
+      },
+      {
+        "type":16,
+        "type.str":"issuer key ID",
+        "length":8,
+        "hashed":false,
+        "critical":false,
+        "issuer keyid":"c972affd358bf887"
+      }
+    ],
+    "lbits":"dec3",
+    "material":{
+      "r.bits":250,
+      "s.bits":256
+    }
+  }
+]

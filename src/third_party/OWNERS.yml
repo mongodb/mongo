@@ -21,6 +21,9 @@ filters:
   - "boost":
     approvers:
       - 10gen/server-programmability
+  - "bzip2":
+    approvers:
+      - 10gen/server-security
   - "cares":
     approvers:
       - 10gen/server-networking-and-observability
@@ -54,6 +57,9 @@ filters:
   - "IntelRDFPMathLib*":
     approvers:
       - 10gen/server-programmability
+  - "json-c":
+    approvers:
+      - 10gen/server-security
   - "JSON-Schema-Test-Suite":
     approvers:
       - 10gen/query-optimization
@@ -112,6 +118,9 @@ filters:
   - "re2":
     approvers:
       - 10gen/server-programmability
+  - "rnp":
+    approvers:
+      - 10gen/server-security
   - "s2":
     approvers:
       - 10gen/query-integration

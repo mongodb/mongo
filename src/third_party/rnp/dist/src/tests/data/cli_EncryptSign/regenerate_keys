@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+
+import tempfile
+import sys
+
+sys.path.append("../../")
+import git
+from gnupg import GnuPG as GnuPG
+from rnp import Rnp as Rnp
+
+PASSWORD = "password"
+USERID_PFX = '@example.com'
+
+def find_exe(basedir, exename):
+    import os
+    for root, _, files in os.walk(basedir):
+        fpath = os.path.join(root, exename)
+        if exename in files and os.access(fpath, os.X_OK):
+            return os.path.abspath(fpath)
+
+    return None
+
+class KeyFormatter(object):
+    def __init__(self, ktype, pattern):
+        self.pattern = pattern
+        self.key_type = ktype
+
+    def key_type(self): return self.key_type
+
+    def key_size(self, sign_key_size, enc_key_size):
+        self.sign_key_size = sign_key_size
+        self.enc_key_size = enc_key_size
+        return self
+
+    def format(self, gen_obj):
+        raise NotImplementedError("not implemented in base")
+
+class RnpRsaKeyFormatter(KeyFormatter):
+    RNP_GENERATE_RSA_PATTERN = "1\n{0}\n"
+
+    def __init__(self):
+        super(RnpRsaKeyFormatter, self).__init__('rsa', RnpRsaKeyFormatter.RNP_GENERATE_RSA_PATTERN)
+
+    def format(self, gen_obj):
+        return self.pattern.format(self.sign_key_size)
+
+class GpgRsaKeyFormatter(KeyFormatter):
+    GPG_GENERATE_RSA_PATERN = """
+        Key-Type: rsa
+        Key-Length: {0}
+        Key-Usage: sign auth
+        Subkey-Type: rsa
+        Subkey-Length: {1}
+        Subkey-Usage: encrypt
+        Name-Real: Test Testovich
+        Preferences: aes256 aes512 sha256 sha384 sha512 sha1 zlib
+        Name-Email: {2}"""
+
+    def __init__(self):
+        super(GpgRsaKeyFormatter, self).__init__('rsa', GpgRsaKeyFormatter.GPG_GENERATE_RSA_PATERN)
+
+    def format(self, gen_obj):
+        return self.pattern.format(self.sign_key_size, self.enc_key_size, gen_obj.userid)
+
+class GpgDsaKeyFormatter(KeyFormatter):
+    GPG_GENERATE_DSA_ELGAMAL_PATERN = """
+        Key-Type: dsa
+        Key-Length: {0}
+        Key-Usage: sign
+        Subkey-Type: ELG-E
+        Subkey-Length: {1}
+        Subkey-Usage: encrypt
+        Name-Real: Test Testovich
+        Preferences: aes256 aes512 sha256 sha384 sha512 sha1 zlib
+        Name-Email: {2}
+        """
+
+    def __init__(self):
+        super(GpgDsaKeyFormatter, self).__init__('dsa_elgamal', GpgDsaKeyFormatter.GPG_GENERATE_DSA_ELGAMAL_PATERN)
+
+    def format(self, gen_obj):
+        return self.pattern.format(self.sign_key_size, self.enc_key_size, gen_obj.userid)
+
+class RnpDsaKeyFormatter(KeyFormatter):
+    RNP_GENERATE_DSA_ELGAMAL_PATTERN = "16\n{0}\n"
+
+    def __init__(self):
+        super(RnpDsaKeyFormatter, self).__init__('dsa_elgamal', RnpDsaKeyFormatter.RNP_GENERATE_DSA_ELGAMAL_PATTERN)
+
+    def format(self, gen_obj):
+        return self.pattern.format(self.sign_key_size)
+
+def keygen(obj, formatter):
+    key_name_pfx = obj.__class__.__name__
+    enc_key_size = formatter.enc_key_size
+    sign_key_size = formatter.sign_key_size
+
+    key_name = '_'.join([key_name_pfx, formatter.key_type, str(sign_key_size), str(enc_key_size)])
+    obj.userid = key_name+USERID_PFX
+
+    # generate and export
+    if not obj.generate_key_batch(formatter.format(obj)): raise RuntimeError("Generation failed")
+    if not obj.export_key(key_name+"-sec.gpg", True): raise RuntimeError("Secret key export failed")
+    if not obj.export_key(key_name+".gpg", False): raise RuntimeError("Public key export failed")
+
+
+# Lists of tuples (sign key size, encryption key size)
+DSA_ELGAMAL_KEY_SIZES = [(1024, 1024), (1024, 2048), (1234, 1234), (2048, 2048), (2112, 2112), (3072, 3072)]
+RSA_KEY_SIZES = [(1024, 1024), (2048, 2048), (3072, 3072), (4096, 4096)]
+
+
+topdir = git.Repo(".", search_parent_directories=True).working_tree_dir
+rnp = Rnp(tempfile.mkdtemp(prefix="rnp-regen-rnp"), find_exe(topdir, "rnp"), find_exe(topdir, "rnpkeys"))
+rnp.password = PASSWORD
+gpg = GnuPG(tempfile.mkdtemp(prefix="rnp-regen-gpg"), "/usr/bin/gpg")
+gpg.password = PASSWORD
+
+# Generate RSA
+for key in RSA_KEY_SIZES:
+    keygen(rnp, RnpRsaKeyFormatter().key_size(key[0], key[1]))
+    keygen(gpg, GpgRsaKeyFormatter().key_size(key[0], key[1]))
+
+# Generate DSA/ElGamal
+for key in DSA_ELGAMAL_KEY_SIZES:
+    keygen(rnp, RnpDsaKeyFormatter().key_size(key[0], key[1]))
+    keygen(gpg, GpgDsaKeyFormatter().key_size(key[0], key[1]))

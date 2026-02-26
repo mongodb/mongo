@@ -1,0 +1,8 @@
+
+/* Define to 1 if you have the <sys/resource.h> header file. */
+#cmakedefine HAVE_SYS_RESOURCE_H
+
+/* Define if you have the `getrusage' function. */
+#cmakedefine HAVE_GETRUSAGE
+
+#cmakedefine HAVE_JSON_TOKENER_GET_PARSE_END

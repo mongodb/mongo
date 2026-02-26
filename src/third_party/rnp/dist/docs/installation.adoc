@@ -1,0 +1,255 @@
+= Installing RNP
+
+Binaries that will be installed:
+
+* `rnp`
+* `rnpkeys`
+
+
+== On NixOS or Nix package manager
+
+We provide a Nix package for easy installation on NixOS and any OS with Nix
+installed (including Linux and macOS, even NixOS on WSL).
+
+[source,console]
+----
+nix-env -iA nixpkgs.rnp
+----
+
+== With Nix Flakes
+
+We provide a Nix flake.
+
+[source,console]
+----
+nix profile install github:rnpgp/rnp
+----
+
+== On macOS using Homebrew
+
+We provide a Homebrew tap for easy installation of RNP on macOS.
+
+[source,console]
+----
+brew tap rnpgp/rnp
+brew install rnp
+----
+
+== On RHEL and CentOS via YUM
+
+We provide pre-built packages for RHEL and CentOS at our YUM repository hosted
+at GitHub.
+
+[source,console]
+----
+rpm --import https://github.com/riboseinc/yum/raw/master/ribose-packages.pub
+rpm --import https://github.com/riboseinc/yum/raw/master/ribose-packages-next.pub
+curl -L https://github.com/riboseinc/yum/raw/master/ribose.repo > /etc/yum.repos.d/ribose.repo
+yum install -y rnp
+----
+
+== On Ubuntu
+
+Prerequisites: please ensure `git` is installed on the system
+[source,console]
+----
+# Clone the repository by version tag (or omit it to get the latest sources)
+git clone https://github.com/rnpgp/rnp.git -b v0.18.1
+
+Please ensure that you clone with submodules if you use a version higher then 0.16.2
+git clone https://github.com/rnpgp/rnp.git --recurse-submodules --shallow-submodules
+
+# Install required packages
+sudo apt install g++-8 cmake libbz2-dev zlib1g-dev libjson-c-dev build-essential python-minimal
+
+# Download, build and install Botan2
+wget -qO- https://botan.randombit.net/releases/Botan-3.10.0.tar.xz | tar xvJ
+cd Botan-3.10.0
+./configure.py --prefix=/usr
+make
+sudo make install
+cd ..
+
+# CMake encourages building outside of the source directory.
+mkdir rnp-build
+cd rnp-build
+
+# Run CMake
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=on -DBUILD_TESTING=off ../rnp/
+
+# Compile
+make
+
+# Install
+sudo make install
+----
+
+== On Debian
+
+Prerequisite: please ensure `git` is installed on the system.
+
+[source,console]
+----
+# Clone the repository by version tag (or omit it to get the latest sources)
+git clone https://github.com/rnpgp/rnp.git -b v0.18.1
+
+Please ensure that you clone with submodules if you use a version higher then 0.16.2
+git clone https://github.com/rnpgp/rnp.git --recurse-submodules --shallow-submodules
+
+# Enable access to `testing` packages by editing /etc/apt/sources.list
+# deb http://deb.debian.org/debian testing main
+
+# Install required packages
+sudo apt install g++-8 cmake libbz2-dev zlib1g-dev libjson-c-dev \
+  libbotan-2-dev build-essential
+
+# Cmake recommend out-of-source builds
+mkdir rnp-build
+cd rnp-build
+
+# Cmake it
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=on -DBUILD_TESTING=off ../rnp/
+
+# Compile and install
+sudo make install
+----
+
+== On Gentoo Linux
+
+RNP is present in the official Gentoo repository under the name `dev-util/librnp`.
+
+[source,console]
+----
+emerge -av dev-util/librnp
+----
+
+== Compile from source
+
+Clone this repo, or download a release and expand it.
+
+Enter the source folder and run the following commands:
+
+[source,console]
+----
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_SHARED_LIBS=on -DBUILD_TESTING=off  .
+
+make install
+----
+
+== On Windows
+
+=== Using MSYS/MinGW
+
+From a clean MSYS2 install, please first update `pacman` and install required
+packages via the `msys` console.
+
+[source,console]
+----
+pacman -Syu --noconfirm --needed
+
+# Most likely you'll need to close msys console and run it again:
+pacman -Syu --noconfirm --needed
+
+# Install packages
+pacman --noconfirm -S --needed tar zlib-devel libbz2-devel git automake autoconf libtool automake-wrapper make pkg-config mingw64/mingw-w64-x86_64-cmake mingw64/mingw-w64-x86_64-gcc mingw64/mingw-w64-x86_64-json-c mingw64/mingw-w64-x86_64-libbotan mingw64/mingw-w64-x86_64-python3
+----
+
+Then clone the RNP repository and build it.
+
+Please ensure that you clone with submodules if you use a version higher then 0.16.2
+git clone https://github.com/rnpgp/rnp.git --recurse-submodules --shallow-submodules
+
+[source,console]
+----
+# CMake encourages building outside of the source directory.
+mkdir rnp-build
+cd rnp-build
+
+# Add paths to PATH so dependency dll/lib files can be found
+export PATH="/c/msys64/mingw64/lib:/c/msys64/mingw64/bin:$PWD/bin:$PATH"
+
+# Run CMake
+cmake -DBUILD_SHARED_LIBS=yes -G "MSYS Makefiles" -DBUILD_TESTING=off ../rnp
+
+# Compile and install
+make && make install
+----
+
+=== Using Microsoft Visual Studio 2019 and vcpkg
+
+Use appropriate command prompt for your target platform, for example "x64 Native Tools Command Prompt for VS 2019"
+```
+cmd /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+```
+
+Install `vcpkg` according to
+https://docs.microsoft.com/en-us/cpp/build/install-vcpkg?view=msvc-160&tabs=windows[these instructions]:
+
+Set the `VCPKG_ROOT` environment variable to the `vcpkg` root folder.
+
+For botan backend:
+[source,console]
+----
+vcpkg install --triplet x64-windows bzip2 zlib botan json-c getopt dirent python3[core,enable-shared]
+----
+
+For openssl backend:
+[source,console]
+----
+vcpkg install --triplet x64-windows bzip2 zlib botan json-c getopt dirent python3[core,enable-shared]
+----
+
+If you need to target 32-bit platform you'll need to to replace `x64-windows` with `x86-windows`.
+
+* The following steps will perform a console build for CMake using Visual Studio 2019 CMake generator: +
++
+--
+[source,console]
+----
+cmake -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake \
+      -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=off -DCRYPTO_BACKEND="botan" .
+cmake --build build --config Release
+cmake --install build
+----
+--
+Replace CRYPTO_BACKEND parameter to "openssl" if you target this backend.
+
+Ensure that the following dependencies are available on path:
+
+* `librnp.dll`
+* `botan.dll` or `libcrypto.dll` depending on target backend and architecture
+* `bz2.dll`
+* `getopt.dll`
+* `json-c.dll`
+* `zlib1.dll`
+
+=== Using Microsoft Visual Studio 2019 and pre-installed libraries
+
+Use appropriate command prompt for your target platform, for example "x64 Native Tools Command Prompt for VS 2019"
+```
+cmd /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+```
+
+Install dependencies and make them available either on PATH or using CMAKE_TARGET_PREFIX parameter:
+
+* Botan(2.14+) or Crypto (OpenSSL 1.1.1+) depending on target backend
+* BZip2
+* GetOpt
+* JSON-C (0.12.1+)
+* ZLIB
+
+If openssl backend is used note that your environment may have another ("default") openssl installation.
+In such case use OPENSSL_ROOT_DIR.
+
+* The following steps will perform a console build for CMake using Visual Studio 2019 CMake generator: +
++
+--
+[source,console]
+----
+cmake -B build -G "Visual Studio 16 2019" -A x64 -DOPENSSL_ROOT_DIR=<openssl root> -DCMAKE_TARGET_PREFIX=<target prefix> \
+      -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=off -DCRYPTO_BACKEND="botan" .
+cmake --build build --config Release
+cmake --install build
+----
+--
+Replace CRYPTO_BACKEND parameter to "openssl" if you target this backend, use OPENSSL_ROOT_DIR and CMAKE_TARGET_PREFIX optionally as explained above

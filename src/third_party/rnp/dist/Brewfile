@@ -1,0 +1,7 @@
+brew "cmake"
+brew "pkg-config"
+brew "googletest"
+brew "gnupg"
+brew "python"
+brew "json-c"
+brew "asciidoc"

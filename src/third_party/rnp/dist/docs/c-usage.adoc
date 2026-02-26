@@ -1,0 +1,129 @@
+= Using the RNP C API
+
+This document is for developers who wish to use RNP as a library in C.
+
+Examples are given below to demonstrate such usage.
+
+== Examples
+
+[TIP]
+.Location of examples
+====
+The source code of these examples can be found under
+`https://github.com/rnpgp/rnp/blob/main/src/examples/[src/examples]`.
+
+If you are planning to build from source, these examples are built
+together with the RNP library and will be available under `src/examples`
+within your build folder.
+====
+
+[TIP]
+====
+All samples below use APIs exposed via the header file
+`https://github.com/rnpgp/rnp/blob/main/include/rnp/rnp.h[include/rnp/rnp.h]`.
+For further details please refer to the file directly.
+====
+
+The following example applications are available:
+
+`generate`:: Demonstrates generating keys, save/load of keyrings, exporting keys.
+
+`encrypt`:: Demonstrates how to encrypt a file using a password and/or key.
+
+`decrypt`:: Demonstrates how to decrypt OpenPGP data using a key and/or password.
+
+`sign`:: Demonstrates how to sign messages, using one or more keys from a loaded keyring.
+
+`verify`:: Demonstrates how to verify signed messages using dynamic keys fetching
+  (using a sample key provider implementation).
+
+`dump`:: Demonstrates how to dump OpenPGP packet information.
+
+
+=== generate.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/generate.c
+
+This example is composed from 2 functions:
+
+* `ffi_generate_keys()`: Demonstrates how to generate and save different key types
+   (RSA and EDDSA/Curve25519) using JSON key description.
+   Also demonstrates usage of the password provider.
++
+Keyrings will be saved to files `pubring.pgp` and `secring.pgp` in the current directory.
+You can use `rnp --list-packets pubring.pgp` to check the properties of the generated key(s).
+
+* `ffi_output_keys()`: Demonstrates how to load keyrings,
+   search for keys (in helper functions `ffi_print_key()`/`ffi_export_key()`),
+   and how to export them to memory or file in armored format.
+
+=== encrypt.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/encrypt.c
+
+This code example does the following:
+
+* first loads a public keyring (`pubring.pgp`) (created by the `generate.c` example)
+* then creates an encryption operation structure and
+* configures it with various options (including the setup of password encryption and public-key encryption).
+
+The result is the encrypted and armored (for easier reading) message
+`RNP encryption sample message`.
+
+This message is saved to the file `encrypted.asc` in current directory.
+
+What you can do after:
+
+* Inspect the message with `rnp --list-packets encrypted.asc`.
+* Decrypt the saved file via `rnp --keyfile secring.pgp -d encrypted.asc`.
+
+=== decrypt.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/decrypt.c
+
+This example uses keyrings generated from the `generate.c` example
+to decrypt messages encrypted by the `encrypt.c` example.
+
+This example demonstrates how to decrypt message with a password or with a key,
+and implements a custom password provider for decryption via key or key password.
+
+The decrypted message is saved to memory and then printed to the `stdout`.
+
+=== sign.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/sign.c
+
+This example uses keyrings generated in the preceding `generate.c` example.
+
+It demonstrates configuration of a signing context, signing of the message,
+and the saving of the detached signature to the `signed.asc` file.
+
+Then the attached signature is used: i.e. the data is encapsulated into
+the resulting message.
+
+What you can do after:
+
+* Inspect the signed message with `rnp --list-packets signed.asc`.
+* Verify the message with `rnp --keyfile pubring.pgp -v signed.asc`.
+
+=== verify.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/verify.c
+
+This example uses keyrings generated in the `generate.c` example.
+
+However, instead of loading the whole keyring, it implements dynamic key fetching
+via custom key provider (see function `example_key_provider`).
+
+After verification, it outputs the verified embedded message
+and all signatures to `stdout` (with signing key IDs and statuses).
+
+=== dump.c
+
+Location: https://github.com/rnpgp/rnp/blob/main/src/examples/dump.c
+
+This example dumps OpenPGP packet information from the input stream
+(via `stdin` or filename), tuned with flags passed via the
+command-line interface.
+
+The resulting human-readable text or JSON is printed to `stdout`.

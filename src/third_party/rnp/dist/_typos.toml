@@ -1,0 +1,32 @@
+[default]
+extend-ignore-identifiers-re = [
+    ".*fpr.*",
+    ".*FPR.*",
+    ".*[0-9a-fA-F]{4,}",
+]
+
+[default.extend-identifiers]
+validate_desig_revokes = "validate_desig_revokes"
+desig_rev = "desig_rev"
+Nominet = "Nominet"
+NOMINET = "NOMINET"
+PNGs = "PNGs"
+FOF = "FOF"
+EDE3 = "EDE3"
+ede3 = "ede3"
+ffrom = "ffrom"
+clen = "clen"
+__THW_INTEL__ = "__THW_INTEL__"
+
+[default.extend-words]
+MERCHANTIBILITY = "MERCHANTIBILITY"
+FOF = "FOF"
+FO = "FO"
+claus = "claus"
+desig = "desig"
+
+[files]
+extend-exclude = [
+    "src/tests/data/**",
+    "src/libsexpp/**"
+]

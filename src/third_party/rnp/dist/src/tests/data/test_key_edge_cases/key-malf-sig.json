@@ -1,0 +1,45 @@
+[
+  {
+    "header":{
+      "offset":0,
+      "tag":6,
+      "tag.str":"Public Key",
+      "raw":"9833",
+      "length":51,
+      "partial":false,
+      "indeterminate":false
+    },
+    "version":4,
+    "creation time":1590071668,
+    "algorithm":22,
+    "algorithm.str":"EdDSA",
+    "material":{
+      "p.bits":263,
+      "curve":"Ed25519"
+    },
+    "keyid":"c972affd358bf887"
+  },
+  {
+    "header":{
+      "offset":53,
+      "tag":13,
+      "tag.str":"User ID",
+      "raw":"b400",
+      "length":0,
+      "partial":false,
+      "indeterminate":false
+    },
+    "userid":""
+  },
+  {
+    "header":{
+      "offset":55,
+      "tag":2,
+      "tag.str":"Signature",
+      "raw":"8890",
+      "length":144,
+      "partial":false,
+      "indeterminate":false
+    }
+  }
+]

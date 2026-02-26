@@ -1,0 +1,25 @@
+{
+  "primary": {
+      "type": "ECDSA",
+      "curve": "NIST P-256",
+      "userid": "test0",
+      "usage": "sign",
+      "expiration": 0,
+      "hash": "SHA256",
+      "preferences" : {
+        "hashes": ["SHA512", "SHA256"],
+        "ciphers": ["AES256", "AES128"],
+        "compression": ["Zlib"],
+        "key server": "hkp://pgp.mit.edu"
+      },
+      "protection" : {
+          "cipher": "AES256",
+          "hash": "SHA256",
+          "iterations": 65536
+      }
+   },
+   "sub": {
+      "type": "RSA",
+      "length": 1024
+   }
+}

@@ -1,0 +1,231 @@
+
+/* Enable RDRAND Hardware RNG Hash Seed */
+#cmakedefine ENABLE_RDRAND "@ENABLE_RDRAND@"
+
+/* Override json_c_get_random_seed() with custom code */
+#cmakedefine OVERRIDE_GET_RANDOM_SEED @OVERRIDE_GET_RANDOM_SEED@
+
+/* Enable partial threading support */
+#cmakedefine ENABLE_THREADING "@@"
+
+/* Define if .gnu.warning accepts long strings. */
+#cmakedefine HAS_GNU_WARNING_LONG "@@"
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#cmakedefine HAVE_DLFCN_H
+
+/* Define to 1 if you have the <endian.h> header file. */
+#cmakedefine HAVE_ENDIAN_H
+
+/* Define to 1 if you have the <fcntl.h> header file. */
+#cmakedefine HAVE_FCNTL_H
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#cmakedefine HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <limits.h> header file. */
+#cmakedefine HAVE_LIMITS_H
+
+/* Define to 1 if you have the <locale.h> header file. */
+#cmakedefine HAVE_LOCALE_H
+
+/* Define to 1 if you have the <memory.h> header file. */
+#cmakedefine HAVE_MEMORY_H
+
+/* Define to 1 if you have the <stdarg.h> header file. */
+#cmakedefine HAVE_STDARG_H
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#cmakedefine HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#cmakedefine HAVE_STDLIB_H
+
+/* Define to 1 if you have the <strings.h> header file. */
+#cmakedefine HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#cmakedefine HAVE_STRING_H
+
+/* Define to 1 if you have the <syslog.h> header file. */
+#cmakedefine HAVE_SYSLOG_H @HAVE_SYSLOG_H@
+
+/* Define to 1 if you have the <sys/cdefs.h> header file. */
+#cmakedefine HAVE_SYS_CDEFS_H
+
+/* Define to 1 if you have the <sys/param.h> header file. */
+#cmakedefine HAVE_SYS_PARAM_H @HAVE_SYS_PARAM_H@
+
+/* Define to 1 if you have the <sys/random.h> header file. */
+#cmakedefine HAVE_SYS_RANDOM_H
+
+/* Define to 1 if you have the <sys/resource.h> header file. */
+#cmakedefine HAVE_SYS_RESOURCE_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#cmakedefine HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#cmakedefine HAVE_SYS_TYPES_H @HAVE_SYS_TYPES_H@
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#cmakedefine HAVE_UNISTD_H @HAVE_UNISTD_H@
+
+/* Define to 1 if you have the <xlocale.h> header file. */
+#cmakedefine HAVE_XLOCALE_H
+
+/* Define to 1 if you have the <bsd/stdlib.h> header file. */
+#cmakedefine HAVE_BSD_STDLIB_H
+
+/* Define to 1 if you have `arc4random' */
+#cmakedefine HAVE_ARC4RANDOM
+
+/* Define to 1 if you don't have `vprintf' but do have `_doprnt.' */
+#cmakedefine HAVE_DOPRNT
+
+/* Has atomic builtins */
+#cmakedefine HAVE_ATOMIC_BUILTINS
+
+/* Define to 1 if you have the declaration of `INFINITY', and to 0 if you
+   don't. */
+#cmakedefine HAVE_DECL_INFINITY
+
+/* Define to 1 if you have the declaration of `isinf', and to 0 if you don't.
+   */
+#cmakedefine HAVE_DECL_ISINF
+
+/* Define to 1 if you have the declaration of `isnan', and to 0 if you don't.
+   */
+#cmakedefine HAVE_DECL_ISNAN
+
+/* Define to 1 if you have the declaration of `nan', and to 0 if you don't. */
+#cmakedefine HAVE_DECL_NAN
+
+/* Define to 1 if you have the declaration of `_finite', and to 0 if you
+   don't. */
+#cmakedefine HAVE_DECL__FINITE
+
+/* Define to 1 if you have the declaration of `_isnan', and to 0 if you don't.
+   */
+#cmakedefine HAVE_DECL__ISNAN
+
+/* Define to 1 if you have the `open' function. */
+#cmakedefine HAVE_OPEN
+
+/* Define to 1 if you have the `realloc' function. */
+#cmakedefine HAVE_REALLOC
+
+/* Define to 1 if you have the `setlocale' function. */
+#cmakedefine HAVE_SETLOCALE
+
+/* Define to 1 if you have the `snprintf' function. */
+#cmakedefine HAVE_SNPRINTF
+
+
+/* Define to 1 if you have the `strcasecmp' function. */
+#cmakedefine HAVE_STRCASECMP @HAVE_STRCASECMP@
+
+/* Define to 1 if you have the `strdup' function. */
+#cmakedefine HAVE_STRDUP
+
+/* Define to 1 if you have the `strerror' function. */
+#cmakedefine HAVE_STRERROR
+
+/* Define to 1 if you have the `strncasecmp' function. */
+#cmakedefine HAVE_STRNCASECMP @HAVE_STRNCASECMP@
+
+/* Define to 1 if you have the `uselocale' function. */
+#cmakedefine HAVE_USELOCALE
+
+/* Define to 1 if newlocale() needs freelocale() called on it's `base` argument */
+#cmakedefine NEWLOCALE_NEEDS_FREELOCALE
+
+/* Define to 1 if you have the `vasprintf' function. */
+#cmakedefine HAVE_VASPRINTF
+
+/* Define to 1 if you have the `vprintf' function. */
+#cmakedefine HAVE_VPRINTF
+
+/* Define to 1 if you have the `vsnprintf' function. */
+#cmakedefine HAVE_VSNPRINTF
+
+/* Define to 1 if you have the `vsyslog' function. */
+#cmakedefine HAVE_VSYSLOG @HAVE_VSYSLOG@
+
+/* Define if you have the `getrandom' function. */
+#cmakedefine HAVE_GETRANDOM
+
+/* Define if you have the `getrusage' function. */
+#cmakedefine HAVE_GETRUSAGE
+
+#cmakedefine HAVE_STRTOLL
+#if !defined(HAVE_STRTOLL)
+#define strtoll @json_c_strtoll@
+/* #cmakedefine json_c_strtoll @json_c_strtoll@*/
+#endif
+
+#cmakedefine HAVE_STRTOULL
+#if !defined(HAVE_STRTOULL)
+#define strtoull @json_c_strtoull@
+/* #cmakedefine json_c_strtoull @json_c_strtoull@ */
+#endif
+
+/* Have __thread */
+#cmakedefine HAVE___THREAD
+
+/* Public define for json_inttypes.h */
+#cmakedefine JSON_C_HAVE_INTTYPES_H @JSON_C_HAVE_INTTYPES_H@
+
+/* Name of package */
+#define PACKAGE "@PROJECT_NAME@"
+
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT "@JSON_C_BUGREPORT@"
+
+/* Define to the full name of this package. */
+#define PACKAGE_NAME "@PROJECT_NAME@"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "@PROJECT_NAME@ @CPACK_PACKAGE_VERSION_MAJOR@.@CPACK_PACKAGE_VERSION_MINOR@.@CPACK_PACKAGE_VERSION_PATCH@"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "@PROJECT_NAME@"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL "https://github.com/json-c/json-c"
+
+/* Define to the version of this package. */
+#define PACKAGE_VERSION "@CPACK_PACKAGE_VERSION_MAJOR@.@CPACK_PACKAGE_VERSION_MINOR@.@CPACK_PACKAGE_VERSION_PATCH@"
+
+/* The number of bytes in type int */
+#cmakedefine SIZEOF_INT @SIZEOF_INT@
+
+/* The number of bytes in type int64_t */
+#cmakedefine SIZEOF_INT64_T @SIZEOF_INT64_T@
+
+/* The number of bytes in type long */
+#cmakedefine SIZEOF_LONG @SIZEOF_LONG@
+
+/* The number of bytes in type long long */
+#cmakedefine SIZEOF_LONG_LONG @SIZEOF_LONG_LONG@
+
+/* The number of bytes in type size_t */
+#cmakedefine SIZEOF_SIZE_T @SIZEOF_SIZE_T@
+
+/* The number of bytes in type ssize_t */
+#cmakedefine SIZEOF_SSIZE_T @SIZEOF_SSIZE_T@
+
+/* Specifier for __thread */
+#cmakedefine SPEC___THREAD @SPEC___THREAD@
+
+/* Define to 1 if you have the ANSI C header files. */
+#cmakedefine STDC_HEADERS
+
+/* Version number of package */
+#define VERSION "@CPACK_PACKAGE_VERSION_MAJOR@.@CPACK_PACKAGE_VERSION_MINOR@.@CPACK_PACKAGE_VERSION_PATCH@"
+
+/* Define to empty if `const' does not conform to ANSI C. */
+#cmakedefine const
+
+/* Define to `unsigned int' if <sys/types.h> does not define. */
+#cmakedefine size_t

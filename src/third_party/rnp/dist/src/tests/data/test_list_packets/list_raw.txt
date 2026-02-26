@@ -1,0 +1,148 @@
+:armored input
+:off 0: packet header 0x9852 (tag 6, len 82)
+:off 2: packet contents (82 bytes)
+    00000 | 04 5a c3 82 35 13 08 2a 86 48 ce 3d 03 01 07 02  | .Z..5..*.H.=....
+    00016 | 03 04 12 e4 6e a6 9f 97 61 6a 66 7a eb bf 12 5c  | ....n...ajfz...\
+    00032 | 4d 5a cd ab ea 7f c0 48 b5 63 bd 42 ff 15 75 2d  | MZ.....H.c.B..u-
+    00048 | 6f 10 4a 03 d7 8b ab af 93 90 29 32 ee 1e 10 d1  | o.J.......)2....
+    00064 | 8e f4 90 75 ac 51 b6 47 f4 b0 8e 75 4f bd b7 d2  | ...u.Q.G...uO...
+    00080 | c4 f7                                            | ..              
+
+Public key packet
+    version: 4
+    creation time: 1522762293 (??? ??? ?? ??:??:?? 2018)
+    public key algorithm: 19 (ECDSA)
+    public key material:
+        ecc p: 515 bits
+        ecc curve: NIST P-256
+    keyid: 0x23674f21b2441527
+:off 84: packet header 0xb408 (tag 13, len 8)
+:off 86: packet contents (8 bytes)
+    00000 | 65 63 63 2d 70 32 35 36                          | ecc-p256        
+
+UserID packet
+    id: ecc-p256
+:off 94: packet header 0x8894 (tag 2, len 148)
+:off 96: packet contents (148 bytes)
+    00000 | 04 13 13 08 00 3c 02 1b 03 05 0b 09 08 07 02 03  | .....<..........
+    00016 | 22 02 01 06 15 0a 09 08 0b 02 04 16 02 03 01 02  | "...............
+    00032 | 1e 03 02 17 80 16 21 04 b5 4f de bb b6 73 42 3a  | ......!..O...sB:
+    00048 | 5d 0a a5 44 23 67 4f 21 b2 44 15 27 05 02 5c 55  | ]..D#gO!.D.'..\U
+    00064 | af e7 00 0a 09 10 23 67 4f 21 b2 44 15 27 d7 27  | ......#gO!.D.'.'
+    00080 | 00 fb 05 60 f6 c1 1f 1c 30 5a 1a d2 ea 95 44 81  | ...`....0Z....D.
+    00096 | 59 d1 8a 51 1a c7 37 b0 89 7b 65 13 cf 5f fb a1  | Y..Q..7..{e.._..
+    00112 | 00 81 01 00 c3 8b 84 50 c8 b1 ec f9 37 ce ac 13  | .......P....7...
+    00128 | 52 6c b1 2c c0 2b b5 a0 48 7c 56 61 ed fd 23 7b  | Rl.,.+..H|Va..#{
+    00144 | fa 6a 8d 2d                                      | .j.-            
+
+Signature packet
+    version: 4
+    type: 19 (Positive User ID certification)
+    public key algorithm: 19 (ECDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 27, len 1
+        :subpacket contents:
+            00000 | 03                                               | .               
+        key flags: 0x03 ( certify sign )
+        :type 11, len 4
+        :subpacket contents:
+            00000 | 09 08 07 02                                      | ....            
+        preferred symmetric algorithms: AES-256, AES-192, AES-128, TripleDES (9, 8, 7, 2)
+        :type 34, len 2
+        :subpacket contents:
+            00000 | 02 01                                            | ..              
+        preferred aead algorithms: OCB, EAX (2, 1)
+        :type 21, len 5
+        :subpacket contents:
+            00000 | 0a 09 08 0b 02                                   | .....           
+        preferred hash algorithms: SHA512, SHA384, SHA256, SHA224, SHA1 (10, 9, 8, 11, 2)
+        :type 22, len 3
+        :subpacket contents:
+            00000 | 02 03 01                                         | ...             
+        preferred compression algorithms: ZLib, BZip2, ZIP (2, 3, 1)
+        :type 30, len 1
+        :subpacket contents:
+            00000 | 03                                               | .               
+        features: 0x03 ( mdc aead )
+        :type 23, len 1
+        :subpacket contents:
+            00000 | 80                                               | .               
+        key server preferences
+        no-modify: 1
+        :type 33, len 21
+        :subpacket contents:
+            00000 | 04 b5 4f de bb b6 73 42 3a 5d 0a a5 44 23 67 4f  | ..O...sB:]..D#gO
+            00016 | 21 b2 44 15 27                                   | !.D.'           
+        issuer fingerprint: 0xb54fdebbb673423a5d0aa54423674f21b2441527 (20 bytes)
+        :type 2, len 4
+        :subpacket contents:
+            00000 | 5c 55 af e7                                      | \U..            
+        signature creation time: 1549119463 (??? ??? ?? ??:??:?? 2019)
+    unhashed subpackets:
+        :type 16, len 8
+        :subpacket contents:
+            00000 | 23 67 4f 21 b2 44 15 27                          | #gO!.D.'        
+        issuer key ID: 0x23674f21b2441527
+    lbits: 0xd727
+    signature material:
+        ecc r: 251 bits
+        ecc s: 256 bits
+:off 244: packet header 0xb856 (tag 14, len 86)
+:off 246: packet contents (86 bytes)
+    00000 | 04 5a c3 82 35 12 08 2a 86 48 ce 3d 03 01 07 02  | .Z..5..*.H.=....
+    00016 | 03 04 2c 33 80 ac b2 06 f3 90 01 42 ed 48 c2 04  | ..,3.......B.H..
+    00032 | 0c a6 22 2e 53 08 fe 37 b8 9b 80 67 a7 4d 17 24  | ..".S..7...g.M.$
+    00048 | e5 d9 01 a5 7e 3c 78 ad e5 6e 3a 2f 5e 7e 18 90  | ....~<x..n:/^~..
+    00064 | 19 de 03 bc f5 e2 27 b3 df e4 9d 83 a5 05 00 c1  | ......'.........
+    00080 | 55 d9 03 01 08 07                                | U.....          
+
+Public subkey packet
+    version: 4
+    creation time: 1522762293 (??? ??? ?? ??:??:?? 2018)
+    public key algorithm: 18 (ECDH)
+    public key material:
+        ecdh p: 515 bits
+        ecdh curve: NIST P-256
+        ecdh hash algorithm: 8 (SHA256)
+        ecdh key wrap algorithm: 7
+    keyid: 0x37e285e9e9851491
+:off 332: packet header 0x8878 (tag 2, len 120)
+:off 334: packet contents (120 bytes)
+    00000 | 04 18 13 08 00 20 02 1b 0c 16 21 04 b5 4f de bb  | ..... ....!..O..
+    00016 | b6 73 42 3a 5d 0a a5 44 23 67 4f 21 b2 44 15 27  | .sB:]..D#gO!.D.'
+    00032 | 05 02 5c 55 af ef 00 0a 09 10 23 67 4f 21 b2 44  | ..\U......#gO!.D
+    00048 | 15 27 64 aa 01 00 9e b8 82 fd f0 db b9 c5 04 44  | .'d............D
+    00064 | 6f 22 c4 6a b9 fb d1 eb 17 22 9a a4 bb 1a 27 fe  | o".j....."....'.
+    00080 | 59 e8 41 53 e3 f9 01 00 b9 6e aa 08 4a 1d 28 49  | Y.AS.....n..J.(I
+    00096 | 08 9d 69 d2 3c e1 fe b4 46 e3 9a a3 3a 63 bd 1d  | ..i.<...F...:c..
+    00112 | c1 d5 b3 d9 89 1e ae ef                          | ........        
+
+Signature packet
+    version: 4
+    type: 24 (Subkey Binding Signature)
+    public key algorithm: 19 (ECDSA)
+    hash algorithm: 8 (SHA256)
+    hashed subpackets:
+        :type 27, len 1
+        :subpacket contents:
+            00000 | 0c                                               | .               
+        key flags: 0x0c ( encrypt_comm encrypt_storage )
+        :type 33, len 21
+        :subpacket contents:
+            00000 | 04 b5 4f de bb b6 73 42 3a 5d 0a a5 44 23 67 4f  | ..O...sB:]..D#gO
+            00016 | 21 b2 44 15 27                                   | !.D.'           
+        issuer fingerprint: 0xb54fdebbb673423a5d0aa54423674f21b2441527 (20 bytes)
+        :type 2, len 4
+        :subpacket contents:
+            00000 | 5c 55 af ef                                      | \U..            
+        signature creation time: 1549119471 (??? ??? ?? ??:??:?? 2019)
+    unhashed subpackets:
+        :type 16, len 8
+        :subpacket contents:
+            00000 | 23 67 4f 21 b2 44 15 27                          | #gO!.D.'        
+        issuer key ID: 0x23674f21b2441527
+    lbits: 0x64aa
+    signature material:
+        ecc r: 256 bits
+        ecc s: 256 bits

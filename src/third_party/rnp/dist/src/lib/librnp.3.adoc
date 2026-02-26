@@ -1,0 +1,89 @@
+= librnp(3)
+RNP
+:doctype: manpage
+:release-version: {component-version}
+:man manual: RNP Manual
+:man source: RNP {release-version}
+
+== NAME
+
+librnp - OpenPGP implementation, available via FFI interface.
+
+== SYNOPSIS
+
+*#include <rnp/rnp.h>* +
+*#include <rnp/rnp_err.h>*
+
+
+== DESCRIPTION
+
+*librnp* is part of the *RNP* suite and forms the basis for the _rnp(1)_ and _rnpkeys(1)_ command-line utilities.
+
+It provides an FFI interface to functions required for operations needed by the OpenPGP protocol.
+
+Interface to the library is exposed via _<rnp/rnp.h>_ and _<rnp/rnp_err.h>_ headers.
+You will also need to link to _librnp_.
+
+Please see its headers for the full function list and detailed documentation.
+
+== EXAMPLES
+
+A number of examples are provided in *src/examples* folder of the *RNP* suite source tree.
+
+*generate.c*::
+Demonstrates generation of an OpenPGP keypair using the JSON key description mechanism.
+May be used to generate any custom key types that are supported by the *RNP* suite.
+
+*encrypt.c*::
+Demonstrates how to build OpenPGP-encrypted messages.
+A message is encrypted with keys, generated via *./generate*, with a hardcoded password.
+
+*decrypt.c*::
+Demonstrates how to decrypt OpenPGP messages.
+Running this example requires the *./encrypt* example to be first run
+in order to produce the sample encrypted message for decryption.
+
+*sign.c*::
+Demonstrates how to sign OpenPGP messages.
+Running this example requires the *./generate* example to be first run
+in order to generate and write out secret keys.
+
+*verify.c*::
+Demonstrates verify OpenPGP signed messages.
+Again, running this example requires the *./sign* example to be first run
+in order to generate a signed OpenPGP message.
+
+== BUGS
+
+Please report _issues_ via the RNP public issue tracker at:
+https://github.com/rnpgp/rnp/issues.
+
+_Security reports_ or _security-sensitive feedback_ should be reported
+according to the instructions at:
+https://www.rnpgp.org/feedback.
+
+
+== AUTHORS
+
+*RNP* is an open source project led by Ribose and has
+received contributions from numerous individuals and
+organizations.
+
+
+== RESOURCES
+
+*Web site*: https://www.rnpgp.org
+
+*Source repository*: https://github.com/rnpgp/rnp
+
+
+== COPYING
+
+Copyright \(C) 2017-2021 Ribose.
+The RNP software suite is _freely licensed_:
+please refer to the *LICENSE* file for details.
+
+
+== SEE ALSO
+
+*rnp(1)*, *rnpkeys(1)*

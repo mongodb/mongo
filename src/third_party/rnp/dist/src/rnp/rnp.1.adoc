@@ -1,0 +1,438 @@
+= rnp(1)
+RNP
+:doctype: manpage
+:release-version: {component-version}
+:man manual: RNP Manual
+:man source: RNP {release-version}
+
+== NAME
+
+RNP - OpenPGP-compatible signatures and encryption.
+
+== SYNOPSIS
+
+*rnp* [_--homedir_ _dir_] [_OPTIONS_] _COMMAND_ [_INPUT_FILE_, ...] ...
+
+
+== DESCRIPTION
+
+The _rnp_ command-line utility is part of the _RNP_ suite and
+provides OpenPGP signing and encryption functionality
+compliant with IETF RFC 4880.
+
+_rnp_ does not allow manipulation of keys or keyrings --
+please use _rnpkeys(1)_ for that purpose.
+
+=== BASICS
+
+By default, *rnp* will apply a _COMMAND_, additionally configured with _OPTIONS_,
+to all _INPUT_FILE_(s) or _stdin_ if no _INPUT_FILE_ is given.
+There are some special cases for _INPUT_FILE_ :
+
+* _-_ (dash) substitutes to _stdin_
+* env:VARIABLE_NAME substitutes to the contents of environment variable VARIABLE_NAME
+
+Depending on the input, output may be written:
+
+* if *--output* option is given output is written to the path specified (or to the *stdout* if *-* is used)
+* to the _INPUT_FILE_ with a removed or added file extension (_.pgp_, _.gpg_, _.asc_, _.sig_), depending on operation.
+* to the _stdout_ if input was read from the _stdin_.
+
+If output file already exists, it will *not* be overwritten, unless *--overwrite* option is given.
+
+Without the *--armor* option, output will be in binary.
+
+If _COMMAND_ requires public or private keys, *rnp* will look for the keyrings in *~/.rnp*. The options *--homedir* and *--keyfile* override this (see below).
+
+If _COMMAND_ needs a password, *rnp* will ask for it via *stdin* or *tty*,
+unless the *--password* or *--pass-fd* option was specified.
+
+
+== COMMANDS
+
+=== INFORMATIONAL
+
+*-h*, *--help*::
+Displays a short help message. No options are expected.
+
+*-V*, *--version*::
+Displays version information. No options are expected.
+
+
+=== ENCRYPTION AND SIGNING
+
+*-e*, *--encrypt*::
+Encrypt data with public key(s), and optionally sign, if the *--sign* command is added. +
++
+You would likely want to specify one or more *--recipient*(s) or pick a *--cipher* (instead of the default).
++
+Additional options:
+
+*--recipient*:::
+Specify one or more recipients.
+
+*--cipher*:::
+Select a specific cipher.
+
+*-z 0..9*, *--zlib*, *--zip*, *--bzip*:::
+Select a compression algorithm and level.
+
+*--armor*:::
+Output ASCII data instead of binary via the *--armor* option. If the input file is _file.ext_, and *--output* is not specified, then the data will be written (depending on *--armor* option) to _file.ext.pgp_ or _file.ext.asc_. +
+
+*--no-wrap*:::
+Do not wrap the output in a literal data packet. This could be used to encrypt a file which is already signed or encrypted.
+By default this would also disable compression, use option *-z* to override.
+
+*--overwrite*:::
+If the destination file already exists, and the *--overwrite* option is not given, the caller will be asked for the permission to overwrite or to provide a new file name. Please see the *OPTIONS* section for more information.
+
+*-c*, *--symmetric*::
+Encrypt data with password(s). +
++
+Can be combined with the commands *--encrypt* and *--sign*.
++
+Options that apply to the *--encrypt* command also apply here.
++
+Additional options:
+
+*--passwords*:::
+Encryption to multiple passwords is possible with *--passwords* option. Each password would be asked via stdin/tty unless *--password* or *--pass-fd* is specified. +
+
+*-s*, *--sign*::
+Digitally sign data, using one or more secret keys you own. +
++
+Public-key or password-based encryption may be added via the *--encrypt* and *--symmetric* commands. +
++
+Additional options:
+
+*-u*, *--userid*:::
+By default, the first secret key you own will be selected for signing. Apply this option to select a different key or to use multiple keys.
+
+*--detach*:::
+By default, the signature is stored together with signed data. This option detaches the data signature to a separate file (_file.ext.sig_).
+
+*--hash*:::
+You may want to use *--hash* option to override default hash algorithm settings. As with encryption, output may be converted to ascii via the *--armor* option. +
++
+Compression options also apply here. Since the secret key is usually stored encrypted, you will be asked for the password to decrypt it via _stdin_/_tty_ unless *--password* or *--pass-fd* is specified.
+
+*--allow-weak-hash*:::
+Allow usage of a weak hash algorithm.
+
+*--allow-sha1-key-sigs*:::
+Allow usage of a SHA-1 key signatures.
+
+*--clearsign*::
+Digitally sign text data, producing human-readable output with the signature attached. +
++
+In this mode, data cannot be additionally encrypted or compressed.
++
+Other signing options, *--hash*, *-u*, *--password*, can still be used here.
+
+=== DECRYPTION AND VERIFICATION
+
+*-d*, *--decrypt*::
+Decrypt and verify data from the _INPUT_FILE_ or stdin. +
++
+If the data is signed, signature verification information will be printed to _stdout_/_tty_.
++
+Additional options:
+
+*--output*:::
+Override the default output selection with a file name or stdout specifier (*_-_*). For the default output path selection see the *BASICS* section.
+
+*--password*, *--pass-fd*:::
+Depending on encryption options, you may be asked for the password of one of your secret keys, or for the encryption password. These options override that behavior such that you can input the password through automated means.
+
+*-v*, *--verify*::
+Verify signature(s) without writing embedded data out, if any (unless option _--output_ is specified). +
++
+To verify the detached signature of a file _file.ext_, the detached signature file in the file name pattern of _file.ext.sig_ or _file.ext.asc_ must exist. +
++
+Also you may use option *--source* to specify the exact source for the signed data. +
++
+If data is encrypted, you may be asked for password as in the *--decrypt* command.
+
+=== OTHER COMMANDS
+
+*--list-packets*::
+Show detailed information about the OpenPGP data in _INPUT_FILE_ or stdin.
+Useful for curiosity, troubleshooting or debugging. +
++
+Additional options can be used:
+
+*--json*::: output JSON data instead of human-readable information
+*--grips*::: print out key fingerprints and grips
+*--mpi*::: print out all MPI values
+*--raw*::: print raw, hex-encoded packets too
+
+*--enarmor*[=_msg_|_pubkey_|_seckey_|_sign_]::
+Convert binary data to the ASCII-armored as per OpenPGP standard.
+This includes the `-----BEGIN PGP MESSAGE-----` header and footer,
+and Base64-encoded data. +
++
+Output for _file.ext_ will be written to _file.ext.asc_ (if it does not exist)
+or to _stdout_. +
++
+The following OpenPGP headers may be specified:
++
+--
+*msg* (default) ::: _-----BEGIN PGP MESSAGE-----_
+*pubkey*::: _-----BEGIN PGP PUBLIC KEY BLOCK-----_
+*seckey*::: _-----BEGIN PGP SECRET KEY BLOCK-----_
+*sign*::: _-----BEGIN PGP SIGNATURE-----_
+--
++
+Additional options:
+
+*--overwrite*:::
+Forcefully overwrite existing destination file if it exists.
+
+*--output*:::
+Specify destination file path.
+
+
+*--dearmor*::
+Attempts to convert data from an armored format to the binary format. +
++
+The _file.ext.asc_ output file would be written to _file.ext_.
+If the destination file already exists, it will prompt the user
+for a new filename.
++
+Additional options:
+
+*--overwrite*:::
+Forcefully overwrite existing destination file if it exists.
+
+*--output*:::
+Specify destination file path.
+
+
+== OPTIONS
+
+*--home*, *--homedir* _DIR_::
+Change homedir (where RNP looks for keyrings) to the specified value. +
++
+The default homedir is _~/.rnp_ .
+
+*-f*, *--keyfile* _PATH_::
+Instead of loading keyrings, use key(s) from the file specified.
+
+*-u*, *--userid* _KEY_::
+Specify one or more signing keys, searching for it via the given value _KEY_.
+See *rnpkeys(1)* on how to find valid values.
+
+*-r*, *--recipient* _KEY_::
+Add the message recipient, i.e. the public key to which message will be encrypted to.
+See *rnpkeys(1)* on how to find valid values.
+
+*--armor*, *--ascii*::
+Apply ASCII armoring to the output, so that the resulting output
+can be transferred as plain text. +
++
+See IETF RFC 4880 for more details.
+
+*--detach*, *--detached*::
+Create a detached signature.
+
+*--output* _PATH_::
+Write data processing related output to the file specified. +
++
+If not specified, the output filename will be guessed from
+the input filename/extension or the command will prompt the user
+via _stdin_/_tty_.
+
+*--overwrite*::
+Overwrite already existing files without prompt.
+
+*--source*::
+Specify signed data for the detached signature verification (_-_ and _env:_ substitutions may be used here). +
+
+*--hash* _ALGORITHM_::
+Set hash algorithm which to be used for signing and derivation
+of the encryption key from a password. +
++
+The default value is _SHA256_.
+
+*--cipher* _ALGORITHM_::
+Set the symmetric algorithm used during encryption. +
++
+The default value is _AES256_.
+
+*--aead* [_EAX_, _OCB_]::
+Enable AEAD encryption and select algorithm to be used.
+Warning: EAX mode is deprecated and should not be used.
+
+*--aead-chunk-bits* _BITS_::
+Change AEAD chunk size bits, from 0 to 16 (actual chunk size would be 1 << (6 + bits)). See OpenPGP documentation for the details. +
+
+*--zip*, *--zlib*, *--bzip2*::
+Select corresponding algorithm to compress data with.
+Please refer to IETF RFC 4880 for details.
+
+*-z* _0..9_::
+Set compression level for the compression algorithms. +
++
+*9* is the highest compression level, where *0* disables compression.
++
+The default value is *6*.
+
+*--pass-fd* _FD_::
+Specify a file descriptor to read passwords from instead of from _stdin_/_tty_. +
++
+Useful for automated or non-interactive sessions.
+
+*--password* _PASSWORD_::
+Use the specified password when it is needed. +
++
+WARNING: Not recommended for production use due to potential security issues.
+Use *--pass-fd* for batch operations instead.
+
+*--passwords* _COUNT_::
+Set the number of passwords for *--symmetric* encryption. +
++
+While not commonly used, you may encrypt a message to any reasonable number of passwords.
+
+*--creation* _TIME_::
+Override signature creation time. +
++
+By default, creation time is set to the current local computer time. +
++
+*TIME* could be specified in the ISO 8601-1:2019 date format (_yyyy-mm-dd_), or in the UNIX timestamp format.
+
+*--expiration* _TIME_::
+Set signature expiration time, counting from the creation time. +
++
+By default, signatures do not expire. +
++
+A specific expiration time can be specified as:
+
+*** expiration date in the ISO 8601:2019 date format (_yyyy-mm-dd_); or
+*** hours/days/months/years since creation time with the syntax of _20h_/_30d_/_1m_/_1y_;
+*** number of seconds.
+
+*--keystore-format* _GPG_|_KBX_|_G10_|_G21_::
+Set keystore format. +
++
+RNP automatically detects the keystore format. +
++
+This option allows the auto-detection behavior to be overridden.
+
+*--notty*::
+Disable use of tty. +
++
+By default RNP would detect whether TTY is attached and use it for user prompts. +
++
+This option overrides default behaviour so user input may be passed in batch mode.
+
+*--current-time* _TIME_::
+Override system's time with a specified value. +
++
+By default RNP uses system's time in all signature/key checks, however in some scenarios it could be needed to override this. +
++
+*TIME* may be specified in the same way as *--creation*.
+
+*--set-filename* _FNAME_::
+Override or set a file name, stored inside of OpenPGP message. +
++
+By default RNP will store input filename (or empty string for *stdin*/*env* input) in the resulting OpenPGP message during encryption or embedded signing.
+This option allows the user to override this filename. Special value *_CONSOLE* may be used for "for your eyes only"-message. Refer to OpenPGP documentation for details.
+
+*--allow-hidden* ::
+Allow hidden recipient support. +
++
+Sender of an encrypted message may wish to hide recipient's key by setting a Key ID field to all zeroes.
+In this case receiver has to try every available secret key, checking for a valid decrypted session key. This option is disabled by default.
+
+== EXIT STATUS
+
+_0_::
+  Success.
+
+_Non-zero_::
+  Failure.
+
+
+== EXAMPLES
+
+The following examples demonstrate method of usage of the _rnp_ command.
+
+=== EXAMPLE 1
+
+*rnp* *--homedir* _.rnp_ *--encrypt* *-r* _0x6E69636B6F6C6179_
+*--output* _document.txt.encrypted_ _document.txt_
+
+Load keyrings from the _.rnp_ folder,
+encrypt the _document.txt_ file using the
+key with keyid _0x6E69636B6F6C6179_.
+
+=== EXAMPLE 2
+
+*rnp* *--keyfile* _john-sec.asc_ *-s* *--detach* *--hash* _SHA512_ _document.txt_
+
+Generate a detached signature over the file _document.txt_, using the
+secret key stored in the file.
+Additionally override the hash algorithm to _SHA512_.
+
+=== EXAMPLE 3
+
+*rnp* *--keyfile* _john-pub.asc_ *--verify* _document.txt.sig_
+
+Verify detached signature, using the key stored in the _john-pub.asc_ file.
+The signed data is assumed to be available from the file _document.txt_.
+
+=== EXAMPLE 4
+
+*rnp* *-e* *-c* *-s* *--passwords* _3_
+*-r* _0x526F6E616C642054_
+*-r* "_john@doe.com_"
+*-u* _0x44616E69656C2057_
+_document.txt_
+
+Encrypt _document.txt_ with 2 keys (specified via _keyid_
+_0x526F6E616C642054_ and _userid_ _john@doe.com_), and 3 passwords,
+so *any* of these may be used to decrypt the resulting file.
+
+Additionally, the message will be signed with key _0x44616E69656C2057_.
+
+=== EXAMPLE 5
+
+*printf* _"Message"_ | *rnp* *--keyfile* _env:PGP_ENCRYPTION_KEY_ *-e* *-* *--armor*
+
+Encrypt message, passed via stdin, using the key, stored in environment variable *PGP_ENCRYPTION_KEY*, add ascii armoring, and print result to the stdout.
+
+== BUGS
+
+Please report _issues_ via the RNP public issue tracker at:
+https://github.com/rnpgp/rnp/issues.
+
+_Security reports_ or _security-sensitive feedback_ should be reported
+according to the instructions at:
+https://www.rnpgp.org/feedback.
+
+
+== AUTHORS
+
+*RNP* is an open source project led by Ribose and has
+received contributions from numerous individuals and
+organizations.
+
+
+== RESOURCES
+
+*Web site*: https://www.rnpgp.org
+
+*Source repository*: https://github.com/rnpgp/rnp
+
+
+== COPYING
+
+Copyright \(C) 2017-2021 Ribose.
+The RNP software suite is _freely licensed_:
+please refer to the *LICENSE* file for details.
+
+
+== SEE ALSO
+
+*rnpkeys(1)*, *librnp(3)*

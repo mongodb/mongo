@@ -1,0 +1,8 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+This is test message to be signed, and/or encrypted, cleartext signed and detached signed.
+It will use keys from keyrings/1.
+End of message.
+-----BEGIN PGP SIGNATURE-----
+-----END PGP SIGNATURE-----

@@ -2614,6 +2614,162 @@
         ]
       },
       "scope": "excluded"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/libarchive/bzip2@bzip2-1.0.8",
+      "supplier": {
+        "name": "bzip2 project",
+        "url": [
+          "https://sourceware.org/bzip2/"
+        ]
+      },
+      "author": "Julian Seward",
+      "group": "libarchive",
+      "name": "bzip2",
+      "version": "1.0.8",
+      "description": "A high-quality data compression program and library.",
+      "licenses": [
+        {
+          "license": {
+            "id": "bzip2-1.0.6"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 1996-2019 Julian Seward",
+      "purl": "pkg:github/libarchive/bzip2@bzip2-1.0.8",
+      "externalReferences": [
+        {
+          "url": "https://github.com/libarchive/bzip2",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/bzip2/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/bzip2"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/json-c/json-c@json-c-0.18-20240915",
+      "supplier": {
+        "name": "json-c project",
+        "url": [
+          "https://github.com/json-c/json-c"
+        ]
+      },
+      "author": "json-c contributors",
+      "group": "json-c",
+      "name": "json-c",
+      "version": "0.18",
+      "description": "A JSON implementation in C.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2009-2012 Eric Haszlakiewicz",
+      "purl": "pkg:github/json-c/json-c@json-c-0.18-20240915",
+      "externalReferences": [
+        {
+          "url": "https://github.com/json-c/json-c",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/json-c/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/json-c"
+          }
+        ]
+      },
+      "scope": "required"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/rnpgp/rnp@v0.18.1",
+      "supplier": {
+        "name": "Ribose Inc.",
+        "url": [
+          "https://www.rnpgp.org/"
+        ]
+      },
+      "author": "Ribose Inc.",
+      "group": "rnpgp",
+      "name": "rnp",
+      "version": "0.18.1",
+      "description": "A high performance C++ OpenPGP library, fully compliant to RFC 4880.",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) 2017-2024 Ribose Inc.",
+      "purl": "pkg:github/rnpgp/rnp@v0.18.1",
+      "externalReferences": [
+        {
+          "url": "https://github.com/rnpgp/rnp",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Server Security"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/rnp/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/rnp"
+          }
+        ]
+      },
+      "scope": "required"
     }
   ],
   "dependencies": [
@@ -2667,7 +2823,10 @@
         "pkg:github/nlohmann/json@v3.11.3",
         "pkg:github/wiredtiger/wiredtiger@12.0.0",
         "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
-        "pkg:github/jeremy-rifkin/cpptrace@v1.0.3"
+        "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
+        "pkg:github/libarchive/bzip2@bzip2-1.0.8",
+        "pkg:github/json-c/json-c@json-c-0.18-20240915",
+        "pkg:github/rnpgp/rnp@v0.18.1"
       ]
     },
     {
@@ -2861,6 +3020,22 @@
     {
       "ref": "pkg:pypi/ocspresponder@0.5.0",
       "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/libarchive/bzip2@bzip2-1.0.8",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/json-c/json-c@json-c-0.18-20240915",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/rnpgp/rnp@v0.18.1",
+      "dependsOn": [
+        "pkg:github/libarchive/bzip2@bzip2-1.0.8",
+        "pkg:github/json-c/json-c@json-c-0.18-20240915",
+        "pkg:github/madler/zlib@1.3.1"
+      ]
     }
   ]
 }
