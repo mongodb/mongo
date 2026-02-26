@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/util/modules.h"
 
 #include <span>
@@ -56,14 +55,4 @@ SelectivityEstimate conjExponentialBackoff(std::span<SelectivityEstimate> conjSe
 SelectivityEstimate disjExponentialBackoff(std::span<SelectivityEstimate> disjSelectivities);
 
 void addFieldsToRelevantIndexOutput(const BSONObj& keyPattern, StringSet& relevantIndexOutput);
-
-/**
- * Returns true if the CE/costing of the given StageType is not yet supported by CBR.
- */
-bool isNodeUnsupportedByCBR(StageType type);
-
-/**
- * Returns true if CBR should never encounter this StageType.
- */
-bool isNodeUnexpectedByCBR(StageType type);
 }  // namespace mongo::cost_based_ranker

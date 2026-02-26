@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
@@ -39,27 +38,13 @@ CEResult ExactCardinalityImpl::populateCardinalities(
     const QuerySolutionNode* node,
     const PlanStage* execStage,
     cost_based_ranker::EstimateMap& cardinalities) {
-
-    auto stageType = execStage->stageType();
-
-    if (cost_based_ranker::isNodeUnsupportedByCBR(stageType)) {
-        // These stages will fallback to multiplanning.
-        return Status(ErrorCodes::UnsupportedCbrNode, "encountered unsupported stages");
-    } else if (cost_based_ranker::isNodeUnexpectedByCBR(stageType)) {
-        // These stages should never reach the cardinality estimator.
-        tasserted(12039702,
-                  str::stream{} << "Encountered " << stageType
-                                << " stage in ExactCE which should be unreachable");
-    }
-
     const auto commonStats = execStage->getCommonStats();
     cost_based_ranker::QSNEstimate card{
         .outCE = CardinalityEstimate{CardinalityType{(double)commonStats->advanced},
                                      EstimationSource::Code}};
     // If we are at a leaf node, we must record inCE as well. We get this from the SpecificStats.
     if (execStage->getChildren().empty()) {
-        // TODO SERVER-99075: Add a case for distinct scan here
-        switch (stageType) {
+        switch (execStage->stageType()) {
             case STAGE_COLLSCAN: {
                 auto stats = static_cast<const CollectionScanStats*>(execStage->getSpecificStats());
                 card.inCE = CardinalityEstimate{CardinalityType{(double)stats->docsTested},

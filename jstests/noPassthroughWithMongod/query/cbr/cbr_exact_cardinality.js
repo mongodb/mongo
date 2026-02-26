@@ -263,20 +263,6 @@ function testEof() {
     });
 }
 
-function testNodeUnsupportedByCBR() {
-    assert(coll.drop());
-    assert.commandWorked(coll.insert({}));
-    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-    // The explain forces costing, otherwise there is only one plan and no need to cost.
-    let winningPlan = getWinningPlanFromExplain(coll.explain().distinct("b", {a: 1}));
-    // TODO SERVER-99075: Assert that the distinct stage has a CE. Right now, the root
-    // node (PROJECTION_COVERED) has a CE but its child (DISTINCT_SCAN) doesn't.
-    assert(
-        winningPlan.hasOwnProperty("cardinalityEstimate") &&
-            !winningPlan.inputStage.hasOwnProperty("cardinalityEstimate"),
-    );
-}
-
 try {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "exactCE"}),
@@ -304,8 +290,6 @@ try {
     testCoveredPlans();
     // Ensure that eof plans are correctly calculated.
     testEof();
-    // Ensure that exactCE succeeds when it encounters a node not yet supported by CBR.
-    testNodeUnsupportedByCBR();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false}));

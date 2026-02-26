@@ -77,16 +77,6 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");
     bool isConjunctionBreaker = false;
 
-    if (isNodeUnsupportedByCBR(nodeType)) {
-        // These stages will fallback to multiplanning.
-        return Status(ErrorCodes::UnsupportedCbrNode, "encountered unsupported stages");
-    } else if (isNodeUnexpectedByCBR(nodeType)) {
-        // These stages should never reach the cardinality estimator.
-        tasserted(9902301,
-                  str::stream{} << "Encountered " << nodeType
-                                << " stage in CardinalityEstimator which should be unreachable");
-    }
-
     switch (nodeType) {
         case STAGE_COLLSCAN:
             ceRes = estimate(static_cast<const CollectionScanNode*>(node));
@@ -144,10 +134,55 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
             ceRes = estimate(static_cast<const SkipNode*>(node));
             isConjunctionBreaker = true;
             break;
-        default:
-            // We should have returned earlier in this function if we encountered an
-            // unsupported/unexpected node.
-            MONGO_UNREACHABLE_TASSERT(12039701);
+        case STAGE_SHARDING_FILTER:  // TODO SERVER-99073: Implement shard filter
+        case STAGE_DISTINCT_SCAN:    // TODO SERVER-99075: Implement distinct scan
+        case STAGE_TEXT_OR:
+        case STAGE_TEXT_MATCH:
+        case STAGE_GEO_NEAR_2D:
+        case STAGE_GEO_NEAR_2DSPHERE:
+        case STAGE_SORT_KEY_GENERATOR:
+        case STAGE_RETURN_KEY: {
+            // These stages will fallback to multiplanning.
+            return Status(ErrorCodes::UnsupportedCbrNode, "encountered unsupported stages");
+        }
+        case STAGE_BATCHED_DELETE:
+        case STAGE_CACHED_PLAN:
+        case STAGE_COUNT:
+        case STAGE_COUNT_SCAN:
+        case STAGE_DELETE:
+        case STAGE_IDHACK:
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_INDEX_PROBE_NODE:
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_MATCH:
+        case STAGE_MOCK:
+        case STAGE_MULTI_ITERATOR:
+        case STAGE_MULTI_PLAN:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_QUEUED_DATA:
+        case STAGE_RECORD_STORE_FAST_COUNT:
+        case STAGE_REPLACE_ROOT:
+        case STAGE_SAMPLE_FROM_TIMESERIES_BUCKET:
+        case STAGE_SPOOL:
+        case STAGE_SUBPLAN:
+        case STAGE_TIMESERIES_MODIFY:
+        case STAGE_TRIAL:
+        case STAGE_UNKNOWN:
+        case STAGE_UNPACK_SAMPLED_TS_BUCKET:
+        case STAGE_UNWIND:
+        case STAGE_UPDATE:
+        case STAGE_GROUP:
+        case STAGE_EQ_LOOKUP:
+        case STAGE_EQ_LOOKUP_UNWIND:
+        case STAGE_SEARCH:
+        case STAGE_WINDOW:
+        case STAGE_SENTINEL:
+        case STAGE_UNPACK_TS_BUCKET:
+            // These stages should never reach the cardinality estimator.
+            tasserted(9902301,
+                      str::stream{}
+                          << "Encountered " << nodeType
+                          << " stage in CardinalityEstimator which should be unreachable");
     }
 
     if (!ceRes.isOK()) {
@@ -1291,15 +1326,6 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
     };
 
     const StageType nodeType = node->getType();
-
-    if (isNodeUnsupportedByCBR(nodeType) || isNodeUnexpectedByCBR(nodeType)) {
-        // These stages should never reach the cardinality estimator.
-        tasserted(10064700,
-                  str::stream{} << "Encountered " << nodeType
-                                << " stage in CardinalityEstimator limit propagation which "
-                                   "should be unreachable");
-    }
-
     switch (nodeType) {
         case STAGE_COLLSCAN:
         case STAGE_VIRTUAL_SCAN:
@@ -1397,10 +1423,52 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             applyLimitToSelf();
             propagateToChildren(limit + size_t(static_cast<const SkipNode*>(node)->skip));
             break;
-        default:
-            // We should have returned earlier in this function if we encountered an
-            // unsupported/unexpected node.
-            MONGO_UNREACHABLE_TASSERT(12039700);
+        case STAGE_SHARDING_FILTER:  // TODO SERVER-99073: Implement shard filter
+        case STAGE_DISTINCT_SCAN:    // TODO SERVER-99075: Implement distinct scan
+        case STAGE_TEXT_OR:
+        case STAGE_TEXT_MATCH:
+        case STAGE_GEO_NEAR_2D:
+        case STAGE_GEO_NEAR_2DSPHERE:
+        case STAGE_SORT_KEY_GENERATOR:
+        case STAGE_RETURN_KEY:
+        case STAGE_BATCHED_DELETE:
+        case STAGE_CACHED_PLAN:
+        case STAGE_COUNT:
+        case STAGE_COUNT_SCAN:
+        case STAGE_DELETE:
+        case STAGE_IDHACK:
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_INDEX_PROBE_NODE:
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_MATCH:
+        case STAGE_MOCK:
+        case STAGE_MULTI_ITERATOR:
+        case STAGE_MULTI_PLAN:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_QUEUED_DATA:
+        case STAGE_RECORD_STORE_FAST_COUNT:
+        case STAGE_REPLACE_ROOT:
+        case STAGE_SAMPLE_FROM_TIMESERIES_BUCKET:
+        case STAGE_SPOOL:
+        case STAGE_SUBPLAN:
+        case STAGE_TIMESERIES_MODIFY:
+        case STAGE_TRIAL:
+        case STAGE_UNKNOWN:
+        case STAGE_UNPACK_SAMPLED_TS_BUCKET:
+        case STAGE_UNWIND:
+        case STAGE_UPDATE:
+        case STAGE_GROUP:
+        case STAGE_EQ_LOOKUP:
+        case STAGE_EQ_LOOKUP_UNWIND:
+        case STAGE_SEARCH:
+        case STAGE_WINDOW:
+        case STAGE_SENTINEL:
+        case STAGE_UNPACK_TS_BUCKET:
+            // These stages should never reach the cardinality estimator.
+            tasserted(10064700,
+                      str::stream{} << "Encountered " << nodeType
+                                    << " stage in CardinalityEstimator limit propagation which "
+                                       "should be unreachable");
     }
 }
 
