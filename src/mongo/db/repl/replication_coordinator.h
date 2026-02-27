@@ -501,6 +501,14 @@ public:
                                           const ReadConcernArgs& settings) = 0;
 
     /**
+     * Registers a waiter for the given opTime to be majority available.
+     *
+     * If the opTime given is already visible then this will return an immediately fulfilled future.
+     */
+    virtual SharedSemiFuture<void> registerWaiterForMajorityReadOpTime(OperationContext* opCtx,
+                                                                       OpTime targetOpTime) = 0;
+
+    /**
      * Waits until the deadline or until the optime of the current node is at least the opTime
      * specified in 'settings'.
      *

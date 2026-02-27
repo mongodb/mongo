@@ -404,6 +404,11 @@ Status ReplicationCoordinatorMock::waitUntilOpTimeWrittenUntil(OperationContext*
     return Status::OK();
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorMock::registerWaiterForMajorityReadOpTime(
+    OperationContext* opCtx, OpTime optime) {
+    return Future<void>::makeReady().share();
+}
+
 Status ReplicationCoordinatorMock::awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) {
     return Status::OK();
 }

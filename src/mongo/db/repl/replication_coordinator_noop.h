@@ -200,6 +200,9 @@ public:
     Status waitUntilOpTimeForRead(OperationContext*, const ReadConcernArgs&) final;
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) final;
 
+    SharedSemiFuture<void> registerWaiterForMajorityReadOpTime(OperationContext* opCtx,
+                                                               OpTime targetOpTime) final;
+
     OID getElectionId() final;
 
     int getMyId() const final;

@@ -279,6 +279,11 @@ SharedSemiFuture<void> ReplicationCoordinatorNoOp::awaitReplicationAsyncNoWTimeo
     MONGO_UNREACHABLE;
 }
 
+SharedSemiFuture<void> ReplicationCoordinatorNoOp::registerWaiterForMajorityReadOpTime(
+    OperationContext* opCtx, OpTime targetOpTime) {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::stepDown(OperationContext*,
                                           const bool,
                                           const Milliseconds&,

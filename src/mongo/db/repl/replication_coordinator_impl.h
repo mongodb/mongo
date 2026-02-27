@@ -310,6 +310,10 @@ public:
 
     Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                   const ReadConcernArgs& readConcern) override;
+
+    SharedSemiFuture<void> registerWaiterForMajorityReadOpTime(OperationContext* opCtx,
+                                                               OpTime targetOpTime) override;
+
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) override;
     OID getElectionId() override;
 
@@ -1852,6 +1856,10 @@ private:
     // list of information about clients waiting for a particular lastWritten opTime.
     // Waiters in this list are checked and notified on self's lastWritten opTime updates.
     WaiterList _lastWrittenOpTimeWaiterList;  // (M)
+
+    // list of clients that are waiting for a given opTime to be majority available.
+    // Waiters in this list are checked and notified whenever the majority opTime updates.
+    WaiterList _majorityReadWaiterList;  // (M)
 
     // Maps a horizon name to the promise waited on by awaitable hello requests when the node
     // has an initialized replica set config and is an active member of the replica set.

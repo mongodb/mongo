@@ -447,6 +447,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _replicationWaiterList(replicationWaiterListMetric),
       _lastAppliedOpTimeWaiterList(opTimeWaiterListMetric),
       _lastWrittenOpTimeWaiterList(opTimeWaiterListMetric),
+      _majorityReadWaiterList(opTimeWaiterListMetric),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
       _rsConfigState(kConfigPreStart),
@@ -1222,6 +1223,8 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
             lk, {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _lastWrittenOpTimeWaiterList.setErrorAll(
             lk, {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
+        _majorityReadWaiterList.setErrorAll(
+            lk, {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _currentCommittedSnapshotCond.notify_all();
         _initialSyncer.swap(initialSyncerCopy);
     }
@@ -1795,6 +1798,26 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+SharedSemiFuture<void> ReplicationCoordinatorImpl::registerWaiterForMajorityReadOpTime(
+    OperationContext* opCtx, OpTime targetOpTime) {
+    uassert(ErrorCodes::CommandNotSupported,
+            "Current storage engine does not support majority committed reads",
+            _externalState->snapshotsEnabled());
+
+    std::unique_lock lk(_mutex);
+
+    uassert(ErrorCodes::ShutdownInProgress, "Shutdown in progress", !_inShutdown);
+
+    // If the current majority timestamp is already inclusive of the given target opTime then it
+    // means the waiter can immediately return.
+    if (_currentCommittedSnapshot >= targetOpTime) {
+        return SemiFuture<void>::makeReady().share();
+    }
+
+    auto [future, handle] = _majorityReadWaiterList.add(lk, targetOpTime);
+    return std::move(future);
 }
 
 Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCtx,
@@ -5649,6 +5672,13 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
     // Wake up any threads waiting for read concern or write concern.
     if (_externalState->snapshotsEnabled() && _currentCommittedSnapshot) {
         _wakeReadyWaiters(lk, _currentCommittedSnapshot);
+
+        _majorityReadWaiterList.setValueIf(
+            lk,
+            [&](WithLock, const OpTime& targetOpTime, const SharedWaiterHandle&) -> bool {
+                return _currentCommittedSnapshot >= targetOpTime;
+            },
+            _currentCommittedSnapshot);
     }
     return true;
 }

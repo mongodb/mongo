@@ -221,6 +221,10 @@ public:
     Status waitUntilOpTimeWrittenUntil(OperationContext* opCtx,
                                        LogicalTime clusterTime,
                                        boost::optional<Date_t> deadline) override;
+
+    SharedSemiFuture<void> registerWaiterForMajorityReadOpTime(OperationContext* opCtx,
+                                                               OpTime optime) override;
+
     Status awaitTimestampCommitted(OperationContext* opCtx, Timestamp ts) override;
     OID getElectionId() override;
 

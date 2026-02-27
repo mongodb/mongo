@@ -6404,6 +6404,38 @@ TEST_F(ReplCoordTest, WaitUntilOpTimeforReadReturnsImmediatelyForMajorityReadCon
     ASSERT_OK(status);
 }
 
+TEST_F(ReplCoordTest, RegisterWaiterForMajorityOpTimeWorks) {
+    assertStartSuccess(BSON("_id" << "mySet"
+                                  << "version" << 2 << "members"
+                                  << BSON_ARRAY(BSON("host" << "node1:12345"
+                                                            << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+    auto opCtx = makeOperationContext();
+    runSingleNodeElection(opCtx.get());
+    getStorageInterface()->allDurableTimestamp = Timestamp(100, 1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 1),
+                                                        Date_t() + Seconds(100));
+    getReplCoord()->attemptToAdvanceStableTimestamp();
+
+    auto fulfilledFuture = getReplCoord()->registerWaiterForMajorityReadOpTime(
+        opCtx.get(), OpTime(Timestamp(1, 0), 1));
+
+    ASSERT_TRUE(fulfilledFuture.isReady());
+
+    auto future = getReplCoord()->registerWaiterForMajorityReadOpTime(opCtx.get(),
+                                                                      OpTime(Timestamp(200, 0), 1));
+
+    ASSERT_FALSE(future.isReady());
+
+    OpTime committedOpTime(Timestamp(200, 1), 1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(committedOpTime, Date_t() + Seconds(100));
+    getStorageInterface()->allDurableTimestamp = committedOpTime.getTimestamp();
+    getReplCoord()->attemptToAdvanceStableTimestamp();
+
+    ASSERT_TRUE(future.isReady());
+}
+
 TEST_F(ReplCoordTest, DoNotIgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatchOurs) {
     // Ensure that we do not process ReplSetMetadata when ConfigVersions do not match.
     assertStartSuccess(BSON("_id" << "mySet"
