@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "*pbt*":
+    approvers:
+      - 10gen/query-property-based-testing
   - "OWNERS.yml":
     approvers:
       - 10gen/query-execution-staff-leads

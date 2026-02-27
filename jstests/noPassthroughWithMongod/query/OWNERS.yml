@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "*pbt*":
+    approvers:
+      - 10gen/query-property-based-testing
   - "*query_stats*":
     approvers:
       - 10gen/query-integration-observability

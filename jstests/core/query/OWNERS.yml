@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "*pbt*":
+    approvers:
+      - 10gen/query-property-based-testing
   - "boolean_expression_simplification.js":
     approvers:
       - 10gen/query-optimization
