@@ -5,12 +5,11 @@ import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
+import requests
 import structlog
 import typer
 from tabulate import tabulate
 from typing_extensions import Annotated
-
-from evergreen import EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -25,8 +24,8 @@ from buildscripts.monitor_build_status.code_lockdown_config import (
 )
 from buildscripts.monitor_build_status.issue_report import IssueCategory, IssueReport
 from buildscripts.monitor_build_status.jira_service import JiraService
-from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
 from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.expansions import get_expansion
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -61,12 +60,12 @@ class MonitorBuildStatusOrchestrator:
     def __init__(
         self,
         jira_service: JiraService,
-        evg_api: EvergreenApi,
         code_lockdown_config: CodeLockdownConfig,
+        slack_webhook_url: str = None,
     ) -> None:
         self.jira_service = jira_service
-        self.evg_api = evg_api
         self.code_lockdown_config = code_lockdown_config
+        self.slack_webhook_url = slack_webhook_url
 
     def evaluate_build_redness(self, notify: bool) -> None:
         for notification_config in self.code_lockdown_config.notifications:
@@ -93,9 +92,25 @@ class MonitorBuildStatusOrchestrator:
                 LOGGER.info(line)
 
             if notify:
-                slack_channel = notification_config.slack.channel
-                LOGGER.info("Notifying slack channel with results", slack_channel=slack_channel)
-                self.evg_api.send_slack_message(target=slack_channel, msg=status_message.strip())
+                LOGGER.info("Sending Slack webhook notification")
+                self._send_slack_webhook(status_message.strip())
+
+    def _send_slack_webhook(self, message: str) -> None:
+        """Send a message to Slack using a webhook URL from the Devprod Correctness Slack app."""
+        if not self.slack_webhook_url:
+            raise ValueError(
+                "Slack webhook URL is required for notifications. "
+                "Please provide --slack-webhook-url parameter."
+            )
+
+        payload = {"text": message}
+        try:
+            response = requests.post(self.slack_webhook_url, json=payload, timeout=30)
+            response.raise_for_status()
+            LOGGER.info("Successfully sent Slack webhook notification")
+        except requests.exceptions.RequestException as e:
+            LOGGER.error("Failed to send Slack webhook notification", error=str(e))
+            raise
 
     def _make_report(self, scopes_config: ScopesConfig) -> IssueReport:
         LOGGER.info("Processing scope", name=scopes_config.name)
@@ -264,6 +279,9 @@ def main(
     notify: Annotated[
         bool, typer.Option(help="Whether to send slack notification with the results")
     ] = False,  # default to the more "quiet" setting
+    webhook_expansion_name: Annotated[
+        str, typer.Option(help="Evergreen expansion name for the Slack webhook URL")
+    ] = "mongo-code-lockdown-webhook",
 ) -> None:
     """
     Analyze Jira BFs count for redness reports.
@@ -279,15 +297,17 @@ def main(
     """
     enable_logging(verbose=False)
 
+    # Get webhook URL from Evergreen expansion
+    slack_webhook_url = get_expansion(webhook_expansion_name)
+
     jira_client = JiraClient(JIRA_SERVER, JiraAuth())
-    evg_api = get_evergreen_api()
 
     jira_service = JiraService(jira_client=jira_client)
     code_lockdown_config = CodeLockdownConfig.from_yaml_config(CODE_LOCKDOWN_CONFIG)
     orchestrator = MonitorBuildStatusOrchestrator(
         jira_service=jira_service,
-        evg_api=evg_api,
         code_lockdown_config=code_lockdown_config,
+        slack_webhook_url=slack_webhook_url,
     )
 
     orchestrator.evaluate_build_redness(notify)

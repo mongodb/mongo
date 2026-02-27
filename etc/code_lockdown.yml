@@ -27,7 +27,6 @@ notifications:
           count: 6
           grace_period_days: 2
     slack:
-      channel: "#10gen-mongo-code-lockdown"
       overall_scope_tags:
         - "<!here>"
       message_footer: |
@@ -70,7 +69,6 @@ notifications:
   #         count: 10
   #         grace_period_days: 0
   #   slack:
-  #     channel: "#10gen-mongo-version-lockdown"
   #     overall_scope_tags:
   #       - "<!here>"
   #     message_footer: |

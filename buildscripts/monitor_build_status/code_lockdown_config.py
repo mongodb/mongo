@@ -39,7 +39,6 @@ class ScopesConfig(BaseModel):
 
 
 class SlackConfig(BaseModel):
-    channel: str
     overall_scope_tags: list[str]
     message_footer: str
     short_issue_data_table: bool = False

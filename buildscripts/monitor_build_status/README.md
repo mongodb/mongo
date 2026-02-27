@@ -108,4 +108,8 @@ Use your PAT to run the following and output its results:
 JIRA_AUTH_PAT=<auth-token> python buildscripts/monitor_build_status/cli.py
 ```
 
-The above will _not_ spam the slack channel, unless you explicitly use `--notify`.
+The above will _not_ send notifications to the Slack channel.
+
+### Slack Notifications
+
+Slack notifications use a webhook from the Devprod Correctness Slack app (rather than user credentials) for security. The webhook URL is read from the `mongo-code-lockdown-webhook` Evergreen expansion, which points to the `#10gen-mongo-code-lockdown` Slack channel.
