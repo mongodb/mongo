@@ -253,26 +253,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 }
 
                 const auto& ns = nss();
-
-                // fetch the collection metadata and install it on each shard
-                if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                    LOGV2_INFO(
-                        10303102,
-                        "Fetching and installing collection and chunks metadata on all shards",
-                        "ns"_attr = ns);
-
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::sendFetchCollMetadataToShards(
-                        opCtx,
-                        ns,
-                        getShardsWithDataForCollection(opCtx, ns),
-                        session,
-                        executor,
-                        token);
-                }
-
                 auto opts = [&] {
                     ShardsvrValidateShardKeyCandidate validateRequest(ns);
                     validateRequest.setKey(_doc.getNewShardKey());
