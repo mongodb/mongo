@@ -49,11 +49,13 @@
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/scopeguard.h"
@@ -62,6 +64,7 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
 
+#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <queue>
@@ -433,6 +436,41 @@ TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
     tla->stopAcceptingSessions();
     ASSERT_OK(tla->start());
 }
+
+#ifndef _WIN32
+/**
+ * Test that when unixProxySocketPrefix is set, the transport layer creates proxy Unix domain
+ * sockets and they appear in the listener socket backlog queue depths (i.e.
+ * getProxyDomainSocketAddrs is used and the listener binds to the expected path).
+ */
+TEST(AsioTransportLayer, ProxyUnixDomainSockets) {
+    unittest::TempDir tempDir("proxy_socket");
+    auto opts = defaultTLAOptions();
+    // Use a non-privileged port (>= 1024) so binding succeeds without root.
+    opts.priorityPort = 1042;
+    opts.unixProxySocketPrefix = tempDir.path();
+
+    TestFixture tf(opts);
+    const std::string expectedStandardPath =
+        makeProxyUnixSockPath(opts.port, opts.unixProxySocketPrefix);
+    const std::string expectedPriorityPath =
+        makeProxyUnixSockPath(*opts.priorityPort, opts.unixProxySocketPrefix);
+
+    const auto depths = tf.tla().getListenerSocketBacklogQueueDepths();
+    auto unixSocketCount = std::count_if(
+        depths.begin(), depths.end(), [](const auto& p) { return p.first.getType() == AF_UNIX; });
+    EXPECT_EQ(unixSocketCount, 2);
+
+    for (const auto& expectedPath : {expectedStandardPath, expectedPriorityPath}) {
+        auto it = std::find_if(depths.begin(), depths.end(), [&](const auto& p) {
+            return p.first.getType() == AF_UNIX && p.first.getAddr() == expectedPath;
+        });
+        EXPECT_NE(it, depths.end())
+            << "Expected to find proxy Unix socket path \"" << expectedPath
+            << "\" in listener socket backlog queue depths (size=" << depths.size() << ")";
+    }
+}
+#endif  // _WIN32
 
 #ifdef __linux__
 /**

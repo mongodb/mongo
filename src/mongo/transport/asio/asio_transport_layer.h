@@ -108,7 +108,8 @@ public:
         boost::optional<int> priorityPort;             // accepts priority connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
-        bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
+        bool useUnixSockets = true;         // whether to allow UNIX sockets in ipList
+        std::string unixProxySocketPrefix;  // empty means disabled
 #endif
         bool enableIPv6 = false;             // whether to allow IPv6 sockets in ipList
         size_t maxConns = DEFAULT_MAX_CONN;  // maximum number of active connections
@@ -225,6 +226,10 @@ public:
     boost::optional<int> priorityPort() const {
         return _listenerOptions.priorityPort;
     }
+
+#ifndef _WIN32
+    bool isProxyUnixDomainSocket(StringData path, int port) const;
+#endif
 
     SessionManager* getSessionManager() const override {
         return _sessionManager.get();
@@ -352,7 +357,8 @@ private:
 
         Status setup(const std::vector<int>& ports,
                      const std::vector<std::string>& listenIPAddrs,
-                     const std::vector<std::string>& listenUnixSocketsAddr,
+                     const std::vector<std::string>& listenUnixSocketsAddrs,
+                     const std::vector<std::string>& listenProxyUnixSocketsAddrs,
                      Options& listenerOptions);
 
         void stopListenerWithLock(stdx::unique_lock<stdx::mutex>& lk);
@@ -391,7 +397,8 @@ private:
         StatusWith<std::vector<std::unique_ptr<AsioTransportLayer::AcceptorRecord>>>
         _createAcceptorRecords(const std::vector<int>& ports,
                                const std::set<WrappedEndpoint>& endpoints,
-                               const Options& listenerOptions);
+                               const Options& listenerOptions,
+                               bool isProxyUnixDomainSocket);
 
         // The lock is not necessary for this method since there are no concurrent operations
         // accessing the shared state.
@@ -399,6 +406,7 @@ private:
         _retrieveAllAcceptorRecords(const std::vector<int>& ports,
                                     const std::vector<std::string>& listenIPAddrs,
                                     const std::vector<std::string>& listenUnixSocketsAddrs,
+                                    const std::vector<std::string>& listenProxyUnixSocketsAddrs,
                                     const Options& listenerOptions);
 
         // The real incoming port in case of the corresponding listener option port is 0

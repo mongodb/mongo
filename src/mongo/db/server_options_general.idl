@@ -125,6 +125,13 @@ configs:
         source: [cli, ini]
         condition:
             preprocessor: "!defined(_WIN32)"
+    "net.proxyUnixDomainSocket.pathPrefix":
+        short_name: proxyUnixSocketPrefix
+        description: "The directory for proxy UNIX domain sockets. If not configured, the proxy sockets are disabled."
+        arg_vartype: String
+        default: ""
+        condition:
+            preprocessor: "!defined(_WIN32)"
     "net.unixDomainSocket.enabled":
         description: "Disable listening on unix sockets"
         arg_vartype: Bool

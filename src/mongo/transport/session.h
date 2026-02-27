@@ -196,6 +196,10 @@ public:
      */
     virtual bool isConnectedToPriorityPort() const = 0;
 
+    /**
+     * Returns true if the connection is on the proxy unix socket.
+     */
+    virtual bool isConnectedToProxyUnixSocket() const = 0;
 
     /**
      * Returns true if this session binds to the operation state, which implies open cursors and

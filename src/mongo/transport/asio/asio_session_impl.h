@@ -139,6 +139,8 @@ public:
 
     bool isConnectedToPriorityPort() const override;
 
+    bool isConnectedToProxyUnixSocket() const override;
+
     bool isLoadBalancerPeer() const override;
 
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
@@ -328,6 +330,11 @@ protected:
      * storms.
      */
     bool _isConnectedToPriorityPort = false;
+
+    /**
+     * Indicates whether this is a proxy unix domain socket connection.
+     */
+    bool _isConnectedToProxyUnixSocket = false;
 
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;

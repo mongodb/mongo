@@ -175,6 +175,13 @@ public:
     }
 
     /**
+     * Returns true if the connection is on the proxy unix socket.
+     */
+    bool isConnectedToProxyUnixSocket() const final {
+        return false;
+    }
+
+    /**
      * All gRPC sessions are considered bound to the operation state.
      */
     bool bindsToOperationState() const final {

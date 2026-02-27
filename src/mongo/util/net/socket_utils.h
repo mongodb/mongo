@@ -48,6 +48,7 @@ void setSocketKeepAliveParams(int sock,
                               Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
 std::string makeUnixSockPath(int port, StringData label = "");
+std::string makeProxyUnixSockPath(int port, StringData prefix);
 
 /**
  * Extracts the port number from the specified unix domain socket path name, under the assumption

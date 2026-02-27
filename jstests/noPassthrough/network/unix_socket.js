@@ -7,6 +7,9 @@
  * 3) That bad socket paths, like paths longer than the maximum size of a sockaddr
  *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
+ * 5) When proxyUnixSocketPrefix is set, the proxy Unix domain socket file is created at
+ *    {prefix}/unix-mongodb-{port}.sock and removed on shutdown (connect/ping use the
+ *    regular unix socket; proxy sockets require PROXY protocol so we only verify creation/cleanup).
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -75,6 +78,21 @@ let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ","
         checkPath = `${MongoRunner.dataDir}/${expectSockPath}`;
     }
 
+    // When proxyUnixSocketPrefix is set, verify the proxy socket file exists (path matches
+    // makeProxyUnixSockPath) and has permissions 0600. We do not connect over it; proxy listeners
+    // require PROXY protocol.
+    let proxyPath = null;
+    if (optDict.proxyUnixSocketPrefix) {
+        proxyPath = `${optDict.proxyUnixSocketPrefix}/unix-mongodb-${conn.port}.sock`;
+        assert(fileExists(proxyPath), `Proxy socket should exist: ${proxyPath}`);
+        const proxyMode = new Number(getFileMode(proxyPath));
+        assert.eq(
+            proxyMode,
+            0o600,
+            `Proxy socket ${proxyPath} should have permissions 0600, got ${proxyMode.toString(8)}`,
+        );
+    }
+
     checkSocket(checkPath);
 
     // Test the naming of the unix socket
@@ -94,6 +112,9 @@ let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ","
     }
 
     assert.eq(fileExists(checkPath), false);
+    if (proxyPath) {
+        assert.eq(fileExists(proxyPath), false, `Proxy socket should be removed: ${proxyPath}`);
+    }
 };
 
 // Check that the default unix sockets work
@@ -146,3 +167,8 @@ if (jsTestOptions().shellGRPC) {
     var sockName = `socketdir/mongodb-${port}.sock`;
     testSockOptions(undefined, sockName, {unixSocketPrefix: socketPrefix, port: port}, ",", true);
 }
+
+// Check that when proxyUnixSocketPrefix is set, the proxy unix socket is created and removed.
+// We connect and ping over the default unix socket; proxy socket is only checked for existence/cleanup.
+testSockOptions(undefined, undefined, {proxyUnixSocketPrefix: socketPrefix});
+testSockOptions(undefined, undefined, {proxyUnixSocketPrefix: socketPrefix}, ",", true);

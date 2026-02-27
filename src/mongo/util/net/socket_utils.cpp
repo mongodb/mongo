@@ -249,6 +249,10 @@ std::string makeUnixSockPath(int port, StringData label) {
     return stream << port << ".sock";
 }
 
+std::string makeProxyUnixSockPath(int port, StringData prefix) {
+    return fmt::format("{}/unix-mongodb-{}.sock", prefix, port);
+}
+
 int parsePortFromUnixSockPath(StringData path) {
     constexpr StringData extension = ".sock";
     if (!path.ends_with(extension)) {

@@ -93,6 +93,10 @@ public:
         return false;
     }
 
+    bool isConnectedToProxyUnixSocket() const override {
+        return false;
+    }
+
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
 
     bool bindsToOperationState() const override {
