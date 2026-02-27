@@ -1,3 +1,5 @@
+"""Repository rule for MongoDB's C/C++ toolchain."""
+
 load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
@@ -10,7 +12,7 @@ def _toolchain_download(ctx):
     skip_toolchain = ctx.os.environ.get(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE, None)
     if skip_toolchain:
         generate_noop_toolchain(ctx, substitutions)
-        print("Skipping c++ toolchain download and defining noop toolchain due to " + SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE + " being defined.")
+        ctx.report_progress("Skipping c++ toolchain download and defining noop toolchain due to {} being defined.".format(SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE))
         return None
 
     toolchain_key = "{distro}_{arch}".format(distro = distro, arch = arch)
@@ -21,7 +23,6 @@ def _toolchain_download(ctx):
         sha = toolchain_info["sha"]
 
         ctx.report_progress("downloading {} mongo toolchain {}".format(toolchain_key, urls))
-        print("downloading {} mongo toolchain {}".format(toolchain_key, urls))
         retry_download_and_extract(
             ctx = ctx,
             tries = 5,
@@ -30,7 +31,7 @@ def _toolchain_download(ctx):
         )
 
         if arch in MOLD_MAP:
-            print("Downloading mold from {}.".format(MOLD_MAP[arch]["url"]))
+            ctx.report_progress("Downloading mold from {}.".format(MOLD_MAP[arch]["url"]))
             retry_download_and_extract(
                 ctx = ctx,
                 tries = 5,
@@ -84,7 +85,12 @@ toolchain_download = repository_rule(
     },
 )
 
-def setup_mongo_toolchains():
+def setup_mongo_toolchains(name = "setup_toolchains"):
+    """Download/register the MongoDB C/C++ toolchain repositories.
+
+    Args:
+        name: Unused. Present to match public macro conventions.
+    """
     toolchain_download(
         name = "mongo_toolchain_v5",
         version = "v5",
@@ -92,7 +98,7 @@ def setup_mongo_toolchains():
     )
 
     native.register_toolchains(
-        "@mongo_toolchain_v5//:all",
+        "@mongo_toolchain_v5//:mongo_toolchain",
     )
 
 # Defines aliases for key targets inside the toolchain the user has chosen via
@@ -100,7 +106,13 @@ def setup_mongo_toolchains():
 # toolchains, so this function defines an alias called clang_tidy that points to
 # @mongo_toolchain_vN//:clang_tidy, where N depends on the config value. This lets us use
 # the name //:clang_tidy to refer to the clang_tidy of the configured toolchain.
-def setup_mongo_toolchain_aliases():
+def setup_mongo_toolchain_aliases(name = "setup_aliases"):
+    """Create aliases to tools within the configured mongo toolchain.
+
+    Args:
+        name: Unused. Present to match public macro conventions.
+    """
+
     # Map from target's name inside the toolchain to the name we want to alias it to.
     toolchain_targets = {
         "llvm_symbolizer": "llvm_symbolizer",

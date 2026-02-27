@@ -69,10 +69,47 @@ sys.pycache_prefix = os.path.join(tempfile.gettempdir(), "{pycache_dirname}")
     )
 
 def generate_noop_toolchain(ctx, substitutions):
-    # BUILD file is required for a no-op
+    # BUILD file is required for a no-op.
+    # Keep a stub mongo_toolchain target so unconditional register_toolchains()
+    # calls don't fail when the toolchain is intentionally skipped/unsupported.
     ctx.file(
         "BUILD.bazel",
-        "# {} not supported on this platform".format(ctx.attr.version),
+        """
+# {} not supported on this platform
+
+filegroup(
+    name = "all_files",
+    srcs = [],
+)
+
+filegroup(
+    name = "clang_tidy",
+    srcs = [],
+)
+
+filegroup(
+    name = "clang_format",
+    srcs = [],
+)
+
+filegroup(
+    name = "llvm_symbolizer",
+    srcs = [],
+)
+
+filegroup(
+    name = "llvm_symbolizer_libs",
+    srcs = [],
+)
+
+toolchain(
+    name = "mongo_toolchain",
+    exec_compatible_with = ["@platforms//:incompatible"],
+    target_compatible_with = ["@platforms//:incompatible"],
+    toolchain = "@bazel_tools//tools/cpp:current_cc_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+""".format(ctx.attr.version),
     )
 
 def get_toolchain_subs(ctx):
