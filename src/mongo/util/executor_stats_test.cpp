@@ -36,14 +36,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/functional.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <cstddef>
 #include <functional>
 #include <memory>
-#include <ratio>
 #include <string>
 #include <utility>
 
@@ -57,7 +55,7 @@ namespace mongo {
 class ExecutorStatsTest : public unittest::Test {
 public:
     void setUp() override {
-        _stats = std::make_unique<ExecutorStats>(&_clkSource);
+        _stats = std::make_unique<ExecutorStats>(&_tickSource);
     }
 
     void tearDown() override {
@@ -84,8 +82,8 @@ public:
         return _stats->wrapTask(std::move(task));
     }
 
-    void advanceTime(Milliseconds step) {
-        _clkSource.advance(step);
+    void advanceTime(Nanoseconds step) {
+        _tickSource.advance(step);
     }
 
     BSONObj getStats() const {
@@ -108,52 +106,62 @@ public:
         return getServerStatusStats().getField("averageRunTimeMicros").numberDouble();
     }
 
-    void runTimingTests(std::string histogramTag,
+    const Histogram<Microseconds>& getWaiting() const {
+        return _stats->waiting_forTest();
+    }
+
+    const Histogram<Microseconds>& getRunning() const {
+        return _stats->running_forTest();
+    }
+
+    void runTimingTests(const Histogram<Microseconds>& histogram,
                         std::function<size_t(Microseconds, Microseconds)> test) {
-        // Represents a test case, where `min` and `max` will be provided to `test`. The expected
-        // behavior for `ExecutorStats` is to update the histogram bucket corresponding to `tag`.
+        // For each bucket in `histogram`, invoke `test` with the bounds of the bucket.
+        // `test` will cause side effects on our `ExecutorStats` such that the
+        // corresponding bucket will be incremented by a known amount, and no
+        // other buckets will be incremented.
         struct Bucket {
-            std::string tag;
-            Microseconds min;
-            Microseconds max;
+            size_t i;
+            Microseconds lowerBound;
+            Microseconds upperBound;
         };
+        Microseconds lower{0};
+        std::vector<Bucket> buckets;
+        for (Microseconds upper : histogram.getPartitions()) {
+            buckets.push_back({.i = buckets.size(), .lowerBound = lower, .upperBound = upper});
+            lower = upper;
+        }
+        // "100 seconds" arbitrarily standing in for "infinitely long."
+        buckets.push_back({.i = buckets.size(), .lowerBound = lower, .upperBound = Seconds(100)});
 
-        const Bucket inputs[]{
-            {"0-999us", Microseconds(0), Microseconds(1000)},
-            {"1-49ms", Milliseconds(1), Milliseconds(50)},
-            {"50-99ms", Milliseconds(50), Milliseconds(100)},
-            {"500-549ms", Milliseconds(500), Milliseconds(550)},
-            {"950-999ms", Milliseconds(950), Milliseconds(1000)},
-            {"1000ms+", Seconds(1), Seconds(100)},
-        };
-
-        for (const auto& bucket : inputs) {
+        for (const auto& [i, lowerBound, upperBound] : buckets) {
             // Runs the test and captures stats before and after.
             // For each entry in `inputs`, the following calls into `test` and provides `min` and
             // `max` delays. The test function returns the number of tasks it schedules and runs.
-            const auto beforeStats = getStats().getObjectField(histogramTag).getOwned();
-
-            const auto numTasks = test(bucket.min, bucket.max);
-
-            const auto afterStats = getStats().getObjectField(histogramTag).getOwned();
+            const auto countsBefore = histogram.getCounts();
+            const auto numTasks = test(lowerBound, upperBound);
+            const auto countsAfter = histogram.getCounts();
 
             // Verify stats by inspecting the before and after states. The expectation is for the
             // bucket corresponding to `bucket.tag` to increase by `numTasks`, and for all other
             // buckets to remain unchanged.
-            std::string errMsg =
-                fmt::format("Bad value for bucket '{}' in {}", bucket.tag, afterStats.toString());
-            ASSERT_EQ(afterStats.getField(bucket.tag).numberLong(), numTasks) << errMsg;
+            std::string errMsg = fmt::format(
+                "bucket {} with lower bound {} and upper bound {} did not have the expected value.",
+                i,
+                lowerBound,
+                upperBound);
+            ASSERT_EQ(countsAfter[i], numTasks) << errMsg;
 
-            for (const auto& element : afterStats) {
-                const auto fieldName = element.fieldName();
-                if (fieldName == bucket.tag)
+            for (size_t j = 0; j < countsAfter.size(); ++j) {
+                if (j == i)
                     continue;
-                std::string errMsg = fmt::format("Expected matching values for '{}' in {} and {}",
-                                                 fieldName,
-                                                 beforeStats.toString(),
-                                                 afterStats.toString());
-                ASSERT_EQ(beforeStats.getField(fieldName).numberLong(), element.numberLong())
-                    << errMsg;
+                std::string errMsg = fmt::format(
+                    "bucket {} with lower bound {} and upper bound{} was expected not to have "
+                    "changed.",
+                    i,
+                    lowerBound,
+                    upperBound);
+                ASSERT_EQ(countsBefore[j], countsAfter[j]) << errMsg;
             }
         }
 
@@ -161,7 +169,7 @@ public:
     }
 
 private:
-    ClockSourceMock _clkSource;
+    TickSourceMock<Nanoseconds> _tickSource;
 
     std::unique_ptr<ExecutorStats> _stats;
 };
@@ -196,48 +204,47 @@ TEST_F(ExecutorStatsTest, ScheduledAndExecutedMetrics) {
 
 TEST_F(ExecutorStatsTest, WaitTime) {
     /**
-     * Schedules a total of 100 tasks and introduces artificial delays before running each task.
+     * Schedules some tasks separated by delays.
      * The delays start at `min`, never exceed `max`, and are incrementally increased by `step`.
      */
-    auto test = [this](Microseconds min, Microseconds max) {
-        const auto numTasks = 100;
+    auto test = [this](Nanoseconds min, Nanoseconds max) {
+        const auto numTasks = 10;
         const auto step = (max - min) / numTasks;
-        ASSERT_GT(step, Microseconds{0});
+        ASSERT_GT(step, step.zero());
 
         size_t scheduledTasks = 0;
         for (auto delay = min; delay < max; delay += step, scheduledTasks++) {
             auto task = wrapTask([](Status) {});
-            advanceTime(duration_cast<Milliseconds>(delay));
+            advanceTime(delay);
             task(Status::OK());
         }
 
         return scheduledTasks;
     };
 
-    runTimingTests("waitTime", test);
+    runTimingTests(getWaiting(), test);
 }
 
 TEST_F(ExecutorStatsTest, RunTime) {
     /**
-     * Schedules a few tasks and introduces artificial delays as running each task. These delays
+     * Schedules some tasks separated by delays.
      * follow the same semantics as mentioned earlier in `ExecutorStatsTest::WaitTime`.
      */
-    auto test = [this](Microseconds min, Microseconds max) {
-        const auto numTasks = 20;
+    auto test = [this](Nanoseconds min, Nanoseconds max) {
+        const auto numTasks = 10;
         const auto step = (max - min) / numTasks;
-        ASSERT_GT(step, Microseconds{0});
+        ASSERT_GT(step, step.zero());
 
         size_t scheduledTasks = 0;
         for (auto delay = min; delay < max; delay += step, scheduledTasks++) {
-            auto task = wrapTask(
-                [this, delay](Status) { advanceTime(duration_cast<Milliseconds>(delay)); });
+            auto task = wrapTask([this, delay](Status) { advanceTime(delay); });
             task(Status::OK());
         }
 
         return scheduledTasks;
     };
 
-    runTimingTests("runTime", test);
+    runTimingTests(getRunning(), test);
 }
 
 TEST_F(ExecutorStatsTest, SlowTaskExecutorWaitTimeProfilingLog) {

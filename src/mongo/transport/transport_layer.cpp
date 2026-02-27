@@ -61,10 +61,6 @@ ReactorTimer::ReactorTimer() : _id(reactorTimerIdCounter.addAndFetch(1)) {}
 
 thread_local Reactor* Reactor::_reactorForThread = nullptr;
 
-Date_t Reactor::ReactorClockSource::now() {
-    return _reactor->now();
-}
-
 ExecutorFuture<void> Reactor::sleepFor(Milliseconds duration, const CancellationToken& token) {
     auto when = now() + duration;
 

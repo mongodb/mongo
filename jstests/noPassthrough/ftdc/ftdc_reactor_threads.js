@@ -75,6 +75,112 @@ for (var t = 0; t < numThreads; t++) {
     threads[t].join();
 }
 
+function parseHistogramKey(key, unit, hist) {
+    // input: "(-inf, 123 μs)"
+    // output: {lowerBound: -Infinity, upperBound: 123}
+    //
+    // input: "totalCount"
+    // output: undefined
+    //
+    // unit is, e.g., "μs".
+    //
+    // hist is the enclosing histogram, for use in error diagnostics.
+    //
+    // An assertion is violated on parse failure.
+    const parts = key.split(",");
+    if (parts.length !== 2) {
+        return; // not a range, e.g. probably is "totalCount"
+    }
+    let [lower, upper] = parts.map((s) => s.trim());
+
+    let lowerBound;
+    if (lower.startsWith("(")) {
+        assert.eq(
+            lower,
+            "(-inf",
+            () => `unexpected open lower bound ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
+        );
+        lowerBound = -Infinity;
+    } else {
+        assert.eq(
+            lower[0],
+            "[",
+            () => `unexpected interval syntax ${lower} in histogram key ${key} in histogram: ${tojson(hist)}`,
+        );
+        const [lowerString, unitString] = lower.slice(1).split(" ");
+        assert(
+            !isNaN(Number(lowerString)),
+            () =>
+                `expected lower bound ${lowerString} to be a number in histogram key ${key} in histogram ${tojson(hist)}`,
+        );
+        assert.eq(
+            unitString,
+            unit,
+            () =>
+                `unexpected unit ${unitString} (expected ${unit}) in histogram key ${key} in histogram ${tojson(hist)}`,
+        );
+        lowerBound = Number(lowerString);
+    }
+
+    let upperBound;
+    assert.eq(
+        upper[upper.length - 1],
+        ")",
+        () => `unexpected interval syntax ${upper} in histogram key ${key} in histogram: ${tojson(hist)}`,
+    );
+    if (upper === "inf)") {
+        upperBound = Infinity;
+    } else {
+        const [upperString, unitString] = upper.slice(0, upper.length - 1).split(" ");
+        assert(
+            !isNaN(Number(upperString)),
+            () =>
+                `expected upper bound ${upperString} to be a number in histogram key ${key} in histogram ${tojson(hist)}`,
+        );
+        assert.eq(
+            unitString,
+            unit,
+            () =>
+                `unexpected unit ${unitString} (expected ${unit}) in histogram key ${key} in histogram ${tojson(hist)}`,
+        );
+        upperBound = Number(upperString);
+    }
+
+    return {lowerBound, upperBound};
+}
+
+function parseHistogram(hist, unit) {
+    // input: {"(-inf, 123 μs)": {"count": 0}, "[123 μs, 456 μs)": {"count": 8}, ...}
+    // output: [{lowerBound: Number, upperBound: Number, count: Number}, ...]
+    //     sorted by lowerBound.
+    // unit is, e.g., "μs".
+    // An assertion is violated on parse failure.
+    const result = [];
+
+    Object.entries(hist).forEach(([key, value]) => {
+        const parsedKey = parseHistogramKey(key, unit);
+        if (parsedKey === undefined) {
+            return; // not a range, e.g. probably is "totalCount"
+        }
+        const {lowerBound, upperBound} = parsedKey;
+        result.push({lowerBound, upperBound, count: value.count});
+    });
+
+    result.sort((left, right) => {
+        if (left.lowerBound < right.lowerBound) {
+            return -1;
+        }
+        if (right.lowerBound < left.lowerBound) {
+            return 1;
+        }
+        return 0;
+    });
+
+    assert.neq(result.length, 0, () => `histogram doesn't have any bucket: ${tojson(hist)}`);
+
+    return result;
+}
+
 jsTestLog("Verifying FTDC metrics ...");
 assert.soon(
     () => {
@@ -84,7 +190,10 @@ assert.soon(
         let longRunningTasks = 0; // Tasks with a run time > 1 sec.
         for (const instance in metrics) {
             if (!metrics[instance].hasOwnProperty("runTime")) continue; // Filter out FTDC metadata.
-            longRunningTasks += metrics[instance]["runTime"]["1000ms+"];
+            const thresholdMicros = 1_000_000; // one second
+            longRunningTasks += parseHistogram(metrics[instance]["runTime"], "μs")
+                .filter(({lowerBound}) => lowerBound >= thresholdMicros)
+                .reduce((sum, {count}) => sum + count, 0);
         }
         return longRunningTasks >= 1;
     },

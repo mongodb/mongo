@@ -47,7 +47,7 @@ function getCriteriaForGetDiagnosticData(data) {
 /**
  * Verify that getDiagnosticData is working correctly.
  */
-export function verifyGetDiagnosticData(adminDb, logData = true) {
+export function verifyGetDiagnosticData(adminDb) {
     const maxAttempts = 60;
     const retryMillis = 500;
     // We need to retry a few times in case we're running this test immediately
@@ -65,9 +65,6 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
         }, {});
         if (Object.values(results).indexOf(false) === -1) {
             // all predicates are satisfied
-            if (logData) {
-                jsTestLog("getDiagnosticData response met all criteria: " + tojson({criteria: results}));
-            }
             return data;
         }
 

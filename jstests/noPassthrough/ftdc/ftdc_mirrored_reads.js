@@ -28,7 +28,7 @@ const secondaries = rst.getSecondaries();
 
 function getDiagnosticData(node) {
     let db = node.getDB("admin");
-    const stats = verifyGetDiagnosticData(db, false /* logData */).serverStatus;
+    const stats = verifyGetDiagnosticData(db).serverStatus;
     assert(stats.hasOwnProperty("mirroredReads"));
     jsTestLog(`Got diagnostic data for host: ${node}, ${tojson(stats.mirroredReads)}`);
     return stats.mirroredReads;

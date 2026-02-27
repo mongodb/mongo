@@ -118,7 +118,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Date_t now() final {
+    stdx::chrono::system_clock::time_point systemTime() final {
         MONGO_UNREACHABLE;
     }
 
