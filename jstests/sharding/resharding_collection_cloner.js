@@ -5,6 +5,7 @@
  *   uses_atclustertime,
  * ]
  */
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
@@ -81,6 +82,13 @@ st.shard1.rs.awaitLastOpCommitted();
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 const reshardingCollectionClonerMaxStalenessSeconds = 100;
 
+// Some persistence providers (e.g., DSC) do not support local collections like system.profile.
+const supportsLocalCollections = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+    st.s,
+    "supportsLocalCollections",
+    true,
+);
+
 if (!isMultiversion) {
     // Verify that the ReshardingCollectionCloner's maxStalenessSeconds can be set at runtime.
     const shard0Primary = st.rs0.getPrimary();
@@ -104,8 +112,15 @@ if (!isMultiversion) {
 function testReshardCloneCollection(shard, expectedDocs) {
     const dbName = inputCollection.getDB().getName();
     const allNodes = [...st.shard0.rs.nodes, ...st.shard1.rs.nodes];
+    const primaryNodes = [st.shard0.rs.getPrimary(), st.shard1.rs.getPrimary()];
 
-    for (const node of allNodes) {
+    // If the storage provider supports local collections, set profiling on all nodes.
+    // Otherwise, only set profiling on primary nodes to avoid creating system.profile
+    // collections on non-primary nodes (which is not supported in some persistence providers
+    // like DSC).
+    const nodesToProfile = supportsLocalCollections ? allNodes : primaryNodes;
+
+    for (const node of nodesToProfile) {
         node.getDB(dbName).setProfilingLevel(2);
     }
 
@@ -120,7 +135,7 @@ function testReshardCloneCollection(shard, expectedDocs) {
     jsTestLog({"Node": shard.rs.getPrimary(), "ReshardingCmd": reshardCmd});
     assert.commandWorked(shard.rs.getPrimary().adminCommand(reshardCmd));
 
-    for (const node of allNodes) {
+    for (const node of nodesToProfile) {
         node.getDB(dbName).setProfilingLevel(0);
     }
 
@@ -138,7 +153,9 @@ function testReshardCloneCollection(shard, expectedDocs) {
     // Verify the ReshardingCollectionCloner is sending its aggregation requests with a logical
     // session ID to prevent idle cursors from being timed out by the CursorManager.
     for (const donorShard of [st.shard0, st.shard1]) {
-        const profilerEntries = donorShard.rs.nodes
+        // Check profiler on the same nodes where we enabled profiling.
+        const nodesToCheck = supportsLocalCollections ? donorShard.rs.nodes : [donorShard.rs.getPrimary()];
+        const profilerEntries = nodesToCheck
             .map((node) =>
                 node.getDB(dbName).system.profile.findOne({
                     op: "command",
