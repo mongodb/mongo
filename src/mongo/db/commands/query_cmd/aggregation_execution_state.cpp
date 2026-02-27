@@ -244,8 +244,7 @@ private:
             });
 
         // TODO SERVER-111172: Remove this test once view-ful timeseries are removed and 9.0 is LTS.
-        if (_aggExState.isView() && !_mainAcq->collectionExists() &&
-            executionNss.isTimeseriesBucketsCollection()) {
+        if (!_mainAcq->collectionExists() && executionNss.isTimeseriesBucketsCollection()) {
             // We resolved a timeseries view, but didn't later find the targeted buckets collection.
             // If we continue execution, we will return no documents.
             //
@@ -254,8 +253,11 @@ private:
             // 2. Due to the timeseries collection (buckets + view) being concurrently dropped.
             // 3. Due to a 'orphaned' timeseries view (e.g. because of a stepdown during a drop).
             //
-            // In scenario (1), it is incorrect to return empty results. Throw CollectionBecameView
-            // to re-resolve the aggregation over the now viewless timeseries collection.
+            // In scenario (1), it is incorrect to return empty results. To avoid this:
+            // * If the aggregation runs locally via a timeseries view, throw CollectionBecameView
+            //   to re-resolve it over the now viewless timeseries collection.
+            // * If the aggregation was resolved remotely (e.g. view kickback via the router),
+            //   interrupt it by a retriable error, a higher level is responsible for the retry.
             //
             // In scenarios like (2) or (3), preserve the existing (v8.0) behavior of returning
             // empty results on queries over dropped or incomplete viewful timeseries collections.
@@ -263,8 +265,17 @@ private:
             auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
                 opCtx, timeseriesMainNss, boost::none /* readTimestamp */);
             if (coll && coll->isTimeseriesCollection()) {
-                uasserted(ErrorCodes::CollectionBecameView,
-                          "Timeseries collection upgraded to viewless format while resolving view");
+                if (_aggExState.isView()) {
+                    uasserted(
+                        ErrorCodes::CollectionBecameView,
+                        "Timeseries collection upgraded to viewless format while resolving view");
+                }
+
+                uasserted(ErrorCodes::InterruptedDueToTimeseriesUpgradeDowngrade,
+                          fmt::format(
+                              "Operation on collection '{}' was interrupted due to a time-series "
+                              "metadata change during aggregation resolution. Retry the operation.",
+                              executionNss.toStringForErrorMsg()));
             }
         }
     }

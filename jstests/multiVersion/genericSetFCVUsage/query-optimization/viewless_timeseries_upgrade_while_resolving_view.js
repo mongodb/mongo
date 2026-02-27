@@ -13,7 +13,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-// TODO(SERVER-114573): Remove this test once 9.0 becomes lastLTS.
+// TODO(SERVER-111172): Remove this test once 9.0 becomes lastLTS.
 if (lastLTSFCV != "8.0") {
     quit();
 }
