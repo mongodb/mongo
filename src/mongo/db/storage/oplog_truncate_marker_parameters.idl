@@ -32,7 +32,7 @@ global:
 server_parameters:
     maxOplogTruncationPointsAfterStartup:
         description: "Maximum allowable number of oplog truncation points after startup has finished"
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_vartype: "long long"
         cpp_varname: gMaxOplogTruncateMarkersAfterStartup
         default: 100
@@ -50,7 +50,7 @@ server_parameters:
 
     minOplogTruncationPoints:
         description: "Minimum allowable number of oplog truncation points"
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_vartype: "long long"
         cpp_varname: gMinOplogTruncateMarkers
         default: 10
@@ -59,7 +59,7 @@ server_parameters:
 
     oplogTruncationPointSizeMB:
         description: "Oplog truncation point size in MB used to determine the number of oplog truncation points for an oplog of a given size. The size will be rounded up to the maximum size of an internal BSON object."
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_vartype: "int"
         cpp_varname: gOplogTruncateMarkerSizeMB
         default: 0
@@ -68,7 +68,7 @@ server_parameters:
 
     oplogTruncationCheckPeriodSeconds:
         description: "The number of seconds the oplog truncation thread wakes up periodically to check and truncate oplog."
-        set_at: [startup]
+        set_at: [startup, runtime]
         cpp_vartype: "int"
         cpp_varname: gOplogTruncationCheckPeriodSeconds
         default: 300
