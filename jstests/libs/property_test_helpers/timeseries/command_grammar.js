@@ -6,6 +6,9 @@
  * test harness to run against both time-series and control collections.
  */
 
+import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {makeMetricArb} from "jstests/libs/property_test_helpers/timeseries/metric_arbitraries.js";
+
 /**
  * The model is used to track the expected contents of the collections, to enable
  * delete/update commands to pick valid targets, and to check preconditions.
@@ -143,6 +146,27 @@ export class BatchInsertCommand {
 }
 
 /**
+ * Deterministically remix a base seed into a different pseudo-random-looking 32-bit integer.
+ *
+ * - Given the same (seed, salt), always returns the same signed 32-bit integer.
+ * - Different salts should yield decorrelated outputs.
+ * - Output is intended for stable index selection and RNG seeding via:
+ * - Not cryptographic; just stable mixing.
+ *
+ * @param {number} seed - base seed (any JS number; will be truncated to int32)
+ * @param {number} [salt=0] - small integer distinguishing different derived values
+ * @returns {number} signed 32-bit integer
+ */
+function remixSeed(seed, salt = 0) {
+    // A compact int32 mixer (inspired by Murmur3 finalizers).
+    let x = (seed | 0) ^ (salt | 0) ^ 0x9e3779b9;
+    x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+    x = (x ^ (x >>> 16)) | 0;
+    return x;
+}
+
+/**
  * Filter: generates filter strings for update/delete commands.
  *
  * Includes:
@@ -224,7 +248,7 @@ export class Filter {
                 // Use seed to pick two offsets within [0, span], then order them to get gte<=lte.
                 // Use two different deterministic mixes of the seed to reduce correlation.
                 const s1 = Math.abs(this.seed);
-                const s2 = Math.abs((this.seed * 1103515245 + 12345) | 0); // simple LCG mix
+                const s2 = Math.abs(remixSeed(this.seed, 1));
 
                 const off1 = span === 0 ? 0 : s1 % (span + 1);
                 const off2 = span === 0 ? 0 : s2 % (span + 1);
@@ -260,7 +284,7 @@ export class Filter {
                 if (keys.length === 0) return matchNothing;
 
                 // Pick a key by seed; use another mix so key choice isn't perfectly correlated with doc choice.
-                const s3 = Math.abs((this.seed * 1664525 + 1013904223) | 0);
+                const s3 = Math.abs(remixSeed(this.seed, 2));
                 const key = keys[s3 % keys.length];
 
                 return {[key]: d[key]};
@@ -428,4 +452,264 @@ export class DeleteByFilterCommand {
             model.docs.delete(String(id));
         }
     }
+}
+
+/**
+ * UpdateMany using a model-derived Filter, and generate the new $set value using
+ * a metric arbitrary that matches the current field's type in the model.
+ *
+ * No explicit id list is used; the filter/query is applied directly.
+ */
+export class UpdateByFilterCommand {
+    /**
+     * @param {Filter} filter - model-dependent filter (seeded)
+     * @param {number} seed   - used deterministically to pick which field to update + value generation seed
+     * @param {string} timeFieldname
+     * @param {string} metaFieldname
+     */
+    constructor(filter, seed, timeFieldname, metaFieldname) {
+        this._filter = filter;
+        this._seed = seed | 0;
+        this._timeFieldname = timeFieldname;
+        this._metaFieldname = metaFieldname;
+
+        this._lastQuery = null;
+        this._lastUpdate = null;
+    }
+
+    toString() {
+        return `UpdateByFilterCommand(filter=${this._filter.toString()}, seed=${this._seed})`;
+    }
+
+    check(model) {
+        return model.docs.size > 0;
+    }
+
+    run(model, {tsColl, ctrlColl}) {
+        const docs = Array.from(model.docs.values()); // deterministic (Map insertion order)
+
+        // Deterministically pick a base doc (for field selection + type inference).
+        const baseDoc = docs[Math.abs(this._seed) % docs.length];
+
+        // Pick a field name from the chosen doc, excluding _id/time/meta.
+        const excluded = new Set(["_id", this._timeFieldname, this._metaFieldname].filter(Boolean));
+        const keys = Object.keys(baseDoc).filter((k) => !excluded.has(k));
+        if (keys.length === 0) return;
+
+        const keySeed = remixSeed(this._seed, 1);
+        const key = keys[Math.abs(keySeed) % keys.length];
+
+        // Infer the metric type from the current value in the model.
+        const currentValue = baseDoc[key];
+        const metricType = inferMetricType(currentValue);
+        if (!metricType) return;
+
+        // Deterministically generate a new metric value of the same type.
+        const valueSeed = remixSeed(this._seed, 2);
+        const rng = fc.random(Math.abs(valueSeed));
+        const newValue = makeMetricArb([metricType]).generate(rng, undefined).value;
+
+        // Materialize filter -> query based on current model, then apply it directly.
+        const query = this._filter.toQuery(model, {
+            timeFieldname: this._timeFieldname,
+            metaFieldname: this._metaFieldname,
+        });
+        this._lastQuery = query;
+
+        const update = {$set: {[key]: newValue}};
+        this._lastUpdate = update;
+
+        tsColl.updateMany(query, update);
+        ctrlColl.updateMany(query, update);
+
+        // Keep the model in sync by applying the update to the docs that match the filter.
+        for (const doc of model.docs.values()) {
+            if (_filterMatchesDoc(this._filter, doc, model, this._timeFieldname, this._metaFieldname)) {
+                doc[key] = newValue;
+            }
+        }
+    }
+}
+
+/**
+ * Minimal in-memory matcher for current Filter kinds so we can keep the model updated
+ * when applying updates/deletes by query rather than by explicit ids.
+ *
+ * Must mirror Filter.toQuery() semantics for supported kinds.
+ */
+function _filterMatchesDoc(filter, doc, model, timeFieldname, metaFieldname) {
+    const docs = Array.from(model.docs.values()); // deterministic order (Map insertion order)
+    const ids = Array.from(model.docs.keys());
+
+    const matchNothing = false;
+
+    const pickDocBySeed = (seed) => (docs.length === 0 ? null : docs[Math.abs(seed) % docs.length]);
+    const pickIdBySeed = (seed) => (ids.length === 0 ? null : ids[Math.abs(seed) % ids.length]);
+
+    switch (filter.kind) {
+        case "matchAll":
+            return true;
+
+        case "byId": {
+            const picked = pickIdBySeed(filter.seed);
+            if (picked === null) return matchNothing;
+            return String(doc._id) === String(picked);
+        }
+
+        case "byMetaEq": {
+            if (!metaFieldname) return matchNothing;
+            const pickedDoc = pickDocBySeed(filter.seed);
+            if (!pickedDoc) return matchNothing;
+            // This mirrors the query {[metaFieldname]: pickedDoc[metaFieldname]} (JS equality approximation).
+            return doc[metaFieldname] === pickedDoc[metaFieldname];
+        }
+
+        case "byTimeGte": {
+            if (!timeFieldname) return matchNothing;
+            const pickedDoc = pickDocBySeed(filter.seed);
+            if (!pickedDoc) return matchNothing;
+            const t = pickedDoc[timeFieldname];
+            const myT = doc[timeFieldname];
+            if (!(t instanceof Date) || !(myT instanceof Date)) return matchNothing;
+            return myT.getTime() >= t.getTime();
+        }
+
+        case "byTimeLte": {
+            if (!timeFieldname) return matchNothing;
+            const pickedDoc = pickDocBySeed(filter.seed);
+            if (!pickedDoc) return matchNothing;
+            const t = pickedDoc[timeFieldname];
+            const myT = doc[timeFieldname];
+            if (!(t instanceof Date) || !(myT instanceof Date)) return matchNothing;
+            return myT.getTime() <= t.getTime();
+        }
+
+        case "byTimeRange": {
+            if (!timeFieldname) return matchNothing;
+
+            const myT = doc[timeFieldname];
+            if (!(myT instanceof Date)) return matchNothing;
+
+            // Compute min/max across model for the time field.
+            let minMs = null;
+            let maxMs = null;
+            for (const d of docs) {
+                const td = d?.[timeFieldname];
+                if (td instanceof Date) {
+                    const ms = td.getTime();
+                    if (minMs === null || ms < minMs) minMs = ms;
+                    if (maxMs === null || ms > maxMs) maxMs = ms;
+                }
+            }
+            if (minMs === null || maxMs === null) return matchNothing;
+
+            const span = Math.max(0, maxMs - minMs);
+
+            // Same seed mixing as Filter.toQuery()
+            const s1 = Math.abs(filter.seed);
+            const s2 = Math.abs(remixSeed(filter.seed, 1));
+            const off1 = span === 0 ? 0 : s1 % (span + 1);
+            const off2 = span === 0 ? 0 : s2 % (span + 1);
+
+            let gteMs = minMs + Math.min(off1, off2);
+            let lteMs = minMs + Math.max(off1, off2);
+
+            const expandFactor = Number(filter.params?.expandFactor ?? 0);
+            if (expandFactor > 0 && span > 0) {
+                const pad = Math.floor(span * expandFactor);
+                gteMs = Math.max(minMs, gteMs - pad);
+                lteMs = Math.min(maxMs, lteMs + pad);
+            }
+
+            const ms = myT.getTime();
+            return ms >= gteMs && ms <= lteMs;
+        }
+
+        case "byFieldEqFromDoc": {
+            const baseDoc = pickDocBySeed(filter.seed);
+            if (!baseDoc) return matchNothing;
+
+            const exclude = new Set(filter.params?.exclude ?? ["_id", timeFieldname, metaFieldname].filter(Boolean));
+            const allow = Array.isArray(filter.params?.allow) ? new Set(filter.params.allow) : null;
+
+            const keys = Object.keys(baseDoc).filter((k) => !exclude.has(k) && (allow ? allow.has(k) : true));
+            if (keys.length === 0) return matchNothing;
+
+            const s3 = Math.abs(remixSeed(filter.seed, 2));
+            const key = keys[s3 % keys.length];
+
+            return doc[key] === baseDoc[key];
+        }
+
+        case "and": {
+            const children = filter.params?.filters ?? [];
+            if (!Array.isArray(children) || children.length === 0) return true;
+            return children.every((f) => _filterMatchesDoc(f, doc, model, timeFieldname, metaFieldname));
+        }
+
+        case "or": {
+            const children = filter.params?.filters ?? [];
+            if (!Array.isArray(children) || children.length === 0) return true;
+            return children.some((f) => _filterMatchesDoc(f, doc, model, timeFieldname, metaFieldname));
+        }
+
+        default:
+            return matchNothing;
+    }
+}
+
+/**
+ * Map a runtime JS/BSON value (jstest environment) to a metric type string
+ * understood by makeMetricArb([type]).
+ *
+ * Returns null if unsupported or unknown.
+ */
+function inferMetricType(v) {
+    if (v === null) return "null";
+    if (v === undefined) return "undefined";
+
+    if (v instanceof Date) return "date";
+    if (v instanceof RegExp) return "regex";
+
+    if (typeof ObjectId === "function" && v instanceof ObjectId) return "objectId";
+    if (typeof Timestamp === "function" && v instanceof Timestamp) return "timestamp";
+    if (typeof NumberLong === "function" && v instanceof NumberLong) return "long";
+    if (typeof NumberDecimal === "function" && v instanceof NumberDecimal) return "decimal";
+    if (typeof DBPointer === "function" && v instanceof DBPointer) return "dbPointer";
+    if (typeof Code === "function" && v instanceof Code) {
+        return v.scope !== undefined ? "javascriptWithScope" : "javascript";
+    }
+    if (typeof globalThis.BSONSymbol === "function" && v instanceof globalThis.BSONSymbol) return "symbol";
+
+    // MinKey/MaxKey: support both constructor and structural forms.
+    if (typeof MinKey === "function" && v instanceof MinKey) return "minKey";
+    if (typeof MaxKey === "function" && v instanceof MaxKey) return "maxKey";
+    if (v && typeof v === "object") {
+        if (v.$minKey === 1) return "minKey";
+        if (v.$maxKey === 1) return "maxKey";
+    }
+
+    // BinData/HexData: best-effort identification.
+    if (v && typeof v === "object") {
+        const ctorName = v.constructor && v.constructor.name;
+        if (ctorName === "BinData") return "binData";
+    }
+
+    // Strings: distinguish UUID vs normal string by pattern.
+    if (typeof v === "string") {
+        try {
+            UUID(v);
+            return "uuid";
+        } catch (e) {
+            return "string";
+        }
+    }
+    if (typeof v === "boolean") return "bool";
+
+    if (typeof v === "number") {
+        return Number.isInteger(v) ? "int" : "double";
+    }
+
+    // Intentionally exclude object/array for now.
+    return null;
 }

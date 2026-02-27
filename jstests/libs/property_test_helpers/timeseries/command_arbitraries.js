@@ -14,6 +14,7 @@ import {
     DeleteByFilterCommand,
     DeleteByRandomIdCommand,
     Filter,
+    UpdateByFilterCommand,
 } from "jstests/libs/property_test_helpers/timeseries/command_grammar.js";
 
 /**
@@ -198,11 +199,31 @@ export function makeDeleteByFilterCommandArb(timeFieldname, metaFieldname, filte
 }
 
 /**
+ * Arbitrary for UpdateByFilterCommand.
+ *
+ * Generates:
+ *   new UpdateByFilterCommand(filter, seed, timeFieldname, metaFieldname)
+ *
+ * The actual filter is chosen at run-time from the model by the command
+ * itself; this arb just controls when such an update appears.
+ *
+ * @returns {fc.Arbitrary<UpdateByFilterCommand>}
+ */
+export function makeUpdateByFilterCommandArb(timeFieldname, metaFieldname, filterOpts = {}) {
+    const seedArb = fc.integer({min: -0x7fffffff, max: 0x7fffffff});
+
+    return fc
+        .tuple(makeFilterArb(timeFieldname, metaFieldname, filterOpts), seedArb)
+        .map(([filter, seed]) => new UpdateByFilterCommand(filter, seed, timeFieldname, metaFieldname));
+}
+
+/**
  * Arbitrary for a single timeseries command from the grammar:
  *
  *   - InsertCommand
  *   - BatchInsertCommand
- *   - DeleteByRandomIdCommand
+ *   - DeleteByFilterCommand
+ *   - UpdateByFilterCommand
  *
  * @param {string} [timeField='ts']
  * @param {string} [metaField='meta']
@@ -214,7 +235,7 @@ export function makeDeleteByFilterCommandArb(timeFieldname, metaFieldname, filte
  * @param {{intRange?: Range, dateRange?: Range}} [ranges]
  * @param {fc.Arbitrary<string>} [fieldNameArb=fc.string({minLength:1,maxLength:8})]
  *
- * @returns {fc.Arbitrary<InsertCommand|BatchInsertCommand|DeleteByFilterCommand>}
+ * @returns {fc.Arbitrary<InsertCommand|BatchInsertCommand|DeleteByFilterCommand|UpdateByFilterCommand>}
  */
 export function makeTimeseriesCommandArb(
     timeField = "ts",
@@ -243,7 +264,9 @@ export function makeTimeseriesCommandArb(
 
     const deleteArb = makeDeleteByFilterCommandArb(timeField, metaField);
 
-    return fc.oneof(insertArb, batchInsertArb, deleteArb);
+    const updateArb = makeUpdateByFilterCommandArb(timeField, metaField);
+
+    return fc.oneof(insertArb, batchInsertArb, deleteArb, updateArb);
 }
 
 /**
