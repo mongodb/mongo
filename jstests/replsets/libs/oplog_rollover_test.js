@@ -6,11 +6,20 @@ import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function numInsertOplogEntry(oplog) {
-    print(
-        `Oplog times for ${oplog.getMongo().host}: ${tojsononeline(
-            oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray(),
-        )}`,
-    );
+    // Try to log a debug message about the current oplog times, but skip if there is a CappedPositionLost
+    // error, as this may happen if the oplog collection is being truncated.
+    try {
+        print(
+            `Oplog times for ${oplog.getMongo().host}: ${tojsononeline(
+                oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray(),
+            )}`,
+        );
+    } catch (e) {
+        if (e.code !== ErrorCodes.CappedPositionLost) {
+            throw e;
+        }
+        print(`Skipping oplog times logging for ${oplog.getMongo().host} due to conflict with oplog cap maintainer`);
+    }
     let result;
     assert.soon(() => {
         try {

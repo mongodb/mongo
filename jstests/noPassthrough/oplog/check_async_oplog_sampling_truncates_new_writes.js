@@ -130,20 +130,28 @@ restartedPrimary.getDB("admin").runCommand({fsync: 1});
 // Wait for truncation to occur
 // Verify large documents inserted during intial sampling are eventually truncated from the oplog
 assert.soon(() => {
-    const cursor = restartedPrimaryOplog.find({ns: "test.markers"});
-    while (cursor.hasNext()) {
-        const entry = cursor.next();
-        jsTest.log.info("Checking " + tojson(entry));
+    try {
+        const cursor = restartedPrimaryOplog.find({ns: "test.markers"});
+        while (cursor.hasNext()) {
+            const entry = cursor.next();
+            jsTest.log.info("Checking " + tojson(entry));
 
-        const foundId = largeDocIDs.some((id) => {
-            return id == entry.o["_id"];
-        });
+            const foundId = largeDocIDs.some((id) => {
+                return id == entry.o["_id"];
+            });
 
-        if (foundId) {
-            return false;
+            if (foundId) {
+                return false;
+            }
         }
+        return true;
+    } catch (e) {
+        if (e.code !== ErrorCodes.CappedPositionLost) {
+            throw e;
+        }
+        print(`Failed to fully iterate over collection due to conflict with oplog cap maintainer, retrying`);
+        return false;
     }
-    return true;
 });
 
 jsTest.log.info("Test complete. Stopping replica set.");
