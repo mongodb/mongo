@@ -205,7 +205,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
 
-    def before_suite(self, test_report):
+    def before_suite(self, test_report, queued_tests: Optional[list[str]] = None):
         """Set suite start time."""
         self.create_time = datetime.datetime.now()
 

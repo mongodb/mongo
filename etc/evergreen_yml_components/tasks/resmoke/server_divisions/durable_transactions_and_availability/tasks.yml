@@ -2508,6 +2508,8 @@ tasks:
         vars:
           suite: disagg_backup_restore_jscore_passthrough
           use_large_distro: "true"
+          # Running multiple jobs in parallel complicates getting a consistent view of the database via checkpoints.
+          resmoke_jobs_max: 1
 
   - <<: *gen_task_template
     name: disagg_retryable_writes_jscore_passthrough_gen

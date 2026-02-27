@@ -41,7 +41,7 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
                 "Concrete Hook subclasses must override the IS_BACKGROUND class property"
             )
 
-    def before_suite(self, test_report):
+    def before_suite(self, test_report, queued_tests: Optional[list[str]] = None):
         """Test runner calls this exactly once before they start running the suite."""
         pass
 

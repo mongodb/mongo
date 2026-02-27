@@ -171,7 +171,7 @@ class Job(object):
     ):
         """Call the before/after suite hooks and continuously execute tests from 'queue'."""
 
-        self._run_hooks_before_suite(hook_failure_flag)
+        self._run_hooks_before_suite(hook_failure_flag, [t.testcase.test_name for t in queue.queue])
 
         while not queue.empty() and not interrupt_flag.is_set():
             queue_elem = queue.get_nowait()
@@ -340,13 +340,15 @@ class Job(object):
                 self.archival.archive(self.logger, result, self.manager)
 
     @TRACER.start_as_current_span("job._run_hooks_before_suite")
-    def _run_hooks_before_suite(self, hook_failure_flag: Optional[threading.Event]):
+    def _run_hooks_before_suite(
+        self, hook_failure_flag: Optional[threading.Event], queued_tests: Optional[list[str]] = None
+    ):
         """Run the before_suite method on each of the hooks."""
         run_hooks_before_suite_span = trace.get_current_span()
         hooks_failed = True
         try:
             for hook in self.hooks:
-                hook.before_suite(self.report)
+                hook.before_suite(self.report, queued_tests)
             hooks_failed = False
         finally:
             if hooks_failed and hook_failure_flag is not None:

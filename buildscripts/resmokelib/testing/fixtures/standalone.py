@@ -23,7 +23,7 @@ from buildscripts.resmokelib.extensions.setup_mongot_extension import setup_mong
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import certs
-from buildscripts.resmokelib.utils.history import HistoryDict
+from buildscripts.resmokelib.utils.history import Historic, HistoryDict
 
 
 class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
@@ -244,7 +244,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.debug("Mongod not running when gathering standalone fixture pid.")
         return out
 
-    def get_mongod_options(self):
+    def get_mongod_options(self) -> Historic:
         return self.mongod_options
 
     def set_mongod_options(self, options):
