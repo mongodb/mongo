@@ -1763,6 +1763,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           use_large_distro: "true"
+          resmoke_jobs_max: 4
 
   - <<: *gen_task_template
     name: sharding_gen
