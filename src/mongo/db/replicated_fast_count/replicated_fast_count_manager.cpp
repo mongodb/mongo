@@ -75,15 +75,19 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
     }
 }
 
-void ReplicatedFastCountManager::shutdown() {
+void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     LOGV2(11648800, "Shutting down ReplicatedFastCountManager");
     massert(11751500,
             "ReplicatedFastCountManager background thread is not already running. It should be"
             " started before calling shutdown().",
             _backgroundThread.joinable());
+
+    // Shutdown background thread.
     _isEnabled.store(false);
-    flushAsync();
+    _backgroundThreadReadyForFlush.notify_one();
     _backgroundThread.join();
+
+    flushSync(opCtx);
 
     LOGV2(11751501, "ReplicatedFastCountManager stopped");
 }
@@ -168,7 +172,7 @@ void ReplicatedFastCountManager::flushAsync() {
     _backgroundThreadReadyForFlush.notify_one();
 }
 
-void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
+void ReplicatedFastCountManager::flushSync(OperationContext* opCtx) {
     FastSizeCountMap dirtyMetadata;
     {
         stdx::unique_lock lock(_metadataMutex);
@@ -236,11 +240,8 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
 void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) {
     ThreadClient tc(_threadName, svcCtx->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();
-    auto uniqueOpCtx = tc->makeOperationContext();
-    auto opCtx = uniqueOpCtx.get();
-
     try {
-        _flushPeriodicallyOnSignal(opCtx);
+        _flushPeriodicallyOnSignal();
     } catch (const DBException& ex) {
         LOGV2_WARNING(11648806,
                       "Failure in thread",
@@ -248,31 +249,28 @@ void ReplicatedFastCountManager::_startBackgroundThread(ServiceContext* svcCtx) 
                       "error"_attr = ex.toStatus());
     }
 
-    // Final flush, in case shutdown and a flushAsync conflicted and missed a flush.
-    // This is needed because a queue of requests is not maintained. These two operations
-    // can conflict, but there shouldn't be more than two callers of flushAsync.
-    {
-        stdx::unique_lock lock(_metadataMutex);
-        const FastSizeCountMap dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
-        _acquireAndFlush(opCtx, dirtyMetadata);
-    }
-
     LOGV2(11648804, "ReplicatedFastCountManager exited");
 }
 
-void ReplicatedFastCountManager::_flushPeriodicallyOnSignal(OperationContext* opCtx) {
+void ReplicatedFastCountManager::_flushPeriodicallyOnSignal() {
     while (_isEnabled.load()) {
         FastSizeCountMap dirtyMetadata;
         {
             stdx::unique_lock lock(_metadataMutex);
-            _backgroundThreadReadyForFlush.wait(lock, [this] { return _flushRequested; });
+            _backgroundThreadReadyForFlush.wait(
+                lock, [this] { return _flushRequested || !_isEnabled.load(); });
             _flushRequested = false;
+            // If the condition variable was signalled during shutdown, we can exit early.
+            if (!_isEnabled.load()) {
+                break;
+            }
             // Get snapshot of metadata while still holding mutex from condition variable signal.
             dirtyMetadata = _getAndClearSnapshotOfDirtyMetadata(lock);
         }
 
         try {
-            _acquireAndFlush(opCtx, dirtyMetadata);
+            auto opCtx = cc().makeOperationContext();
+            _acquireAndFlush(opCtx.get(), dirtyMetadata);
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange) {
                 // Stepdown attempt interrupted us. We can continue here - if the stepdown did not

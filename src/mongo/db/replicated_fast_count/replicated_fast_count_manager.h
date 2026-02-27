@@ -114,9 +114,12 @@ public:
     void startup(OperationContext* opCtx);
 
     /**
-     * Signals fastcount thread to stop.
+     * Signals fastcount thread to stop and flushes final changes synchronously.
+     *
+     * WARNING: This function should be called exactly once per startup() call. Calling shutdown()
+     * more than once on the same background thread is an assertion error.
      */
-    void shutdown();
+    void shutdown(OperationContext* opCtx);
 
     /**
      * Initializes state for the ReplicatedFastCountManager. Populates in-memory _metadata values
@@ -137,17 +140,21 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
-     * Signals background thread to perform a flush.
+     * Signals the background thread to perform a flush.
+     *
      * This flush involves snapshotting and writing dirty in-memory SizeCounts to the internal
      * fastcount collection on disk.
      */
     void flushAsync();
 
     /**
-     * Flushes data synchronously on the caller's thread. Calling thread must be able
-     * to take a MODE_IX lock.
+     * Flushes data synchronously on the caller's thread. The calling thread must be able to take a
+     * MODE_IX lock.
+     *
+     * This function is useful in testing and during shutdown when flushing must happen
+     * synchronously to ensure a predictable order of events.
      */
-    void flushSync_ForTest(OperationContext* opCtx);
+    void flushSync(OperationContext* opCtx);
 
     /**
      * Disables periodic background writes of metadata for testing purposes. Must be called before
@@ -181,7 +188,7 @@ private:
      * Sleeps on a condition variable - _backgroundThreadReadyForFlush - waiting for _flushRequested
      * to be true.
      */
-    void _flushPeriodicallyOnSignal(OperationContext* opCtx);
+    void _flushPeriodicallyOnSignal();
 
     /**
      * Write one collection's sizeCount to disk.

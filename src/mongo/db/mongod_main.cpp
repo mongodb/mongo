@@ -1928,6 +1928,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         checker->stop();
     }
 
+    // Shutdown the thread managing fast size and count information. This is only called for
+    // standalone nodes because replicated nodes call shutdown() during stepdown instead.
+    if (isReplicatedFastCountEnabled(opCtx) &&
+        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet()) {
+        ReplicatedFastCountManager::get(serviceContext).shutdown(opCtx);
+    }
+
     // We should always be able to acquire the global lock at shutdown.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
@@ -1944,11 +1951,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // Allow memory leak for faster shutdown.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
                                                                         true /* memLeakAllowed */);
-    }
-
-    // Shut down the thread managing fast size and count information.
-    if (isReplicatedFastCountEnabled(opCtx)) {
-        ReplicatedFastCountManager::get(serviceContext).shutdown();
     }
 
     // Depending on the underlying implementation, there may be some state that needs to be shut

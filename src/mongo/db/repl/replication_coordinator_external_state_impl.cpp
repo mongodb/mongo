@@ -1280,7 +1280,7 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
 void ReplicationCoordinatorExternalStateImpl::_stopReplicatedFastCountThread() {
     auto opCtx = cc().getOperationContext();
     if (isReplicatedFastCountEnabled(opCtx)) {
-        ReplicatedFastCountManager::get(_service).shutdown();
+        ReplicatedFastCountManager::get(_service).shutdown(opCtx);
     }
 }
 }  // namespace repl
