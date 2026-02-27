@@ -47,6 +47,7 @@
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
@@ -208,7 +209,19 @@ void ReshardingOplogApplicationRules::_applyInsertOrUpdate(OperationContext* opC
             MONGO_UNREACHABLE;
     }
 
-    if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped()) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
+    auto mustUsePrimaryDrivenIndexBuilds =
+        rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
+
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    bool batchedWritesExist = batchedWriteContext.writesAreBatched() &&
+        !batchedWriteContext.getBatchedOperations(opCtx)->isEmpty();
+    bool allowBatchedWritesToCommit = batchedWritesExist && mustUsePrimaryDrivenIndexBuilds;
+
+    // Batched writes are assigned their timestamp upon committing, unlike regular writes. In the
+    // Primary Driven Index Builds mode, write operations are combined into batches instead of being
+    // processed individually.
+    if (shard_role_details::getRecoveryUnit(opCtx)->isTimestamped() || allowBatchedWritesToCommit) {
         // Resharding oplog application does two kinds of writes:
         //
         // 1) The (obvious) write for applying oplog entries to documents being resharded.
