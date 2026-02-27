@@ -139,6 +139,20 @@ int getMessageSizeErrorLogSeverityLevel() {
     return logSeverity().toInt();
 }
 
+std::string makeTLVString(const std::vector<ProxiedSupplementaryDataEntry>& tlvData) {
+    std::ostringstream tlvStringStream;
+    for (const auto& tlv : tlvData) {
+        tlvStringStream << fmt::format("{:#04x}", tlv.type) << ":" << tlv.data << ",";
+    }
+
+    auto tlvString = tlvStringStream.str();
+    if (!tlvString.empty()) {
+        // Pop off the last comma if we had any TLVs.
+        tlvString.pop_back();
+    }
+    return tlvString;
+};
+
 auto& totalIngressTLSConnections =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
 auto& totalIngressTLSHandshakeTimeMillis =  //
@@ -558,27 +572,6 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                         RestrictionEnvironment(_proxiedSrcRemoteAddr.value(), _localAddr);
                 }
 
-                auto makeTLVString = [&results]() {
-                    std::ostringstream tlvStringStream;
-                    for (const auto& tlv : results->tlvs) {
-                        tlvStringStream << fmt::format("{:#04x}", tlv.type) << ":" << tlv.data
-                                        << ",";
-                    }
-                    if (results->sslTlvs) {
-                        for (const auto& sslTlv : results->sslTlvs->subTLVs) {
-                            tlvStringStream << fmt::format("{:#04X}", sslTlv.type) << ":"
-                                            << sslTlv.data << ",";
-                        }
-                    }
-
-                    auto tlvString = tlvStringStream.str();
-                    if (!tlvString.empty()) {
-                        // Pop off the last comma if we had any TLVs.
-                        tlvString.pop_back();
-                    }
-                    return tlvString;
-                };
-
                 // Log ParserResults for testing.
                 LOGV2_DEBUG(
                     11978400,
@@ -588,7 +581,9 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                     "sourcePort"_attr = results->endpoints->sourceAddress.getPort(),
                     "destinationAddress"_attr = results->endpoints->destinationAddress.toString(),
                     "destinationPort"_attr = results->endpoints->destinationAddress.getPort(),
-                    "tlvs"_attr = makeTLVString(),
+                    "tlvs"_attr = makeTLVString(results->tlvs),
+                    "sslTlvs"_attr =
+                        results->sslTlvs ? makeTLVString(results->sslTlvs->subTLVs) : "",
                     "bytesParsed"_attr = results->bytesParsed);
             } else {
                 _proxiedSrcRemoteAddr = {};

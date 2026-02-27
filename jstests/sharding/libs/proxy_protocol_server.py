@@ -24,13 +24,12 @@ import proxyprotocol.server.main
 from proxyprotocol.server.main import main
 
 # Optional TLVs to append to every emitted PROXY protocol v2 header.
-_added_tlv_structs = None  # type: Optional[Dict[int, bytes]]
+_tlv_structs = None  # type: Optional[Dict[int, bytes]]
+_ssl_tlv_structs = None  # type: Optional[Dict[int, bytes]]
 _tlv_file_path = None  # type: Optional[str]
-_tlv_file_mtime = None  # type: Optional[int]
 
 
-# Expects to be in this format:
-# [{type: 0xE0, value: "val"}, {...}]
+# See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
 def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
     import json
 
@@ -42,41 +41,54 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
             or (0xE0 <= type_num <= 0xEF)
         )
 
-    def parse_type(type_val) -> int:
-        if not isinstance(type_val, str):
-            raise ValueError(f"TLV 'type' must be a hex string, got: {type_val!r}")
-        s = type_val.strip()
-        # Enforce "hex" rather than decimal.
-        is_hex = s.lower().startswith("0x")
-        if not is_hex:
-            raise ValueError(f"TLV 'type' must be hex (e.g. '0xE0'), got: {type_val!r}")
-        type_num = int(s, 16)
-        if not is_valid_type(type_num):
-            raise ValueError(f"TLV type out of range: {type_num}")
-        return type_num
-
     def parse_one_struct(obj: dict) -> Tuple[int, bytes]:
         if "type" not in obj:
             raise ValueError("TLV object missing required field 'type'")
-        type_num = parse_type(obj["type"])
+        type_num = obj["type"]
+        if type(type_num) is not int:
+            raise ValueError("TLV type expected to be a number")
+        if not is_valid_type(type_num):
+            raise ValueError("TLV type is invalid")
         if "value" not in obj:
             raise ValueError("TLV object missing required field 'value'")
         return type_num, str(obj["value"]).encode("utf-8")
 
+    def parse_ssl_tlv(obj: dict) -> Dict[int, bytes]:
+        ret: Dict[int, bytes] = {}
+        if "ssl" in obj:
+            ssl_obj = obj["ssl"]
+            if not isinstance(ssl_obj, list):
+                raise ValueError(f"Invalid TLV entry (expected list): {obj!r}")
+            for sub_entry in ssl_obj:
+                type_num, val = parse_one_struct(sub_entry)
+                ret[type_num] = val
+        return ret
+
+    def parse_common(entry: dict, tlvs, ssl_tlvs):
+        maybe_ssl_obj = parse_ssl_tlv(entry)
+        if maybe_ssl_obj:
+            if ssl_tlvs:
+                raise ValueError(f"Expected one ssl entry but received multiple")
+            ssl_tlvs.update(maybe_ssl_obj)
+            return
+
+        type_num, val = parse_one_struct(entry)
+        tlvs[type_num] = val
+
     tlvs: Dict[int, bytes] = {}
+    ssl_tlvs: Dict[int, bytes] = {}
     parsed = json.loads(raw_json_tlv)
     if isinstance(parsed, dict):
-        type_num, val = parse_one_struct(parsed)
-        tlvs[type_num] = val
+        parse_common(parsed, tlvs, ssl_tlvs)
     elif isinstance(parsed, list):
         for entry in parsed:
             if not isinstance(entry, dict):
                 raise ValueError(f"Invalid TLV entry (expected object): {entry!r}")
-            type_num, val = parse_one_struct(entry)
-            tlvs[type_num] = val
+            parse_common(entry, tlvs, ssl_tlvs)
     else:
         raise ValueError("TLV JSON must be an object or array of objects")
-    return tlvs
+
+    return tlvs, ssl_tlvs
 
 
 # We want to know when the proxy protocol server is ready to accept connections; so, we log to
@@ -137,7 +149,7 @@ async def _patched_run(args):
         ProxyResultIPv6,
         ProxyResultUnix,
     )
-    from proxyprotocol.tlv import ProxyProtocolTLV
+    from proxyprotocol.tlv import ProxyProtocolTLV, ProxyProtocolSSLTLV
 
     # --- BEGIN: Code copied from library's run() function ---
     loop = asyncio.get_running_loop()
@@ -147,27 +159,27 @@ async def _patched_run(args):
     dnsbl = Dnsbl.load(args.dnsbl, timeout=args.dnsbl_timeout)
 
     # --- BEGIN MODIFICATION: Injecting TLV into proxy protocol header ---
-    def _maybe_reload_tlv_file() -> None:
-        global _added_tlv_structs, _tlv_file_mtime
+    def _reload_tlv_file() -> None:
+        global _tlv_structs, _ssl_tlv_structs
         path = _tlv_file_path
         if not path:
             return
         try:
-            import os
-
-            mtime = os.stat(path).st_mtime
-            if _tlv_file_mtime is not None and mtime == _tlv_file_mtime:
-                return
             with open(path, "r", encoding="utf-8") as f:
                 raw = f.read()
-            _added_tlv_structs = _parse_pp2_tlv_structs_json(raw) if raw.strip() else {}
-            _tlv_file_mtime = mtime
+                if raw.strip():
+                    while "\n" in raw:
+                        line, raw = raw.split("\n", 1)
+                        if raw:
+                            # Only read the last line
+                            continue
+                        _tlv_structs, _ssl_tlv_structs = _parse_pp2_tlv_structs_json(line)
+                else:
+                    _tlv_structs, _ssl_tlv_structs = {}, {}
         except FileNotFoundError:
-            # The TLV file may be briefly missing during an update (i.e. tests removing then
-            # re-creating it). Keep the last-known-good TLVs in that case, and force a reload
-            # next time by clearing our recorded mtime.
-            _tlv_file_mtime = None
+            pass
         except Exception as e:
+            _tlv_structs, _ssl_tlv_structs = {}, {}
             print(f"Failed to reload TLV file {path!r}: {e}", file=sys.stderr, flush=True)
 
     def _with_tlv(result: ProxyResult, tlv: ProxyProtocolTLV) -> ProxyResult:
@@ -181,17 +193,23 @@ async def _patched_run(args):
 
     class UpstreamProtocolWithTLV(UpstreamProtocol):
         def build_pp_header(self, dnsbl, result):
-            _maybe_reload_tlv_file()
+            _reload_tlv_file()
             if self.downstream.connected:
                 result = build_transport_result(
                     self.downstream.transport,
-                    unique_id=self.downstream.id,
                     dnsbl=dnsbl,
                 )
-            cur_added = _added_tlv_structs or {}
-            if not cur_added:
+            cur_tlv = _tlv_structs or {}
+            cur_ssl_tlv = _ssl_tlv_structs or {}
+
+            if not cur_tlv and not cur_ssl_tlv:
                 return self.pp.pack(result)
-            return self.pp.pack(_with_tlv(result, ProxyProtocolTLV(init=cur_added)))
+            return self.pp.pack(
+                _with_tlv(
+                    result,
+                    ProxyProtocolTLV(init=cur_tlv, ssl=ProxyProtocolSSLTLV(init=cur_ssl_tlv)),
+                )
+            )
 
     new_server = partial(DownstreamProtocol, UpstreamProtocolWithTLV, loop, buf_len, dnsbl)
     # --- END MODIFICATION ---
