@@ -80,7 +80,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
     // Register query stats key
-    WriteBatchQueryStatsRegistrar::registerRequest(opCtx, cmdRef);
+    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
 
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);

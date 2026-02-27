@@ -50,8 +50,13 @@ public:
 
     /**
      * Register the write ops inside 'cmdRef' for query stats.
+     *
+     * @param skipRegistration - If true, parses the write ops in the command and computes the
+     * QueryShapeHash, but doesn't register with the query stats store. Used for explains.
      */
-    static void registerRequest(OperationContext* opCtx, WriteCommandRef cmdRef);
+    static void parseAndRegisterRequest(OperationContext* opCtx,
+                                        WriteCommandRef cmdRef,
+                                        bool skipRegistration = false);
 
     /**
      * Set the field includeQueryStatsMetrics in 'updateOpEntry' if the write op at 'opIndex' is

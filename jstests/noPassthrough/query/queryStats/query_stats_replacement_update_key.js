@@ -57,7 +57,6 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjRequired,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -92,7 +91,6 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjComplex,
                 shapeFields: queryShapeUpdateFieldsComplex,
                 keyFields: updateKeyFieldsComplex,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -108,7 +106,6 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: replacementUpdateCommandObjEmpty,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
     });

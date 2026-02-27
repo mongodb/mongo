@@ -57,7 +57,6 @@ function runPipelineUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: pipelineUpdateCommandObjSimple,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -93,7 +92,6 @@ function runPipelineUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: pipelineUpdateCommandObjComplex,
                 shapeFields: queryShapePipelineUpdateFieldsComplex,
                 keyFields: updateKeyFieldsComplex,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
 
@@ -109,7 +107,6 @@ function runPipelineUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 commandObj: pipelineUpdateCommandObjNoop,
                 shapeFields: queryShapeUpdateFieldsRequired,
                 keyFields: updateKeyFieldsRequired,
-                checkExplain: topologyName !== "Sharded", // TODO(SERVER-119025) enable once queryShapeHash is in explain for update on mongos
             });
         });
     });
