@@ -365,29 +365,29 @@ function validateListCatalogToListCollectionsConsistency(
     // We create a map for looking up $listCatalog namespaces by name. This map is used to handle
     // legacy time series collections, which inherit their options from their buckets collection in
     // listCollections. This becomes redundant once only viewless timeseries collections exist.
-    const listCatalogMap = new Map(listCatalog.map((c) => [c.name, c]));
-
-    const listCollectionsFromListCatalog = removeDuplicateDocuments(
-        sortCollectionsInPlace(
-            listCatalog.map((ci) => mapListCatalogToListCollectionsEntry(ci, listCatalogMap, isDbReadOnly)),
-        ),
+    const listCatalogMap = listCatalog.map((ci) =>
+        mapListCatalogToListCollectionsEntry(ci, new Map(listCatalog.map((c) => [c.name, c])), isDbReadOnly),
     );
-    const sortedListCollections = sortCollectionsInPlace([...listCollections]);
+
     // TODO (SERVER-95599): Remove this workaround under the "if" for the configDebugDump once 9.0 becomes last LTS.
     // This is because v8.2 and v8.3 binaries handle this field differently for views and timeseries. We just prevent any comparison.
     if (isMultiversion) {
-        listCollectionsFromListCatalog.forEach((e) => {
+        listCatalogMap.forEach((e) => {
             if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
         });
-        sortedListCollections.forEach((e) => {
+        listCollections.forEach((e) => {
             if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
         });
     }
     // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
     if (ignoreRecordIdsReplicatedOption) {
-        listCollectionsFromListCatalog.forEach((e) => delete e.options.recordIdsReplicated);
-        sortedListCollections.forEach((e) => delete e.options.recordIdsReplicated);
+        listCatalogMap.forEach((e) => delete e.options.recordIdsReplicated);
+        listCollections.forEach((e) => delete e.options.recordIdsReplicated);
     }
+
+    const listCollectionsFromListCatalog = removeDuplicateDocuments(sortCollectionsInPlace(listCatalogMap));
+    const sortedListCollections = sortCollectionsInPlace([...listCollections]);
+
     const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
         const message =
