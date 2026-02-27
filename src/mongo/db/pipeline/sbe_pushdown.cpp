@@ -546,10 +546,15 @@ bool findSbeCompatibleStagesForPushdown(
             !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrNotFullyLocal(),
 
-        // We're allowed to push down transforms if trySbeEngine is on, or we're querying a time
-        // series collection. If we're querying a time series collection, an InternalUnpackBucket
-        // stage must be pushed down for any later stages to also be pushed down.
-        .transform = meetsRequirements(SbeCompatibility::requiresTrySbe) || isTimeseriesCollection,
+        // We're allowed to push down transforms if trySbeEngine is on, or it is explicitly enabled
+        // by a feature flag, or we're querying a time series collection. If we're querying a time
+        // series collection, an InternalUnpackBucket stage must be pushed down for any later stages
+        // to also be pushed down.
+        .transform = meetsRequirements(cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                                           feature_flags::gFeatureFlagSbeTransformStages)
+                                           ? SbeCompatibility::noRequirements
+                                           : SbeCompatibility::requiresTrySbe) ||
+            isTimeseriesCollection,
 
         .match = meetsRequirements(cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
                                        feature_flags::gFeatureFlagSbeNonLeadingMatch)

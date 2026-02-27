@@ -32,6 +32,7 @@ import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/li
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
 const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
+const sbeTransformStagesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -223,7 +224,7 @@ assertPipelineIfSbeEnabled(
                 {$limit: 1},
                 {$project: {x: {$substrBytes: ["$y", 0, 1]}, _id: 0}},
             ],
-            expectedStages: ["LIMIT", "PROJECTION_SIMPLE", "FETCH", "IXSCAN"],
+            expectedStages: ["PROJECTION_DEFAULT", "LIMIT", "PROJECTION_SIMPLE", "FETCH", "IXSCAN"],
             expectedResult: [{x: ""}],
         });
     },
@@ -242,6 +243,7 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{x: ""}],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 
 assert.commandWorked(coll.dropIndexes());
@@ -302,6 +304,7 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{count: 2}],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 
 assertPipelineIfSbeEnabled(
@@ -663,6 +666,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE"],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -795,6 +799,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -817,6 +822,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["COLLSCAN", "PROJECTION_SIMPLE", "$project"],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
@@ -848,6 +854,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN", "$addFields", "$replaceRoot"],
         });
     },
+    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
 );
 
 // getMore cases.

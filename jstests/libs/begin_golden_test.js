@@ -4,6 +4,7 @@ import {
     checkJoinOptimizationStatus,
     checkSbeNonLeadingMatchEnabled,
     checkSbeEqLookupUnwindEnabled,
+    checkSbeTransformStagesEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -33,12 +34,12 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
     const sbeNonLeadingMatchEnabled = checkSbeNonLeadingMatchEnabled(typeof db === "undefined" ? null : db);
     const sbeEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(typeof db === "undefined" ? null : db);
+    const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(typeof db === "undefined" ? null : db);
+    const sbeIndividualFeaturesEnabled =
+        sbeNonLeadingMatchEnabled && sbeEqLookupUnwindEnabled && sbeTransformStagesEnabled;
 
-    const sbeNonLeadingMatchExpectedExists = fileExists(
-        relativePathToExpectedOutput + "/featureFlagSbeNonLeadingMatch/" + outputName,
-    );
-    const sbeEqLookupUnwindExpectedExists = fileExists(
-        relativePathToExpectedOutput + "/featureFlagSbeEqLookupUnwind/" + outputName,
+    const sbeIndividualFeaturesExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/sbeIndividualFeatures/" + outputName,
     );
     const sbeExpectedExists = fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
 
@@ -52,10 +53,8 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
 
-    if (sbeNonLeadingMatchEnabled && sbeNonLeadingMatchExpectedExists) {
-        relativePathToExpectedOutput += "/featureFlagSbeNonLeadingMatch";
-    } else if (sbeEqLookupUnwindEnabled && sbeEqLookupUnwindExpectedExists) {
-        relativePathToExpectedOutput += "/featureFlagSbeEqLookupUnwind";
+    if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
+        relativePathToExpectedOutput += "/sbeIndividualFeatures";
     } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {

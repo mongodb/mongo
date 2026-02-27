@@ -188,6 +188,26 @@ function isDeferredGetExecutorEnabled(theDB) {
 }
 
 /**
+ * Check if featureFlagSbeTransformStages is enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
+ */
+export function checkSbeTransformStagesEnabled(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            return FeatureFlagUtil.isPresentAndEnabled(conn, "SbeTransformStages");
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        return (
+            TestData.setParameters.featureFlagSbeTransformStages &&
+            TestData.setParameters.featureFlagSbeTransformStages === "true"
+        );
+    }
+}
+
+/**
  * Check if featureFlagSbeFull is enabled in the cluster.
  *
  * Quits test if there is no primary node and we are running in a mixed configuration.
