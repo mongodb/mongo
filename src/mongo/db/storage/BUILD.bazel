@@ -277,7 +277,6 @@ mongo_cc_library(
         "recovery_unit_base",
         "storage_options",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/views",
     ],
 )
 

@@ -14,10 +14,6 @@
  *   # Runs setFCV, which can interfere with other tests.
  *   incompatible_with_concurrency_simultaneous,
  *   runs_set_fcv,
- *   # TODO(SERVER-110441): Remove once point-in-time reads work with timeseries upgrade/downgrade.
- *   # Causal consistency suites read from secondaries, which always read at a point-in-time
- *   # even if one is not explictly requested (see ReadSource::kLastApplied).
- *   does_not_support_causal_consistency,
  * ]
  */
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
@@ -94,6 +90,15 @@ export const $config = (function () {
             assert.sameMembers(expectedDocs, actualDocs);
         },
 
+        findWithMajority: function (db, collName) {
+            const coll = getCollection(db, Random.randInt(numCollections));
+
+            const actualDocs = withRetryOnTimeseriesUpgradeDowngradeError(() =>
+                coll.find({}, {_id: 0}).readConcern("majority").toArray(),
+            );
+            assert.sameMembers(expectedDocs, actualDocs);
+        },
+
         findOne: function (db, collName) {
             const coll = getCollection(db, Random.randInt(numCollections));
 
@@ -131,9 +136,14 @@ export const $config = (function () {
 
         // Increase the pending commit time in the catalog to exercise the fix for SERVER-115811.
         cluster.executeOnMongodNodes((adminDb) => {
-            configureFailPoint(adminDb, "hangBeforePublishingCatalogUpdates", {
-                pauseEntireCommitMillis: 25,
-            });
+            configureFailPoint(
+                adminDb,
+                "hangBeforePublishingCatalogUpdates",
+                {
+                    pauseEntireCommitMillis: 25,
+                },
+                {activationProbability: 0.15},
+            );
         });
     };
     const teardown = function (db, collName, cluster) {
@@ -146,7 +156,7 @@ export const $config = (function () {
 
     return {
         threadCount: 4,
-        iterations: 30,
+        iterations: 100,
         states,
         transitions: uniformDistTransitions(states),
         setup,

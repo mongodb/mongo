@@ -48,6 +48,7 @@
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/views/util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/rwmutex.h"
@@ -1074,6 +1076,68 @@ bool CollectionCatalog::_hasPendingTimeseriesUpgradeDowngradeCommit(
     return true;
 }
 
+std::shared_ptr<const ViewDefinition>
+CollectionCatalog::_openViewAtPointInTimeIfUpgradedToViewlessTimeseries(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    // We only need to this for point-in-time reads. Non-PIT reads can go through the regular
+    // view lookup logic, which always looks up views "at latest".
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
+    if (!readTimestamp) {
+        return nullptr;
+    }
+
+    // Verify that there has been a timeseries upgrade to viewless format, i.e.:
+    // (1) The collection 'at latest' is in viewless format.
+    // (2) The same collection at the point-in-time was viewful format.
+    // This is done for performance, note there is no caching of the parsed view definitions.
+    auto collAtLatest = _lookupCollectionByNamespaceNoFindInstantiated(nss);
+    if (!collAtLatest || !collAtLatest->isNewTimeseriesWithoutView()) {
+        return nullptr;
+    }
+
+    // Calling establishConsistentCollection may open a new storage snapshot, which existing callers
+    // may not expect, so abandon that snapshot to avoid breaking their expectations.
+    auto ruWasActive = shard_role_details::getRecoveryUnit(opCtx)->isActive();
+    ON_BLOCK_EXIT([&] {
+        if (!ruWasActive && shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+        }
+    });
+
+    auto buckets =
+        establishConsistentCollection(opCtx, nss.makeTimeseriesBucketsNamespace(), readTimestamp);
+    if (!buckets || buckets->uuid() != collAtLatest->uuid()) {
+        return nullptr;
+    }
+
+    // Look up system.views at that point in time and reload the view.
+    auto systemViews = establishConsistentCollection(
+        opCtx, NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), readTimestamp);
+    if (!systemViews) {
+        return nullptr;
+    }
+
+    const auto entry = systemViews->getIndexCatalog()->findIdIndex(opCtx);
+    auto recordId = entry->accessMethod()->asSortedData()->findSingle(
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        CollectionPtr(systemViews),
+        entry,
+        BSON("_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
+    Snapshotted<BSONObj> viewBson;
+    if (!recordId.isValid() || !systemViews->findDoc(opCtx, recordId, &viewBson)) {
+        return nullptr;
+    }
+
+    auto viewDefinition = uassertStatusOK(
+        view_util::parseViewDefinitionBSON(opCtx, systemViews->ns().dbName(), viewBson.value())
+            .viewDefinition);
+    tassert(11044100,
+            "Expected timeseries view for point-in-time lookup before viewless format upgrade",
+            viewDefinition->viewOn() == buckets->ns());
+    return viewDefinition;
+}
+
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
@@ -1900,34 +1964,45 @@ void CollectionCatalog::iterateViews(
 
 std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
     OperationContext* opCtx, const NamespaceString& ns) const {
-    auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName());
-    if (!viewsForDb) {
-        return nullptr;
-    }
+    if (auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName())) {
+        if (!viewsForDb->allViewsAreValid() && opCtx->getClient()->isFromUserConnection()) {
+            // We want to avoid lookups on invalid collection names.
+            if (!NamespaceString::validCollectionName(
+                    NamespaceStringUtil::serializeForCatalog(ns))) {
+                return nullptr;
+            }
 
-    if (!viewsForDb->allViewsAreValid() && opCtx->getClient()->isFromUserConnection()) {
-        // We want to avoid lookups on invalid collection names.
-        if (!NamespaceString::validCollectionName(NamespaceStringUtil::serializeForCatalog(ns))) {
-            return nullptr;
+            // ApplyOps should work on a valid existing collection, despite the presence of bad
+            // views otherwise the server would crash. The view catalog will remain invalid until
+            // the bad view definitions are removed.
+            assertViewIsValid(*viewsForDb, ns);
         }
 
-        // ApplyOps should work on a valid existing collection, despite the presence of bad views
-        // otherwise the server would crash. The view catalog will remain invalid until the bad view
-        // definitions are removed.
-        assertViewIsValid(*viewsForDb, ns);
+        if (auto view = viewsForDb->lookup(ns)) {
+            return view;
+        }
     }
 
-    return viewsForDb->lookup(ns);
+    if (auto timeseriesView = _openViewAtPointInTimeIfUpgradedToViewlessTimeseries(opCtx, ns)) {
+        return timeseriesView;
+    }
+
+    return nullptr;
 }
 
 std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValidatingDurable(
     OperationContext* opCtx, const NamespaceString& ns) const {
-    auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName());
-    if (!viewsForDb) {
-        return nullptr;
+    if (auto viewsForDb = _getViewsForDatabase(opCtx, ns.dbName())) {
+        if (auto view = viewsForDb->lookup(ns)) {
+            return view;
+        }
     }
 
-    return viewsForDb->lookup(ns);
+    if (auto timeseriesView = _openViewAtPointInTimeIfUpgradedToViewlessTimeseries(opCtx, ns)) {
+        return timeseriesView;
+    }
+
+    return nullptr;
 }
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(

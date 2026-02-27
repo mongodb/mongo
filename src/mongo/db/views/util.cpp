@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -95,4 +96,34 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
                       << "'",
         valid);
 }
+
+ParsedViewDefinition parseViewDefinitionBSON(OperationContext* opCtx,
+                                             const DatabaseName& dbName,
+                                             const BSONObj& view) {
+    try {
+        view_util::validateViewDefinitionBSON(opCtx, view, dbName);
+    } catch (const DBException& ex) {
+        return {.viewName = boost::none, .viewDefinition = std::move(ex.toStatus())};
+    }
+
+    auto viewName = NamespaceStringUtil::deserialize(
+        dbName.tenantId(), view.getStringField("_id"), SerializationContext::stateDefault());
+    auto collatorElem = view["collation"];
+    auto collator = collatorElem && !collatorElem.Obj().isEmpty()
+        ? CollatorFactoryInterface::get(opCtx->getServiceContext())
+              ->makeFromBSON(collatorElem.Obj())
+        : nullptr;
+    if (!collator.isOK()) {
+        return {.viewName = std::move(viewName), .viewDefinition = std::move(collator.getStatus())};
+    }
+
+    auto viewDefinition =
+        std::make_shared<ViewDefinition>(viewName.dbName(),
+                                         viewName.coll(),
+                                         view.getStringField("viewOn"),
+                                         BSONArray{view.getObjectField("pipeline")},
+                                         std::move(collator.getValue()));
+    return {.viewName = std::move(viewName), .viewDefinition = std::move(viewDefinition)};
+}
+
 }  // namespace mongo::view_util

@@ -723,6 +723,20 @@ private:
         const NamespaceStringOrUUID& nsOrUUID, const std::shared_ptr<Collection>& pending) const;
 
     /**
+     * If reading at a point-in-time, and the given namespace used to contain a viewful timeseries
+     * collection which has been since upgraded to a viewless timeseries collection, then
+     * return the timeseries view that used to exist at that point in time.
+     *
+     * This is to support point-in-time reads after viewless timeseries upgrade, which would
+     * otherwise not work after the upgrade to viewless format drops the view: Views are
+     * untimestamped, so they always read 'at latest' even for point-in-time reads (SERVER-74429).
+     *
+     * TODO(SERVER-114573): Remove once 9.0 is last LTS.
+     */
+    std::shared_ptr<const ViewDefinition> _openViewAtPointInTimeIfUpgradedToViewlessTimeseries(
+        OperationContext* opCtx, const NamespaceString& nss) const;
+
+    /**
      * Gets Collections by UUID/Namespace.
      */
     std::shared_ptr<const Collection> _getCollectionByNamespace(OperationContext* opCtx,

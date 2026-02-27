@@ -147,26 +147,6 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     return liteParsedPipeline.getInvolvedNamespaces();
 }
 
-NamespaceString findSourceCollectionNamespace(OperationContext* opCtx,
-                                              std::shared_ptr<const CollectionCatalog> catalog,
-                                              const NamespaceString& nss) {
-
-    // Points to the name of the most resolved namespace.
-    const NamespaceString* resolvedNss = &nss;
-
-    int depth = 0;
-    for (; depth < ViewGraph::kMaxViewDepth; depth++) {
-        auto view = catalog->lookupView(opCtx, *resolvedNss);
-        if (!view) {
-            return NamespaceString({*resolvedNss});
-        }
-        resolvedNss = &view->viewOn();
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-
 StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                                      std::shared_ptr<const CollectionCatalog> catalog,
                                      const NamespaceString& nss,
@@ -183,7 +163,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
 
     // The last seen view definition, which owns the NamespaceString pointed to by
     // 'resolvedNss'.
-    std::shared_ptr<ViewDefinition> lastViewDefinition;
+    std::shared_ptr<const ViewDefinition> lastViewDefinition;
 
     std::vector<NamespaceString> dependencyChain{nss};
 
@@ -226,6 +206,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                  isNewTimeseriesWithoutView});
         }
 
+        lastViewDefinition = view;
         resolvedNss = &view->viewOn();
 
         if (storageGlobalParams.restore) {

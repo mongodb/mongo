@@ -18,6 +18,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/collation:collator_interface",
     ],
 )

@@ -132,36 +132,21 @@ Status ViewsForDatabase::_reload(OperationContext* opCtx,
         // decimal data even if decimal is disabled.
         fassert(40224, validateBSON(record->data.data(), record->data.size()));
 
-        auto view = record->data.toBson();
-        try {
-            view_util::validateViewDefinitionBSON(opCtx, view, systemViews->ns().dbName());
-        } catch (const DBException& ex) {
-            _hasInvalidNss = true;
+        auto [viewName, viewDefinition] = view_util::parseViewDefinitionBSON(
+            opCtx, systemViews->ns().dbName(), record->data.toBson());
+        if (!viewDefinition.isOK()) {
+            if (!viewName.has_value()) {
+                _hasInvalidNss = true;
+            } else {
+                _invalidViewNames.insert(*viewName);
+            }
             if (errorOnInvalid) {
-                return ex.toStatus();
+                return viewDefinition.getStatus();
             }
             continue;
         }
 
-        auto viewName = NamespaceStringUtil::deserialize(systemViews->ns().tenantId(),
-                                                         view.getStringField("_id"),
-                                                         SerializationContext::stateDefault());
-        auto collatorElem = view["collation"];
-        auto collator = parseCollator(opCtx, collatorElem ? collatorElem.Obj() : BSONObj{});
-        if (!collator.isOK()) {
-            _invalidViewNames.insert(viewName);
-            if (errorOnInvalid) {
-                return collator.getStatus();
-            }
-            continue;
-        }
-
-        _upsertIntoMap(opCtx,
-                       std::make_shared<ViewDefinition>(viewName.dbName(),
-                                                        viewName.coll(),
-                                                        view.getStringField("viewOn"),
-                                                        BSONArray{view.getObjectField("pipeline")},
-                                                        std::move(collator.getValue())));
+        _upsertIntoMap(opCtx, std::move(viewDefinition.getValue()));
     }
 
     return Status::OK();
