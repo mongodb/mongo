@@ -225,3 +225,6 @@ filters:
   - "ssl*.yml":
     approvers:
       - 10gen/server-security
+  - "timeseries_write_pbt.yml":
+    approvers:
+      - 10gen/server-timeseries-testing

@@ -15,11 +15,8 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-import {makeEmptyModel} from "jstests/libs/property_test_helpers/timeseries/command_grammar.js";
-import {makeTimeseriesCommandSequenceArb} from "jstests/libs/property_test_helpers/timeseries/command_arbitraries.js";
-
-const conn = MongoRunner.runMongod();
-const db = conn.getDB("test");
+import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
+import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -46,10 +43,6 @@ describe("Basic comparative PBT for timeseries inserts", () => {
     afterEach(() => {
         ctrlColl.drop();
         tsColl.drop();
-    });
-
-    after(() => {
-        MongoRunner.stopMongod(conn);
     });
 
     function assertCollectionsMatch() {

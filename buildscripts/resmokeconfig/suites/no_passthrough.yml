@@ -18,8 +18,6 @@ selector:
     - jstests/concurrency/*.js
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
-    # Exclude the timeseries pbt tests. These are intended to be run in a separate suite.
-    - jstests/noPassthrough/timeseries/pbt/**/*.js
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.

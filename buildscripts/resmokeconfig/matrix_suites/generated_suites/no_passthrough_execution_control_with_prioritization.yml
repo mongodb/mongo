@@ -35,7 +35,6 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
-    - jstests/noPassthrough/timeseries/pbt/**/*.js
   exclude_with_any_tags:
     - incompatible_with_execution_control_with_prioritization
   roots:

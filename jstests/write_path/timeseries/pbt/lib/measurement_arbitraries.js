@@ -8,7 +8,7 @@ import {
     makeMetricArb,
     makeSensorDateMetricStreamArb,
     makeMetricStreamArb,
-} from "jstests/libs/property_test_helpers/timeseries/metric_arbitraries.js";
+} from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
 
 /**
  * Make a single measurement document arbitrary.

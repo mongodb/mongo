@@ -1,0 +1,15 @@
+test_kind: js_test
+selector:
+  roots:
+    - jstests/write_path/timeseries/pbt/*.js
+
+executor:
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

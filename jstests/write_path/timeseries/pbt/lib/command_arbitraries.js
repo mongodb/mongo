@@ -7,7 +7,7 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {
     makeMeasurementDocArb,
     makeMeasurementDocStreamArb,
-} from "jstests/libs/property_test_helpers/timeseries/measurement_arbitraries.js";
+} from "jstests/write_path/timeseries/pbt/lib/measurement_arbitraries.js";
 import {
     InsertCommand,
     BatchInsertCommand,
@@ -15,7 +15,7 @@ import {
     DeleteByRandomIdCommand,
     Filter,
     UpdateByFilterCommand,
-} from "jstests/libs/property_test_helpers/timeseries/command_grammar.js";
+} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 
 /**
  * Arbitrary for InsertCommand (single doc insert).

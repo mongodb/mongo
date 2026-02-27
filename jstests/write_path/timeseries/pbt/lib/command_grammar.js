@@ -7,7 +7,7 @@
  */
 
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-import {makeMetricArb} from "jstests/libs/property_test_helpers/timeseries/metric_arbitraries.js";
+import {makeMetricArb} from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
 
 /**
  * The model is used to track the expected contents of the collections, to enable

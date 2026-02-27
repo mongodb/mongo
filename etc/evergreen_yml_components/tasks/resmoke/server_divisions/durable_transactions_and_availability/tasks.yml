@@ -2408,6 +2408,20 @@ tasks:
         vars:
           suite: v1index_jscore_passthrough
 
+  - <<: *task_template
+    name: timeseries_write_pbt
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "run tests"
+        vars:
+          suite: timeseries_write_pbt
+
   ################################################
   #           Disagg Storage tasks               #
   ################################################
