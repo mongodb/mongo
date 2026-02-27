@@ -169,6 +169,17 @@ TEST(BSONElement, TimestampToString) {
     ASSERT_EQ(obj["ts3"].toString(false, false), "Timestamp(4294967295, 4294967295)");
 }
 
+TEST(BSONElement, GtestPrintTo) {
+    auto obj = BSONObjBuilder{}
+                   .append("f1", 8)
+                   .append("f2", "value")
+                   .append("f3", Timestamp(Seconds(100), 1U))
+                   .obj();
+    ASSERT_EQ(testing::PrintToString(obj["f1"]), obj["f1"].toString());
+    ASSERT_EQ(testing::PrintToString(obj["f2"]), obj["f2"].toString());
+    ASSERT_EQ(testing::PrintToString(obj["f3"]), obj["f3"].toString());
+}
+
 TEST(BSONElement, ExtractLargeSubObject) {
     std::int32_t size = 17 * 1024 * 1024;
     std::vector<char> buffer(size);

@@ -48,6 +48,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 #include <array>
 #include <cstddef>
@@ -67,6 +68,16 @@ TEST(BSONObjToString, EmptyArray) {
     mongo::BSONObj o1 = mongo::fromjson(text);
     const std::string o1_str = o1.toString();
     ASSERT_EQUALS(text, o1_str);
+}
+
+TEST(BSONObjToString, GtestPrintTo) {
+    auto obj = BSONObjBuilder{}
+                   .append("number", 2.5f)
+                   .append("string", "value")
+                   .append("array", BSONArray{})
+                   .append("date", Date_t::min())
+                   .obj();
+    ASSERT_EQ(testing::PrintToString(obj), obj.toString());
 }
 
 TEST(BSONObjCompare, Timestamp) {

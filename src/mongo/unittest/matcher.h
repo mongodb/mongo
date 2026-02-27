@@ -52,6 +52,7 @@ MONGO_MOD_PUBLIC;
 namespace mongo::unittest::match {
 
 using namespace ::testing;
+using ::testing::Matcher;
 
 namespace MONGO_MOD_FILE_PRIVATE match_details {
 
@@ -67,8 +68,7 @@ namespace MONGO_MOD_FILE_PRIVATE match_details {
 template <typename Exception>
 class ThrowsMatcherImpl {
 public:
-    explicit ThrowsMatcherImpl(testing::Matcher<const Exception&> matcher)
-        : _matcher(std::move(matcher)) {}
+    explicit ThrowsMatcherImpl(Matcher<const Exception&> matcher) : _matcher(std::move(matcher)) {}
 
     void DescribeTo(std::ostream* os) const {
         *os << fmt::format("throws a {} which ", demangleName(typeid(Exception)));
@@ -106,7 +106,7 @@ public:
         return false;
     }
 
-    testing::Matcher<const Exception&> _matcher;
+    Matcher<const Exception&> _matcher;
 };
 }  // namespace MONGO_MOD_FILE_PRIVATE match_details
 

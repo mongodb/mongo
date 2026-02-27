@@ -65,6 +65,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
@@ -337,6 +339,14 @@ inline void PrintTo(const Status& s, std::ostream* os) {
         return;
     *os << " ";
     unittest::universalPrint(s.reason(), *os);
+}
+
+inline void PrintTo(const BSONObj& obj, std::ostream* os) {
+    *os << obj.toString();
+}
+
+inline void PrintTo(const BSONElement& el, std::ostream* os) {
+    *os << el.toString();
 }
 
 template <typename T>
