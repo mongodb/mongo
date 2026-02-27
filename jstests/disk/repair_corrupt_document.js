@@ -1,5 +1,9 @@
 /**
  * Tests that --repair deletes corrupt BSON documents.
+ * @tags: [
+ *   # TODO SERVER-117520: Re-visit this tag after implementing unclean shutdown repair.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {

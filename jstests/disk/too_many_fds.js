@@ -1,10 +1,11 @@
-// Create more than 1024 files on certain storage engines, then restart the server and see that it
-// can still listen on fd's smaller than FD_SETSIZE.
-//
-// @tags: [
-//   # This test can be slow and timeout on certain build variants (such as macOS).
-//   incompatible_with_macos,
-// ]
+/* Create more than 1024 files on certain storage engines, then restart the server and see that it
+ * can still listen on fd's smaller than FD_SETSIZE.
+ *
+ * @tags: [
+ *   # This test can be slow and timeout on certain build variants (such as macOS).
+ *   incompatible_with_macos,
+ * ]
+ */
 
 let baseName = "jstests_disk_too_many_fds";
 

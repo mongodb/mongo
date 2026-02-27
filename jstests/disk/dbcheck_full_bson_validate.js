@@ -2,7 +2,9 @@
  * Test BSON validation warning logs in the dbCheck command for full bson validate mode.
  *
  * @tags: [
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # TODO SERVER-117520: Re-visit this tag after implementing unclean shutdown repair.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

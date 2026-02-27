@@ -4,6 +4,9 @@
  *
  * @tags: [
  *   requires_wiredtiger,
+ *   # TODO SERVER-120515: Re-enable this test because the size storer can coexist with the
+ *   # replicated fast count collection.
+ *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

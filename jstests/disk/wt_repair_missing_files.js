@@ -2,7 +2,12 @@
  * Tests that --repair on WiredTiger correctly and gracefully handles missing data files and
  * directories.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [
+ *   requires_wiredtiger,
+ *   # TODO SERVER-120515: Re-enable this test because the size storer can coexist with the
+ *   # replicated fast count collection.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {

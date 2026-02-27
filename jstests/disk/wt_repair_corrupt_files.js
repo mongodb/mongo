@@ -2,7 +2,10 @@
  * Tests that --repair on WiredTiger correctly and gracefully handles corrupt data files and
  * directories.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [requires_wiredtiger,
+ *   # TODO SERVER-117520: Re-visit this tag after implementing unclean shutdown repair.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {

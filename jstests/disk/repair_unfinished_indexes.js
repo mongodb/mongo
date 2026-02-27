@@ -2,7 +2,12 @@
  * This test shuts down a replica set during a two-phase index build. The test corrupts a WiredTiger
  * collection file and expects that --repair salvages the data and drops the unfinished index.
  *
- * @tags: [requires_wiredtiger, requires_replication]
+ * @tags: [
+ *   requires_wiredtiger,
+ *   requires_replication,
+ *   # TODO SERVER-117520: Re-visit this tag after implementing unclean shutdown repair.
+ *   featureFlagReplicatedFastCount_incompatible,
+ * ]
  */
 
 import {
