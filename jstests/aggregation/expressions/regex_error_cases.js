@@ -1,6 +1,7 @@
 import "jstests/libs/query/sbe_assert_error_override.js";
 
 import {executeAggregationTestCase} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 
 // The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
 // In case of multiple mongos, disable random dispatching of command by enforcing pinToSingleMongos and route against a single mongos.
@@ -48,9 +49,11 @@ function assertFails(parameters, errorCode, allowNullResponse = false) {
 
     // Check constant parameters, but without optimization phase.
     try {
-        assert.commandWorked(
-            db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "alwaysOn"}),
-        );
+        configureFailPointForAllShardsAndMongos({
+            conn: db.getMongo(),
+            failPointName: "disablePipelineOptimization",
+            failPointMode: "alwaysOn",
+        });
 
         executeAggregationTestCase(
             coll,
@@ -74,7 +77,11 @@ function assertFails(parameters, errorCode, allowNullResponse = false) {
             ),
         );
     } finally {
-        assert.commandWorked(db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));
+        configureFailPointForAllShardsAndMongos({
+            conn: db.getMongo(),
+            failPointName: "disablePipelineOptimization",
+            failPointMode: "off",
+        });
     }
 
     // Check parameters pulled from collection.

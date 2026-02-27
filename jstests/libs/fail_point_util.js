@@ -3,6 +3,7 @@
  */
 
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 
 export var configureFailPoint;
 
@@ -129,3 +130,12 @@ export var kDefaultWaitForFailPointTimeout;
         };
     };
 })();
+
+export function configureFailPointForAllShardsAndMongos({conn, failPointName, data = {}, failPointMode}) {
+    for (const host of DiscoverTopology.findNonConfigNodes(db.getMongo())) {
+        const conn = new Mongo(host, undefined);
+        assert.commandWorked(
+            conn.getDB("admin").runCommand({"configureFailPoint": failPointName, "mode": failPointMode, data: data}),
+        );
+    }
+}

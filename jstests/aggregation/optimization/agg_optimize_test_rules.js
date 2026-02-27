@@ -9,6 +9,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {isAggregationPlan} from "jstests/libs/query/analyze_plan.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+import {configureFailPointForAllShardsAndMongos} from "jstests/libs/fail_point_util.js";
 
 // The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
 // In case of multiple mongos, disable random dispatching of command by enforcing pinToSingleMongos and route against a single mongos.
@@ -26,7 +27,11 @@ if (
     quit();
 }
 
-assert.commandWorked(db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));
+configureFailPointForAllShardsAndMongos({
+    conn: db.getMongo(),
+    failPointName: "disablePipelineOptimization",
+    failPointMode: "off",
+});
 
 function explainPipeline(coll, pipeline) {
     const explain = coll.explain().aggregate([{$_internalInhibitOptimization: {}}, ...pipeline]);
