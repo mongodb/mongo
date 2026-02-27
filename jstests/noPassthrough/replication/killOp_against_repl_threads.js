@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_replication,
- *   requires_fcv_83,
  * ]
  */
 
