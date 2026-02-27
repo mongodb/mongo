@@ -247,6 +247,11 @@ std::string makeUnixSockPath(int port, StringData label) {
     return stream << port << ".sock";
 }
 
+std::string makeProxyUnixSockPath(int port, StringData prefix) {
+    invariant(!prefix.empty());
+    return fmt::format("{}/unix-mongodb-{}.sock", prefix, port);
+}
+
 #ifndef _WIN32
 void setUnixDomainSocketPermissions(const std::string& path, int permissions) {
     if (::chmod(path.c_str(), permissions) == -1) {

@@ -136,6 +136,8 @@ public:
 
     bool isConnectedToLoadBalancerPort() const override;
 
+    bool isConnectedToProxyUnixSocket() const override;
+
     bool isLoadBalancerPeer() const override;
 
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
@@ -329,6 +331,12 @@ protected:
      */
     bool _isConnectedToLoadBalancerPort = false;
     bool _isLoadBalancerPeer = false;
+
+    /**
+     * Indicates whether this is a proxy unix domain socket connection.
+     */
+    bool _isConnectedToProxyUnixSocket = false;
+
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;
 

@@ -64,16 +64,20 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -435,6 +439,36 @@ TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
     tla->stopAcceptingSessions();
     ASSERT_OK(tla->start());
 }
+
+#ifndef _WIN32
+/**
+ * Test that when unixProxySocketPrefix is set, the transport layer creates proxy Unix domain
+ * sockets and they appear in the listener socket backlog queue depths (i.e.
+ * getProxyDomainSocketAddrs is used and the listener binds to the expected path).
+ */
+TEST(AsioTransportLayer, ProxyUnixDomainSockets) {
+    unittest::TempDir tempDir("proxy_socket");
+    auto opts = defaultTLAOptions();
+    opts.unixProxySocketPrefix = tempDir.path();
+
+    TestFixture tf(opts);
+    const std::string expectedStandardPath =
+        makeProxyUnixSockPath(opts.port, opts.unixProxySocketPrefix);
+
+    const auto depths = tf.tla().getListenerSocketBacklogQueueDepths();
+    auto unixSocketCount = std::count_if(
+        depths.begin(), depths.end(), [](const auto& p) { return p.first.getType() == AF_UNIX; });
+    ASSERT_EQ(unixSocketCount, 1);
+
+    auto it = std::find_if(depths.begin(), depths.end(), [&](const auto& p) {
+        return p.first.getType() == AF_UNIX && p.first.getAddr() == expectedStandardPath;
+    });
+    ASSERT_NE(it, depths.end()) << "Expected to find proxy Unix socket path \""
+                                << expectedStandardPath
+                                << "\" in listener socket backlog queue depths (size="
+                                << depths.size() << ")";
+}
+#endif  // _WIN32
 
 #ifdef __linux__
 /**

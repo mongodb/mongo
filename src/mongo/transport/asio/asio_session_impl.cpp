@@ -227,10 +227,15 @@ CommonAsioSession::CommonAsioSession(
     }
 
     try {
-        _local = HostAndPort(_localAddr.toString(true));
+        const std::string localAddrWithPort = _localAddr.toString(true);
+        _local = HostAndPort(localAddrWithPort);
         if (tl->loadBalancerPort()) {
             _isConnectedToLoadBalancerPort = _local.port() == *tl->loadBalancerPort();
         }
+#ifndef _WIN32
+        _isConnectedToProxyUnixSocket =
+            (!_localAddr.isIP() && tl->isProxyUnixDomainSocket(localAddrWithPort, _local.port()));
+#endif
     } catch (...) {
         LOGV2_DEBUG(9079002,
                     1,
@@ -271,6 +276,10 @@ bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
 
 bool CommonAsioSession::isLoadBalancerPeer() const {
     return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
+}
+
+bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
+    return isConnectedToProxyUnixSocketOverride.shouldFail() || _isConnectedToProxyUnixSocket;
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
@@ -529,11 +538,8 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     return AsyncTry([this, buffer] {
                const auto bytesRead = peekASIOStream(
                    _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
-               // TODO(SERVER-119261): Update isProxyUnixSock argument to check if we are connected
-               // to the proxy socket.
-               return transport::parseProxyProtocolHeader(
-                   StringData(buffer->data(), bytesRead),
-                   isConnectedToProxyUnixSocketOverride.shouldFail());
+               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
+                                                          isConnectedToProxyUnixSocket());
            })
         .until([deadline, proxyHeaderTimeout, reactor](
                    StatusWith<boost::optional<ParserResults>> sw) {

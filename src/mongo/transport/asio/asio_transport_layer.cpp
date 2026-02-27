@@ -102,6 +102,9 @@ using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
 #endif  // __linux__
 
 const Seconds kSessionShutdownTimeout{10};
+#ifndef _WIN32
+constexpr int kProxyUnixDomainSocketPerms = S_IRUSR | S_IWUSR;
+#endif
 
 bool shouldDiscardSocketDueToLostConnectivity(AsioSession::GenericSocket& peerSocket) {
 #ifdef __linux__
@@ -327,6 +330,7 @@ AsioTransportLayer::Options::Options(const ServerGlobalParams* params)
       ipList(params->bind_ips),
 #ifndef _WIN32
       useUnixSockets(!params->noUnixSocket),
+      unixProxySocketPrefix{params->proxySocketPrefix},
 #endif
       enableIPv6(params->enableIPv6),
       maxConns(params->maxConns) {
@@ -999,6 +1003,10 @@ Status AsioTransportLayer::setup() {
             listenAddrs.push_back(makeUnixSockPath(*port));
         }
     }
+    if (!_listenerOptions.unixProxySocketPrefix.empty() && _listenerOptions.isIngress()) {
+        listenAddrs.push_back(
+            makeProxyUnixSockPath(_listenerOptions.port, _listenerOptions.unixProxySocketPrefix));
+    }
 #endif
 
     if (auto foStatus = tfo::ensureInitialized(); !foStatus.isOK()) {
@@ -1113,8 +1121,13 @@ Status AsioTransportLayer::setup() {
 
 #ifndef _WIN32
         if (addr.family() == AF_UNIX) {
-            setUnixDomainSocketPermissions(addr.toString(),
-                                           serverGlobalParams.unixSocketPermissions);
+            auto addrStr = addr.toString();
+            if (auto lastSlashIndex = addrStr.rfind('/'); lastSlashIndex != StringData::npos &&
+                addrStr.substr(lastSlashIndex + 1).starts_with("unix")) {
+                setUnixDomainSocketPermissions(addrStr, kProxyUnixDomainSocketPerms);
+            } else {
+                setUnixDomainSocketPermissions(addrStr, serverGlobalParams.unixSocketPermissions);
+            }
         }
 #endif
         auto endpoint = acceptor.local_endpoint(ec);
@@ -1583,6 +1596,13 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
 #ifdef __linux__
 BatonHandle AsioTransportLayer::makeBaton(OperationContext* opCtx) const {
     return std::make_shared<AsioNetworkingBaton>(this, opCtx);
+}
+#endif
+
+#ifndef _WIN32
+bool AsioTransportLayer::isProxyUnixDomainSocket(StringData path, int port) const {
+    return !_listenerOptions.unixProxySocketPrefix.empty() &&
+        makeProxyUnixSockPath(port, _listenerOptions.unixProxySocketPrefix) == path;
 }
 #endif
 
