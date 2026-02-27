@@ -66,6 +66,8 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
             "Expected fastcount collection to exist on startup",
             _acquireFastCountCollectionForRead(opCtx).has_value());
 
+    LOGV2(12051100, "Starting up ReplicatedFastCountManager thread");
+
     if (!_isUnderTest) {
         _isEnabled.store(true);
         _backgroundThread = stdx::thread(
