@@ -25,7 +25,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.logging import flush
 
 _TIMEOUT_SECS = 55
-MAX_EXCEPTION_LENGTH = 15  # number of lines; leave room for the header and a trivial diff
+DEFAULT_MAX_EXCEPTION_LENGTH = 150  # number of lines; leave room for the header and a trivial diff
 
 
 class Truncate(Enum):
@@ -38,7 +38,7 @@ class Truncate(Enum):
 class ExceptionExtractor:
     """A class which extracts an exception based on regex."""
 
-    def __init__(self, start_regex, end_regex, truncate):
+    def __init__(self, start_regex, end_regex, truncate, max_length=DEFAULT_MAX_EXCEPTION_LENGTH):
         """Initialize the exception extractor."""
         self.start_re = re.compile(start_regex)
         self.end_re = re.compile(end_regex)
@@ -47,6 +47,7 @@ class ExceptionExtractor:
         self.active = False
 
         self.truncate = truncate
+        self.max_length = max_length
         self.current_exception_is_truncated = False
 
         self.exception_detected = False
@@ -60,7 +61,7 @@ class ExceptionExtractor:
             self.current_exception.append(log_line)
         elif self.active:
             self.current_exception.append(log_line)
-            if len(self.current_exception) > MAX_EXCEPTION_LENGTH:
+            if len(self.current_exception) > self.max_length:
                 self.current_exception_is_truncated = True
                 if self.truncate == Truncate.FIRST:
                     self.current_exception.popleft()

@@ -691,6 +691,19 @@ class TestExceptionExtraction(unittest.TestCase):
 
         expected = """The following tests failed (with exit code):
         buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)
+            Traceback (most recent call last):"""
+
+        assert expected in output
+
+    def test_resmoke_python_exception_truncated(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_failing_python.yml",
+            "--maxExceptionLength=10",
+        ]
+        output = execute_resmoke(resmoke_args).stdout
+
+        expected = """The following tests failed (with exit code):
+        buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)
             [LAST Part of Exception]"""
 
         assert expected in output

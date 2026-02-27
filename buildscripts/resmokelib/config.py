@@ -138,6 +138,7 @@ DEFAULTS = {
     "tag_files": [],
     "test_files": [],
     "user_friendly_output": None,
+    "max_exception_length": 150,
     # Output log format.
     "log_format": None,
     # Level of log severity.
@@ -810,6 +811,9 @@ JSTESTS_DIR = None
 # Generated logging config for the current invocation.
 LOGGING_CONFIG: dict = {}
 SHORTEN_LOGGER_NAME_CONFIG: dict = {}
+
+# Maximum number of lines to capture for an extracted exception in the test summary.
+MAX_EXCEPTION_LENGTH = 150
 
 # Whether legacy multiversion code is used. This value is not used on the master version of
 # resmoke.py but is needed to ensure the v5.0 version of fixture classes (e.g. standalone.py)

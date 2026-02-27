@@ -829,6 +829,7 @@ flags in common: {common_set}
         _config.SUITE_FILES = _config.SUITE_FILES.split(",")
     _config.TAG_FILES = config.pop("tag_files")
     _config.USER_FRIENDLY_OUTPUT = config.pop("user_friendly_output")
+    _config.MAX_EXCEPTION_LENGTH = config.pop("max_exception_length")
     _config.LOG_FORMAT = config.pop("log_format")
     _config.LOG_LEVEL = config.pop("log_level")
     _config.SANITY_CHECK = config.pop("sanity_check")

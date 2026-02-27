@@ -58,7 +58,7 @@ def _setup_redirects():
             [
                 "grep",
                 "-Ea",
-                r"Summary of|Running.*\.\.\.|invariant|fassert|BACKTRACE|Invalid access|Workload\(s\) started|Workload\(s\)|WiredTiger error|AddressSanitizer|threads with tids|failed to load|Completed cmd|Completed stepdown",
+                r"Summary of [a-zA-Z_0-9]+ suite:|Summary of latest execution:|Running.*\.\.\.|invariant|fassert|BACKTRACE|Invalid access|Workload\(s\) started|Workload\(s\)|WiredTiger error|AddressSanitizer|threads with tids|failed to load|Failure detected from Mocha test runner|✘|Completed cmd|Completed stepdown",
             ]
         )
 
@@ -176,15 +176,30 @@ def configure_exception_capture(test_logger):
     if config.LOG_FORMAT != "plain":
         return []
 
+    max_len = config.MAX_EXCEPTION_LENGTH
+
     js_exception = ExceptionExtractor(
         start_regex=r"^uncaught exception:",
         end_regex=r"^exiting with code",
         truncate=Truncate.LAST,
+        max_length=max_len,
     )
     py_exception = ExceptionExtractor(
         start_regex=r"^Traceback",
         end_regex=r"^\S*:",
         truncate=Truncate.FIRST,
+        max_length=max_len,
+    )
+    # Mocha-style tests report a summary with passing/failing counts and reprinted failure
+    # details before throwing. This extractor captures from the summary header through the
+    # thrown error so the most relevant lines appear in the test summary at the bottom of
+    # the log. The start_regex lacks a ^ anchor because the shell prefixes the line with
+    # "[jsTest] ".
+    mocha_exception = ExceptionExtractor(
+        start_regex=r"^\[jsTest\] Test Report Summary:",
+        end_regex=r"^Failure detected from Mocha",
+        truncate=Truncate.LAST,
+        max_length=max_len,
     )
 
     # py_exception extracts Python exception messages from the stdout of a Python subprocess.
@@ -193,8 +208,9 @@ def configure_exception_capture(test_logger):
     # from resmoke hooks and fixtures are handled separately through TestReport.addError().
     test_logger.addHandler(ExceptionExtractionHandler(js_exception))
     test_logger.addHandler(ExceptionExtractionHandler(py_exception))
+    test_logger.addHandler(ExceptionExtractionHandler(mocha_exception))
 
-    return [js_exception, py_exception]
+    return [js_exception, py_exception, mocha_exception]
 
 
 def new_test_logger(test_shortname, test_basename, parent, job_num, test_id, job_logger):
