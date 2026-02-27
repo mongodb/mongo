@@ -2571,8 +2571,6 @@ tasks:
 
   - <<: *task_template
     name: query_golden_cbr_automatic_cost_choice
-    # Currently disabled until SERVER-x?
-    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
         "experimental",
