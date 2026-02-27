@@ -28,6 +28,7 @@ export class ProxyProtocolServer {
         // values and will reload upon any change.
         this.tlvFile =
             MongoRunner.dataPath + `proxyprotocol_tlvs_${ingress_port}_${egress_port}.json`;
+        writeFile(this.tlvFile, "");
     }
 
     /**
@@ -112,20 +113,21 @@ export class ProxyProtocolServer {
     /**
      * Update PROXY protocol v2 TLVs (type-length-value) for future connections.
      *
-     * Input must be an array of objects representing the TLV.
+     * Input must be an array of objects representing the TLV. A valid array includes 0 to many TLV
+     * objects with 0 or 1 SSL TLV objects.
      *
-     * TLV object format:
-     * - type: hex string with 0x prefix (e.g. "0xE0")
+     * A TLV object has the following format:
+     * - type: Number indicating the TLV type
      * - value: UTF-8 string
      *
-     * Ex. [{"type":"0xE1","value":"hello"}, {...}]
+     * An SSL TLV object has the following format:
+     * - ssl: array of TLV objects
+     *
+     * Ex. { [{"type":0xE1,"value":"hello"}, {...}, {ssl: [{"type":0xE2,"value":"hello2"}, {...}]] }
      */
     setTLVs(tlvs) {
-        const jsonString = JSON.stringify(tlvs);
-        // writeFile asserts that the file doesn't already exist so remove the file before writing.
-        // This will also allow us to update the tlvs multiple times within the same test.
-        removeFile(this.tlvFile);
-        writeFile(this.tlvFile, jsonString);
+        const jsonString = JSON.stringify(tlvs) + "\n";
+        appendFile(this.tlvFile, jsonString);
     }
 
     /**
