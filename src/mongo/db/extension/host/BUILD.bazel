@@ -138,10 +138,7 @@ mongo_cc_library(
         "//src/third_party/yaml-cpp:yaml",
     ] + select({
         "//bazel/config:not_linux": [],
-        "//conditions:default": [
-            ":signature_validator",
-            "//src/third_party/rnp",
-        ],
+        "//conditions:default": [":signature_validator"],
     }),
 )
 
