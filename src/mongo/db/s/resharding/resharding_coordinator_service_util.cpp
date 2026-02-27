@@ -65,6 +65,7 @@
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -1175,6 +1176,34 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
             );
         }
     }
+}
+
+UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) {
+    const bool useRegistry =
+        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+    if (useRegistry) {
+        auto op = LocalReshardingOperationsRegistry::get().getOperation(ns);
+        uassert(ErrorCodes::NoSuchReshardCollection,
+                "Could not find resharding-related metadata that matches the given namespace",
+                op);
+
+        return op->metadata.getReshardingUUID();
+    }
+
+    repl::ReadConcernArgs::get(opCtx) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+    const auto collEntry =
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, ns);
+
+    uassert(ErrorCodes::NoSuchReshardCollection,
+            "Could not find resharding-related metadata that matches the given namespace",
+            collEntry.getReshardingFields());
+
+    return collEntry.getReshardingFields()->getReshardingUUID();
 }
 
 }  // namespace resharding

@@ -28,11 +28,14 @@
  */
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/unittest/unittest.h"
@@ -48,18 +51,23 @@ public:
     void tearDown() override {
         ServiceContextTest::tearDown();
     }
+
+    const NamespaceString kSourceNss = NamespaceString::createNamespaceString_forTest("db.foo");
+    const NamespaceString kTempNss =
+        NamespaceString::createNamespaceString_forTest("db.system.resharding");
+    const BSONObj kShardKey = BSON("x" << 1);
+
+    CommonReshardingMetadata makeMetadata(const UUID& reshardingUUID = UUID::gen()) {
+        return CommonReshardingMetadata(
+            reshardingUUID, kSourceNss, UUID::gen(), kTempNss, kShardKey);
+    }
 };
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
        GenerateBatchedCommandRequestForConfigCollectionsForTempNss) {
     auto opCtx = makeOperationContext();
     ReshardingCoordinatorDocument coordinatorDoc;
-    // Set the common resharding metadata.
-    NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest("db.foo");
-    NamespaceString tempNss =
-        NamespaceString::createNamespaceString_forTest("db.system.resharding");
-    CommonReshardingMetadata commonReshardingMetadata(
-        UUID::gen(), sourceNss, UUID::gen(), tempNss, KeyPattern(BSON("tempShardKey" << 1)));
+    auto commonReshardingMetadata = makeMetadata();
     commonReshardingMetadata.setStartTime(Date_t::now());
     commonReshardingMetadata.setPerformVerification(true);
 
@@ -275,12 +283,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
     auto opCtx = makeOperationContext();
 
     ReshardingCoordinatorDocument coordinatorDoc;
-    // Set the common resharding metadata.
-    NamespaceString sourceNss = NamespaceString::createNamespaceString_forTest("db.foo");
-    NamespaceString tempNss =
-        NamespaceString::createNamespaceString_forTest("db.system.resharding");
-    CommonReshardingMetadata commonReshardingMetadata(
-        UUID::gen(), sourceNss, UUID::gen(), tempNss, KeyPattern(BSON("tempShardKey" << 1)));
+    auto commonReshardingMetadata = makeMetadata();
     commonReshardingMetadata.setStartTime(Date_t::now());
     commonReshardingMetadata.setPerformVerification(true);
 
@@ -299,6 +302,26 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
     auto setFields = updateBSON.getObjectField("$set");
     auto reshardingFields = setFields.getObjectField("reshardingFields");
     ASSERT(reshardingFields.hasField("telemetryContext"));
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathThrowsWhenReshardingUUIDNotFound) {
+    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
+    auto opCtx = makeOperationContext();
+
+    ASSERT_THROWS_CODE(retrieveReshardingUUID(opCtx.get(), kSourceNss),
+                       DBException,
+                       ErrorCodes::NoSuchReshardCollection);
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathReturnsReshardingUUID) {
+    RAIIServerParameterControllerForTest featureFlagScope{"featureFlagReshardingRegistry", true};
+    auto opCtx = makeOperationContext();
+    auto reshardingUUID = UUID::gen();
+    auto meta = makeMetadata(reshardingUUID);
+    LocalReshardingOperationsRegistry::get().registerOperation(
+        LocalReshardingOperationsRegistry::Role::kCoordinator, meta);
+
+    ASSERT_EQ(retrieveReshardingUUID(opCtx.get(), kSourceNss), reshardingUUID);
 }
 
 }  // namespace resharding

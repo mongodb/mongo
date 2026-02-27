@@ -169,6 +169,8 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     boost::optional<OID> newCollectionEpoch,
     boost::optional<Timestamp> newCollectionTimestamp);
+
+UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 }  // namespace resharding
 
 }  // namespace mongo

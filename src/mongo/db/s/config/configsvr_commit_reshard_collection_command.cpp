@@ -44,6 +44,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -68,21 +69,6 @@ namespace mongo {
 namespace {
 
 
-UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) {
-    repl::ReadConcernArgs::get(opCtx) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    const auto collEntry = catalogClient->getCollection(opCtx, ns);
-
-    uassert(ErrorCodes::NoSuchReshardCollection,
-            fmt::format("Could not find resharding metadata for {}", ns.toStringForErrorMsg()),
-            collEntry.getReshardingFields());
-
-    return collEntry.getReshardingFields()->getReshardingUUID();
-}
-
-
 class ConfigsvrCommitReshardCollectionCommand final
     : public TypedCommand<ConfigsvrCommitReshardCollectionCommand> {
 public:
@@ -100,7 +86,7 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            UUID reshardingUUID = retrieveReshardingUUID(opCtx, ns());
+            UUID reshardingUUID = resharding::retrieveReshardingUUID(opCtx, ns());
 
             auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
                 ReshardingCoordinatorService,
