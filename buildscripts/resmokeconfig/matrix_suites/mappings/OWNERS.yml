@@ -74,6 +74,9 @@ filters:
   - "fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-transactions
+  - "fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "*primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds

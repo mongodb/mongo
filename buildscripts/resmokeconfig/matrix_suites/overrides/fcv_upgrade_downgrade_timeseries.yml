@@ -1,4 +1,24 @@
 # Overrides for suites that perform timeseries upgrade/downgrade in background
+#
+# TODO SERVER-120439 remove this overrides and their usages once 9.0 becomes last LTS and
+# we will not perform anymore timeseries transformation during FCV upgrade/downgrade
+
+- name: common_exclude_files
+  value:
+    exclude_files:
+      # TODO SERVER-120052 adapt following test to work with concurrent timeseries upgrade/downgrade
+      - jstests/core/timeseries/ddl/rename_timeseries.js
+
+      # TODO SERVER-120235 re-enable tests that uses timeseries sub-pipeline (e.g. graphLookup)
+      # on timeseries collections
+      - jstests/core/timeseries/query/timeseries_graph_lookup.js
+      - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
+      - jstests/core/timeseries/query/timeseries_lookup.js
+
+      # This test assumes no buckets will be closed during insertion.
+      # In the FCV upgrade/downgrade suite this can actually happen when we upgrade/downgrade the timeseries collection.
+      - jstests/core/timeseries/query/timeseries_lastpoint.js
+
 - name: replicaset_exclude_files
   value:
     exclude_files:
@@ -26,16 +46,7 @@
       - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
       - jstests/core/timeseries/write/timeseries_viewless_oplog_entries.js
 
-      # TODO SERVER-120052 adapt following test to work with concurrent timeseries upgrade/downgrade
-      - jstests/core/timeseries/ddl/rename_timeseries.js
-
-      # TODO SERVER-120235 re-enable tests that uses timeseries sub-pipeline (e.g. graphLookup)
-      # on timeseries collections
-      - jstests/core/timeseries/query/timeseries_graph_lookup.js
-      - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
-      - jstests/core/timeseries/query/timeseries_lookup.js
-
-- name: replicaset_exclude_tags
+- name: exclude_tags
   value:
     exclude_with_any_tags:
       # timeseries upgrade/downgrade cause getMore requests over timeseries collections

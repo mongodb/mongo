@@ -3,20 +3,20 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
   archive:
     hooks:
       - CheckReplDBHash
-      - CheckReplOplogs
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
       - FCVUpgradeDowngradeInBackground
   config:
     shell_options:
       eval:
-        globalThis.testingReplication = true; await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
         await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");;
         await import("jstests/libs/override_methods/enable_sessions.js"); await import("jstests/libs/override_methods/retry_writes_at_least_once.js");
       global_vars:
@@ -26,15 +26,22 @@ executor:
           sessionOptions:
             retryWrites: true
   fixture:
-    class: ReplicaSetFixture
+    class: ShardedClusterFixture
     mongod_options:
       set_parameters:
         enableTestCommands: 1
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
-    num_nodes: 2
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_mongos: 3
+    num_rs_nodes_per_shard: 2
+    num_shards: 1
   hooks:
-    - class: CheckReplOplogs
     - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
     - class: ValidateCollections
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN
@@ -42,12 +49,22 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/core/**/set_param1.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/or_to_in.js
-    - jstests/core/**/awaitdata_getmore_cmd.js
-    - jstests/core/**/getmore_cmd_maxtimems.js
-    - jstests/core/**/tailable_cursor_invalidation.js
-    - jstests/core/**/tailable_getmore_batch_size.js
     - jstests/core/query/api/api_version_unstable_indexes.js
     - jstests/aggregation/sources/densify/internal_parse.js
     - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
@@ -55,18 +72,20 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/facet/facet_stats.js
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
-    - jstests/aggregation/sources/unionWith/unionWith_explain.js
     - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
     - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
     - jstests/core/shell/role_management_helpers.js
     - jstests/core/administrative/roles_info.js
     - jstests/core/catalog/views/views_all_commands.js
-    - jstests/core/query/queryable_encryption/**/*.js
-    - jstests/core/administrative/profile/profile_delete.js
-    - jstests/core/administrative/profile/profile_sampling.js
-    - jstests/core/administrative/profile/profile1.js
-    - jstests/aggregation/sources/lookup/profile_lookup.js
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
+    - jstests/aggregation/expressions/internal_js_emit_with_scope.js
+    - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
+    - jstests/aggregation/sources/lookup/lookup_non_correlated.js
+    - jstests/core/ddl/collection_uuid_index_commands.js
+    - jstests/core/query/queryable_encryption/*.js
+    - jstests/aggregation/exec/spill_to_disk.js
     - jstests/core/shell/bench_test1.js
+    - jstests/core_sharding/resharding/*.js
     - jstests/core/query/query_settings/query_settings_size_limits.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
@@ -96,38 +115,16 @@ selector:
     - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
     - jstests/core/timeseries/query/timeseries_lookup.js
     - jstests/core/timeseries/query/timeseries_lastpoint.js
-    - jstests/core/catalog/list_collections_correctness.js
-    - jstests/core/query/change_streams_pre_and_post_images_in_create_and_collmod.js
-    - jstests/core/timeseries/ddl/bucket_granularity.js
-    - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
-    - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
-    - jstests/core/timeseries/ddl/timeseries_collmod.js
-    - jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
-    - jstests/core/timeseries/ddl/timeseries_expire_collmod.js
-    - jstests/core/timeseries/ddl/timeseries_index.js
-    - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
-    - jstests/core/timeseries/pbt/timeseries_add_fields_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_agg_stages_basic_behavior_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_match_pbt.js
-    - jstests/core/timeseries/pbt/timeseries_project_pbt.js
-    - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
-    - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
-    - jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js
-    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
-    - jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
-    - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
-    - jstests/core/timeseries/write/timeseries_viewless_oplog_entries.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
     - featureFlagFLE2CleanupCommand
     - featureFlagTimeseriesUpdatesSupport
     - featureFlagRecordIdsReplicated
     - featureFlagRankFusionBasic
     - featureFlagRankFusionFull
     - featureFlagSearchHybridScoringFull
-    - featureFlagRankFusion
-    - featureFlagMongotIndexedViews
     - featureFlagCreateViewlessTimeseriesCollections
     - uses_transactions
     - requires_fcv_80
@@ -135,6 +132,7 @@ selector:
     - requires_fcv_82
     - requires_fcv_83
     - cannot_run_during_upgrade_downgrade
+    - requires_2_or_more_shards
     - does_not_support_causal_consistency
     - does_not_support_retryable_writes
     - requires_getmore
@@ -144,5 +142,6 @@ selector:
   roots:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
+    - jstests/core_sharding/**/*.js
     - jstests/aggregation/**/*.js
 test_kind: js_test

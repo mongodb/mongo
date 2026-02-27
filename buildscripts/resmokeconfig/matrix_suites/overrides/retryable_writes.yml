@@ -19,6 +19,8 @@
   value:
     exclude_with_any_tags:
       - does_not_support_causal_consistency
+      # Tests that issue non-retryable write operations are incompatible with retryable writes
+      # sessions, as the test likely makes assertions on write results that may differ when retried.
       - does_not_support_retryable_writes
 
 - name: exclude_files

@@ -1,4 +1,4 @@
-base_suite: fcv_upgrade_downgrade_replica_sets_jscore_passthrough
+base_suite: fcv_upgrade_downgrade_sharding_jscore_passthrough
 overrides:
   - "retryable_writes.shell_options_test_data"
 eval:
@@ -7,5 +7,4 @@ excludes:
   - "retryable_writes.exclude_tags"
   - "retryable_writes.exclude_files"
   - "fcv_upgrade_downgrade_timeseries.common_exclude_files"
-  - "fcv_upgrade_downgrade_timeseries.replicaset_exclude_files"
   - "fcv_upgrade_downgrade_timeseries.exclude_tags"
