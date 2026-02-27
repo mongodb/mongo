@@ -2669,10 +2669,14 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
         scopedCss->checkShardVersionOrThrow(opCtx);
 
-        if (useRegistry) {
-            resharding::throwIfReshardingInProgress(nss);
-        } else {
-            scopedCss->getCollectionDescription(opCtx).throwIfReshardingInProgress(nss);
+        if (opCtx->writesAreReplicated()) {
+            // This check is only meaningful on primaries. Secondaries should defer to the primary's
+            // decision.
+            if (useRegistry) {
+                resharding::throwIfReshardingInProgress(nss);
+            } else {
+                scopedCss->getCollectionDescription(opCtx).throwIfReshardingInProgress(nss);
+            }
         }
     }
 
