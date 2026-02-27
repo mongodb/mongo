@@ -535,5 +535,17 @@ py_binary(
             "requests",
             group = "core",
         ),
+        dependency(
+            "opentelemetry-api",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-sdk",
+            group = "testing",
+        ),
+        dependency(
+            "opentelemetry-exporter-otlp-proto-http",
+            group = "testing",
+        ),
     ],
 )

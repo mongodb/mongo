@@ -2714,6 +2714,28 @@ opentelemetry-sdk = ">=1.35.0,<1.36.0"
 typing-extensions = ">=4.6.0"
 
 [[package]]
+name = "opentelemetry-exporter-otlp-proto-http"
+version = "1.35.0"
+description = "OpenTelemetry Collector Protobuf over HTTP Exporter"
+optional = false
+python-versions = ">=3.9"
+groups = ["testing"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_http-1.35.0-py3-none-any.whl", hash = "sha256:9a001e3df3c7f160fb31056a28ed7faa2de7df68877ae909516102ae36a54e1d"},
+    {file = "opentelemetry_exporter_otlp_proto_http-1.35.0.tar.gz", hash = "sha256:cf940147f91b450ef5f66e9980d40eb187582eed399fa851f4a7a45bb880de79"},
+]
+
+[package.dependencies]
+googleapis-common-protos = ">=1.52,<2.0"
+opentelemetry-api = ">=1.15,<2.0"
+opentelemetry-exporter-otlp-proto-common = "1.35.0"
+opentelemetry-proto = "1.35.0"
+opentelemetry-sdk = ">=1.35.0,<1.36.0"
+requests = ">=2.7,<3.0"
+typing-extensions = ">=4.5.0"
+
+[[package]]
 name = "opentelemetry-proto"
 version = "1.35.0"
 description = "OpenTelemetry Python Proto"
@@ -5896,4 +5918,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "33a897a6d5a0482f8d4d9378582c1f3a732d74fae6068e9b80a9ffb6cc7a3873"
+content-hash = "c1531f3ed6e9a5a5492221184f226041f98cfefc2b0928e5ad87e49a4d707e76"
