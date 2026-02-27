@@ -645,6 +645,15 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
             entry.setMulti(false);
             return entry;
         }()});
+        // Use w: 1 since the delete is meant to be best-effort to avoid blocking the remaining
+        // steps in the TransactionCoordinator. If the write gets rolled back, the next primary
+        // would resume the coordinator with existing decision which would run to completion
+        // immediately and try to delete the doc again.
+        // TODO (SERVER-120584): Re-evaluate if the deletion of transaction coordinator doc should
+        // continue to use w: 1.
+        deleteOp.setWriteConcern(WriteConcernOptions(1 /* numNodes */,
+                                                     WriteConcernOptions::SyncMode::UNSET,
+                                                     WriteConcernOptions::Timeout::kNoTimeoutVal));
         return deleteOp.serialize();
     }());
 
