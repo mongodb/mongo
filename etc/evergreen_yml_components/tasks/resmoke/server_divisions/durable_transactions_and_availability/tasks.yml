@@ -1334,6 +1334,23 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: disagg_replica_sets_multi_stmt_txn_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_replica_sets_multi_stmt_txn_jscore_passthrough
+          use_large_distro: "true"
+          resmoke_jobs_max: 2
+
+  - <<: *gen_task_template
     name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:
