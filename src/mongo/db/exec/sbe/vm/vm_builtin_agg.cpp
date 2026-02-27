@@ -2921,10 +2921,11 @@ std::tuple<value::Array*, size_t> firstLastNState(value::TypeTags stateTag, valu
 }  // namespace
 
 value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNInit(ArityType arity) {
-    auto fieldTagVal = value::TagValueMaybeOwned::fromRaw(getFromStack(0));
+    auto [_, fieldTag, fieldVal] = getFromStack(0);
+    auto fieldTagVal = value::rawToView({fieldTag, fieldVal});
 
     auto nTagVal = value::TagValueMaybeOwned::fromRaw(
-        genericNumConvert(fieldTagVal.tag(), fieldTagVal.value(), value::TypeTags::NumberInt64));
+        genericNumConvert(fieldTagVal.tag, fieldTagVal.value, value::TypeTags::NumberInt64));
     uassert(8070607,
             "Failed to convert to 64-bit integer",
             nTagVal.tag() == value::TypeTags::NumberInt64);
@@ -2976,8 +2977,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNRemove(ArityType arity) 
 
 template <AccumulatorFirstLastN::Sense S>
 value::TagValueMaybeOwned ByteCode::builtinAggFirstLastNFinalize(ArityType arity) {
-    auto state = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
-    auto [queue, n] = firstLastNState(state.tag(), state.value());
+    auto [_, stateTag, stateVal] = getFromStack(0);
+    auto stateTagVal = value::rawToView({stateTag, stateVal});
+
+    auto [queue, n] = firstLastNState(stateTagVal.tag, stateTagVal.value);
 
     if constexpr (S == AccumulatorFirstLastN::Sense::kFirst) {
         auto result = arrayQueueFrontN(queue, n);

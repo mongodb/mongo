@@ -1,0 +1,12 @@
+# Golden test output of SBESetWindowFieldsTest/FirstNLongStringWindow
+[2] project [s11 = makeBsonObj(MakeObjSpec([firstN = Set(0)], Open, NewObj, 0), s2, s10)] 
+[2] project [s10 = 
+    if exists(s7) 
+    then aggRemovableFirstNFinalize(s7) 
+    else null 
+] 
+[2] window [s2, s4, s8] [frameFirst[], frameLast[], lowBound{((s9 <=> (s8 + 1)) >= 0)}, highBound{((s9 <=> (s8 + 2)) <= 0)}] [s7 = {init{aggRemovableFirstNInit(2)}, add{aggRemovableFirstNAdd((s4 ?: null))}, remove{aggRemovableFirstNRemove((s4 ?: null))}}] 
+[2] agg_project [s8 = sum(1)] 
+[1] project [s3 = getField(s2, "a"), s4 = getField(s2, "b")] 
+[1] project [s2 = getElement(s1, 0)] 
+[1] virtualscan s1 {[[{"a" : "wwwwwwwwwwwwwwwwwwww", "b" : "wwwwwwwwwwwwwwwwwwww"}], [{"a" : "xxxxxxxxxxxxxxxxxxxx", "b" : "xxxxxxxxxxxxxxxxxxxx"}], [{"a" : "yyyyyyyyyyyyyyyyyyyy", "b" : "yyyyyyyyyyyyyyyyyyyy"}], [{"a" : "zzzzzzzzzzzzzzzzzzzz", "b" : "zzzzzzzzzzzzzzzzzzzz"}]]} 

@@ -276,6 +276,52 @@ TEST_F(SBESetWindowFieldsTest, FirstTestConstantValueNegativeWindow) {
                    << BSON("a" << 4 << "b" << 7 << "first" << 1000)));
 }
 
+TEST_F(SBESetWindowFieldsTest, FirstNLongStringWindow) {
+    std::string firstLongStr = std::string(20, 'w');
+    std::string secondLongStr = std::string(20, 'x');
+    std::string thirdLongStr = std::string(20, 'y');
+    std::string fourthLongStr = std::string(20, 'z');
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << firstLongStr << "b" << firstLongStr)),
+                               BSON_ARRAY(BSON("a" << secondLongStr << "b" << secondLongStr)),
+                               BSON_ARRAY(BSON("a" << thirdLongStr << "b" << thirdLongStr)),
+                               BSON_ARRAY(BSON("a" << fourthLongStr << "b" << fourthLongStr))};
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {firstN: {$firstN: {input: '$b', n: 2}, window: {documents: [1, 2]}}}})",
+        docs,
+        BSON_ARRAY(
+            BSON("a" << firstLongStr << "b" << firstLongStr << "firstN"
+                     << BSON_ARRAY(secondLongStr << thirdLongStr))
+            << BSON("a" << secondLongStr << "b" << secondLongStr << "firstN"
+                        << BSON_ARRAY(thirdLongStr << fourthLongStr))
+            << BSON("a" << thirdLongStr << "b" << thirdLongStr << "firstN"
+                        << BSON_ARRAY(fourthLongStr))
+            << BSON("a" << fourthLongStr << "b" << fourthLongStr << "firstN" << BSONArray())));
+}
+
+TEST_F(SBESetWindowFieldsTest, LastNLongStringWindow) {
+    std::string firstLongStr = std::string(20, 'w');
+    std::string secondLongStr = std::string(20, 'x');
+    std::string thirdLongStr = std::string(20, 'y');
+    std::string fourthLongStr = std::string(20, 'z');
+    auto docs =
+        std::vector<BSONArray>{BSON_ARRAY(BSON("a" << firstLongStr << "b" << firstLongStr)),
+                               BSON_ARRAY(BSON("a" << secondLongStr << "b" << secondLongStr)),
+                               BSON_ARRAY(BSON("a" << thirdLongStr << "b" << thirdLongStr)),
+                               BSON_ARRAY(BSON("a" << fourthLongStr << "b" << fourthLongStr))};
+    runSetWindowFieldsTest(
+        R"({sortBy: {a: 1}, output: {lastN: {$lastN: {input: '$b', n: 2}, window: {documents: [1, 3]}}}})",
+        docs,
+        BSON_ARRAY(
+            BSON("a" << firstLongStr << "b" << firstLongStr << "lastN"
+                     << BSON_ARRAY(thirdLongStr << fourthLongStr))
+            << BSON("a" << secondLongStr << "b" << secondLongStr << "lastN"
+                        << BSON_ARRAY(thirdLongStr << fourthLongStr))
+            << BSON("a" << thirdLongStr << "b" << thirdLongStr << "lastN"
+                        << BSON_ARRAY(fourthLongStr))
+            << BSON("a" << fourthLongStr << "b" << fourthLongStr << "lastN" << BSONArray())));
+}
+
 TEST_F(SBESetWindowFieldsTest, LastTestPositiveWindow) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
                                        BSON_ARRAY(BSON("a" << 2 << "b" << 3)),
