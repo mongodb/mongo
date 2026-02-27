@@ -266,10 +266,9 @@ private:
 };
 
 /**
- * Merge-sorts results from 0 or more FileIterators, all of which should be iterating over sorted
- * ranges within the same file. The input iterators must implement nextWithDeferredValue() and
- * getDeferredValue(). This class is given the data source file name upon construction and is
- * responsible for deleting the data source file upon destruction.
+ * Merge-sorts results from 0 or more iterators, all of which should be iterating over sorted
+ * ranges within the same iterators. The input iterators must implement nextWithDeferredValue() and
+ * getDeferredValue() so that the merge can compare keys before reading values..
  */
 template <typename Key, typename Value>
 class MergeIterator final : public sorter::Iterator<Key, Value> {
@@ -286,7 +285,7 @@ public:
           _greater(comp) {
         for (auto& iter : iters) {
             if (iter->more()) {
-                _heap.push_back(std::make_unique<Stream<Key, Value>>(_maxFile++, iter));
+                _heap.push_back(std::make_unique<Stream<Key, Value>>(_maxSourceId++, iter));
             }
         }
 
@@ -313,7 +312,7 @@ public:
             return;
         }
 
-        _heap.push_back(std::make_unique<Stream<Key, Value>>(++_maxFile, iter));
+        _heap.push_back(std::make_unique<Stream<Key, Value>>(++_maxSourceId, iter));
         std::push_heap(_heap.begin(), _heap.end(), _greater);
 
         if (_greater(_current, _heap.front())) {
@@ -418,8 +417,8 @@ private:
             if (auto ret = _comp(lhs->current(), rhs->current()); ret != 0)
                 return ret > 0;
 
-            // then compare fileNums to ensure stability
-            return lhs->fileNum > rhs->fileNum;
+            // then compare sourceIds to ensure stability
+            return lhs->sourceId > rhs->sourceId;
         }
 
     private:
@@ -432,7 +431,7 @@ private:
     std::unique_ptr<Stream<Key, Value>> _current;
     std::vector<std::unique_ptr<Stream<Key, Value>>> _heap;  // MinHeap
     STLComparator _greater;                                  // named so calls make sense
-    size_t _maxFile = 0;  // The maximum file identifier used thus far
+    size_t _maxSourceId = 0;  // The maximum file identifier used thus far
 };
 
 //
@@ -534,17 +533,17 @@ protected:
      */
     size_t _spillsNumToRespectMemoryLimits = 0;
 
-    size_t fileIteratorsMaxBytesSize =
+    size_t iteratorsMaxBytesSize =
         1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
-    size_t fileIteratorsMaxNum = 0;
+    size_t iteratorsMaxNum = 0;
 
 private:
-    // Update the maxMemoryUsageBytes subtracting the memory reserved for the file iterators. File
-    // iterators can use up to maxIteratorsMemoryUsagePercentage of the maxMemoryUsageBytes with
-    // lower bound fileIteratorsMaxBytesSize and upper bound 1MB.
+    // Update the maxMemoryUsageBytes subtracting the memory reserved for iterators. Iterators can
+    // use up to maxIteratorsMemoryUsagePercentage of the maxMemoryUsageBytes with lower bound
+    // iteratorsMaxBytesSize and upper bound 1MB.
     void setMaxMemoryUsageBytes() {
         if (this->_spiller == nullptr) {
-            this->fileIteratorsMaxBytesSize = 0;
+            this->iteratorsMaxBytesSize = 0;
             return;
         }
         _iteratorSize = this->_spiller->getStorage().getIteratorSize();
@@ -552,18 +551,17 @@ private:
         double percRequested = maxIteratorsMemoryUsagePercentage.load();
         auto iteratorMemBytesRequested =
             static_cast<size_t>(this->_opts.maxMemoryUsageBytes * percRequested);
-        if (iteratorMemBytesRequested < this->fileIteratorsMaxBytesSize) {
-            this->fileIteratorsMaxBytesSize = std::max(_iteratorSize, iteratorMemBytesRequested);
+        if (iteratorMemBytesRequested < this->iteratorsMaxBytesSize) {
+            this->iteratorsMaxBytesSize = std::max(_iteratorSize, iteratorMemBytesRequested);
         }
-        this->fileIteratorsMaxNum =
-            static_cast<size_t>(this->fileIteratorsMaxBytesSize / _iteratorSize);
-        this->fileIteratorsMaxBytesSize = _iteratorSize * this->fileIteratorsMaxNum;
+        this->iteratorsMaxNum = static_cast<size_t>(this->iteratorsMaxBytesSize / _iteratorSize);
+        this->iteratorsMaxBytesSize = _iteratorSize * this->iteratorsMaxNum;
 
-        if (this->fileIteratorsMaxBytesSize >= this->_opts.maxMemoryUsageBytes) {
+        if (this->iteratorsMaxBytesSize >= this->_opts.maxMemoryUsageBytes) {
             this->_opts.MaxMemoryUsageBytes(0);
         } else {
             this->_opts.MaxMemoryUsageBytes(this->_opts.maxMemoryUsageBytes -
-                                            this->fileIteratorsMaxBytesSize);
+                                            this->iteratorsMaxBytesSize);
         }
         _spillsNumToRespectMemoryLimits =
             std::max(this->_opts.maxMemoryUsageBytes / _bufferSize, static_cast<std::size_t>(2));
@@ -732,7 +730,7 @@ private:
             uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream()
                           << "Sort exceeded memory limit of "
-                          << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
+                          << (this->_opts.maxMemoryUsageBytes + this->iteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting.");
         }
 
@@ -763,8 +761,8 @@ private:
 
         this->_stats.incrementSpilledRanges();
 
-        // Merge spills to remain below the `fileIteratorsMaxBytesSize` threshold.
-        if (this->_iters.size() >= this->fileIteratorsMaxNum) {
+        // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
+        if (this->_iters.size() >= this->iteratorsMaxNum) {
             this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }
@@ -777,7 +775,7 @@ private:
 template <typename Key, typename Value>
 class LimitOneSorter : public Sorter<Key, Value> {
     // Since this class is only used for limit==1, it omits all logic to
-    // spill to disk and only tracks memory usage if explicitly requested.
+    // spill and only tracks memory usage if explicitly requested.
 public:
     typedef std::pair<Key, Value> Data;
     typedef std::function<Value()> ValueProducer;
@@ -1093,7 +1091,7 @@ private:
             uasserted(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                       str::stream()
                           << "Sort exceeded memory limit of "
-                          << (this->_opts.maxMemoryUsageBytes + this->fileIteratorsMaxBytesSize)
+                          << (this->_opts.maxMemoryUsageBytes + this->iteratorsMaxBytesSize)
                           << " bytes, but did not opt in to external sorting. Aborting operation."
                           << " Pass allowDiskUse:true to opt in.");
         }
@@ -1114,8 +1112,8 @@ private:
         this->_stats.resetMemUsage();
         this->_stats.incrementSpilledRanges();
 
-        // Merge spills to remain below the `fileIteratorsMaxBytesSize` threshold.
-        if (this->_iters.size() >= this->fileIteratorsMaxNum) {
+        // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
+        if (this->_iters.size() >= this->iteratorsMaxNum) {
             this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }

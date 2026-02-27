@@ -93,7 +93,8 @@ struct SortOptions {
     // The number of KV pairs to be returned. 0 indicates no limit.
     unsigned long long limit;
 
-    // When in-memory memory usage exceeds this value, we try to spill to disk. This is approximate.
+    // When in-memory memory usage exceeds this value, we try to spill to the underlying sorter
+    // storage. This is approximate.
     size_t maxMemoryUsageBytes;
     static const size_t DefaultMaxMemoryUsageBytes = 64 * 1024 * 1024;
 
@@ -320,8 +321,8 @@ public:
     virtual void addAlreadySorted(const Key&, const Value&) = 0;
 
     /**
-     * Writes any data remaining in the buffer to disk and then closes the storage to which data was
-     * written.
+     * If the storage has a buffer, flushes the buffer to the storage.
+     * Closes the storage to which data was written to and closes it.
      *
      * No more data can be added via addAlreadySorted() after calling done().
      */
@@ -329,11 +330,12 @@ public:
     virtual std::unique_ptr<Iterator> doneUnique() = 0;
 
     /**
-     * The SortedStorageWriter organizes data into chunks, with a chunk getting written to the
-     * output storage when it exceeds a maximum chunks size. A SortedStorageWriter client can
-     * produce a short chunk by manually calling this function.
+     * For sorter storages that use a buffer, the SortedStorageWriter organizes data into chunks,
+     * with a chunk getting written to the output storage when it exceeds a maximum chunks size. A
+     * SortedStorageWriter client can produce a short chunk by manually calling this function.
      *
-     * If no new data has been added since the last chunk was written, this function is a no-op.
+     * If the sorter storage doesn't use a buffer, or no new data has been added since the last
+     * chunk was written, this function is a no-op.
      */
     virtual void writeChunk() = 0;
 
@@ -348,7 +350,7 @@ protected:
 
 
 /**
- * Represents the file that a Sorter uses to spill to disk. Supports reading and writing
+ * Represents the file that a Sorter can use to spill to disk. Supports reading and writing
  * (append-only).
  */
 class SorterFile {
@@ -361,26 +363,26 @@ public:
     }
 
     /**
-     * Signals that the on-disk storage should not be cleaned up.
+     * Signals that the on-disk file should not be cleaned up.
      */
     void keep() {
         _keep = true;
     };
 
     /**
-     * Reads the requested data from the storage. Cannot write more to the storage once this has
+     * Reads the requested data from the file. Cannot write more to the file once this has
      * been called.
      */
     void read(std::streamoff offset, std::streamsize size, void* out);
 
 
     /**
-     * Writes the given data to the end of the storage. Cannot be called after reading.
+     * Writes the given data to the end of the file. Cannot be called after reading.
      */
     void write(const char* data, std::streamsize size);
 
     /**
-     * Returns the current offset of the end of the storage. Cannot be called after reading.
+     * Returns the current offset of the end of the file. Cannot be called after reading.
      */
     std::streamoff currentOffset();
 
@@ -402,13 +404,13 @@ private:
      */
     std::error_code _getErrorCode();
 
-    // The current offset of the end of the storage if there may be unflushed data, or -1 if the
+    // The current offset of the end of the file if there may be unflushed data, or -1 if the
     // file either has not yet been opened or has been flushed.
     std::streamoff _offset = -1;
 
     std::fstream _file;
 
-    // Whether to keep the on-disk storage even after this in-memory object has been destructed.
+    // Whether to keep the on-disk file even after this in-memory object has been destructed.
     bool _keep = false;
 
     // If set, this points to an external metrics holder for tracking storage open/close
@@ -497,8 +499,8 @@ template <typename Key, typename Value>
 class MONGO_MOD_PRIVATE Stream {
 public:
     typedef sorter::Iterator<Key, Value> Input;
-    Stream(size_t fileNum, std::shared_ptr<Input> iter)
-        : fileNum(fileNum), _current(iter->nextWithDeferredValue()), _rest(std::move(iter)) {}
+    Stream(size_t sourceId, std::shared_ptr<Input> iter)
+        : sourceId(sourceId), _current(iter->nextWithDeferredValue()), _rest(std::move(iter)) {}
 
     const Key& current() const {
         return _current;
@@ -520,7 +522,7 @@ public:
         return *_rest;
     }
 
-    const size_t fileNum;
+    const size_t sourceId;
 
 private:
     Key _current;
@@ -641,13 +643,14 @@ private:
 };
 
 /**
- * This is the way to input data to the sorting framework.
+ * Each instance of this class accepts (Key, Value) pairs and, depending on its
+ * SortOptions and the configured SorterSpiller/SorterStorage, may keep them
+ * in memory or spill sorted ranges to an external storage.
  *
- * Each instance of this class will generate a file name and spill sorted data ranges to that file
- * if allowed in its given Settings. If the instance destructs before done() is called, it will
- * handle deleting the data file used for spills. Otherwise, if done() is called, responsibility for
- * file deletion moves to the returned Iterator object, which must then delete the file upon its own
- * destruction.
+ * Ownership and cleanup of any spill storage are handled by the underlying
+ * SorterStorage implementation. Callers that need spilled data to outlive
+ * the Sorter itself should use persistDataForShutdown() and later reconstruct a Sorter from the
+ * returned PersistedState.
  */
 template <typename Key, typename Value>
 class Sorter : public SorterBase {
@@ -717,9 +720,9 @@ public:
     virtual ~Sorter() {}
 
     /**
-     * Spills all of the sorted data to disk, preserves the temporary file, and then returns
-     * metadata which can be passed to makeFromExistingRanges() to use the spill file later. May be
-     * called before or after calling done().
+     * Spills all of the sorted data to disk, preserves the temporary storage, and then returns
+     * metadata which can be passed to makeFromExistingRanges() to use the spill storage later. May
+     * be called before or after calling done().
      *
      * Only applicable to sorters with limit = 0.
      */
