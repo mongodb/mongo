@@ -494,6 +494,28 @@ Actual cardinality: 0
 Estimated cardinality: 0  
 Close enough?: yes
 
+# Multi-table joins - low-cardinality predicates at various positions
+```js
+db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right1","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","as":"right2","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right2"},{"$match":{"i_idx":1}}])
+```
+Actual cardinality: 1  
+Estimated cardinality: 1  
+Close enough?: yes
+
+```js
+db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right1","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]},"i_idx":1}}]}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","as":"right2","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right2"}])
+```
+Actual cardinality: 1  
+Estimated cardinality: 1  
+Close enough?: yes
+
+```js
+db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right1","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]}}}]}},{"$unwind":"$right1"},{"$lookup":{"from":"many_rows","as":"right2","let":{"localField":"$i_idx"},"pipeline":[{"$match":{"$expr":{"$eq":["$$localField","$i_idx"]},"i_idx":1}}]}},{"$unwind":"$right2"}])
+```
+Actual cardinality: 1  
+Estimated cardinality: 1  
+Close enough?: yes
+
 # Summary
-Good estimations: 54  
+Good estimations: 57  
 Bad estimations: 13  

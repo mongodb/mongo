@@ -368,6 +368,78 @@ estimatePipeline("many_rows", [
     {$unwind: "$right2"},
 ]);
 
+print("# Multi-table joins - low-cardinality predicates at various positions");
+estimatePipeline("many_rows", [
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right1",
+            let: {localField: "$i_idx"},
+            pipeline: [{$match: {$expr: {$eq: ["$$localField", "$i_idx"]}}}],
+        },
+    },
+    {$unwind: "$right1"},
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right2",
+            let: {localField: "$i_idx"},
+            pipeline: [{$match: {$expr: {$eq: ["$$localField", "$i_idx"]}}}],
+        },
+    },
+    {$unwind: "$right2"},
+    {$match: {i_idx: 1}},
+]);
+
+estimatePipeline("many_rows", [
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right1",
+            let: {localField: "$i_idx"},
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {$eq: ["$$localField", "$i_idx"]},
+                        i_idx: 1,
+                    },
+                },
+            ],
+        },
+    },
+    {$unwind: "$right1"},
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right2",
+            let: {localField: "$i_idx"},
+            pipeline: [{$match: {$expr: {$eq: ["$$localField", "$i_idx"]}}}],
+        },
+    },
+    {$unwind: "$right2"},
+]);
+
+estimatePipeline("many_rows", [
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right1",
+            let: {localField: "$i_idx"},
+            pipeline: [{$match: {$expr: {$eq: ["$$localField", "$i_idx"]}}}],
+        },
+    },
+    {$unwind: "$right1"},
+    {
+        $lookup: {
+            from: "many_rows",
+            as: "right2",
+            let: {localField: "$i_idx"},
+            pipeline: [{$match: {$expr: {$eq: ["$$localField", "$i_idx"]}, i_idx: 1}}],
+        },
+    },
+    {$unwind: "$right2"},
+]);
+
 print("# Summary");
 print(`Good estimations: ${goodEstimations}  `);
 print(`Bad estimations: ${badEstimations}  `);

@@ -69,40 +69,39 @@ function getValueByPath(obj, path) {
     return current;
 }
 
-function getCosts(command1, command2, path) {
+function getCost(command, path) {
     /**
-     * Extract the costEstimate from two commands for the given dotted path.
+     * Extract the costEstimate from a command for the given dotted path.
      */
 
-    command1["cursor"] = {};
-    command2["cursor"] = {};
+    command["cursor"] = {};
 
-    const explain1 = db.runCommand({
-        explain: command1,
-    });
+    const explain = assert.commandWorked(
+        db.runCommand({
+            explain: command,
+        }),
+    );
 
-    const explain2 = db.runCommand({
-        explain: command2,
-    });
+    assert(
+        explain.hasOwnProperty("queryPlanner"),
+        `Expected explain output to have 'queryPlanner' field: ${JSON.stringify(explain)}`,
+    );
+    assert(
+        explain.queryPlanner.hasOwnProperty("winningPlan"),
+        `Expected explain output to have 'winningPlan' field: ${JSON.stringify(explain)}`,
+    );
+    const winningPlan = explain.queryPlanner.winningPlan;
 
-    const winningPlan1 = explain1.queryPlanner.winningPlan;
-    const winningPlan2 = explain2.queryPlanner.winningPlan;
+    print(`Winning plan for command ${JSON.stringify(command)}: ${JSON.stringify(winningPlan)}`);
 
-    print(`Winning plan for command #1: ${JSON.stringify(winningPlan1)}`);
-    print(`Winning plan for command #2: ${JSON.stringify(winningPlan2)}`);
-
-    const cost1 = Number(getValueByPath(winningPlan1, path + ".costEstimate"));
-    const cost2 = Number(getValueByPath(winningPlan2, path + ".costEstimate"));
-
-    return [cost1, cost2];
+    return Number(Number(getValueByPath(winningPlan, path + ".costEstimate")).toFixed(3));
 }
 
 function assertCostGt(command1, command2, path) {
-    const [cost1, cost2] = getCosts(command1, command2, path);
-    print(`Command #1: ${JSON.stringify(command1)}`);
-    print(`Command #2: ${JSON.stringify(command2)}`);
-    print(`Path: ${path}`);
-    print(`Costs: ${cost1} vs ${cost2}`);
+    assert(path !== undefined);
+    const cost1 = getCost(command1, path);
+    const cost2 = getCost(command2, path);
+
     assert.gt(
         cost2,
         cost1,
@@ -110,8 +109,11 @@ function assertCostGt(command1, command2, path) {
     );
 }
 
-function costEq(command1, command2, path) {
-    const [cost1, cost2] = getCosts(command1, command2, path);
+function assertCostEq(command1, command2, path) {
+    assert(path !== undefined);
+    const cost1 = getCost(command1, path);
+    const cost2 = getCost(command2, path);
+
     assert.eq(
         cost1,
         cost2,
@@ -119,12 +121,12 @@ function costEq(command1, command2, path) {
     );
 }
 
-function costsAlmostZero(command1, command2, path) {
-    const [cost1, cost2] = getCosts(command1, command2, path);
-    assert(
-        cost1 < 0.1 && cost2 < 0.1,
-        `Expected both costs at path '${path}' to be less than 0.1 (${cost1} and ${cost2}).`,
-    );
+function assertCostsAlmostZero(commands, path) {
+    assert(path !== undefined);
+    for (const command of commands) {
+        const cost = getCost(command, path);
+        assert(cost < 0.1, `Expected cost at path '${path}' to be less than 0.1 (${cost}).`);
+    }
 }
 
 populate();
@@ -132,72 +134,59 @@ checkPauseAfterPopulate();
 
 describe("Costing of individual inputs to a join", () => {
     it("Empty inputs should have near-zero costs", () => {
-        costsAlmostZero(
-            {
-                aggregate: "no_rows",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
+        assertCostsAlmostZero(
+            [
+                {
+                    aggregate: "no_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                    ],
+                },
+            ],
             "queryPlan.inputStages[0]",
         );
     });
 
     it("Inputs with no matching rows should have near-zero costs (IXSCAN)", () => {
-        costsAlmostZero(
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                    {"$match": {i_idx: -1}},
-                ],
-            },
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {
-                        "$lookup": {
-                            "from": "many_rows",
-                            "localField": "a",
-                            "foreignField": "a",
-                            pipeline: [{$match: {i_idx: -1}}],
-                            "as": "a",
+        assertCostsAlmostZero(
+            [
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                        {"$match": {i_idx: -1}},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                pipeline: [{$match: {i_idx: -1}}],
+                                "as": "a",
+                            },
                         },
-                    },
-                    {"$unwind": "$a"},
-                ],
-            },
+                        {"$unwind": "$a"},
+                    ],
+                },
+            ],
             "queryPlan.inputStages[0]",
         );
     });
 
     it("Larger base table should have higher cost", () => {
-        assertCostGt(
-            {
-                aggregate: "no_rows",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
-            {
-                aggregate: "one_row",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
-            "queryPlan.inputStages[0]",
-        );
         assertCostGt(
             {
                 aggregate: "one_row",
@@ -306,50 +295,54 @@ describe("Costing of individual inputs to a join", () => {
 
 describe("Costing entire joins", () => {
     it("Joins over an empty collection should have an almost-zero cost.", () => {
-        costsAlmostZero(
-            {
-                aggregate: "no_rows",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                ],
-            },
+        assertCostsAlmostZero(
+            [
+                {
+                    aggregate: "no_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "no_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                    ],
+                },
+            ],
             "queryPlan",
         );
     });
 
     it("Joins with empty input should have an almost-zero cost (IXSCAN).", () => {
-        costsAlmostZero(
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
-                    {"$unwind": "$a"},
-                    {"$match": {i_idx: -1}},
-                ],
-            },
-            {
-                aggregate: "many_rows",
-                pipeline: [
-                    {
-                        "$lookup": {
-                            "from": "many_rows",
-                            "localField": "a",
-                            "foreignField": "a",
-                            pipeline: [{$match: {i_idx: -1}}],
-                            "as": "a",
+        assertCostsAlmostZero(
+            [
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "a", "foreignField": "a", "as": "a"}},
+                        {"$unwind": "$a"},
+                        {"$match": {i_idx: -1}},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {
+                            "$lookup": {
+                                "from": "many_rows",
+                                "localField": "a",
+                                "foreignField": "a",
+                                pipeline: [{$match: {i_idx: -1}}],
+                                "as": "a",
+                            },
                         },
-                    },
-                    {"$unwind": "$a"},
-                ],
-            },
+                        {"$unwind": "$a"},
+                    ],
+                },
+            ],
             "queryPlan",
         );
     });
@@ -431,7 +424,7 @@ describe("Costing entire joins", () => {
     });
 
     it("Symmetrical joins should have identical costs", () => {
-        costEq(
+        assertCostEq(
             {
                 aggregate: "one_row",
                 pipeline: [
@@ -444,6 +437,308 @@ describe("Costing entire joins", () => {
                 pipeline: [
                     {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
                     {"$unwind": "$a"},
+                ],
+            },
+            "queryPlan",
+        );
+    });
+
+    it("N-table join should have a higher cost than a (N-1)-table join", () => {
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "c"}},
+                    {"$unwind": "$c"},
+                ],
+            },
+            "queryPlan",
+        );
+    });
+
+    it("3-table join with empty table at any position should have a near-zero cost", () => {
+        assertCostsAlmostZero(
+            [
+                {
+                    aggregate: "no_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {"$unwind": "$a"},
+
+                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {"$unwind": "$b"},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "no_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {"$unwind": "$a"},
+
+                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {"$unwind": "$b"},
+                    ],
+                },
+                {
+                    aggregate: "many_rows",
+                    pipeline: [
+                        {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                        {"$unwind": "$a"},
+
+                        {"$lookup": {"from": "no_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                        {"$unwind": "$b"},
+                    ],
+                },
+            ],
+            "queryPlan",
+        );
+    });
+
+    it("3-table joins should have identical costs regardless of syntactic order", () => {
+        assertCostEq(
+            {
+                aggregate: "one_row",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+
+        assertCostEq(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "one_row", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+
+        assertCostEq(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                            pipeline: [{$match: {i_idx: {$lt: 50}}}],
+                        },
+                    },
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                            pipeline: [{$match: {i_idx: {$lt: 50}}}],
+                        },
+                    },
+                    {"$unwind": "$a"},
+                ],
+            },
+            "queryPlan",
+        );
+    });
+
+    it("3-table join with higher join predicate cardinality should have a higher cost", () => {
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "d_idx", "foreignField": "d_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+    });
+
+    it("3-table join with higher table predicate cardinality should have a higher cost", () => {
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                            pipeline: [{$match: {i_idx: {$lt: 50}}}],
+                        },
+                    },
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                            pipeline: [{$match: {i_idx: {$lt: 100}}}],
+                        },
+                    },
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            "queryPlan",
+        );
+
+        assertCostGt(
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {
+                        "$lookup": {
+                            "from": "many_rows",
+                            "localField": "i_idx",
+                            "foreignField": "i_idx",
+                            "as": "a",
+                            pipeline: [{$match: {i_idx: {$lt: 900}}}],
+                        },
+                    },
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
+                ],
+            },
+            {
+                aggregate: "many_rows",
+                pipeline: [
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "a"}},
+                    {"$unwind": "$a"},
+
+                    {"$lookup": {"from": "many_rows", "localField": "i_idx", "foreignField": "i_idx", "as": "b"}},
+                    {"$unwind": "$b"},
                 ],
             },
             "queryPlan",
