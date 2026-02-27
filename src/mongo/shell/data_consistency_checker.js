@@ -1,3 +1,5 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 /**
  * Returns a filter for listCollections that excludes views but includes timeseries collections.
  * This filter prevents reloading the view catalog and is available in MongoDB 8.3+.
@@ -309,11 +311,14 @@ class DataConsistencyChecker {
         };
     }
 
-    static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName) {
-        if (collName === "system.preimages") {
+    static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName, usesReplicatedTruncates) {
+        if (collName === "system.preimages" && !usesReplicatedTruncates) {
+            // When not using replicated truncates for the change streams pre-images collection, all
+            // nodes in the replica set individually delete expired pre-images locally. The nodes in
+            // the replica set thus can have different state for this collection.
             print(
-                `Ignoring hash inconsistencies for 'system.preimages' as those can be ` +
-                    `expected with independent truncates. Content is checked separately by ` +
+                `Ignoring hash inconsistencies for 'system.preimages' as those can be expected ` +
+                    `with independent local truncates. Content is checked separately by ` +
                     `ReplSetTest.checkPreImageCollection`,
             );
             return true;
@@ -472,6 +477,32 @@ class DataConsistencyChecker {
             success = false;
         }
 
+        // There are two modes for deleting change streams pre-images from the "system.preimages"
+        // collection:
+        // 1. They can be deleted independently and locally on each node. This can cause different
+        //    nodes in the replica set to have a different view of the pre-images collection state.
+        // 2. They can be deleted via replicated truncates. In this case, only the primary executes
+        //    the deletions via "truncateRange()" calls, and the deletions are replicated via the
+        //    oplog. In this case, all nodes in the replica set are expected to have same view of
+        //    the pre-images collection.
+        // Replicated truncates for deleting change streams pre-images are used when:
+        // - using disaggregated storage clusters (DSC) OR
+        // - the feature flag "featureFlagUseReplicatedTruncatesForDeletions" is enabled
+        let usesReplicatedTruncates = undefined;
+        const systemUsesReplicatedTruncates = () => {
+            // Determine the usage only once and cache the result, as checking the feature flag
+            // every time is expensive.
+            if (usesReplicatedTruncates === undefined) {
+                usesReplicatedTruncates =
+                    TestData.notASC ||
+                    FeatureFlagUtil.isPresentAndEnabled(
+                        sourceCollInfos.conn,
+                        "featureFlagUseReplicatedTruncatesForDeletions",
+                    );
+            }
+            return usesReplicatedTruncates;
+        };
+
         let didIgnoreFailure = false;
         sourceCollInfos.collInfosRes.forEach((coll) => {
             if (sourceDBHash.collections[coll.name] !== syncingDBHash.collections[coll.name]) {
@@ -482,11 +513,16 @@ class DataConsistencyChecker {
                 // an initial sync or after a restart (see SERVER-60048). Dump the collection
                 // diff anyways for more visibility as a sanity check.
                 //
-                // 'config.system.preimages' can potentially be inconsistent via hashes,
-                // there's a special process that verifies them with
-                // ReplSetTest.checkPreImageCollection so it is safe to ignore failures here.
+                // 'config.system.preimages' can potentially be inconsistent via hashes, there's a
+                // special process that verifies them with ReplSetTest.checkPreImageCollection so it
+                // is safe to ignore failures here.
                 this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
-                const shouldIgnoreFailure = this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, coll.name);
+                const shouldIgnoreFailure = this.canIgnoreCollectionDiff(
+                    sourceCollInfos,
+                    syncingCollInfos,
+                    coll.name,
+                    systemUsesReplicatedTruncates(),
+                );
                 if (shouldIgnoreFailure) {
                     prettyPrint(
                         `Collection diff in ${dbName}.${coll.name} can be ignored: ` +
