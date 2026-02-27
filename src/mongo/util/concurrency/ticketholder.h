@@ -32,19 +32,17 @@
 #include "mongo/db/admission/execution_control/execution_control_stats.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/ticket_semaphore.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
-#include <limits>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -52,9 +50,13 @@ namespace mongo {
 class Ticket;
 
 /**
- * Maintains and distributes tickets across operations from a limited pool of tickets. The ticketing
- * mechanism is required for global lock acquisition to reduce contention on storage engine
- * resources.
+ * Concurrent admission control mechanism that distributes a finite number of tickets to limit how
+ * many operations may proceed simultaneously. Operations acquire a ticket before performing work
+ * and release it when done/yield. If tickets are exhausted, incoming operations block until one
+ * becomes available.
+ *
+ * Additionally, it tracks queue and processing statistics (wait times, queue depth, cancellations,
+ * peak usage) and fires observer callbacks on acquisition, release, and delinquent operations.
  */
 class MONGO_MOD_PUBLIC TicketHolder {
     friend class Ticket;
@@ -82,17 +84,18 @@ public:
      * The default value for maxQueueDepth. It it set to the default max connection amount, which is
      * practically infinite for the purpose of the ticket holder.
      */
-    static constexpr auto kDefaultMaxQueueDepth = static_cast<std::int32_t>(DEFAULT_MAX_CONN);
+    static constexpr int kDefaultMaxQueueDepth = static_cast<int>(DEFAULT_MAX_CONN);
 
     TicketHolder(ServiceContext* serviceContext,
                  int numTickets,
                  bool trackPeakUsed,
-                 std::int32_t maxQueueDepth,
+                 int maxQueueDepth,
                  DelinquentCallback delinquentCallback = nullptr,
                  AcquisitionCallback acquisitionCallback = nullptr,
                  WaitedAcquisitionCallback waitedAcquisitionCallback = nullptr,
                  ReleaseCallback releaseCallback = nullptr,
-                 ResizePolicy resizePolicy = ResizePolicy::kGradual);
+                 ResizePolicy resizePolicy = ResizePolicy::kGradual,
+                 std::unique_ptr<TicketSemaphore> semaphore = nullptr);
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
@@ -100,13 +103,13 @@ public:
      * Returns 'true' if the resize completed without reaching the 'deadline', and 'false'
      * otherwise.
      */
-    bool resize(OperationContext* opCtx, int32_t newSize, Date_t deadline = Date_t::max());
+    bool resize(OperationContext* opCtx, int newSize, Date_t deadline = Date_t::max());
 
     /**
      * Adjusts the maximum number of threads waiting for a ticket. Will not affect threads already
      * waiting
      */
-    void setMaxQueueDepth(int32_t newSize);
+    void setMaxQueueDepth(int newSize);
 
     /**
      * Attempts to acquire a ticket without blocking. Returns a ticket if one is available,
@@ -147,39 +150,33 @@ public:
     /**
      * The total number of tickets allotted to the ticket pool.
      */
-    int32_t outof() const {
+    int outof() const {
         return _outof.loadRelaxed();
     }
 
     /**
      * Instantaneous number of tickets that are checked out by an operation.
      */
-    int32_t used() const {
+    int used() const {
         return outof() - available();
     }
 
     /**
      * Instantaneous number of operations waiting in queue for a ticket.
-     * TODO SERVER-74082: Consider changing this metric to int32_t.
      */
-    int64_t queued() const;
+    int queued() const;
 
     /**
      * Peak number of tickets checked out at once since the previous time this function was called.
      * Invariants that 'trackPeakUsed' has been passed to the TicketHolder,
      */
-    int32_t getAndResetPeakUsed();
-
-    /**
-     * Exposes the amount of waiting threads for testing purpose.
-     */
-    int32_t waiting_forTest() const;
+    int getAndResetPeakUsed();
 
     /**
      * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
      * pool.
      */
-    int32_t available() const;
+    int available() const;
 
     /**
      * The total number of operations that acquired a ticket, completed their work, and released the
@@ -187,9 +184,9 @@ public:
      */
     int64_t numFinishedProcessing() const;
 
-    MONGO_MOD_PRIVATE void setNumFinishedProcessing_forTest(int32_t numFinishedProcessing);
+    MONGO_MOD_PRIVATE void setNumFinishedProcessing_forTest(int64_t numFinishedProcessing);
 
-    MONGO_MOD_PRIVATE void setPeakUsed_forTest(int32_t used);
+    MONGO_MOD_PRIVATE void setPeakUsed_forTest(int used);
 
     /**
      * Appends all queue and delinquency stats.
@@ -231,35 +228,30 @@ private:
     };
 
     /**
+     * Generates and returns a ticket to the caller.
+     */
+    Ticket _issueTicket(AdmissionContext* admCtx);
+
+    /**
      * Releases a ticket back into the ticket pool and updates queueing statistics. Tickets
      * issued for exempt operations do not get deposited back to the pool.
      * This function must not throw.
      */
-    void _releaseTicketUpdateStats(Ticket& ticket);
-    /**
-     * This function must not throw.
-     */
-    void _releaseNormalPriorityTicket(AdmissionContext* admCtx);
-
-    boost::optional<Ticket> _tryAcquireNormalPriorityTicket(AdmissionContext* admCtx);
+    void _releaseTicket(Ticket& ticket);
 
     boost::optional<Ticket> _waitForTicketUntilMaybeInterruptible(OperationContext* opCtx,
                                                                   AdmissionContext* admCtx,
                                                                   Date_t until,
                                                                   bool interruptible);
-    boost::optional<Ticket> _performWaitForTicketUntil(OperationContext* opCtx,
-                                                       AdmissionContext* admCtx,
-                                                       Date_t until,
-                                                       bool interruptible);
 
     void _updatePeakUsed();
 
     const bool _trackPeakUsed;
 
-    void _updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats, const Ticket& ticket);
-    void _updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
-                                              TicketHolder::QueueStats& queueStats,
-                                              AdmissionContext::Priority priority);
+    /**
+     * Updates statistics and notifies the observer for a ticket acquisition at the given priority.
+     */
+    void _recordAcquisition(AdmissionContext* admCtx, AdmissionContext::Priority priority);
 
     /**
      * Appends the statistics stored in QueueStats to BSONObjBuilder b; We track statistics
@@ -267,26 +259,18 @@ private:
      */
     void _appendQueueStats(BSONObjBuilder& b, const QueueStats& stats) const;
 
-    void _immediateResize(WithLock, int32_t newSize);
-
-    /**
-     * Creates a ticket for a non-exempt admission.
-     */
-    Ticket _makeTicket(AdmissionContext* admCtx);
+    void _immediateResize(WithLock, int newSize);
 
     QueueStats _holderStats;
     QueueStats _exemptStats;
     ResizePolicy _resizePolicy;
-    ServiceContext* _serviceContext;
+    TickSource* _tickSource;
 
     // Serializes updates to _outof to ensure only 1 thread can change the size of the ticket pool
     // at a time. Reading _outof does not require holding the lock.
     stdx::mutex _resizeMutex;
-    BasicWaitableAtomic<int32_t> _tickets;
-    Atomic<int32_t> _maxQueueDepth;
-    Atomic<int32_t> _waiterCount{0};
-    Atomic<int32_t> _outof;
-    Atomic<int32_t> _peakUsed;
+    Atomic<int> _outof;
+    Atomic<int> _peakUsed;
     bool _enabledDelinquent{false};
     Milliseconds _delinquentMs{0};
     DelinquentCallback _reportDelinquentOpCallback{nullptr};
@@ -294,6 +278,9 @@ private:
     WaitedAcquisitionCallback _reportWaitedAcquisitionOpCallback{nullptr};
     ReleaseCallback _reportReleaseOpCallback{nullptr};
     mongo::admission::execution_control::DelinquencyStats _delinquencyStats;
+
+    // Synchronization mechanism for waiters.
+    std::unique_ptr<TicketSemaphore> _semaphore;
 };
 
 /**
@@ -332,7 +319,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            _ticketholder->_releaseTicketUpdateStats(*this);
+            _ticketholder->_releaseTicket(*this);
         }
     }
 
@@ -358,7 +345,7 @@ private:
     Ticket(TicketHolder* ticketHolder, AdmissionContext* admissionContext)
         : _ticketholder(ticketHolder), _admissionContext(admissionContext) {
         _priority = admissionContext->getPriority();
-        _acquisitionTime = ticketHolder->_serviceContext->getTickSource()->getTicks();
+        _acquisitionTime = ticketHolder->_tickSource->getTicks();
     }
 
     /**
@@ -381,11 +368,5 @@ private:
 
     TickSource::Tick _acquisitionTime;
 };
-
-inline Ticket TicketHolder::_makeTicket(AdmissionContext* admCtx) {
-    // TODO(SERVER-92647): Move this to the Ticket constructor so it also applies to exempt tickets
-    admCtx->markTicketHeld();
-    return Ticket{this, admCtx};
-}
 
 }  // namespace mongo

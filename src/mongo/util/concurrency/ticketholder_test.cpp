@@ -947,7 +947,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
 
     // We wait until ticketFuture is actually waiting for the ticket or until timeout exceeded
     _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        waitUntilCanceled(*_opCtx, [&] { return holder->waiting_forTest() == 1; });
+        waitUntilCanceled(*_opCtx, [&] { return holder->queued() == 1; });
     });
 
     // Since the maximum amount of ticket is one, and one is already waiting, it will throw
@@ -1014,7 +1014,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
 
     // We wait until ticketFuture is actually waiting for the ticket or until timeout exceeded
     _opCtx->runWithDeadline(getNextDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        waitUntilCanceled(*_opCtx, [&] { return holder->waiting_forTest() == 1; });
+        waitUntilCanceled(*_opCtx, [&] { return holder->queued() == 1; });
     });
 
     // Change the max queue depth to one. Since one is already waiting, the next acquisition attempt
