@@ -77,7 +77,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         shard_logging_prefix=None,
         replicaset_logging_prefix=None,
         replset_name=None,
-        require_graceful_shutdown=False,
         use_auto_bootstrap_procedure=None,
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
@@ -150,7 +149,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
         self.replset_name = replset_name
-        self.require_graceful_shutdown = require_graceful_shutdown
         self.initial_sync_uninitialized_fcv = initial_sync_uninitialized_fcv
         self.hide_initial_sync_node_from_conn_string = hide_initial_sync_node_from_conn_string
         # Used by the enhanced multiversion system to signify multiversion mode.
@@ -574,7 +572,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary = self.nodes[0]
-        client: pymongo.MongoClient = primary.mongo_client()
+        client = primary.mongo_client()
 
         if deadline is None:
             deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
@@ -669,10 +667,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                             interface.Fixture.AWAIT_READY_TIMEOUT_SECS, node.port
                         )
                     )
-
-                # TODO(SERVER-119066): Remove when no longer necessary
-                if self.disagg_base_config:
-                    break
 
                 status = client_admin.command("replSetGetStatus")
 
@@ -862,8 +856,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.teardown_counter += 1
         else:
             self.logger.error("Stopping the replica set fixture failed.")
-            if self.require_graceful_shutdown:
-                raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
+            raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
         """Return True if all nodes in the replica set are running."""
