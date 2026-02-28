@@ -52,7 +52,7 @@ namespace mongo::transport {
  * The maximum number of bytes ever needed by a proxy protocol header; represents
  * the minimum TCP MTU.
  */
-constexpr size_t kProxyProtocolHeaderSizeUpperBound = 536;
+constexpr size_t kDefaultProxyProtocolHeaderReadSize = 536;
 constexpr uint8_t kProxyProtocolSSLTlvType = 0x20;
 
 /**
@@ -115,7 +115,7 @@ struct ParserResults {
 boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer, bool isProxyUnixSock);
 
 /**
- * Peek a buffer fo at least 12 bytes to determine if it may be a proxy protocol header.
+ * Peek a buffer for at least 12 bytes to determine if it may be a proxy protocol header.
  *
  * Note that this does not definitively identify the initial packet as proxy protocol,
  * it only establishes that it is possible that it is such.

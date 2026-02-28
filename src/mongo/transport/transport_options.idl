@@ -170,6 +170,17 @@ server_parameters:
         validator: {gte: 0}
         redact: false
 
+    proxyUnixSocketMaximumHeaderSize:
+        description: >-
+            When connected to a proxy Unix domain socket, the server will read at most
+            proxyUnixSocketMaximumHeaderSize bytes to parse the proxy protocol v2 header.
+        set_at: [startup, runtime]
+        cpp_varname: proxyUnixSocketMaximumHeaderSize
+        cpp_vartype: Atomic<int>
+        default: 4096
+        validator: {gte: 536, lt: 16384}
+        redact: false
+
     preAuthMaximumMessageSizeBytes:
         description: >-
             The maximum size of a message that can be sent before the session is authenticated.

@@ -272,7 +272,8 @@ bool CommonAsioSession::isLoadBalancerPeer() const {
 }
 
 bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
-    return isConnectedToProxyUnixSocketOverride.shouldFail() || _isConnectedToProxyUnixSocket;
+    return _isConnectedToProxyUnixSocket ||
+        MONGO_unlikely(isConnectedToProxyUnixSocketOverride.shouldFail());
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
@@ -537,10 +538,14 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     const Seconds proxyHeaderTimeout{Seconds(gProxyProtocolTimeoutSecs.load())};
     const Date_t deadline = reactor->now() + proxyHeaderTimeout;
 
-    auto buffer = std::make_shared<std::array<char, kProxyProtocolHeaderSizeUpperBound>>();
+    const size_t headerReadSize = isConnectedToProxyUnixSocket()
+        ? static_cast<size_t>(proxyUnixSocketMaximumHeaderSize.loadRelaxed())
+        : kDefaultProxyProtocolHeaderReadSize;
+
+    auto buffer = std::make_shared<std::vector<char>>(headerReadSize);
     return AsyncTry([this, buffer] {
-               const auto bytesRead = peekASIOStream(
-                   _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
+               const auto bytesRead =
+                   peekASIOStream(_socket, asio::buffer(buffer->data(), buffer->size()));
                return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
                                                           isConnectedToProxyUnixSocket());
            })
@@ -604,7 +609,7 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
             ScopeGuard guard([&] { _asyncOpState.complete(); });
 
             // Drain the read buffer.
-            opportunisticRead(_socket, asio::buffer(buffer.get(), results->bytesParsed)).get();
+            opportunisticRead(_socket, asio::buffer(buffer->data(), results->bytesParsed)).get();
         })
         .onError([this](Status s) {
             LOGV2_DEBUG(6067900,
