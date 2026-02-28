@@ -422,3 +422,9 @@ feature_flags:
         fcv_gated: false
         default: false
         incremental_rollout_phase: in_development
+
+    featureFlagExtensionsInsideHybridSearch:
+        description: "Feature flag to enable extension stages inside of hybrid search."
+        cpp_varname: gFeatureFlagExtensionsInsideHybridSearch
+        default: false
+        fcv_gated: false
