@@ -671,6 +671,7 @@ roles:
       - matchType: cluster
         actions:
           - bypassDefaultMaxTimeMS
+          - fsync
 
   # Builtin role 'admin.__system' has its privileges special cased in builtin_roles.tpl.cpp
   __system:
