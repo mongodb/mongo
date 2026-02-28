@@ -186,7 +186,9 @@ function runUpdateCmdMetricsTests(topologyName, setupFn, teardownFn) {
 runUpdateCmdMetricsTests(
     "Standalone",
     () => {
-        const conn = MongoRunner.runMongod({setParameter: {internalQueryStatsRateLimit: -1}});
+        const conn = MongoRunner.runMongod({
+            setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
+        });
         const testDB = conn.getDB("test");
         testDB[collName].drop();
         return {fixture: conn, testDB};
@@ -199,7 +201,7 @@ runUpdateCmdMetricsTests(
     () => {
         const st = new ShardingTest({
             shards: 2,
-            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1}},
+            mongosOptions: {setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1}},
         });
         const testDB = st.s.getDB("test");
         // TODO SERVER-117919 Remove skipping test due to UWE.

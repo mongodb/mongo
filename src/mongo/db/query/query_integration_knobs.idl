@@ -92,6 +92,8 @@ server_parameters:
             When both internalQueryStatsSampleRate and internalQueryStatsRateLimit are set to non-zero
             values, the sampling-based rate limiting takes precedence over this window-based rate limiting. To disable
             query stats collection completely, set both internalQueryStatsRateLimit and internalQueryStatsSampleRate to 0.
+            This parameter does not affect how we collect query stats for writes. Use
+            internalQueryStatsWriteCmdSampleRate to rate-limit query stats collection for write commands.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsRateLimit"
         cpp_vartype: AtomicWord<int>
@@ -110,6 +112,8 @@ server_parameters:
             If internalQueryStatsSampleRate is set to 0, query sampling will be controlled by the window-based
             rate limiter. To disable query stats collection completely, set both internalQueryStatsSampleRate and
             internalQueryStatsRateLimit to 0.
+            This parameter does not affect how we collect query stats for writes. Use
+            internalQueryStatsWriteCmdSampleRate to rate-limit query stats collection for write commands.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsSampleRate"
         cpp_vartype: AtomicWord<double>
@@ -122,18 +126,20 @@ server_parameters:
 
     internalQueryStatsWriteCmdSampleRate:
         description: >-
-            Controls whether query stats are collected for write commands. Set to 1 to enable collection for
-            write commands, or 0 to disable. This parameter is only effective if query stats is already enabled
-            via 'internalQueryStatsRateLimit' or 'internalQueryStatsSampleRate'.
-            Note: This parameter may become a floating point value to support percentage-based sampling.
+            The fractional number representing the rate of write operations that are sampled for
+            query stats using sample-base rate limiting. To sample all write operations, this can be
+            set to 1. This parameter is independent from internalQueryStatsSampleRate and
+            internalQueryStatsRateLimit, and governs only which write operations are sampled. Note
+            that query stats for write commands can only be rate-limited with the sample-based
+            approach (window-based not supported).
         set_at: [startup, runtime]
         cpp_varname: "internalQueryStatsWriteCmdSampleRate"
         cpp_vartype: AtomicWord<double>
-        default: 1.0
+        default: 0.0
         validator:
             gte: 0.0
             lte: 1.0
-            callback: query_stats_util::validateQueryStatsWriteCmdSampleRate
+        on_update: query_stats_util::onQueryStatsWriteCmdSamplingRateUpdate
         redact: false
 
     internalQueryStatsCacheSize:

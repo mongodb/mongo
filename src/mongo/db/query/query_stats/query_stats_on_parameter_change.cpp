@@ -47,18 +47,24 @@
 namespace mongo::query_stats_util {
 
 namespace {
-/**
- * Given the current 'Client', returns a pointer to the 'ServiceContext' and an interface for
- * updating the queryStats store.
- */
-std::pair<ServiceContext*, OnParamChangeUpdater*> getUpdater(const Client& client) {
-    auto serviceCtx = client.getServiceContext();
-    tassert(7106500, "ServiceContext must be non null", serviceCtx);
 
-    auto updater = queryStatsStoreOnParamChangeUpdater(serviceCtx).get();
-    tassert(7106501, "queryStats store size updater must be non null", updater);
-    return {serviceCtx, updater};
+/**
+ * This helper expects a lambda that takes a ServiceContext* and a OnParamChangeUpdater*. If there
+ * is a client, it will execute the given lambda.
+ *
+ * The client is nullptr if the parameter is supplied from the command line. In this case, we ignore
+ * the update event, the parameter will be processed when initializing the service context.
+ */
+void onParamChange(auto&& fn) {
+    if (auto client = Client::getCurrent()) {
+        auto serviceCtx = client->getServiceContext();
+        tassert(7106500, "ServiceContext must be non null", serviceCtx);
+        auto updater = queryStatsStoreOnParamChangeUpdater(serviceCtx).get();
+        tassert(7106501, "queryStats store size updater must be non null", updater);
+        fn(serviceCtx, updater);
+    }
 }
+
 }  // namespace
 
 
@@ -68,13 +74,9 @@ Status onQueryStatsStoreSizeUpdate(const std::string& str) {
         return newSize.getStatus();
     }
 
-    // The client is nullptr if the parameter is supplied from the command line. In this case, we
-    // ignore the update event, the parameter will be processed when initializing the service
-    // context.
-    if (auto client = Client::getCurrent()) {
-        auto&& [serviceCtx, updater] = getUpdater(*client);
+    onParamChange([&newSize](ServiceContext* serviceCtx, OnParamChangeUpdater* updater) {
         updater->updateCacheSize(serviceCtx, newSize.getValue());
-    }
+    });
 
     return Status::OK();
 }
@@ -84,13 +86,17 @@ Status validateQueryStatsStoreSize(const std::string& str, const boost::optional
 }
 
 Status onQueryStatsRateLimiterUpdateImpl() {
-    // The client is nullptr if the parameter is supplied from the command line. In this case, we
-    // ignore the update event, the parameter will be processed when initializing the service
-    // context.
-    if (auto client = Client::getCurrent()) {
-        auto&& [serviceCtx, updater] = getUpdater(*client);
+    onParamChange([](ServiceContext* serviceCtx, OnParamChangeUpdater* updater) {
         updater->updateRateLimiter(serviceCtx);
-    }
+    });
+
+    return Status::OK();
+}
+
+Status onQueryStatsWriteCmdRateLimiterUpdateImpl() {
+    onParamChange([](ServiceContext* serviceCtx, OnParamChangeUpdater* updater) {
+        updater->updateWriteCmdRateLimiter(serviceCtx);
+    });
 
     return Status::OK();
 }
@@ -103,13 +109,8 @@ Status onQueryStatsSamplingRateUpdate(double) {
     return onQueryStatsRateLimiterUpdateImpl();
 }
 
-Status validateQueryStatsWriteCmdSampleRate(const double& value, const boost::optional<TenantId>&) {
-    if (value == 0.0 || value == 1.0) {
-        return Status::OK();
-    }
-
-    return Status(ErrorCodes::Error{11204700},
-                  "Query stats write command sample rate should be either 0.0 or 1.0");
+Status onQueryStatsWriteCmdSamplingRateUpdate(double) {
+    return onQueryStatsWriteCmdRateLimiterUpdateImpl();
 }
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>

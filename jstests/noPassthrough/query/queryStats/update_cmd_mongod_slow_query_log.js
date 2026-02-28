@@ -28,10 +28,10 @@ describe("Query Shape Hash Output Tests", function () {
             shards: 2,
             mongos: 1,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1},
+                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
             },
             shardOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1},
+                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
 
@@ -56,7 +56,7 @@ describe("Query Shape Hash Output Tests", function () {
     });
 
     after(function () {
-        this.st.stop();
+        this.st?.stop();
     });
 
     beforeEach(function () {

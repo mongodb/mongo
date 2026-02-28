@@ -163,7 +163,13 @@ function assertUpdateCommandRecordedOnShardsExceptRouter(primaryConn) {
  * TODO: We will revisit this part when 8.3 becomes the last LTS.
  */
 testPerformUpgradeReplSet({
-    upgradeNodeOptions: {setParameter: {featureFlagQueryStatsUpdateCommand: true, internalQueryStatsSampleRate: 1}},
+    upgradeNodeOptions: {
+        setParameter: {
+            featureFlagQueryStatsUpdateCommand: true,
+            internalQueryStatsSampleRate: 1,
+            internalQueryStatsWriteCmdSampleRate: 1,
+        },
+    },
     setupFn: setupCollection,
     whenFullyDowngraded: assertUpdateCommandsNotRecorded,
     whenSecondariesAreLatestBinary: assertUpdateCommandsNotRecorded,
@@ -177,7 +183,13 @@ testPerformUpgradeReplSet({
  * to check that there is no regression when shard servers send cursor metrics using the latest UpdateCommandReply.
  */
 testPerformUpgradeSharded({
-    upgradeNodeOptions: {setParameter: {featureFlagQueryStatsUpdateCommand: true, internalQueryStatsSampleRate: 1}},
+    upgradeNodeOptions: {
+        setParameter: {
+            featureFlagQueryStatsUpdateCommand: true,
+            internalQueryStatsSampleRate: 1,
+            internalQueryStatsWriteCmdSampleRate: 1,
+        },
+    },
     setupFn: setupCollection,
     whenFullyDowngraded: assertUpdateCommandsNotRecorded,
     whenOnlyConfigIsLatestBinary: assertUpdateCommandsNotRecorded,

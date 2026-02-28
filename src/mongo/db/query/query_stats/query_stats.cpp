@@ -78,6 +78,10 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManag
 const Decorable<ServiceContext>::Decoration<RateLimiter> QueryStatsStoreManager::getRateLimiter =
     ServiceContext::declareDecoration<RateLimiter>();
 
+const Decorable<ServiceContext>::Decoration<RateLimiter>
+    QueryStatsStoreManager::getWriteCmdRateLimiter =
+        ServiceContext::declareDecoration<RateLimiter>();
+
 // Fail point to mimic the operation fails during 'registerRequest()'.
 MONGO_FAIL_POINT_DEFINE(queryStatsFailToSerializeKey);
 
@@ -155,6 +159,18 @@ void configureRateLimiter(ServiceContext* serviceCtx) {
     }
 }
 
+/**
+ * Configure the write command rate limiter. This reads the configured value from the server
+ * parameter.
+ */
+void configureWriteCmdRateLimiter(ServiceContext* serviceCtx) {
+    auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
+
+    const auto configuredSamplingRate =
+        RateLimiter::roundSampleRateToPerThousand(internalQueryStatsWriteCmdSampleRate.load());
+    limiter.configureSampleBased(configuredSamplingRate, SecureRandom().nextInt32());
+}
+
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
@@ -172,6 +188,11 @@ public:
     void updateRateLimiter(ServiceContext* serviceCtx) override {
         assertConfigurationAllowed();
         configureRateLimiter(serviceCtx);
+    }
+
+    void updateWriteCmdRateLimiter(ServiceContext* serviceCtx) override {
+        assertConfigurationAllowed();
+        configureWriteCmdRateLimiter(serviceCtx);
     }
 };
 
@@ -207,6 +228,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         configureRateLimiter(serviceCtx);
+        configureWriteCmdRateLimiter(serviceCtx);
     }};
 
 /**
@@ -225,9 +247,7 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
  * Internal check for whether we should collect metrics. This checks the rate limiting
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
-bool shouldCollect(ServiceContext* serviceCtx) {
-    auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
-
+bool shouldCollect(RateLimiter& limiter) {
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
     const auto samplingRate = limiter.getSamplingRate();
@@ -360,13 +380,12 @@ void insertQueryStatsEntry(
         proofOfLock, newMetrics.getValue()->second, snapshot, std::move(supplementalMetrics));
 }
 
-}  // namespace
-
-void registerRequest(const OperationContext* opCtx,
-                     const NamespaceString& collection,
-                     const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                     OpDebug::QueryStatsInfo& queryStatsInfo,
-                     bool willNeverExhaust = false) {
+void registerRequestImpl(const OperationContext* opCtx,
+                         RateLimiter& rateLimiter,
+                         const NamespaceString& collection,
+                         const std::function<std::unique_ptr<Key>(void)>& makeKey,
+                         OpDebug::QueryStatsInfo& queryStatsInfo,
+                         bool willNeverExhaust = false) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         LOGV2_DEBUG(8473000,
                     5,
@@ -398,7 +417,7 @@ void registerRequest(const OperationContext* opCtx,
         return;
     }
 
-    if (!shouldCollect(opCtx->getServiceContext())) {
+    if (!shouldCollect(rateLimiter)) {
         queryStatsInfo.disableForSubqueryExecution = true;
         return;
     }
@@ -464,37 +483,39 @@ void registerRequest(const OperationContext* opCtx,
     }
 }
 
+}  // namespace
+
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      const std::function<std::unique_ptr<Key>(void)>& makeKey,
                      bool willNeverExhaust) {
     auto& opDebug = CurOp::get(opCtx)->debug();
-    registerRequest(opCtx, collection, makeKey, opDebug.getQueryStatsInfo(), willNeverExhaust);
+    RateLimiter& rateLimiter = QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext());
+    registerRequestImpl(
+        opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo(), willNeverExhaust);
 }
 
 void registerWriteRequest(OperationContext* opCtx,
                           const NamespaceString& collection,
-                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                          bool willNeverExhaust) {
-    // Check if collecting write commands is enabled.
-    if (internalQueryStatsWriteCmdSampleRate.load() != 0.0) {
-        registerRequest(opCtx, collection, makeKey, willNeverExhaust);
-    }
+                          const std::function<std::unique_ptr<Key>(void)>& makeKey) {
+    RateLimiter& rateLimiter =
+        QueryStatsStoreManager::getWriteCmdRateLimiter(opCtx->getServiceContext());
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    registerRequestImpl(opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo());
 }
 
 void registerWriteRequest(OperationContext* opCtx,
                           const NamespaceString& collection,
                           size_t writeOpIndex,
                           const std::function<std::unique_ptr<Key>(void)>& makeKey) {
-    // Check if collecting write commands is enabled.
-    if (internalQueryStatsWriteCmdSampleRate.load() != 0.0) {
-        OpDebug::QueryStatsInfo queryStatsInfo;
-        registerRequest(opCtx, collection, makeKey, queryStatsInfo);
-        // Create and set queryStatsInfo if it is not empty.
-        if (queryStatsInfo.key != nullptr || queryStatsInfo.keyHash != boost::none) {
-            CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(writeOpIndex,
-                                                                  std::move(queryStatsInfo));
-        }
+    RateLimiter& rateLimiter =
+        QueryStatsStoreManager::getWriteCmdRateLimiter(opCtx->getServiceContext());
+    OpDebug::QueryStatsInfo queryStatsInfo;
+    registerRequestImpl(opCtx, rateLimiter, collection, makeKey, queryStatsInfo);
+    // Create and set queryStatsInfo if it is not empty.
+    if (queryStatsInfo.key != nullptr || queryStatsInfo.keyHash != boost::none) {
+        CurOp::get(opCtx)->debug().setQueryStatsInfoAtOpIndex(writeOpIndex,
+                                                              std::move(queryStatsInfo));
     }
 }
 

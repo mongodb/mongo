@@ -45,6 +45,7 @@ executor:
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
         internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
         notablescan: false
       verbose: ""

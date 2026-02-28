@@ -53,7 +53,7 @@ Status onQueryStatsRateLimitUpdate(int requestLimit);
 
 Status onQueryStatsSamplingRateUpdate(double samplingRate);
 
-Status validateQueryStatsWriteCmdSampleRate(const double&, const boost::optional<TenantId>&);
+Status onQueryStatsWriteCmdSamplingRateUpdate(double samplingRate);
 
 /**
  * An interface used to modify the queryStats store when query setParameters are modified. This is
@@ -75,6 +75,11 @@ public:
      * Updates the sampling rate for the queryStats rate limiter.
      */
     virtual void updateRateLimiter(ServiceContext* serviceCtx) = 0;
+
+    /**
+     * Updates the sampling rate for the queryStats write command rate limiter.
+     */
+    virtual void updateWriteCmdRateLimiter(ServiceContext* serviceCtx) = 0;
 };
 
 /**

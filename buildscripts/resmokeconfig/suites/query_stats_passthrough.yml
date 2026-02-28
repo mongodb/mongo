@@ -41,4 +41,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true

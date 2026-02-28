@@ -60,9 +60,10 @@ public:
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
 
-        // Set query stats collection to 100%
-        auto& limiter = query_stats::QueryStatsStoreManager::getRateLimiter(getServiceContext());
-        limiter.configureWindowBased(-1);
+        // Set write cmd query stats collection to 100% (1000/1000)
+        auto& limiter =
+            query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+        limiter.configureSampleBased(1000, 42);
     }
 
     ServiceContext::UniqueOperationContext opCtxHolder;
@@ -123,27 +124,27 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequ
 
     // Selects one of the keys and checks its query stats key.
     ASSERT_BSONOBJ_EQ_AUTO(
-        R"({                                  
-            "queryShape": {                   
-                "cmdNs": {                    
-                    "db": "testDB",           
-                    "coll": "testColl"        
-                },                            
-                "command": "update",          
-                "q": {                        
-                    "x": {                    
-                        "$eq": "?number"      
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "update",
+                "q": {
+                    "x": {
+                        "$eq": "?number"
                     }
-                },                            
-                "u": {                        
+                },
+                "u": {
                     "$set": {
-                        "bar": "?string"      
-                    }                         
-                },                            
+                        "bar": "?string"
+                    }
+                },
                 "multi": false,
-                "upsert": false               
-            },                                
-            "ordered": true,                  
+                "upsert": false
+            },
+            "ordered": true,
             "bypassDocumentValidation": false
         })",
         opDebug.getQueryStatsInfo(1).key->toBson(
@@ -383,6 +384,42 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
             CurOp::get(opCtx), opIndex, updateOpEntry);
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
     }
+}
+
+/**
+ * Show that we don't register writes for query stats collection when the write sample rate is zero,
+ * even if the read path is configured for query stats collection.
+ */
+TEST_F(WriteBatchQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRateIsZero) {
+    auto& writeLimiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    writeLimiter.configureSampleBased(0, 42);
+
+    auto& readLimiter = query_stats::QueryStatsStoreManager::getRateLimiter(getServiceContext());
+
+    auto runTest = [&](auto configureReadLimiter) {
+        auto update = fromjson(R"({
+            update: "testColl",
+            updates: [
+                { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false }
+            ],
+            "$db": "testDB"
+            })"_sd);
+        auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
+        BatchedCommandRequest batchRequest(updateCommandRequest);
+        WriteCommandRef cmdRef{batchRequest};
+
+        configureReadLimiter();
+
+        WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+            opCtx, cmdRef, false /* skip request */);
+
+        const auto& opDebug = CurOp::get(opCtx)->debug();
+        ASSERT_FALSE(opDebug.hasQueryStatsInfo(0));
+    };
+
+    runTest([&] { readLimiter.configureSampleBased(1000, 42); });
+    runTest([&] { readLimiter.configureWindowBased(1000); });
 }
 
 }  // namespace

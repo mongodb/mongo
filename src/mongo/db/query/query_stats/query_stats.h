@@ -108,6 +108,7 @@ public:
     // This is essentially global, but can be manipulated by unit tests.
     static const ServiceContext::Decoration<std::unique_ptr<QueryStatsStoreManager>> get;
     static const ServiceContext::Decoration<RateLimiter> getRateLimiter;
+    static const ServiceContext::Decoration<RateLimiter> getWriteCmdRateLimiter;
 
     template <typename... QueryStatsStoreArgs>
     QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
@@ -194,8 +195,7 @@ void registerRequest(OperationContext* opCtx,
  */
 void registerWriteRequest(OperationContext* opCtx,
                           const NamespaceString& collection,
-                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
-                          bool willNeverExhaust = false);
+                          const std::function<std::unique_ptr<Key>(void)>& makeKey);
 
 /**
  * Register the write op at 'writeOpIndex' for a batched write command (e.g., update) on mongos.

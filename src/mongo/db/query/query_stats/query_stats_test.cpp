@@ -289,4 +289,39 @@ TEST_F(QueryStatsTest, TestConfiguringQueryStatsViaServerParameters) {
     }
 }
 
+TEST_F(QueryStatsTest, TestConfiguringWriteCmdRateLimiterViaServerParameters) {
+    auto opCtx = makeOperationContext();
+    auto serviceCtx = opCtx->getServiceContext();
+
+    {
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
+                                                            0.042);
+
+        auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
+        ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(limiter.getSamplingRate(), 42);
+    }
+
+    {  // Full sampling rate of 1.0 should yield a per-thousand rate of 1000.
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
+                                                            1.0);
+
+        auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
+        ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(limiter.getSamplingRate(), 1000);
+    }
+
+    {  // A rate of 0.0 should disable write command sampling.
+        RAIIServerParameterControllerForTest flagCtrl("featureFlagQueryStats", true);
+        RAIIServerParameterControllerForTest sampleRateCtrl("internalQueryStatsWriteCmdSampleRate",
+                                                            0.0);
+
+        auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
+        ASSERT_EQ(limiter.getPolicyType(), RateLimiter::kSampleBasedPolicy);
+        ASSERT_EQ(limiter.getSamplingRate(), 0);
+    }
+}
+
 }  // namespace mongo::query_stats

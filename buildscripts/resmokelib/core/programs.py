@@ -150,6 +150,9 @@ def mongod_program(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
     )
     remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsWriteCmdSampleRate", bin_version, "8.3.0"
+    )
+    remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"
     )
     remove_set_parameter_if_before_version(
@@ -227,6 +230,9 @@ def mongos_program(
 
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsRateLimit", bin_version, "7.3.0"
+    )
+    remove_set_parameter_if_before_version(
+        suite_set_parameters, "internalQueryStatsWriteCmdSampleRate", bin_version, "8.3.0"
     )
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0"

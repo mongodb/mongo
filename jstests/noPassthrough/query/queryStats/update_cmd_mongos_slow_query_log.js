@@ -31,10 +31,10 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
             shards: 1,
             mongos: 1,
             mongosOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1},
+                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
             },
             shardOptions: {
-                setParameter: {internalQueryStatsRateLimit: -1},
+                setParameter: {internalQueryStatsRateLimit: -1, internalQueryStatsWriteCmdSampleRate: 1},
             },
         });
         // TODO SERVER-117919 Remove skipping test due to UWE.
@@ -61,7 +61,7 @@ describe("Mongos - Single vs Batched Updates Query Shape Hash", function () {
     });
 
     after(function () {
-        this.st.stop();
+        this.st?.stop();
     });
 
     beforeEach(function () {

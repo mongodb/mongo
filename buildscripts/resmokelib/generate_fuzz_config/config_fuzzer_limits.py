@@ -523,6 +523,11 @@ config_fuzzer_params = {
             "period": 10,
             "fuzz_at": ["startup", "runtime"],
         },
+        "internalQueryStatsWriteCmdSampleRate": {
+            "choices": [0, 0.0001, 0.1, 1.0],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
         "internalQueryStatsCacheSize": {
             "choices": ["0.00001MB", "0MB", "1MB", "10MB"],
             "period": 10,
@@ -728,6 +733,11 @@ config_fuzzer_params = {
         "internalQueryStatsSampleRate": {
             "min": 0,
             "max": 1,
+            "choices": [0, 0.0001, 0.1, 1.0],
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "internalQueryStatsWriteCmdSampleRate": {
             "choices": [0, 0.0001, 0.1, 1.0],
             "period": 10,
             "fuzz_at": ["startup", "runtime"],

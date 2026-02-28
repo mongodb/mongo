@@ -44,6 +44,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
       verbose: ""
     mongod_options:
@@ -53,6 +54,7 @@ executor:
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
         internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1.0
         internalQueryStatsErrorsAreCommandFatal: true
         notablescan: false
       verbose: ""

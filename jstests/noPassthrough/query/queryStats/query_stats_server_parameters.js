@@ -88,8 +88,19 @@ function runTest(conn) {
     }
 
     {
-        // Test enabling collecting write commands.
-        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1}));
+        // Test enabling collecting write commands for 1% of the writes we can currently collect
+        // stats for.
+        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.01}));
+        const sampleRate = conn.adminCommand({
+            getParameter: 1,
+            internalQueryStatsWriteCmdSampleRate: 1,
+        }).internalQueryStatsWriteCmdSampleRate;
+        assert.eq(sampleRate, 0.01);
+    }
+
+    {
+        // Test enabling collecting write commands for all writes we can current collect stats for.
+        assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 1.0}));
         const sampleRate = conn.adminCommand({
             getParameter: 1,
             internalQueryStatsWriteCmdSampleRate: 1,
@@ -110,24 +121,12 @@ function runTest(conn) {
     {
         // Test setting internalQueryStatsWriteCmdSampleRate with invalid values.
         assert.commandFailedWithCode(
-            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.001}),
-            11204700,
-        );
-        assert.commandFailedWithCode(
-            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.999}),
-            11204700,
-        );
-        assert.commandFailedWithCode(
-            conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 0.5}),
-            11204700,
-        );
-        assert.commandFailedWithCode(
             conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: 2}),
-            11204700,
+            ErrorCodes.BadValue,
         );
         assert.commandFailedWithCode(
             conn.adminCommand({setParameter: 1, internalQueryStatsWriteCmdSampleRate: -1}),
-            11204700,
+            ErrorCodes.BadValue,
         );
     }
 }
