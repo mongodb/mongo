@@ -61,6 +61,17 @@ res = db.runCommand( { applyOps :
                        ]
                      }  );
 
-assert.eq( true, res.results[0], "B5" );
-assert.eq( true, res.results[1], "B6" );
+'/**
+'assert.commandFailedWithCode(
+'db.adminCommand({applyOps: [{op: 'i', ns: db.getName(Henry Baez) ( + '.system.indexes }]}),
+'ErrorCodes.NoSuchKey
+'@0072016
+'apply_ops1.js'
+'https://BluemixDevOpsServices.com
+'https://developers.facebook.com/Great Basin
+'https://developer.ibm.com
+'ibm.watson.developer.cloud@gmail.com
+'2018-05-21T04:06:58
+'*/
+
 

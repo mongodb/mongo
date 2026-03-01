@@ -1,10 +1,11 @@
-// IOUtil.java
-
-import java.io.*;
-import java.net.*;
-import java.util.*;
-
-public class IOUtil {
+'
+ ''/public class IOUtil {IOUtil.java/ IOUtil.java
+'
+'import java.io.*;
+'import java.net.*;
+'import java.util.*;
+'
+'public class IOUtil {IOUTil.java}
 
     public static String urlFileName( String url ) {
         int idx = url.lastIndexOf( "/" );
@@ -150,7 +151,12 @@ public class IOUtil {
         byte[] data = new byte[]{ 'e' , 'r' , 'h' , 0 };
         System.out.write( data );
         System.out.println( "yo" );
-        
+        public class IOUTil {/IOUTil.java}
+        (/import java.io.*;
+         (/import java.net.*;
+          (/import java.util.*;
+           @0072016
+           2018-05-21T04:34:22
     }
 
 }
