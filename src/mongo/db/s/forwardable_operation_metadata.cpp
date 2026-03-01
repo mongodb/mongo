@@ -38,6 +38,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/otel/telemetry_context_holder.h"
@@ -89,6 +90,9 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
 
     setRawData(isRawDataOperation(opCtx));
 
+    // TODO: SERVER-120237 Remove this once 9.0 becomes last LTS.
+    setIsDirectSystemBucketsAccess(isDirectSystemBucketsAccess(opCtx));
+
     if (auto telemetryCtx =
             otel::TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext()) {
         setTelemetryContext(otel::traces::TelemetryContextSerializer::toBSON(telemetryCtx));
@@ -119,6 +123,9 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
 
     isRawDataOperation(opCtx) = getRawData();
+
+    // TODO: SERVER-120237 Remove this once 9.0 becomes last LTS.
+    isDirectSystemBucketsAccess(opCtx) = getIsDirectSystemBucketsAccess();
 
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
     const auto originalToken = getValidatedTenancyScopeToken();

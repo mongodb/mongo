@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -162,6 +163,11 @@ void readRequestMetadata(OperationContext* opCtx,
 
     if (requestArgs.getRawData()) {
         isRawDataOperation(opCtx) = true;
+    }
+
+    // TODO: SERVER-120237 remove this once 9.0 becomes last LTS.
+    if (requestArgs.getIsDirectSystemBucketsAccess()) {
+        isDirectSystemBucketsAccess(opCtx) = true;
     }
 }
 

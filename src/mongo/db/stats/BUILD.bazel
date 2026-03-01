@@ -87,6 +87,20 @@ mongo_cc_library(
     ],
 )
 
+# TODO SERVER-120237: remove this once 9.0 becomes last LTS.
+mongo_cc_library(
+    name = "direct_system_buckets_access",
+    srcs = [
+        "direct_system_buckets_access.cpp",
+    ],
+    hdrs = [
+        "direct_system_buckets_access.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 mongo_cc_library(
     name = "system_buckets_metrics",
     srcs = [
@@ -96,6 +110,7 @@ mongo_cc_library(
         "system_buckets_metrics.h",
     ],
     deps = [
+        ":direct_system_buckets_access",
         "//src/mongo/db:commands",
     ],
 )

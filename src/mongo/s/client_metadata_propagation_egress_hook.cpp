@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/stats/direct_system_buckets_access.h"
 #include "mongo/db/topology/user_write_block/write_block_bypass.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
@@ -64,6 +65,11 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
 
         if (isRawDataOperation(opCtx)) {
             metadataBob->append(kRawDataFieldName, true);
+        }
+
+        // TODO: SERVER-120237 remove this once 9.0 becomes last LTS.
+        if (isDirectSystemBucketsAccess(opCtx)) {
+            metadataBob->append(kIsDirectSystemBucketsAccessFieldName, true);
         }
 
         // If the request is using the 'defaultMaxTimeMS' value, attaches the field so shards can

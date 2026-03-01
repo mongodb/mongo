@@ -392,6 +392,20 @@ structs:
                 # forward_to_shards to false because it gets manually appended upon egress.
                 forward_to_shards: false
                 stability: "internal"
+            # Set by the router when a user directly targets a system.buckets namespace.
+            # This flag must be propagated to shards because mongos lacks FCV awareness,
+            # it cannot reliably evaluate whether BlockDirectSystemBucketsAccess is enabled
+            # for the current cluster version. Enforcement is therefore delegated to the shards.
+            # TODO SERVER-120237: remove this once 9.0 becomes last LTS.
+            isDirectSystemBucketsAccess:
+                type: optionalBool
+                # Even though this field is forwarded to shards, forward_to_shards is set to
+                # false because the standard mechanism only forwards fields present in the
+                # original command BSON. This flag is set on the OperationContext after parsing,
+                # so it is not present there. Instead, the egress metadata hook manually appends
+                # it when forwarding the request to a shard or config server. See also: rawData.
+                forward_to_shards: false
+                stability: "internal"
             # Contains context fields of the current transaction
             transactionRuntimeContext:
                 type: TransactionRuntimeContext
