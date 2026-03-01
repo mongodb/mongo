@@ -85,6 +85,41 @@ TEST(ContinueRequest, parseRequestAndResponse) {
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 
+TEST(ScopesRequest, parseRequestAndResponse) {
+
+    std::string json =
+        R"({"type":"request","seq":3,"command":"scopes","arguments":{"frameId":100}})";
+    auto request = std::static_pointer_cast<ScopesRequest>(Request::fromJSON(json));
+    ASSERT_EQ(request->seq, 3);
+    ASSERT_EQ(request->frameId, 100);
+
+    std::vector<Scope> stubScopes = {
+        Scope("Local", 99, false), Scope("Closure", 1, false), Scope("Global", 67, true)};
+    auto response = request->response(stubScopes);
+    std::string expectedResponse =
+        R"({ "type" : "response", "seq" : 3, "body" : { "scopes" : [ { "name" : "Local", "variablesReference" : 99, "expensive" : false }, { "name" : "Closure", "variablesReference" : 1, "expensive" : false }, { "name" : "Global", "variablesReference" : 67, "expensive" : true } ] } })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
+}
+
+TEST(VariablesRequest, parseRequestAndResponse) {
+
+    std::string json =
+        R"({"type":"request","seq":4,"command":"variables","arguments":{"variablesReference":1001}})";
+    auto request = std::static_pointer_cast<VariablesRequest>(Request::fromJSON(json));
+    ASSERT_EQ(request->seq, 4);
+    ASSERT_EQ(request->variablesReference, 1001);
+
+    std::vector<Variable> stubVariables = {Variable("x", "42", "number", 99),
+                                           Variable("name", "John", "string", 1),
+                                           Variable("isActive", "true", "boolean", 5),
+                                           Variable("myObj", "Object {...}", "object", 67)};
+
+    auto response = request->response(stubVariables);
+    std::string expectedResponse =
+        R"({ "type" : "response", "seq" : 4, "body" : { "variables" : [ { "name" : "x", "value" : "42", "type" : "number", "variablesReference" : 99 }, { "name" : "name", "value" : "John", "type" : "string", "variablesReference" : 1 }, { "name" : "isActive", "value" : "true", "type" : "boolean", "variablesReference" : 5 }, { "name" : "myObj", "value" : "Object {...}", "type" : "object", "variablesReference" : 67 } ] } })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
+}
+
 TEST(StoppedEvent, parseEvent) {
 
     auto event = StoppedEvent();

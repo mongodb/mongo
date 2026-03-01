@@ -45,6 +45,8 @@ class PartialRequest;
 class SetBreakpointsRequest;
 class ContinueRequest;
 class StackTraceRequest;
+class ScopesRequest;
+class VariablesRequest;
 class UnknownRequest;
 
 
@@ -55,6 +57,8 @@ public:
     virtual void handleRequest(SetBreakpointsRequest& req) = 0;
     virtual void handleRequest(ContinueRequest& req) = 0;
     virtual void handleRequest(StackTraceRequest& req) = 0;
+    virtual void handleRequest(ScopesRequest& req) = 0;
+    virtual void handleRequest(VariablesRequest& req) = 0;
     virtual void handleRequest(UnknownRequest& req) = 0;
 };
 
@@ -127,6 +131,45 @@ public:
     inline static constexpr std::string_view COMMAND = "stackTrace";
     StackTraceRequest(const PartialRequest& partial);
     Response response(std::string script, int line);
+};
+
+class Scope {
+    std::string name;
+    int variablesReference;
+    bool expensive;
+
+public:
+    Scope(std::string name, int variablesReference, bool expensive);
+    BSONObj toBSON() const;
+};
+
+class ScopesRequest : public VisitableRequest<ScopesRequest> {
+public:
+    inline static constexpr std::string_view COMMAND = "scopes";
+    int frameId;
+
+    ScopesRequest(const PartialRequest& partial);
+    Response response(std::vector<Scope> scopes);
+};
+
+class Variable {
+    std::string name;
+    std::string value;
+    std::string type;
+    int variablesReference;
+
+public:
+    Variable(std::string name, std::string value, std::string type, int variablesReference);
+    BSONObj toBSON() const;
+};
+
+class VariablesRequest : public VisitableRequest<VariablesRequest> {
+public:
+    inline static constexpr std::string_view COMMAND = "variables";
+    int variablesReference;
+
+    VariablesRequest(const PartialRequest& partial);
+    Response response(std::vector<Variable> variables);
 };
 
 class UnknownRequest : public VisitableRequest<UnknownRequest> {

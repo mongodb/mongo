@@ -61,6 +61,8 @@ public:
     void handleRequest(SetBreakpointsRequest& request) override;
     void handleRequest(ContinueRequest& request) override;
     void handleRequest(StackTraceRequest& request) override;
+    void handleRequest(ScopesRequest& request) override;
+    void handleRequest(VariablesRequest& request) override;
     void handleRequest(UnknownRequest& request) override;
 };
 

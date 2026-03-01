@@ -519,6 +519,22 @@ int DebuggerGlobal::getPausedLine() {
     return _pausedLine;
 }
 
+std::vector<Scope> DebuggerGlobal::getScopes(int frameId) {
+    // STUBS for now
+    std::vector<Scope> stubScopes = {
+        Scope("Local", 99, false), Scope("Closure", 1, false), Scope("Global", 67, true)};
+    return stubScopes;
+}
+
+std::vector<Variable> DebuggerGlobal::getVariables(int variablesReference) {
+    // STUBS for now
+    std::vector<Variable> stubVariables = {Variable("x", "42", "number", 99),
+                                           Variable("name", "John", "string", 1),
+                                           Variable("isActive", "true", "boolean", 5),
+                                           Variable("myObj", "Object {...}", "object", 67)};
+    return stubVariables;
+}
+
 void DebuggerGlobal::unpause() {
     _paused.store(false);
     _pauseCV.notify_all();

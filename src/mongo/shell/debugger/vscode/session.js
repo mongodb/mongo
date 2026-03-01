@@ -90,7 +90,6 @@ class MongoShellDebugSession extends DebugSession {
             let line = data.toString();
             if (!line.trim()) return;
 
-            this.log(`Received message: ${line}`);
             try {
                 const msg = JSON.parse(line);
                 this.handleDebugMessage(msg);
@@ -284,6 +283,24 @@ class MongoShellDebugSession extends DebugSession {
                 this.sendResponse(response);
             })
             .catch((err) => this.sendErrorResponse(response, 1013, `Stack trace failed: ${err.message}`));
+    }
+
+    scopesRequest(response, args) {
+        this.sendCommand("scopes", {frameId: args.frameId})
+            .then((result) => {
+                response.body = result;
+                this.sendResponse(response);
+            })
+            .catch((err) => this.sendErrorResponse(response, 1014, `Scopes failed: ${err.message}`));
+    }
+
+    variablesRequest(response, args) {
+        this.sendCommand("variables", {variablesReference: args.variablesReference})
+            .then((result) => {
+                response.body = result;
+                this.sendResponse(response);
+            })
+            .catch((err) => this.sendErrorResponse(response, 1015, `Variables failed: ${err.message}`));
     }
 
     // Send command to debug server

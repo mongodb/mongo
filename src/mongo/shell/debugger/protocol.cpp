@@ -68,6 +68,12 @@ std::shared_ptr<Request> Request::fromJSON(std::string line) {
     if (command == StackTraceRequest::COMMAND) {
         return std::make_shared<StackTraceRequest>(partial);
     }
+    if (command == ScopesRequest::COMMAND) {
+        return std::make_shared<ScopesRequest>(partial);
+    }
+    if (command == VariablesRequest::COMMAND) {
+        return std::make_shared<VariablesRequest>(partial);
+    }
 
     // Null Object pattern
     return std::make_shared<UnknownRequest>(partial);
@@ -164,6 +170,85 @@ Response StackTraceRequest::response(std::string script, int line) {
 
     Response response(seq, responseBuilder.obj().getOwned());
     return response;
+}
+
+
+/**
+ * ScopesRequest
+ */
+
+ScopesRequest::ScopesRequest(const PartialRequest& partial) : VisitableRequest(partial) {
+    frameId = arguments.getIntField("frameId");
+}
+
+Response ScopesRequest::response(std::vector<Scope> scopes) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("type", "response");
+    responseBuilder.append("seq", seq);
+
+    BSONObjBuilder bodyBuilder;
+    BSONArrayBuilder scopesArray;
+
+    for (const auto& scope : scopes) {
+        scopesArray.append(scope.toBSON());
+    }
+
+    bodyBuilder.append("scopes", scopesArray.arr());
+    responseBuilder.append("body", bodyBuilder.obj());
+
+    Response response(seq, responseBuilder.obj().getOwned());
+    return response;
+}
+
+Scope::Scope(std::string name, int variablesReference, bool expensive)
+    : name(name), variablesReference(variablesReference), expensive(expensive) {};
+
+BSONObj Scope::toBSON() const {
+    BSONObjBuilder obj;
+    obj.append("name", name);
+    obj.append("variablesReference", variablesReference);
+    obj.append("expensive", expensive);
+    return obj.obj();
+}
+
+
+/**
+ * VariablesRequest
+ */
+
+VariablesRequest::VariablesRequest(const PartialRequest& partial) : VisitableRequest(partial) {
+    variablesReference = arguments.getIntField("variablesReference");
+}
+
+Response VariablesRequest::response(std::vector<Variable> variables) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("type", "response");
+    responseBuilder.append("seq", seq);
+
+    BSONObjBuilder bodyBuilder;
+    BSONArrayBuilder variablesArray;
+
+    for (const auto& variable : variables) {
+        variablesArray.append(variable.toBSON());
+    }
+
+    bodyBuilder.append("variables", variablesArray.arr());
+    responseBuilder.append("body", bodyBuilder.obj());
+
+    Response response(seq, responseBuilder.obj().getOwned());
+    return response;
+}
+
+Variable::Variable(std::string name, std::string value, std::string type, int variablesReference)
+    : name(name), value(value), type(type), variablesReference(variablesReference) {};
+
+BSONObj Variable::toBSON() const {
+    BSONObjBuilder obj;
+    obj.append("name", name);
+    obj.append("value", value);
+    obj.append("type", type);
+    obj.append("variablesReference", variablesReference);
+    return obj.obj();
 }
 
 /**

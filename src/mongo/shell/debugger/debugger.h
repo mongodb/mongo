@@ -54,6 +54,10 @@ public:
 
     static std::string getPausedScript();
     static int getPausedLine();
+
+    static std::vector<Scope> getScopes(int frameId);
+    static std::vector<Variable> getVariables(int variablesReference);
+
     static void unpause();
 };
 

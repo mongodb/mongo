@@ -83,6 +83,18 @@ void DebugAdapter::handleRequest(StackTraceRequest& request) {
     sendMessage(response);
 }
 
+void DebugAdapter::handleRequest(ScopesRequest& request) {
+    auto scopes = DebuggerGlobal::getScopes(request.frameId);
+    auto response = request.response(scopes);
+    sendMessage(response);
+}
+
+void DebugAdapter::handleRequest(VariablesRequest& request) {
+    auto variables = DebuggerGlobal::getVariables(request.variablesReference);
+    auto response = request.response(variables);
+    sendMessage(response);
+}
+
 void DebugAdapter::handleRequest(UnknownRequest& request) {
     std::cerr << "Unknown request for command '" << request.command << "'" << std::endl;
 }
