@@ -128,18 +128,6 @@ MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 // and clear the new durable flag which is stored inside the collection options.
 MONGO_FAIL_POINT_DEFINE(simulateLegacyTimeseriesMixedSchemaFlag);
 
-/**
- * Returns true if we are running retryable write or retryable internal multi-document transaction.
- */
-bool isRetryableWrite(OperationContext* opCtx) {
-    if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
-        return false;
-    }
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    return txnParticipant &&
-        (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
-}
-
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
 }

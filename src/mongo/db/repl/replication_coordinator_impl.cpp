@@ -109,7 +109,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction/retryable_write_util.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/remote_command_request.h"
@@ -5881,12 +5881,7 @@ void ReplicationCoordinatorImpl::clearSyncSource() {
 }
 
 bool ReplicationCoordinatorImpl::isRetryableWrite(OperationContext* opCtx) const {
-    if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
-        return false;
-    }
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    return txnParticipant &&
-        (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
+    return retryable_write_util::isRetryableWrite(opCtx);
 }
 
 boost::optional<UUID> ReplicationCoordinatorImpl::getInitialSyncId(OperationContext* opCtx) {
