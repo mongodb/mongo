@@ -54,7 +54,6 @@
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -67,6 +66,15 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 namespace mongo {
 namespace {
+
+template <typename T>
+std::vector<T*> makeViewPtrVec(const std::vector<std::unique_ptr<T>>& in) {
+    std::vector<T*> out;
+    out.reserve(in.size());
+    for (auto&& up : in)
+        out.push_back(up.get());
+    return out;
+}
 
 struct WriteErrorComp {
     bool operator()(const write_ops::WriteError& errorA,
@@ -944,7 +952,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     //
 
     if (_upsertedIds.size() != 0) {
-        batchResp->setUpsertDetails(transitional_tools_do_not_use::unspool_vector(_upsertedIds));
+        batchResp->setUpsertDetails(makeViewPtrVec(_upsertedIds));
     }
 
     // Stats

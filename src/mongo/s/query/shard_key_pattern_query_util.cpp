@@ -63,7 +63,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -238,8 +237,7 @@ BSONObj extractShardKeyFromQuery(const ShardKeyPattern& shardKeyPattern,
     // Extract equalities from query.
     EqualityMatches equalities;
     // TODO: Build the path set initially?
-    FieldRefSet keyPatternPathSet(
-        transitional_tools_do_not_use::unspool_vector(shardKeyPattern.getKeyPatternFields()));
+    FieldRefSet keyPatternPathSet(shardKeyPattern.getKeyPatternFields());
     // We only care about extracting the full key pattern paths - if they don't exist (or are
     // conflicting), we don't contain the shard key.
     Status eqStatus = pathsupport::extractFullEqualityMatches(

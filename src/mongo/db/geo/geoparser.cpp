@@ -54,8 +54,8 @@
 #include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 #include <cmath>
 #include <memory>
@@ -321,23 +321,27 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
         return BAD_VALUE("Polygon has no loops.");
     }
 
+    std::vector<S2Loop*> rawLoops;
+    ScopeGuard rawLoopsGuard = [&] {
+        for (S2Loop* p : rawLoops)
+            delete p;
+    };
+    rawLoops.reserve(loops.size());
+    for (auto&& up : loops)
+        rawLoops.push_back(up.release());
 
     // Check if the given loops form a valid polygon.
     // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
     // 2. No loop covers more than half of the sphere.
     // 3. No two loops cross.
-    if (!skipValidation &&
-        !S2Polygon::IsValid(transitional_tools_do_not_use::unspool_vector(loops), &err))
+    if (!skipValidation && !S2Polygon::IsValid(rawLoops, &err))
         return BAD_VALUE("Polygon isn't valid: " << err << " " << elem.toString(false));
 
     // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
     // The polygon must be valid. See S2Polygon member function IsValid().
 
-    {
-        // Transfer ownership of the loops and clears loop vector.
-        std::vector<S2Loop*> rawLoops = transitional_tools_do_not_use::leak_vector(loops);
-        out->Init(&rawLoops);
-    }
+    // Transfer ownership of the loops and clears loop vector.
+    out->Init(&rawLoops);
 
     if (skipValidation)
         return Status::OK();

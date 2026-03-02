@@ -57,8 +57,8 @@
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 #include <set>
 #include <utility>
@@ -487,10 +487,12 @@ bool containsLine(const S2Polygon& poly, const S2Polyline& otherLine) {
     // polygon.  We do this and make sure the line is the same as the
     // line we're clipping against.
     std::vector<S2Polyline*> clipped;
+    ScopeGuard clippedGuard = [&] {
+        for (auto p : clipped)
+            delete p;
+    };
 
     poly.IntersectWithPolyline(&otherLine, &clipped);
-    const std::vector<std::unique_ptr<S2Polyline>> clippedOwned =
-        transitional_tools_do_not_use::spool_vector(clipped);
     if (1 != clipped.size()) {
         return false;
     }

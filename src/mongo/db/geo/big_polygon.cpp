@@ -30,7 +30,7 @@
 #include "mongo/db/geo/big_polygon.h"
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 #include <vector>
@@ -47,10 +47,6 @@
 #include <util/math/vector3-inl.h>
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::vector;
-
 
 BigSimplePolygon::BigSimplePolygon() {}
 
@@ -104,20 +100,19 @@ bool BigSimplePolygon::Contains(const S2Polyline& line) const {
     const S2Polygon& polyBorder = GetPolygonBorder();
 
     std::vector<S2Polyline*> clipped;
+    ScopeGuard clippedGuard = [&] {
+        for (auto* p : clipped)
+            delete p;
+    };
 
     if (_isNormalized) {
         // Polygon border is the same as the loop
         polyBorder.SubtractFromPolyline(&line, &clipped);
-        const std::vector<std::unique_ptr<S2Polyline>> clippedOwned =
-            transitional_tools_do_not_use::spool_vector(clipped);
-        return clipped.size() == 0;
     } else {
         // Polygon border is the complement of the loop
         polyBorder.IntersectWithPolyline(&line, &clipped);
-        const std::vector<std::unique_ptr<S2Polyline>> clippedOwned =
-            transitional_tools_do_not_use::spool_vector(clipped);
-        return clipped.size() == 0;
     }
+    return clipped.empty();
 }
 
 bool BigSimplePolygon::Contains(S2Point const& point) const {
@@ -175,7 +170,7 @@ const S2Polygon& BigSimplePolygon::GetPolygonBorder() const {
     if (_borderPoly)
         return *_borderPoly;
 
-    unique_ptr<S2Loop> cloned(_loop->Clone());
+    std::unique_ptr<S2Loop> cloned(_loop->Clone());
 
     // Any loop in polygon should be than a hemisphere (2*Pi).
     cloned->Normalize();
@@ -190,7 +185,7 @@ const S2Polyline& BigSimplePolygon::GetLineBorder() const {
     if (_borderLine)
         return *_borderLine;
 
-    vector<S2Point> points;
+    std::vector<S2Point> points;
     int numVertices = _loop->num_vertices();
     for (int i = 0; i <= numVertices; ++i) {
         // vertex() maps "numVertices" to 0 internally, so we don't have to deal with
