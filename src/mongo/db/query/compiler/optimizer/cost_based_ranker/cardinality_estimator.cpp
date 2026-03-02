@@ -452,7 +452,10 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
 
     QSNEstimate est;
 
-    if (_inputCard == zeroCE) {
+    if (_inputCard == zeroCE ||
+        // TODO SERVER-96816: Implement support for estimation of simple ranges
+        (!node->index.multikey && !node->filter && !node->bounds.isSimpleRange &&
+         node->bounds.isUnbounded())) {
         est.inCE = _inputCard;
         est.outCE = _inputCard;
         _qsnEstimates.emplace(node, std::move(est));

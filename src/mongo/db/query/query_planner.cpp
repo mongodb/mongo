@@ -956,6 +956,7 @@ void extendCandidatePlans(const CanonicalQuery& query,
                           const std::vector<IndexEntry>& relevantIndices,
                           bool hasHint,
                           boost::optional<StringSet&> relevantIndexOutput,
+                          boost::optional<bool&> hasRelevantMultikeyIndex,
                           std::vector<std::unique_ptr<QuerySolution>>& out) {
     const bool isDistinctMultiplanningEnabled =
         query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
@@ -1043,6 +1044,9 @@ void extendCandidatePlans(const CanonicalQuery& query,
                             cost_based_ranker::addFieldsToRelevantIndexOutput(
                                 index.keyPattern, relevantIndexOutput.get());
                         }
+                        if (hasRelevantMultikeyIndex) {
+                            *hasRelevantMultikeyIndex |= index.multikey;
+                        }
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                         indexTree->setIndexEntry(fullIndexList[i]);
                         SolutionCacheData* scd = new SolutionCacheData();
@@ -1094,6 +1098,9 @@ void extendCandidatePlans(const CanonicalQuery& query,
                     cost_based_ranker::addFieldsToRelevantIndexOutput(index.keyPattern,
                                                                       relevantIndexOutput.get());
                 }
+                if (hasRelevantMultikeyIndex) {
+                    *hasRelevantMultikeyIndex |= index.multikey;
+                }
                 PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                 indexTree->setIndexEntry(index);
 
@@ -1139,7 +1146,8 @@ void extendCandidatePlans(const CanonicalQuery& query,
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
-    boost::optional<StringSet&> relevantIndexOutput) {
+    boost::optional<StringSet&> relevantIndexOutput,
+    boost::optional<bool&> hasRelevantMultikeyIndex) {
     LOGV2_DEBUG(20967,
                 5,
                 "Beginning planning",
@@ -1339,6 +1347,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         if (relevantIndexOutput) {
             cost_based_ranker::addFieldsToRelevantIndexOutput(relevantIndices[i].keyPattern,
                                                               relevantIndexOutput.get());
+        }
+        if (hasRelevantMultikeyIndex) {
+            *hasRelevantMultikeyIndex |= relevantIndices[i].multikey;
         }
     }
 
@@ -1608,6 +1619,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                          relevantIndices,
                          hintedIndexBson.has_value(),
                          relevantIndexOutput,
+                         hasRelevantMultikeyIndex,
                          out);
 
     // The caller can explicitly ask for a collscan.
@@ -1724,7 +1736,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 }  // QueryPlanner::plan
 
 StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
-    const CanonicalQuery& query,
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,
     const ce::ExactCardinalityEstimator* exactCardinality,

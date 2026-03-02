@@ -171,7 +171,7 @@ const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
 
     Timer planningTimer;
     auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(
-        *cq, plannerParams, samplingEstimator.get(), nullptr, std::move(statusWithMultiPlanSolns));
+        plannerParams, samplingEstimator.get(), nullptr, std::move(statusWithMultiPlanSolns));
     double planTimeMS = planningTimer.elapsed().count() / 1000.0;
 
     if (timeProfile.has_value()) {

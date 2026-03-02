@@ -49,7 +49,7 @@ public:
     // getBestCBRPlan
     StatusWith<PlanRankingResult> rankPlans(OperationContext* opCtx,
                                             CanonicalQuery& query,
-                                            const QueryPlannerParams& plannerParams,
+                                            QueryPlannerParams& plannerParams,
                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
                                             const MultipleCollectionAccessor& collections) const;
 };
