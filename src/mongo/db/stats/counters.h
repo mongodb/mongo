@@ -963,11 +963,36 @@ public:
 QueryCounters& getQueryCounters(OperationContext* opCtx);
 
 template <typename DurationType>
-class DurationCounter64 : public Counter64 {
+class DurationCounter64 {
 public:
     void increment(DurationType d) {
-        Counter64::increment(d.count());
+        _counter.increment(d.count());
     }
+
+    DurationType get() const {
+        return DurationType{_counter.get()};
+    }
+
+private:
+    Counter64 _counter;
+};
+
+template <typename D>
+struct ServerStatusMetricPolicySelection<DurationCounter64<D>> {
+    struct Policy {
+        DurationCounter64<D>& value() {
+            return _v;
+        }
+
+        void appendTo(BSONObjBuilder& b, StringData leafName) const {
+            b.append(leafName, static_cast<long long>(_v.get().count()));
+        }
+
+    private:
+        DurationCounter64<D> _v;
+    };
+
+    using type = Policy;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

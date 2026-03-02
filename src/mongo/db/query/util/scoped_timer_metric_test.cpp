@@ -31,8 +31,8 @@
 
 #include "mongo/db/stats/counters.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -50,7 +50,7 @@ TEST(ScopedTimerMetricTest, IncrementCounterOnDestruction) {
         ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.get(), 100);
+    ASSERT_EQ(counter.get(), Milliseconds{100});
 }
 
 TEST(ScopedTimerMetricTest, ZeroDurationWhenNoTimeElapsed) {
@@ -62,7 +62,7 @@ TEST(ScopedTimerMetricTest, ZeroDurationWhenNoTimeElapsed) {
         ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.get(), 0);
+    ASSERT_EQ(counter.get(), Milliseconds{0});
 }
 
 TEST(ScopedTimerMetricTest, MultipleTimersAccumulate) {
@@ -82,7 +82,7 @@ TEST(ScopedTimerMetricTest, MultipleTimersAccumulate) {
     }
 
     // Each timer should add 50ms (the advance on read amount).
-    ASSERT_EQ(counter.get(), 150);
+    ASSERT_EQ(counter.get(), Milliseconds{150});
 }
 
 TEST(ScopedTimerMetricTest, WorksWithMicroseconds) {
@@ -95,7 +95,7 @@ TEST(ScopedTimerMetricTest, WorksWithMicroseconds) {
         ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.get(), 500);
+    ASSERT_EQ(counter.get(), Microseconds{500});
 }
 
 TEST(ScopedTimerMetricTest, DifferentDurationTypes) {
@@ -109,7 +109,7 @@ TEST(ScopedTimerMetricTest, DifferentDurationTypes) {
         ScopedTimerMetric timer(&tickSource, counter);
     }
 
-    ASSERT_EQ(counter.get(), 5);
+    ASSERT_EQ(counter.get(), Milliseconds{5});
 }
 
 TEST(ScopedTimerMetricTest, ManualAdvanceSimulatesTimePassage) {
@@ -122,7 +122,7 @@ TEST(ScopedTimerMetricTest, ManualAdvanceSimulatesTimePassage) {
         tickSource.advance(Milliseconds{250});
     }
 
-    ASSERT_EQ(counter.get(), 250);
+    ASSERT_EQ(counter.get(), Milliseconds{250});
 }
 
 TEST(ScopedTimerMetricTest, NestedTimersWorkIndependently) {
@@ -138,12 +138,12 @@ TEST(ScopedTimerMetricTest, NestedTimersWorkIndependently) {
             tickSource.advance(Milliseconds{50});
         }
         // Inner timer should have recorded 50ms.
-        ASSERT_EQ(innerCounter.get(), 50);
+        ASSERT_EQ(innerCounter.get(), Milliseconds{50});
         tickSource.advance(Milliseconds{25});
     }
 
     // Outer timer should have recorded the total time: 100 + 50 + 25 = 175ms.
-    ASSERT_EQ(outerCounter.get(), 175);
+    ASSERT_EQ(outerCounter.get(), Milliseconds{175});
 }
 
 TEST(ScopedTimerMetricTest, LargeDurations) {
@@ -156,9 +156,8 @@ TEST(ScopedTimerMetricTest, LargeDurations) {
         tickSource.advance(Seconds{10});
     }
 
-    ASSERT_EQ(counter.get(), 10000000);
+    ASSERT_EQ(counter.get(), Seconds{10});
 }
 
 }  // namespace
 }  // namespace mongo
-
