@@ -2393,6 +2393,7 @@ tasks:
         "release_critical",
         "incompatible_mac",
         "timeseries_crud",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
