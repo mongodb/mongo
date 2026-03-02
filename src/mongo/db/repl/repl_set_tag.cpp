@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -80,7 +79,8 @@ bool ReplSetTagMatch::update(const ReplSetTag& tag) {
                      _boundTagValues.end(),
                      [ki = tag.getKeyIndex()](const auto& x) { return ki == x.getKeyIndex(); });
     if (iter != _boundTagValues.end()) {
-        if (!sequenceContains(iter->boundValues, tag.getValueIndex())) {
+        if (const auto& v = iter->boundValues;
+            std::find(v.begin(), v.end(), tag.getValueIndex()) == v.end()) {
             iter->boundValues.push_back(tag.getValueIndex());
         }
     }

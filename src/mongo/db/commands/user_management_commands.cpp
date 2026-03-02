@@ -119,7 +119,6 @@
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -583,6 +582,11 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         return;
     }
 
+    auto haveAuthMechanism = [&](StringData mech) {
+        const auto& v = saslGlobalParams.authenticationMechanisms;
+        return std::find(v.begin(), v.end(), mech) != v.end();
+    };
+
     bool buildSCRAMSHA1 = false, buildSCRAMSHA256 = false;
     if (auto mechanisms = cmd.getMechanisms(); mechanisms && !mechanisms->empty()) {
         for (const auto& mech : mechanisms.get()) {
@@ -597,13 +601,12 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
 
             uassert(ErrorCodes::BadValue,
                     str::stream() << mech << " not supported in authMechanisms",
-                    sequenceContains(saslGlobalParams.authenticationMechanisms, mech));
+                    haveAuthMechanism(mech));
         }
 
     } else {
-        buildSCRAMSHA1 = sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1");
-        buildSCRAMSHA256 =
-            sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-256");
+        buildSCRAMSHA1 = haveAuthMechanism("SCRAM-SHA-1");
+        buildSCRAMSHA256 = haveAuthMechanism("SCRAM-SHA-256");
     }
 
     auto password = cmd.getPwd().get();
@@ -1061,7 +1064,8 @@ Status checkOkayToGrantRolesToRole(OperationContext* opCtx,
                               << "': " << swData.getStatus().reason()};
     }
 
-    if (sequenceContains(swData.getValue().roles.get(), role)) {
+    if (const auto& v = swData.getValue().roles.get();
+        std::find(v.begin(), v.end(), role) != v.end()) {
         return {ErrorCodes::InvalidRoleModification,
                 str::stream() << "Granting roles to " << role
                               << " would introduce a cycle in the role graph"};

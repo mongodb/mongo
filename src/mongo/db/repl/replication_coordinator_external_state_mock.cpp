@@ -38,7 +38,6 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/sequence_util.h"
 
 #include <memory>
 #include <mutex>
@@ -100,12 +99,12 @@ void ReplicationCoordinatorExternalStateMock::forwardSecondaryProgress(bool prio
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
                                                      const boost::optional<int>& priorityPort,
                                                      ServiceContext* const service) {
-    return sequenceContains(_selfHosts, host) || _selfHostsSlow.find(host) != _selfHostsSlow.end();
+    return _selfHostsContains(host) || _selfHostsSlow.find(host) != _selfHostsSlow.end();
 }
 
 bool ReplicationCoordinatorExternalStateMock::isSelfFastPath(
     const HostAndPort& host, const boost::optional<int>& priorityPort) {
-    return sequenceContains(_selfHosts, host);
+    return _selfHostsContains(host);
 }
 
 bool ReplicationCoordinatorExternalStateMock::isSelfSlowPath(
@@ -113,7 +112,7 @@ bool ReplicationCoordinatorExternalStateMock::isSelfSlowPath(
     const boost::optional<int>& priorityPort,
     ServiceContext* const service,
     Milliseconds timeout) {
-    if (sequenceContains(_selfHosts, host))
+    if (_selfHostsContains(host))
         return true;
     auto iter = _selfHostsSlow.find(host);
     if (iter == _selfHostsSlow.end())
@@ -350,6 +349,10 @@ void ReplicationCoordinatorExternalStateMock::clearOtherMemberDataChanged() {
 
 bool ReplicationCoordinatorExternalStateMock::getOtherMemberDataChanged() const {
     return _otherMemberDataChanged;
+}
+
+bool ReplicationCoordinatorExternalStateMock::_selfHostsContains(const HostAndPort& host) const {
+    return std::find(_selfHosts.begin(), _selfHosts.end(), host) != _selfHosts.end();
 }
 
 }  // namespace repl

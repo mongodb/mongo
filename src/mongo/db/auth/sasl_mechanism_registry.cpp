@@ -41,7 +41,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -148,7 +147,8 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
 }
 
 bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechName) const {
-    return sequenceContains(_enabledMechanisms, mechName);
+    const auto& v = _enabledMechanisms;
+    return std::find(v.begin(), v.end(), mechName) != v.end();
 }
 
 void appendMechs(const std::vector<std::unique_ptr<ServerFactoryBase>>& mechs,

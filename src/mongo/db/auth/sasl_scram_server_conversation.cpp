@@ -53,7 +53,6 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -217,7 +216,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
                                             << " is disallowed for cluster authentication");
             }
         } else {
-            if (!sequenceContains(saslGlobalParams.authenticationMechanisms, Policy::getName())) {
+            if (auto&& v = saslGlobalParams.authenticationMechanisms;
+                std::find(v.begin(), v.end(), Policy::getName()) == v.end()) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << Policy::getName() << " authentication is disabled");
             }

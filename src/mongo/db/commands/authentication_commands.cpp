@@ -64,7 +64,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/sequence_util.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -236,9 +235,10 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
     auto request = getX509UserRequest(opCtx, userName);
 
     auto authorizeExternalUser = [&] {
+        const auto& v = saslGlobalParams.authenticationMechanisms;
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
-                sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism));
+                std::find(v.begin(), v.end(), kX509AuthMechanism) != v.end());
 
         uassertStatusOK(
             authorizationSession->addAndAuthorizeUser(opCtx, std::move(request), boost::none));

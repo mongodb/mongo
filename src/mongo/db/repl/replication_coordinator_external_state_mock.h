@@ -230,6 +230,8 @@ public:
     JournalListener* getReplicationJournalListener() final;
 
 private:
+    bool _selfHostsContains(const HostAndPort& host) const;
+
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;
     StatusWith<OpTime> _lastOpTime;
