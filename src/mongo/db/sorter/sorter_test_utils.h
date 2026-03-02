@@ -169,6 +169,18 @@ public:
     }
 };
 
+class RangeOnlyIterator : public EmptyIterator {
+public:
+    explicit RangeOnlyIterator(SorterRange range) : _range(std::move(range)) {}
+
+    SorterRange getRange() const override {
+        return _range;
+    }
+
+private:
+    SorterRange _range;
+};
+
 class LimitIterator : public IWIterator {
 public:
     LimitIterator(long long limit, std::shared_ptr<IWIterator> source)

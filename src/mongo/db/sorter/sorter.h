@@ -42,6 +42,7 @@
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <functional>
 #include <memory>
@@ -549,6 +550,28 @@ struct MONGO_MOD_PRIVATE Greater {
 };
 
 /**
+ * Validates that all ranges in a merge batch have non-decreasing offsets and form a contiguous
+ * sequence. Returns the end offset immediately after the final range in the batch.
+ */
+template <typename Key, typename Value>
+inline int64_t validateMergeSpillRanges(
+    std::span<std::shared_ptr<sorter::Iterator<Key, Value>>> spillsToMerge) {
+    invariant(!spillsToMerge.empty());
+    int64_t expectedRangeStart = spillsToMerge.front()->getRange().getStartOffset();
+    for (const auto& it : spillsToMerge) {
+        auto range = it->getRange();
+        uassert(12017000,
+                "Merge range end offset must be greater than or equal to start offset",
+                range.getEndOffset() >= range.getStartOffset());
+        uassert(12017001,
+                "Merge ranges in batch must be adjacent",
+                range.getStartOffset() == expectedRangeStart);
+        expectedRangeStart = range.getEndOffset();
+    }
+    return expectedRangeStart;
+}
+
+/**
  * A class where we declare how to spill depending on the underlying storage the sorter is using.
  */
 template <typename Key, typename Value>
@@ -576,6 +599,13 @@ public:
         const Settings& settings,
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value>>& heap) = 0;
 
+    /**
+     * Merge 'iters' in groups of at most 'numParallelSpills' until at most
+     * 'numTargetedSpills' remain.
+     *
+     * 'iters' must be ordered by increasing range start offset and form one contiguous
+     * range.
+     */
     virtual void mergeSpills(const SortOptions& opts,
                              const Settings& settings,
                              SorterStats& stats,

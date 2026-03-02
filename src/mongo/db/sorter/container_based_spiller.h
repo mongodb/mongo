@@ -384,15 +384,9 @@ public:
                 auto mergeIterator = sorter::merge<Key, Value>(spillsToMerge, opts, comp);
                 auto writer = this->_storage->makeWriter(opts, settings);
 
-                std::vector<std::pair<int64_t, int64_t>> rangesToDelete;
-                rangesToDelete.reserve(spillsToMerge.size());
-                int64_t numSourceRows = 0;
-                for (const auto& iter : spillsToMerge) {
-                    auto range = iter->getRange();
-                    rangesToDelete.emplace_back(range.getStartOffset(), range.getEndOffset());
-                    numSourceRows += range.getEndOffset() - range.getStartOffset();
-                }
-                std::sort(rangesToDelete.begin(), rangesToDelete.end());
+                int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStartOffset();
+                int64_t deleteRangeEnd = validateMergeSpillRanges<Key, Value>(spillsToMerge);
+                const int64_t numSourceRows = deleteRangeEnd - deleteRangeStart;
 
                 int64_t numSpilled = 0;
 
@@ -404,10 +398,8 @@ public:
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
 
                 // TODO(SERVER-117546): Use a truncate rather than individual deletes.
-                for (const auto& [start, end] : rangesToDelete) {
-                    for (int64_t current = start; current < end; ++current) {
-                        _containerBasedStorage().remove(current);
-                    }
+                for (int64_t current = deleteRangeStart; current < deleteRangeEnd; ++current) {
+                    _containerBasedStorage().remove(current);
                 }
 
                 iters.push_back(writer->done());

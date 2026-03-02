@@ -573,6 +573,8 @@ void FileBasedSorterSpiller<Key, Value>::mergeSpills(
             auto count = std::min(numParallelSpills, iterators.size() - i);
             auto spillsToMerge = std::span(iterators).subspan(i, count);
 
+            validateMergeSpillRanges<Key, Value>(spillsToMerge);
+
             // Since we are merging the spills to a new file, we make sure we have sufficient
             // available disk space
             int64_t minRequiredDiskSpace = 0;

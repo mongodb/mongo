@@ -451,6 +451,54 @@ TYPED_TEST(MakeFromExistingRangesTest, NextWithDeferredValues) {
     ASSERT_FALSE(iter->more());
 }
 
+TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
+    unittest::TempDir storageLocation = makeTempDir();
+    auto opts = SortOptions().TempDir(storageLocation.path());
+
+    auto spiller = this->storage().makeSpiller(opts);
+    using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
+    auto spillSingleKey = [&](int key) -> IteratorPtr {
+        std::vector<IWPair> oneRecord{{key, -key}};
+        return spiller->spill(opts, IWSorter::Settings{}, oneRecord, 0);
+    };
+
+    auto firstRange = spillSingleKey(50);   // [0, 1)
+    auto secondRange = spillSingleKey(75);  // [1, 2)
+    auto thirdRange = spillSingleKey(100);  // [2, 3)
+
+    // Reorder to create a gap: [0, 1), [2, 3), [1, 2).
+    std::vector<IteratorPtr> disjointRanges{firstRange, thirdRange, secondRange};
+    SorterStats sorterStats{nullptr};
+
+    ASSERT_THROWS_CODE(
+        spiller->mergeSpills(
+            opts, IWSorter::Settings{}, sorterStats, disjointRanges, IWComparator(ASC), 2, 2),
+        DBException,
+        12017001);
+}
+
+TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDecreasingOffsets) {
+    unittest::TempDir storageLocation = makeTempDir();
+    auto opts = SortOptions().TempDir(storageLocation.path());
+
+    auto spiller = this->storage().makeSpiller(opts);
+    using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
+    auto makeRange = [](int64_t start, int64_t end) -> IteratorPtr {
+        return std::make_shared<RangeOnlyIterator>(SorterRange{start, end, 0});
+    };
+
+    std::vector<IteratorPtr> invalidRanges{
+        makeRange(0, 1), makeRange(2, 1),  // end < start
+    };
+    SorterStats sorterStats{nullptr};
+
+    ASSERT_THROWS_CODE(
+        spiller->mergeSpills(
+            opts, IWSorter::Settings{}, sorterStats, invalidRanges, IWComparator(ASC), 1, 2),
+        DBException,
+        12017000);
+}
+
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, ChecksumVersion) {
     unittest::TempDir storageLocation = makeTempDir();
     auto opts = SortOptions().TempDir(storageLocation.path()).Tracker(nullptr);
