@@ -45,6 +45,9 @@ filters:
   - "benchmarks_query.yml":
     approvers:
       - 10gen/query
+  - "buildscripts_test.yml":
+    approvers:
+      - 10gen/devprod-correctness
   - "bulk_write*":
     approvers:
       - 10gen/query-execution-write-exec

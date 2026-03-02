@@ -42,6 +42,7 @@ from buildscripts.burn_in_tests import (
     SELECTOR_FILE,
     SUPPORTED_TEST_KINDS,
     LocalFileChangeDetector,
+    MockFileChangeDetector,
 )
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.generate_result_tasks import make_results_task
@@ -141,8 +142,15 @@ def get_resmoke_configs():
         return yaml.safe_load(f)
 
 
-def query_targets_to_burn_in(origin_rev: str) -> set[BurnInTargetInfo]:
-    change_detector = LocalFileChangeDetector(origin_rev)
+def query_targets_to_burn_in(
+    origin_rev: str, test_changed_files: str | None = None
+) -> set[BurnInTargetInfo]:
+    # Use MockFileChangeDetector if test files are provided (for testing purposes)
+    if test_changed_files:
+        changed_files = {f.strip() for f in test_changed_files.split(",")}
+        change_detector = MockFileChangeDetector(changed_files)
+    else:
+        change_detector = LocalFileChangeDetector(origin_rev)
     tests_changed = change_detector.find_changed_tests([Repo(".")])
 
     with open(SELECTOR_FILE, "r") as f:
@@ -291,11 +299,17 @@ app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
 @app.command()
-def generate_targets(origin_rev: str):
+def generate_targets(
+    origin_rev: str,
+    test_changed_files: Annotated[
+        str | None,
+        typer.Option(hidden=True, help="Comma-separated list of changed files (for testing)"),
+    ] = None,
+):
     """Generate burn-in test targets for changed test files."""
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
-    targets = query_targets_to_burn_in(origin_rev)
+    targets = query_targets_to_burn_in(origin_rev, test_changed_files)
     print(f"\nFound {len(targets)} burn-in targets to generate\n")
 
     for burn_in_name, original_target, test in targets:
@@ -305,10 +319,17 @@ def generate_targets(origin_rev: str):
 
 
 @app.command()
-def generate_tasks(origin_rev: str, outfile: Annotated[str, typer.Option()]):
+def generate_tasks(
+    origin_rev: str,
+    outfile: Annotated[str, typer.Option()],
+    test_changed_files: Annotated[
+        str | None,
+        typer.Option(hidden=True, help="Comma-separated list of changed files (for testing)"),
+    ] = None,
+):
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
-    targets = query_targets_to_burn_in(origin_rev)
+    targets = query_targets_to_burn_in(origin_rev, test_changed_files)
 
     evg_conf = parse_evergreen_file("etc/evergreen.yml")
 

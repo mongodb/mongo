@@ -538,6 +538,19 @@ class LocalFileChangeDetector(FileChangeDetector):
         return {}
 
 
+class MockFileChangeDetector(FileChangeDetector):
+    """A change detector that returns a predefined list of changed files (for testing only)."""
+
+    def __init__(self, changed_files: set[str]) -> None:
+        self.changed_files = changed_files
+
+    def create_revision_map(self, repos: list[Repo]) -> RevisionMap:
+        return {}
+
+    def find_changed_tests(self, repos: list[Repo]) -> set[str]:
+        return {os.path.normpath(path) for path in self.changed_files if is_file_a_test_file(path)}
+
+
 class BurnInExecutor(ABC):
     """An interface to execute discovered tests."""
 
@@ -748,6 +761,13 @@ def cli():
     default=DEFAULT_EVG_PROJECT_FILE,
     help="Evergreen project config file",
 )
+@click.option(
+    "--test-changed-files",
+    "test_changed_files",
+    default=None,
+    hidden=True,
+    help="Comma-separated list of changed files to test (for testing purposes only).",
+)
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 def run(
     build_variant: str,
@@ -761,6 +781,7 @@ def run(
     origin_rev: Optional[str],
     use_yaml: bool,
     evg_project_file: Optional[str],
+    test_changed_files: Optional[str],
 ) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
@@ -794,6 +815,7 @@ def run(
     :param origin_rev: The revision that local changes will be compared against.
     :param use_yaml: Output discovered tasks in YAML. Tests will not be run.
     :param evg_project_file: Evergreen project config file.
+    :param test_changed_files: Comma-separated list of changed files (for testing only).
     """
     _configure_logging(verbose)
 
@@ -807,7 +829,13 @@ def run(
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
     evg_conf = parse_evergreen_file(evg_project_file)
 
-    change_detector = LocalFileChangeDetector(origin_rev)
+    # Use MockFileChangeDetector if test files are provided (for testing purposes)
+    if test_changed_files:
+        changed_files = {f.strip() for f in test_changed_files.split(",")}
+        change_detector = MockFileChangeDetector(changed_files)
+    else:
+        change_detector = LocalFileChangeDetector(origin_rev)
+
     executor = LocalBurnInExecutor(resmoke_args, repeat_config)
     if use_yaml:
         executor = YamlBurnInExecutor()
