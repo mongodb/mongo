@@ -1,5 +1,3 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 /**
  * Returns a filter for listCollections that excludes views but includes timeseries collections.
  * This filter prevents reloading the view catalog and is available in MongoDB 8.3+.
@@ -485,20 +483,34 @@ class DataConsistencyChecker {
         //    the deletions via "truncateRange()" calls, and the deletions are replicated via the
         //    oplog. In this case, all nodes in the replica set are expected to have same view of
         //    the pre-images collection.
-        // Replicated truncates for deleting change streams pre-images are used when:
-        // - using disaggregated storage clusters (DSC) OR
-        // - the feature flag "featureFlagUseReplicatedTruncatesForDeletions" is enabled
         let usesReplicatedTruncates = undefined;
         const systemUsesReplicatedTruncates = () => {
+            // Fetch persistence provider properties.
+            const fetchProviderProperty = () => {
+                const doc = sourceCollInfos.conn.adminCommand({persistenceProviderProperties: 1});
+                if (!doc.ok) {
+                    return false;
+                }
+                return doc["shouldUseReplicatedTruncates"];
+            };
+
+            // Fetch feature flag status.
+            const fetchFeatureFlagValue = () => {
+                const kFlag = "featureFlagUseReplicatedTruncatesForDeletions";
+                const doc = sourceCollInfos.conn.adminCommand({getParameter: 1, [kFlag]: 1});
+                if (!doc.ok || !doc.hasOwnProperty(kFlag)) {
+                    return false;
+                }
+                return doc[kFlag].hasOwnProperty("currentlyEnabled") ? doc[kFlag].currentlyEnabled : false;
+            };
+
             // Determine the usage only once and cache the result, as checking the feature flag
             // every time is expensive.
             if (usesReplicatedTruncates === undefined) {
-                usesReplicatedTruncates =
-                    TestData.notASC ||
-                    FeatureFlagUtil.isPresentAndEnabled(
-                        sourceCollInfos.conn,
-                        "featureFlagUseReplicatedTruncatesForDeletions",
-                    );
+                // First check the persistence provider property. If this has replicated truncates
+                // enabled, we go with it. If the persistence provider does not have replicated
+                // truncates enabled, we check the current value of the feature flag.
+                usesReplicatedTruncates = fetchProviderProperty() || fetchFeatureFlagValue();
             }
             return usesReplicatedTruncates;
         };
