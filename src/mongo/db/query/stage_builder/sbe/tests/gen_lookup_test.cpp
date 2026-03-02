@@ -1213,7 +1213,7 @@ protected:
                       << std::endl;
         }
 
-        auto context = makeCompileCtx();
+        auto context = makeCompileCtx(data.env->makeDeepCopy());
         prepareTree(context.get(), rootStage.get());
 
         return ExecutablePlan(std::move(colls),
@@ -2192,9 +2192,95 @@ TEST_F(BinaryJoinStageBuilderTest, JoinFilterBase) {
         boost::none,
         boost::none));
 
-    std::cout << solution->toString() << std::endl;
     auto execPlan = makeExecutablePlan(
         _nss, {foreignCollectionName1, foreignCollectionName2}, std::move(solution), expCtx);
+    execPlan.expectReturnedDocuments(expected);
+}
+
+// Create a node that has both sources without an embedding, to check we are preserving the correct
+// result object from the main collection.
+TEST_F(BinaryJoinStageBuilderTest, JoinOnNonEmbeddedSources) {
+    instantiateMainCollection({
+        fromjson("{_id: 0, l1key: 0}"),
+        fromjson("{_id: 1, l1key: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0, l2key: 10}"),
+                                       fromjson("{_id: 11, f1key: 1, l2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 10}"),
+                                       fromjson("{_id: 21, f2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName3 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_3");
+    instantiateSecondaryCollection(foreignCollectionName3,
+                                   {
+                                       fromjson("{_id: 30, f3key: 0}"),
+                                       fromjson("{_id: 31, f3key: 1}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, l1key: 0, y: {_id: 30, f3key: 0}, x: {_id: 10, f1key: 0, l2key: 10}, z: "
+                 "{_id: 20, f2key: 10}}"),
+        fromjson("{_id: 1, l1key: 1, y: {_id: 31, f3key: 1}, x: {_id: 11, f1key: 1, l2key: 11}, z: "
+                 "{_id: 21, f2key: 11}}"),
+    };
+
+    auto cs1 = std::make_unique<CollectionScanNode>();
+    cs1->nss = foreignCollectionName1;
+
+    auto cs2 = std::make_unique<CollectionScanNode>();
+    cs2->nss = foreignCollectionName2;
+
+    auto cs3 = std::make_unique<CollectionScanNode>();
+    cs3->nss = _nss;
+
+    auto cs4 = std::make_unique<CollectionScanNode>();
+    cs4->nss = foreignCollectionName3;
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+        new ExpressionContextForTest(operationContext(), _nss));
+
+    auto hj1 = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs1),
+        std::move(cs2),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq, .leftField = "l2key", .rightField = "f2key"}},
+        FieldPath{"x"},
+        FieldPath{"z"});
+
+    auto hj2 = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs3),
+        std::move(hj1),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = "l1key",
+                                                       .rightField = "x.f1key"}},
+        boost::none,
+        boost::none);
+
+    auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
+        std::move(cs4),
+        std::move(hj2),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq, .leftField = "f3key", .rightField = "l1key"}},
+        FieldPath{"y"},
+        boost::none));
+
+    auto execPlan =
+        makeExecutablePlan(_nss,
+                           {foreignCollectionName1, foreignCollectionName2, foreignCollectionName3},
+                           std::move(solution),
+                           expCtx);
     execPlan.expectReturnedDocuments(expected);
 }
 

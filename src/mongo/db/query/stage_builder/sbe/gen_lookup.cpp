@@ -1610,20 +1610,17 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
         } else {
             // In a bushy plan we could be joining two streams that don't contain the base
             // collection.
-            if (leftOutputs.get(SlotBasedStageBuilder::kResult).getId() == state.getNothingSlot() &&
-                rightOutputs.get(SlotBasedStageBuilder::kResult).getId() ==
-                    state.getNothingSlot()) {
+            if (state.isNothingSlot(leftOutputs.get(SlotBasedStageBuilder::kResult).getId()) &&
+                state.isNothingSlot(rightOutputs.get(SlotBasedStageBuilder::kResult).getId())) {
                 return SbSlot{state.getNothingSlot()};
             }
             // Both sides are not embedded, the result object is the one that is not Nothing.
-            if (leftOutputs.get(SlotBasedStageBuilder::kResult).getId() != state.getNothingSlot() &&
-                rightOutputs.get(SlotBasedStageBuilder::kResult).getId() ==
-                    state.getNothingSlot()) {
+            if (!state.isNothingSlot(leftOutputs.get(SlotBasedStageBuilder::kResult).getId()) &&
+                state.isNothingSlot(rightOutputs.get(SlotBasedStageBuilder::kResult).getId())) {
                 return leftOutputs.get(SlotBasedStageBuilder::kResult);
             }
-            if (leftOutputs.get(SlotBasedStageBuilder::kResult).getId() == state.getNothingSlot() &&
-                rightOutputs.get(SlotBasedStageBuilder::kResult).getId() !=
-                    state.getNothingSlot()) {
+            if (state.isNothingSlot(leftOutputs.get(SlotBasedStageBuilder::kResult).getId()) &&
+                !state.isNothingSlot(rightOutputs.get(SlotBasedStageBuilder::kResult).getId())) {
                 return rightOutputs.get(SlotBasedStageBuilder::kResult);
             }
             tasserted(11158603, "Cannot join two streams having two different result objects");
@@ -1640,7 +1637,11 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
                                         const PlanStageSlots& childOutputs) {
             if (!embedding) {
                 for (auto projectedSlot : childOutputs.getAllNameSlotPairsInOrder()) {
-                    outputs.set(projectedSlot.first, projectedSlot.second);
+                    // Skip result objects, we already set the correct one with the call to
+                    // setResultInfoBaseObj.
+                    if (projectedSlot.first != SlotBasedStageBuilder::kResult) {
+                        outputs.set(projectedSlot.first, projectedSlot.second);
+                    }
                 }
             } else {
                 for (auto projectedSlot : childOutputs.getAllNameSlotPairsInOrder()) {
