@@ -31,7 +31,6 @@
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/stream_utils.h"
 
 #include <algorithm>
 #include <ostream>
@@ -233,7 +232,11 @@ bool operator==(const Maxterm& lhs, const Maxterm& rhs) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Maxterm& maxterm) {
-    using mongo::operator<<;
-    return os << maxterm.minterms;
+    os << "[";
+    StringData sep;
+    for (auto&& t : maxterm.minterms)
+        os << std::exchange(sep, ", ") << t;
+    os << "]";
+    return os;
 }
 }  // namespace mongo::boolean_simplification

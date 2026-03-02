@@ -30,7 +30,6 @@
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_tree.h"
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/stream_utils.h"
 
 namespace mongo::boolean_simplification {
 namespace {
@@ -207,9 +206,12 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
 }
 
 std::ostream& operator<<(std::ostream& os, const BitsetTreeNode& tree) {
-    using mongo::operator<<;
-    os << tree.type << ":" << tree.isNegated << "--" << tree.leafChildren << " "
-       << tree.internalChildren;
+    os << tree.type << ":" << tree.isNegated << "--" << tree.leafChildren << " ";
+    os << "[";
+    StringData sep;
+    for (auto&& node : tree.internalChildren)
+        os << std::exchange(sep, ", ") << node;
+    os << "]";
     return os;
 }
 }  // namespace mongo::boolean_simplification
