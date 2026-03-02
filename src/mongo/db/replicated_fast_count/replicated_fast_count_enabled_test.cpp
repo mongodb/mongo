@@ -29,7 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 
-#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -37,19 +37,14 @@
 namespace mongo {
 namespace {
 
-class ReplicatedFastCountPersistenceProvider : public rss::AttachedPersistenceProvider {
-    bool shouldUseReplicatedFastCount() const override {
-        return true;
-    }
-};
-
 class IsReplicatedFastCountEnabledTest : public CatalogTestFixture {};
 
 class IsReplicatedFastCountEnabledWithProviderTest : public CatalogTestFixture {
 public:
     IsReplicatedFastCountEnabledWithProviderTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<ReplicatedFastCountPersistenceProvider>())) {}
+              std::make_unique<replicated_fast_count_test_helpers::
+                                   ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {

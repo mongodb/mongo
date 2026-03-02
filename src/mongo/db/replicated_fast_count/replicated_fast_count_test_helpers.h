@@ -29,15 +29,90 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
-#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
 
 namespace mongo::replicated_fast_count_test_helpers {
 /**
- * Mock persistence provider for enabling the replicated fast count collection.
+ * Stub persistence provider for enabling the replicated fast count collection.
  */
-class ReplicatedFastCountPersistenceProvider : public rss::AttachedPersistenceProvider {
+class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistenceProvider {
+    boost::optional<Timestamp> getSentinelDataTimestamp() const override {
+        return boost::none;
+    }
+
+    std::string getWiredTigerConfig(bool, bool wtLogEnabled, const std::string&) const override {
+        invariant(!wtLogEnabled);
+        return "in_memory=true,log=(enabled=false),";
+    }
+
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
+    }
+
+    bool shouldUseReplicatedCatalogIdentifiers() const override {
+        return false;
+    }
+
+    // Enables replicated fast count collection for tests.
     bool shouldUseReplicatedFastCount() const override {
         return true;
+    }
+
+    bool shouldUseOplogWritesForFlowControlSampling() const override {
+        return false;
+    }
+
+    bool shouldUseReplicatedRecordIds() const override {
+        return false;
+    }
+
+    bool shouldDelayDataAccessDuringStartup() const override {
+        return false;
+    }
+
+    bool shouldAvoidDuplicateCheckpoints() const override {
+        return false;
+    }
+
+    bool supportsCursorReuseForExpressPathQueries() const override {
+        return false;
+    }
+
+    bool supportsLocalCollections() const override {
+        return true;
+    }
+
+    bool supportsUnstableCheckpoints() const override {
+        return false;
+    }
+
+    bool supportsTableLogging() const override {
+        return true;
+    }
+
+    bool supportsCrossShardTransactions() const override {
+        return false;
+    }
+
+    bool supportsFindAndModifyImageCollection() const override {
+        return false;
+    }
+
+    bool supportsWriteConcernOptions(const WriteConcernOptions&) const override {
+        return true;
+    }
+
+    multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override {
+        // (Generic FCV reference): Mock storage can operate at any FCV.
+        return multiversion::GenericFCV::kLastLTS;
+    }
+
+    const char* getWTMemoryPageMaxForOplogStrValue() const override {
+        return "10m";  // 10MB
+    }
+
+    bool settingsProvideMajorityWriteJournalDurability(bool) const override {
+        return false;
     }
 };
 

@@ -42,7 +42,7 @@ namespace mongo::rss {
  * 'NotImplemented' error. Tests can use this implementation as a base and only override the methods
  * that they need and want to specialize.
  */
-class StubPersistenceProvider : public PersistenceProvider {
+class MONGO_MOD_OPEN StubPersistenceProvider : public PersistenceProvider {
 public:
     std::string name() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
@@ -51,161 +51,177 @@ public:
 
     boost::optional<Timestamp> getSentinelDataTimestamp() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::getSentinelDataTimestamp() not implemented");
     }
 
     std::string getWiredTigerConfig(bool wtInMemory,
                                     bool wtLogEnabled,
                                     const std::string& wtLogCompressor) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::getWiredTigerConfig() method not implemented");
     }
 
     std::string getMainWiredTigerTableSettings() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::getMainWiredTigerTableSettings() method not implemented");
     }
 
     bool shouldUseReplicatedCatalogIdentifiers() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldUseReplicatedCatalogIdentifiers() method not "
+                  "implemented");
     }
 
     bool mustUsePrimaryDrivenIndexBuilds() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::mustUsePrimaryDrivenIndexBuilds() method not implemented");
     }
 
     bool shouldUseReplicatedRecordIds() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldUseReplicatedRecordIds() method not implemented");
     }
 
     bool shouldUseReplicatedTruncates() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldUseReplicatedTruncates() method not implemented");
     }
 
     bool shouldUseReplicatedFastCount() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldUseReplicatedFastCount() method not implemented");
     }
 
     bool shouldUseOplogWritesForFlowControlSampling() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldUseOplogWritesForFlowControlSampling method not "
+                  "implemented");
     }
 
     bool shouldStepDownForShutdown() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldStepDownForShutdown() method not implemented");
     }
 
     bool shouldDelayDataAccessDuringStartup() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::shouldDelayDataAccessDuringStartup() method not implemented");
     }
 
     bool shouldAvoidDuplicateCheckpoints() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::shouldAvoidDuplicateCheckpoints() method not implemented");
     }
 
     bool supportsCursorReuseForExpressPathQueries() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsCursorReuseForExpressPathQueries() method not "
+                  "implemented");
     }
 
     bool supportsLocalCollections() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsLocalCollections() method not implemented");
     }
 
     bool supportsUnstableCheckpoints() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsUnstableCheckpoints() method not implemented");
     }
 
     bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsPreservingPreparedTxnInPreciseCheckpoints() "
+                  "method not implemented");
     }
 
     bool supportsTableLogging() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsTableLogging() method not implemented");
     }
 
     bool supportsCrossShardTransactions() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::supportsCrossShardTransactions() method not implemented");
     }
 
     bool supportsFindAndModifyImageCollection() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsFindAndModifyImageCollection() method not "
+                  "implemented");
     }
 
     bool supportsOplogSampling() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsOplogSampling() method not implemented");
     }
 
     bool supportsWriteConcernOptions(
         const WriteConcernOptions& writeConcernOptions) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsWriteConcernOptions() method not implemented");
     }
 
     bool supportsReadConcernLevel(const repl::ReadConcernLevel& readConcernLevel) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsReadConcernLevel method not implemented");
     }
 
     bool shouldDisableTransactionUpdateCoalescing() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::shouldDisableTransactionUpdateCoalescing() method not "
+                  "implemented");
     }
 
     multiversion::FeatureCompatibilityVersion getMinimumRequiredFCV() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::getMinimumRequiredFCV() method not implemented");
     }
 
     const char* getWTMemoryPageMaxForOplogStrValue() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::getWTMemoryPageMaxForOplogStrValue() method not implemented");
     }
 
     bool supportsCompaction() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsCompaction() method not implemented");
     }
 
     bool supportsClassicMagicRestore() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::supportsClassicMagicRestore() method not implemented");
     }
 
     bool shouldTimestampTableCreations() const override {
-        uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::shouldTimestampTableCreations() method not implemented");
     }
 
     int getMinSnapshotHistoryWindowInSeconds() const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::getMinSnapshotHistoryWindowInSeconds() method not "
+                  "implemented");
     }
 
     void setMinSnapshotHistoryWindowInSeconds(int seconds) override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::setMinSnapshotHistoryWindowInSeconds() method not "
+                  "implemented");
     }
 
     bool settingsProvideMajorityWriteJournalDurability(
         bool writeConcernMajorityShouldJournal) const override {
         uasserted(mongo::ErrorCodes::NotImplemented,
-                  "StubPersistenceProvider method not implemented");
+                  "StubPersistenceProvider::settingsProvideMajorityWriteJournalDurability() method "
+                  "not implemented");
     }
 };
 

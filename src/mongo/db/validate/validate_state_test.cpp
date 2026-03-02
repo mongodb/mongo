@@ -30,7 +30,7 @@
 #include "mongo/db/validate/validate_state.h"
 
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -51,18 +51,12 @@ const ValidationOptions kValidationOptionsEnforceFastCount(
 
 class ValidateStateTest : public CatalogTestFixture {};
 
-class ReplicatedFastCountTestPersistenceProvider : public rss::AttachedPersistenceProvider {
-    // Disable creating the WT size storer table.
-    bool shouldUseReplicatedFastCount() const override {
-        return true;
-    }
-};
-
 class ValidateStateWithoutSizeStorerTest : public CatalogTestFixture {
 public:
     ValidateStateWithoutSizeStorerTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<ReplicatedFastCountTestPersistenceProvider>())) {}
+              std::make_unique<replicated_fast_count_test_helpers::
+                                   ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
 /**

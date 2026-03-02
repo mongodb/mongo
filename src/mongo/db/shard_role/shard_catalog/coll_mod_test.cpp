@@ -37,8 +37,8 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
@@ -483,8 +483,7 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {
     ASSERT_FALSE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
 }
 
-class MockPersistenceProviderRequiringReplicatedRecordIds
-    : public rss::AttachedPersistenceProvider {
+class StubPersistenceProviderRequiringReplicatedRecordIds : public rss::StubPersistenceProvider {
 public:
     std::string name() const override {
         return "MockPersistenceProviderRequiringReplicatedRecordIds";
@@ -493,12 +492,32 @@ public:
     bool shouldUseReplicatedRecordIds() const override {
         return true;
     }
+
+    bool shouldUseReplicatedCatalogIdentifiers() const override {
+        return false;
+    }
+
+    bool supportsTableLogging() const override {
+        return true;
+    }
+
+    const char* getWTMemoryPageMaxForOplogStrValue() const override {
+        return "10m";  // 10MB
+    }
+
+    bool supportsUnstableCheckpoints() const override {
+        return true;
+    }
+
+    bool shouldUseOplogWritesForFlowControlSampling() const override {
+        return true;
+    }
 };
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequiresIt_Fails) {
     rss::ReplicatedStorageService::get(getServiceContext())
         .setPersistenceProvider(
-            std::make_unique<MockPersistenceProviderRequiringReplicatedRecordIds>());
+            std::make_unique<StubPersistenceProviderRequiringReplicatedRecordIds>());
 
     auto opCtx = makeOpCtx();
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.collModColl");

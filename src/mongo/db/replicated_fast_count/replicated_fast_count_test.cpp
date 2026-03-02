@@ -51,8 +51,8 @@ class ReplicatedFastCountTest : public CatalogTestFixture {
 public:
     ReplicatedFastCountTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<
-                  replicated_fast_count_test_helpers::ReplicatedFastCountPersistenceProvider>())) {}
+              std::make_unique<replicated_fast_count_test_helpers::
+                                   ReplicatedFastCountTestPersistenceProvider>())) {}
 
 protected:
     void setUp() override {
