@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "key1",
     "testconfig",
+    "authTestsKey",
 ])
 
 mongo_js_library(

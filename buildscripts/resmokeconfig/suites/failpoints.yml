@@ -1,8 +1,7 @@
 test_kind: js_test
 
 selector:
-  roots:
-    - jstests/fail_point/*.js
+  from_target: //jstests/suites/programmability:failpoints
 
 # Failpoint tests start their own mongod's.
 executor:

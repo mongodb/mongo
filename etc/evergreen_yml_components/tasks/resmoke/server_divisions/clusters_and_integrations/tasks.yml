@@ -337,6 +337,7 @@ tasks:
         "assigned_to_jira_team_server_programmability",
         "release_critical",
         "misc_js",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -351,6 +352,7 @@ tasks:
         "incompatible_mac",
         "incompatible_windows",
         "auth",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -467,6 +469,7 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_tsan",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"

@@ -66,6 +66,9 @@ filters:
   - "extensions*":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "failpoints*":
+    approvers:
+      - 10gen/server-programmability
   - "fle*":
     approvers:
       - 10gen/query-integration-features
@@ -117,6 +120,9 @@ filters:
   - "jstestfuzz_replication*":
     approvers:
       - 10gen/server-jstest-infra
+  - "libunwind.yml":
+    approvers:
+      - 10gen/server-programmability
   - "magic_restore*":
     approvers:
       - 10gen/server-recovery

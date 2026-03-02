@@ -1,0 +1,58 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+resmoke_suite_test(
+    name = "failpoints",
+    srcs = ["//jstests/fail_point:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/failpoints.yml",
+    tags = [
+        "ci-release-critical",
+        "misc_js",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "failpoints_auth",
+    srcs = ["//jstests/fail_point:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/failpoints_auth.yml",
+    data = [
+        "//jstests/libs:authTestsKey",
+    ],
+    tags = [
+        "auth",
+        "ci-release-critical",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "libunwind",
+    srcs = ["//jstests/libunwind:all_javascript_files"],
+    config = "//buildscripts/resmokeconfig:suites/libunwind.yml",
+    tags = ["ci-release-critical"],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "@platforms//cpu:ppc": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
