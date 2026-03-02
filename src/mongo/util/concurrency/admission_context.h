@@ -125,21 +125,6 @@ public:
 
     Priority getPriority() const;
 
-    /**
-     * Setters for queue statistics to be used in unit tests only
-     */
-    MONGO_MOD_PUBLIC void setAdmission_forTest(int32_t admissions);
-
-    MONGO_MOD_PUBLIC void setTotalTimeQueuedMicros_forTest(int64_t micros);
-
-protected:
-    friend class ScopedAdmissionPriorityBase;
-    friend class Ticket;
-    friend class TicketHolder;
-    friend class WaitingForAdmissionGuard;
-
-    AdmissionContext() = default;
-
     void recordAdmission();
 
     void recordLowAdmission();
@@ -159,6 +144,19 @@ protected:
     void markTicketReleased() {
         _holdingTicket.store(false);
     }
+
+    /**
+     * Setters for queue statistics to be used in unit tests only
+     */
+    MONGO_MOD_PUBLIC void setAdmission_forTest(int32_t admissions);
+
+    MONGO_MOD_PUBLIC void setTotalTimeQueuedMicros_forTest(int64_t micros);
+
+protected:
+    friend class ScopedAdmissionPriorityBase;
+    friend class WaitingForAdmissionGuard;
+
+    AdmissionContext() = default;
 
     constexpr static TickSource::Tick kNotQueueing = -1;
 
