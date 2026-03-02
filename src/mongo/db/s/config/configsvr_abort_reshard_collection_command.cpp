@@ -48,6 +48,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -72,20 +73,6 @@
 
 namespace mongo {
 namespace {
-
-UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) {
-    repl::ReadConcernArgs::get(opCtx) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-    const auto collEntry =
-        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, ns);
-
-    uassert(ErrorCodes::NoSuchReshardCollection,
-            "Could not find resharding-related metadata that matches the given namespace",
-            collEntry.getReshardingFields());
-
-    return collEntry.getReshardingFields()->getReshardingUUID();
-}
 
 void assertExistsReshardingDocument(OperationContext* opCtx, UUID reshardingUUID) {
     PersistentTaskStore<ReshardingCoordinatorDocument> store(
@@ -145,7 +132,7 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            const auto reshardingUUID = retrieveReshardingUUID(opCtx, ns());
+            const auto reshardingUUID = resharding::retrieveReshardingUUID(opCtx, ns());
 
             LOGV2(5403501,
                   "Aborting resharding operation",
