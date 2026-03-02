@@ -31,6 +31,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
+#include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -64,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(ftdcThrowBSONObjectTooLarge);
 
 namespace {
 auto& totalDiscardedSamples = *MetricBuilder<Counter64>("ftdc.totalDiscardedSamples");
+auto& lastSampleSizeBytes = *MetricBuilder<Atomic64Metric>("ftdc.lastSampleSizeBytes");
 }  // namespace
 
 long long FTDCController::getNumAsyncPeriodicCollectors() {
@@ -388,6 +390,9 @@ void FTDCController::doLoop(Service* service) try {
             auto collectSample = feature_flags::gFeatureFlagGaplessFTDC.isEnabled()
                 ? _asyncPeriodicCollectors->collect(client, sectionSizes)
                 : _periodicCollectors.collect(client, sectionSizes);
+
+            lastSampleSizeBytes.set(std::get<0>(collectSample).objsize());
+
             Status s = _mgr->writeSampleAndRotateIfNeeded(
                 client, std::get<0>(collectSample), std::get<1>(collectSample));
 
