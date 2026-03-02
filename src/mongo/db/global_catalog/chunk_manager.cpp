@@ -1139,9 +1139,9 @@ bool EndpointComp::operator()(const ShardEndpoint* endpointA,
     }
 
     if (endpointA->databaseVersion && endpointB->databaseVersion) {
-        const int uuidDiff =
-            endpointA->databaseVersion->getUuid().compare(endpointB->databaseVersion->getUuid());
-        if (uuidDiff)
+        if (auto uuidDiff =
+                endpointA->databaseVersion->getUuid() <=> endpointB->databaseVersion->getUuid();
+            uuidDiff != 0)
             return uuidDiff < 0;
 
         return endpointA->databaseVersion->getLastMod() < endpointB->databaseVersion->getLastMod();

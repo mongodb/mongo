@@ -143,33 +143,8 @@ public:
         return ConstDataRange(_uuid.data(), _uuid.size());
     }
 
-    inline int compare(const UUID& rhs) const {
-        return memcmp(&_uuid, &rhs._uuid, sizeof(_uuid));
-    }
-
-    inline bool operator==(const UUID& rhs) const {
-        return !compare(rhs);
-    }
-
-    inline bool operator!=(const UUID& rhs) const {
-        return !(*this == rhs);
-    }
-
-    inline bool operator<(const UUID& rhs) const {
-        return _uuid < rhs._uuid;
-    }
-
-    inline bool operator>(const UUID& rhs) const {
-        return _uuid > rhs._uuid;
-    }
-
-    inline bool operator<=(const UUID& rhs) const {
-        return _uuid <= rhs._uuid;
-    }
-
-    inline bool operator>=(const UUID& rhs) const {
-        return _uuid >= rhs._uuid;
-    }
+    bool operator==(const UUID&) const = default;
+    auto operator<=>(const UUID&) const = default;
 
     template <typename H>
     friend H AbslHashValue(H h, const UUID& uuid) {
