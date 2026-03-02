@@ -36,7 +36,6 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/queue.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/timer.h"
@@ -312,18 +311,6 @@ struct IsValidUTF8Test {
     }
 };
 
-
-class QueueTest {
-public:
-    void run() {
-        BlockingQueue<int> q;
-        Timer t;
-        int x;
-        ASSERT(!q.blockingPop(x, 5));
-        ASSERT(t.seconds() > 3);
-    }
-};
-
 class StrTests {
 public:
     void run() {
@@ -363,8 +350,6 @@ public:
 
         add<StringSplitterTest>();
         add<IsValidUTF8Test>();
-
-        add<QueueTest>();
 
         add<StrTests>();
 

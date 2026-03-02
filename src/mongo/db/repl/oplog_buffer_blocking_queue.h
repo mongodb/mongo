@@ -36,7 +36,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/queue.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
