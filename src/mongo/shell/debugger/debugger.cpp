@@ -43,6 +43,14 @@
 #include <js/Conversions.h>
 #include <js/SourceText.h>
 
+// Forward declarations for generated JS files
+namespace mongo {
+namespace JSFiles {
+extern const JSFile onDebuggerStatement;
+extern const JSFile onNewScript;
+}  // namespace JSFiles
+}  // namespace mongo
+
 namespace mongo {
 namespace mozjs {
 namespace debugger {
@@ -258,63 +266,8 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
         return status;
     }
 
-    // Doing more work here in JS makes for 10x fewer LOC in C++
-    const char* hookCode = R"HOOK(
-            (function(frame) {
-                // Store location info so C++ can access it
-                globalThis.__pausedLocation = {
-                    script: frame.script?.url ?? "unknown",
-                    line: frame.script?.getOffsetLocation?.call(frame.script, frame.offset)?.lineNumber ?? 0,
-                };
-                
-                // invoke the C++ callback
-                globalThis.__onDebuggerStatement(frame);
-
-                // Spin-wait until the paused flag is cleared
-                // This blocks JavaScript execution in this frame
-                while (globalThis.__isPaused()) {
-
-                    // Check for pending evaluation requests
-                    if (globalThis.__hasEvalRequest()) {
-                        // Get the expression to evaluate
-                        const expr = globalThis.__getEvalRequest();
-
-                        // Wrap the expression to format the result with tojson in the debuggee context
-                        const wrappedExpr = `\
-                            (function() {
-                                try {
-                                    const __result = (${expr});
-                                    return tojson(__result);
-                                } catch (e) {
-                                    // eg. reference errors, assertion failures
-                                    return e.name + ": " + e.message;
-                                }
-                            })()`;
-                        // Evaluate in the context of the current frame
-                        let result = "";
-                        try {
-                            output = frame.eval(wrappedExpr);
-                            if (output.return) {
-                                result = output.return;
-                            } else if (output.throw) {
-                                // eg, syntax error in eval'ed string
-                                const e = output.throw.unsafeDereference(); // unwrap Debugger.Object
-                                result = e.name + ": " + e.message;
-                            }
-                        } catch (e) {
-                            // something really unexpected happened, but avoid a crash
-                            result = e.name + ": " + e.message;
-                        }
-                        globalThis.__storeEvalResult(result);
-                    }
-                }
-
-                return undefined;
-            })
-        )HOOK";
-
     JS::RootedValue onDebuggerStatement(_cx);
-    status = compileJSCodeBlock(hookCode, "debugger-hook", &onDebuggerStatement);
+    status = compileJSCodeBlock(::mongo::JSFiles::onDebuggerStatement, &onDebuggerStatement);
     if (!status.isOK()) {
         return status;
     }
@@ -324,6 +277,12 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
     }
 
     return status;
+}
+
+Status DebuggerObject::compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out) {
+    auto code = std::string(toStdStringViewForInterop(jsfile.source));
+    auto name = jsfile.name;
+    return DebuggerObject::compileJSCodeBlock(code.c_str(), name, out);
 }
 
 Status DebuggerObject::compileJSCodeBlock(const char* code,
@@ -447,62 +406,8 @@ Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
         return status;
     }
 
-    /*
-     * Set up onNewScript callback - calls the helper for new scripts
-     * This can be called multiple times for the same script "file" due to lazy loading.
-     *
-     * Once for the top-level script content and offsets, eg:
-     *    script = {
-     *       url: "jstests/my_test.js",
-     *       displayName: undefined,
-     *       ...
-     *    }
-     *
-     * Then recursively to explicitly cover functions, and subfunctions, etc., eg:
-     *    script = {
-     *       url: "jstests/my_test.js",
-     *       displayName: "myfunction",
-     *       ...
-     *    }
-     */
-    const char* onNewScriptCode = R"JS(
-        (function processScript(script) {
-            const url = script.url;
-            if (!url) return;
-
-            // Set callbacks via script.setBreakpoint for any pending breakpoints
-            const pendingBps = globalThis.__getPendingBreakpoints(url);
-            if (!pendingBps || pendingBps.length === 0) return;
-
-            for (const line of pendingBps) {
-                const offsets = script.getLineOffsets(line);
-                if (offsets?.length > 0) {
-                    const offset = offsets[0];
-                    script.setBreakpoint(offset, {
-                        hit: function(frame) {
-                            // Store location info so C++ can access it
-                            globalThis.__pausedLocation = {
-                                script: frame.script?.url ?? "unknown",
-                                line: frame.script?.getOffsetLocation?.call(frame.script, frame.offset)?.lineNumber ?? 0,
-                            };
-
-                            // Invoke the C++ callback
-                            globalThis.__onScriptSetBreakpoint();
-                        }
-                    });
-                }
-            }
-
-            // Process child scripts (nested functions) recursively
-            const children = script.getChildScripts();
-            for (const child of children) {
-                processScript(child);
-            }
-        })
-    )JS";
-
     JS::RootedValue onNewScript(_cx);
-    status = compileJSCodeBlock(onNewScriptCode, "onNewScript-callback", &onNewScript);
+    status = compileJSCodeBlock(::mongo::JSFiles::onNewScript, &onNewScript);
     if (!status.isOK()) {
         return status;
     }

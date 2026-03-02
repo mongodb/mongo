@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/shell/debugger/adapter.h"
 #include "mongo/shell/debugger/protocol.h"
 
@@ -84,6 +85,7 @@ class DebuggerObject {
 
     // Helper: Compile a JS Code block and set a reference.
     Status compileJSCodeBlock(const char* code, const char* name, JS::MutableHandleValue out);
+    Status compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out);
 
 public:
     DebuggerObject(JSContext* cx, JS::HandleObject debugger);

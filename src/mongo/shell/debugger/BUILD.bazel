@@ -1,4 +1,6 @@
+load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -6,6 +8,13 @@ exports_files(
     glob([
         "*.h",
         "*.cpp",
+    ]),
+)
+
+mongo_js_library(
+    name = "all_javascript_files",
+    srcs = glob([
+        "*.js",
     ]),
 )
 
@@ -26,10 +35,48 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        ":js_compiled_code",
         "//src/mongo:base",
         "//src/mongo/scripting/mozjs/common:mozjs_common",
         "//src/mongo/scripting/mozjs/shell:mozjs_shell",
         "//src/third_party/mozjs",
+    ],
+)
+
+JSFILES_TO_PRECOMPILE = [
+    "onDebuggerStatement.js",
+    "onNewScript.js",
+]
+
+render_template(
+    name = "render_js_compiled_code",
+    srcs = [
+        "//buildscripts:jstoh.py",
+    ] + JSFILES_TO_PRECOMPILE,
+    cmd = [
+        "$(location {})".format(file)
+        for file in [
+            "//buildscripts:jstoh.py",
+            "js_compiled_code.cpp",
+        ] + JSFILES_TO_PRECOMPILE
+    ],
+    output = "js_compiled_code.cpp",
+)
+
+mongo_cc_library(
+    name = "js_compiled_code",
+    srcs = ["js_compiled_code.cpp"],
+    # Can't use auto_header here since this is a generated cpp file from the rendered template.
+    # Other jstoh usages have backwards-compatible shims directly in auto_header.py
+    # that accomplishes this in an allow-list approach. This makes it self-sufficient.
+    auto_header = False,
+    private_hdrs = [
+        "//src/mongo/base:string_data.h",
+        "//src/mongo/scripting:engine.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
     ],
 )
 
