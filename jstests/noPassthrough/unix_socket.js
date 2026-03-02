@@ -13,6 +13,7 @@
  */
 // @tags: [
 //   requires_sharding,
+//   grpc_incompatible,
 // ]
 // This test will only work on POSIX machines.
 if (_isWindows()) {

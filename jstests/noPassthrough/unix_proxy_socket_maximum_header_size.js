@@ -2,6 +2,10 @@
  * Test the proxyUnixSocketMaximumHeaderSize server parameter.
  * This parameter controls the maximum size of the proxy protocol header
  * that can be read from proxy Unix domain sockets.
+ *
+ * @tags: [
+ *   grpc_incompatible,
+ * ]
  */
 
 if (_isWindows()) {
