@@ -18,37 +18,3 @@ idl_generator(
         "//src/mongo/db/versioning_protocol:chunk_version_gen",
     ],
 )
-
-mongo_cc_benchmark(
-    name = "sharding_write_router_bm",
-    srcs = [
-        "sharding_write_router_bm.cpp",
-    ],
-    tags = ["sharding_bm"],
-    deps = [
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/auth:authorization_manager_global",
-        "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
-        "//src/mongo/db/s:sharding_runtime_d",
-        "//src/mongo/db/s/resharding:sharding_write_router",
-        "//src/mongo/db/sharding_environment:sharding_test_fixture_common",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "sharding_write_router_test",
-    srcs = [
-        "sharding_write_router_test.cpp",
-    ],
-    tags = ["mongo_unittest_fifth_group"],
-    deps = [
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/auth:authorization_manager_global",
-        "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
-        "//src/mongo/db/s:sharding_runtime_d",
-        "//src/mongo/db/s/resharding:sharding_write_router",
-        "//src/mongo/db/sharding_environment:sharding_test_fixture_common",
-    ],
-)

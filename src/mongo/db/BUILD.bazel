@@ -972,6 +972,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/s/resharding:resharding_destined_recipient_util",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",
         "//src/mongo/db/shard_role",

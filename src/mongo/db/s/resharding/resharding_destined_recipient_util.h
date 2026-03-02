@@ -27,48 +27,44 @@
  *    it in the license file.
  */
 
-#pragma once
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/resharding/resharding_metrics_common.h"
-#include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/modules.h"
-#include "mongo/util/observable_mutex.h"
+#include "mongo/db/shard_role/post_resharding_placement.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+namespace mongo::resharding {
 
-MONGO_MOD_PUBLIC;
-
-namespace mongo {
-class LocalReshardingOperationsRegistry {
-public:
-    using Role = ReshardingMetricsCommon::Role;
-    struct Operation {
-        CommonReshardingMetadata metadata;
-        stdx::unordered_set<Role> roles;
-    };
-
-    static LocalReshardingOperationsRegistry& get();
-
-    void registerOperation(Role role, const CommonReshardingMetadata& metadata);
-    void unregisterOperation(Role role, const CommonReshardingMetadata& metadata);
-    boost::optional<Operation> getOperation(const NamespaceString& nss) const;
-    boost::optional<CommonReshardingMetadata> getDonorMetadata(const NamespaceString& nss) const;
-
-    void resyncFromDisk(OperationContext* opCtx);
-
-private:
-    using UuidToOperation = stdx::unordered_map<UUID, Operation>;
-
-    mutable ObservableMutex<std::shared_mutex> _mutex;
-    stdx::unordered_map<NamespaceString, UuidToOperation> _namespaceToOperations;
+/**
+ * Holds the destined recipient shards for the pre-image and post-image of a document
+ * being updated during a resharding operation. Used to determine whether the update
+ * would cause the document to change owning shards under the new resharding key.
+ */
+struct DestinedRecipients {
+    ShardId oldRecipient;
+    ShardId newRecipient;
 };
 
-namespace resharding {
 /**
- * Throws ReshardCollectionInProgress if the registry contains an entry for the given namespace.
+ * Computes the destined recipients for the old and new documents under the resharding key
+ * using the LocalReshardingOperationsRegistry. Returns boost::none if resharding is not
+ * active, the resharding operation has committed, or the old and new documents map to the
+ * same recipient.
  */
-void throwIfReshardingInProgress(const NamespaceString& nss);
-}  // namespace resharding
+boost::optional<DestinedRecipients> getDestinedRecipientsIfPossiblyDifferent(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& oldDoc,
+    const BSONObj& newDoc);
 
-}  // namespace mongo
+/**
+ * Computes the destined recipients for the old and new documents using the given
+ * PostReshardingCollectionPlacement from a collection acquisition. Returns boost::none
+ * if 'reshardingPlacement' is empty or the resharding keys for oldDoc and newDoc are
+ * identical. This overload supports the legacy (non resharding registry) code path.
+ */
+boost::optional<DestinedRecipients> getDestinedRecipientsIfPossiblyDifferent(
+    OperationContext* opCtx,
+    const boost::optional<PostReshardingCollectionPlacement>& reshardingPlacement,
+    const BSONObj& oldDoc,
+    const BSONObj& newDoc);
+
+}  // namespace mongo::resharding

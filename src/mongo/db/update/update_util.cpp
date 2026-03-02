@@ -52,10 +52,14 @@
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
+#include "mongo/db/s/resharding/resharding_destined_recipient_util.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -276,23 +280,23 @@ void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* 
                                                               const BSONObj& newObj,
                                                               const Snapshotted<BSONObj>& oldObj) {
 
-    auto& reshardingPlacement = _collAcq.getPostReshardingPlacement();
-    if (!reshardingPlacement)
-        return;
-    auto oldShardKey = reshardingPlacement->extractReshardingKeyFromDocument(oldObj.value());
-    auto newShardKey = reshardingPlacement->extractReshardingKeyFromDocument(newObj);
+    const bool useRegistry =
+        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
-    if (newShardKey.binaryEqual(oldShardKey))
+    auto destinedRecipients = useRegistry
+        ? resharding::getDestinedRecipientsIfPossiblyDifferent(
+              opCtx, _collAcq.nss(), oldObj.value(), newObj)
+        : resharding::getDestinedRecipientsIfPossiblyDifferent(
+              opCtx, _collAcq.getPostReshardingPlacement(), oldObj.value(), newObj);
+    if (!destinedRecipients) {
         return;
+    }
 
     const auto& collDesc = _collAcq.getShardingDescription();
     FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(opCtx, collDesc, shardKeyPaths);
-
-    auto oldRecipShard =
-        reshardingPlacement->getReshardingDestinedRecipientFromShardKey(oldShardKey);
-    auto newRecipShard =
-        reshardingPlacement->getReshardingDestinedRecipientFromShardKey(newShardKey);
 
     uassert(WouldChangeOwningShardInfo(oldObj.value(),
                                        newObj,
@@ -300,9 +304,9 @@ void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* 
                                        _collAcq.nss(),
                                        _collAcq.uuid(),
                                        boost::none,
-                                       oldRecipShard),
+                                       destinedRecipients->oldRecipient),
             "This update would cause the doc to change owning shards under the new shard key",
-            oldRecipShard == newRecipShard);
+            destinedRecipients->oldRecipient == destinedRecipients->newRecipient);
 }
 
 void ShardingChecksForUpdate::checkUpdateChangesShardKeyFields(

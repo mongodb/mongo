@@ -120,6 +120,18 @@ LocalReshardingOperationsRegistry::getOperation(const NamespaceString& nss) cons
     return operations.begin()->second;
 }
 
+boost::optional<CommonReshardingMetadata> LocalReshardingOperationsRegistry::getDonorMetadata(
+    const NamespaceString& nss) const {
+    auto operation = getOperation(nss);
+    if (!operation) {
+        return boost::none;
+    }
+    if (operation->roles.contains(Role::kDonor)) {
+        return operation->metadata;
+    }
+    return boost::none;
+}
+
 void LocalReshardingOperationsRegistry::resyncFromDisk(OperationContext* opCtx) {
     LocalReshardingOperationsRegistry resyncedRegistry;
     updateFromNamespace<ReshardingCoordinatorDocument>(
