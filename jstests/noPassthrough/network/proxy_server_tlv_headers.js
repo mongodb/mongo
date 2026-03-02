@@ -1,7 +1,8 @@
 /**
  * Tests that the proxy server correctly sends tlv data to a mongod.
  * @tags: [
- *   multiversion_incompatible
+ *   multiversion_incompatible,
+ *   grpc_incompatible,
  * ]
  */
 
