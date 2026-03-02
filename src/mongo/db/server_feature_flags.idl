@@ -268,3 +268,8 @@ feature_flags:
         default: false
         fcv_gated: false
         incremental_rollout_phase: in_development
+    featureFlagESEKeystoreV2:
+        description: "Enables the ESE V2 keystore and migration to that keystore on upgrade"
+        cpp_varname: gFeatureFlagESEKeystoreV2
+        default: false
+        fcv_gated: true
