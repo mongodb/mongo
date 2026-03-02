@@ -79,9 +79,13 @@ protected:
 
         int currentBufSize = 0;
         // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
-        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile(), *opts.tempDir);
+        FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(
+            makeFile(),
+            *opts.tempDir,
+            /*dbName=*/boost::none,
+            sorter::kLatestChecksumVersion);
         std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
-            sorterStorage.makeWriter(opts);
+            sorterStorage.makeWriter(opts, /*settings=*/{});
         for (int i = 0; i < range; ++i) {
             sorter->addAlreadySorted(i, -i);
             currentBufSize += sizeof(i) + sizeof(-i);
@@ -352,8 +356,8 @@ protected:
     }
 
     std::shared_ptr<IWSorter> makeSorter(const SortOptions& sortOpts, Direction direction) {
-        return std::shared_ptr<IWSorter>(
-            IWSorter::make(sortOpts, IWComparator(direction), storage().makeSpiller(sortOpts)));
+        return std::shared_ptr<IWSorter>(IWSorter::make(
+            sortOpts, IWComparator(direction), storage().makeSpiller(sortOpts), /*settings=*/{}));
     }
 
     std::shared_ptr<IWSorter> runSort(const SortOptions& sortOpts,

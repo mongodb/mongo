@@ -67,15 +67,21 @@ struct SpillStorageState {
 };
 
 inline std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper>> makeFileSorterSpiller(
-    const SortOptions& opts, SorterFileStats* fileStats, std::string storageIdentifier = "") {
+    const SortOptions& opts,
+    SorterFileStats* fileStats,
+    const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
+    std::string storageIdentifier = "") {
     ASSERT(opts.tempDir);
 
     if (storageIdentifier.empty()) {
-        return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(*opts.tempDir,
-                                                                                fileStats);
+        return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(
+            *opts.tempDir, fileStats, /*dbName=*/boost::none, checksumVersion);
     }
     return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(
-        std::make_shared<SorterFile>(*opts.tempDir / storageIdentifier, fileStats), *opts.tempDir);
+        std::make_shared<SorterFile>(*opts.tempDir / storageIdentifier, fileStats),
+        *opts.tempDir,
+        /*dbName=*/boost::none,
+        checksumVersion);
 }
 
 template <typename Traits>
@@ -84,15 +90,16 @@ concept StorageTraits = requires(Traits& traits,
                                  const boost::filesystem::path& storageLocation,
                                  const SortOptions& opts,
                                  const std::string& storageIdentifier,
+                                 const SorterChecksumVersion checksumVersion,
                                  SpillStorageState& spillState) {
     { Traits::kHasFileStats } -> std::convertible_to<bool>;
     { Traits::kEmptyStorageErrorCode } -> std::convertible_to<int>;
     { Traits::kCorruptedStorageErrorCode } -> std::convertible_to<int>;
     {
-        traits.makeSpiller(opts)
+        traits.makeSpiller(opts, checksumVersion)
     } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>>;
     {
-        traits.makeSpillerForResume(opts, storageIdentifier)
+        traits.makeSpillerForResume(opts, checksumVersion, storageIdentifier)
     } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>>;
     {
         traits.makeWriter(opts)
@@ -110,22 +117,30 @@ struct FileTraits {
     static constexpr int kCorruptedStorageErrorCode = 16817;
 
     static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpiller(
-        const SortOptions& opts) {
+        const SortOptions& opts,
+        const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
         return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(
-            makeFileSorterSpiller(opts, /*fileStats=*/nullptr));
+            makeFileSorterSpiller(opts, /*fileStats=*/nullptr, checksumVersion));
     }
 
     static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpillerForResume(
-        const SortOptions& opts, const std::string& storageIdentifier) {
+        const SortOptions& opts,
+        const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
+        const std::string& storageIdentifier = "") {
         return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(
-            makeFileSorterSpiller(opts, /*fileStats=*/nullptr, storageIdentifier));
+            makeFileSorterSpiller(opts, /*fileStats=*/nullptr, checksumVersion, storageIdentifier));
     }
 
     static std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> makeWriter(
         const SortOptions& opts) {
         ASSERT(opts.tempDir);
         auto spillFile = std::make_shared<SorterFile>(sorter::nextFileName(*opts.tempDir), nullptr);
-        return std::make_unique<SortedFileWriter<IntWrapper, IntWrapper>>(opts, spillFile);
+        return std::make_unique<SortedFileWriter<IntWrapper, IntWrapper>>(
+            opts,
+            spillFile,
+            /*dbName=*/boost::none,
+            sorter::kLatestChecksumVersion,
+            SortedFileWriter<IntWrapper, IntWrapper>::Settings{});
     }
 
     static std::string makeEmptyStorage(const boost::filesystem::path& storageLocation) {
@@ -147,7 +162,7 @@ struct FileTraits {
         SpillStorageState ret;
         ret.opts = SortOptions().TempDir(storageLocation).Tracker(nullptr);
 
-        auto sorter = IWSorter::make(ret.opts, ret.comp, makeSpiller(ret.opts));
+        auto sorter = IWSorter::make(ret.opts, ret.comp, makeSpiller(ret.opts), /*settings=*/{});
         for (int i = 0; i < 10; ++i) {
             sorter->add(i, -i);
         }
@@ -185,7 +200,9 @@ struct ContainerTraits {
         _writerTable = _makeTemporaryRecordStore();
     }
 
-    std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpiller(const SortOptions& opts) {
+    std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpiller(
+        const SortOptions& opts,
+        const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
         using Spiller = ContainerBasedSpiller<IntWrapper, IntWrapper>;
         struct SpillerOwner {
             std::shared_ptr<TemporaryRecordStore> table;
@@ -207,14 +224,16 @@ struct ContainerTraits {
                                container,
                                _containerStats,
                                _collPtr->ns().dbName(),
-                               opts.checksumVersion,
+                               checksumVersion,
                                insertionBatchSize),
         });
         return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(owner, &owner->spiller);
     }
 
     static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpillerForResume(
-        const SortOptions& opts, const std::string& storageIdentifier) {
+        const SortOptions& opts,
+        const SorterChecksumVersion,
+        const std::string& storageIdentifier) {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -226,7 +245,15 @@ struct ContainerTraits {
                               _writerTable->rs()->getContainer())
                               .get();
         return std::make_unique<SortedContainerWriter<IntWrapper, IntWrapper>>(
-            *_opCtx, ru, _collPtr, container, _containerStats, opts, _nextKey, settings);
+            *_opCtx,
+            ru,
+            _collPtr,
+            container,
+            _containerStats,
+            opts,
+            _nextKey,
+            sorter::kLatestChecksumVersion,
+            settings);
     }
 
     // TODO SERVER-120078

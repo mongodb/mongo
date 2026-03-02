@@ -48,8 +48,12 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
                                   comparator,
                                   (opts.tempDir)
                                       ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T>>(
-                                            *opts.tempDir, _sorterFileStats.get())
-                                      : nullptr);
+                                            *opts.tempDir,
+                                            _sorterFileStats.get(),
+                                            /*dbName=*/boost::none,
+                                            sorter::kLatestChecksumVersion)
+                                      : nullptr,
+                                  /*settings=*/{});
 }
 template class SortExecutor<Document>;
 template class SortExecutor<SortableWorkingSetMember>;

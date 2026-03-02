@@ -255,7 +255,10 @@ private:
             comparator,
             (opts.tempDir)
                 ? std::make_shared<mongo::sorter::FileBasedSorterSpiller<KeyRow, ValueRow>>(
-                      *opts.tempDir, _sorterFileStats.get())
+                      *opts.tempDir,
+                      _sorterFileStats.get(),
+                      /*dbName=*/boost::none,
+                      sorter::kLatestChecksumVersion)
                 : nullptr,
             {});
         _outputIt.reset();

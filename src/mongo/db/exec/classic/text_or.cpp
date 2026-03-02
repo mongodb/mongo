@@ -468,7 +468,11 @@ void TextOrStage::initSorter() {
         opts,
         comparator,
         std::make_shared<sorter::FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
-            *opts.tempDir, _sorterStats.get()));
+            *opts.tempDir,
+            _sorterStats.get(),
+            /*dbName=*/boost::none,
+            sorter::kLatestChecksumVersion),
+        /*settings=*/{});
 }
 
 }  // namespace mongo

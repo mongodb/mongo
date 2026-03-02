@@ -99,12 +99,6 @@ struct SortOptions {
     size_t maxMemoryUsageBytes;
     static const size_t DefaultMaxMemoryUsageBytes = 64 * 1024 * 1024;
 
-    // In case the sorter spills encrypted data to disk that must be readable even after process
-    // restarts, it must encrypt with a persistent key. This key is accessed using the database
-    // name that the sorted collection lives in. If encryption is enabled and dbName is boost::none,
-    // a temporary key is used.
-    boost::optional<DatabaseName> dbName;
-
     // Directory into which we place a file when spilling to disk. boost::none means we aren't
     // allowing external sorting.
     boost::optional<boost::filesystem::path> tempDir;
@@ -121,9 +115,6 @@ struct SortOptions {
     // If set to true and sorted data fits into memory, sorted data will be moved into iterator
     // instead of copying.
     bool moveSortedDataIntoIterator;
-
-    // Checksum version to use for spill files. Only applicable if tempDir != boost::none.
-    SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2;
 
     SortOptions()
         : limit(0),
@@ -150,11 +141,6 @@ struct SortOptions {
         return *this;
     }
 
-    SortOptions& DBName(DatabaseName newDbName) {
-        dbName = std::move(newDbName);
-        return *this;
-    }
-
     SortOptions& Tracker(SorterTracker* newSorterTracker) {
         sorterTracker = newSorterTracker;
         return *this;
@@ -167,11 +153,6 @@ struct SortOptions {
 
     SortOptions& UseMemoryPool(bool usePool) {
         useMemPool = usePool;
-        return *this;
-    }
-
-    SortOptions& ChecksumVersion(SorterChecksumVersion version) {
-        checksumVersion = version;
         return *this;
     }
 };
@@ -316,7 +297,9 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
-    explicit SortedStorageWriter(const SortOptions& opts, const Settings& settings);
+    explicit SortedStorageWriter(const SortOptions& opts,
+                                 const Settings& settings,
+                                 SorterChecksumCalculator checksumCalculator);
     virtual ~SortedStorageWriter() = default;
 
     virtual void addAlreadySorted(const Key&, const Value&) = 0;
@@ -435,7 +418,7 @@ public:
     virtual ~SorterStorage() = default;
 
     virtual std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
-        const SortOptions& opts, const Settings& settings = Settings()) = 0;
+        const SortOptions& opts, const Settings& settings) = 0;
 
     virtual size_t getIteratorSize() = 0;
 
@@ -712,7 +695,7 @@ public:
     static std::unique_ptr<Sorter> make(const SortOptions& opts,
                                         const Comparator& comp,
                                         std::shared_ptr<SorterSpiller<Key, Value>> spiller,
-                                        const Settings& settings = Settings());
+                                        const Settings& settings);
 
     static std::unique_ptr<Sorter> makeFromExistingRanges(
         std::string storageIdentifier,
@@ -720,7 +703,7 @@ public:
         const SortOptions& opts,
         const Comparator& comp,
         std::shared_ptr<SorterSpiller<Key, Value>> spiller,
-        const Settings& settings = Settings());
+        const Settings& settings);
 
     virtual void add(const Key&, const Value&) = 0;
     virtual void emplace(Key&&, ValueProducer) = 0;

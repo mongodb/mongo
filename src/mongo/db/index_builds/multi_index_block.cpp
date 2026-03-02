@@ -205,7 +205,7 @@ std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> makeSpiller(
             entry->indexBuildInterceptor()->getSorterContainer(),
             containerStats,
             dbName,
-            SorterChecksumVersion::v2,
+            sorter::kLatestChecksumVersion,
             primaryDrivenIndexBuildSorterInsertionBatchSize.load());
     }
 
@@ -216,8 +216,10 @@ std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> makeSpiller(
         ? std::make_shared<FileBasedSpiller>(
               std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
               tmpPath,
-              dbName)
-        : std::make_shared<FileBasedSpiller>(tmpPath, &fileStats, dbName);
+              dbName,
+              sorter::kLatestChecksumVersion)
+        : std::make_shared<FileBasedSpiller>(
+              tmpPath, &fileStats, dbName, sorter::kLatestChecksumVersion);
 }
 
 }  // namespace

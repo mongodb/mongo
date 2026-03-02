@@ -154,8 +154,11 @@ struct SpillHandle {
     static constexpr int64_t kWriteBufferSize = (int64_t)sorter::kSortedFileBufferSize;
 
     SpillHandle(const boost::filesystem::path& tempDir, SorterFileStats* fileStats)
-        : storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats), tempDir),
-          writer(storage.makeWriter(SortOptions{})) {}
+        : storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
+                  tempDir,
+                  /*dbName=*/boost::none,
+                  sorter::kLatestChecksumVersion),
+          writer(storage.makeWriter(SortOptions{}, /*settings=*/{})) {}
 
     void finishWrite() {
         range = writer->done()->getRange();

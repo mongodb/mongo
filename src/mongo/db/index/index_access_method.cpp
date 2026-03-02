@@ -209,13 +209,12 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-SortOptions makeSortOptions(size_t maxMemoryUsageBytes, const DatabaseName& dbName) {
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .UseMemoryPool(true)
-        .Tracker(&indexBulkBuilderSSS.sorterTracker)
-        .DBName(dbName);
+        .Tracker(&indexBulkBuilderSSS.sorterTracker);
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
@@ -1441,7 +1440,7 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
     const boost::optional<IndexStateInfo>& stateInfo,
     const DatabaseName& dbName,
     const IndexBuildMethodEnum& method) {
-    const SortOptions& opts = makeSortOptions(maxMemoryUsageBytes, dbName);
+    const SortOptions& opts = makeSortOptions(maxMemoryUsageBytes);
     return stateInfo
         ? std::make_unique<BulkBuilderImpl>(entry,
                                             this,

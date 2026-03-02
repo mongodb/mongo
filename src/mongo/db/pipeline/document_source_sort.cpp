@@ -400,7 +400,10 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     auto spiller = expCtx->getAllowDiskUse()
         ? std::make_shared<
               sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
-              expCtx->getTempDir(), ds->_sortExecutor->getSorterFileStats())
+              expCtx->getTempDir(),
+              ds->_sortExecutor->getSorterFileStats(),
+              /*dbName=*/boost::none,
+              sorter::kLatestChecksumVersion)
         : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
@@ -505,7 +508,10 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     auto spiller = expCtx->getAllowDiskUse()
         ? std::make_shared<
               sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
-              expCtx->getTempDir(), ds->_sortExecutor->getSorterFileStats())
+              expCtx->getTempDir(),
+              ds->_sortExecutor->getSorterFileStats(),
+              /*dbName=*/boost::none,
+              sorter::kLatestChecksumVersion)
         : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {

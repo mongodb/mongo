@@ -110,8 +110,12 @@ GetNextResult BucketAutoStage::populateSorter() {
             opts,
             comparator,
             (opts.tempDir) ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document>>(
-                                 *opts.tempDir, &_sorterFileStats)
-                           : nullptr);
+                                 *opts.tempDir,
+                                 &_sorterFileStats,
+                                 /*dbName=*/boost::none,
+                                 sorter::kLatestChecksumVersion)
+                           : nullptr,
+            /*setting=*/{});
     }
 
     auto next = pSource->getNext();

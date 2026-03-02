@@ -279,7 +279,9 @@ public:
 
     explicit SortedFileWriter(const SortOptions& opts,
                               std::shared_ptr<SorterFile> file,
-                              const Settings& settings = Settings());
+                              boost::optional<DatabaseName> dbName,
+                              SorterChecksumVersion checksumVersion,
+                              const Settings& settings);
 
     ~SortedFileWriter() override = default;
 
@@ -293,6 +295,7 @@ public:
 private:
     BufBuilder _buffer;
     std::shared_ptr<SorterFile> _file;
+    boost::optional<DatabaseName> _dbName;
 
     // Tracks where in the file we started writing the sorted data range so that the information can
     // be given to the Iterator in done().
@@ -303,9 +306,12 @@ private:
 template <typename Key, typename Value>
 SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                std::shared_ptr<SorterFile> file,
+                                               boost::optional<DatabaseName> dbName,
+                                               SorterChecksumVersion checksumVersion,
                                                const Settings& settings)
-    : SortedStorageWriter<Key, Value>(opts, settings),
+    : SortedStorageWriter<Key, Value>(opts, settings, checksumVersion),
       _file(std::move(file)),
+      _dbName(dbName),
       _fileStartOffset(_file->currentOffset()) {}
 
 template <typename Key, typename Value>
@@ -348,9 +354,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
         out = std::make_unique<char[]>(protectedSizeMax);
         DataRange outRange(out.get(), protectedSizeMax);
         Status status = encryptionHooks->protectTmpData(
-            ConstDataRange(reinterpret_cast<const uint8_t*>(outBuffer), size),
-            &outRange,
-            this->_opts.dbName);
+            ConstDataRange(reinterpret_cast<const uint8_t*>(outBuffer), size), &outRange, _dbName);
         uassert(28842,
                 str::stream() << "Failed to compress data: " << status.toString(),
                 status.isOK());
@@ -379,7 +383,7 @@ std::shared_ptr<sorter::Iterator<Key, Value>> SortedFileWriter<Key, Value>::done
                                                               _fileStartOffset,
                                                               _file->currentOffset(),
                                                               this->_settings,
-                                                              this->_opts.dbName,
+                                                              _dbName,
                                                               this->_checksumCalculator.checksum(),
                                                               this->_checksumCalculator.version());
 }
@@ -392,7 +396,7 @@ std::unique_ptr<sorter::Iterator<Key, Value>> SortedFileWriter<Key, Value>::done
                                                               _fileStartOffset,
                                                               _file->currentOffset(),
                                                               this->_settings,
-                                                              this->_opts.dbName,
+                                                              _dbName,
                                                               this->_checksumCalculator.checksum(),
                                                               this->_checksumCalculator.version());
 }
@@ -411,11 +415,11 @@ public:
 
     FileBasedSorterStorage(std::shared_ptr<SorterFile> file,
                            boost::filesystem::path pathToSpillDir,
-                           boost::optional<DatabaseName> dbName = boost::none,
-                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2);
+                           boost::optional<DatabaseName> dbName,
+                           SorterChecksumVersion checksumVersion);
 
-    std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
-        const SortOptions& opts, const Settings& settings = Settings()) override;
+    std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(const SortOptions& opts,
+                                                                const Settings& settings) override;
 
     size_t getIteratorSize() override;
 
@@ -447,7 +451,8 @@ FileBasedSorterStorage<Key, Value>::FileBasedSorterStorage(std::shared_ptr<Sorte
 template <typename Key, typename Value>
 std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Value>::makeWriter(
     const SortOptions& opts, const Settings& settings) {
-    return std::make_unique<SortedFileWriter<Key, Value>>(opts, _file, settings);
+    return std::make_unique<SortedFileWriter<Key, Value>>(
+        opts, _file, this->getDbName(), this->getChecksumVersion(), settings);
 }
 
 template <typename Key, typename Value>
@@ -502,8 +507,8 @@ public:
 
     FileBasedSorterSpiller(boost::filesystem::path tempDir,
                            SorterFileStats* fileStats,
-                           boost::optional<DatabaseName> dbName = boost::none,
-                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+                           boost::optional<DatabaseName> dbName,
+                           SorterChecksumVersion checksumVersion)
         : SorterSpillerBase<Key, Value>(std::make_unique<FileBasedSorterStorage<Key, Value>>(
               std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
               tempDir,
@@ -513,8 +518,8 @@ public:
 
     FileBasedSorterSpiller(std::shared_ptr<SorterFile> file,
                            boost::filesystem::path tempDir,
-                           boost::optional<DatabaseName> dbName = boost::none,
-                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+                           boost::optional<DatabaseName> dbName,
+                           SorterChecksumVersion checksumVersion)
         : SorterSpillerBase<Key, Value>(std::make_unique<FileBasedSorterStorage<Key, Value>>(
               file, tempDir, dbName, checksumVersion)),
           _fileStats(file->getFileStats()) {}
@@ -557,7 +562,10 @@ void FileBasedSorterSpiller<Key, Value>::mergeSpills(
 
     std::shared_ptr<File> newSpillsFile =
         std::make_shared<File>(sorter::nextFileName(*opts.tempDir), _fileStats);
-    FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile, *opts.tempDir);
+    FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile,
+                                                     *opts.tempDir,
+                                                     this->getStorage().getDbName(),
+                                                     this->getStorage().getChecksumVersion());
 
     std::vector<std::shared_ptr<Iterator>> iterators;
     while (iters.size() > numTargetedSpills) {
@@ -592,7 +600,11 @@ void FileBasedSorterSpiller<Key, Value>::mergeSpills(
                 6033102, 2, "Merging spills", "beginIdx"_attr = i, "endIdx"_attr = i + count - 1);
 
             auto mergeIterator = sorter::merge<Key, Value>(spillsToMerge, opts, comp);
-            sorterStorage = FileBasedSorterStorage<Key, Value>(newSpillsFile, *opts.tempDir);
+            sorterStorage =
+                FileBasedSorterStorage<Key, Value>(newSpillsFile,
+                                                   *opts.tempDir,
+                                                   this->getStorage().getDbName(),
+                                                   this->getStorage().getChecksumVersion());
             std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
                 sorterStorage.makeWriter(opts, settings);
             uint64_t pairCount = 0;

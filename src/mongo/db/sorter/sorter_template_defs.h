@@ -580,7 +580,7 @@ public:
     NoLimitSorter(const SortOptions& opts,
                   const Comparator& comp,
                   std::shared_ptr<SorterSpiller<Key, Value>> spiller,
-                  const Settings& settings = Settings())
+                  const Settings& settings)
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings) {
         invariant(opts.limit == 0);
     }
@@ -590,7 +590,7 @@ public:
                   const SortOptions& opts,
                   const Comparator& comp,
                   std::shared_ptr<SorterSpiller<Key, Value>> spiller,
-                  const Settings& settings = Settings())
+                  const Settings& settings)
         : MergeableSorter<Key, Value>(opts, storageIdentifier, comp, std::move(spiller), settings) {
         invariant(opts.tempDir);
         invariant(this->_spiller != nullptr);
@@ -861,7 +861,7 @@ public:
     TopKSorter(const SortOptions& opts,
                const Comparator& comp,
                std::shared_ptr<SorterSpiller<Key, Value>> spiller,
-               const Settings& settings = Settings())
+               const Settings& settings)
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings),
           _haveCutoff(false),
           _worstCount(0),
@@ -1326,9 +1326,11 @@ inline std::error_code SorterFile::_getErrorCode() {
 // SortedStorageWriter
 //
 template <typename Key, typename Value>
-SortedStorageWriter<Key, Value>::SortedStorageWriter(const SortOptions& opts,
-                                                     const Settings& settings)
-    : _settings(settings), _checksumCalculator(opts.checksumVersion), _opts(opts) {
+SortedStorageWriter<Key, Value>::SortedStorageWriter(
+    const SortOptions& opts,
+    const Settings& settings,
+    const SorterChecksumCalculator checksumCalculator)
+    : _settings(settings), _checksumCalculator(checksumCalculator), _opts(opts) {
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(16946,
             "Attempting to use external sort from mongos. This is not allowed.",

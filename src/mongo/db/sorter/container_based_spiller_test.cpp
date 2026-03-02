@@ -121,7 +121,7 @@ TEST(ContainerIteratorTest, Iterate) {
                                                        containerKey5 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
                                                        /*_checksumCalculator=*/3272515249,
-                                                       SorterChecksumVersion::v2};
+                                                       sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
     auto next = iterator.next();
@@ -206,14 +206,14 @@ TEST(ContainerIteratorTest, MultipleCursors) {
         containerKey2 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
         /*_checksumCalculator=*/71873048,
-        SorterChecksumVersion::v2};
+        sorter::kLatestChecksumVersion};
     ContainerIterator<IntWrapper, IntWrapper> iterator2{
         container.getCursor(ru),
         containerKey3,
         containerKey4 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
         /*_checksumCalculator=*/2815298670,
-        SorterChecksumVersion::v2};
+        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator1.more());
     ASSERT_TRUE(iterator2.more());
@@ -252,7 +252,7 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
                                                        /*_checksumCalculator=*/4104690164,
-                                                       SorterChecksumVersion::v2};
+                                                       sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
     EXPECT_THROW(iterator.next(), DBException);
@@ -291,7 +291,7 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
                                                        /*_checksumCalculator=*/4104690164,
-                                                       SorterChecksumVersion::v2};
+                                                       sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
     EXPECT_THROW(iterator.getDeferredValue(), DBException);
@@ -352,7 +352,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
                                                        /*_checksumCalculator=*/0,
-                                                       SorterChecksumVersion::v2};
+                                                       sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
     iterator.next();
@@ -362,7 +362,8 @@ class ContainerIteratorTest : public testing::TestWithParam<SorterChecksumVersio
 
 INSTANTIATE_TEST_SUITE_P(ContainerIteratorTestSuite,
                          ContainerIteratorTest,
-                         testing::Values(SorterChecksumVersion::v1, SorterChecksumVersion::v2));
+                         testing::Values(SorterChecksumVersion::v1,
+                                         sorter::kLatestChecksumVersion));
 
 TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
     RecoveryUnitNoop ru;
@@ -438,6 +439,7 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
         stats,
         opts,
         startingKey,
+        sorter::kLatestChecksumVersion,
         SortedContainerWriter<IntWrapper, IntWrapper>::Settings{});
 
     const IntWrapper k1{1};
@@ -490,6 +492,7 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
         stats,
         opts,
         startingKey,
+        sorter::kLatestChecksumVersion,
         SortedContainerWriter<NullValue, NullValue>::Settings{});
     writer.addAlreadySorted(NullValue{}, NullValue{});
 
@@ -525,6 +528,7 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
         stats,
         opts,
         startingKey,
+        sorter::kLatestChecksumVersion,
         SortedContainerWriter<IntWrapper, NullValue>::Settings{});
 
     const IntWrapper key{123};
@@ -569,7 +573,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         container,
         stats,
         ns.dbName(),
-        SorterChecksumVersion::v2,
+        sorter::kLatestChecksumVersion,
         /*batchSize=*/GetParam()};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
@@ -612,7 +616,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         container,
         containerStats,
         ns.dbName(),
-        SorterChecksumVersion::v2,
+        sorter::kLatestChecksumVersion,
         /*batchSize=*/GetParam()};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{
@@ -676,7 +680,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         container,
         containerStats,
         ns.dbName(),
-        SorterChecksumVersion::v2,
+        sorter::kLatestChecksumVersion,
         /*batchSize=*/GetParam()};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}},
@@ -776,7 +780,7 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
                                                                    stats,
                                                                    /*currKey=*/0,
                                                                    ns.dbName(),
-                                                                   SorterChecksumVersion::v2};
+                                                                   sorter::kLatestChecksumVersion};
 
         auto spillPath = storage.getSpillDirPath();
         ASSERT(spillPath);

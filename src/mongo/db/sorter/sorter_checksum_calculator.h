@@ -34,6 +34,10 @@
 
 namespace mongo {
 
+namespace MONGO_MOD_PUB sorter {
+static constexpr SorterChecksumVersion kLatestChecksumVersion = SorterChecksumVersion::v2;
+}
+
 /**
  * Calculates the checksum of a given version, by gradually consuming provided data.
  */

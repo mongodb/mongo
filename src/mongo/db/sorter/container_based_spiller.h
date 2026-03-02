@@ -201,8 +201,9 @@ public:
                           SorterContainerStats& containerStats,
                           const SortOptions& opts,
                           int64_t nextKey,
+                          SorterChecksumVersion checksumVersion,
                           const Settings& settings)
-        : SortedStorageWriter<Key, Value>(opts, settings),
+        : SortedStorageWriter<Key, Value>(opts, settings, checksumVersion),
           _opCtx(opCtx),
           _ru(ru),
           _collection(collection),
@@ -281,8 +282,8 @@ public:
                                 IntegerKeyedContainer& container,
                                 SorterContainerStats& stats,
                                 int64_t currKey,
-                                boost::optional<DatabaseName> dbName = boost::none,
-                                SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+                                boost::optional<DatabaseName> dbName,
+                                SorterChecksumVersion checksumVersion)
         : SorterStorageBase<Key, Value>(std::move(dbName), checksumVersion),
           _opCtx(opCtx),
           _ru(ru),
@@ -294,7 +295,15 @@ public:
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(const SortOptions& opts,
                                                                 const Settings& settings) override {
         return std::make_unique<sorter::SortedContainerWriter<Key, Value>>(
-            _opCtx, _ru, _collection, _container, _stats, opts, _currKey, settings);
+            _opCtx,
+            _ru,
+            _collection,
+            _container,
+            _stats,
+            opts,
+            _currKey,
+            this->getChecksumVersion(),
+            settings);
     };
 
     size_t getIteratorSize() override {
