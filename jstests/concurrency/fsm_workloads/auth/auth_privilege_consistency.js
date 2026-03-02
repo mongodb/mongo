@@ -123,7 +123,7 @@ export const $config = (function () {
                 const hello = assert.commandWorked(db.runCommand({hello: 1}));
                 jsTest.log("hello: " + tojson(hello));
                 if (hello.hosts) {
-                    const allHosts = hello.hosts.concat(hello.passives);
+                    const allHosts = hello.hosts.concat(hello.passives ? hello.passives : []);
                     allHosts.forEach(function (node) {
                         if (node === hello.me) {
                             // Reuse existing connection for db's connection.

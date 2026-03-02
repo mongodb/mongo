@@ -190,6 +190,7 @@ class CoreAnalysisTaskGenerator(ABC):
             "disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer",
             "disagg_two_nodes_repl_jscore_passthrough",
             "no_passthrough_disagg_override",
+            "disagg_concurrency_replication_multi_stmt_txn",
             "disagg_concurrency_sharded_replication",
             "disagg_concurrency_sharded_replication_with_balancer",
             "disagg_concurrency_sharded_causal_consistency",
