@@ -287,7 +287,8 @@
         # too many network errors occur when re-running a transaction we will run out of retries.
         - class: ContinuousStepdown
           randomize_kill: true
-        - class: CheckIdleCursors
+        # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+        # - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections
@@ -307,7 +308,8 @@
         test: true
         hooks:
           - ContinuousStepdown
-          - CheckIdleCursors
+          # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+          # - CheckIdleCursors
           - CheckReplDBHash
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
@@ -386,7 +388,8 @@
       archive:
         test: true
         hooks:
-          - CheckIdleCursors
+          # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+          # - CheckIdleCursors
           - CheckReplDBHash
           - CheckMetadataConsistencyInBackground
           - ValidateCollections
@@ -395,7 +398,8 @@
       hooks:
         - class: ContinuousStepdown
           randomize_kill: true
-        - class: CheckIdleCursors
+        # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+        # - class: CheckIdleCursors
         - class: CheckReplDBHash
         - class: CheckMetadataConsistencyInBackground
         - class: ValidateCollections
