@@ -1079,6 +1079,58 @@ Status ClusterAggregate::runAggregate(
         opCtx, namespaces, request, {request}, privileges, verbosity, result, comment, ifrContext);
 }
 
+void makeEOFExplainResult(OperationContext* opCtx,
+                          const ClusterAggregate::Namespaces& namespaces,
+                          AggregateCommandRequest& request,
+                          const LiteParsedPipeline& liteParsedPipeline,
+                          boost::optional<ExplainOptions::Verbosity> verbosity,
+                          BSONObjBuilder* result,
+                          std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    BSONObjBuilder queryPlannerBob(result->subobjStart("queryPlanner"));
+    BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));
+    winningPlanBob.append("stage", "EOF");
+    winningPlanBob.appendNumber("planNodeId", 1);
+    winningPlanBob.append("type", eof_node::typeStr(eof_node::EOFType::NonExistentNamespace));
+    winningPlanBob.doneFast();
+    queryPlannerBob.doneFast();
+
+    auto expCtx =
+        makeExpressionContext(opCtx,
+                              request,
+                              boost::none /* cri */,
+                              namespaces.executionNss,
+                              namespaces.requestedNss,
+                              BSONObj(), /* collation obj */
+                              boost::none /* uuid */,
+                              resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
+                              liteParsedPipeline.hasChangeStream(),
+                              verbosity,
+                              ExpressionContextCollationMatchesDefault::kYes,
+                              std::move(ifrContext));
+
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx);
+
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
+            request,
+            namespaces.executionNss,
+            liteParsedPipeline.getInvolvedNamespaces(),
+            *pipeline,
+            expCtx);
+    }};
+    CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
+        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, namespaces.executionNss);
+    });
+
+    explain_common::generateQueryShapeHash(opCtx, result);
+    explain_common::generateServerInfo(result);
+    explain_common::generateServerParameters(expCtx, result);
+    explain_common::appendIfRoom(
+        serializeForPassthrough(expCtx, request, namespaces.requestedNss).toBson(),
+        "command",
+        result);
+}
+
 Status ClusterAggregate::runAggregate(
     OperationContext* opCtx,
     const Namespaces& namespaces,
@@ -1120,19 +1172,6 @@ Status ClusterAggregate::runAggregate(
 
     sharding::router::CollectionRouter router(opCtx, namespaces.executionNss);
 
-    bool isExplain = verbosity.has_value();
-    if (isExplain) {
-        // Implicitly create the database for explain commands since, right now, there is no way
-        // to respond properly when the database doesn't exist.
-        // Before, the database was implicitly created by the CollectionRoutingInfoTargeter class,
-        // (for context, it's a legacy class to store the routing information), now that we are
-        // using the RoutingContext instead, we still need to create a database until SERVER-108882
-        // gets addressed.
-        // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
-        // doesn't exist.
-        router.createDbImplicitlyOnRoute();
-    }
-
     // We'll use the aggregationStatus to distinguish whether an error was thrown by the
     // aggregation command or the refresh loop.
     Status aggregationStatus = Status::OK();
@@ -1157,6 +1196,20 @@ Status ClusterAggregate::runAggregate(
     Status finalStatus = std::invoke([&]() -> Status {
         try {
             return router.routeWithRoutingContext(comment, bodyFn);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            if (verbosity.has_value()) {
+                // Build an EOF explain result for explained aggregations
+                // targeting non-existent databases.
+                makeEOFExplainResult(opCtx,
+                                     namespaces,
+                                     request,
+                                     liteParsedPipeline,
+                                     verbosity,
+                                     result,
+                                     std::move(ifrContext));
+                return Status::OK();
+            }
+            return ex.toStatus();
         } catch (const DBException& ex) {
             return ex.toStatus();
         }

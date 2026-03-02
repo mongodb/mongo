@@ -241,7 +241,7 @@ export function normalizePlan(plan, flatten = true) {
  */
 export function formatQueryPlanner(queryPlanner, shouldFlatten = true) {
     let winningPlan = normalizePlan(getWinningPlanFromExplain(queryPlanner), shouldFlatten);
-    let rejectedPlans = queryPlanner.rejectedPlans.map((plan) => normalizePlan(plan, shouldFlatten));
+    let rejectedPlans = queryPlanner.rejectedPlans?.map((plan) => normalizePlan(plan, shouldFlatten)) ?? [];
     return {winningPlan, rejectedPlans};
 }
 

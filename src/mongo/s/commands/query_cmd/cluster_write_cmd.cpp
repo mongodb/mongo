@@ -555,7 +555,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
 
     // Implicitly create the db if it doesn't exist. There is no way right now to return an
     // explain on a sharded cluster if the database doesn't exist.
-    // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+    // TODO (SERVER-120673) Stop creating the db once explain can be executed when th db
     // doesn't exist.
     router.createDbImplicitlyOnRoute();
     return router.routeWithRoutingContext(
@@ -649,7 +649,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
 
     // Implicitly create the db if it doesn't exist. There is no way right now to return an
     // explain on a sharded cluster if the database doesn't exist.
-    // TODO (SERVER-108882) Stop creating the db once explain can be executed when th db
+    // TODO (SERVER-120673) Stop creating the db once explain can be executed when th db
     // doesn't exist.
     router.createDbImplicitlyOnRoute();
     router.routeWithRoutingContext(
