@@ -248,6 +248,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
+          num_tasks: 10
           fallback_num_sub_suites: 2
 
   - <<: *gen_task_template
@@ -257,6 +258,7 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
+          num_tasks: 10
           fallback_num_sub_suites: 2
           resmoke_jobs_max: 1
 

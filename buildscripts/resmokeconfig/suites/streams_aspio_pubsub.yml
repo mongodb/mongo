@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_errors.js
     - src/mongo/db/modules/*/jstests/streams/aspio/pubsub/pubsub_checkpoint.js
 
 executor:
