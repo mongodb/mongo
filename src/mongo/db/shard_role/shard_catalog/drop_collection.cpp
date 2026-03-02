@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_helper_ddl.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -148,17 +149,6 @@ Status _dropView(OperationContext* opCtx,
 
     auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName);
 
-    // The view catalog depends on observing the latest state of system.views,
-    // which isn't the case if we have an snapshot open.
-    // TODO(SERVER-117478): Do not abandon the snapshot here.
-    tassert(11609004,
-            "_dropView can not safely abandon the snapshot because we are inside a WUOW",
-            !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-
-    // Operations all lock system.views in the end to prevent deadlock.
-    Lock::CollectionLock systemViewsLock(opCtx, db->getSystemViewsName(), MODE_X);
-
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
         LOGV2(20330,
               "hangDuringDropCollection fail point enabled. Blocking until fail point is "
@@ -259,8 +249,7 @@ StatusWith<timeseries::CollectionOrViewAcquisitionPlusTimeseriesView> _abortInde
         locks.emplace(timeseries::acquireCollectionOrViewPlusTimeseriesView(
             opCtx,
             CollectionOrViewAcquisitionRequest::fromOpCtx(
-                opCtx, startingNss, expectedUUID, AcquisitionPrerequisites::kWrite),
-            MODE_X));
+                opCtx, startingNss, expectedUUID, AcquisitionPrerequisites::kWrite)));
     }
 
     invariant(locks->target.getCollectionPtr()->getIndexCatalog()->numIndexesInProgress() == 0);
@@ -336,8 +325,7 @@ Status _dropCollection(OperationContext* opCtx,
             auto locks = timeseries::acquireCollectionOrViewPlusTimeseriesView(
                 opCtx,
                 CollectionOrViewAcquisitionRequest::fromOpCtx(
-                    opCtx, nss, expectedUUID, AcquisitionPrerequisites::kWrite),
-                MODE_X);
+                    opCtx, nss, expectedUUID, AcquisitionPrerequisites::kWrite));
 
             auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName());
             if (!db) {
@@ -548,7 +536,10 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
 
         DropReply unusedReply;
         if (isView) {
-            Lock::CollectionLock viewLock(opCtx, collectionName, MODE_IX);
+            auto ddlAcq = catalog_helper_ddl::acquireCollectionOrViewForCatalogWrites(
+                opCtx,
+                {CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx, collectionName, AcquisitionPrerequisites::kWrite)});
             return _dropView(opCtx, db, collectionName, &unusedReply);
         } else {
             return _dropCollectionForApplyOps(

@@ -441,5 +441,100 @@ TEST_F(TimeseriesCatalogHelperTest, acquireWithUpgradeDowngrade) {
     }
 }
 
+/**
+ * acquireCollectionOrViewPlusTimeseriesView acquires systemViews when working on a view or a
+ *viewful timeseries collection.
+ *
+ **/
+TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnPlainViewHasSystemViews) {
+    auto opCtx = operationContext();
+
+    // Create backing collection.
+    CreateCommand cmd(_otherNss);
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    // Create a simple view on top of the other collection.
+    {
+        CreateCommand viewCmd(_mainNss);
+        auto& req = viewCmd.getCreateCollectionRequest();
+        req.setViewOn(_otherNss.coll());
+        req.setPipeline(std::vector<mongo::BSONObj>());
+        ASSERT_OK(createCollection(opCtx, viewCmd));
+    }
+
+    auto request = CollectionOrViewAcquisitionRequest::fromOpCtx(
+        opCtx, _mainNss, AcquisitionPrerequisites::kWrite);
+    auto result = timeseries::acquireCollectionOrViewPlusTimeseriesView(opCtx, request);
+
+    ASSERT_TRUE(result.target.isView());
+    ASSERT_TRUE(result.systemViews.has_value());
+}
+
+TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnViewfulTimeseriesHasSystemViews) {
+    auto opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
+    CreateCommand cmd(_mainNss);
+    cmd.getCreateCollectionRequest().setTimeseries(_tsOptions);
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    auto request = CollectionOrViewAcquisitionRequest::fromOpCtx(
+        opCtx, _mainNss, AcquisitionPrerequisites::kWrite);
+    auto result = timeseries::acquireCollectionOrViewPlusTimeseriesView(opCtx, request);
+
+    ASSERT_TRUE(result.target.collectionExists());
+    ASSERT_TRUE(result.timeseriesView.has_value());
+    ASSERT_TRUE(result.systemViews.has_value());
+}
+
+TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnViewlessTimeseriesHasNoSystemViews) {
+    auto opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    CreateCommand cmd(_mainNss);
+    cmd.getCreateCollectionRequest().setTimeseries(_tsOptions);
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    auto request = CollectionOrViewAcquisitionRequest::fromOpCtx(
+        opCtx, _mainNss, AcquisitionPrerequisites::kWrite);
+    auto result = timeseries::acquireCollectionOrViewPlusTimeseriesView(opCtx, request);
+
+    ASSERT_TRUE(result.target.collectionExists());
+    ASSERT_FALSE(result.timeseriesView.has_value());
+    ASSERT_FALSE(result.systemViews.has_value());
+}
+
+TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnRegularCollectionHasNoSystemViews) {
+    auto opCtx = operationContext();
+
+    CreateCommand cmd(_mainNss);
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    auto request = CollectionOrViewAcquisitionRequest::fromOpCtx(
+        opCtx, _mainNss, AcquisitionPrerequisites::kWrite);
+    auto result = timeseries::acquireCollectionOrViewPlusTimeseriesView(opCtx, request);
+
+    ASSERT_TRUE(result.target.collectionExists());
+    ASSERT_FALSE(result.timeseriesView.has_value());
+    ASSERT_FALSE(result.systemViews.has_value());
+}
+
+TEST_F(TimeseriesCatalogHelperTest, acquireTimeseriesViewOnNonExistingNamespaceHasNoSystemViews) {
+    auto opCtx = operationContext();
+
+    auto request = CollectionOrViewAcquisitionRequest::fromOpCtx(
+        opCtx, _mainNss, AcquisitionPrerequisites::kWrite);
+    auto result = timeseries::acquireCollectionOrViewPlusTimeseriesView(opCtx, request);
+
+    ASSERT_FALSE(result.target.collectionExists());
+    ASSERT_FALSE(result.target.isView());
+    ASSERT_FALSE(result.timeseriesView.has_value());
+    ASSERT_FALSE(result.systemViews.has_value());
+}
+
 }  // namespace
 }  // namespace mongo

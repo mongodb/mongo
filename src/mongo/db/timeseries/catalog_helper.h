@@ -84,10 +84,13 @@ struct CollectionOrViewAcquisitionPlusTimeseriesView {
     // If target is a system.buckets collection with timeseries options,
     // the corresponding timeseries view, if one exists.
     boost::optional<ViewAcquisition> timeseriesView;
+    // The system.views collection acquisition. Populated when 'target' is a view
+    // or when 'timeseriesView' is present (i.e., whenever the view catalog may be modified).
+    boost::optional<CollectionAcquisition> systemViews;
 };
 
 CollectionOrViewAcquisitionPlusTimeseriesView acquireCollectionOrViewPlusTimeseriesView(
-    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq, LockMode mode);
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionReq);
 
 struct TimeseriesLookupInfo {
     // If the namespace refer to a timeseries collection

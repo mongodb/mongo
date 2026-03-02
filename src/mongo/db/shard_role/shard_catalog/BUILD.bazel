@@ -428,6 +428,7 @@ mongo_cc_unit_test(
     name = "db_catalog_test",
     srcs = [
         "backwards_compatible_collection_options_util_test.cpp",
+        "catalog_helper_ddl_test.cpp",
         "coll_mod_test.cpp",
         "collection_catalog_test.cpp",
         "collection_options_test.cpp",

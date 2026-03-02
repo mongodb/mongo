@@ -62,6 +62,7 @@ mongo_cc_library(
         "shard_role_mock.cpp",
         "//src/mongo/db/shard_role/ddl:direct_connection_ddl_hook.cpp",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helper.cpp",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helper_ddl.cpp",
         "//src/mongo/db/shard_role/shard_catalog:catalog_raii.cpp",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch.cpp",
         "//src/mongo/db/shard_role/shard_catalog:collection_yield_restore.cpp",
