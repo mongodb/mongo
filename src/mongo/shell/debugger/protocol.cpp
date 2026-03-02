@@ -105,14 +105,15 @@ Response SetBreakpointsRequest::response() {
 
     BSONObjBuilder bodyBuilder;
     BSONArrayBuilder breakpointsArr;
-    BSONObjBuilder bpBuilder;
-
-    // STUB response for now, simply match the "seq" for DAP to sync
-    bpBuilder.append("id", "1");
-    bpBuilder.append("verified", true);
-    bpBuilder.append("line", "12");
-    bpBuilder.append("column", "0");
-    breakpointsArr.append(bpBuilder.obj());
+    // Create a breakpoint response for each requested line
+    for (size_t i = 0; i < lines.size(); ++i) {
+        BSONObjBuilder bpBuilder;
+        bpBuilder.append("id", static_cast<int>(i + 1));
+        bpBuilder.append("verified", true);
+        bpBuilder.append("line", lines[i]);
+        bpBuilder.append("column", 0);
+        breakpointsArr.append(bpBuilder.obj());
+    }
     bodyBuilder.append("breakpoints", breakpointsArr.arr());
 
     responseBuilder.append("body", bodyBuilder.obj());

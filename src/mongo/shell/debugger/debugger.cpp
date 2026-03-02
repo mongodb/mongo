@@ -447,9 +447,26 @@ Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
         return status;
     }
 
-    // Set up onNewScript callback - calls the helper for new scripts
+    /*
+     * Set up onNewScript callback - calls the helper for new scripts
+     * This can be called multiple times for the same script "file" due to lazy loading.
+     *
+     * Once for the top-level script content and offsets, eg:
+     *    script = {
+     *       url: "jstests/my_test.js",
+     *       displayName: undefined,
+     *       ...
+     *    }
+     *
+     * Then recursively to explicitly cover functions, and subfunctions, etc., eg:
+     *    script = {
+     *       url: "jstests/my_test.js",
+     *       displayName: "myfunction",
+     *       ...
+     *    }
+     */
     const char* onNewScriptCode = R"JS(
-        (function(script) {
+        (function processScript(script) {
             const url = script.url;
             if (!url) return;
 
@@ -458,25 +475,28 @@ Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
             if (!pendingBps || pendingBps.length === 0) return;
 
             for (const line of pendingBps) {
-                try {
-                    const offsets = script.getLineOffsets(line);
-                    if (offsets.length > 0) {
-                        const offset = offsets[0];
-                        script.setBreakpoint(offset, {
-                            hit: function(frame) {
-                                // Store location info so C++ can access it
-                                globalThis.__pausedLocation = {
-                                    script: frame.script?.url ?? "unknown",
-                                    line: frame.script?.getOffsetLocation?.call(frame.script, frame.offset)?.lineNumber ?? 0,
-                                };
+                const offsets = script.getLineOffsets(line);
+                if (offsets?.length > 0) {
+                    const offset = offsets[0];
+                    script.setBreakpoint(offset, {
+                        hit: function(frame) {
+                            // Store location info so C++ can access it
+                            globalThis.__pausedLocation = {
+                                script: frame.script?.url ?? "unknown",
+                                line: frame.script?.getOffsetLocation?.call(frame.script, frame.offset)?.lineNumber ?? 0,
+                            };
 
-                                // Invoke the C++ callback
-                                globalThis.__onScriptSetBreakpoint();
-                            }
-                        });
-                    }
-                } catch (e) {
+                            // Invoke the C++ callback
+                            globalThis.__onScriptSetBreakpoint();
+                        }
+                    });
                 }
+            }
+
+            // Process child scripts (nested functions) recursively
+            const children = script.getChildScripts();
+            for (const child of children) {
+                processScript(child);
             }
         })
     )JS";

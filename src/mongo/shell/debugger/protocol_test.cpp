@@ -48,18 +48,17 @@ TEST(Request, fromJSON) {
 TEST(SetBreakpointsRequest, parseRequestAndResponse) {
 
     std::string json =
-        R"({"type":"request","seq":17,"command":"setBreakpoints","arguments":{"source":"jstests/my_test.js","lines":[{"line":5},{"line":6}]}})";
+        R"({"type":"request","seq":17,"command":"setBreakpoints","arguments":{"source":"jstests/my_test.js","lines":[{"line":5},{"line":82}]}})";
     auto request = std::static_pointer_cast<SetBreakpointsRequest>(Request::fromJSON(json));
     ASSERT_EQ(request->seq, 17);
     ASSERT_EQ(request->source, "jstests/my_test.js");
-    ASSERT_EQ(request->lines, std::vector<int>({5, 6}));
+    ASSERT_EQ(request->lines, std::vector<int>({5, 82}));
 
     auto response = request->response();
     std::string expectedResponse =
-        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : "1", "verified" : true, "line" : "12", "column" : "0" } ] } })";
+        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : 1, "verified" : true, "line" : 5, "column" : 0 }, { "id" : 2, "verified" : true, "line" : 82, "column" : 0 } ] } })";
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
-
 
 TEST(StackTraceRequest, parseRequestAndResponse) {
 
