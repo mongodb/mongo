@@ -64,10 +64,11 @@
     __oldname = (s)->name;                                                                   \
     ++(s)->api_call_counter;                                                                 \
     (s)->dhandle = (dh);                                                                     \
-    (s)->name = (s)->lastop = #struct_name "." #func_name
-#define API_SESSION_POP(s)  \
-    (s)->dhandle = __olddh; \
-    (s)->name = __oldname;  \
+    (s)->lastop = #struct_name "." #func_name;                                               \
+    __wt_atomic_store_ptr_relaxed(&(s)->name, (s)->lastop);
+#define API_SESSION_POP(s)                                \
+    (s)->dhandle = __olddh;                               \
+    __wt_atomic_store_ptr_relaxed(&(s)->name, __oldname); \
     --(s)->api_call_counter
 
 /* Standard entry points to the API: declares/initializes local variables. */

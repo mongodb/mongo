@@ -17,25 +17,28 @@
  *     between multiple threads of the same type/name.
  */
 static int
-__thread_set_name(WT_SESSION_IMPL *session, uint32_t thread_num, pthread_t thread_id)
+__thread_set_name(uint32_t thread_num, pthread_t thread_id, const char *session_name)
 {
     char short_name[WT_THREAD_NAME_MAX_LEN] = {0}, thread_name[WT_THREAD_NAME_MAX_LEN] = {0};
 
-    if (session != NULL && session->name != NULL) {
-        if (thread_num == 0)
-            strncpy(thread_name, session->name, WT_THREAD_NAME_MAX_LEN);
-        else {
-            strncpy(short_name, session->name, WT_THREAD_NAME_MAX_LEN - 4);
+    if (session_name == NULL)
+        return (0);
 
-            if (thread_num < 100)
-                WT_RET(__wt_snprintf(
-                  thread_name, WT_THREAD_NAME_MAX_LEN, "%s %" PRIu32, short_name, thread_num));
-            else
-                WT_RET(__wt_snprintf(thread_name, WT_THREAD_NAME_MAX_LEN, "%s ++", short_name));
-        }
-        thread_name[WT_THREAD_NAME_MAX_LEN - 1] = '\0';
-        WT_RET(pthread_setname_np(thread_id, thread_name));
+    if (thread_num == 0)
+        strncpy(thread_name, session_name, WT_THREAD_NAME_MAX_LEN);
+    else {
+        strncpy(short_name, session_name, WT_THREAD_NAME_MAX_LEN - 4);
+
+        if (thread_num < 100)
+            WT_RET(__wt_snprintf(
+              thread_name, WT_THREAD_NAME_MAX_LEN, "%s %" PRIu32, short_name, thread_num));
+        else
+            WT_RET(__wt_snprintf(thread_name, WT_THREAD_NAME_MAX_LEN, "%s ++", short_name));
     }
+
+    thread_name[WT_THREAD_NAME_MAX_LEN - 1] = '\0';
+    WT_RET(pthread_setname_np(thread_id, thread_name));
+
     return (0);
 }
 #endif
@@ -49,6 +52,11 @@ __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret,
   WT_THREAD_CALLBACK (*func)(void *), void *arg) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
     WT_DECL_RET;
+    /*
+     * The created thread may change the session name, and we call __thread_set_name after the
+     * thread has started, so we must capture the session name before creating the thread.
+     */
+    const char *session_name = (session != NULL) ? session->name : NULL;
 
     /*
      * Creating a thread isn't a memory barrier, but WiredTiger commonly sets flags and or state and
@@ -61,7 +69,7 @@ __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret,
     if (ret == 0) {
         tidret->created = true;
 #ifdef __linux__
-        WT_IGNORE_RET(__thread_set_name(session, tidret->name_index, tidret->id));
+        WT_IGNORE_RET(__thread_set_name(tidret->name_index, tidret->id, session_name));
 #endif
         return (0);
     }

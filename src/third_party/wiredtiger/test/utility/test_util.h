@@ -68,8 +68,6 @@ extern "C" {
 #include "windows_shim.h"
 #endif
 
-#define PALM_DISAGG_STORAGE "palm"
-
 #define DIR_STORE_BUCKET_NAME "bucket"
 #define S3_DEFAULT_BUCKET_NAME "s3testext;ap-southeast-2"
 
@@ -186,7 +184,7 @@ typedef struct {
         const char *page_log_home; /* Page and log service home dir for disaggregated storage */
 
         uint64_t drain_threads;        /* Number of drain threads for disaggregated storage*/
-        uint64_t page_log_map_size_mb; /* Megabytes of map size for PALM database */
+        uint64_t page_log_map_size_mb; /* Megabytes of map size for page log local database */
         uint32_t page_log_verbose;     /* Page log verbosity; see WT_VERBOSE_LEVEL */
     } disagg;
 

@@ -1698,6 +1698,18 @@ variables:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
           format_test_script_args: -t 360
 
+  - &format-stress-asan-realloc-exact-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
+      - func: "format test script"
+        vars:
+          additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+          format_test_script_args: -t 360 -- -C "debug_mode=(realloc_exact=true)"
+
   - &race-condition-stress-asan-test
     exec_timeout_secs: 25200
     commands:
@@ -2617,18 +2629,6 @@ tasks:
           # as there are a few files that contain a large number of slower tests.
           # FIXME-WT-16228: decrease the timeout when the performance of the disagg leader tests is improved.
           unit_test_args: -v 2 --timeout 3600 --extra-long --hook "disagg=(role=leader)"
-
-  # FIXME-WT-15652 Remove PALM tests when PALite is fully validated.
-  # Run the tests with PALM for comparison with PALite to catch discrepancies.
-  - name: unit-test-palm
-    tags: ["python"]
-    depends_on:
-    - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "unit test"
-        vars:
-          unit_test_args: -v 2 page_log=palm
 
   # Run the tests that uses suite_random with a random starting seed
   - name: unit-test-random-seed
@@ -5136,6 +5136,9 @@ tasks:
   - <<: *format-stress-asan-test
     name: format-stress-asan-test-4
     tags: ["stress-test-asan"]
+  - <<: *format-stress-asan-realloc-exact-test
+    name: format-stress-asan-realloc-exact-test
+    tags: ["stress-test-asan"]
   - <<: *race-condition-stress-asan-test
     name: race-condition-stress-asan-test-1
     tags: ["stress-test-asan"]
@@ -5242,30 +5245,6 @@ tasks:
         vars:
           # run for 10 minutes.
           format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.mode=follower runs.rows=10000 runs.ops=50000
-
-  - name: format-stress-test-disagg-leader-msan-palm
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test script"
-        vars:
-          # run for 10 minutes.
-          # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
-          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.page_log=palm disagg.mode=leader runs.rows=10000 runs.ops=50000 disk.encryption=none
-          num_jobs: 1  # MSAN builds (with PALM) can cause OOM issues if multiple jobs are run in parallel.
-
-  - name: format-stress-test-disagg-follower-msan-palm
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "format test script"
-        vars:
-          # run for 10 minutes.
-          # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
-          format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.page_log=palm disagg.mode=follower runs.rows=10000 runs.ops=50000 disk.encryption=none
-          num_jobs: 1  # MSAN builds (with PALM) can cause OOM issues if multiple jobs are run in parallel.
 
   - name: format-stress-test-disagg-leader-tsan
     tags: ["pull_request"]
@@ -6791,7 +6770,6 @@ buildvariants:
     - name: csuite-long-running
       batchtime: 1440 # once a day
     - name: live-restore-long
-    - name: unit-test-palm
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -6921,8 +6899,6 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-msan-test
-    - name: format-stress-test-disagg-leader-msan-palm
-    - name: format-stress-test-disagg-follower-msan-palm
     - name: make-check-test
       distros: ubuntu2004-large
 
@@ -7431,7 +7407,6 @@ buildvariants:
       distros: amazon2023.3-arm64-large
     - name: make-check-test
     - name: unit-test
-    - name: unit-test-palm
     - name: unit-test-extra-long
       distros: amazon2023.3-arm64-large
     - name: unit-test-hook-disagg-leader-extra-long
@@ -7667,8 +7642,6 @@ buildvariants:
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
     - name: format-msan-test
-    - name: format-stress-test-disagg-leader-msan-palm
-    - name: format-stress-test-disagg-follower-msan-palm
     - name: make-check-test
       distros: amazon2023.3-arm64-large
     - name: csuite-long-running

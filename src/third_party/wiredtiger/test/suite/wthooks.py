@@ -294,7 +294,7 @@ class DisaggParameters(object):
     def __init__(self):
         self.config = None
         self.role = 'leader'
-        self.page_log = 'palm'
+        self.page_log = 'palite'
 
 class WiredTigerHookPlatformAPI(object):
     def setUp(self, testcase):

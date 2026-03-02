@@ -195,8 +195,8 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     } else if (WT_CONFIG_LIT_MATCH("oldest_timestamp", cval) ||
       WT_CONFIG_LIT_MATCH("oldest", cval)) {
         ts = __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) ?
-          txn_global->oldest_timestamp :
-          0;
+          __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp) :
+          WT_TS_NONE;
     } else if (WT_CONFIG_LIT_MATCH("oldest_reader", cval))
         __wti_txn_get_pinned_timestamp(session, &ts, WT_TXN_TS_INCLUDE_CKPT);
     else if (WT_CONFIG_LIT_MATCH("pinned", cval))
@@ -205,9 +205,9 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     else if (WT_CONFIG_LIT_MATCH("recovery", cval))
         /* Read-only value forever. No lock needed. */
         ts = txn_global->recovery_timestamp;
-    else if (WT_CONFIG_LIT_MATCH("stable_timestamp", cval) || WT_CONFIG_LIT_MATCH("stable", cval)) {
-        ts = txn_global->has_stable_timestamp ? txn_global->stable_timestamp : 0;
-    } else
+    else if (WT_CONFIG_LIT_MATCH("stable_timestamp", cval) || WT_CONFIG_LIT_MATCH("stable", cval))
+        ts = __wt_get_stable_timestamp(session);
+    else
         WT_RET_MSG(session, EINVAL, "unknown timestamp query %.*s", (int)cval.len, cval.str);
 
     *tsp = ts;
@@ -278,7 +278,7 @@ __wti_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
     txn_global = &S2C(session)->txn_global;
 
     /* Skip locking and scanning when the oldest timestamp is pinned. */
-    if (txn_global->oldest_is_pinned)
+    if (__wt_atomic_load_bool_relaxed(&txn_global->oldest_is_pinned))
         return;
 
     /* Scan to find the global pinned timestamp. */
@@ -305,14 +305,16 @@ __wti_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
       (!txn_global->has_pinned_timestamp || force ||
         txn_global->pinned_timestamp < pinned_timestamp)) {
         __wt_atomic_store_uint64_release(&txn_global->pinned_timestamp, pinned_timestamp);
+        __wt_atomic_store_bool_relaxed(&txn_global->oldest_is_pinned,
+          pinned_timestamp == __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp));
+        __wt_atomic_store_bool_relaxed(&txn_global->stable_is_pinned,
+          pinned_timestamp == __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp));
         /*
          * Release write requires the data and destination have exactly the same size. stdbool.h
          * only defines true as `#define true 1` so we need a bool cast to provide proper type
          * information.
          */
         __wt_atomic_store_bool_release(&txn_global->has_pinned_timestamp, true);
-        txn_global->oldest_is_pinned = txn_global->pinned_timestamp == txn_global->oldest_timestamp;
-        txn_global->stable_is_pinned = txn_global->pinned_timestamp == txn_global->stable_timestamp;
         __wt_verbose_timestamp(session, pinned_timestamp, "Updated pinned timestamp");
     }
     __wt_writeunlock(session, &txn_global->rwlock);
@@ -373,8 +375,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 
     __wt_readlock(session, &txn_global->rwlock);
 
-    last_oldest_ts = txn_global->oldest_timestamp;
-    last_stable_ts = txn_global->stable_timestamp;
+    last_oldest_ts = __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp);
+    last_stable_ts = __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp);
 
     /* It is an invalid call to set the oldest or stable timestamps behind the current values. */
     if (has_oldest && __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) &&
@@ -386,7 +388,8 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
           __wt_timestamp_to_string(last_oldest_ts, ts_string[1]));
     }
 
-    if (has_stable && txn_global->has_stable_timestamp && stable_ts < last_stable_ts) {
+    if (has_stable && __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) &&
+      stable_ts < last_stable_ts) {
         __wt_readunlock(session, &txn_global->rwlock);
         WT_RET_MSG(session, EINVAL,
           "set_timestamp: stable timestamp %s must not be older than current stable timestamp %s",
@@ -401,13 +404,14 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (!has_oldest && __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp))
         oldest_ts = last_oldest_ts;
-    if (!has_stable && txn_global->has_stable_timestamp)
+    if (!has_stable && __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp))
         stable_ts = last_stable_ts;
 
     /* The oldest and stable timestamps must always satisfy the condition that oldest <= stable. */
     if ((has_oldest || has_stable) &&
       (has_oldest || __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp)) &&
-      (has_stable || txn_global->has_stable_timestamp) && oldest_ts > stable_ts) {
+      (has_stable || __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp)) &&
+      oldest_ts > stable_ts) {
         __wt_readunlock(session, &txn_global->rwlock);
         WT_RET_MSG(session, EINVAL,
           "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
@@ -442,23 +446,19 @@ set:
       (!__wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) || force ||
         oldest_ts > txn_global->oldest_timestamp)) {
         __wt_atomic_store_uint64_relaxed(&txn_global->oldest_timestamp, oldest_ts);
+        __wt_atomic_store_bool_relaxed(&txn_global->oldest_is_pinned, false);
+        __wt_atomic_store_bool_release(&txn_global->has_oldest_timestamp, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_oldest_upd);
-        __wt_atomic_store_bool_relaxed(&txn_global->has_oldest_timestamp, true);
-        txn_global->oldest_is_pinned = false;
         __wt_verbose_timestamp(session, oldest_ts, "Updated global oldest timestamp");
     }
 
     if (has_stable &&
-      (!txn_global->has_stable_timestamp || force || stable_ts > txn_global->stable_timestamp)) {
-        __wt_atomic_store_uint64_release(&txn_global->stable_timestamp, stable_ts);
-        WT_STAT_CONN_INCR(session, txn_set_ts_stable_upd);
-        /*
-         * Release write requires the data and destination have exactly the same size. stdbool.h
-         * only defines true as `#define true 1` so we need a bool cast to provide proper type
-         * information.
-         */
+      (!__wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) || force ||
+        stable_ts > __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp))) {
+        __wt_atomic_store_uint64_relaxed(&txn_global->stable_timestamp, stable_ts);
+        __wt_atomic_store_bool_relaxed(&txn_global->stable_is_pinned, false);
         __wt_atomic_store_bool_release(&txn_global->has_stable_timestamp, true);
-        txn_global->stable_is_pinned = false;
+        WT_STAT_CONN_INCR(session, txn_set_ts_stable_upd);
         __wt_verbose_timestamp(session, stable_ts, "Updated global stable timestamp");
     }
 
@@ -466,14 +466,17 @@ set:
      * Even if the timestamps have been forcibly set, they must always satisfy the condition that
      * oldest <= stable. Don't fail as MongoDB violates this rule in very specific scenarios.
      */
-    if (txn_global->has_stable_timestamp &&
+    if (__wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) &&
       __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) &&
-      txn_global->oldest_timestamp > txn_global->stable_timestamp) {
+      __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp) >
+        __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp)) {
         WT_STAT_CONN_INCR(session, txn_set_ts_out_of_order);
         __wt_verbose_debug1(session, WT_VERB_TIMESTAMP,
           "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
-          __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
-          __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[1]));
+          __wt_timestamp_to_string(
+            __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp), ts_string[0]),
+          __wt_timestamp_to_string(
+            __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp), ts_string[1]));
     }
 
     __wt_writeunlock(session, &txn_global->rwlock);
@@ -539,27 +542,24 @@ __txn_validate_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *commit
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t commit_ts, oldest_ts, stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool has_oldest_ts, has_stable_ts;
+    bool has_oldest_ts;
 
     txn = session->txn;
     txn_global = &S2C(session)->txn_global;
     commit_ts = *commit_tsp;
 
     /* Added this redundant initialization to circumvent build failure. */
-    oldest_ts = stable_ts = WT_TS_NONE;
+    oldest_ts = WT_TS_NONE;
 
     /*
      * Compare against the oldest and the stable timestamp. Return an error if the given timestamp
      * is less than oldest and/or stable timestamp.
      */
     /* FIXME-WT-16310: Check synchronization around `oldest_timestamp` and `stable_timestamp`. */
-    has_oldest_ts = __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp);
+    has_oldest_ts = __wt_atomic_load_bool_acquire(&txn_global->has_oldest_timestamp);
     if (has_oldest_ts)
-        oldest_ts = __wt_tsan_suppress_load_uint64(&txn_global->oldest_timestamp);
-    has_stable_ts = __wt_tsan_suppress_load_bool(&txn_global->has_stable_timestamp);
-    if (has_stable_ts)
-        stable_ts = __wt_tsan_suppress_load_uint64(&txn_global->stable_timestamp);
-
+        oldest_ts = __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp);
+    stable_ts = __wt_get_stable_timestamp(session);
     if (!F_ISSET(txn, WT_TXN_HAS_TS_PREPARE)) {
         /* Compare against the first commit timestamp of the current transaction. */
         if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
@@ -581,7 +581,7 @@ __txn_validate_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *commit
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(oldest_ts, ts_string[1]));
 
-        if (has_stable_ts && commit_ts <= stable_ts)
+        if (stable_ts != WT_TS_NONE && commit_ts <= stable_ts)
             WT_RET_MSG(session, EINVAL, "commit timestamp %s must be after the stable timestamp %s",
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
@@ -681,31 +681,29 @@ __txn_validate_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durabl
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t oldest_ts, stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool has_oldest_ts, has_stable_ts;
+    bool has_oldest_ts;
 
     txn = session->txn;
     txn_global = &S2C(session)->txn_global;
 
     /* Added this redundant initialization to circumvent build failure. */
-    oldest_ts = stable_ts = 0;
+    oldest_ts = WT_TS_NONE;
 
     /*
      * Compare against the oldest and the stable timestamp. Return an error if the given timestamp
      * is less than oldest and/or stable timestamp.
      */
-    has_oldest_ts = __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp);
+    has_oldest_ts = __wt_atomic_load_bool_acquire(&txn_global->has_oldest_timestamp);
     if (has_oldest_ts)
-        oldest_ts = txn_global->oldest_timestamp;
-    has_stable_ts = txn_global->has_stable_timestamp;
-    if (has_stable_ts)
-        stable_ts = txn_global->stable_timestamp;
+        oldest_ts = __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp);
+    stable_ts = __wt_get_stable_timestamp(session);
 
     if (has_oldest_ts && durable_ts < oldest_ts)
         WT_RET_MSG(session, EINVAL, "durable timestamp %s is less than the oldest timestamp %s",
           __wt_timestamp_to_string(durable_ts, ts_string[0]),
           __wt_timestamp_to_string(oldest_ts, ts_string[1]));
 
-    if (has_stable_ts && durable_ts <= stable_ts)
+    if (stable_ts != WT_TS_NONE && durable_ts <= stable_ts)
         WT_RET_MSG(session, EINVAL, "durable timestamp %s must be after the stable timestamp %s",
           __wt_timestamp_to_string(durable_ts, ts_string[0]),
           __wt_timestamp_to_string(stable_ts, ts_string[1]));
@@ -808,12 +806,8 @@ __txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_ts)
 
     __txn_assert_after_reads(session, "prepare", prepare_ts);
 
-    /*
-     * Check whether the prepare timestamp is less than the stable timestamp.
-     *
-     * FIXME-WT-16306: Ensure correct synchronization around `stable_timestamp`.
-     */
-    stable_ts = __wt_tsan_suppress_load_uint64(&txn_global->stable_timestamp);
+    /* Check whether the prepare timestamp is less than the stable timestamp. */
+    stable_ts = __wt_get_stable_timestamp(session);
     if (prepare_ts <= stable_ts) {
         /*
          * Check whether the application is using the "prepared" roundup mode. This rounds up to
@@ -973,12 +967,10 @@ static int
 __txn_set_rollback_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t rollback_ts)
 {
     WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     txn = session->txn;
-    txn_global = &S2C(session)->txn_global;
 
     if (!F_ISSET(txn, WT_TXN_PREPARE))
         WT_RET_MSG(session, EINVAL, "rollback timestamp is set for an non-prepared transaction");
@@ -997,8 +989,7 @@ __txn_set_rollback_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
     __txn_assert_after_reads(session, "rollback", rollback_ts);
 
     /* Check whether the rollback timestamp is less than the stable timestamp. */
-    /* FIXME-WT-16717: Fix the race. */
-    stable_ts = __wt_tsan_suppress_load_uint64(&txn_global->stable_timestamp);
+    stable_ts = __wt_get_stable_timestamp(session);
     if (rollback_ts <= stable_ts) {
         WT_RET_MSG(session, EINVAL,
           "rollback timestamp %s is not newer than the stable timestamp %s",

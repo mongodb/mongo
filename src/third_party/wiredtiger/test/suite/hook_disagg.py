@@ -354,7 +354,7 @@ class DisaggHookCreator(wthooks.WiredTigerHookCreator):
             ("layered",              "Layered tests already turn on the proper stuff"),
             ("live_restore",         "Live restore is not supported with disagg storage"),
             ("lsm",                  "LSM is not supported with tiering"),
-            ("modify_smoke_recover", "Copying WT dir doesn't copy the PALM/PALite directory"),
+            ("modify_smoke_recover", "Copying WT dir doesn't copy the PALite directory"),
             ("rollback_to_stable",   "Rollback to stable is not needed at startup"),
             ("test_backup",          "Can't backup a disagg table"),
             ("test_compact",         "Can't compact a disagg table"),
@@ -501,7 +501,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
             testcase.pr(f'>>>>layered tables: {testcase.layered_uris}<<<<<')
 
     def tableExists(self, name):
-        # TODO: for palm/palite will need to rummage in kv_home files.
+        # TODO: for PALite will need to rummage in kv_home files.
         return False
 
     def initialFileName(self, uri):

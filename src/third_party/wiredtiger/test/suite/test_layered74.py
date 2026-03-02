@@ -64,7 +64,7 @@ class test_layered74(wttest.WiredTigerTestCase, DisaggConfigMixin):
     ]
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
-                     + 'disaggregated=(page_log=palm),'
+                     + 'disaggregated=(page_log=palite),'
     disagg_storages = gen_disagg_storages('test_layered74', disagg_only = True)
 
     # Make scenarios for different cloud service providers

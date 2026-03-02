@@ -114,7 +114,7 @@ class test_live_restore01(backup_base):
         # Specify statistics are disabled.
         self.expect_failure("statistics=(none),live_restore=(enabled=true,path=SOURCE)", "/Statistics must be enabled when live restore is active./")
 
-        self.expect_failure("live_restore=(enabled=true,path=SOURCE),disaggregated=(page_log=palm)", "/Live restore is not compatible with disaggregated storage mode/")
+        self.expect_failure("live_restore=(enabled=true,path=SOURCE),disaggregated=(page_log=palite)", "/Live restore is not compatible with disaggregated storage mode/")
         # Specify the multi round live_restore start and end
         # WT-15089
         self.expect_failure_rounds([

@@ -30,7 +30,7 @@ import wiredtiger, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
-from helper import WiredTigerStat
+from helper import WiredTigerCursor, statistic_uri
 
 # test_stat14.py
 # Check that eviction threshold stats are correctly updated.
@@ -73,30 +73,30 @@ class test_stat14(wttest.WiredTigerTestCase):
 
         # Test with integer value: Reconfigure eviction_target to 70
         self.conn.reconfigure("eviction_target=70")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_cache_full_target][2], 7000)
 
         # Test with integer value: Reconfigure eviction_trigger to 85
         self.conn.reconfigure("eviction_trigger=85")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_cache_full_trigger][2], 8500)
 
         # Test with integer value: Reconfigure eviction_dirty_target to 10
         self.conn.reconfigure("eviction_dirty_target=10")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_dirty_target][2], 1000)
 
         # Test with integer value: Reconfigure eviction_dirty_trigger to 25
         self.conn.reconfigure("eviction_dirty_trigger=25")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_dirty_trigger][2], 2500)
 
         # Test with integer value: Reconfigure eviction_updates_target to 8
         self.conn.reconfigure("eviction_updates_target=8")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_updates_target][2], 800)
 
         # Test with integer value: Reconfigure eviction_updates_trigger to 15
         self.conn.reconfigure("eviction_updates_trigger=15")
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             self.assertEqual(stat_cursor[stat.conn.eviction_threshold_updates_trigger][2], 1500)

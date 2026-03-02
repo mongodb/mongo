@@ -479,6 +479,7 @@ __wt_log_get_backup_files(
 {
     WT_DECL_RET;
     WTI_LOG *log;
+    WT_LSN tmp_lsn;
     uint32_t id, max, max_file, min_file;
     u_int count, i;
     char **files;
@@ -486,6 +487,7 @@ __wt_log_get_backup_files(
     *filesp = NULL;
     *countp = 0;
     *maxid = 0;
+    WT_INIT_LSN(&tmp_lsn);
 
     id = 0;
     log = S2C(session)->log_mgr.log;
@@ -496,14 +498,16 @@ __wt_log_get_backup_files(
      * backup may be writing to an even later log file. In that case, copying the journal files is
      * correct, but wasteful.
      */
-    max_file = log->alloc_lsn.l.file;
+    WT_ASSIGN_LSN(&tmp_lsn, &log->alloc_lsn);
+    max_file = tmp_lsn.l.file;
 
     /*
      * Capture the journal file the current checkpoint started in. The current checkpoint or a later
      * one may be selected for backing up, requiring log files as early as this file. Together with
      * max_file, this defines the range of journal files to include.
      */
-    min_file = log->ckpt_lsn.l.file;
+    WT_ASSIGN_LSN(&tmp_lsn, &log->ckpt_lsn);
+    min_file = tmp_lsn.l.file;
 
     /*
      * Force the current slot to get written to the file. Also switch to using a new log file. That

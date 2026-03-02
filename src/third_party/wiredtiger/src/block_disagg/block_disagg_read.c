@@ -285,7 +285,13 @@ corrupt:
         WT_ERR_PANIC(session, WT_ERROR, "%s: fatal read error", block_disagg->name);
     }
 
-    /* The cumulative size from the cookie must match the sum of all individual block sizes. */
+    /*
+     * The size contained in the cookie must match the sum of all the individual block sizes,
+     * however this isn't true when the victim cache is enabled and the read is serviced by the
+     * cache. Effectively blocks stored in the victim cache are compressed versions of the in-memory
+     * page which is different to what the cookie size tracks which refers to pages written to the
+     * page service.
+     */
     if (!from_cache)
         /*
          * Since the Victim Cache stores compressed variant of in-memory page representation rather

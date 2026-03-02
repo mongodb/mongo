@@ -2334,7 +2334,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     WT_PAGE_BLOCK_META *block_meta;
     size_t addr_size, compressed_size;
     uint8_t addr[WT_ADDR_MAX_COOKIE];
-    bool build_delta, skip_write;
+    bool build_delta, delta_enabled, skip_write;
 #ifdef HAVE_DIAGNOSTIC
     WT_ADDR *verify_addr, __verify_addr;
     bool verify_image;
@@ -2476,31 +2476,51 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
         WT_ASSERT_ALWAYS(session, chunk->entries > 0, "Trying to write an empty chunk");
     }
 
+    delta_enabled = WT_DELTA_ENABLED_FOR_PAGE(session, r->page->type);
+    if (delta_enabled)
+        WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_eligible);
+
     if (page->disagg_info != NULL) {
         block_meta = &page->disagg_info->block_meta;
-
         if (last_block && r->multi_next == 1 && block_meta->page_id != WT_BLOCK_INVALID_PAGE_ID &&
           WT_REC_RESULT_SINGLE_PAGE((session), (r))) {
             if (!r->newer_updates_than_last_rec_used && !WT_PAGE_IS_INTERNAL(page) &&
               !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT))
                 skip_write = true;
-            else if (WT_DELTA_ENABLED_FOR_PAGE(session, r->page->type) &&
-              block_meta->delta_count < conn->page_delta.max_consecutive_delta) {
-                WT_RET(__rec_build_delta(session, r, chunk->image.mem, &build_delta));
-                /*
-                 * Discard the delta if it is larger than the configured percentage of the size of
-                 * the full image.
-                 */
-                if (build_delta) {
-                    WT_PAGE_HEADER *header = (WT_PAGE_HEADER *)r->delta.data;
-                    WT_ASSERT_ALWAYS(session, header->u.entries > 0 || WT_PAGE_IS_INTERNAL(page),
-                      "build empty leaf page delta");
-                    if (header->u.entries == 0)
-                        skip_write = true;
-                    else if (r->delta.size * 100 / chunk->image.size > conn->page_delta.delta_pct)
-                        build_delta = false;
-                }
+            else if (delta_enabled) {
+                if (block_meta->delta_count < conn->page_delta.max_consecutive_delta) {
+                    WT_RET(__rec_build_delta(session, r, chunk->image.mem, &build_delta));
+                    /*
+                     * Discard the delta if it is larger than the configured percentage of the size
+                     * of the full image.
+                     */
+                    if (build_delta) {
+                        WT_PAGE_HEADER *header = (WT_PAGE_HEADER *)r->delta.data;
+                        WT_ASSERT_ALWAYS(session,
+                          header->u.entries > 0 || WT_PAGE_IS_INTERNAL(page),
+                          "build empty leaf page delta");
+                        if (header->u.entries == 0) {
+                            WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_zero_entries);
+                            skip_write = true;
+                        } else if (r->delta.size * 100 / chunk->image.size >
+                          conn->page_delta.delta_pct) {
+                            WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_size_threshold);
+                            build_delta = false;
+                        }
+                    } else
+                        WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_build_failed);
+                } else
+                    WT_STAT_CONN_DSRC_INCR(
+                      session, rec_page_delta_rejected_max_consecutive_exceeded);
             }
+        } else if (delta_enabled) {
+            /* Track stats for why we can't write deltas for this page */
+            if (r->multi_next > 1)
+                WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_multiblock);
+            else if (block_meta->page_id == WT_BLOCK_INVALID_PAGE_ID)
+                WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_invalid_page_id);
+            else if (!WT_REC_RESULT_SINGLE_PAGE((session), (r)))
+                WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_rejected_non_single_page);
         }
     }
 

@@ -30,8 +30,16 @@ __check_imported_ts(
 
     ckptbase = NULL;
     txn_global = &S2C(session)->txn_global;
-    ts = against_stable ? txn_global->stable_timestamp : txn_global->oldest_timestamp;
-    ts_name = against_stable ? "stable" : "oldest";
+
+    if (against_stable) {
+        ts_name = "stable";
+        ts = __wt_get_stable_timestamp(session);
+    } else {
+        ts_name = "oldest";
+        /* FIXME-WT-16776: use an atomic read operation similar to the stable timestamp
+         * implementation. */
+        ts = txn_global->oldest_timestamp;
+    }
 
     WT_ERR_NOTFOUND_OK(
       __wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config), true);

@@ -31,8 +31,25 @@ def check_unique_description(sorted_list):
     temp = ""
     for i in sorted_list:
         if temp == i.desc:
-            print("ERROR: repeated stat description in - '%s'" % (i.desc))
+            raise Exception(f"ERROR: repeated stat description in - '{i.desc}'")
         temp = i.desc
+
+##########################################
+# Check the description format.
+# Removes prefix from description before checking.
+# Checks for leading/trailing whitespace, newlines, and leading/trailing punctation.
+##########################################
+def check_description_format(stat):
+    desc = stat.desc.split(': ', 1)[1]
+    if desc != desc.strip():
+        raise Exception(
+            f"ERROR: {stat.name} description has leading or trailing whitespace - '{desc}'")
+    if '\n' in desc:
+        raise Exception(f"ERROR: {stat.name} description contains newline - '{desc}'")
+    punctuation = ('.', ',', ';', ':', '!', '?')
+    if desc.startswith(punctuation) or desc.endswith(punctuation):
+        raise Exception(
+            f"ERROR: {stat.name} description has leading or trailing punctuation - '{desc}'")
 
 ##########################################
 # Remove trailing digits for a string.
@@ -54,12 +71,13 @@ def check_name_sorted(stat_list):
         sorted_stats = sorted(stats, key=lambda stat: remove_suffix_digits(stat.name))
         for sorted_stat, stat in zip(sorted_stats, stats):
             if sorted_stat.name != stat.name:
-                print(f"ERROR: {stat_type.__name__} not sorted alphabetically by name, expected " \
-                      f"'{sorted_stat.name}' but found '{stat.name}'")
-                return
+                raise Exception(f"ERROR: {stat_type.__name__} not sorted alphabetically by name, " \
+                      f"expected '{sorted_stat.name}' but found '{stat.name}'")
 
 all_stat_list = [conn_dsrc_stats, conn_stats, dsrc_stats, session_stats]
 for stat_list in all_stat_list:
+    for stat in stat_list:
+        check_description_format(stat)
     check_name_sorted(stat_list)
 
 conn_dsrc_stats.sort(key=attrgetter('desc'))

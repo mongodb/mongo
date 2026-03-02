@@ -33,7 +33,7 @@ from wtdataset import SimpleDataSet
 # test_rollback_to_stable45.py
 #    Make sure RTS does nothing in a disaggregated storage context.
 class test_rollback_to_stable45(wttest.WiredTigerTestCase):
-    conn_config = 'disaggregated=(page_log=palm),' \
+    conn_config = 'disaggregated=(page_log=palite),' \
         + 'disaggregated=(role="leader")'
 
     def __init__(self, *args, **kwargs):
@@ -43,12 +43,12 @@ class test_rollback_to_stable45(wttest.WiredTigerTestCase):
     def conn_extensions(self, extlist):
         if os.name == 'nt':
             extlist.skip_if_missing = True
-        extlist.extension('page_log', 'palm')
+        extlist.extension('page_log', 'palite')
 
     # Custom test case setup
     def early_setup(self):
         os.mkdir('follower')
-        # Create the home directory for the PALM k/v store, and share it with the follower.
+        # Create the home directory for the PALite k/v store, and share it with the follower.
         os.mkdir('kv_home')
         os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 

@@ -65,9 +65,6 @@ static int
 __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 {
     WT_CONFIG_ITEM cval;
-    WT_TXN_GLOBAL *txn_global;
-
-    txn_global = &S2C(session)->txn_global;
 
     WT_RET(__wt_config_gets(session, cfg, "do_not_clear_txn_id", &cval));
     if (cval.val)
@@ -103,10 +100,10 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "stable_timestamp", &cval));
     vs->stable_timestamp = WT_TS_NONE; /* Ignored unless a value has been set */
     if (cval.val != 0) {
-        if (!txn_global->has_stable_timestamp)
+        vs->stable_timestamp = __wt_get_stable_timestamp(session);
+        if (vs->stable_timestamp == WT_TS_NONE)
             WT_RET_MSG(session, ENOTSUP,
               "cannot verify against the stable timestamp if it has not been set");
-        vs->stable_timestamp = txn_global->stable_timestamp;
     }
     if (vs->dump_all_data && vs->dump_key_data)
         WT_RET_MSG(session, ENOTSUP, "%s",

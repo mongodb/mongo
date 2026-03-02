@@ -71,7 +71,7 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # each supported method in the API at least once.
         self.skipTest('Disagg test is broken until PageLogPutArgs, PageLogGetArgs work')
         session = self.session
-        page_log = self.conn.get_page_log('palm')
+        page_log = self.conn.get_page_log('palite')
 
         page_log.pl_begin_checkpoint(session, 1)
         page_log.pl_complete_checkpoint(session, 1)

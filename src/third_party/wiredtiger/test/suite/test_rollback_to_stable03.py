@@ -31,7 +31,7 @@ from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
-from helper import WiredTigerStat
+from helper import WiredTigerCursor, statistic_uri
 
 # test_rollback_to_stable03.py
 # Test that rollback to stable clears the history store updates from reconciled pages.
@@ -112,7 +112,7 @@ class test_rollback_to_stable03(test_rollback_to_stable_base):
         self.check(valueb, uri, nrows, 20)
         self.check(valuea, uri, nrows, 10)
 
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             calls = stat_cursor[stat.conn.txn_rts][2]
             hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
             keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
@@ -136,7 +136,7 @@ class test_rollback_to_stable03(test_rollback_to_stable_base):
         self.assertGreater(pages_visited, 0)
 
         self.conn.rollback_to_stable('threads=' + str(self.threads))
-        with WiredTigerStat(self.session) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri()) as stat_cursor:
             rts_btrees_applied = stat_cursor[stat.conn.txn_rts_btrees_applied][2]
             rts_btrees_skipped = stat_cursor[stat.conn.txn_rts_btrees_skipped][2]
 

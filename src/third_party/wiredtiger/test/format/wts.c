@@ -337,7 +337,7 @@ configure_disagg_storage(const char *home, char **p, size_t max, char *ext_cfg, 
       /* page_log             */ (char *)GVS(DISAGG_PAGE_LOG),
       /* page_log_home        */ disagg_is_multi_node() ? g.home_page_log : (char *)home,
       /* drain_threads        */ GV(DISAGG_DRAIN_THREADS),
-      /* page_log_map_size_mb */ 2048, /* 2 Gigabytes for PALM map */
+      /* page_log_map_size_mb */ 2048, /* 2 Gigabytes for storage memory map */
       /* page_log_verbose     */ GV(DISAGG_PAGE_LOG_VERBOSE));
 
     testutil_disagg_storage_configuration(

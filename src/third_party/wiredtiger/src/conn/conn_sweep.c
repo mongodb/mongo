@@ -357,6 +357,7 @@ __sweep_check_session_callback(
 
     last = array_session->last_cursor_big_sweep;
     last_sweep = __wt_atomic_load_uint64_relaxed(&array_session->last_sweep);
+    const char *session_name = __wt_atomic_load_ptr_relaxed(&array_session->name);
 
     /*
      * Get the earlier of the two timestamps, as they refer to sweeps of two different data
@@ -387,10 +388,16 @@ __sweep_check_session_callback(
         if (!array_session->sweep_warning_60min) {
             array_session->sweep_warning_60min = 1;
             WT_STAT_CONN_INCR(session, no_session_sweep_60min);
+            /*
+             * The name in this comment is marked as "possible" because it is obtained using a
+             * relaxed read. This means the name may be outdated with a very small probability;
+             * therefore, it should not be treated as an authoritative source. Please use session id
+             * output instead, as it is more reliable.
+             */
             __wt_verbose_warning(session, WT_VERB_SWEEP,
-              "Session %" PRIu32 " (@: 0x%p name: %s) did not run a sweep for 60 minutes.",
+              "Session %" PRIu32 " (@: 0x%p possible name: %s) did not run a sweep for 60 minutes.",
               array_session->id, (void *)array_session,
-              array_session->name == NULL ? "EMPTY" : array_session->name);
+              session_name == NULL ? "EMPTY" : session_name);
         }
     } else {
         array_session->sweep_warning_60min = 0;

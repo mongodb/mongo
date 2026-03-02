@@ -1245,6 +1245,13 @@ struct __wt_connection_stats {
     int64_t rec_ingest_garbage_collection_keys_disk_image;
     int64_t rec_ingest_garbage_collection_keys_update_chain;
     int64_t rec_overflow_value;
+    int64_t rec_page_delta_rejected_invalid_page_id;
+    int64_t rec_page_delta_rejected_max_consecutive_exceeded;
+    int64_t rec_page_delta_rejected_multiblock;
+    int64_t rec_page_delta_rejected_non_single_page;
+    int64_t rec_page_delta_rejected_size_threshold;
+    int64_t rec_page_delta_rejected_zero_entries;
+    int64_t rec_page_delta_rejected_build_failed;
     int64_t rec_pages;
     int64_t rec_pages_eviction;
     int64_t rec_pages_size_1MB_to_10MB;
@@ -1255,6 +1262,7 @@ struct __wt_connection_stats {
     int64_t rec_pages_with_ts;
     int64_t rec_pages_with_txn;
     int64_t rec_page_delete;
+    int64_t rec_page_delta_eligible;
     int64_t rec_time_aggr_newest_start_durable_ts;
     int64_t rec_time_aggr_newest_stop_durable_ts;
     int64_t rec_time_aggr_newest_stop_ts;
@@ -1343,8 +1351,6 @@ struct __wt_connection_stats {
     int64_t child_modify_blocked_page;
     int64_t page_split_restart;
     int64_t page_read_skip_deleted;
-    int64_t txn_global_checkpoint_timestamp;
-    int64_t txn_global_durable_timestamp;
     int64_t txn_prepared_updates;
     int64_t txn_prepared_updates_committed;
     int64_t txn_prepared_updates_key_repeated;
@@ -1394,6 +1400,8 @@ struct __wt_connection_stats {
     int64_t txn_set_ts_stable_upd;
     int64_t txn_begin;
     int64_t txn_hs_ckpt_duration;
+    int64_t txn_global_checkpoint_timestamp;
+    int64_t txn_global_durable_timestamp;
     int64_t txn_global_last_running_timestamp;
     int64_t txn_global_newest_timestamp;
     int64_t txn_global_oldest_timestamp;
@@ -1755,6 +1763,13 @@ struct __wt_dsrc_stats {
     int64_t rec_ingest_garbage_collection_keys_disk_image;
     int64_t rec_ingest_garbage_collection_keys_update_chain;
     int64_t rec_overflow_value;
+    int64_t rec_page_delta_rejected_invalid_page_id;
+    int64_t rec_page_delta_rejected_max_consecutive_exceeded;
+    int64_t rec_page_delta_rejected_multiblock;
+    int64_t rec_page_delta_rejected_non_single_page;
+    int64_t rec_page_delta_rejected_size_threshold;
+    int64_t rec_page_delta_rejected_zero_entries;
+    int64_t rec_page_delta_rejected_build_failed;
     int64_t rec_pages;
     int64_t rec_pages_eviction;
     int64_t rec_pages_size_1MB_to_10MB;
@@ -1762,6 +1777,7 @@ struct __wt_dsrc_stats {
     int64_t rec_pages_size_100MB_to_1GB;
     int64_t rec_pages_size_1GB_plus;
     int64_t rec_page_delete;
+    int64_t rec_page_delta_eligible;
     int64_t rec_time_aggr_newest_start_durable_ts;
     int64_t rec_time_aggr_newest_stop_durable_ts;
     int64_t rec_time_aggr_newest_stop_ts;

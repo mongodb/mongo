@@ -1458,16 +1458,12 @@ __txn_mod_compare(const void *a, const void *b)
 static int
 __txn_check_if_stable_has_moved_ahead_commit_ts(WT_SESSION_IMPL *session)
 {
-    WT_CONNECTION_IMPL *conn;
     WT_TXN *txn;
-    WT_TXN_GLOBAL *txn_global;
 
-    conn = S2C(session);
     txn = session->txn;
-    txn_global = &conn->txn_global;
 
-    if (txn_global->has_stable_timestamp && txn->first_commit_timestamp != WT_TS_NONE &&
-      txn_global->stable_timestamp >= txn->first_commit_timestamp)
+    if (txn->first_commit_timestamp != WT_TS_NONE &&
+      __wt_get_stable_timestamp(session) >= txn->first_commit_timestamp)
         WT_RET_MSG(session, EINVAL,
           "Rollback the transaction because the stable timestamp has moved ahead of the commit "
           "timestamp.");
@@ -1493,7 +1489,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_OP *op;
     WT_UPDATE *upd;
-    wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp;
+    wt_timestamp_t candidate_durable_timestamp, prev_durable_timestamp, stable_timestamp;
 #ifdef HAVE_DIAGNOSTIC
     uint32_t prepare_count;
 #endif
@@ -1815,7 +1811,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
      * transaction's durable timestamp. Otherwise, checkpoint may only write partial updates of the
      * transaction.
      */
-    if (prepare && txn->durable_timestamp <= txn_global->stable_timestamp) {
+    stable_timestamp = __wt_get_stable_timestamp(session);
+    if (prepare && txn->durable_timestamp <= stable_timestamp) {
         WT_ERR(__wt_verbose_dump_sessions(session, true));
         WT_ERR_PANIC(session, WT_PANIC,
           "stable timestamp is larger than or equal to the committing prepared transaction's "
@@ -2533,7 +2530,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
     ckpt_cfg = "use_timestamp=false";
     if (cval.val != 0) {
         ckpt_cfg = "use_timestamp=true";
-        if (conn->txn_global.has_stable_timestamp)
+        if (__wt_atomic_load_bool_relaxed(&conn->txn_global.has_stable_timestamp))
             use_timestamp = true;
     }
     if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY) &&
@@ -2554,7 +2551,8 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
             __wt_timer_start(session, &timer);
             __wt_verbose_info(session, WT_VERB_RTS,
               "[SHUTDOWN_INIT] performing shutdown rollback to stable, stable_timestamp=%s",
-              __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
+              __wt_timestamp_to_string(
+                __wt_atomic_load_uint64_relaxed(&conn->txn_global.stable_timestamp), ts_string));
             WT_TRET(conn->rts->rollback_to_stable(session, rts_cfg, true));
 
             /* Time since the shutdown RTS has started. */
@@ -2833,17 +2831,20 @@ __wt_verbose_dump_txn(WT_SESSION_IMPL *session)
     WT_RET(__wt_msg(session, "pinned timestamp: %s",
       __wt_timestamp_to_string(txn_global->pinned_timestamp, ts_string)));
     WT_RET(__wt_msg(session, "stable timestamp: %s",
-      __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string)));
+      __wt_timestamp_to_string(
+        __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp), ts_string)));
     WT_RET(__wt_msg(
       session, "has_durable_timestamp: %s", txn_global->has_durable_timestamp ? "yes" : "no"));
     WT_RET(__wt_msg(session, "has_oldest_timestamp: %s",
       __wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) ? "yes" : "no"));
     WT_RET(__wt_msg(
       session, "has_pinned_timestamp: %s", txn_global->has_pinned_timestamp ? "yes" : "no"));
-    WT_RET(__wt_msg(
-      session, "has_stable_timestamp: %s", txn_global->has_stable_timestamp ? "yes" : "no"));
-    WT_RET(__wt_msg(session, "oldest_is_pinned: %s", txn_global->oldest_is_pinned ? "yes" : "no"));
-    WT_RET(__wt_msg(session, "stable_is_pinned: %s", txn_global->stable_is_pinned ? "yes" : "no"));
+    WT_RET(__wt_msg(session, "has_stable_timestamp: %s",
+      __wt_atomic_load_bool_relaxed(&txn_global->has_stable_timestamp) ? "yes" : "no"));
+    WT_RET(__wt_msg(session, "oldest_is_pinned: %s",
+      __wt_atomic_load_bool_relaxed(&txn_global->oldest_is_pinned) ? "yes" : "no"));
+    WT_RET(__wt_msg(session, "stable_is_pinned: %s",
+      __wt_atomic_load_bool_relaxed(&txn_global->stable_is_pinned) ? "yes" : "no"));
 
     WT_RET(__wt_msg(session, "checkpoint running: %s",
       __wt_atomic_load_bool_v_relaxed(&txn_global->checkpoint_running) ? "yes" : "no"));

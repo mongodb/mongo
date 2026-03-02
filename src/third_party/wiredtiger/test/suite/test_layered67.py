@@ -29,7 +29,7 @@
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
-from helper import WiredTigerStat
+from helper import WiredTigerCursor, statistic_uri
 from wiredtiger import stat
 
 
@@ -55,7 +55,7 @@ class test_layered67(wttest.WiredTigerTestCase):
 
     def test_uncommit_eviction(self):
         self.session.create(self.uri, self.session_create_config())
-        with WiredTigerStat(self.session, self.uri) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri(self.uri)) as stat_cursor:
             cache_put_before = stat_cursor[stat.dsrc.cache_write][2]
         self.session.begin_transaction()
 
@@ -77,6 +77,6 @@ class test_layered67(wttest.WiredTigerTestCase):
         evict_cursor.close()
 
         # Monitor the status after eviction.
-        with WiredTigerStat(self.session, self.uri) as stat_cursor:
+        with WiredTigerCursor(self.session, statistic_uri(self.uri)) as stat_cursor:
             cache_put_after = stat_cursor[stat.dsrc.cache_write][2]
         self.assertGreater(cache_put_after, cache_put_before)

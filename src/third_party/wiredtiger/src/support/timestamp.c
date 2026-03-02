@@ -129,21 +129,6 @@ __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, const char *
         WT_RET_MSG(session, EINVAL, __VA_ARGS__); \
     } while (0)
 
-/*
- * __time_stable --
- *     Return the stable timestamp for the system.
- */
-static wt_timestamp_t
-__time_stable(WT_SESSION_IMPL *session)
-{
-    WT_TXN_GLOBAL *txn_global;
-
-    txn_global = &S2C(session)->txn_global;
-
-    return (txn_global->has_stable_timestamp ? txn_global->stable_timestamp :
-                                               txn_global->recovery_timestamp);
-}
-
 #undef WT_TIME_ERROR
 #define WT_TIME_ERROR(tag)                                             \
     WT_TIME_VALIDATE_RET(session,                                      \
@@ -163,7 +148,7 @@ __time_aggregate_validate_parent_stable(
     wt_timestamp_t stable;
     char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
 
-    stable = __time_stable(session);
+    stable = __wt_get_stable_timestamp(session);
 
     if (ta->newest_start_durable_ts > stable)
         WT_TIME_ERROR("a newest start durable time after");
@@ -388,7 +373,7 @@ __time_value_validate_parent_stable(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw
     wt_timestamp_t stable;
     char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
 
-    stable = __time_stable(session);
+    stable = __wt_get_stable_timestamp(session);
 
     if (tw->durable_start_ts > stable)
         WT_TIME_ERROR("a durable start time after");

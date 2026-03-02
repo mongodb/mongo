@@ -197,7 +197,7 @@ CONFIG configuration_list[] = {
 
 {"disagg.mode", "configure mode for disaggregated storage (follower | leader | switch)", C_IGNORE | C_STRING, 0, 0, 0}
 
-{"disagg.page_log", "configure page log for disaggregated storage (off | palm | palite)", C_IGNORE | C_STRING, 0, 0, 0}
+{"disagg.page_log", "configure page log for disaggregated storage (off | palite)", C_IGNORE | C_STRING, 0, 0, 0}
 
 {"disagg.key_provider", "configure a key provider for disaggregated storage", C_BOOL, 20, 0, 0}
 

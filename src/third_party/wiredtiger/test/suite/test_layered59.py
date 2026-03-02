@@ -38,7 +38,7 @@ class test_layered59(wttest.WiredTigerTestCase, DisaggConfigMixin):
     disagg_storages = gen_disagg_storages('test_layered59', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
 
-    conn_config = 'disaggregated=(page_log=palm),page_delta=(delta_pct=100),disaggregated=(role="leader")'
+    conn_config = 'disaggregated=(page_log=palite),page_delta=(delta_pct=100),disaggregated=(role="leader")'
 
     nitems = 1000
 

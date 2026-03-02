@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 # Test that a modify remains valid across a checkpoint update.
 @disagg_test_class
 class test_layered_modify01(wttest.WiredTigerTestCase, DisaggConfigMixin):
-    conn_base_config = 'disaggregated=(page_log=palm),'
+    conn_base_config = 'disaggregated=(page_log=palite),'
     disagg_storages = gen_disagg_storages('test_layered_modify01', disagg_only=True)
     uri = 'layered:test_layered_modify01'
 

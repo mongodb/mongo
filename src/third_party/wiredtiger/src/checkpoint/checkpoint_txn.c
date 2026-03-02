@@ -960,7 +960,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
             WT_ERR(EINVAL);
 
         /* Precise checkpoint needs the stable timestamp. */
-        if (__wt_tsan_suppress_load_uint64(&txn_global->stable_timestamp) == WT_TS_NONE)
+        if (__wt_get_stable_timestamp(session) == WT_TS_NONE)
             WT_ERR_MSG(session, EINVAL, "Precise checkpoint requires a stable timestamp");
     }
 
@@ -1050,19 +1050,20 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
          * or not a stable timestamp is actually in use. Only set it when we're not running recovery
          * because recovery doesn't set the recovery timestamp until its checkpoint is complete.
          */
-        if (txn_global->has_stable_timestamp) {
+        wt_timestamp_t stable_timestamp = __wt_get_stable_timestamp(session);
+        if (stable_timestamp != WT_TS_NONE) {
             /* A checkpoint should never proceed when timestamps are out of order. */
             if (__wt_atomic_load_bool_relaxed(&txn_global->has_oldest_timestamp) &&
-              txn_global->oldest_timestamp > txn_global->stable_timestamp) {
+              __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp) > stable_timestamp) {
                 __wt_writeunlock(session, &txn_global->rwlock);
                 WT_ASSERT_ALWAYS(session, false,
                   "oldest timestamp %s must not be later than stable timestamp %s when taking a "
                   "checkpoint",
-                  __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
-                  __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[1]));
+                  __wt_timestamp_to_string(
+                    __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp), ts_string[0]),
+                  __wt_timestamp_to_string(stable_timestamp, ts_string[1]));
             }
-            __wt_tsan_suppress_store_uint64(
-              &txn_global->checkpoint_timestamp, txn_global->stable_timestamp);
+            __wt_tsan_suppress_store_uint64(&txn_global->checkpoint_timestamp, stable_timestamp);
             if (!F_ISSET(conn, WT_CONN_RECOVERING))
                 txn_global->meta_ckpt_timestamp = txn_global->checkpoint_timestamp;
         } else if (!F_ISSET(conn, WT_CONN_RECOVERING))
@@ -1176,9 +1177,8 @@ __checkpoint_can_skip(
      * file has been modified, as such if the connection has been modified it is currently unsafe to
      * skip checkpoints.
      */
-    if (!conn->modified && use_timestamp && txn_global->has_stable_timestamp &&
-      txn_global->last_ckpt_timestamp != WT_TS_NONE &&
-      txn_global->last_ckpt_timestamp == txn_global->stable_timestamp) {
+    if (!conn->modified && use_timestamp && txn_global->last_ckpt_timestamp != WT_TS_NONE &&
+      txn_global->last_ckpt_timestamp == __wt_get_stable_timestamp(session)) {
         *can_skipp = true;
         return (0);
     }

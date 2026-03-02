@@ -41,7 +41,7 @@ both an ingest and stable table will first look for a result in the ingest table
 is found, fall back on the shared table.
 
 Layered tables are primarily for Disaggregated Storage Clusters (DSC) but can also be used outside
-of DSC for testing purposes, in particular, via local Page and Log Mock (PALM) infrastructure.
+of DSC for testing purposes, in particular, via local PALI Mock (PALite) infrastructure.
 
 \image html shared_cluster.png
 
@@ -88,7 +88,7 @@ Each layered table contains three related entries in metadata:
 
 ```
 layered:foo.wt
-    disaggregated=(page_log=palm),ingest="file:foo.wt_ingest",log=(enabled=false),stable="file:foo.wt_stable"
+    disaggregated=(page_log=palite),ingest="file:foo.wt_ingest",log=(enabled=false),stable="file:foo.wt_stable"
 file:foo.wt_ingest
 file:foo.wt_stable
 ```

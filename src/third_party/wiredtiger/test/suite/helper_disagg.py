@@ -37,13 +37,13 @@ import functools, os, shutil, wttest
 def get_conn_config(disagg_storage):
     if not disagg_storage.is_disagg_scenario():
             return ''
-    if disagg_storage.ds_name == 'palm' and not os.path.exists(disagg_storage.bucket):
+    if disagg_storage.ds_name == 'palite' and not os.path.exists(disagg_storage.bucket):
             os.mkdir(disagg_storage.bucket)
     return \
         f'statistics=(all),name={disagg_storage.ds_name},lose_all_my_data=true'
 
 def gen_disagg_storages(test_name='', disagg_only = False):
-    # Get the string of the configured page_log, e.g. 'palm' or 'palite'.
+    # Get the string of the configured page_log, e.g. 'palite'.
     page_log = wttest.WiredTigerTestCase.vars().page_log
     page_log_verbose = wttest.WiredTigerTestCase.vars().page_log_verbose
     disagg_storages = [
@@ -78,7 +78,7 @@ def disagg_test_class(cls):
         if cls.early_setup == wttest.WiredTigerTestCase.early_setup:
             def early_setup(self):
                 os.mkdir('follower')
-                # Create the home directory for the PALM k/v store, and share it with the follower.
+                # Create the home directory for the disagg k/v store, and share it with the follower.
                 os.mkdir('kv_home')
                 os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
@@ -115,7 +115,6 @@ class DisaggConfigMixin:
     # Configuration parameters, can be overridden in test class
     disagg_verbose = 0        # (0 <= level <=3) can be overridden in test class
     disagg_config = None      # a string, can be overridden in test class
-    palm_cache_size_mb = -1   # this uses the default, can be overridden
 
     # Internal state tracking
     num_restarts = 0
@@ -167,19 +166,10 @@ class DisaggConfigMixin:
     # extension has their own configurations that are valid.
     #
     # Some possible values to return: 'verbose=1'
-    # or for palm: 'verbose=1,delay_ms=13,force_delay=30'
+    # or for palite: 'verbose=1,delay_ms=13,force_delay=30'
     # or 'materialization_delay_ms=1000'
     def disaggregated_extension_config(self):
-        extension_config = ''
-        if self.ds_name == 'palm':
-            if self.disagg_verbose > 0: # PALM doesn't support fine verbose levels
-                extension_config += ',verbose=1'
-            else:
-                extension_config += ',verbose=0'
-            if self.palm_cache_size_mb != -1:
-                extension_config += f',cache_size_mb={self.palm_cache_size_mb}'
-        elif self.ds_name == 'palite':
-            extension_config += f',verbose={self.disagg_verbose}'
+        extension_config = f'verbose={self.disagg_verbose}'
 
         if self.is_disagg:
             if self.disagg_config:

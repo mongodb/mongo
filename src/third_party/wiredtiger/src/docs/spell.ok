@@ -127,6 +127,8 @@ NUMA
 NoSQL
 OOP
 OPTYPE
+PALI
+PALite
 PMU
 PPC
 PREFETCH
@@ -590,6 +592,7 @@ os
 outlier
 outliers
 ovfl
+palite
 parallelizable
 pareto
 pcoll

@@ -189,13 +189,13 @@ struct __wt_txn_global {
     wt_timestamp_t recovery_timestamp;
     wt_shared wt_timestamp_t stable_timestamp;
     wt_shared wt_timestamp_t newest_seen_timestamp; /* Used by eviction to make guesses */
-    wt_timestamp_t version_cursor_pinned_timestamp;
-    bool has_durable_timestamp;
+    wt_shared wt_timestamp_t version_cursor_pinned_timestamp;
+    wt_shared bool has_durable_timestamp;
     wt_shared bool has_oldest_timestamp;
-    bool has_pinned_timestamp;
-    bool has_stable_timestamp;
-    bool oldest_is_pinned;
-    bool stable_is_pinned;
+    wt_shared bool has_pinned_timestamp;
+    wt_shared bool has_stable_timestamp;
+    wt_shared bool oldest_is_pinned;
+    wt_shared bool stable_is_pinned;
 
     /* Protects the active transaction states. */
     WT_RWLOCK rwlock;
@@ -214,9 +214,9 @@ struct __wt_txn_global {
      */
     wt_shared volatile bool checkpoint_running; /* Checkpoint running */
     wt_shared volatile bool
-      checkpoint_running_hs;             /* Checkpoint running and processing history store file */
-    volatile uint32_t checkpoint_id;     /* Checkpoint's session ID */
-    WT_TXN_SHARED checkpoint_txn_shared; /* Checkpoint's txn shared state */
+      checkpoint_running_hs; /* Checkpoint running and processing history store file */
+    wt_shared volatile uint32_t checkpoint_id;     /* Checkpoint's session ID */
+    WT_TXN_SHARED checkpoint_txn_shared;           /* Checkpoint's txn shared state */
     wt_shared wt_timestamp_t checkpoint_timestamp; /* Checkpoint's timestamp */
 
     wt_shared volatile uint64_t debug_ops;       /* Debug mode op counter */

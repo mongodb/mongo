@@ -93,7 +93,7 @@ class test_layered18(wttest.WiredTigerTestCase):
         self.disagg_advance_checkpoint(conn_follow)
         session_follow = conn_follow.open_session('')
 
-        # Check the table in the follower: The call to GET will validate the delta chain in PALM.
+        # Check the table in the follower: The call to GET will validate the delta chain in page log extension.
         cursor = session_follow.open_cursor(self.uri, None, None)
         for i in range(self.nitems):
             if i == self.key_to_update:
