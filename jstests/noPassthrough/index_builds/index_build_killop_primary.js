@@ -5,6 +5,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -44,10 +45,14 @@ function killopOnFailpoint(rst, failpointName, collName) {
     // desired location).
     IndexBuildTest.resumeIndexBuilds(primary);
 
-    // Index build should be present in the config.system.indexBuilds collection.
+    // Index build should be present in the config.system.indexBuilds collection if not primary driven.
     const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
     const indexBuildUUID = indexMap["a_1"].buildUUID;
-    assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
+    if (FeatureFlagUtil.isPresentAndEnabled(primary.getDB("config"), "PrimaryDrivenIndexBuilds")) {
+        assert.isnull(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
+    } else {
+        assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
+    }
 
     // Kill the index builder thread.
     fp.wait();

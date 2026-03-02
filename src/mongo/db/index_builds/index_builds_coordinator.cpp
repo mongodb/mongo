@@ -288,7 +288,12 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& dbAndUUID,
                                              const CollectionPtr& indexBuildEntryCollection,
                                              const ReplIndexBuildState& replState) {
-    if (IndexBuildProtocol::kSinglePhase == replState.protocol) {
+    if (IndexBuildProtocol::kTwoPhase != replState.protocol) {
+        return;
+    }
+
+    // TODO SERVER-109664: remove this check since the above protocol check is sufficient
+    if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
         return;
     }
 
@@ -299,16 +304,7 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
 
     // In magic restore we finish in-progress index builds unlike in standalone recovery, so we
     // should not halt execution for magic restore.
-    // However, when running magic restore in Disagg, magic restore is to strictly follow
-    // the oplog it's receiving, and so should not independently remove the entry from
-    // the config.system.indexBuilds unless it sees explicit oplog (a delete) for it. For that
-    // reason magic restore returns early if running with primary driven index builds here,
-    // because in primary driven index builds + Disagg magic restore everything is explicit.
-    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone() ||
-        (storageGlobalParams.magicRestore &&
-         !rss::ReplicatedStorageService::get(opCtx->getServiceContext())
-              .getPersistenceProvider()
-              .supportsClassicMagicRestore())) {
+    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
         // Writes to the 'config.system.indexBuilds' collection are replicated and the index entry
         // will be removed when the delete oplog entry is replayed at a later time.
         return;
@@ -2799,14 +2795,18 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                                             indexBuildOptions.commitQuorum.value(),
                                             toIndexNames(replState->getIndexes()));
 
-            try {
-                uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
-                // If config.system.indexBuilds is not found, convert the NamespaceNotFound
-                // exception to an anonymous error code. This is to distinguish from
-                // a NamespaceNotFound exception on the user collection, which callers sometimes
-                // interpret as not being an error condition.
-                uasserted(6325700, e.reason());
+            // TODO SERVER-109664: check against protocol
+            if (indexBuildOptions.indexBuildMethod != IndexBuildMethodEnum::kPrimaryDriven) {
+                try {
+                    uassertStatusOK(
+                        indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& e) {
+                    // If config.system.indexBuilds is not found, convert the NamespaceNotFound
+                    // exception to an anonymous error code. This is to distinguish from
+                    // a NamespaceNotFound exception on the user collection, which callers sometimes
+                    // interpret as not being an error condition.
+                    uasserted(6325700, e.reason());
+                }
             }
 
             opCtx->getServiceContext()->getOpObserver()->onStartIndexBuild(
