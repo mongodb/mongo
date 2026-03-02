@@ -77,7 +77,7 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
         // Destructure the nested `md` field and validate that we recognize all fields.
         const {
             options: mdOptions,
-            recordIdsReplicated: recordIdsReplicated,
+            recordIdsReplicated: mdRecordIdsReplicated,
             // Indexes are carefully checked when validating `listIndexes` later.
             indexes: mdIndexes,
             // Namespace information can be safely thrown away.
@@ -121,6 +121,7 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
                 readOnly: isDbReadOnly,
                 uuid: mdOptionsUuid,
                 ...(nsConfigDebugDump !== undefined && {configDebugDump: nsConfigDebugDump}),
+                ...(mdRecordIdsReplicated && {recordIdsReplicated: mdRecordIdsReplicated}),
             },
             ...(idIndex !== undefined && {idIndex: idIndex.spec}),
         };
@@ -379,14 +380,15 @@ function validateListCatalogToListCollectionsConsistency(
             if (e.type == "view" || e.type == "timeseries") delete e.info.configDebugDump;
         });
     }
-    // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
-    if (ignoreRecordIdsReplicatedOption) {
-        listCatalogMap.forEach((e) => delete e.options.recordIdsReplicated);
-        listCollections.forEach((e) => delete e.options.recordIdsReplicated);
-    }
 
     const listCollectionsFromListCatalog = removeDuplicateDocuments(sortCollectionsInPlace(listCatalogMap));
     const sortedListCollections = sortCollectionsInPlace([...listCollections]);
+
+    // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
+    if (ignoreRecordIdsReplicatedOption) {
+        listCollectionsFromListCatalog.forEach((e) => delete e.info.recordIdsReplicated);
+        sortedListCollections.forEach((e) => delete e.info.recordIdsReplicated);
+    }
 
     const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
@@ -737,11 +739,11 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         if (TestData.isRunningFCVUpgradeDowngradeSuite) {
             catalogInfo.forEach((doc) => {
                 if (doc.md) {
-                    delete doc.md.options.recordIdsReplicated;
+                    delete doc.md.recordIdsReplicated;
                 }
             });
             collInfo.forEach((doc) => {
-                delete doc.options.recordIdsReplicated;
+                delete doc.info.recordIdsReplicated;
             });
         }
 

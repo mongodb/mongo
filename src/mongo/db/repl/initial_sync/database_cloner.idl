@@ -54,6 +54,9 @@ structs:
                 optional: true
             uuid:
                 type: uuid
+            recordIdsReplicated:
+                type: bool
+                optional: true
         mod_visibility: pub
 
     ListCollectionResult:

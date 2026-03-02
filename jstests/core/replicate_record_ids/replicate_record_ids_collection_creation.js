@@ -26,7 +26,7 @@ const clusteredCollName = collName + "_clustered";
 assert.commandWorked(db.createCollection(clusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
 const clusteredCollInfo = db[clusteredCollName].exists();
 assert(
-    !clusteredCollInfo.options.hasOwnProperty("recordIdsReplicated"),
+    !clusteredCollInfo.info.hasOwnProperty("recordIdsReplicated"),
     "clustered collection created with recordIdsReplicated collection option: " + tojson(clusteredCollInfo),
 );
 
@@ -46,6 +46,6 @@ assert(
 );
 jsTestLog("Collection options after creation: " + tojson(collInfo));
 assert(
-    collInfo.options.hasOwnProperty("recordIdsReplicated"),
+    collInfo.info.hasOwnProperty("recordIdsReplicated"),
     "collection options does not contain recordIdsReplicated flag after collection creation",
 );

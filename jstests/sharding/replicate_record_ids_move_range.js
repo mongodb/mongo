@@ -113,7 +113,7 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
 
     // Ensure collection option 'recordIdsReplicated' is preserved on destination shard.
     const collInfoShard1 = shard1.getCollection(ns).exists();
-    assert(collInfoShard1.options.recordIdsReplicated, tojson(collInfoShard1));
+    assert(collInfoShard1.info.recordIdsReplicated, tojson(collInfoShard1));
 
     // Second move: shard1 to shard0.
 
@@ -131,7 +131,7 @@ function runMoveRangeReplicaRecordIDsTest(collName, keyDoc) {
 
     // Ensure collection option 'recordIdsReplicated' is still present.
     const collInfoShard0 = shard0.getCollection(ns).exists();
-    assert(collInfoShard0.options.recordIdsReplicated, tojson(collInfoShard0));
+    assert(collInfoShard0.info.recordIdsReplicated, tojson(collInfoShard0));
 }
 
 const st = new ShardingTest({mongos: 1, shards: 2});

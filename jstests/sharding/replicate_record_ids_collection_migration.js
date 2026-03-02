@@ -31,7 +31,7 @@ assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: 
 assert.commandWorked(testDB.createCollection(collName));
 
 let collInfo = coll.exists();
-assert(collInfo.options.recordIdsReplicated, tojson(collInfo));
+assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
 
 // Remove some of the initial documents on the collection with replicated record
 // IDs to create gaps in the record IDs.
@@ -107,10 +107,10 @@ assert.eq(
 // Ensure that 'recordIdsReplicated` collection option is still present and set to true.
 // Check collection options on shard.
 collInfo = shard1.getCollection(collNS).exists();
-assert(collInfo.options.recordIdsReplicated, tojson(collInfo));
+assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
 
 // Check collection options through mongos.
 collInfo = mongos.getCollection(collNS).exists();
-assert(collInfo.options.recordIdsReplicated, tojson(collInfo));
+assert(collInfo.info.recordIdsReplicated, tojson(collInfo));
 
 st.stop();

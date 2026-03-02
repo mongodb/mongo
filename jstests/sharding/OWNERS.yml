@@ -166,6 +166,9 @@ filters:
   - "swallow_unnecessary_uuid_mismatch_error.js":
     approvers:
       - 10gen/query-execution-router
+  - "replicate_record_ids_collection_migration.js":
+    approvers:
+      - 10gen/server-collection-write-path
   - "heal_config_shards_on_fcv_upgrade.js":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -132,7 +132,7 @@ assertDocsInColl(node, []);
 // an existing recordId. In this case, because the standalone can't see existing non-majority
 // committed documents, the test must take care to make sure the document inserted as a standalone
 // doesn't use a recordId that collides with the non-majority committed documents' recordIds.
-if (node.getDB(dbName).getCollectionInfos({name: collName})[0].options.recordIdsReplicated) {
+if (node.getDB(dbName).getCollectionInfos({name: collName})[0].info.recordIdsReplicated) {
     assert.commandWorked(
         node.getDB(dbName).runCommand({
             applyOps: [

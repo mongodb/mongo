@@ -187,8 +187,9 @@ TEST_F(DatabaseClonerTest, ListCollectionsCollectionsWithRecordIds) {
         BSON("name" << "b"
                     << "type"
                     << "collection"
-                    << "options" << BSON("recordIdsReplicated" << true) << "info"
-                    << BSON("readOnly" << false << "uuid" << uuid2))};
+                    << "options" << BSONObj() << "info"
+                    << BSON("readOnly" << false << "uuid" << uuid2 << "recordIdsReplicated"
+                                       << true))};
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
     ASSERT_OK(cloner->run());
@@ -202,8 +203,8 @@ TEST_F(DatabaseClonerTest, ListCollectionsCollectionsWithRecordIds) {
     ASSERT_EQ(false, std::get<2>(collections[0]));
     ASSERT_EQ(NamespaceString::createNamespaceString_forTest(_dbName, "b"),
               std::get<0>(collections[1]));
-    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2 << "recordIdsReplicated" << true),
-                      std::get<1>(collections[1]).toBSON());
+    ASSERT_BSONOBJ_EQ(BSON("uuid" << uuid2), std::get<1>(collections[1]).toBSON());
+    // The recordIdsReplicated
     ASSERT_EQ(true, std::get<2>(collections[1]));
 }
 

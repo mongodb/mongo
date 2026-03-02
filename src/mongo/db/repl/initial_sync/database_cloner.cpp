@@ -135,9 +135,8 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         // collectionUUID there as part of the options, but instead places it in the 'info' field.
         // We need to move it back to CollectionOptions to create the collection properly.
         result.getOptions().uuid = result.getInfo().getUuid();
-        // TODO SERVER-119642 Use the recordIdsReplicated from listCollection info.
         _collections.emplace_back(
-            collectionNamespace, result.getOptions(), result.getOptions().recordIdsReplicated);
+            collectionNamespace, result.getOptions(), result.getInfo().getRecordIdsReplicated());
     }
     return kContinueNormally;
 }

@@ -189,11 +189,16 @@ void _addWorkingSetMember(OperationContext* opCtx,
 BSONObj buildInfoField(OperationContext* opCtx,
                        bool readOnly,
                        const NamespaceString& nss,
-                       boost::optional<UUID> uuid) {
+                       boost::optional<UUID> uuid,
+                       boost::optional<bool> recordIdsReplicated) {
     BSONObjBuilder infoBuilder;
     infoBuilder.append("readOnly", readOnly);
     if (uuid) {
         infoBuilder.appendElements(uuid->toBSON());
+    }
+
+    if (recordIdsReplicated.get_value_or(false)) {
+        infoBuilder.appendBool("recordIdsReplicated", true);
     }
 
     if (const auto configDebugDump =
@@ -223,7 +228,12 @@ BSONObj buildViewBson(OperationContext* opCtx, const ViewDefinition& view, bool 
     }
     optionsBuilder.doneFast();
 
-    b.append("info", buildInfoField(opCtx, true /*readOnly*/, view.name(), boost::none /*uuid*/));
+    b.append("info",
+             buildInfoField(opCtx,
+                            true /*readOnly*/,
+                            view.name(),
+                            boost::none /*uuid*/,
+                            boost::none /*recordIdsReplicated*/));
     return b.obj();
 }
 
@@ -241,8 +251,12 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const Collection* collectio
     builder.append("options",
                    collection->getCollectionOptions().toBSON(
                        false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions));
-    builder.append(
-        "info", buildInfoField(opCtx, opCtx->readOnly(), collection->ns(), boost::none /*uuid*/));
+    builder.append("info",
+                   buildInfoField(opCtx,
+                                  opCtx->readOnly(),
+                                  collection->ns(),
+                                  boost::none /*uuid*/,
+                                  boost::none /*recordIdsReplicated*/));
     return builder.obj();
 }
 
@@ -256,7 +270,12 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const NamespaceString& nss,
     }
 
     builder.append("options", BSONObj{});
-    builder.append("info", buildInfoField(opCtx, opCtx->readOnly(), nss, boost::none /*uuid*/));
+    builder.append("info",
+                   buildInfoField(opCtx,
+                                  opCtx->readOnly(),
+                                  nss,
+                                  boost::none /*uuid*/,
+                                  boost::none /*recordIdsReplicated*/));
 
     return builder.obj();
 }
@@ -306,7 +325,12 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     // unsettable read-only property, so put it in the 'info' section. Pass 'false' to toBSON so
     // it doesn't include 'uuid' here.
     b.append("options", options.toBSON(false /* includeUUID */, includeOptionsFields));
-    b.append("info", buildInfoField(opCtx, opCtx->readOnly(), collection->ns(), options.uuid));
+    b.append("info",
+             buildInfoField(opCtx,
+                            opCtx->readOnly(),
+                            collection->ns(),
+                            options.uuid,
+                            collection->areRecordIdsReplicated()));
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
     if (idIndex) {

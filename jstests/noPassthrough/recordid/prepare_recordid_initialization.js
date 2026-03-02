@@ -90,7 +90,7 @@ assert.commandWorked(coll.remove({_id: 4}));
 // a) if recordIdsReplicated:true, replaying the prepare oplog entry will give the previously
 // inserted document the same RID it had then - RID: 2 - as this info is present in the oplog entry.
 // b) if recordIdsReplicated:false, determine that RID 4 is not visible and insert at RID 5.
-let preparedRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].options.recordIdsReplicated
+let preparedRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info.recordIdsReplicated
     ? NumberLong(2)
     : NumberLong(5);
 replTest.restart(primary);
@@ -129,7 +129,7 @@ assert.commandWorked(s2.commitTransaction_forTesting());
 
 coll = primary.getDB("test")["foo"];
 assert.commandWorked(coll.insert({_id: 6})); // Should not re-use any RecordIds
-const newestRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].options.recordIdsReplicated
+const newestRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].info.recordIdsReplicated
     ? NumberLong(5)
     : NumberLong(6);
 docs = sessionDb["foo"].find().showRecordId().toArray();

@@ -55,7 +55,7 @@ assert(
 );
 jsTestLog("Collection options: " + tojson(collInfo));
 assert(
-    !collInfo.options.hasOwnProperty("recordIdsReplicated"),
+    !collInfo.info.hasOwnProperty("recordIdsReplicated"),
     "collMod failed to remove recordIdsReplicated flag from collection options",
 );
 
@@ -73,7 +73,7 @@ assert(
         tojson(secondaryDB.getCollectionInfos()),
 );
 assert(
-    !secondaryCollInfo.options.hasOwnProperty("recordIdsReplicated"),
+    !secondaryCollInfo.info.hasOwnProperty("recordIdsReplicated"),
     "collMod failed to remove recordIdsReplicated flag from collection options on secondary",
 );
 

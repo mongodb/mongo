@@ -56,6 +56,11 @@ structs:
                     (e.g., mongodump).
                 optional: true
                 stability: unstable
+            recordIdsReplicated:
+                type: bool
+                description: "If true, the collection has record Ids replicated."
+                optional: true
+                stability: unstable
 
     ListCollectionsReplyItem:
         description: "Individual result"

@@ -38,10 +38,9 @@ function makeSrcAndDstNames() {
 }
 
 function assertRecordIdsReplicated(coll) {
-    const collOptions = assert.commandWorked(
-        coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}),
-    ).cursor.firstBatch[0].options;
-    assert(collOptions.recordIdsReplicated);
+    const collInfo = assert.commandWorked(coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}))
+        .cursor.firstBatch[0].info;
+    assert(collInfo.recordIdsReplicated);
 }
 
 function validateRidsAcrossNodes(coll) {
