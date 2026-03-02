@@ -373,11 +373,11 @@ CostEstimate CostEstimator::filterCost(StageType stage,
 }
 
 const CostCoefficient CostEstimator::fetchFilterIncrement =
-    CostCoefficient{CostCoefficientType{435.38_ms}};
+    CostCoefficient{CostCoefficientType{435.38_ns}};
 const CostCoefficient CostEstimator::indexFilterIncrement =
-    CostCoefficient{CostCoefficientType{132.60_ms}};
+    CostCoefficient{CostCoefficientType{132.60_ns}};
 const CostCoefficient CostEstimator::collScanFilterIncrement =
-    CostCoefficient{CostCoefficientType{202.32_ms}};
+    CostCoefficient{CostCoefficientType{202.32_ns}};
 
 // TODO(SERVER-114546): Use the calibrated coefficients once we estimate the number of
 // filter leaf evaluations.
@@ -386,90 +386,90 @@ const CostCoefficient CostEstimator::incrementalIndexFilterLeafCost = minCC;
 const CostCoefficient CostEstimator::incrementalCollScanFilterLeafCost = minCC;
 
 const CostCoefficient CostEstimator::collScanForwardIncrement =
-    CostCoefficient{CostCoefficientType{399.23_ms}};
+    CostCoefficient{CostCoefficientType{399.23_ns}};
 const CostCoefficient CostEstimator::collScanBackwardIncrement =
-    CostCoefficient{CostCoefficientType{404.0_ms}};
+    CostCoefficient{CostCoefficientType{404.0_ns}};
 
 const CostCoefficient CostEstimator::indexScanForwardExamineKey =
-    CostCoefficient{CostCoefficientType{435.55_ms}};
+    CostCoefficient{CostCoefficientType{435.55_ns}};
 const CostCoefficient CostEstimator::indexScanBackwardExamineKey =
-    CostCoefficient{CostCoefficientType{459.68_ms}};
+    CostCoefficient{CostCoefficientType{459.68_ns}};
 const CostCoefficient CostEstimator::incrementalFieldCost =
-    CostCoefficient{CostCoefficientType{51.25_ms}};
+    CostCoefficient{CostCoefficientType{51.25_ns}};
 const CostCoefficient CostEstimator::indexForwardSeek =
-    CostCoefficient{CostCoefficientType{1134.71_ms}};
+    CostCoefficient{CostCoefficientType{1134.71_ns}};
 const CostCoefficient CostEstimator::indexBackwardSeek =
-    CostCoefficient{CostCoefficientType{1211.58_ms}};
+    CostCoefficient{CostCoefficientType{1211.58_ns}};
 
 const CostCoefficient CostEstimator::fetchIncrement =
-    CostCoefficient{CostCoefficientType{1232.20_ms}};
+    CostCoefficient{CostCoefficientType{1232.20_ns}};
 
-const CostCoefficient CostEstimator::andHashBuild = CostCoefficient{CostCoefficientType{216.05_ms}};
-const CostCoefficient CostEstimator::andHashProbe = CostCoefficient{CostCoefficientType{180.35_ms}};
+const CostCoefficient CostEstimator::andHashBuild = CostCoefficient{CostCoefficientType{216.05_ns}};
+const CostCoefficient CostEstimator::andHashProbe = CostCoefficient{CostCoefficientType{180.35_ns}};
 const CostCoefficient CostEstimator::andHashOutput =
-    CostCoefficient{CostCoefficientType{281.46_ms}};
+    CostCoefficient{CostCoefficientType{281.46_ns}};
 
 const CostCoefficient CostEstimator::sortDefaultStartup =
-    CostCoefficient{CostCoefficientType{24067.01_ms}};
+    CostCoefficient{CostCoefficientType{24067.01_ns}};
 const CostCoefficient CostEstimator::sortDefaultIncrement =
-    CostCoefficient{CostCoefficientType{216.73_ms}};
+    CostCoefficient{CostCoefficientType{216.73_ns}};
 const CostCoefficient CostEstimator::sortDefaultSpillIncrement =
-    CostCoefficient{CostCoefficientType{653.83_ms}};
+    CostCoefficient{CostCoefficientType{653.83_ns}};
 const CostCoefficient CostEstimator::sortDefaultLimitStartup =
-    CostCoefficient{CostCoefficientType{23761.57_ms}};
+    CostCoefficient{CostCoefficientType{23761.57_ns}};
 const CostCoefficient CostEstimator::sortDefaultLimitC1 =
-    CostCoefficient{CostCoefficientType{764.58_ms}};
+    CostCoefficient{CostCoefficientType{764.58_ns}};
 const CostCoefficient CostEstimator::sortDefaultLimitC2 =
-    CostCoefficient{CostCoefficientType{15.81_ms}};
+    CostCoefficient{CostCoefficientType{15.81_ns}};
 const CostCoefficient CostEstimator::sortDefaultLimitC3 =
-    CostCoefficient{CostCoefficientType{233.36_ms}};
+    CostCoefficient{CostCoefficientType{233.36_ns}};
 
 const CostCoefficient CostEstimator::sortSimpleStartup =
-    CostCoefficient{CostCoefficientType{22324.54_ms}};
+    CostCoefficient{CostCoefficientType{22324.54_ns}};
 const CostCoefficient CostEstimator::sortSimpleIncrement =
-    CostCoefficient{CostCoefficientType{163.56_ms}};
+    CostCoefficient{CostCoefficientType{163.56_ns}};
 const CostCoefficient CostEstimator::sortSimpleSpillIncrement =
-    CostCoefficient{CostCoefficientType{297.03_ms}};
+    CostCoefficient{CostCoefficientType{297.03_ns}};
 const CostCoefficient CostEstimator::sortSimpleLimitStartup =
-    CostCoefficient{CostCoefficientType{21813.35_ms}};
+    CostCoefficient{CostCoefficientType{21813.35_ns}};
 const CostCoefficient CostEstimator::sortSimpleLimitC1 =
-    CostCoefficient{CostCoefficientType{739.81_ms}};
+    CostCoefficient{CostCoefficientType{739.81_ns}};
 const CostCoefficient CostEstimator::sortSimpleLimitC2 =
-    CostCoefficient{CostCoefficientType{11.67_ms}};
+    CostCoefficient{CostCoefficientType{11.67_ns}};
 const CostCoefficient CostEstimator::sortSimpleLimitC3 =
-    CostCoefficient{CostCoefficientType{164.50_ms}};
+    CostCoefficient{CostCoefficientType{164.50_ns}};
 
 const CostCoefficient CostEstimator::sortedMergeInput =
-    CostCoefficient{CostCoefficientType{481.48_ms}};
+    CostCoefficient{CostCoefficientType{481.48_ns}};
 const CostCoefficient CostEstimator::sortedMergeOutput =
-    CostCoefficient{CostCoefficientType{254.03_ms}};
+    CostCoefficient{CostCoefficientType{254.03_ns}};
 
 const CostCoefficient CostEstimator::simpleProjectionIncrement =
-    CostCoefficient{CostCoefficientType{317.60_ms}};
+    CostCoefficient{CostCoefficientType{317.60_ns}};
 const CostCoefficient CostEstimator::coveredProjectionIncrement =
-    CostCoefficient{CostCoefficientType{216.77_ms}};
+    CostCoefficient{CostCoefficientType{216.77_ns}};
 const CostCoefficient CostEstimator::defaultProjectionIncrement =
-    CostCoefficient{CostCoefficientType{768.21_ms}};
+    CostCoefficient{CostCoefficientType{768.21_ns}};
 
 const CostCoefficient CostEstimator::limitIncrement =
-    CostCoefficient{CostCoefficientType{109.50_ms}};
+    CostCoefficient{CostCoefficientType{109.50_ns}};
 
 const CostCoefficient CostEstimator::skipIncrement =
-    CostCoefficient{CostCoefficientType{127.41_ms}};
+    CostCoefficient{CostCoefficientType{127.41_ns}};
 const CostCoefficient CostEstimator::passIncrement =
-    CostCoefficient{CostCoefficientType{113.94_ms}};
+    CostCoefficient{CostCoefficientType{113.94_ns}};
 
-const CostCoefficient CostEstimator::orIncrement = CostCoefficient{CostCoefficientType{211.52_ms}};
+const CostCoefficient CostEstimator::orIncrement = CostCoefficient{CostCoefficientType{211.52_ns}};
 
 const CostCoefficient CostEstimator::andSortedInput =
-    CostCoefficient{CostCoefficientType{183.34_ms}};
+    CostCoefficient{CostCoefficientType{183.34_ns}};
 const CostCoefficient CostEstimator::andSortedOutput =
-    CostCoefficient{CostCoefficientType{362.22_ms}};
+    CostCoefficient{CostCoefficientType{362.22_ns}};
 
 // Virtual scan costs are not calibrated.
 const CostCoefficient CostEstimator::virtScanStartup =
-    CostCoefficient{CostCoefficientType{200.0_ms}};
+    CostCoefficient{CostCoefficientType{200.0_ns}};
 const CostCoefficient CostEstimator::virtScanIncrement =
-    CostCoefficient{CostCoefficientType{100.3_ms}};
+    CostCoefficient{CostCoefficientType{100.3_ns}};
 
 }  // namespace mongo::cost_based_ranker

@@ -44,9 +44,9 @@
 namespace mongo::cost_based_ranker {
 
 /**
- * Convert nanoseconds to milliseconds.
+ * Converts a nanosecond calibration measurement to milliseconds.
  */
-constexpr double operator""_ms(long double v) {
+constexpr double operator""_ns(long double v) {
     return static_cast<double>(v) * 1.0e-6;
 }
 
@@ -140,10 +140,10 @@ struct CostCoefficientTagParam {
     // The smallest cost coefficient is equal to the cost of the fastest QE
     // operation. This is typically the cost of a simple binary comparison of a
     // scalar value.
-    static constexpr double kMin = 11.67_ms;
+    static constexpr double kMin = 11.67_ns;
     // The maximum value of a cost coefficient is the most expensive operation per
     // document according to the cost model.
-    static constexpr double kMax = 1000000.0_ms;
+    static constexpr double kMax = 1000000.0_ns;
     // TODO (SERVER-94981): Define this value based on cost model sensitivity.
     static constexpr double kEpsilon = 1.0e-5;
 };

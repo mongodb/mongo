@@ -36,7 +36,7 @@ namespace mongo::join_ordering {
 // * Processing a document takes 100 nanoseconds
 // * Sequential IO is 100x slower that processing a document
 // * Random IO is 10x slower than sequential IO.
-const CostCoefficient docProcessCpuIncremental{CostCoefficientType{100.0_ms}};
+const CostCoefficient docProcessCpuIncremental{CostCoefficientType{100.0_ns}};
 const CostCoefficient ioSeqIncremental{
     CostCoefficientType{docProcessCpuIncremental.toDouble() * 10e2}};
 const CostCoefficient ioRandIncremental{CostCoefficientType{ioSeqIncremental.toDouble() * 10}};
