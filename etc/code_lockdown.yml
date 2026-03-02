@@ -161,22 +161,40 @@ teams:
   - name: "Catalog and Routing"
     slack_tags:
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
   - name: "Cluster Scalability"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
   - name: "Networking & Observability"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
   - name: "Server Programmability"
     slack_tags:
       - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
   - name: "Server Security"
     slack_tags:
       - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
       - "<@U02HWKGMAQL>" # adam.rayner@mongodb.com - Lead
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
   - name: "Workload Resilience"
     slack_tags:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+    thresholds: # reduced thresholds for C&I teams
+      hot: 3
+      cold: 5
 
   # Durable Transactions & Availability teams
   - name: "RSSD"
