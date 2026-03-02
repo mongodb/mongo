@@ -28,11 +28,10 @@ const indexDroppedByTest = {
     x: 1,
 };
 
-// TODO SERVER-108241 Re-enable dropIndexes once investigation is done.
 const prohibitedCommands = [
     {collMod: collectionName},
     {createIndexes: collectionName, indexes: [{name: "idx1", key: indexCreatedByTest}]},
-    // {dropIndexes: collectionName, index: indexDroppedByTest},
+    {dropIndexes: collectionName, index: indexDroppedByTest},
 ];
 
 /**
@@ -43,7 +42,12 @@ const prohibitedCommands = [
 const assertCommandsSucceedAfterReshardingOpFinishes = (database) => {
     prohibitedCommands.forEach((command) => {
         jsTest.log(`Testing that ${tojson(command)} succeeds after the resharding operation finishes.`);
-        assert.commandWorked(database.runCommand(command));
+        if (command.hasOwnProperty("dropIndexes")) {
+            // TODO (SERVER-107148): Always assert that dropIndexes command succeeds once 9.0 is LTS.
+            assert.commandWorkedOrFailedWithCode(database.runCommand(command), ErrorCodes.IndexNotFound);
+        } else {
+            assert.commandWorked(database.runCommand(command));
+        }
     });
 };
 
@@ -189,6 +193,8 @@ withReshardingInBackground(
         afterReshardingFn: () => {
             jsTest.log("Join possible ongoing collMod command");
             assert.commandWorked(sourceCollection.runCommand("collMod"));
+            jsTest.log("Join possible ongoing dropIndex command");
+            assert.commandWorked(sourceCollection.dropIndex(indexDroppedByTest));
         },
     },
 );

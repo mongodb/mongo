@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/server_parameters_gen.h"
@@ -75,6 +76,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -406,7 +408,17 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
-        collDesc.throwIfReshardingInProgress(nss);
+
+        const bool useRegistry =
+            resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
+        if (useRegistry) {
+            resharding::throwIfReshardingInProgress(nss);
+        } else {
+            collDesc.throwIfReshardingInProgress(nss);
+        }
 
         // Only collections that are not registered in the sharding catalog are affected by
         // movePrimary
