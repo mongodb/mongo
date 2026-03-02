@@ -777,6 +777,15 @@ public:
                                                       bool isUpgrade,
                                                       bool skipViewCreation = false) = 0;
 
+    /**
+     * This function logs an oplog entry when a replicated StorageEngine ident drop is executed.
+     * Returns the optime of the oplog entry successfully written to the oplog.
+     * Returns a null optime if an oplog entry was not written for this operation.
+     */
+    virtual void onReplicatedIdentDrop(OperationContext* opCtx,
+                                       const std::string& ident,
+                                       repl::OpTime& opTime) = 0;
+
     struct Times;
 
 protected:

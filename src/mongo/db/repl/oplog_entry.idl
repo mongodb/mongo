@@ -104,6 +104,7 @@ enums:
             kTruncateRange: "truncateRange"
             kUpgradeDowngradeViewlessTimeseries: "upgradeDowngradeViewlessTimeseries"
             kSetMultikeyMetadata: "setMultikeyMetadata"
+            kDropIdent: "dropIdent"
 
 types:
     zeroOneManyStmtId:

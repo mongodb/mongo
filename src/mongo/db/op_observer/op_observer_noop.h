@@ -294,6 +294,10 @@ public:
                                               const UUID& uuid,
                                               bool isUpgrade,
                                               bool skipViewCreation = false) override {}
+
+    void onReplicatedIdentDrop(OperationContext* opCtx,
+                               const std::string& ident,
+                               repl::OpTime& opTime) override {}
 };
 
 }  // namespace mongo

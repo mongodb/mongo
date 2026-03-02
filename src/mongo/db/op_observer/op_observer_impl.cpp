@@ -2488,4 +2488,15 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 
+void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
+                                           const std::string& ident,
+                                           repl::OpTime& opTime) {
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+    oplogEntry.setObject(BSON("dropIdent" << ident));
+    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+}
+
+
 }  // namespace mongo

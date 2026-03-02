@@ -305,6 +305,10 @@ public:
                                               bool isUpgrade,
                                               bool skipViewCreation = false) final;
 
+    void onReplicatedIdentDrop(OperationContext* opCtx,
+                               const std::string& ident,
+                               repl::OpTime& opTime) final;
+
 private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };

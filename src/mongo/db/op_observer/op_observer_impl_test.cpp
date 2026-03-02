@@ -6014,6 +6014,32 @@ TEST_F(OpObserverTest, OnContainerDelete) {
     ASSERT_EQ(std::string(entry2KeyBinData, entry2KeyBinDataLength), key2);
 }
 
+TEST_F(OpObserverTest, onDropIdent) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto uniqueOpCtx = cc().makeOperationContext();
+    OperationContext* opCtx = uniqueOpCtx.get();
+    const std::string myIdent = "my-ident";
+
+
+    repl::OpTime dropIdentOpTime;
+    {
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opObserver.onReplicatedIdentDrop(opCtx, myIdent, dropIdentOpTime);
+        wuow.commit();
+    }
+
+    // Check the produced oplog entry.
+    auto oplogEntry = getSingleOplogEntry(opCtx);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON("dropIdent" << myIdent);
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+
+    // Check the produced op time.
+    ASSERT(!dropIdentOpTime.isNull());
+    ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), dropIdentOpTime);
+}
+
 TEST_F(BatchedWriteOutputsTest, OnContainerInsertBatched) {
     auto opCtx = cc().makeOperationContext();
     Lock::GlobalLock lock{opCtx.get(), LockMode::MODE_IX};

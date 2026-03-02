@@ -1372,7 +1372,15 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           return Status::OK();
       },
       {}}},
-};
+    {
+        "dropIdent",
+        {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+             -> Status {
+             // TODO: SERVER-118737 implement.
+             return Status::OK();
+         },
+         {}},
+    }};
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
 // operation to collection 'collection'.

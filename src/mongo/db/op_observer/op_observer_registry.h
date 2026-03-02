@@ -683,6 +683,15 @@ public:
             o->onUpgradeDowngradeViewlessTimeseries(opCtx, nss, uuid, isUpgrade, skipViewCreation);
     }
 
+    void onReplicatedIdentDrop(OperationContext* opCtx,
+                               const std::string& ident,
+                               repl::OpTime& opTime) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onReplicatedIdentDrop(opCtx, ident, opTime);
+        }
+    }
+
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {
