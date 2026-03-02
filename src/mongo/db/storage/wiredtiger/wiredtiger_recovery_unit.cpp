@@ -37,7 +37,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
@@ -73,6 +72,7 @@ namespace {
 logv2::LogSeverity kSlowTransactionSeverity = logv2::LogSeverity::Debug(1);
 
 MONGO_FAIL_POINT_DEFINE(doUntimestampedWritesForIdempotencyTests);
+MONGO_FAIL_POINT_DEFINE(forceCheckpointOnTableCreate);
 
 const char* getIsolationConfig(RecoveryUnit::Isolation isolation) {
     switch (isolation) {
@@ -390,6 +390,10 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             _session->modifyConfiguration("cache_max_wait_ms=1", "cache_max_wait_ms=0");
         }
 
+        if (!_createdTables.empty() && _isTimestamped) {
+            _forceCheckpointOnTableCreateForTestingIfEnabled();
+        }
+
         wtRet = _session->commit_transaction(nullptr);
 
         LOGV2_DEBUG(
@@ -462,6 +466,20 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     // simplifies the handling when stepup happens concurrently with read operations.
     if (_timestampReadSource == ReadSource::kLastApplied) {
         _timestampReadSource = ReadSource::kNoTimestamp;
+    }
+}
+
+void WiredTigerRecoveryUnit::_forceCheckpointOnTableCreateForTestingIfEnabled() {
+    if (MONGO_unlikely(forceCheckpointOnTableCreate.shouldFail())) {
+        auto cpSession = _connection->getUninterruptibleSession();
+        int cpRet = cpSession->checkpoint("use_timestamp=true");
+        if (cpRet != EBUSY && cpRet != ENOTSUP && cpRet != EINVAL) {
+            invariantWTOK(cpRet, *cpSession);
+        }
+        LOGV2(11873600,
+              "Forced checkpoint before committing table-creating transaction",
+              "numCreatedTables"_attr = _createdTables.size(),
+              "result"_attr = cpRet);
     }
 }
 

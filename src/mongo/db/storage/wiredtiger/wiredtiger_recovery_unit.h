@@ -244,6 +244,13 @@ private:
     void _txnOpen();
 
     /**
+     * Forces a checkpoint on table create if the failpoint forceCheckpointOnTableCreate is
+     * enabled. This is used to reproduce excess-table-in-checkpoint inconsistencies for testing.
+     * The checkpoint is forced before committing the transaction that created the table.
+     */
+    void _forceCheckpointOnTableCreateForTestingIfEnabled();
+
+    /**
      * Starts a transaction at the current all_durable timestamp.
      * Returns the timestamp the transaction was started at.
      */
