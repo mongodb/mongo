@@ -87,19 +87,11 @@ MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 MONGO_FAIL_POINT_DEFINE(allowSystemViewsDrop);
 
 /**
- * Checks that the collection has the 'expectedUUID' if given.
  * Checks that writes are allowed to 'coll' -- e.g. whether this server is PRIMARY.
  */
-Status _checkUUIDAndReplState(OperationContext* opCtx,
-                              const CollectionPtr& coll,
-                              const NamespaceString& nss,
-                              const boost::optional<UUID>& expectedUUID = boost::none) {
-    try {
-        checkCollectionUUIDMismatch(opCtx, nss, coll, expectedUUID);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
+Status _checkReplState(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       const NamespaceString& nss) {
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
         return Status(ErrorCodes::NotWritablePrimary,
@@ -151,16 +143,8 @@ void warnEncryptedCollectionsIfNeeded(OperationContext* opCtx, const CollectionP
 Status _dropView(OperationContext* opCtx,
                  Database* db,
                  const NamespaceString& collectionName,
-                 const boost::optional<UUID>& expectedUUID,
                  DropReply* reply) {
     invariant(db);
-
-    // Views don't have UUIDs so if the expectedUUID is specified, we will always throw.
-    try {
-        checkCollectionUUIDMismatch(opCtx, collectionName, CollectionPtr(), expectedUUID);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
 
     auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName);
 
@@ -239,9 +223,7 @@ StatusWith<timeseries::CollectionOrViewAcquisitionPlusTimeseriesView> _abortInde
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
 
     while (true) {
-        // Even if the collection doesn't exist, UUID mismatches must return an error.
-        Status status = _checkUUIDAndReplState(
-            opCtx, locks->target.getCollectionPtr(), startingNss, expectedUUID);
+        Status status = _checkReplState(opCtx, locks->target.getCollectionPtr(), startingNss);
         if (!status.isOK()) {
             return status;
         } else if (!locks->target.collectionExists()) {
@@ -277,7 +259,7 @@ StatusWith<timeseries::CollectionOrViewAcquisitionPlusTimeseriesView> _abortInde
         locks.emplace(timeseries::acquireCollectionOrViewPlusTimeseriesView(
             opCtx,
             CollectionOrViewAcquisitionRequest::fromOpCtx(
-                opCtx, startingNss, AcquisitionPrerequisites::kWrite),
+                opCtx, startingNss, expectedUUID, AcquisitionPrerequisites::kWrite),
             MODE_X));
     }
 
@@ -305,8 +287,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
             CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
                 opCtx, collectionName, boost::none /*readTimestamp*/));
 
-        // Even if the collection doesn't exist, UUID mismatches must return an error.
-        Status status = _checkUUIDAndReplState(opCtx, coll, collectionName);
+        Status status = _checkReplState(opCtx, coll, collectionName);
         if (!status.isOK()) {
             return status;
         } else if (!coll) {
@@ -355,16 +336,12 @@ Status _dropCollection(OperationContext* opCtx,
             auto locks = timeseries::acquireCollectionOrViewPlusTimeseriesView(
                 opCtx,
                 CollectionOrViewAcquisitionRequest::fromOpCtx(
-                    opCtx, nss, AcquisitionPrerequisites::kWrite),
+                    opCtx, nss, expectedUUID, AcquisitionPrerequisites::kWrite),
                 MODE_X);
 
             auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName());
             if (!db) {
-                return expectedUUID
-                    ? Status{CollectionUUIDMismatchInfo(
-                                 nss.dbName(), *expectedUUID, std::string{nss.coll()}, boost::none),
-                             "Database does not exist"}
-                    : Status::OK();
+                return Status::OK();
             }
 
             AutoStatsTracker statsTracker(opCtx,
@@ -386,19 +363,10 @@ Status _dropCollection(OperationContext* opCtx,
             if (locks.target.isView()) {
                 // We need a MODE_X lock to drop a view. This is to prevent a concurrent create
                 // collection on the same namespace that will reserve an OpTime before this drop.
-                return _dropView(opCtx, db, nss, expectedUUID, reply);
+                return _dropView(opCtx, db, nss, reply);
             }
 
             if (!locks.target.collectionExists()) {
-                // There is no collection or view at the namespace. Check whether a UUID was given
-                // and error if so because the caller expects the collection to exist. If no UUID
-                // was given, then it is OK to return success.
-                try {
-                    checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), expectedUUID);
-                } catch (const DBException& ex) {
-                    return ex.toStatus();
-                }
-
                 audit::logDropView(opCtx->getClient(),
                                    nss,
                                    NamespaceString::kEmpty,
@@ -420,19 +388,12 @@ Status _dropCollection(OperationContext* opCtx,
             const auto& targetNss = locks.target.nss();
 
             if (targetNss.isTimeseriesBucketsCollection()) {
-                // Disallow checking the expectedUUID when dropping buckets collections.
-                uassert(ErrorCodes::InvalidOptions,
-                        "The collectionUUID parameter cannot be passed when dropping a "
-                        "time-series collection",
-                        !expectedUUID);
-
                 // We need a MODE_X lock to drop the timeseries view, which
                 // `acquireCollectionOrViewPlusTimeseriesView` acquired. This is to prevent
                 // a concurrent create collection on the same namespace that will
                 // reserve an OpTime before this drop.
                 if (locks.timeseriesView.has_value()) {
-                    auto status =
-                        _dropView(opCtx, db, locks.timeseriesView->nss(), boost::none, reply);
+                    auto status = _dropView(opCtx, db, locks.timeseriesView->nss(), reply);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -467,14 +428,7 @@ Status _dropCollection(OperationContext* opCtx,
             reply->setNs(nss);
             return Status::OK();
         });
-    } catch (ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
-        // Views don't have UUIDs so if the expectedUUID is specified, we will always throw.
-        try {
-            checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), expectedUUID);
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-
+    } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
         // Allow dropping a nonexistent view even if the view catalog is invalid.
         if (!CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(opCtx, nss)) {
             audit::logDropView(opCtx->getClient(),
@@ -486,15 +440,26 @@ Status _dropCollection(OperationContext* opCtx,
         }
 
         throw;
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // Any unhandled namespace not found errors should be converted into success. Unless the
-        // caller specified a UUID and expects the collection to exist.
-        try {
-            checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), expectedUUID);
-        } catch (const DBException& ex) {
-            return ex.toStatus();
+    } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& e) {
+        // Preserve behavior for legacy timeseries which returns InvalidOptions when passing
+        // collectionUUID.
+        // TODO SERVER-101784 Remove the code below once 9.0 becomes LTS and legacy time-series are
+        // removed.
+        if (!e->actualCollection()) {
+            throw;
         }
-
+        const auto expectedNs =
+            NamespaceStringUtil::deserialize(nss.dbName(), e->expectedCollection());
+        const auto actualNs =
+            NamespaceStringUtil::deserialize(nss.dbName(), *e->actualCollection());
+        uassert(ErrorCodes::InvalidOptions,
+                "The collectionUUID parameter cannot be passed when dropping a "
+                "time-series collection",
+                actualNs != expectedNs.makeTimeseriesBucketsNamespace());
+        throw;
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If the command specified a UUID, the acquisition throws CollectionUUIDMismatch, so on
+        // NamespaceNotFound we always return success.
         return Status::OK();
     }
 }
@@ -584,7 +549,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         DropReply unusedReply;
         if (isView) {
             Lock::CollectionLock viewLock(opCtx, collectionName, MODE_IX);
-            return _dropView(opCtx, db, collectionName, boost::none, &unusedReply);
+            return _dropView(opCtx, db, collectionName, &unusedReply);
         } else {
             return _dropCollectionForApplyOps(
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);
