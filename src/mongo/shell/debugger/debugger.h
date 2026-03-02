@@ -74,7 +74,11 @@ class DebuggerObject {
     static bool onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool isPausedCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+
     static bool storeEvalResult(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool storeScopesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool storeVariablesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+
     static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
