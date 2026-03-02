@@ -28,6 +28,7 @@ EXCLUDED_PATTERNS = [
     "buildscripts/modules/",
     ".github/workflows/",
     "src/third_party/private/",
+    "sbom.private.json",
     ".augment/",
     ".cursor/",
     "AGENTS.md",
