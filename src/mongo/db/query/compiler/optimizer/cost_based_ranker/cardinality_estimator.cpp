@@ -470,7 +470,7 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
         if (!bounds.size() && !filter) {
             return _collCard;
         }
-        // TODO(SERVER-115233): This is wrong for some index bounds.
+        // TODO(SERVER-105939): This is wrong for some index bounds.
         auto matchExpr = getMatchExpressionFromBounds(bounds, filter.get());
         if (matchExpr) {
             return _ceCache.getOrCompute(std::move(matchExpr), [&] {
@@ -579,7 +579,7 @@ CEResult CardinalityEstimator::estimate(const FetchNode* node) {
         ) {
             auto& bounds = static_cast<const IndexScanNode*>(node->children[0].get())->bounds;
             auto ce = [&]() -> CardinalityEstimate {
-                // TODO(SERVER-115233): This is wrong for some index bounds.
+                // TODO(SERVER-105939): This is wrong for some index bounds.
                 auto matchExpr = getMatchExpressionFromBounds(bounds, node->filter.get());
                 if (matchExpr) {
                     return _ceCache.getOrCompute(std::move(matchExpr), [&] {
