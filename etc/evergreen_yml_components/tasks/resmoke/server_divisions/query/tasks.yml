@@ -2185,6 +2185,7 @@ tasks:
         "incompatible_mac",
         "aggregation",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
