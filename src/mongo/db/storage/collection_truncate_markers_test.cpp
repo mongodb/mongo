@@ -191,6 +191,22 @@ public:
         _expirePartialMarker = value;
     }
 
+    void testUpdateCurrentMarker(int64_t bytesAdded,
+                                 const RecordId& highestRecordId,
+                                 Date_t highestWallTime,
+                                 int64_t numRecordsAdded,
+                                 bool oplogSamplingAsyncEnabled) {
+        updateCurrentMarker(bytesAdded,
+                            highestRecordId,
+                            highestWallTime,
+                            numRecordsAdded,
+                            oplogSamplingAsyncEnabled);
+    }
+
+    const std::deque<Marker>& getMarkersForTest() const {
+        return getMarkers();
+    }
+
 private:
     bool _expirePartialMarker = false;
 
@@ -891,5 +907,55 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
     // no truncatable record if all but one oplog entry is pinned, but not as an exact match
     ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
         opCtx.get(), rs, pins.at(0), wallTime + Seconds(25)));
+}
+
+// Test that we create a partial marker at the highest recordId if it's not covered by a previously
+// created marker, even if the counters are zero. This ensures that we have a marker that
+// covers the position of the highest record.
+TEST_F(CollectionMarkersTest,
+       CreatesPartialMarkerWhenCountersZeroButHighestRecordIdAheadOfLastMarker) {
+    auto opCtx = getClient()->makeOperationContext();
+
+    // Make the minimum small so we hit it quickly.
+    auto testMarkers =
+        std::make_shared<TestCollectionMarkersWithPartialExpiration>(/*minBytesPerMarker*/ 1);
+
+    const Date_t wallA = Date_t::now() + Milliseconds(1000);
+    const Date_t wallB = Date_t::now() + Milliseconds(2000);
+    const RecordId recordA(10);
+    const RecordId recordB(20);
+
+    testMarkers->testUpdateCurrentMarker(/*bytesAdded*/ 1,
+                                         /*highestRecordId*/ recordA,
+                                         /*highestWallTime*/ wallA,
+                                         /*numRecordsAdded*/ 1,
+                                         /*oplogSamplingAsyncEnabled*/ false);
+
+    // Assert that we should have created a marker here.
+    ASSERT_EQ(testMarkers->getMarkersForTest().size(), 1UL);
+    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
+
+    // Advance _highestRecordId to B without adding any more bytes/records.
+    testMarkers->testUpdateCurrentMarker(/*bytesAdded*/ 0,
+                                         /*highestRecordId*/ recordB,
+                                         /*highestWallTime*/ wallB,
+                                         /*numRecordsAdded*/ 0,
+                                         /*oplogSamplingAsyncEnabled*/ false);
+
+    // We should not have created another marker here since counters are zero and we didn't call
+    // create partial marker if needed.
+    ASSERT_EQ(testMarkers->getMarkersForTest().size(), 1UL);
+    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
+
+    // Expire the partial marker and call to create a new one if needed which should trigger partial
+    // marker creation that covers B.
+    testMarkers->setExpirePartialMarker(true);
+    testMarkers->createPartialMarkerIfNecessary(opCtx.get());
+
+    // We should have created a new partial marker with zero counters.
+    ASSERT_EQ(testMarkers->getMarkersForTest().size(), 2UL);
+    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordB);
+    ASSERT_EQ(testMarkers->getMarkersForTest().back().bytes, 0);
+    ASSERT_EQ(testMarkers->getMarkersForTest().back().records, 0);
 }
 }  // namespace mongo

@@ -594,11 +594,17 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
         return;
     }
 
-    if (_currentBytes.load() == 0 && _currentRecords.load() == 0) {
-        // Nothing can be used for a marker. Early exit now.
+    if (_currentBytes.load() == 0 && _currentRecords.load() == 0 &&
+        (_markers.empty() || _highestRecordId <= _markers.back().lastRecord)) {
+        // If _highestRecordId is not already covered by an existing marker, even if the counters
+        // are zero we can still proceed to create a partial marker.
         return;
     }
 
+    // This block can result in a marker creation even if the current bytes and records are 0. If
+    // the highest record seen so far is not covered by the last marker, then we need to create a
+    // partial marker to cover it to ensure that we have a marker that can be expired when
+    // the highest record seen so far expires.
     if (_hasPartialMarkerExpired(opCtx, _highestRecordId, _highestWallTime)) {
         auto& marker = createNewMarker(_highestRecordId, _highestWallTime);
 
