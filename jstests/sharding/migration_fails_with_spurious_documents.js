@@ -387,9 +387,14 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     );
 
     // Find a chunk we can move that would conflict with our spurious document.
+    const hashedValue = convertShardKeyToHashed(testUserId);
     let targetChunk = null;
     for (let chunk of hashedChunks) {
-        if (chunk.shard === targetShard) {
+        if (chunk.shard !== targetShard) {
+            continue;
+        }
+        if (bsonWoCompare(chunk.min.user_id, hashedValue) <= 0 &&
+            bsonWoCompare(chunk.max.user_id, hashedValue) > 0) {
             targetChunk = chunk;
             break;
         }
@@ -404,7 +409,7 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     let hashedMoveResult = admin.runCommand({
         moveChunk: hashedColl.getFullName(),
         bounds: [targetChunk.min, targetChunk.max],
-        to: spuriousShardColl.getName().includes("rs0") ? st.shard1.shardName : st.shard0.shardName,
+        to: targetShard === st.shard0.shardName ? st.shard1.shardName : st.shard0.shardName,
         _waitForDelete: true,
     });
 
@@ -433,7 +438,7 @@ assert.commandWorked(admin.runCommand({enableSharding: "test", primaryShard: st.
     hashedMoveResult = admin.runCommand({
         moveChunk: hashedColl.getFullName(),
         bounds: [targetChunk.min, targetChunk.max],
-        to: spuriousShardColl.getName().includes("rs0") ? st.shard1.shardName : st.shard0.shardName,
+        to: targetShard === st.shard0.shardName ? st.shard1.shardName : st.shard0.shardName,
         _waitForDelete: true,
     });
 
