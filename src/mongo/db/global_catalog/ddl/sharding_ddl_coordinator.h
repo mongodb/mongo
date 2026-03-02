@@ -104,8 +104,8 @@ public:
      * Returns a future that will be completed when the construction of this coordinator instance
      * is completed.
      *
-     * In particular the returned future will be ready only after this coordinator succesfully
-     * aquires the required locks.
+     * In particular the returned future will be ready only after this coordinator successfully
+     * acquires the required locks.
      */
     SharedSemiFuture<void> getConstructionCompletionFuture() {
         return _constructionCompletionPromise.getFuture();
@@ -113,10 +113,10 @@ public:
 
     /*
      * Returns a future that will be ready when all the work associated with this coordinator
-     * isntances will be completed.
+     * instances will be completed.
      *
-     * In particular the returned future will be ready after this coordinator will succesfully
-     * release all the aquired locks.
+     * In particular the returned future will be ready after this coordinator will successfully
+     * release all the acquired locks.
      */
     SharedSemiFuture<void> getCompletionFuture() {
         return _completionPromise.getFuture();
@@ -191,7 +191,7 @@ protected:
     /*
      * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
      * expected for a coordinator to make progress after performing intermediate operations that
-     * can't be rollbacked.
+     * can't be rolled back.
      */
     virtual bool _mustAlwaysMakeProgress() {
         return false;
@@ -506,7 +506,7 @@ protected:
 
     /**
      * Persists the abort reason and throws it as an exception. This causes the coordinator to fail,
-     * and triggers the cleanup future chain since there is a the persisted reason.
+     * and triggers the cleanup future chain since there is a persisted reason.
      */
     void triggerCleanup(OperationContext* opCtx, const Status& status) {
         LOGV2_INFO(7418502,
