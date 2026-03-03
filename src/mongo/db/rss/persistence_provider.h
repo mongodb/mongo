@@ -230,6 +230,12 @@ public:
      */
     virtual bool settingsProvideMajorityWriteJournalDurability(
         bool writeConcernMajorityShouldJournal) const = 0;
+
+    /**
+     * If true, untimestamped ident drops should be converted to checkpoint-based drops rather than
+     * being reaped immediately.
+     */
+    virtual bool shouldDeferUntimestampedDrops() const = 0;
 };
 
 }  // namespace rss

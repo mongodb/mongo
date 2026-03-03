@@ -203,4 +203,8 @@ bool AttachedPersistenceProvider::settingsProvideMajorityWriteJournalDurability(
     return writeConcernMajorityShouldJournal;
 }
 
+bool AttachedPersistenceProvider::shouldDeferUntimestampedDrops() const {
+    return false;
+}
+
 }  // namespace mongo::rss

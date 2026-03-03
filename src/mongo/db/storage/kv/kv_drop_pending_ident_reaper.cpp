@@ -81,6 +81,11 @@ void KVDropPendingIdentReaper::configureDelay(Seconds delay) {
     _delay = delay;
 }
 
+void KVDropPendingIdentReaper::enableDeferUntimestampedDrops() {
+    stdx::lock_guard lock(_mutex);
+    _deferUntimestampedDrops = true;
+}
+
 Timestamp KVDropPendingIdentReaper::_applyDelay(const Timestamp& ts) const {
     if (ts == Timestamp::min()) {
         return ts;
@@ -104,8 +109,14 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime
     auto info = std::make_shared<IdentInfo>();
     info->identName = ident->getIdent();
     info->dropToken = ident;
-    info->dropTime = dropTime;
     info->onDrop = onDrop;
+
+    if (_deferUntimestampedDrops && dropTime == Timestamp::min()) {
+        info->dropTime = _engine->getCheckpointIteration();
+    } else {
+        // Tables aren't shared across nodes in attached storage, so immediate reaping is safe.
+        info->dropTime = dropTime;
+    }
 
     _timestampOrderedIdents.insert(info);
     _dropPendingIdents.insert(std::make_pair(ident->getIdent(), info));

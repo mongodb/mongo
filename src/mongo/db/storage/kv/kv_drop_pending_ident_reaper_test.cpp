@@ -229,6 +229,10 @@ public:
         return iteration < checkpointIteration;
     }
 
+    StorageEngine::CheckpointIteration getCheckpointIteration() const override {
+        return checkpointIteration;
+    }
+
     // List of ident names removed using dropIdent().
     std::vector<std::string> droppedIdents;
 
@@ -850,6 +854,55 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyCompletePendingDropWorksAfterInt
     {
         auto opCtx = makeOpCtx();
         ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
+        ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    }
+}
+
+TEST_F(KVDropPendingIdentReaperTest, UntimestampedDropsUseCheckpointIterationWhenDeferred) {
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+
+    // Without deferUntimestampedDrops, Timestamp::min() drops are immediately expired
+    {
+        auto ident = std::make_shared<Ident>("ident_no_defer");
+        reaper.addDropPendingIdent(Timestamp::min(), ident);
+        ASSERT_FALSE(reaper.hasExpiredIdents(Timestamp::min()));
+        ident.reset();
+        ASSERT_TRUE(reaper.hasExpiredIdents(Timestamp::min()));
+
+        auto opCtx = makeOpCtx();
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp::min());
+        ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    }
+
+    engine->droppedIdents.clear();
+
+    // With deferUntimestampedDrops enabled Timestamp::min() drops are converted to checkpoint-based
+    // drops. They are not expired until the checkpoint iteration advances.
+    reaper.enableDeferUntimestampedDrops();
+    engine->checkpointIteration = StorageEngine::CheckpointIteration{5};
+    {
+        auto ident = std::make_shared<Ident>("ident_with_defer");
+        reaper.addDropPendingIdent(Timestamp::min(), ident);
+        ident.reset();
+
+        // Drop is not expired because checkpoint iteration hasn't advanced past 5
+        ASSERT_FALSE(reaper.hasExpiredIdents(Timestamp::min()));
+        ASSERT_FALSE(reaper.hasExpiredIdents(Timestamp(Seconds(1000000), 0)));
+
+        // Dropping should have no effect
+        auto opCtx = makeOpCtx();
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(1000000), 0));
+        ASSERT_EQUALS(0U, engine->droppedIdents.size());
+    }
+
+    // Advancing the checkpoint iteration should allow the drop to proceed
+    engine->checkpointIteration = StorageEngine::CheckpointIteration{6};
+    ASSERT_TRUE(reaper.hasExpiredIdents(Timestamp::min()));
+
+    {
+        auto opCtx = makeOpCtx();
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp::min());
         ASSERT_EQUALS(1U, engine->droppedIdents.size());
     }
 }

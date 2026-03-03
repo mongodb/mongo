@@ -160,6 +160,11 @@ public:
      */
     void configureDelay(Seconds delay);
 
+    /**
+     * Enable deferring untimestamped drops until the next checkpoint completes.
+     */
+    void enableDeferUntimestampedDrops();
+
 private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
@@ -247,6 +252,10 @@ private:
     // How long to extend the timeout on all requested drops with a timestamp. Has no effect
     // on checkpoints.
     Seconds _delay;
+
+    // If true, untimestamped drops are converted to checkpoint-based drops, deferring them until
+    // the next checkpoint completes rather than reaping immediately.
+    bool _deferUntimestampedDrops = false;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

@@ -136,6 +136,14 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
         opCtx, _engine->newRecoveryUnit(), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
+
+    // For disaggregated storage, untimestamped drops must be converted to checkpoint-based drops.
+    // This gives standbys time to synchronize via checkpoints before internal tables are removed
+    // from shared storage.
+    if (rss.getPersistenceProvider().shouldDeferUntimestampedDrops()) {
+        _dropPendingIdentReaper.enableDeferUntimestampedDrops();
+    }
+
     if (rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
         LOGV2(10985326,
               "Skip loading catalog on startup; it will be handled later when WT loads the "

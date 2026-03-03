@@ -114,6 +114,10 @@ class ReplicatedFastCountTestPersistenceProvider : public rss::StubPersistencePr
     bool settingsProvideMajorityWriteJournalDurability(bool) const override {
         return false;
     }
+
+    bool shouldDeferUntimestampedDrops() const override {
+        return false;
+    }
 };
 
 /**

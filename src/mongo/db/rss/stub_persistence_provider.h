@@ -223,6 +223,11 @@ public:
                   "StubPersistenceProvider::settingsProvideMajorityWriteJournalDurability() method "
                   "not implemented");
     }
+
+    bool shouldDeferUntimestampedDrops() const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider method not implemented");
+    }
 };
 
 }  // namespace mongo::rss
