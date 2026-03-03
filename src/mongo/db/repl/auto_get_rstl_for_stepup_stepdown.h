@@ -32,16 +32,16 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
-#include "mongo/db/session/kill_sessions_local.h"
-#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
+#include <vector>
+
 namespace mongo {
-namespace repl {
+namespace MONGO_MOD_PRIVATE repl {
 class StepUpStepDownCoordinator {
 public:
     /**
@@ -82,37 +82,17 @@ public:
     AutoGetRstlForStepUpStepDown(const AutoGetRstlForStepUpStepDown&) = delete;
     AutoGetRstlForStepUpStepDown& operator=(const AutoGetRstlForStepUpStepDown&) = delete;
 
-    /*
+    /**
      * Releases RSTL lock.
      */
     void rstlRelease();
 
-    /*
+    /**
      * Reacquires RSTL lock.
      */
     void rstlReacquire();
 
-    /*
-     * Returns _totalOpsKilled value.
-     */
-    size_t getTotalOpsKilled() const;
-
-    /*
-     * Increments _totalOpsKilled by val.
-     */
-    void incrementTotalOpsKilled(size_t val = 1);
-
-    /*
-     * Returns _totalOpsRunning value.
-     */
-    size_t getTotalOpsRunning() const;
-
-    /*
-     * Increments _totalOpsRunning by val.
-     */
-    void incrementTotalOpsRunning(size_t val = 1);
-
-    /*
+    /**
      * Returns the step up/step down opCtx.
      */
     const OperationContext* getOpCtx() const;
@@ -148,19 +128,13 @@ private:
      * transactions.
      * Terminates once killSignaled is set true.
      */
-    void _killOpThreadFn(Date_t deadline = Date_t::max());
+    void _killOpThreadFn(Date_t deadline);
 
-    /*
+    /**
      * Signals killOpThread to stop killing operations.
      */
     void _stopAndWaitForKillOpThread();
 
-    /**
-     * kill all conflicting operations that are blocked either on prepare conflict or have taken
-     * global lock not in MODE_IS. The conflicting operations can be either user or system
-     * operations marked as killable.
-     */
-    void _killConflictingOpsOnStepUpAndStepDown(ErrorCodes::Error reason);
 
     StepUpStepDownCoordinator* const _stepUpStepDownCoord;  // not owned.
     // step up/step down opCtx.
@@ -170,10 +144,6 @@ private:
     boost::optional<ReplicationStateTransitionLockGuard> _rstlLock;
     // Thread that will run killOpThreadFn().
     std::unique_ptr<stdx::thread> _killOpThread;
-    // Tracks number of operations killed on step up / step down.
-    size_t _totalOpsKilled = 0;
-    // Tracks number of operations left running on step up / step down.
-    size_t _totalOpsRunning = 0;
     // Protects killSignaled and stopKillingOps cond. variable.
     stdx::mutex _mutex;
     // Signals thread about the change of killSignaled value.
@@ -184,5 +154,59 @@ private:
     // class.
     ReplicationCoordinator::OpsKillingStateTransitionEnum _stateTransition;
 };
-}  // namespace repl
+
+/**
+ * Helper class to kill conflicting operations and sessions on step-up or step-down.
+ */
+class MONGO_MOD_FILE_PRIVATE OpsAndSessionsKiller {
+public:
+    OpsAndSessionsKiller(ServiceContext* serviceCtx,
+                         ErrorCodes::Error killReason,
+                         std::vector<const OperationContext*> opsToIgnore,
+                         Date_t deadline);
+
+    OpsAndSessionsKiller(const OpsAndSessionsKiller&) = delete;
+    OpsAndSessionsKiller& operator=(const OpsAndSessionsKiller&) = delete;
+
+    /**
+     * Kill conflicting operations and stashed transactions resources during a step-up or
+     * step-down, in order to release locks.
+     * Operations that are blocked either on prepare conflict or have taken the global lock not
+     * in MODE_IS or are retry-able writes are killed. The conflicting operations can be either
+     * user or system operations marked as killable.
+     */
+    void killConflictingOpsAndSessionsOnStepUpAndStepDown();
+
+    /**
+     * Returns the total number of operation killed by this object.
+     */
+    size_t getTotalOpsKilled() const {
+        return _totalOpsKilled;
+    }
+
+    /**
+     * Returns the total number of operation running that were not killed in the last call of
+     * killConflictingOpsAndSessionsOnStepUpAndStepDown().
+     */
+    size_t getTotalOpsRunning() const {
+        return _totalOpsRunning;
+    }
+
+private:
+    ServiceContext* _serviceCtx;
+    // The op context for this thread.
+    ServiceContext::UniqueOperationContext _opCtx;
+    // Error code used when killing operations and sessions.
+    const ErrorCodes::Error _killReason;
+    // Operations that should not be killed.
+    std::vector<const OperationContext*> _opsToIgnore;
+    // Deadline to kill sessions.
+    Date_t _deadline;
+    // Tracks total number of operations killed.
+    size_t _totalOpsKilled = 0;
+    // Tracks number of operations left running.
+    size_t _totalOpsRunning = 0;
+};
+
+}  // namespace MONGO_MOD_PRIVATE repl
 }  // namespace mongo

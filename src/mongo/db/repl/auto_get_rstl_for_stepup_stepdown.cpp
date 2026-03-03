@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/logv2/log.h"
 
@@ -126,26 +127,14 @@ void AutoGetRstlForStepUpStepDown::_killOpThreadFn(Date_t deadline) {
                        ClientOperationKillableByStepdown{false});
 
     LOGV2(21343, "Starting to kill user operations");
-    auto uniqueOpCtx = cc().makeOperationContext();
-    OperationContext* opCtx = uniqueOpCtx.get();
-
-    // Set the reason for killing operations.
-    ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
-
-    // This thread needs storage rollback to complete timely, so instruct the storage
-    // engine to not do any extra eviction for this thread, if supported.
-    shard_role_details::getRecoveryUnit(opCtx)->setNoEvictionAfterCommitOrRollback();
+    const OperationContext* rstlOpCtx = getOpCtx();
+    OpsAndSessionsKiller killer(rstlOpCtx->getServiceContext(),
+                                ErrorCodes::InterruptedDueToReplStateChange,
+                                std::vector<const OperationContext*>{rstlOpCtx},
+                                deadline);
 
     while (true) {
-        // Reset the value before killing operations as we only want to track the number
-        // of operations that's running after step down.
-        _totalOpsRunning = 0;
-        _killConflictingOpsOnStepUpAndStepDown(killReason);
-
-        // Destroy all stashed transaction resources, in order to release locks.
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions, killReason, deadline);
+        killer.killConflictingOpsAndSessionsOnStepUpAndStepDown();
 
         // Operations (like batch insert) that have currently yielded the global lock during step
         // down can reacquire global lock in IX mode when this node steps back up after a brief
@@ -159,7 +148,7 @@ void AutoGetRstlForStepUpStepDown::_killOpThreadFn(Date_t deadline) {
                     lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
                 LOGV2(21344, "Stopped killing user operations");
                 _stepUpStepDownCoord->updateAndLogStateTransitionMetrics(
-                    _stateTransition, getTotalOpsKilled(), getTotalOpsRunning());
+                    _stateTransition, killer.getTotalOpsKilled(), killer.getTotalOpsRunning());
                 _killSignaled = false;
                 return;
             }
@@ -180,22 +169,6 @@ void AutoGetRstlForStepUpStepDown::_stopAndWaitForKillOpThread() {
     _killOpThread.reset();
 }
 
-size_t AutoGetRstlForStepUpStepDown::getTotalOpsKilled() const {
-    return _totalOpsKilled;
-}
-
-void AutoGetRstlForStepUpStepDown::incrementTotalOpsKilled(size_t val) {
-    _totalOpsKilled += val;
-}
-
-size_t AutoGetRstlForStepUpStepDown::getTotalOpsRunning() const {
-    return _totalOpsRunning;
-}
-
-void AutoGetRstlForStepUpStepDown::incrementTotalOpsRunning(size_t val) {
-    _totalOpsRunning += val;
-}
-
 void AutoGetRstlForStepUpStepDown::rstlRelease() {
     _rstlLock->release();
 }
@@ -214,54 +187,88 @@ void AutoGetRstlForStepUpStepDown::rstlReacquire() {
     _rstlLock->reacquire();
 }
 
-void AutoGetRstlForStepUpStepDown::_killConflictingOpsOnStepUpAndStepDown(
-    ErrorCodes::Error reason) {
-    const OperationContext* rstlOpCtx = getOpCtx();
-    ServiceContext* serviceCtx = rstlOpCtx->getServiceContext();
-    invariant(serviceCtx);
-
-    for (ServiceContext::LockedClientsCursor cursor(serviceCtx); Client* client = cursor.next();) {
-        ClientLock lk(client);
-        OperationContext* toKill = client->getOperationContext();
-
-        // Don't kill step up/step down thread.
-        if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
-            auto& tracker = StorageExecutionContext::get(toKill)->getPrepareConflictTracker();
-            bool isWaitingOnPrepareConflict = tracker.isWaitingOnPrepareConflict();
-            if (client->canKillOperationInStepdown()) {
-                auto locker = shard_role_details::getLocker(toKill);
-                bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
-                bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
-                if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict) {
-                    serviceCtx->killOperation(lk, toKill, reason);
-                    incrementTotalOpsKilled();
-                    LOGV2(8562701,
-                          "Repl state change interrupted a thread.",
-                          "name"_attr = client->desc(),
-                          "alwaysInterrupt"_attr = alwaysInterrupt,
-                          "globalLockConflict"_attr = globalLockConfict,
-                          "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict);
-                } else {
-                    incrementTotalOpsRunning();
-                }
-            } else if (isWaitingOnPrepareConflict) {
-                // All operations that hit a prepare conflict should be killable to prevent
-                // deadlocks with prepared transactions on replica set step up and step down.
-                LOGV2_FATAL(9699100,
-                            "Repl state change encountered a non-killable thread blocked on a "
-                            "prepare conflict.",
-                            "name"_attr = client->desc(),
-                            "conflictCount"_attr = tracker.getThisOpPrepareConflictCount(),
-                            "conflictDurationMicros"_attr =
-                                tracker.getThisOpPrepareConflictDuration());
-            }
-        }
-    }
-}
-
 const OperationContext* AutoGetRstlForStepUpStepDown::getOpCtx() const {
     return _opCtx;
 }
 
+
+OpsAndSessionsKiller::OpsAndSessionsKiller(ServiceContext* serviceCtx,
+                                           ErrorCodes::Error killReason,
+                                           std::vector<const OperationContext*> opsToIgnore,
+                                           Date_t deadline)
+    : _serviceCtx(serviceCtx),
+      _killReason(killReason),
+      _opsToIgnore(std::move(opsToIgnore)),
+      _deadline(deadline) {
+    invariant(_serviceCtx);
+
+    _opCtx = cc().makeOperationContext();
+    _opsToIgnore.push_back(_opCtx.get());
+
+    // This thread needs storage rollback to complete timely, so instruct the storage
+    // engine to not do any extra eviction for this thread, if supported.
+    shard_role_details::getRecoveryUnit(_opCtx.get())->setNoEvictionAfterCommitOrRollback();
+}
+
+void OpsAndSessionsKiller::killConflictingOpsAndSessionsOnStepUpAndStepDown() {
+    // Reset the value before killing operations as we only want to track the number of operations
+    // that's running after step down.
+    _totalOpsRunning = 0;
+
+    for (ServiceContext::LockedClientsCursor cursor(_serviceCtx); Client* client = cursor.next();) {
+        ClientLock lk(client);
+        OperationContext* toKill = client->getOperationContext();
+
+        if (!toKill || toKill->isKillPending()) {
+            continue;
+        }
+        // Don't kill ops to ignore.
+        if (std::any_of(_opsToIgnore.begin(),
+                        _opsToIgnore.end(),
+                        [&toKill](const OperationContext* opCtxToIgnore) {
+                            return toKill->getOpID() == opCtxToIgnore->getOpID();
+                        })) {
+            continue;
+        }
+
+        auto& tracker = StorageExecutionContext::get(toKill)->getPrepareConflictTracker();
+        const bool isWaitingOnPrepareConflict = tracker.isWaitingOnPrepareConflict();
+        if (client->canKillOperationInStepdown()) {
+            auto locker = shard_role_details::getLocker(toKill);
+            const bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
+            const bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
+            const bool isRetryableWrite = toKill->isRetryableWrite();
+            if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict ||
+                isRetryableWrite) {
+                _serviceCtx->killOperation(lk, toKill, _killReason);
+                ++_totalOpsKilled;
+                LOGV2(8562701,
+                      "Repl state change interrupted a thread.",
+                      "name"_attr = client->desc(),
+                      "alwaysInterrupt"_attr = alwaysInterrupt,
+                      "globalLockConflict"_attr = globalLockConfict,
+                      "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict,
+                      "isRetryableWrite"_attr = isRetryableWrite);
+            } else {
+                ++_totalOpsRunning;
+            }
+        } else if (isWaitingOnPrepareConflict) {
+            // All operations that hit a prepare conflict should be killable to prevent
+            // deadlocks with prepared transactions on replica set step up and step down.
+            LOGV2_FATAL(9699100,
+                        "Repl state change encountered a non-killable thread blocked on a "
+                        "prepare conflict.",
+                        "name"_attr = client->desc(),
+                        "conflictCount"_attr = tracker.getThisOpPrepareConflictCount(),
+                        "conflictDuration"_attr = tracker.getThisOpPrepareConflictDuration());
+        }
+    }
+
+    // Destroy all stashed transaction resources, in order to release locks.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx.get())});
+    killSessionsAbortUnpreparedTransactions(
+        _opCtx.get(), matcherAllSessions, _killReason, _deadline);
+}
 }  // namespace repl
 }  // namespace mongo
