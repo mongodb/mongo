@@ -594,6 +594,7 @@ flags in common: {common_set}
     _config.INCLUDE_TAGS = _tags_from_list(config.pop("include_with_all_tags"))
 
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
+    _config.APPEND_MONGO_PATH = config.pop("append_mongo_path")
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"

@@ -584,6 +584,13 @@ def mongo_shell_program(
     _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
+
+    # Add MONGO_PATH environment variable for the shell if specified
+    if config.APPEND_MONGO_PATH:
+        env_vars = process_kwargs.get("env_vars", {}).copy()
+        env_vars["MONGO_PATH"] = os.pathsep.join(config.APPEND_MONGO_PATH)
+        process_kwargs["env_vars"] = env_vars
+
     return make_process(logger, args, **process_kwargs)
 
 

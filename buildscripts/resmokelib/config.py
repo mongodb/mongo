@@ -79,6 +79,7 @@ DEFAULTS = {
     "config_fuzz_seed": None,
     "disable_encryption_fuzzing": False,
     "genny_executable": None,
+    "append_mongo_path": [],
     "include_with_any_tags": None,
     "include_with_all_tags": None,
     "install_dir": None,
@@ -511,6 +512,9 @@ DISABLE_ENCRYPTION_FUZZING = None
 
 # Executable file for genny, passed in as a command line arg.
 GENNY_EXECUTABLE = None
+
+# List of directories to append to MONGO_PATH for searching JavaScript modules.
+APPEND_MONGO_PATH = []
 
 # If set, then only jstests that have at least one of the specified tags will be run during the
 # jstest portion of the suite(s).

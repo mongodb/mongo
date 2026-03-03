@@ -39,11 +39,13 @@
 // IWYU pragma: no_include "boost/system/detail/errc.hpp"
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include "mongo/logv2/log.h"
+#include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/scripting/mozjs/shell/module_loader.h"
 #include "mongo/util/file.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
 #include <jsapi.h>
@@ -77,6 +79,19 @@ namespace mozjs {
 bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     _baseUrl = resolveBaseUrl(cx, loadPath);
     LOGV2_DEBUG(716281, 2, "Resolved module base url.", "baseUrl"_attr = _baseUrl.c_str());
+
+    // Initialize search paths from MONGO_PATH environment variable
+    _searchPaths = parseMongoPath();
+    // Base URL has highest priority - insert it first if not already present
+    if (_searchPaths.empty() || _searchPaths[0] != _baseUrl) {
+        _searchPaths.insert(_searchPaths.begin(), _baseUrl);
+    }
+
+    LOGV2_DEBUG(99745619,
+                2,
+                "Initialized module search paths.",
+                "numPaths"_attr = _searchPaths.size(),
+                "baseUrl"_attr = _baseUrl.c_str());
 
     JSRuntime* rt = JS_GetRuntime(cx);
     JS::SetModuleResolveHook(rt, ModuleLoader::moduleResolveHook);
@@ -274,8 +289,8 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
     if (is_directory(specifierPath)) {
         JS_ReportErrorUTF8(cx,
                            "Directory import '%s' is not supported, imported from %s",
-                           specifierPath.c_str(),
-                           refAbsPath.c_str());
+                           specifierPath.string().c_str(),
+                           refAbsPath.string().c_str());
         return nullptr;
     }
 
@@ -283,23 +298,46 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
         return specifierString;
     }
 
+    // Search through all configured search paths (MONGO_PATH + base URL)
     boost::system::error_code ec;
-    auto fullPath =
-        boost::filesystem::canonical(specifierPath, _baseUrl, ec).lexically_normal().string();
-    if (ec) {
-        if (ec.value() == boost::system::errc::no_such_file_or_directory) {
-            JS_ReportErrorUTF8(cx,
-                               "Cannot find module '%s' imported from %s",
-                               specifierPath.c_str(),
-                               refAbsPath.c_str());
-        } else {
-            JS_ReportErrorUTF8(cx, "%s", ec.message().c_str());
+    std::string lastErrorMsg;
+
+    for (const auto& searchPath : _searchPaths) {
+        auto fullPath =
+            boost::filesystem::canonical(specifierPath, searchPath, ec).lexically_normal().string();
+
+        if (!ec && boost::filesystem::exists(fullPath)) {
+            // Found the module in this search path
+            LOGV2_DEBUG(99745618,
+                        3,
+                        "Resolved module import.",
+                        "specifier"_attr = specifierPath.string(),
+                        "searchPath"_attr = searchPath,
+                        "fullPath"_attr = fullPath);
+            return JS_NewStringCopyN(cx, fullPath.c_str(), fullPath.size());
         }
 
-        return nullptr;
+        // Track the last error for reporting
+        if (ec && ec.value() != boost::system::errc::no_such_file_or_directory) {
+            lastErrorMsg = ec.message();
+        }
     }
 
-    return JS_NewStringCopyN(cx, fullPath.c_str(), fullPath.size());
+    // Module not found in any search path
+    if (!lastErrorMsg.empty()) {
+        // Report a non-ENOENT error if we encountered one
+        JS_ReportErrorUTF8(cx, "%s", lastErrorMsg.c_str());
+    } else {
+        // Report not found error with search path info
+        JS_ReportErrorUTF8(cx,
+                           "Cannot find module '%s' imported from %s (searched %zu path%s)",
+                           specifierPath.string().c_str(),
+                           refAbsPath.string().c_str(),
+                           _searchPaths.size(),
+                           _searchPaths.size() == 1 ? "" : "s");
+    }
+
+    return nullptr;
 }
 
 bool ModuleLoader::getScriptPath(JSContext* cx,

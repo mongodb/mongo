@@ -33,6 +33,7 @@
 #include "mongo/util/modules.h"
 
 #include <string>
+#include <vector>
 
 #include <jsapi.h>
 
@@ -97,6 +98,7 @@ private:
                                       boost::optional<StringData> source = boost::none);
 
     std::string _baseUrl;
+    std::vector<std::string> _searchPaths;
 };
 
 }  // namespace mozjs

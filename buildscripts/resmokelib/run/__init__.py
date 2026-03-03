@@ -1415,6 +1415,18 @@ class RunPlugin(PluginInterface):
         )
 
         parser.add_argument(
+            "--appendMongoPath",
+            dest="append_mongo_path",
+            action="append",
+            metavar="PATH",
+            help=(
+                "Append a directory to MONGO_PATH for searching JavaScript modules used by "
+                "load() and import(). Can be specified multiple times. Paths are searched in "
+                "the order specified."
+            ),
+        )
+
+        parser.add_argument(
             "--includeWithAnyTags",
             action="append",
             dest="include_with_any_tags",

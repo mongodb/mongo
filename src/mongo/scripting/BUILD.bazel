@@ -37,6 +37,7 @@ mongo_cc_library(
         "deadline_monitor.cpp",
         "engine.cpp",
         "jsexception.cpp",
+        "mongo_path_util.cpp",
         "utils.cpp",
         ":config_gen",
         ":deadline_monitor_gen",

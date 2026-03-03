@@ -29,6 +29,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -111,6 +112,77 @@ TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);
+}
+
+TEST(ModuleLoaderTest, ParseSearchPathsEmpty) {
+    // Test with no MONGO_PATH set - should default to current working directory
+#ifdef _WIN32
+    _putenv_s("MONGO_PATH", "");
+#else
+    unsetenv("MONGO_PATH");
+#endif
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 1U);
+    ASSERT_EQ(paths[0], boost::filesystem::current_path().string());
+}
+
+TEST(ModuleLoaderTest, ParseSearchPathsSinglePath) {
+    // Test with a single path
+#ifdef _WIN32
+    _putenv_s("MONGO_PATH", "C:\\mongo\\lib");
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 1U);
+    ASSERT_EQ(paths[0], "C:\\mongo\\lib");
+    _putenv_s("MONGO_PATH", "");
+#else
+    setenv("MONGO_PATH", "/usr/local/lib/mongo", 1);
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 1U);
+    ASSERT_EQ(paths[0], "/usr/local/lib/mongo");
+    unsetenv("MONGO_PATH");
+#endif
+}
+
+#if !defined(_WIN32)
+TEST(ModuleLoaderTest, ParseSearchPathsMultiplePathsUnix) {
+    // Test with multiple paths (Unix-style colon separator)
+    setenv("MONGO_PATH", "/usr/local/lib/mongo:/opt/mongo/lib:/home/user/.mongo", 1);
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 3U);
+    ASSERT_EQ(paths[0], "/usr/local/lib/mongo");
+    ASSERT_EQ(paths[1], "/opt/mongo/lib");
+    ASSERT_EQ(paths[2], "/home/user/.mongo");
+    unsetenv("MONGO_PATH");
+}
+#else
+TEST(ModuleLoaderTest, ParseSearchPathsMultiplePathsWindows) {
+    // Test with multiple paths (Windows-style semicolon separator)
+    _putenv_s("MONGO_PATH", "C:\\mongo\\lib;D:\\mongo\\lib");
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 2U);
+    ASSERT_EQ(paths[0], "C:\\mongo\\lib");
+    ASSERT_EQ(paths[1], "D:\\mongo\\lib");
+    _putenv_s("MONGO_PATH", "");
+}
+#endif
+
+TEST(ModuleLoaderTest, ParseSearchPathsIgnoresEmpty) {
+    // Test that empty paths are ignored
+#ifdef _WIN32
+    _putenv_s("MONGO_PATH", "C:\\mongo\\lib;;D:\\mongo\\lib");
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 2U);
+    ASSERT_EQ(paths[0], "C:\\mongo\\lib");
+    ASSERT_EQ(paths[1], "D:\\mongo\\lib");
+    _putenv_s("MONGO_PATH", "");
+#else
+    setenv("MONGO_PATH", "/usr/local/lib/mongo::/opt/mongo/lib", 1);
+    auto paths = parseMongoPath();
+    ASSERT_EQ(paths.size(), 2U);
+    ASSERT_EQ(paths[0], "/usr/local/lib/mongo");
+    ASSERT_EQ(paths[1], "/opt/mongo/lib");
+    unsetenv("MONGO_PATH");
+#endif
 }
 
 }  // namespace mozjs
