@@ -1825,9 +1825,10 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
  * of the plan to the solution(s) via the extendWith() call near the end.
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
-    CanonicalQuery& query,
+    const CanonicalQuery& query,
     std::unique_ptr<QuerySolution>&& solution,
-    const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos) {
+    const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos,
+    bool keepSentinel) {
     if (query.cqPipeline().empty()) {
         return std::move(solution);
     }
@@ -1998,8 +1999,10 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         tasserted(5842400, "Pipeline contains unsupported stage for SBE pushdown");
     }
 
-    solution->extendWith(std::move(solnForAgg));
-    solution = QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
+    solution->extendWith(std::move(solnForAgg), keepSentinel);
+    if (!keepSentinel) {
+        solution = QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
+    }
 
     return std::move(solution);
 }  // QueryPlanner::extendWithAggPipeline

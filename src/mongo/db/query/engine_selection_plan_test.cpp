@@ -65,16 +65,25 @@ IndexEntry buildSimpleIndexEntry(const std::vector<std::string>& indexFields) {
             nullptr};
 }
 
-TEST(GetExecutor, FetchIxScan) {
-    // FETCH(IXSCAN)
-    auto nss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+TEST(GetExecutor, LookupUnwind) {
+    auto nssLocal = NamespaceString::createNamespaceString_forTest("testdb.collLocal");
+    auto nssForeign = NamespaceString::createNamespaceString_forTest("testdb.collForeign");
+
     std::vector<std::string> indexFields = {"a"};
-
-    auto indexScan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(indexFields));
-    auto fetch = std::make_unique<FetchNode>(std::move(indexScan), nss);
-
+    auto indexScan = std::make_unique<IndexScanNode>(nssLocal, buildSimpleIndexEntry(indexFields));
+    auto lookupUnwind =
+        std::make_unique<EqLookupUnwindNode>(std::move(indexScan),
+                                             FieldPath("a"),
+                                             nssForeign,
+                                             FieldPath("b"),
+                                             FieldPath("c"),
+                                             EqLookupNode::LookupStrategy::kHashJoin,
+                                             boost::none,
+                                             false,
+                                             false,
+                                             boost::none);
     auto solution = std::make_unique<QuerySolution>();
-    solution->setRoot(std::move(fetch));
+    solution->setRoot(std::move(lookupUnwind));
     ASSERT_TRUE(engineSelectionForPlan(solution.get()) == EngineChoice::kSbe);
 }
 

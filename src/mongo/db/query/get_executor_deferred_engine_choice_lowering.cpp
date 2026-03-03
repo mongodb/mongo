@@ -36,6 +36,7 @@
 #include "mongo/db/query/engine_selection.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
@@ -48,7 +49,6 @@
 namespace mongo::exec_deferred_engine_choice {
 
 namespace {
-
 /*
  * This class takes information about the query and planning results, and outputs an executor when
  * `lower` is called. In `lower`, the plan ranking result is analyzed, the execution engine is
@@ -79,6 +79,36 @@ public:
             return makeClassicExecutor(nullptr /* solution */);
         }
         auto solution = std::move(_rankingResult.solutions[0]);
+        const auto engine = attachPipelineStagesAndSelectEngine(solution);
+        return engine == EngineChoice::kClassic ? makeClassicExecutor(std::move(solution))
+                                                : makeSbePlanExecutor(std::move(solution));
+    }
+
+private:
+    /*
+     * Selects the engine to execute in, guaranteeing that if SBE is chosen, the QSN will be
+     * extended with SBE-eligible pipeline prefix.
+     */
+    EngineChoice attachPipelineStagesAndSelectEngine(std::unique_ptr<QuerySolution>& solution) {
+        bool qsnExtendFnCalled = false;
+        bool qsnExtendedForSbe = false;
+        // If there is an eligible pipeline prefix to attach to the QSN, fills out the planner
+        // params for secondary collections and attaches the stages to the QSN.
+        //    - Tracks if this function was called already via `qsnExtendFnCalled`, since engine
+        //      selection won't always need to call it.
+        //    - Tracks `qsnExtendedForSbe` so we know if the resulting QSN contains a SentinelNode
+        //      that needs to be removed.
+        auto extendSolutionWithPipelineFn = [&]() {
+            qsnExtendFnCalled = true;
+            if (_cq->cqPipeline().empty()) {
+                // Nothing to extend if the CQ pipeline is empty.
+                return;
+            }
+            qsnExtendedForSbe = true;
+            plannerParams()->fillOutSecondaryCollectionsPlannerParams(_opCtx, *_cq, _collections);
+            extendSolutionWithPipeline(solution);
+        };
+
         const auto engine = chooseEngine(
             _opCtx,
             _collections,
@@ -91,12 +121,31 @@ public:
                 .collections = _collections,
                 .plannerOptions = _rankingResult.plannerParams->providedOptions,
             }),
-            solution.get());
-        return engine == EngineChoice::kClassic ? makeClassicExecutor(std::move(solution))
-                                                : makeSbePlanExecutor(std::move(solution));
+            solution.get(),
+            extendSolutionWithPipelineFn);
+
+
+        if (engine == EngineChoice::kClassic && qsnExtendedForSbe) {
+            // If classic was chosen and we extended the QSN to check for SBE eligibility, remove
+            // the extension.
+            solution->removeRootToSentinel();
+        } else if (engine == EngineChoice::kSbe) {
+            // If SBE is chosen, we might still need to call the extension function.
+            if (!qsnExtendFnCalled) {
+                extendSolutionWithPipelineFn();
+            }
+            // If there was a pipeline to extend the QSN with, the QSN now has a SentinelNode that
+            // we need to remove. There is also an additional optimization we may perform if a
+            // $project is its child.
+            if (qsnExtendedForSbe) {
+                solution->removeSentinelNode();
+                solution =
+                    QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
+            }
+        }
+        return engine;
     }
 
-private:
     QueryPlannerParams* plannerParams() {
         return _rankingResult.plannerParams.get();
     }
@@ -114,12 +163,8 @@ private:
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeSbePlanExecutor(
         std::unique_ptr<QuerySolution> solution) {
-        plannerParams()->setTargetSbeStageBuilder(*_cq, _collections);
         // Remove any stages from `pipeline` that will be pushed down to SBE.
         finalizePipelineStages(_pipeline, _cq.get());
-        plannerParams()->fillOutSecondaryCollectionsPlannerParams(_opCtx, *_cq, _collections);
-        // Push down pipeline stages in the CanonicalQuery to the solution.
-        extendSolutionWithPipeline(solution);
 
         auto sbeYieldPolicy =
             PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _cq->nss());
@@ -212,11 +257,10 @@ private:
     }
 
     void extendSolutionWithPipeline(std::unique_ptr<QuerySolution>& solution) {
-        if (_cq->cqPipeline().empty()) {
-            return;
-        }
-        solution = QueryPlanner::extendWithAggPipeline(
-            *_cq, std::move(solution), plannerParams()->secondaryCollectionsInfo);
+        solution = QueryPlanner::extendWithAggPipeline(*_cq,
+                                                       std::move(solution),
+                                                       plannerParams()->secondaryCollectionsInfo,
+                                                       true /* keepSentinel */);
     }
 
     std::unique_ptr<CanonicalQuery> _cq;

@@ -325,6 +325,24 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
         }
     }
 
+    /*
+     * Removes one SentinelNode from the tree, leaving the rest of the tree intact. tasserts if no
+     * sentinel is found.
+     */
+    void removeSentinelNode() {
+        if (children.empty()) {
+            tasserted(11986303,
+                      "Expected at least one child on the qsn when searching for a sentinel node");
+        }
+        auto* child = children[0].get();
+        if (child->getType() == StageType::STAGE_SENTINEL) {
+            tassert(11986302, "Expected sentinel to have 1 child", child->children.size() == 1);
+            children[0] = std::move(child->children[0]);
+        } else {
+            child->removeSentinelNode();
+        }
+    }
+
     std::vector<std::unique_ptr<QuerySolutionNode>> children;
 
     // If a stage has a non-NULL filter all values outputted from that stage must pass that
@@ -447,10 +465,36 @@ public:
     /**
      * Extends the solution's tree by attaching it to the tree rooted at 'extensionRoot'. The
      * extension tree must contain exactly one 'SentinelNode' node that denotes the attachment
-     * point. The sentinel node will be replaced with the '_root' node. Sets _unextendedRootId to
-     * the nodeId of the old root.
+     * point. Sets _unextendedRootId to the nodeId of the old root.
+     * If `keepSentinel` is true, the sentinel node will remain in the tree, with it's only child
+     * being `_root`.
+     * If `false`, the sentinel node will be replaced with the `_root` node.
      */
-    void extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot);
+    void extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot, bool keepSentinel = false);
+
+    /*
+     * Removes one SentinelNode from the tree, leaving the rest of the tree intact. tasserts if no
+     * sentinel is found.
+     */
+    void removeSentinelNode() {
+        _root->removeSentinelNode();
+    }
+
+    /*
+     * Removes every node from the root to the sentinel node, including both the root and the
+     * sentinel.
+     */
+    void removeRootToSentinel() {
+        auto removeRoot = [&]() {
+            tassert(11986306, "Expected at least one child on the qsn", !_root->children.empty());
+            setRoot(std::move(_root->children[0]));
+        };
+        while (_root->getType() != StageType::STAGE_SENTINEL) {
+            removeRoot();
+        }
+        // Call `removeRoot` one more time to remove the sentinel node.
+        removeRoot();
+    }
 
     /**
      * Assigns the QuerySolutionNode rooted at 'root' to this QuerySolution. Also assigns a unique

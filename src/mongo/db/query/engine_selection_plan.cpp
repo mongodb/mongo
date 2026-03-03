@@ -31,6 +31,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/canonical_query.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 
 namespace {
@@ -85,6 +87,12 @@ template <class F>
 void visit(F&& f, const QuerySolutionNode& node) {
     // We'll add specializations as the rules need them.
     switch (node.getType()) {
+        case STAGE_EQ_LOOKUP:
+            f(static_cast<const EqLookupNode&>(node));
+            break;
+        case STAGE_GROUP:
+            f(static_cast<const GroupNode&>(node));
+            break;
         case STAGE_IXSCAN:
             f(static_cast<const IndexScanNode&>(node));
             break;
@@ -152,6 +160,30 @@ bool treeMatchesAny(const QuerySolution* solution, Rules&&... rules) {
 
 /**
  * This rule matches when:
+ * 1. There is at least one GROUP in the tree.
+ */
+class GroupRule {
+public:
+    void preVisit(RuleEngine& engine, const GroupNode& node) {
+        engine.match();
+    }
+};
+static_assert(HasPreVisit<GroupRule, GroupNode>);
+
+/**
+ * This rule matches when:
+ * 1. There is at least one LOOKUP in the tree.
+ */
+class LookupRule {
+public:
+    void preVisit(RuleEngine& engine, const EqLookupNode& node) {
+        engine.match();
+    }
+};
+static_assert(HasPreVisit<LookupRule, EqLookupNode>);
+
+/**
+ * This rule matches when:
  * 1. There is at least one LOOKUP_UNWIND in the tree.
  *
  * TODO SERVER-117922: Implement this rule.
@@ -181,8 +213,13 @@ static_assert(HasPreVisit<IxScanRule, IndexScanNode>);
 }  // namespace
 
 EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
-    return treeMatchesAny(solution, LookupUnwindRule(), IxScanRule()) ? EngineChoice::kSbe
-                                                                      : EngineChoice::kClassic;
+    LOGV2_DEBUG(11986305,
+                1,
+                "Plan-based engine selection logic invoked.",
+                "solution"_attr = solution->toString());
+    return treeMatchesAny(solution, LookupUnwindRule(), LookupRule(), GroupRule())
+        ? EngineChoice::kSbe
+        : EngineChoice::kClassic;
 }
 
 }  // namespace mongo

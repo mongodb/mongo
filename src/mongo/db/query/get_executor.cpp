@@ -1263,7 +1263,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         canonicalQuery->optimizeProjection();
     } else if (canCommitToSbe()) {
         // Commit to using SBE by removing the pushed-down aggregation stages from the original
-        // pipeline and by mutating the canonical query with search specific metadata.
+        // pipeline.
         finalizePipelineStages(pipeline, canonicalQuery.get());
     }
 

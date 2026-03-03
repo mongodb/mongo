@@ -9,6 +9,9 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
 
+    # TODO SERVER-120707 re-enable test once $limit-$match issue is fixed.
+    - jstests/aggregation/optimization/optimize_away_pipeline.js
+
     # TODO SERVER-119038 implement EOF fast-path for non-existent collections
     - jstests/aggregation/sources/lookup/lookup_non_existent_collection.js
 

@@ -646,7 +646,7 @@ bool findSbeCompatibleStagesForPushdown(
 }  // findSbeCompatibleStagesForPushdown
 }  // namespace
 
-void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery) {
+void finalizePipelineStages(Pipeline* pipeline, const CanonicalQuery* canonicalQuery) {
     if (!pipeline || pipeline->empty()) {
         return;
     }

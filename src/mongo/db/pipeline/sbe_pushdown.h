@@ -43,7 +43,7 @@ class Pipeline;
  * with a call to attachPipelineStages() - the caller must first get the stages for push down, add
  * them to the canonical query, and only then remove them from the pipeline.
  */
-void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery);
+void finalizePipelineStages(Pipeline* pipeline, const CanonicalQuery* canonicalQuery);
 
 /**
  * Identifies the prefix of the 'pipeline' that is eligible for running in SBE and adds it to the

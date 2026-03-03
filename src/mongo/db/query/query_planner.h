@@ -100,11 +100,15 @@ public:
      * Given a CanonicalQuery and a QSN tree, creates QSN nodes for each pipeline stage in 'query'
      * and grafts them on top of the existing QSN tree. If 'query' has an empty pipeline, this
      * function is a noop.
+     * If `keepSentinel` is set, extends the QuerySolution but marks where the new stages added by
+     * inserting a SentinelNode into the tree. This node connects the pushed down stages to the
+     * original tree.
      */
     static std::unique_ptr<QuerySolution> extendWithAggPipeline(
-        CanonicalQuery& query,
+        const CanonicalQuery& query,
         std::unique_ptr<QuerySolution>&& solution,
-        const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos);
+        const std::map<NamespaceString, CollectionInfo>& secondaryCollInfos,
+        bool keepSentinel = false);
 
     /**
      * Returns the list of possible query solutions for the provided 'query' for multi-planning.

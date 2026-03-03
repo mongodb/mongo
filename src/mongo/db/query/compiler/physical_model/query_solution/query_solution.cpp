@@ -337,7 +337,8 @@ void QuerySolution::assignNodeIds(PlanNodeId& lastNodeId, QuerySolutionNode& nod
     node._nodeId = ++lastNodeId;
 }
 
-void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot) {
+void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot,
+                               bool keepSentinel) {
     auto current = extensionRoot.get();
     if (current == nullptr || current->getType() == StageType::STAGE_SENTINEL) {
         // Nothing to do for a trivial extension.
@@ -359,8 +360,17 @@ void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot)
                 parentOfSentinel->children.size() == 1);
         current = parentOfSentinel->children[0].get();
     }
+    tassert(11986304,
+            "Expected the sentinel node passed to extendWith() to be a leaf node.",
+            current->children.empty());
     QuerySolutionNode* oldRoot = _root.get();
-    parentOfSentinel->children[0] = std::move(_root);
+    // If `keepSentinel` is set, make the _root a child of the existing sentinel node. Otherwise,
+    // attach _root to the parent of the sentinel (deleting the sentinel).
+    if (keepSentinel) {
+        current->children.push_back(std::move(_root));
+    } else {
+        parentOfSentinel->children[0] = std::move(_root);
+    }
     setRoot(std::move(extensionRoot));
     // setRoot may re-assign node ids, so we assign this value after calling setRoot.
     _unextendedRootId = oldRoot->nodeId();
@@ -1961,6 +1971,10 @@ std::unique_ptr<QuerySolutionNode> SentinelNode::clone() const {
 void SentinelNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "SENTINEL\n";
+    tassert(11986301, "Expected the sentinel node to have 0 or 1 children", children.size() <= 1);
+    if (children.size() == 1) {
+        children[0]->appendToString(ss, indent + 2);
+    }
 }
 
 std::unique_ptr<QuerySolutionNode> SearchNode::clone() const {

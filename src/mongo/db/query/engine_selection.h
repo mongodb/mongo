@@ -48,6 +48,7 @@ EngineChoice chooseEngine(OperationContext* opCtx,
                           Pipeline* pipeline,
                           bool needsMerge,
                           std::unique_ptr<QueryPlannerParams> plannerParams,
-                          const QuerySolution* solution = nullptr);
+                          const QuerySolution* solution = nullptr,
+                          const std::function<void()>& extendSolutionWithPipelineFn = nullptr);
 
 }  // namespace mongo
