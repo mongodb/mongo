@@ -62,6 +62,7 @@ static AtomicWord<bool> _paused{false};
 static std::string _pausedScript;
 static int _pausedLine{0};
 
+AtomicWord<bool> _configurationDone{false};
 static stdx::mutex _pauseMutex;
 static stdx::condition_variable _pauseCV;
 

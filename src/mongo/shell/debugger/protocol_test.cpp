@@ -45,6 +45,16 @@ TEST(Request, fromJSON) {
     ASSERT_EQ(req->command, "setBreakpoints");
 }
 
+TEST(Message, AckResponse) {
+    std::string json = R"({"type":"request","seq":7,"command":"configurationDone","arguments":{}})";
+    auto request = Request::fromJSON(json);
+    ASSERT_EQ(request->seq, 7);
+
+    auto response = Response::Ack(*request);
+    std::string expectedResponse = R"({ "type" : "response", "seq" : 7, "success" : true })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
+}
+
 TEST(SetBreakpointsRequest, parseRequestAndResponse) {
 
     std::string json =
@@ -125,6 +135,18 @@ TEST(StoppedEvent, parseEvent) {
     std::string expectedJson =
         R"({ "type" : "event", "event" : "stopped", "body" : { "reason" : "breakpoint" } })";
     ASSERT_EQ(event.getJson(), expectedJson);
+}
+
+TEST(ConfigurationDoneRequest, parseRequestAndResponse) {
+    std::string json =
+        R"({"type":"request","seq":12,"command":"configurationDone","arguments":{}})";
+
+    auto request = std::static_pointer_cast<ConfigurationDoneRequest>(Request::fromJSON(json));
+    ASSERT_EQ(request->seq, 12);
+
+    auto response = request->response();
+    std::string expectedResponse = R"({ "type" : "response", "seq" : 12, "success" : true })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
 }
 
 }  // namespace protocol

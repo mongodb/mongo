@@ -58,6 +58,7 @@ public:
     static void sendPause();
 
     // visitors
+    void handleRequest(ConfigurationDoneRequest& request) override;
     void handleRequest(SetBreakpointsRequest& request) override;
     void handleRequest(ContinueRequest& request) override;
     void handleRequest(StackTraceRequest& request) override;

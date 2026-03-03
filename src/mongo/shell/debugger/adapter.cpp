@@ -60,11 +60,20 @@ std::unique_ptr<std::thread> _messageThread;
 // Configuration state
 stdx::mutex _configMutex;
 stdx::condition_variable _configCV;
+static AtomicWord<bool> _configured{false};
 
 
 /**
  * DebugAdapter
  */
+
+void DebugAdapter::handleRequest(ConfigurationDoneRequest& request) {
+    std::lock_guard<std::mutex> lock(_configMutex);
+    _configured.store(true);
+    _configCV.notify_all();
+
+    sendMessage(request.response());
+}
 
 void DebugAdapter::handleRequest(SetBreakpointsRequest& request) {
     DebuggerGlobal::setBreakpoints(request);
@@ -105,8 +114,7 @@ void DebugAdapter::waitForHandshake() {
     // breakpoints. We need to wait for the DAP to sync up, and then continue.
 
     std::unique_lock<std::mutex> lock(_configMutex);
-    // TODO(SERVER-XXX): this is just a straight up 1-second pause, and can/should be more elegant
-    _configCV.wait_for(lock, std::chrono::seconds(1), [] { return false; });
+    _configCV.wait_for(lock, std::chrono::milliseconds(100), [] { return _configured.load(); });
 }
 
 void DebugAdapter::sendPause() {
@@ -117,6 +125,7 @@ void DebugAdapter::sendPause() {
 void DebugAdapter::sendMessage(std::string json) {
     if (_clientSocket < 0)
         return;
+    json += '\n';
     send(_clientSocket, json.c_str(), json.length(), 0);
 }
 

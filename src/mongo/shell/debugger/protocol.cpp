@@ -74,11 +74,24 @@ std::shared_ptr<Request> Request::fromJSON(std::string line) {
     if (command == VariablesRequest::COMMAND) {
         return std::make_shared<VariablesRequest>(partial);
     }
+    if (command == ConfigurationDoneRequest::COMMAND) {
+        return std::make_shared<ConfigurationDoneRequest>(partial);
+    }
 
     // Null Object pattern
     return std::make_shared<UnknownRequest>(partial);
 }
 
+/**
+ * ConfigurationDoneRequest
+ */
+
+ConfigurationDoneRequest::ConfigurationDoneRequest(const PartialRequest& partial)
+    : VisitableRequest(partial) {}
+
+Response ConfigurationDoneRequest::response() {
+    return Response::Ack(*this);
+}
 
 /**
  * SetBreakpointsRequest
@@ -282,6 +295,15 @@ Response::Response(int seq, BSONObj obj) : Message(seq), bson(obj) {}
 
 std::string Response::getJson() const {
     return bson.jsonString(LegacyStrict);
+}
+
+Response Response::Ack(Message msg) {
+    BSONObjBuilder builder;
+    builder.append("type", "response");
+    builder.append("seq", msg.seq);
+    builder.append("success", true);
+    Response response(msg.seq, builder.obj());
+    return response;
 }
 
 }  // namespace protocol

@@ -42,6 +42,7 @@ namespace protocol {
 
 // Forward declarations
 class PartialRequest;
+class ConfigurationDoneRequest;
 class SetBreakpointsRequest;
 class ContinueRequest;
 class StackTraceRequest;
@@ -54,6 +55,7 @@ class UnknownRequest;
 class RequestHandler {
 public:
     virtual ~RequestHandler() = default;
+    virtual void handleRequest(ConfigurationDoneRequest& req) = 0;
     virtual void handleRequest(SetBreakpointsRequest& req) = 0;
     virtual void handleRequest(ContinueRequest& req) = 0;
     virtual void handleRequest(StackTraceRequest& req) = 0;
@@ -107,6 +109,15 @@ public:
     const BSONObj bson;
     Response(int seq, BSONObj obj);
     std::string getJson() const;
+
+    static Response Ack(Message msg);
+};
+
+class ConfigurationDoneRequest : public VisitableRequest<ConfigurationDoneRequest> {
+public:
+    inline static constexpr std::string_view COMMAND = "configurationDone";
+    ConfigurationDoneRequest(const PartialRequest& partial);
+    Response response();
 };
 
 class SetBreakpointsRequest : public VisitableRequest<SetBreakpointsRequest> {

@@ -30,6 +30,7 @@ class MongoShellDebugSession extends DebugSession {
         this.debugConnection = null;
         this.debugServer = null;
         this.connected = false;
+        this.configurationDoneResponse = null;
 
         // Handles for variables
         this.breakpoints = new Map();
@@ -86,16 +87,24 @@ class MongoShellDebugSession extends DebugSession {
 
     // Set up message handling for debug protocol
     setupDebugConnection() {
+        let msgBuffer = "";
         this.debugConnection.on("data", (data) => {
-            let line = data.toString();
-            if (!line.trim()) return;
+            msgBuffer += data.toString();
 
-            try {
-                const msg = JSON.parse(line);
-                this.handleDebugMessage(msg);
-            } catch (err) {
-                this.log(`Failed to parse: ${line}`, "stderr");
-                this.log(err);
+            let pos;
+            while ((pos = msgBuffer.indexOf("\n")) !== -1) {
+                let line = msgBuffer.substring(0, pos);
+                msgBuffer = msgBuffer.substring(pos + 1);
+
+                if (!line.trim()) continue;
+
+                try {
+                    const msg = JSON.parse(line);
+                    this.handleDebugMessage(msg);
+                } catch (err) {
+                    this.log(`Failed to parse: ${line}`, "stderr");
+                    this.log(err.toString(), "stderr");
+                }
             }
         });
 
@@ -106,6 +115,18 @@ class MongoShellDebugSession extends DebugSession {
 
         // Send any queued breakpoints from before connection (attach mode)
         this.sendQueuedBreakpoints();
+
+        this.sendDeferredConfigurationDoneRequest();
+    }
+
+    sendDeferredConfigurationDoneRequest() {
+        const response = this.configurationDoneResponse;
+        this.sendCommand("configurationDone", {})
+            .then(() => this.sendResponse(response))
+            .catch((err) => {
+                this.log(`ConfigurationDone failed: ${err.message}`, "stderr");
+                this.sendErrorResponse(response, 1011, `Configuration failed: ${err.message}`);
+            });
     }
 
     // Helper to send output to debug console
@@ -255,6 +276,12 @@ class MongoShellDebugSession extends DebugSession {
             default:
                 this.log(`Event "${msg.event}" has no handler`);
         }
+    }
+
+    configurationDoneRequest(response, _args) {
+        // The DAP is expected to be started up before shells are launched for it to attach to.
+        // Store this response to reuse and pass to each new shell for a handshake
+        this.configurationDoneResponse = response;
     }
 
     // Pause execution
