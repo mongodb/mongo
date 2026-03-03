@@ -37,7 +37,6 @@
 #include "mongo/transport/baton.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 #include <list>
 #include <map>

@@ -34,7 +34,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 

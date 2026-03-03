@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 

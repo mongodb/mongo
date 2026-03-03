@@ -34,7 +34,6 @@
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/timer.h"
 
 #include <boost/move/utility_core.hpp>

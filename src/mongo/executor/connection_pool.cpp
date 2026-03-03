@@ -42,7 +42,6 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"

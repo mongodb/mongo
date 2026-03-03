@@ -42,7 +42,6 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"

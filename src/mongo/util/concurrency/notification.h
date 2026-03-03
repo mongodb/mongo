@@ -34,7 +34,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 

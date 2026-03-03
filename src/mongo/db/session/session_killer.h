@@ -42,7 +42,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 

@@ -56,7 +56,6 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/executor_stats.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"

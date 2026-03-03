@@ -887,7 +887,6 @@ mongo_cc_unit_test(
         "future_test_shared_future.cpp",
         "future_test_valid.cpp",
         "future_util_test.cpp",
-        "hierarchical_acquisition_test.cpp",
         "histogram_test.cpp",
         "icu_test.cpp",
         "inline_memory_test.cpp",

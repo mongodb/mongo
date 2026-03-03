@@ -45,7 +45,6 @@
 #include "mongo/util/concurrency/lock_free_read_list.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/periodic_runner.h"

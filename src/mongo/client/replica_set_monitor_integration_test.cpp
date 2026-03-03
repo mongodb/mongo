@@ -58,7 +58,6 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 #include <algorithm>
 #include <cstddef>

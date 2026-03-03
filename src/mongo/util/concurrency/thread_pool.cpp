@@ -44,7 +44,6 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 #include <algorithm>
 #include <condition_variable>

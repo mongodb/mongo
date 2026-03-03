@@ -36,7 +36,6 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
