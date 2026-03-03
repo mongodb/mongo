@@ -17,17 +17,18 @@
 import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 {
-    jsTest.log("Fail with missing destination shard");
+    jsTest.log("Fail with missing 'to' field");
 
     assert.commandFailed(db.adminCommand({movePrimary: db.getName()}));
 }
 
 {
-    jsTest.log("Fail with invalid destination shard");
+    jsTest.log("Fail with invalid 'to' field");
 
     const invalidShardNames = ["", "unknown", "nonExistingShard", "shard1000"];
 
     // Move primary with non existing shard must fail even if the database does not exists
+    assert.commandWorked(db.dropDatabase());
     invalidShardNames.forEach((invalidShardName) => {
         assert.commandFailed(db.adminCommand({movePrimary: db.getName(), to: invalidShardName}));
     });
