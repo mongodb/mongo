@@ -106,7 +106,6 @@ public:
         StringData comment = "ClusterAggregate::runAggregate"_sd,
         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
-
     /**
      * Convenience version that internally constructs the LiteParsedPipeline.
      */
@@ -152,8 +151,10 @@ public:
      * On success, populates 'result' with the command response.
      *
      * This function doesn't throw, it return a Status object instead.
+     *
+     * TODO SERVER-118953 Remove this function when all callsites can use the generic path.
      */
-    static Status retryOnViewOrIFRKickbackError(
+    [[deprecated]] static Status retryOnViewOrIFRKickbackError(
         OperationContext* opCtx,
         const AggregateCommandRequest& request,
         const std::variant<ResolvedView, IFRFlagRetryInfo>& errInfo,

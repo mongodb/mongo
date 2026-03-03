@@ -147,64 +147,15 @@ public:
                             BSONObjBuilder* result,
                             boost::optional<ExplainOptions::Verbosity> verbosity) {
             const auto& nss = _aggregationRequest.getNamespace();
-
-            try {
-                uassertStatusOK(
-                    ClusterAggregate::runAggregate(opCtx,
-                                                   ClusterAggregate::Namespaces{nss, nss},
-                                                   _aggregationRequest,
-                                                   _liteParsedPipeline,
-                                                   _privileges,
-                                                   verbosity,
-                                                   result,
-                                                   "ClusterAggregate::runAggregate"_sd,
-                                                   _ifrContext));
-
-            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                if (!isRawDataOperation(opCtx) ||
-                    !ex->getNamespace().isTimeseriesBucketsCollection()) {
-                    // If the aggregation failed because the namespace is a view, re-run the command
-                    // with the resolved view pipeline and namespace.
-                    uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
-                        opCtx,
-                        _aggregationRequest,
-                        *ex.extraInfo<ResolvedView>(),
-                        nss,
-                        _privileges,
-                        verbosity,
-                        result,
-                        _ifrContext));
-                } else {
-                    // If the resolved view is on a time-series collection and the command request
-                    // was for raw data, we want to run aggregate on the buckets namespace instead
-                    // of as a view.
-                    result->resetToEmpty();
-                    uassertStatusOK(ClusterAggregate::runAggregate(
-                        opCtx,
-                        ClusterAggregate::Namespaces{_aggregationRequest.getNamespace(),
-                                                     ex->getNamespace()},
-                        _aggregationRequest,
-                        _liteParsedPipeline,
-                        _privileges,
-                        verbosity,
-                        result,
-                        "ClusterAggregate::runAggregate"_sd,
-                        _ifrContext));
-                }
-            } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
-                // TODO SERVER-117797 Move retry loop for IFR retry to top-level
-                // ClusterAggregate::runAggregate(). We got an IFR retry error - retry the command
-                // with the feature flag disabled.
-                uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
-                    opCtx,
-                    _aggregationRequest,
-                    *ex.extraInfo<IFRFlagRetryInfo>(),
-                    nss,
-                    _privileges,
-                    verbosity,
-                    result,
-                    _ifrContext));
-            }
+            uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
+                                                           ClusterAggregate::Namespaces{nss, nss},
+                                                           _aggregationRequest,
+                                                           _liteParsedPipeline,
+                                                           _privileges,
+                                                           verbosity,
+                                                           result,
+                                                           "ClusterAggregate::runAggregate"_sd,
+                                                           _ifrContext));
             _extensionMetrics.markSuccess();
         }
 

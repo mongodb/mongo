@@ -394,7 +394,6 @@ void appendBucketMaxSpan(BSONObjBuilder& bob,
  */
 std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
     const std::vector<BSONObj>& pipeline, const TypeCollectionTimeseriesFields* tsFields) {
-
     std::vector<BSONObj> newPipeline;
     for (auto& stage : pipeline) {
         if (stage.firstElementFieldNameStringData() ==
@@ -1015,11 +1014,12 @@ Status runAggregateImpl(OperationContext* opCtx,
         }
     }(expCtx);
 
-    if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+    if (status.code() != ErrorCodes::CommandOnShardedViewNotSupportedOnMongod &&
+        status.code() != ErrorCodes::IFRFlagRetry) {
         // Increment counters and set flags even in case of failed aggregate commands.
         // But for views on a sharded cluster, aggregation runs twice. First execution fails
         // because the namespace is a view, and then it is re-run with resolved view pipeline
-        // and namespace.
+        // and namespace. Similar situation applies for IFR flag retries.
         liteParsedPipeline.tickGlobalStageCounters();
 
         if (expCtx->getServerSideJsConfig().accumulator && _samplerAccumulatorJs.tick()) {
@@ -1131,6 +1131,90 @@ void makeEOFExplainResult(OperationContext* opCtx,
         result);
 }
 
+namespace {
+struct RetryState {
+    // Information about the view that the top-level pipeline is running against.
+    // This is not populated until after a shard throws the CommandOnShardedViewNotSupportedOnMongod
+    // exception.
+    boost::optional<ResolvedView> resolvedView;
+    // A set containing IFR flags that should be disabled via the IFRFlagRetry kickback exception
+    // retry loop.
+    stdx::unordered_set<IncrementalRolloutFeatureFlag*> ifrFlagsToDisableOnRetries;
+    // The original AggregateCommandRequest passed to runAggregate(). Not set until a shard throws
+    // the CommandOnShardedViewNotSupportedOnMongod, as it is mostly used for search-on-views.
+    boost::optional<AggregateCommandRequest> originalRequest;
+    // The set of namespaces to run the aggregate command on. This gets updated upon view retries to
+    // reflect the actual execution namespace.
+    ClusterAggregate::Namespaces currentNamespaces;
+    // Tracks whether the LiteParsedPipeline that we are going to run the aggregate command against
+    // has already been desugared or not.
+    bool alreadyDesugared = false;
+};
+
+PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
+    RetryState& state,
+    AggregateCommandRequest& request,
+    OperationContext* opCtx,
+    const ClusterAggregate::Namespaces& namespaces,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    if (!state.resolvedView) {
+        // We don't know if we have a view yet. Use the original command request.
+        return PipelineResolver::MongosViewRequestResult(request, boost::none);
+    }
+
+    // We populated a view through the kickback retry logic. Build a new resolved request
+    // from this view, handling special cases for
+    // mongot pipelines, timeseries views, and invoking ViewPolicy callbacks for
+    // extension stages.
+    PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
+                                                    resolveInvolvedNamespaces};
+
+    const auto& requestForResolution = state.originalRequest.value_or(request);
+    auto resolved = PipelineResolver::buildResolvedMongosViewRequest(opCtx,
+                                                                     requestForResolution,
+                                                                     *state.resolvedView,
+                                                                     namespaces.requestedNss,
+                                                                     verbosity,
+                                                                     ifrContext,
+                                                                     helpers);
+
+    state.currentNamespaces.executionNss = state.resolvedView->getNamespace();
+    state.alreadyDesugared = resolved.liteParsedPipeline.has_value();
+
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "$rankFusion and $scoreFusion are unsupported on timeseries collections",
+            !(state.resolvedView->timeseries() && state.originalRequest->getIsHybridSearch()));
+    return resolved;
+}
+
+boost::optional<LiteParsedPipeline> maybeRebuildLiteParsedPipelineForRetry(
+    const RetryState& state,
+    AggregateCommandRequest& request,
+    boost::optional<LiteParsedPipeline> userLPP,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    bool isRetrying = !state.ifrFlagsToDisableOnRetries.empty() || state.resolvedView;
+    if (!isRetrying) {
+        return boost::none;
+    }
+    // If IFR flags changed or there is a view, we must reparse the LiteParsedPipeline from the
+    // request such that we use the correct parsers/updated namespaces.
+
+    if (userLPP) {
+        return userLPP;
+    }
+
+    return LiteParsedPipeline(request, false, LiteParserOptions{.ifrContext = ifrContext});
+}
+
+bool needsCollectionRouter(const LiteParsedPipeline& lpp, const RetryState& state) {
+    const auto pipelineDataSource = sharded_agg_helpers::getPipelineDataSource(lpp);
+    return (pipelineDataSource == PipelineDataSource::kNormal &&
+            !sharded_agg_helpers::checkIfMustRunOnAllShards(state.currentNamespaces.executionNss,
+                                                            pipelineDataSource));
+}
+}  // namespace
+
 Status ClusterAggregate::runAggregate(
     OperationContext* opCtx,
     const Namespaces& namespaces,
@@ -1147,118 +1231,272 @@ Status ClusterAggregate::runAggregate(
         ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
     }
 
-    const bool requiresCollectionRouter = std::invoke([&]() {
-        const auto pipelineDataSource =
-            sharded_agg_helpers::getPipelineDataSource(liteParsedPipeline);
-        return (pipelineDataSource == PipelineDataSource::kNormal &&
-                !sharded_agg_helpers::checkIfMustRunOnAllShards(namespaces.executionNss,
-                                                                pipelineDataSource));
-    });
+    RetryState retryState;
+    retryState.currentNamespaces = namespaces;
 
-    if (!requiresCollectionRouter) {
-        RoutingContext emptyRoutingCtx{opCtx, std::vector<NamespaceString>{}};
-        return runAggregateImpl(opCtx,
-                                emptyRoutingCtx,
-                                namespaces,
-                                request,
-                                liteParsedPipeline,
-                                privileges,
-                                boost::none /* resolvedView */,
-                                boost::none /* originalRequest */,
-                                verbosity,
-                                result,
-                                std::move(ifrContext));
-    }
+    // Main retry body.
+    auto body = [&](RetryState& state) -> Status {
+        // Disable any IFR flags accumulated from previous retries.
+        for (auto* ifrFlag : state.ifrFlagsToDisableOnRetries) {
+            ifrContext->disableFlag(*ifrFlag);
+        }
 
-    sharding::router::CollectionRouter router(opCtx, namespaces.executionNss);
+        // If we have a resolved view, build the resolved aggregate request from the view.
+        auto [currentRequest, userLPP] = buildResolvedViewAggregateRequest(
+            state, request, opCtx, namespaces, verbosity, ifrContext);
 
-    // We'll use the aggregationStatus to distinguish whether an error was thrown by the
-    // aggregation command or the refresh loop.
-    Status aggregationStatus = Status::OK();
-    auto bodyFn = [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-        aggregationStatus = runAggregateImpl(opCtx,
-                                             routingCtx,
-                                             namespaces,
-                                             request,
-                                             liteParsedPipeline,
+        // Sync the modified `currentRequest` back to the original request on scope exit (only after
+        // the first attempt). This has the side effect of syncing PQS that were applied via
+        // `runAggregateImpl` back to the original request.
+        //
+        // We only sync back on the first attempt because on the second retry and each subsequent
+        // retry, `currentRequest` may contain the updated namespaces/pipeline/metadata for running
+        // on a view.
+        ScopeGuard syncRequestOnExit([&] {
+            if (!state.originalRequest) {
+                state.originalRequest = currentRequest;
+            }
+        });
+
+        LiteParsedPipeline liteParsedToUse =
+            maybeRebuildLiteParsedPipelineForRetry(state, currentRequest, userLPP, ifrContext)
+                .value_or(liteParsedPipeline);
+
+        // Check if we need a CollectionRouter.
+        const bool requiresCollectionRouter = needsCollectionRouter(liteParsedToUse, state);
+        if (!requiresCollectionRouter) {
+            RoutingContext emptyRoutingCtx{opCtx, std::vector<NamespaceString>{}};
+            Status status = runAggregateImpl(opCtx,
+                                             emptyRoutingCtx,
+                                             state.currentNamespaces,
+                                             currentRequest,
+                                             liteParsedToUse,
                                              privileges,
-                                             boost::none /* resolvedView */,
-                                             boost::none /* originalRequest */,
+                                             state.resolvedView,
+                                             state.originalRequest,
                                              verbosity,
                                              result,
-                                             ifrContext);
+                                             ifrContext,
+                                             state.alreadyDesugared);
+            // Throw all errors so the outer retry loop can handle any retryable errors
+            // accordingly, or capture any non-retryable errors.
+            uassertStatusOK(status);
+            return status;
+        }
 
-        uassertStatusOK(aggregationStatus);
-        return Status::OK();
+        // Use CollectionRouter with routing context.
+        sharding::router::CollectionRouter router(opCtx, state.currentNamespaces.executionNss);
+
+        Status aggregationStatus = Status::OK();
+
+        // Routes the command to the correct shard. This lambda should throw any error and otherwise
+        // return an OK status.
+        auto routingBody = [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            // For a sharded time-series collection, the routing is based on both routing table
+            // and the bucketMaxSpanSeconds value. We need to make sure we use the
+            // bucketMaxSpanSeconds of the same version as the routing table, instead of the one
+            // attached in the view error. This way the shard versioning check can correctly
+            // catch stale routing information.
+            //
+            // In addition, we should be sure to remove the 'usesExtendedRange' value from the
+            // unpack stage, since the value on the target shard may be different.
+            //
+            // TODO SERVER-111172: Remove this timeseries specific handling after 9.0 is LTS.
+            //
+            // Note: this logic only needs to run for view-ful timeseries collections
+            // but not viewless. There are two main cases to handle here inside
+            // 'patchPipelineForTimeseriesQuery'; altering the 'bucketMaxSpanSeconds' field
+            // and the altering the 'usesExtendedRange' field on the $_internalUnpackBucket
+            // stage. These fields need to be altered for different reasons, but for both the
+            // possibility for their incorrect value at this point in the retry loop stems from
+            // them being set on the primary shard that is, for one reason or another, not
+            // correct here back in the router. Viewless timeseries avoids this kickback loop
+            // between the router and primary shard, and the possibility for these cases thus
+            // does not arise.
+
+            // If the pipeline was patched for timeseries, we need to recreate the
+            // LiteParsedPipeline from the patched request, because the original
+            // LiteParsedPipeline holds views into the old BSONObjs which were destroyed
+            // when setPipeline was called. See the comment in lite_parsed_pipeline.h about
+            // BSONElement lifetime requirements.
+            if (state.currentNamespaces.executionNss.isTimeseriesBucketsCollection() &&
+                state.resolvedView) {
+                const TypeCollectionTimeseriesFields* timeseriesFields = [&]() {
+                    const auto& cri =
+                        routingCtx.getCollectionRoutingInfo(state.currentNamespaces.executionNss);
+                    if (cri.isSharded()) {
+                        return cri.getChunkManager().getTimeseriesFields().get_ptr();
+                    }
+                    return static_cast<const TypeCollectionTimeseriesFields*>(nullptr);
+                }();
+
+                const auto patchedPipeline =
+                    patchPipelineForTimeSeriesQuery(currentRequest.getPipeline(), timeseriesFields);
+                currentRequest.setPipeline(patchedPipeline);
+
+                // Recreate LiteParsedPipeline from the newly patched request.
+                liteParsedToUse = LiteParsedPipeline(
+                    currentRequest, false, LiteParserOptions{.ifrContext = ifrContext});
+            }
+
+            aggregationStatus = runAggregateImpl(opCtx,
+                                                 routingCtx,
+                                                 state.currentNamespaces,
+                                                 currentRequest,
+                                                 liteParsedToUse,
+                                                 privileges,
+                                                 state.resolvedView,
+                                                 state.originalRequest,
+                                                 verbosity,
+                                                 result,
+                                                 ifrContext,
+                                                 state.alreadyDesugared);
+
+            // If aggregation returned an error, propagate it immediately so the outer retry loop
+            // can handle it.
+            uassertStatusOK(aggregationStatus);
+            return Status::OK();
+        };
+
+        // We need to distinguish whether an error came from the router.routeWithRoutingContext
+        // (refresh loop), or the runAggregate (aggregate command). Therefore, we need to implement
+        // an extra try/catch loop here, such that we catch any non-retryable errors and compare
+        // them to the status returned by the aggregation (rather than just uasserting that the
+        // router.routeWithRoutingContext call succeeds).
+        //
+        // If aggregation fails with a retryable error, the routing infrastructure will catch and
+        // rethrow it. We should catch and rethrow it here, so that the outer retry loop can pick it
+        // up.
+        //
+        // If the aggregation fails with a non-retryable error (which will be thrown
+        // via uassertStatusOK), the routing infrastructure will catch and rethrow it. Therefore,
+        // when the aggregation fails, `finalStatus` and `aggregationStatus` will be equal.
+        Status finalStatus = [&]() -> Status {
+            try {
+                return router.routeWithRoutingContext(comment, routingBody);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                if (verbosity.has_value()) {
+                    // Build an EOF explain result for explained aggregations
+                    // targeting non-existent databases.
+                    makeEOFExplainResult(opCtx,
+                                         namespaces,
+                                         request,
+                                         liteParsedPipeline,
+                                         verbosity,
+                                         result,
+                                         std::move(ifrContext));
+                    return Status::OK();
+                }
+                return ex.toStatus();
+            } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
+                // Rethrow view errors so the outer retry loop can handle them.
+                throw;
+            } catch (const ExceptionFor<ErrorCodes::IFRFlagRetry>&) {
+                // Rethrow IFR errors so the outer retry loop can handle them.
+                throw;
+            } catch (const DBException& ex) {
+                // Capture the exception so we can check if it is a routing-only refresh error
+                // gracefully below.
+                return ex.toStatus();
+            }
+        }();
+
+        // Error handling for exceptions raised by the refresh loop.
+        // We can infer this by comparing the 2 status received:
+        // - a failed finalStatus might be either an error from the refresh loop or from the
+        //   aggregate command
+        // - a failed aggregationStatus can only be from the aggregate command (note this includes
+        //   StaleDb and StaleConfig, plus CommandOnShardedViewNotSupportedOnMongod and
+        //   IFRFlagRetry)
+        // A refresh error is calculated as follows:
+        // - the finalStatus fails but the aggregation doesn't
+        // - both finalStatus and aggregationStatus fails, but they are different
+        bool isRefreshError =
+            !finalStatus.isOK() && (aggregationStatus.isOK() || aggregationStatus != finalStatus);
+
+        if (isRefreshError) {
+            uassert(CollectionUUIDMismatchInfo(currentRequest.getDbName(),
+                                               *currentRequest.getCollectionUUID(),
+                                               std::string{currentRequest.getNamespace().coll()},
+                                               boost::none),
+                    "Database does not exist",
+                    finalStatus != ErrorCodes::NamespaceNotFound ||
+                        !currentRequest.getCollectionUUID());
+
+            if (liteParsedToUse.startsWithCollStats()) {
+                uassertStatusOKWithContext(finalStatus,
+                                           "Unable to retrieve information for $collStats stage");
+            }
+
+            // $merge is the only stage that requires to report specifically NamespaceNotFound,
+            // instead of returning an empty batch with status ok.
+            if (finalStatus == ErrorCodes::NamespaceNotFound &&
+                liteParsedToUse.endsWithMergeStage()) {
+                return finalStatus;
+            }
+
+            // Return an empty cursor with the given status.
+            return _parseQueryStatsAndReturnEmptyResult(opCtx,
+                                                        finalStatus,
+                                                        state.currentNamespaces,
+                                                        currentRequest,
+                                                        liteParsedToUse,
+                                                        state.resolvedView,
+                                                        state.originalRequest,
+                                                        verbosity,
+                                                        result);
+        }
+
+        // Return the final status (either from routing or aggregation).
+        return finalStatus;
     };
 
-    // Route the command and capture the returned status.
-    Status finalStatus = std::invoke([&]() -> Status {
-        try {
-            return router.routeWithRoutingContext(comment, bodyFn);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
-            if (verbosity.has_value()) {
-                // Build an EOF explain result for explained aggregations
-                // targeting non-existent databases.
-                makeEOFExplainResult(opCtx,
-                                     namespaces,
-                                     request,
-                                     liteParsedPipeline,
-                                     verbosity,
-                                     result,
-                                     std::move(ifrContext));
-                return Status::OK();
+    // Error handler for CommandOnShardedViewNotSupportedOnMongod.
+    auto onViewError =
+        [&](const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
+            RetryState& state) {
+            // Save the resolved view in the state.
+            state.resolvedView = *ex.extraInfo<ResolvedView>();
+            // Pre-disable vector search extension for views. This is an optimization, because we
+            // know that the vector search extension is not eligible to run on views. If we do not
+            // implement this optimization, we will eventually throw the IFR flag kickback retry and
+            // end up restarting ClusterAggregate again.
+            if (ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension) &&
+                !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+                state.ifrFlagsToDisableOnRetries.insert(
+                    &feature_flags::gFeatureFlagVectorSearchExtension);
             }
-            return ex.toStatus();
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    });
 
-    // Error handling for exceptions raised by the refresh loop.
-    // We can infer this by comparing the 2 status received:
-    // - a failed finalStatus might be either an error from the refresh loop or from the the
-    // aggregate command
-    // - a failed aggregationStatus can only be from the aggregate command (note this includes
-    // StaleDb and StaleConfig)
-    // A refresh error is calculated as follows
-    // - the finalStatus fails but the aggregation doesn't
-    // - both finalStatus and aggregationStatus fails, but they are different
-    bool isRefreshError =
-        !finalStatus.isOK() && (aggregationStatus.isOK() || aggregationStatus != finalStatus);
-    if (isRefreshError) {
-        uassert(CollectionUUIDMismatchInfo(request.getDbName(),
-                                           *request.getCollectionUUID(),
-                                           std::string{request.getNamespace().coll()},
-                                           boost::none),
-                "Database does not exist",
-                finalStatus != ErrorCodes::NamespaceNotFound || !request.getCollectionUUID());
+            result->resetToEmpty();
 
-        if (liteParsedPipeline.startsWithCollStats()) {
-            uassertStatusOKWithContext(finalStatus,
-                                       "Unable to retrieve information for $collStats stage");
-        }
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                txnRouter.onViewResolutionError(opCtx, namespaces.requestedNss);
+            }
+        };
 
-        // $merge is the only stage that requires to report specifically NamespaceNotFound, instead
-        // of returning an empty batch with status ok.
-        if (finalStatus == ErrorCodes::NamespaceNotFound &&
-            liteParsedPipeline.endsWithMergeStage()) {
-            return finalStatus;
-        }
+    // Error handler for IFRFlagRetry.
+    auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex, RetryState& state) {
+        // Save the flag to be disabled upon retry.
+        state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
+            ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
+        result->resetToEmpty();
+    };
 
-        // Return an empty cursor with the given status.
-        return _parseQueryStatsAndReturnEmptyResult(opCtx,
-                                                    finalStatus,
-                                                    namespaces,
-                                                    request,
-                                                    liteParsedPipeline,
-                                                    boost::none /*ResolvedView*/,
-                                                    boost::none /*OriginalRequest*/,
-                                                    verbosity,
-                                                    result);
+    try {
+        return retryOnWithState(
+            "ClusterAggregate::runAggregate",
+            std::move(retryState),
+            kMaxViewRetries,
+            body,
+            makeErrorHandler<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>(onViewError),
+            makeErrorHandler<ErrorCodes::IFRFlagRetry>(onIFRError));
+    } catch (const DBException& ex) {
+        // Capture any exception that makes it out of the retry loop to nicely wrap it in a Status
+        // for the caller.
+        // We reach this branch when a retry loop runs out of max retries, or when a non-retriable
+        // error is thrown.
+        return ex.toStatus();
     }
-
-    return finalStatus;
 }
 
 Status ClusterAggregate::runAggregateWithRoutingCtx(
@@ -1298,176 +1536,53 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
-    struct RetryOnViewOrIFRKickbackState {
-        boost::optional<ResolvedView> resolvedView;
-        stdx::unordered_set<IncrementalRolloutFeatureFlag*> ifrFlagsToDisableOnRetries;
-    };
-
-    // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
-    // flag values between the initial runAggregate() call and retries on view errors.
+    // Create IFRContext if not provided.
     if (!ifrContext) {
         ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
     }
 
-    auto viewRetryBody = [&](RetryOnViewOrIFRKickbackState& state) {
-        auto& currentResolvedView = state.resolvedView;
-        auto& ifrFlagsToDisableOnRetries = state.ifrFlagsToDisableOnRetries;
+    result->resetToEmpty();
 
-        // Disable flags directly on the shared IFRContext. Track potentially multiple IFR flags.
-        // For example, consider the following case:
-        // 1. runAggregate with IFR Flag A enabled
-        // 2. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag A
-        // 3. runAggregate retries with IFR Flag A pre-disabled
-        // 4. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag B
-        // The correct behavior for the next retry is to run with both IFR Flags A and B
-        // disabled. The ifrFlagsToDisableOnRetries set accumulates flags across retries, so once
-        // a flag is disabled, it stays disabled for subsequent retries.
-        for (auto* ifrFlag : ifrFlagsToDisableOnRetries) {
-            ifrContext->disableFlag(*ifrFlag);
-        }
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
+        txnRouter.onViewResolutionError(opCtx, requestedNss);
+    }
 
-        auto [resolvedAggRequest, userLPP] = [&] {
-            if (!currentResolvedView) {
-                // We don't have a view to resolve (i.e. this is an IFR flag retry). Just make a
-                // copy of the original agg request for the retry.
-                return PipelineResolver::MongosViewRequestResult{request, boost::none};
-            }
+    // If this is an IFR retry, pre-disable the flag.
+    if (std::holds_alternative<IFRFlagRetryInfo>(errInfo)) {
+        const auto& ifrInfo = std::get<IFRFlagRetryInfo>(errInfo);
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(ifrInfo.getDisabledFlagName());
+        ifrContext->disableFlag(*flag);
 
-            // Build the resolved aggregation request from the view, handling special cases for
-            // mongot pipelines, timeseries views, and invoking ViewPolicy callbacks for
-            // extension stages.
-            PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
-                                                            resolveInvolvedNamespaces};
-            return PipelineResolver::buildResolvedMongosViewRequest(
-                opCtx, request, *currentResolvedView, requestedNss, verbosity, ifrContext, helpers);
-        }();
+        // For IFR retries, just call runAggregate with the original request.
+        auto mutableRequest = request;
+        return runAggregate(opCtx,
+                            Namespaces{requestedNss, requestedNss},
+                            mutableRequest,
+                            privileges,
+                            verbosity,
+                            result,
+                            "ClusterAggregate::retryOnViewOrIFRKickbackError"_sd,
+                            ifrContext);
+    }
 
-        result->resetToEmpty();
+    // For view retries, we need to build the resolved request before calling runAggregate.
+    const auto& resolvedView = std::get<ResolvedView>(errInfo);
+    PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
+                                                    resolveInvolvedNamespaces};
 
-        if (auto txnRouter = TransactionRouter::get(opCtx)) {
-            txnRouter.onViewResolutionError(opCtx, requestedNss);
-        }
+    // Build the resolved request.
+    auto resolved = PipelineResolver::buildResolvedMongosViewRequest(
+        opCtx, request, resolvedView, requestedNss, verbosity, ifrContext, helpers);
 
-        // We pass both the underlying collection namespace and the view namespace here. The
-        // underlying collection namespace is used to execute the aggregation on mongoD. Any cursor
-        // returned will be registered under the view namespace so that subsequent getMore and
-        // killCursors calls against the view have access.
-        Namespaces nsStruct;
-        nsStruct.requestedNss = requestedNss;
-        nsStruct.executionNss =
-            currentResolvedView ? currentResolvedView->getNamespace() : requestedNss;
-
-        uassert(ErrorCodes::OptionNotSupportedOnView,
-                "$rankFusion and $scoreFusion are unsupported on timeseries collections",
-                !currentResolvedView ||
-                    !(currentResolvedView->timeseries() && request.getIsHybridSearch()));
-
-        sharding::router::CollectionRouter router(opCtx, nsStruct.executionNss);
-        router.routeWithRoutingContext(
-            "ClusterAggregate::retryOnViewOrIFRKickbackError",
-            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-                // For a sharded time-series collection, the routing is based on both routing table
-                // and the bucketMaxSpanSeconds value. We need to make sure we use the
-                // bucketMaxSpanSeconds of the same version as the routing table, instead of the one
-                // attached in the view error. This way the shard versioning check can correctly
-                // catch stale routing information.
-                //
-                // In addition, we should be sure to remove the 'usesExtendedRange' value from the
-                // unpack stage, since the value on the target shard may be different.
-                //
-                // TODO SERVER-111172: Remove this timeseries specific handling after 9.0 is LTS.
-                //
-                // Note: this logic only needs to run for view-ful timeseries collections
-                // but not viewless. There are two main cases to handle here inside
-                // 'patchPipelineForTimeseriesQuery'; altering the 'bucketMaxSpanSeconds' field
-                // and the altering the 'usesExtendedRange' field on the $_internalUnpackBucket
-                // stage. These fields need to be altered for different reasons, but for both the
-                // possibility for their incorrect value at this point in the retry loop stems from
-                // them being set on the primary shard that is, for one reason or another, not
-                // correct here back in the router. Viewless timeseries avoids this kickback loop
-                // between the router and primary shard, and the possibility for these cases thus
-                // does not arise.
-                if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
-                    const TypeCollectionTimeseriesFields* timeseriesFields =
-                        [&]() -> const TypeCollectionTimeseriesFields* {
-                        const auto& cri =
-                            routingCtx.getCollectionRoutingInfo(nsStruct.executionNss);
-                        if (cri.isSharded()) {
-                            return cri.getChunkManager().getTimeseriesFields().get_ptr();
-                        }
-                        return nullptr;
-                    }();
-
-                    const auto patchedPipeline = patchPipelineForTimeSeriesQuery(
-                        resolvedAggRequest.getPipeline(), timeseriesFields);
-                    resolvedAggRequest.setPipeline(patchedPipeline);
-                }
-
-                const auto alreadyDesugared = userLPP.has_value();
-                uassertStatusOK(runAggregateWithRoutingCtx(
-                    opCtx,
-                    routingCtx,
-                    nsStruct,
-                    resolvedAggRequest,
-                    userLPP ? *userLPP
-                            : LiteParsedPipeline(resolvedAggRequest,
-                                                 true,
-                                                 LiteParserOptions{.ifrContext = ifrContext}),
-                    privileges,
-                    currentResolvedView,
-                    boost::make_optional(request),
-                    verbosity,
-                    result,
-                    ifrContext,
-                    alreadyDesugared));
-            });
-
-        return Status::OK();
-    };
-
-    // Retry if IFRFlagRetry is thrown. On retry, disable the flag in the ifrContext.
-    auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
-                          RetryOnViewOrIFRKickbackState& state) {
-        state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
-            ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
-    };
-
-    // If the underlying namespace was changed to a view during retry, then re-run the aggregation
-    // on the new resolved namespace.
-    auto onError = [&](ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex,
-                       RetryOnViewOrIFRKickbackState& state) {
-        state.resolvedView = *ex.extraInfo<ResolvedView>();
-    };
-
-    RetryOnViewOrIFRKickbackState retryState;
-    visit(
-        OverloadedVisitor{
-            [&](const ResolvedView& resolvedView) {
-                // If it's possible this is a $vectorSearch-extension-on-a-view query but extension
-                // views is disabled, we optimistically disable the vector search extension flag on
-                // view retry. This is an optimization to avoid one extra retry (we could wait to
-                // trigger the main view retry logic when we apply the view).
-                if (ifrContext->getSavedFlagValue(
-                        feature_flags::gFeatureFlagVectorSearchExtension) &&
-                    !feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
-                    retryState.ifrFlagsToDisableOnRetries.insert(
-                        &feature_flags::gFeatureFlagVectorSearchExtension);
-                }
-                retryState.resolvedView = resolvedView;
-            },
-            [&](const IFRFlagRetryInfo& ifrRetryInfo) {
-                retryState.ifrFlagsToDisableOnRetries.insert(
-                    IncrementalRolloutFeatureFlag::findByName(ifrRetryInfo.getDisabledFlagName()));
-            }},
-        errInfo);
-
-    return retryOnWithState(
-        "ClusterAggregate::retryOnViewOrIFRKickbackError",
-        std::move(retryState),
-        kMaxViewRetries,
-        viewRetryBody,
-        makeErrorHandler<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>(onError),
-        makeErrorHandler<ErrorCodes::IFRFlagRetry>(onIFRError));
+    // Now call runAggregate with the resolved namespace and request.
+    return runAggregate(opCtx,
+                        Namespaces{requestedNss, resolvedView.getNamespace()},
+                        resolved.resolvedRequest,
+                        privileges,
+                        verbosity,
+                        result,
+                        "ClusterAggregate::retryOnViewOrIFRKickbackError"_sd,
+                        ifrContext);
 }
 
 }  // namespace mongo

@@ -542,9 +542,7 @@ export function runHybridSearchTests(conn, mongotMock, featureFlagValue, shardin
     const expectRetry = getParameter(conn, "featureFlagVectorSearchExtension").value;
     // Hybrid search stages always trigger the kickback when the extension flag is enabled.
     // Unlike the view kickback, this triggers on both router and shards.
-    // TODO SERVER-117797 Fix double counting of kickback on mongos.
-    const temporaryDoubler = shardingTest ? 2 : 1;
-    const expectedHybridKickbackRetryDelta = temporaryDoubler * (expectRetry ? 2 : 0);
+    const expectedHybridKickbackRetryDelta = expectRetry ? 2 : 0;
 
     const numNodes = shardingTest ? kNumShards : 1;
 
