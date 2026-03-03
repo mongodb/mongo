@@ -1348,6 +1348,14 @@ config_setting(
     },
 )
 
+selects.config_setting_group(
+    name = "build_grpc_and_otel_enabled",
+    match_all = [
+        ":build_grpc_enabled",
+        ":build_otel_enabled",
+    ],
+)
+
 # --------------------------------------
 # linkstatic options
 # --------------------------------------
