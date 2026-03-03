@@ -95,12 +95,16 @@ ldd_libs_basename() {
 # Extract DT_NEEDED entries (direct dependencies) from readelf output
 dt_needed_libs() {
     local bin="$1"
-    readelf -d "$bin" |
+    readelf -d "$bin" 2>/dev/null |
         awk '/\(NEEDED\)/ {gsub(/\[|\]/, "", $5); print $5}' |
         sort -u
 }
 
-srv_ldd="$(ldd_libs_basename "$SERVER_BIN")"
+if [[ -n "${_CACHED_SRV_LDD_FILE:-}" && -f "${_CACHED_SRV_LDD_FILE}" ]]; then
+    srv_ldd="$(cat "$_CACHED_SRV_LDD_FILE")"
+else
+    srv_ldd="$(ldd_libs_basename "$SERVER_BIN")"
+fi
 ext_ldd="$(ldd_libs_basename "$EXT_SO")"
 
 # Base regex for allowed dependencies (common to both direct and transitive)
@@ -199,21 +203,25 @@ info "Dependency checks passed."
 info "3) Checking symbol override hazards (common defined symbols + allocator rules)"
 
 # Symbols defined by each (dynamic only).
-srv_defined="$(
+# Use cached file from verify_all_extensions_visibility.sh if available.
+if [[ -n "${_CACHED_SRV_DEFINED_FILE:-}" && -f "${_CACHED_SRV_DEFINED_FILE}" ]]; then
+    srv_defined_file="$_CACHED_SRV_DEFINED_FILE"
+else
+    srv_defined_file="$tmpdir/srv_defined"
     nm -D --defined-only "$SERVER_BIN" |
         awk '{print $NF}' |
         sed 's/@@.*$//' |
-        sort -u
-)"
-ext_defined="$(
-    nm -D --defined-only "$EXT_SO" |
-        awk '{print $NF}' |
-        sed 's/@@.*$//' |
-        sort -u
-)"
+        sort -u >"$srv_defined_file"
+fi
+
+ext_defined_file="$tmpdir/ext_defined"
+nm -D --defined-only "$EXT_SO" |
+    awk '{print $NF}' |
+    sed 's/@@.*$//' |
+    sort -u >"$ext_defined_file"
 
 # Common defined symbols = potential override surface.
-common_defined="$(comm -12 <(echo "$srv_defined") <(echo "$ext_defined") || true)"
+common_defined="$(comm -12 "$srv_defined_file" "$ext_defined_file" || true)"
 
 # Narrow allowlist hook for known-safe shared symbols (start empty; tighten later).
 # Example: ALLOW_COMMON_REGEX='^(_Unwind_|backtrace|dladdr)'
@@ -235,16 +243,16 @@ ALLOC_SYMS=(
 )
 
 # 3a) Extension must NOT define allocator symbols.
-ext_defined="$(
-    nm -D --defined-only "$EXT_SO" |
-        awk '{print $NF}' |
-        sed 's/@@.*$//' |
-        sed 's/@.*$//' |
-        sort -u
-)"
+ext_alloc_file="$tmpdir/ext_alloc_defined"
+nm -D --defined-only "$EXT_SO" |
+    awk '{print $NF}' |
+    sed 's/@@.*$//' |
+    sed 's/@.*$//' |
+    sort -u >"$ext_alloc_file"
+
 alloc_defined=""
 for s in "${ALLOC_SYMS[@]}"; do
-    if echo "$ext_defined" | grep -qx "$s"; then
+    if grep -qx "$s" "$ext_alloc_file"; then
         alloc_defined+="$s"$'\n'
     fi
 done

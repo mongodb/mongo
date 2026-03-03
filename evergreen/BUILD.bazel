@@ -534,6 +534,11 @@ sh_binary(
 )
 
 sh_binary(
+    name = "verify_all_extensions_visibility",
+    srcs = ["verify_all_extensions_visibility.sh"],
+)
+
+sh_binary(
     name = "wait_for_resmoke_to_shutdown",
     srcs = ["wait_for_resmoke_to_shutdown.sh"],
 )

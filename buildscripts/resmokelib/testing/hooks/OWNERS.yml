@@ -82,9 +82,6 @@ filters:
   - "check_system_buckets_metrics.py":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "verify_extensions_visibility.py":
-    approvers:
-      - 10gen/query-integration-extensions-api
   - "continuous_initial_sync.py":
     approvers:
       - 10gen/server-jstest-infra

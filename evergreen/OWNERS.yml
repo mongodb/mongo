@@ -57,3 +57,6 @@ filters:
   - "verify_extension_visibility_test.sh":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "verify_all_extensions_visibility.sh":
+    approvers:
+      - 10gen/query-integration-extensions-api

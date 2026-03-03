@@ -3044,3 +3044,24 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
+
+  - <<: *task_template
+    name: extensions_verify_visibility
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "default",
+        "extensions",
+        "incompatible_windows",
+        "incompatible_mac",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        display_name: "Verify extension visibility and dlopen safety"
+        type: test
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/verify_all_extensions_visibility.sh"
