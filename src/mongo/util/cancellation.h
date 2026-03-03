@@ -31,10 +31,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/intrusive_counter.h"
@@ -289,35 +286,5 @@ private:
     boost::intrusive_ptr<detail::CancellationStateHolder> _stateHolder{
         make_intrusive<detail::CancellationStateHolder>()};
 };
-
-/**
- * Sleeps for the specified duration, returning early if the token is canceled. Returns true if
- * the token was canceled, false if the full duration elapsed.
- */
-inline bool sleepFor(const CancellationToken& token, Milliseconds duration) {
-    if (token.isCanceled()) {
-        return true;
-    }
-
-    struct SharedState {
-        stdx::mutex mutex;
-        stdx::condition_variable cv;
-    };
-
-    auto state = std::make_shared<SharedState>();
-
-    // Register a callback to wake the CV when cancellation fires.
-    token.onCancel()
-        .unsafeToInlineFuture()
-        .then([state] {
-            stdx::lock_guard<stdx::mutex> lk(state->mutex);
-            state->cv.notify_all();
-        })
-        .getAsync([](auto) {});
-
-    stdx::unique_lock<stdx::mutex> lk(state->mutex);
-    return state->cv.wait_for(
-        lk, duration.toSystemDuration(), [&token] { return token.isCanceled(); });
-}
 
 }  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

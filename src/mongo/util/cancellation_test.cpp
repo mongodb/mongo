@@ -29,9 +29,8 @@
 
 #include "mongo/util/cancellation.h"
 
-#include "mongo/stdx/thread.h"
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/duration.h"
 
 #include <memory>
 
@@ -228,75 +227,6 @@ TEST(CancelTest, TokenIsCancelableReturnsTrueIfSourceExistsAndIsNotYetCanceled) 
     CancellationSource source;
     auto token = source.token();
     ASSERT_TRUE(token.isCancelable());
-}
-
-TEST(CancelTest, SleepForReturnsImmediatelyWhenAlreadyCanceled) {
-    CancellationSource source;
-    auto token = source.token();
-    source.cancel();
-
-    auto start = stdx::chrono::steady_clock::now();
-    bool wasCanceled = sleepFor(token, Seconds(10));
-    auto elapsed = stdx::chrono::steady_clock::now() - start;
-
-    ASSERT_TRUE(wasCanceled);
-    // Should return nearly instantly, well under 1 second.
-    ASSERT_LT(elapsed, stdx::chrono::seconds(1));
-}
-
-TEST(CancelTest, SleepForSleepsFullDurationWhenNotCanceled) {
-    CancellationSource source;
-    auto token = source.token();
-
-    auto start = stdx::chrono::steady_clock::now();
-    bool wasCanceled = sleepFor(token, Milliseconds(50));
-    auto elapsed = stdx::chrono::steady_clock::now() - start;
-
-    ASSERT_FALSE(wasCanceled);
-    // Should have slept for at least ~50ms.
-    ASSERT_GTE(elapsed, stdx::chrono::milliseconds(40));
-}
-
-TEST(CancelTest, SleepForWakesUpEarlyWhenCanceledFromAnotherThread) {
-    CancellationSource source;
-    auto token = source.token();
-
-    auto start = stdx::chrono::steady_clock::now();
-
-    // Cancel from another thread after a short delay.
-    stdx::thread canceler([&source] {
-        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
-        source.cancel();
-    });
-
-    bool wasCanceled = sleepFor(token, Seconds(60));
-    auto elapsed = stdx::chrono::steady_clock::now() - start;
-
-    canceler.join();
-
-    ASSERT_TRUE(wasCanceled);
-    // Should have woken up well before the 60-second duration.
-    ASSERT_LT(elapsed, stdx::chrono::seconds(5));
-}
-
-TEST(CancelTest, SleepForWorksWithZeroDuration) {
-    CancellationSource source;
-    auto token = source.token();
-
-    bool wasCanceled = sleepFor(token, Milliseconds(0));
-    // Zero duration should return immediately; token is not canceled so result is false.
-    ASSERT_FALSE(wasCanceled);
-}
-
-TEST(CancelTest, SleepForWorksWithUncancelableToken) {
-    auto token = CancellationToken::uncancelable();
-
-    auto start = stdx::chrono::steady_clock::now();
-    bool wasCanceled = sleepFor(token, Milliseconds(50));
-    auto elapsed = stdx::chrono::steady_clock::now() - start;
-
-    ASSERT_FALSE(wasCanceled);
-    ASSERT_GTE(elapsed, stdx::chrono::milliseconds(40));
 }
 
 }  // namespace
