@@ -1,0 +1,86 @@
+nlm_group_test
+test
+nlm_group_test.coll as coll
+
+// ---------------------------------------------------------------
+// [$group, $match] pipelines
+// ---------------------------------------------------------------
+
+// $sum accumulator, $gt filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", total: {$sum: "$val"}}}, {$match: {total: {$gt: 10}}}], cursor: {}}
+
+// $count accumulator, $eq filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$category", n: {$count: {}}}}, {$match: {n: {$eq: 4}}}], cursor: {}}
+
+// $min accumulator, $lte filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", minVal: {$min: "$val"}}}, {$match: {minVal: {$lte: 2}}}], cursor: {}}
+
+// $max accumulator, $gte filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", maxVal: {$max: "$val"}}}, {$match: {maxVal: {$gte: 10}}}], cursor: {}}
+
+// $avg accumulator, $lt filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$category", avgVal: {$avg: "$val"}}}, {$match: {avgVal: {$lt: 5}}}], cursor: {}}
+
+// $first accumulator, $ne filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", firstCat: {$first: "$category"}}}, {$match: {firstCat: {$ne: "A"}}}], cursor: {}}
+
+// $last accumulator, $in filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", lastCat: {$last: "$category"}}}, {$match: {lastCat: {$in: ["B", "C"]}}}], cursor: {}}
+
+// $push accumulator, $exists filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$category", vals: {$push: "$val"}}}, {$match: {vals: {$exists: true}}}], cursor: {}}
+
+// $addToSet accumulator, $nin filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", cats: {$addToSet: "$category"}}}, {$match: {cats: {$nin: [["A"]]}}}], cursor: {}}
+
+// null _id (whole-collection group), $gt filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: null, total: {$sum: "$val"}}}, {$match: {total: {$gt: 0}}}], cursor: {}}
+
+// $sum accumulator, $and filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", total: {$sum: "$val"}, n: {$count: {}}}}, {$match: {$and: [{total: {$gt: 5}}, {n: {$gte: 3}}]}}], cursor: {}}
+
+// $sum accumulator, $or filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", total: {$sum: "$val"}}}, {$match: {$or: [{total: {$lt: 5}}, {total: {$gt: 20}}]}}], cursor: {}}
+
+// $sum accumulator, $nor filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$category", total: {$sum: "$val"}}}, {$match: {$nor: [{total: {$lt: 10}}, {total: {$gt: 30}}]}}], cursor: {}}
+
+// $count accumulator, $not filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", n: {$count: {}}}}, {$match: {n: {$not: {$eq: 4}}}}], cursor: {}}
+
+// $sum accumulator, $type filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$a", total: {$sum: "$val"}}}, {$match: {total: {$type: "double"}}}], cursor: {}}
+
+// multiple accumulators, compound $match
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: "$category", total: {$sum: "$val"}, mx: {$max: "$val"}, cnt: {$count: {}}}}, {$match: {$and: [{total: {$gte: 10}}, {mx: {$lte: 10}}, {cnt: {$gt: 2}}]}}], cursor: {}}
+
+// expression _id, $gt filter
+:sortFull {aggregate: "coll", pipeline: [{$group: {_id: {a: "$a", cat: "$category"}, total: {$sum: "$val"}}}, {$match: {total: {$gt: 5}}}], cursor: {}}
+
+// ---------------------------------------------------------------
+// [$match, $group, $match] pipelines
+// ---------------------------------------------------------------
+
+// leading $match filters rows, $group + trailing $match on aggregated result
+:sortFull {aggregate: "coll", pipeline: [{$match: {flag: true}}, {$group: {_id: "$a", total: {$sum: "$val"}}}, {$match: {total: {$gt: 10}}}], cursor: {}}
+
+// leading $match with $or, trailing $match with $gte
+:sortFull {aggregate: "coll", pipeline: [{$match: {$or: [{a: "x"}, {a: "y"}]}}, {$group: {_id: "$category", n: {$count: {}}}}, {$match: {n: {$gte: 2}}}], cursor: {}}
+
+// leading $match with comparison, trailing $match with $and
+:sortFull {aggregate: "coll", pipeline: [{$match: {val: {$gte: 3}}}, {$group: {_id: "$a", total: {$sum: "$val"}, n: {$count: {}}}}, {$match: {$and: [{total: {$gt: 10}}, {n: {$gte: 2}}]}}], cursor: {}}
+
+// leading $match with $exists, trailing $match with $ne
+:sortFull {aggregate: "coll", pipeline: [{$match: {tags: {$exists: true}}}, {$group: {_id: "$a", minVal: {$min: "$val"}}}, {$match: {minVal: {$ne: 0}}}], cursor: {}}
+
+// leading $match with $in, trailing $match with $lt
+:sortFull {aggregate: "coll", pipeline: [{$match: {category: {$in: ["A", "B"]}}}, {$group: {_id: "$a", avgVal: {$avg: "$val"}}}, {$match: {avgVal: {$lt: 5}}}], cursor: {}}
+
+// leading $match with $and, trailing $match with $or
+:sortFull {aggregate: "coll", pipeline: [{$match: {$and: [{flag: true}, {val: {$gt: 2}}]}}, {$group: {_id: "$category", total: {$sum: "$val"}}}, {$match: {$or: [{total: {$lt: 5}}, {total: {$gt: 15}}]}}], cursor: {}}
+
+// leading $match with $not, trailing $match with $in
+:sortFull {aggregate: "coll", pipeline: [{$match: {b: {$not: {$gt: 30}}}}, {$group: {_id: "$a", maxVal: {$max: "$val"}}}, {$match: {maxVal: {$in: [5, 7, 10]}}}], cursor: {}}
+
+// leading $match with $elemMatch, trailing $match with $exists
+:sortFull {aggregate: "coll", pipeline: [{$match: {tags: {$elemMatch: {$eq: "p"}}}}, {$group: {_id: "$category", vals: {$push: "$val"}}}, {$match: {vals: {$exists: true}}}], cursor: {}}

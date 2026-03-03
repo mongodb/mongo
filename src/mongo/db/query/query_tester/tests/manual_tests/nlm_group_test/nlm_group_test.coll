@@ -1,0 +1,17 @@
+{"a": 1}
+{"a": -1}
+{"b": 1}
+{"category": 1}
+
+{"_id": 1,  "a": "x", "b": 10, "category": "A", "val": 1,   "flag": true,  "tags": ["p", "q"]}
+{"_id": 2,  "a": "x", "b": 20, "category": "A", "val": 5,   "flag": false, "tags": ["q", "r"]}
+{"_id": 3,  "a": "x", "b": 30, "category": "B", "val": 3,   "flag": true,  "tags": ["p"]}
+{"_id": 4,  "a": "y", "b": 10, "category": "A", "val": 7,   "flag": true,  "tags": ["r", "s"]}
+{"_id": 5,  "a": "y", "b": 20, "category": "B", "val": 2,   "flag": false, "tags": ["p", "q", "r"]}
+{"_id": 6,  "a": "y", "b": 30, "category": "B", "val": 9,   "flag": true,  "tags": ["s"]}
+{"_id": 7,  "a": "z", "b": 10, "category": "C", "val": 4,   "flag": false, "tags": ["p"]}
+{"_id": 8,  "a": "z", "b": 20, "category": "C", "val": 6,   "flag": true,  "tags": ["q", "s"]}
+{"_id": 9,  "a": "z", "b": 30, "category": "A", "val": 8,   "flag": false, "tags": ["r"]}
+{"_id": 10, "a": "x", "b": 40, "category": "C", "val": 10,  "flag": true,  "tags": ["p", "r", "s"]}
+{"_id": 11, "a": "y", "b": 40, "category": "A", "val": 0,   "flag": false, "tags": []}
+{"_id": 12, "a": "z", "b": 40, "category": "B", "val": 12,  "flag": true,  "tags": ["q"]}
