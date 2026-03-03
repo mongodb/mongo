@@ -101,6 +101,7 @@ class MongoShellDebugSession extends DebugSession {
 
         this.debugConnection.on("end", () => {
             this.connected = false;
+            this.unverifyBreakpoints();
         });
 
         // Send any queued breakpoints from before connection (attach mode)
@@ -184,9 +185,6 @@ class MongoShellDebugSession extends DebugSession {
         for (const [filePath, value] of this.breakpoints.entries()) {
             // Check if these are unverified (queued) breakpoints
             if (value.lines && value.unverified) {
-                this.log(
-                    `Sending queued breakpoints for ${filePath}, lines ${value.lines.map((l) => l.line).join(", ")}`,
-                );
                 this.sendCommand("setBreakpoints", {source: filePath, lines: value.lines})
                     .then((result) => {
                         const bps = result.breakpoints.map((bp) => {
@@ -209,6 +207,23 @@ class MongoShellDebugSession extends DebugSession {
             }
         }
     }
+
+    // Reset all breakpoints to unverified state so they can be re-sent when the shell reconnects
+    unverifyBreakpoints() {
+        for (const [filePath, value] of this.breakpoints.entries()) {
+            if (Array.isArray(value)) {
+                // Convert verified breakpoints back to unverified queued format
+                const lines = value.map((bp) => ({
+                    line: bp.line,
+                    condition: bp.condition,
+                    logMessage: bp.logMessage,
+                }));
+                const unverified = lines.map((bp) => new Breakpoint(false, bp.line, 0));
+                this.breakpoints.set(filePath, {lines, unverified});
+            }
+        }
+    }
+
     // Handle incoming messages from debug server
     handleDebugMessage(msg) {
         if (msg.type === "event") {
@@ -216,7 +231,6 @@ class MongoShellDebugSession extends DebugSession {
         } else if (msg.type === "response" && msg.seq) {
             const resolver = this.pendingRequests.get(msg.seq);
             if (resolver) {
-                this.log(`Resolving pending request for seq ${msg.seq}`);
                 resolver(msg.body);
                 this.pendingRequests.delete(msg.seq);
             }
