@@ -29,6 +29,7 @@
 
 #include "mongo/db/service_context.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/operation_key_manager.h"
@@ -36,6 +37,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
@@ -79,6 +81,13 @@ protected:
 
     auto makeClient(std::string desc = "ServiceContextTest") {
         return getService()->makeClient(std::move(desc));
+    }
+    auto makeClient(std::string desc,
+                    ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown) {
+        return getService()->makeClient(std::move(desc),
+                                        nullptr,
+                                        ClientOperationKillableByStepdown{true},
+                                        excludedFromInterruptAtShutdown);
     }
 
     CountingClientObserver* countingClientObserver = nullptr;
@@ -145,6 +154,10 @@ TEST_F(ServiceContextClientTest, MakeAndDeleteClientWithOperationIdManager) {
 
     auto clientLock = OperationIdManager::get(getServiceContext()).findAndLockClient(opId);
     ASSERT_FALSE(clientLock);
+}
+
+bool isExcludedThread(const StringData threadName) {
+    return threadName == "Excluded";
 }
 
 class ServiceContextOpContextTest : public ServiceContextClientTest {
@@ -359,8 +372,7 @@ TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedClients) {
         auto opCtxNotExcluded = clientNotExcluded->makeOperationContext();
         auto opCtxExcluded = clientExcluded->makeOperationContext();
 
-        getServiceContext()->setKillAllOperations(
-            [](const StringData threadName) { return threadName == "Excluded"; });
+        getServiceContext()->setKillAllOperations(isExcludedThread);
 
         ASSERT_EQUALS(opCtxNotExcluded->getKillStatus(), ErrorCodes::InterruptedAtShutdown);
         ASSERT_THROWS_CODE(
@@ -388,6 +400,124 @@ TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedClients) {
 
     ASSERT_EQ(countingKillOpListener.interruptCount, 1);
     ASSERT_EQ(countingKillOpListener.interruptAllCount, 1);
+}
+
+TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedFromInterruptAtShutdown) {
+    auto clientNotExcluded = makeClient("NotExcluded");
+    auto clientExcluded = makeClient("Excluded", ClientExcludedFromInterruptAtShutdown{true});
+
+    {
+        auto opCtxNotExcluded = clientNotExcluded->makeOperationContext();
+        auto opCtxExcluded = clientExcluded->makeOperationContext();
+
+        getServiceContext()->setKillAllOperations(isExcludedThread);
+
+        // Non-excluded client is killed and interrupted.
+        ASSERT_EQUALS(opCtxNotExcluded->getKillStatus(), ErrorCodes::InterruptedAtShutdown);
+        ASSERT_THROWS_CODE(
+            opCtxNotExcluded->checkForInterrupt(), DBException, ErrorCodes::InterruptedAtShutdown);
+
+        // Client excluded from interrupt at shutdown: not killed, not interrupted.
+        ASSERT_OK(opCtxExcluded->getKillStatus());
+        ASSERT_OK(opCtxExcluded->checkForInterruptNoAssert());
+    }
+
+    ASSERT_EQ(countingKillOpListener.interruptCount, 1);
+    ASSERT_EQ(countingKillOpListener.interruptAllCount, 1);
+
+    // New opCtxs for non-excluded clients are immediately interrupted (via _globalKill).
+    auto opCtxNotExcluded = clientNotExcluded->makeOperationContext();
+    ASSERT_THROWS_CODE(
+        opCtxNotExcluded->checkForInterrupt(), DBException, ErrorCodes::InterruptedAtShutdown);
+    ASSERT_OK(opCtxNotExcluded->getKillStatus());
+
+    // New opCtxs for interrupt-excluded clients are NOT interrupted.
+    auto opCtxExcluded = clientExcluded->makeOperationContext();
+    ASSERT_OK(opCtxExcluded->checkForInterruptNoAssert());
+    ASSERT_OK(opCtxExcluded->getKillStatus());
+
+    ASSERT_EQ(countingKillOpListener.interruptCount, 1);
+    ASSERT_EQ(countingKillOpListener.interruptAllCount, 1);
+}
+
+TEST_F(ServiceContextOpContextTest, SetKillAllOperationsExcludedClientsStillKillableByOtherCodes) {
+    auto clientExcluded = makeClient("Excluded", ClientExcludedFromInterruptAtShutdown{true});
+    auto opCtxExcluded = clientExcluded->makeOperationContext();
+
+    getServiceContext()->setKillAllOperations(isExcludedThread);
+
+    // Excluded client is not interrupted by _globalKill.
+    ASSERT_OK(opCtxExcluded->checkForInterruptNoAssert());
+
+    // But it CAN be killed with a non-shutdown error code.
+    {
+        ClientLock lk(clientExcluded.get());
+        getServiceContext()->killOperation(lk, opCtxExcluded.get(), ErrorCodes::Interrupted);
+    }
+    ASSERT_EQUALS(opCtxExcluded->getKillStatus(), ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(opCtxExcluded->checkForInterrupt(), DBException, ErrorCodes::Interrupted);
+}
+
+TEST_F(ServiceContextOpContextTest, ClearingClientFlagRestoresInterruption) {
+    auto clientExcluded = makeClient("Excluded", ClientExcludedFromInterruptAtShutdown{true});
+
+    getServiceContext()->setKillAllOperations(isExcludedThread);
+
+    auto opCtxExcluded = clientExcluded->makeOperationContext();
+    ASSERT_OK(opCtxExcluded->checkForInterruptNoAssert());
+
+    // Clear the exclusion flag on the client.
+    clientExcluded->clearExclusionFromInterruptAtShutdown();
+    ASSERT_THROWS_CODE(
+        opCtxExcluded->checkForInterrupt(), DBException, ErrorCodes::InterruptedAtShutdown);
+}
+
+TEST_F(ServiceContextOpContextTest,
+       ClientExcludedFromInterruptAtShutdownNotKilledWithoutPredicate) {
+    // Even with no excludedClientPredicate, clients marked excludeFromInterruptAtShutdown at
+    // construction are not killed by setKillAllOperations.
+    auto clientExcluded = makeClient("Excluded", ClientExcludedFromInterruptAtShutdown{true});
+    auto opCtxExcluded = clientExcluded->makeOperationContext();
+
+    getServiceContext()->setKillAllOperations();  // No predicate.
+
+    // Excluded client is not killed and not interrupted.
+    ASSERT_OK(opCtxExcluded->getKillStatus());
+    ASSERT_OK(opCtxExcluded->checkForInterruptNoAssert());
+}
+
+TEST_F(ServiceContextOpContextTest, ClearExclusionFromInterruptAtShutdownFromOtherThread) {
+    // Validates that calling clearExclusionFromInterruptAtShutdown() from a different thread
+    // (e.g. shutdown thread) is thread-safe: the owning thread and the clearer thread access
+    // client/opCtx state concurrently so that the thread sanitizer can detect any data races.
+    ThreadClient tc("Excluded-0",
+                    getServiceContext()->getService(),
+                    Client::noSession(),
+                    ThreadClient::Killable{true},
+                    ThreadClient::ExcludedFromInterruptAtShutdown{true});
+    auto opCtx = tc->makeOperationContext();
+
+    auto clearer = stdx::thread([this] {
+        getServiceContext()->setKillAllOperations();
+        for (ServiceContext::LockedClientsCursor cursor(getServiceContext());
+             auto* client = cursor.next();) {
+            ClientLock lk(client);
+            client->clearExclusionFromInterruptAtShutdown();
+        }
+    });
+
+    auto waitUntilInterrupted = [&] {
+        while (true) {
+            opCtx->checkForInterrupt();
+            opCtx->sleepFor(Milliseconds{10});
+        }
+    };
+    ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Seconds{10},
+                                              ErrorCodes::ExceededTimeLimit,
+                                              waitUntilInterrupted),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
+    clearer.join();
 }
 
 DEATH_TEST_F(ServiceContextOpContextTestDeathTest,

@@ -81,7 +81,8 @@ std::function<bool(Client*)> checkAuthForInternalClient = [](Client*) {
 void Client::initThread(StringData desc,
                         Service* service,
                         std::shared_ptr<transport::Session> session,
-                        ClientOperationKillableByStepdown killable) {
+                        ClientOperationKillableByStepdown killable,
+                        ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown) {
     invariantNoCurrentClient();
 
     std::string fullDesc;
@@ -94,7 +95,8 @@ void Client::initThread(StringData desc,
     setThreadName(fullDesc);
 
     // Create the client obj, attach to thread
-    currentClient = service->makeClient(fullDesc, std::move(session), killable);
+    currentClient = service->makeClient(
+        fullDesc, std::move(session), killable, excludedFromInterruptAtShutdown);
     setLogService(toLogService(service));
 }
 
@@ -124,7 +126,8 @@ Client* Client::getCurrent() {
 Client::Client(std::string desc,
                Service* service,
                std::shared_ptr<transport::Session> session,
-               ClientOperationKillableByStepdown killable)
+               ClientOperationKillableByStepdown killable,
+               ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown)
     : _service(service),
       _session(std::move(session)),
       _desc(std::move(desc)),
@@ -133,6 +136,7 @@ Client::Client(std::string desc,
       _prng(generateSeed(_desc)),
       _uuid(UUID::gen()),
       _isPriorityPortClient(_session && _session->isConnectedToPriorityPort()),
+      _excludeFromInterruptAtShutdown(static_cast<bool>(excludedFromInterruptAtShutdown)),
       _tags(kPending) {}
 
 Client::~Client() = default;
@@ -199,10 +203,12 @@ void Client::setKilled() {
 ThreadClient::ThreadClient(StringData desc,
                            Service* service,
                            std::shared_ptr<transport::Session> session,
-                           Killable killable) {
+                           Killable killable,
+                           ExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown) {
     invariantNoCurrentClient();
     _originalThreadName = getThreadNameRef();
-    Client::initThread(desc, service, std::move(session), killable);
+    Client::initThread(
+        desc, service, std::move(session), killable, excludedFromInterruptAtShutdown);
 }
 
 ThreadClient::~ThreadClient() {

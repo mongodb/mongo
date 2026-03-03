@@ -236,7 +236,8 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
         return Status(ErrorCodes::ClientMarkedKilled, "client has been killed");
     }
 
-    if (getServiceContext()->getKillAllOperations() && !_isExecutingShutdown) {
+    if (getServiceContext()->getKillAllOperations() &&
+        !getClient()->shouldExcludeFromInterruptAtShutdown() && !_isExecutingShutdown) {
         return Status(ErrorCodes::InterruptedAtShutdown, "interrupted at shutdown");
     }
 

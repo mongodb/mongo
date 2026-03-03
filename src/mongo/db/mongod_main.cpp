@@ -1798,7 +1798,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         repl::ReplicationStateTransitionLockGuard rstl(
             opCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
 
-        // Kill all operations except FTDC to continue gathering metrics. This makes all newly
+        // Kill all operations except those excluded by the service lifecycle. This makes all newly
         // created opCtx to be immediately interrupted. After this point, the opCtx will have been
         // marked as killed and will not be usable other than to kill all transactions directly
         // below.

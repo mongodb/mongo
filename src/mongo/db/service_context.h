@@ -352,6 +352,12 @@ private:
 enum class ClientOperationKillableByStepdown : bool {};
 
 /**
+ * If true, the client's operations are excluded from _globalKill interrupt at shutdown until
+ * explicitly cleared (e.g. during disaggregated storage shutdown). Set only at client construction.
+ */
+enum class ClientExcludedFromInterruptAtShutdown : bool {};
+
+/**
  * Class representing the context of a service, such as a MongoD database service or
  * a MongoS routing service.
  *
@@ -521,10 +527,12 @@ public:
     void registerClientObserver(std::unique_ptr<ClientObserver> observer);
 
     /** Internal: Called by Service->makeClient. */
-    UniqueClient makeClientForService(std::string desc,
-                                      std::shared_ptr<transport::Session> session,
-                                      ClientOperationKillableByStepdown killable,
-                                      Service* service);
+    UniqueClient makeClientForService(
+        std::string desc,
+        std::shared_ptr<transport::Session> session,
+        ClientOperationKillableByStepdown killable,
+        ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown,
+        Service* service);
 
     /**
      * Creates a new OperationContext on "client".
@@ -916,8 +924,11 @@ public:
     ServiceContext::UniqueClient makeClient(
         std::string desc,
         std::shared_ptr<transport::Session> session = nullptr,
-        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true}) {
-        return _sc->makeClientForService(std::move(desc), std::move(session), killable, this);
+        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true},
+        ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown =
+            ClientExcludedFromInterruptAtShutdown{false}) {
+        return _sc->makeClientForService(
+            std::move(desc), std::move(session), killable, excludedFromInterruptAtShutdown, this);
     }
 
     static UniqueService make(ServiceContext* sc, ClusterRole role);

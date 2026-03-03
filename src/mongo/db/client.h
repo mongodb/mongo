@@ -117,7 +117,9 @@ public:
         StringData desc,
         Service* service,
         std::shared_ptr<transport::Session> session = noSession(),
-        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true});
+        ClientOperationKillableByStepdown killable = ClientOperationKillableByStepdown{true},
+        ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown =
+            ClientExcludedFromInterruptAtShutdown{false});
 
     /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent
@@ -257,6 +259,21 @@ public:
         return _connectionId == 0;
     }
 
+    /**
+     * Returns whether this thread should be excluded from _globalKill interrupt at shutdown.
+     */
+    bool shouldExcludeFromInterruptAtShutdown() const {
+        return _excludeFromInterruptAtShutdown.loadRelaxed();
+    }
+
+    /**
+     * Clears the exclusion from _globalKill interrupt at shutdown. Exclusion must be set at
+     * client construction via ClientExcludedFromInterruptAtShutdown.
+     */
+    void clearExclusionFromInterruptAtShutdown() {
+        _excludeFromInterruptAtShutdown.store(false);
+    }
+
     const auto& getUUID() const {
         return _uuid;
     }
@@ -394,7 +411,9 @@ private:
     Client(std::string desc,
            Service* service,
            std::shared_ptr<transport::Session> session,
-           ClientOperationKillableByStepdown killable);
+           ClientOperationKillableByStepdown killable,
+           ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown =
+               ClientExcludedFromInterruptAtShutdown{false});
 
     /**
      * Sets the active operation context on this client to "opCtx".
@@ -439,6 +458,10 @@ private:
     // See isPriorityPortClient() for more details on this internal flag.
     const bool _isPriorityPortClient{false};
 
+    // If true, OperationContexts created for this Client should be excluded from interrupt at
+    // shutdown.
+    Atomic<bool> _excludeFromInterruptAtShutdown{false};
+
     ErrorCodes::Error _disconnectErrorCode = ErrorCodes::ClientDisconnect;
 
     AtomicWord<TagMask> _tags;
@@ -458,6 +481,7 @@ private:
 class ThreadClient {
 public:
     using Killable = ClientOperationKillableByStepdown;
+    using ExcludedFromInterruptAtShutdown = ClientExcludedFromInterruptAtShutdown;
 
     /**
      * Only the Service pointer is a required parameter. All other parameters are optional and will
@@ -466,7 +490,9 @@ public:
     ThreadClient(StringData desc,
                  Service* service,
                  std::shared_ptr<transport::Session> session,
-                 Killable killable);
+                 Killable killable,
+                 ExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown =
+                     ExcludedFromInterruptAtShutdown{false});
 
     /**
      * If the thread's description is not specified, default it to the thread's existing name.
@@ -493,7 +519,11 @@ public:
      * true.
      */
     ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session)
-        : ThreadClient{desc, service, std::move(session), Killable{true}} {}
+        : ThreadClient{desc,
+                       service,
+                       std::move(session),
+                       Killable{true},
+                       ExcludedFromInterruptAtShutdown{false}} {}
 
     ~ThreadClient();
     ThreadClient(const ThreadClient&) = delete;

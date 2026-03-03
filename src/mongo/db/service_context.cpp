@@ -70,6 +70,7 @@ namespace {
 ServiceContext* globalServiceContext = nullptr;
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyStorageStartupRecoveryComplete);
+MONGO_FAIL_POINT_DEFINE(releaseFailPointAfterGlobalKillSet);
 
 }  // namespace
 
@@ -232,9 +233,10 @@ ServiceContext::UniqueClient ServiceContext::makeClientForService(
     std::string desc,
     std::shared_ptr<transport::Session> session,
     ClientOperationKillableByStepdown killable,
+    ClientExcludedFromInterruptAtShutdown excludedFromInterruptAtShutdown,
     Service* service) {
-    std::unique_ptr<Client> client(
-        new Client(std::move(desc), service, std::move(session), killable));
+    std::unique_ptr<Client> client(new Client(
+        std::move(desc), service, std::move(session), killable, excludedFromInterruptAtShutdown));
     onCreate(client.get(), _clientObservers);
     auto entry = _clientsList.add(client.get());
     {
@@ -403,6 +405,20 @@ void ServiceContext::setKillAllOperations(
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state
     _globalKill.store(true);
+    // This failpoint releases another failpoint after _globalKill is set. This pattern is
+    // necessary because the server is no longer accepting configureFailPoint commands at this
+    // stage of shutdown. Avoid replicating this pattern elsewhere — prefer configureFailPoint
+    // commands in tests when the server is still responsive.
+    releaseFailPointAfterGlobalKillSet.execute([](const BSONObj& data) {
+        if (auto fpName = data.getStringField("releaseFailpoint"); !fpName.empty()) {
+            if (auto* fp = globalFailPointRegistry().find(fpName)) {
+                LOGV2(11078100,
+                      "Releasing failpoint after _globalKill set",
+                      "failpoint"_attr = fpName);
+                fp->setMode(FailPoint::off);
+            }
+        }
+    });
     auto opsKilled = 0;
 
     // Interrupt all active operations
@@ -410,7 +426,8 @@ void ServiceContext::setKillAllOperations(
         ClientLock lk(client);
 
         // Do not kill operations from the excluded clients.
-        if (excludedClientPredicate && excludedClientPredicate(client->desc())) {
+        if (client->shouldExcludeFromInterruptAtShutdown() ||
+            (excludedClientPredicate && excludedClientPredicate(client->desc()))) {
             continue;
         }
 
