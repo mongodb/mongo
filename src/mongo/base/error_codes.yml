@@ -1177,5 +1177,13 @@ error_codes:
       categories: [RetriableError],
     }
 
+  # Reserved for future load-shedding specific rejection code.
+  # Keep unused for now until mongo-side code is finalized and rolled out.
+  - {
+      code: 489,
+      name: SearchRequestRejectedDueToOverload,
+      categories: [SystemOverloadedError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
