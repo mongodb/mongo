@@ -815,7 +815,51 @@ public:
         ASSERT_TRUE(match);
     }
 
+    /**
+     * Given a collection pointer, extracts the field names included in the documents in the
+     * collection.
+     */
+    stdx::unordered_set<std::string> collectAllFieldNamesFromDocuments(
+        const CollectionPtr& collectionPtr) {
+        stdx::unordered_set<std::string> fieldNames;
+        auto cursor = collectionPtr->getCursor(_opCtx);
+        for (auto record = cursor->next(); record; record = cursor->next()) {
+            _extractDottedFieldNames(record->data.toBson(), "" /*prefix*/, fieldNames);
+        }
+        return fieldNames;
+    }
+
 private:
+    /**
+     * Given a BSONObj document, extract all the field names as dotted paths from the document.
+     */
+    void _extractDottedFieldNames(const BSONObj& doc,
+                                  const std::string prefix,
+                                  stdx::unordered_set<std::string>& fieldNames) {
+        for (const auto& elem : doc) {
+            std::string newFieldName(elem.fieldNameStringData());
+
+            if (!prefix.empty()) {
+                std::string withPrefix = prefix;
+                withPrefix += ".";
+                withPrefix += newFieldName;
+                newFieldName = withPrefix;
+            }
+
+            fieldNames.insert(newFieldName);
+
+            if (elem.type() == BSONType::object) {
+                _extractDottedFieldNames(elem.Obj(), newFieldName, fieldNames);
+            } else if (elem.type() == BSONType::array) {
+                for (auto&& elem : elem.embeddedObject()) {
+                    if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+                        _extractDottedFieldNames(elem.Obj(), newFieldName, fieldNames);
+                    }
+                }
+            }
+        }
+    }
+
     BSONObj _getTxnDoc() {
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         auto txnsFilter =
@@ -1461,13 +1505,15 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
     const auto collAcq = acquireCollForRead(_opCtx, nss);
+    stdx::unordered_set<std::string> fieldSet =
+        collectAllFieldNamesFromDocuments(collAcq.getCollectionPtr());
     auto entry = collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, insertTime1.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1481,7 +1527,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1554,13 +1600,15 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
 
     const auto collAcq = acquireCollForRead(_opCtx, nss);
+    stdx::unordered_set<std::string> fieldSet =
+        collectAllFieldNamesFromDocuments(collAcq.getCollectionPtr());
     auto entry = collAcq.getCollectionPtr()->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     {
         // Verify that, even though op2 was applied first, the multikey state is observed in all
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, updateTime1.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1574,7 +1622,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
