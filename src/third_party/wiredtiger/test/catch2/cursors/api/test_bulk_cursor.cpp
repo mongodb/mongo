@@ -87,8 +87,9 @@ check_txn_updates(std::string const &label, WT_SESSION_IMPL *session_impl, bool 
 
         printf("check_txn_updates() - %s\n", label.c_str());
         print_dhandles(session_impl);
-        printf("  txn = 0x%p, txn->id = 0x%" PRIu64 ", txn->mod = 0x%p, txn->mod_count = %u\n", txn,
-          txn->id, txn->mod, txn->mod_count);
+        printf("  txn = 0x%p, txn->time_point.id = 0x%" PRIu64
+               ", txn->mod = 0x%p, txn->mod_count = %u\n",
+          txn, txn->time_point.id, txn->mod, txn->mod_count);
 
         WT_TXN_OP *op = txn->mod;
         for (u_int i = 0; i < txn->mod_count; i++, op++) {

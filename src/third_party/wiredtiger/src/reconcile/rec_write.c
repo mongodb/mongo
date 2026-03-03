@@ -2555,7 +2555,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
           session, btree->maxleafpage, compressed_size, last_block, &btree->maxleafpage_precomp);
 
     /* Update the per-page reconciliation time statistics now that we've written something. */
-    __rec_page_time_stats(session, r);
+    __rec_page_time_stats(session, r, build_delta);
 
 copy_image:
 #ifdef HAVE_DIAGNOSTIC
@@ -2996,7 +2996,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
                      * the one held on page->disagg_info appears to be from the previous block, and
                      * the one on the multi->block_meta appears to be from the current block.
                      */
-                    if (r->multi->block_meta != NULL && r->multi->block_meta->delta_count == 0 &&
+                    if (r->multi_next == 1 && r->multi->block_meta != NULL &&
+                      r->multi->block_meta->delta_count == 0 &&
                       !F_ISSET(r->multi, WT_MULTI_SKIP_WRITE)) {
 
 #ifdef HAVE_DIAGNOSTIC

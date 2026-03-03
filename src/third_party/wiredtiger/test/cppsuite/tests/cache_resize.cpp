@@ -49,7 +49,7 @@ public:
       const std::string &, const std::string &value, wt_timestamp_t ts,
       scoped_cursor &op_track_cursor) override final
     {
-        uint64_t txn_id = ((WT_SESSION_IMPL *)session)->txn->id;
+        uint64_t txn_id = ((WT_SESSION_IMPL *)session)->txn->time_point.id;
         /*
          * The cache_size may have been changed between the time we make an insert to the DB and
          * when we write the details to the tracking table, as such we can't take cache_size from

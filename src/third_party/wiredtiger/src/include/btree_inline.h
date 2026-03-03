@@ -1010,8 +1010,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
      * heuristic and therefore can be a little fuzzy, otherwise this would need to be a compare and
      * swap.
      */
-    if (__wt_atomic_load_uint64_relaxed(&page->modify->update_txn) < session->txn->id)
-        __wt_atomic_store_uint64_relaxed(&page->modify->update_txn, session->txn->id);
+    if (__wt_atomic_load_uint64_relaxed(&page->modify->update_txn) < session->txn->time_point.id)
+        __wt_atomic_store_uint64_relaxed(&page->modify->update_txn, session->txn->time_point.id);
 }
 
 /*

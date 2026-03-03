@@ -32,6 +32,29 @@ __rec_cell_addr_stats(WTI_RECONCILE *r, WT_TIME_AGGREGATE *ta)
 }
 
 /*
+ * __rec_delta_cell_addr_stats --
+ *     Track statistics for time values associated with an address in delta.
+ */
+static WT_INLINE void
+__rec_delta_cell_addr_stats(WTI_RECONCILE *r, WT_TIME_AGGREGATE *ta)
+{
+    if (ta->newest_start_durable_ts != WT_TS_NONE)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_NEWEST_START_DURABLE_TS);
+    if (ta->newest_stop_durable_ts != WT_TS_NONE)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_DURABLE_TS);
+    if (ta->oldest_start_ts != WT_TS_NONE)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_OLDEST_START_TS);
+    if (ta->newest_txn != WT_TXN_NONE)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_NEWEST_TXN);
+    if (ta->newest_stop_ts != WT_TS_MAX)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TS);
+    if (ta->newest_stop_txn != WT_TXN_MAX)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TXN);
+    if (ta->prepare != 0)
+        FLD_SET(r->delta_ts_usage_flags, WTI_REC_TIME_PREPARE);
+}
+
+/*
  * __rec_cell_tw_stats --
  *     Gather statistics about this cell.
  */
@@ -55,6 +78,29 @@ __rec_cell_tw_stats(WTI_RECONCILE *r, WT_TIME_WINDOW *tw)
 }
 
 /*
+ * __rec_delta_cell_tw_stats --
+ *     Gather statistics about this delta cell.
+ */
+static WT_INLINE void
+__rec_delta_cell_tw_stats(WTI_RECONCILE *r, WT_TIME_WINDOW *tw)
+{
+    if (tw->durable_start_ts != WT_TS_NONE)
+        ++r->count_delta_durable_start_ts;
+    if (tw->start_ts != WT_TS_NONE)
+        ++r->count_delta_start_ts;
+    if (tw->start_txn != WT_TXN_NONE)
+        ++r->count_delta_start_txn;
+    if (tw->durable_stop_ts != WT_TS_NONE)
+        ++r->count_delta_durable_stop_ts;
+    if (tw->stop_ts != WT_TS_MAX)
+        ++r->count_delta_stop_ts;
+    if (tw->stop_txn != WT_TXN_MAX)
+        ++r->count_delta_stop_txn;
+    if (WT_TIME_WINDOW_HAS_PREPARE(tw))
+        ++r->count_delta_prepare;
+}
+
+/*
  * __rec_page_time_stats_clear --
  *     Clear page statistics.
  */
@@ -69,7 +115,16 @@ __rec_page_time_stats_clear(WTI_RECONCILE *r)
     r->count_stop_txn = 0;
     r->count_prepare = 0;
 
+    r->count_delta_durable_start_ts = 0;
+    r->count_delta_start_ts = 0;
+    r->count_delta_start_txn = 0;
+    r->count_delta_durable_stop_ts = 0;
+    r->count_delta_stop_ts = 0;
+    r->count_delta_stop_txn = 0;
+    r->count_delta_prepare = 0;
+
     r->ts_usage_flags = 0;
+    r->delta_ts_usage_flags = 0;
 }
 
 /*
@@ -99,74 +154,99 @@ __rec_page_pfx_compression_stats_clear(WTI_RECONCILE *r)
  *     Update statistics about this page.
  */
 static WT_INLINE void
-__rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
+__rec_page_time_stats(WT_SESSION_IMPL *session, WTI_RECONCILE *r, bool is_delta)
 {
-    /* Time window statistics */
-    if (r->count_durable_start_ts != 0) {
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_durable_start_ts);
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_ts, r->count_durable_start_ts * sizeof(wt_timestamp_t));
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_durable_start_ts, r->count_durable_start_ts);
-        r->rec_page_cell_with_ts = true;
-    }
-    if (r->count_start_ts != 0) {
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_ts, r->count_start_ts * sizeof(wt_timestamp_t));
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_ts, r->count_start_ts);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_ts);
-        r->rec_page_cell_with_ts = true;
-    }
-    if (r->count_start_txn != 0) {
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_txn, r->count_start_txn * sizeof(uint64_t));
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_txn, r->count_start_txn);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_txn);
-        r->rec_page_cell_with_txn_id = true;
-    }
-    if (r->count_durable_stop_ts != 0) {
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_ts, r->count_durable_stop_ts * sizeof(wt_timestamp_t));
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_durable_stop_ts, r->count_durable_stop_ts);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_durable_stop_ts);
-        r->rec_page_cell_with_ts = true;
-    }
-    if (r->count_stop_ts != 0) {
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_ts, r->count_stop_ts * sizeof(wt_timestamp_t));
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_ts, r->count_stop_ts);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_ts);
-        r->rec_page_cell_with_ts = true;
-    }
-    if (r->count_stop_txn != 0) {
-        WT_STAT_CONN_DSRC_INCRV(
-          session, rec_time_window_bytes_txn, r->count_stop_txn * sizeof(uint64_t));
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_txn, r->count_stop_txn);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_txn);
-        r->rec_page_cell_with_txn_id = true;
+    uint32_t count_durable_start_ts, count_start_ts, count_start_txn, count_durable_stop_ts,
+      count_stop_ts, count_stop_txn, count_prepare;
+    uint16_t ts_usage_flags;
+    if (is_delta) {
+        count_durable_start_ts = r->count_delta_durable_start_ts;
+        count_start_ts = r->count_delta_start_ts;
+        count_start_txn = r->count_delta_start_txn;
+        count_durable_stop_ts = r->count_delta_durable_stop_ts;
+        count_stop_ts = r->count_delta_stop_ts;
+        count_stop_txn = r->count_delta_stop_txn;
+        count_prepare = r->count_delta_prepare;
+        ts_usage_flags = r->delta_ts_usage_flags;
+    } else {
+        count_durable_start_ts = r->count_durable_start_ts;
+        count_start_ts = r->count_start_ts;
+        count_start_txn = r->count_start_txn;
+        count_durable_stop_ts = r->count_durable_stop_ts;
+        count_stop_ts = r->count_stop_ts;
+        count_stop_txn = r->count_stop_txn;
+        count_prepare = r->count_prepare;
+        ts_usage_flags = r->ts_usage_flags;
     }
 
-    if (r->count_prepare != 0) {
-        WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_prepared, r->count_prepare);
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_prepared);
-        r->rec_page_cell_with_prepared_txn = true;
+    if (WT_PAGE_IS_INTERNAL(r->page)) {
+        /* Time aggregate statistics */
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_NEWEST_START_DURABLE_TS))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_start_durable_ts);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_DURABLE_TS))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_durable_ts);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_OLDEST_START_TS))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_oldest_start_ts);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_NEWEST_TXN))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_txn);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TS))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_ts);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TXN))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_txn);
+        if (FLD_ISSET(ts_usage_flags, WTI_REC_TIME_PREPARE))
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_prepared);
+    } else {
+        /* Time window statistics */
+        if (count_durable_start_ts != 0) {
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_durable_start_ts);
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_ts, count_durable_start_ts * sizeof(wt_timestamp_t));
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_durable_start_ts, count_durable_start_ts);
+            r->rec_page_cell_with_ts = true;
+        }
+        if (count_start_ts != 0) {
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_ts, count_start_ts * sizeof(wt_timestamp_t));
+            WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_ts, count_start_ts);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_ts);
+            r->rec_page_cell_with_ts = true;
+        }
+        if (count_start_txn != 0) {
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_txn, count_start_txn * sizeof(uint64_t));
+            WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_start_txn, count_start_txn);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_start_txn);
+            r->rec_page_cell_with_txn_id = true;
+        }
+        if (count_durable_stop_ts != 0) {
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_ts, count_durable_stop_ts * sizeof(wt_timestamp_t));
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_durable_stop_ts, count_durable_stop_ts);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_durable_stop_ts);
+            r->rec_page_cell_with_ts = true;
+        }
+        if (count_stop_ts != 0) {
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_ts, count_stop_ts * sizeof(wt_timestamp_t));
+            WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_ts, count_stop_ts);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_ts);
+            r->rec_page_cell_with_ts = true;
+        }
+        if (count_stop_txn != 0) {
+            WT_STAT_CONN_DSRC_INCRV(
+              session, rec_time_window_bytes_txn, count_stop_txn * sizeof(uint64_t));
+            WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_stop_txn, count_stop_txn);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_stop_txn);
+            r->rec_page_cell_with_txn_id = true;
+        }
+        if (count_prepare != 0) {
+            WT_STAT_CONN_DSRC_INCRV(session, rec_time_window_prepared, count_prepare);
+            WT_STAT_CONN_DSRC_INCR(session, rec_time_window_pages_prepared);
+            r->rec_page_cell_with_prepared_txn = true;
+        }
     }
-
-    /* Time aggregate statistics */
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_START_DURABLE_TS))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_start_durable_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_DURABLE_TS))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_durable_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_OLDEST_START_TS))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_oldest_start_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_TXN))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_txn);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TS))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_ts);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_NEWEST_STOP_TXN))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_newest_stop_txn);
-    if (FLD_ISSET(r->ts_usage_flags, WTI_REC_TIME_PREPARE))
-        WT_STAT_CONN_DSRC_INCR(session, rec_time_aggr_prepared);
 }
 
 /*

@@ -445,6 +445,8 @@ struct __wt_txn_shared;
 typedef struct __wt_txn_shared WT_TXN_SHARED;
 struct __wt_txn_snapshot;
 typedef struct __wt_txn_snapshot WT_TXN_SNAPSHOT;
+struct __wt_txn_time_point;
+typedef struct __wt_txn_time_point WT_TXN_TIME_POINT;
 struct __wt_update;
 typedef struct __wt_update WT_UPDATE;
 struct __wt_update_value;

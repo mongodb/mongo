@@ -291,11 +291,11 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
          * If this operation is part of a running transaction, that should be included in the
          * checkpoint.
          */
-        ckpt_session->txn->id = session->txn->id;
+        ckpt_session->txn->time_point.id = session->txn->time_point.id;
         WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_METADATA));
         WT_WITH_DHANDLE(ckpt_session, WT_SESSION_META_DHANDLE(session),
           WT_WITH_METADATA_LOCK(ckpt_session, ret = __wt_checkpoint_file(ckpt_session, NULL)));
-        ckpt_session->txn->id = WT_TXN_NONE;
+        ckpt_session->txn->time_point.id = WT_TXN_NONE;
         if (ret == 0)
             WT_WITH_DHANDLE(
               session, WT_SESSION_META_DHANDLE(session), ret = __wt_checkpoint_sync(session, NULL));

@@ -461,7 +461,7 @@ lock_readunlock(WT_SESSION *session, RWLOCK *lock)
                 __wt_verbose_worker(__s, WT_VERB_TEMPORARY, WT_VERBOSE_INFO,                      \
                   "%s%s txn id %" PRIu64 " snap_min %" PRIu64 " snap_max %" PRIu64                \
                   " snap count %" PRIu32,                                                         \
-                  (uri) == NULL ? "" : (uri), (uri) == NULL ? "" : ": ", __s->txn->id,            \
+                  (uri) == NULL ? "" : (uri), (uri) == NULL ? "" : ": ", __s->txn->time_point.id, \
                   __s->txn->snapshot_data.snap_min, __s->txn->snapshot_data.snap_max,             \
                   __s->txn->snapshot_data.snapshot_count);                                        \
                 for (__i = 0; __i < __s->txn->snapshot_data.snapshot_count; ++__i)                \

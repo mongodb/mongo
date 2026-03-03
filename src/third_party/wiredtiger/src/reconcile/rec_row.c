@@ -238,8 +238,8 @@ err:
  *     Pack a delta for an internal page into a reconciliation structure
  */
 static int
-__rec_pack_delta_row_int(
-  WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *key, WTI_REC_KV *value)
+__rec_pack_delta_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *key,
+  WTI_REC_KV *value, WT_TIME_AGGREGATE *ta)
 {
     WT_PAGE_HEADER *header;
     WTI_REC_KV t_kv_struct, *t_kv;
@@ -295,6 +295,7 @@ __rec_pack_delta_row_int(
     } else {
         __wti_rec_kv_copy(session, p, value);
         ++r->count_internal_page_delta_key_updated;
+        __rec_delta_cell_addr_stats(r, ta);
     }
 
     r->delta.size += packed_size;
@@ -394,6 +395,7 @@ __wti_rec_pack_delta_row_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAV
 
     /* Update compression state. */
     __rec_key_state_update(r, ovfl_key);
+    __rec_delta_cell_tw_stats(r, twp);
 
 err:
     __wt_scr_free(session, &key);
@@ -485,7 +487,7 @@ __rec_row_merge(
 
         if (*build_deltap && prev_dirty) {
             WT_ASSERT(session, mod->mod_multi_entries == 1);
-            WT_RET(__rec_pack_delta_row_int(session, r, key, val));
+            WT_RET(__rec_pack_delta_row_int(session, r, key, val, &addr->ta));
         }
     }
     return (0);
@@ -622,7 +624,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
             if (build_delta && prev_dirty) {
                 __wt_ref_key(page, ref, &p, &size);
                 WT_ERR(__rec_cell_build_int_key(session, r, p, size));
-                WT_ERR(__rec_pack_delta_row_int(session, r, key, NULL));
+                WT_ERR(__rec_pack_delta_row_int(session, r, key, NULL, NULL));
             }
 
             /*
@@ -648,7 +650,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                 if (build_delta && prev_dirty) {
                     __wt_ref_key(page, ref, &p, &size);
                     WT_ERR(__rec_cell_build_int_key(session, r, p, size));
-                    WT_ERR(__rec_pack_delta_row_int(session, r, key, NULL));
+                    WT_ERR(__rec_pack_delta_row_int(session, r, key, NULL, NULL));
                 }
 
                 /*
@@ -752,9 +754,9 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
                   ref->page_del->selected_for_write ? "true" : "false");
             }
 
-            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
+            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED))
                 __wti_rec_cell_build_addr(session, r, NULL, vpack, WT_RECNO_OOB, page_del);
-            } else {
+            else {
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
                 val->cell_len = 0;
@@ -764,10 +766,15 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         }
 
         /*
+         * Copy the time aggregate before releasing the ref; otherwise, there's a risk of
+         * encountering heap use-after-free issues.
+         */
+        WT_TIME_AGGREGATE_COPY(&ta, source_ta);
+
+        /*
          * Track the time window. The fast-truncate is a stop time window and has to be considered
          * in the internal page's aggregate information for RTS to find it.
          */
-        WT_TIME_AGGREGATE_COPY(&ta, source_ta);
         if (page_del != NULL)
             WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
 
@@ -795,7 +802,7 @@ __wti_rec_row_int(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         __rec_key_state_update(r, false);
 
         if (build_delta && prev_dirty && !retain_onpage)
-            WT_ERR(__rec_pack_delta_row_int(session, r, key, val));
+            WT_ERR(__rec_pack_delta_row_int(session, r, key, val, &ta));
 
         /*
          * Set the ref_changes state to zero if there were no concurrent changes while reconciling

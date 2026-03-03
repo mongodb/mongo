@@ -219,7 +219,7 @@ TEST_CASE_METHOD(RecUpdSelectFixture, "rec_upd_select: Basic visible update sele
     /* Set up transaction with snapshot for visibility checks */
     F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
     session->txn->snapshot_data.snap_max = 200;
-    session->txn->id = 120;
+    session->txn->time_point.id = 120;
     session->txn->isolation = WT_ISO_SNAPSHOT;
     F_CLR(session->dhandle, WT_DHANDLE_HS);
 
@@ -283,7 +283,7 @@ TEST_CASE_METHOD(
     /* Set up transaction with snapshot for visibility checks */
     F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
     session->txn->snapshot_data.snap_max = 200;
-    session->txn->id = 120;
+    session->txn->time_point.id = 120;
     session->txn->isolation = WT_ISO_SNAPSHOT;
 
     WTI_RECONCILE r;
@@ -332,7 +332,7 @@ TEST_CASE_METHOD(RecUpdSelectFixture, "rec_upd_select: Skip writing aborted and 
     /* Set up transaction with snapshot for visibility checks */
     F_SET(session->txn, WT_TXN_HAS_SNAPSHOT);
     session->txn->snapshot_data.snap_max = 200;
-    session->txn->id = 120;
+    session->txn->time_point.id = 120;
     session->txn->isolation = WT_ISO_SNAPSHOT;
 
     WTI_RECONCILE r;

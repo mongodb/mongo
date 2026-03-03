@@ -72,6 +72,10 @@ class CapacityStat(Stat):
     prefix = 'capacity'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, CapacityStat.prefix, desc, flags)
+class CheckpointCleanupStat(Stat):
+    prefix = 'checkpoint-cleanup'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, CheckpointCleanupStat.prefix, desc, flags)
 class CheckpointStat(Stat):
     prefix = 'checkpoint'
     def __init__(self, name, desc, flags=''):
@@ -483,12 +487,16 @@ conn_stats = [
     CapacityStat('fsync_all_time', 'background fsync time (msecs)', 'no_clear,no_scale'),
 
     ##########################################
+    # Checkpoint Cleanup statistics
+    ##########################################
+    CheckpointCleanupStat('checkpoint_cleanup_duration', 'most recent duration on all eligible files (usecs)', 'no_clear,no_scale'),
+    CheckpointCleanupStat('checkpoint_cleanup_handle_processed', 'most recent handles processed'),
+    CheckpointCleanupStat('checkpoint_cleanup_inmem_pages_visited', 'most recent in-memory pages visited'),
+    CheckpointCleanupStat('checkpoint_cleanup_success', 'successful calls'),
+
+    ##########################################
     # Checkpoint statistics
     ##########################################
-    CheckpointStat('checkpoint_cleanup_duration', 'most recent checkpoint cleanup duration on all eligible files (usecs)', 'no_clear,no_scale'),
-    CheckpointStat('checkpoint_cleanup_handle_processed', 'most recent checkpoint cleanup handles processed'),
-    CheckpointStat('checkpoint_cleanup_inmem_pages_visited', 'in-memory pages visited during checkpoint cleanup'),
-    CheckpointStat('checkpoint_cleanup_success', 'checkpoint cleanup successful calls'),
     CheckpointStat('checkpoint_fsync_post', 'fsync calls after allocating the transaction ID'),
     CheckpointStat('checkpoint_fsync_post_duration', 'fsync duration after allocating the transaction ID (usecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_generation', 'generation', 'no_clear,no_scale'),
@@ -1264,15 +1272,19 @@ conn_dsrc_stats = [
     CacheStat('cache_write_restore_scrub', 'pages written requiring in-memory restoration due to scrub eviction'),
 
     ##########################################
+    # Checkpoint Cleanup statistics
+    ##########################################
+    CheckpointCleanupStat('checkpoint_cleanup_pages_evict', 'pages added for eviction'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_obsolete_tw', 'pages dirtied due to obsolete time window'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_read_obsolete_tw', 'pages read into cache due to obsolete time window'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_read_reclaim_space', 'pages read into cache (reclaim_space)'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_removed', 'pages removed'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_visited', 'pages visited'),
+    CheckpointCleanupStat('checkpoint_cleanup_pages_walk_skipped', 'pages skipped during tree walk'),
+
+    ##########################################
     # Checkpoint statistics
     ##########################################
-    CheckpointStat('checkpoint_cleanup_pages_evict', 'pages added for eviction during checkpoint cleanup'),
-    CheckpointStat('checkpoint_cleanup_pages_obsolete_tw', 'pages dirtied due to obsolete time window by checkpoint cleanup'),
-    CheckpointStat('checkpoint_cleanup_pages_read_obsolete_tw', 'pages read into cache during checkpoint cleanup due to obsolete time window'),
-    CheckpointStat('checkpoint_cleanup_pages_read_reclaim_space', 'pages read into cache during checkpoint cleanup (reclaim_space)'),
-    CheckpointStat('checkpoint_cleanup_pages_removed', 'pages removed during checkpoint cleanup'),
-    CheckpointStat('checkpoint_cleanup_pages_visited', 'pages visited during checkpoint cleanup'),
-    CheckpointStat('checkpoint_cleanup_pages_walk_skipped', 'pages skipped during checkpoint cleanup tree walk'),
     CheckpointStat('checkpoint_snapshot_acquired', 'checkpoint has acquired a snapshot for its transaction'),
 
     ##########################################

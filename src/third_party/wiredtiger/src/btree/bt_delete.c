@@ -297,8 +297,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_TXN_OP *op)
              */
             for (; *updp != NULL; ++updp) {
                 /* The ref is locked, no need to pay attention to memory ordering here. */
-                if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
-                    (*updp)->upd_rollback_ts = txn->rollback_timestamp;
+                if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_ROLLBACK))
+                    (*updp)->upd_rollback_ts = txn->time_point.rollback_timestamp;
                 __wt_atomic_store_uint64_relaxed(&(*updp)->upd_saved_txnid, (*updp)->txnid);
                 __wt_atomic_store_uint64_v_relaxed(&(*updp)->txnid, WT_TXN_ABORTED);
             }

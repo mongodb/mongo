@@ -88,7 +88,7 @@ set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation, co
     const std::string &key, const std::string &value, wt_timestamp_t ts,
     scoped_cursor &op_track_cursor) override final
 {
-    uint64_t txn_id = reinterpret_cast<WT_SESSION_IMPL *>(session)->txn->id;
+    uint64_t txn_id = reinterpret_cast<WT_SESSION_IMPL *>(session)->txn->time_point.id;
 
     op_track_cursor->set_key(op_track_cursor.get(), ts, txn_id);
     op_track_cursor->set_value(op_track_cursor.get(), key.c_str(), value.size());

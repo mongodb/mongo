@@ -214,7 +214,7 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
     fmt = WT_UNCHECKED_STRING(Iq);
 
     if (txn->txn_log.logrec != NULL) {
-        WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_ID));
+        WT_ASSERT(session, F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID));
         return (0);
     }
 
@@ -222,16 +222,17 @@ __txn_logrec_init(WT_SESSION_IMPL *session)
      * The only way we should ever get in here without a txn id is if we are recording diagnostic
      * information. In that case, allocate an id.
      */
-    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING) && txn->id == WT_TXN_NONE)
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING) &&
+      txn->time_point.id == WT_TXN_NONE)
         WT_RET(__wt_txn_id_check(session));
     else
-        WT_ASSERT(session, txn->id != WT_TXN_NONE);
+        WT_ASSERT(session, txn->time_point.id != WT_TXN_NONE);
 
-    WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
+    WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->time_point.id));
     WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
-    WT_ERR(__wt_struct_pack(
-      session, (uint8_t *)logrec->data + logrec->size, header_size, fmt, rectype, txn->id));
+    WT_ERR(__wt_struct_pack(session, (uint8_t *)logrec->data + logrec->size, header_size, fmt,
+      rectype, txn->time_point.id));
     logrec->size += (uint32_t)header_size;
     txn->txn_log.logrec = logrec;
 
@@ -260,7 +261,8 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     txn = session->txn;
 
     /* We'd better have a transaction. */
-    WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING) && F_ISSET(txn, WT_TXN_HAS_ID));
+    WT_ASSERT(
+      session, F_ISSET(txn, WT_TXN_RUNNING) && F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID));
 
     WT_ASSERT(session, txn->mod_count > 0);
     op = txn->mod + txn->mod_count - 1;
@@ -408,14 +410,14 @@ __wti_txn_ts_log(WT_SESSION_IMPL *session)
     WT_RET(__txn_logrec_init(session));
     logrec = txn->txn_log.logrec;
     commit = durable = first_commit = prepare = read = WT_TS_NONE;
-    if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
-        commit = txn->commit_timestamp;
+    if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_COMMIT)) {
+        commit = txn->time_point.commit_timestamp;
         first_commit = txn->first_commit_timestamp;
     }
-    if (F_ISSET(txn, WT_TXN_HAS_TS_DURABLE))
-        durable = txn->durable_timestamp;
-    if (F_ISSET(txn, WT_TXN_HAS_TS_PREPARE))
-        prepare = txn->prepare_timestamp;
+    if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_DURABLE))
+        durable = txn->time_point.durable_timestamp;
+    if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_PREPARE))
+        prepare = txn->time_point.prepare_timestamp;
     if (F_ISSET(txn, WT_TXN_SHARED_TS_READ))
         read = txn_shared->read_timestamp;
 

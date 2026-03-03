@@ -293,6 +293,14 @@ struct __wti_reconcile {
     uint32_t count_stop_txn;
     uint32_t count_prepare;
 
+    uint32_t count_delta_durable_start_ts;
+    uint32_t count_delta_start_ts;
+    uint32_t count_delta_start_txn;
+    uint32_t count_delta_durable_stop_ts;
+    uint32_t count_delta_stop_ts;
+    uint32_t count_delta_stop_txn;
+    uint32_t count_delta_prepare;
+
     /*
      * Counters for tracking the number of key deletions and key insertions or updates in internal
      * page deltas.
@@ -314,6 +322,7 @@ struct __wti_reconcile {
 #define WTI_REC_TIME_PREPARE 0x40u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t ts_usage_flags;
+    uint16_t delta_ts_usage_flags;
 
     /*
      * Saved update list, supporting WT_REC_HS configurations. While reviewing updates for each
