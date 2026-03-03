@@ -34,6 +34,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+#include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -2594,37 +2595,6 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
     ASSERT_EQ(batch.size(), 1);
     ASSERT_EQ(batch[0].getIdx(), 0);
     ASSERT_EQ(batch[0].getStatus().code(), ErrorCodes::BadValue);
-}
-
-// Helper to create a QueryStatsMetrics object with all required fields populated.
-write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
-                                                   long long keysExamined,
-                                                   long long docsExamined,
-                                                   long long nMatched) {
-    CursorMetrics metrics;
-    metrics.setKeysExamined(keysExamined);
-    metrics.setDocsExamined(docsExamined);
-    metrics.setBytesRead(100);
-    metrics.setReadingTimeMicros(50);
-    metrics.setWorkingTimeMillis(10);
-    metrics.setHasSortStage(false);
-    metrics.setUsedDisk(false);
-    metrics.setFromMultiPlanner(false);
-    metrics.setFromPlanCache(false);
-    metrics.setPlanningTimeMicros(5);
-    metrics.setNDocsSampled(0);
-    metrics.setCpuNanos(1000);
-    metrics.setNumInterruptChecks(1);
-    metrics.setNMatched(nMatched);
-    metrics.setNUpserted(0);
-    metrics.setNModified(nMatched);
-    metrics.setNDeleted(0);
-    metrics.setNInserted(0);
-
-    write_ops::QueryStatsMetrics qsm;
-    qsm.setOriginalOpIndex(originalOpIndex);
-    qsm.setMetrics(metrics);
-    return qsm;
 }
 
 TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromShardResponse) {

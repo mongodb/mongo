@@ -728,7 +728,10 @@ export function runCommandAndValidateQueryStats({
 
     // Every field in the key is in keyFields or is the base of a path in keyFields.
     for (const field in entry.key) {
-        assert(keyFieldsPrefixes.includes(field), `Unexpected field ${field} in key for ${commandName}`);
+        assert(
+            keyFieldsPrefixes.includes(field),
+            `Key: ${tojson(entry.key)} has unexpected field ${field} for ${commandName}`,
+        );
     }
 
     // $hint can only be string(index name) or object (index spec).

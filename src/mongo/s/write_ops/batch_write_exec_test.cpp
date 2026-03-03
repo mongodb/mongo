@@ -43,14 +43,17 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/mock_ns_targeter.h"
@@ -66,6 +69,7 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
@@ -408,6 +412,12 @@ TEST_F(BatchWriteExecTest, SingleOpUnordered) {
 }
 
 TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
+    // Enable query stats collection and configure rate limiting
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
     // Try to update the single doc where a let param is used in the shard key.
     const auto let = BSON("y" << 100);
     const auto rtc = LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)};
@@ -466,6 +476,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
         return response;
     });
 
+
     // The update will hit the first shard.
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(kTestShardHost2, request.target);
@@ -488,12 +499,22 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
         for (auto&& u : actualBatchedUpdate.getUpdateRequest().getUpdates())
             ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
 
+        response.setQueryStatsMetrics({makeQueryStatsMetrics(0, 10, 5, 1)});
+
         return response.toBSON();
     });
 
     auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(1, response.getNModified());
+
+    // Verify query stats metrics are aggregated in opDebug
+    auto& opDebug = CurOp::get(operationContext())->debug();
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    const auto& metrics = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics.keysExamined, 10);
+    ASSERT_EQ(*metrics.docsExamined, 5);
+    ASSERT_EQ(*metrics.nModified, 1);
 }
 
 TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
@@ -4445,6 +4466,156 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
     });
 
     future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponse) {
+    // Enable query stats collection and configure rate limiting
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
+    // Test that queryStatsMetrics from shard responses are aggregated into OpDebug.
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setUpdates({write_ops::UpdateOpEntry(
+                                 BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0))),
+                             write_ops::UpdateOpEntry(
+                                 BSON("_id" << 1), write_ops::UpdateModification(BSON("a" << 1)))});
+        return updateOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, updateRequest, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(2);
+        batchedResponse.setNModified(2);
+        batchedResponse.setQueryStatsMetrics(
+            {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getNModified());
+
+    // Verify that the metrics were aggregated into OpDebug for each operation.
+    auto& opDebug = CurOp::get(operationContext())->debug();
+
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics0.keysExamined, 10);
+    ASSERT_EQ(*metrics0.docsExamined, 5);
+    ASSERT_EQ(*metrics0.nModified, 1);
+
+    ASSERT(opDebug.hasQueryStatsInfo(1));
+    const auto& metrics1 = opDebug.getAdditiveMetrics(1);
+    ASSERT_EQ(*metrics1.keysExamined, 20);
+    ASSERT_EQ(*metrics1.docsExamined, 15);
+    ASSERT_EQ(*metrics1.nModified, 1);
+}
+
+TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShards) {
+    // Enable query stats collection and configure rate limiting
+    RAIIServerParameterControllerForTest controller("featureFlagQueryStatsUpdateCommand", true);
+    auto& limiter =
+        query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
+    limiter.configureWindowBased(-1);
+
+    // Test that queryStatsMetrics from multiple shards are aggregated correctly.
+    const static auto epoch = OID::gen();
+    const static Timestamp timestamp(2);
+
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        NSTargeter::TargetingResult targetUpdate(OperationContext* opCtx,
+                                                 const BatchItemRef& itemRef) const override {
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200})),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200})),
+                                             boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        nss,
+        {MockRange(
+             ShardEndpoint(kShardName1,
+                           ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200})),
+                           boost::none),
+             BSON("x" << MINKEY),
+             BSON("x" << 0)),
+         MockRange(
+             ShardEndpoint(kShardName2,
+                           ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200})),
+                           boost::none),
+             BSON("x" << 0),
+             BSON("x" << MAXKEY))});
+
+    BatchedCommandRequest updateRequest([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setUpdates({write_ops::UpdateOpEntry(
+            BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0)))});
+        return updateOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, updateRequest, &response, &stats);
+
+        return response;
+    });
+
+    // First shard response with query stats metrics
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(1);
+        batchedResponse.setNModified(1);
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0, 10, 5, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    // Second shard response with different query stats metrics
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+        BatchedCommandResponse batchedResponse;
+        batchedResponse.setStatus(Status::OK());
+        batchedResponse.setN(1);
+        batchedResponse.setNModified(1);
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0, 15, 8, 1)});
+        return batchedResponse.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(2, response.getNModified());
+
+    // Verify that the metrics from both shards were aggregated (summed) for the operation.
+    auto& opDebug = CurOp::get(operationContext())->debug();
+    ASSERT(opDebug.hasQueryStatsInfo(0));
+    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
+    ASSERT_EQ(*metrics0.keysExamined, 25);  // 10 + 15
+    ASSERT_EQ(*metrics0.docsExamined, 13);  // 5 + 8
+    ASSERT_EQ(*metrics0.nModified, 2);      // 1 + 1
 }
 
 }  // namespace

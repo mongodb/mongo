@@ -59,4 +59,34 @@ OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence) {
     return request;
 }
 
+write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
+                                                   long long keysExamined,
+                                                   long long docsExamined,
+                                                   long long nMatched) {
+    CursorMetrics metrics;
+    metrics.setKeysExamined(keysExamined);
+    metrics.setDocsExamined(docsExamined);
+    metrics.setBytesRead(100);
+    metrics.setReadingTimeMicros(50);
+    metrics.setWorkingTimeMillis(10);
+    metrics.setHasSortStage(false);
+    metrics.setUsedDisk(false);
+    metrics.setFromMultiPlanner(false);
+    metrics.setFromPlanCache(false);
+    metrics.setPlanningTimeMicros(5);
+    metrics.setNDocsSampled(0);
+    metrics.setCpuNanos(1000);
+    metrics.setNumInterruptChecks(1);
+    metrics.setNMatched(nMatched);
+    metrics.setNUpserted(0);
+    metrics.setNModified(nMatched);
+    metrics.setNDeleted(0);
+    metrics.setNInserted(0);
+
+    write_ops::QueryStatsMetrics qsm;
+    qsm.setOriginalOpIndex(originalOpIndex);
+    qsm.setMetrics(metrics);
+    return qsm;
+}
+
 }  // namespace mongo

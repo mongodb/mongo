@@ -90,5 +90,6 @@ mongo_cc_library(
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/s:sharding_write_without_shard_key_api",
         "//src/mongo/s/commands/query_cmd:populate_cursor",
+        "//src/mongo/s/write_ops/unified_write_executor:write_batch_query_stats_registrar",
     ],
 )

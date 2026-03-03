@@ -56,11 +56,14 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
+#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
@@ -279,6 +282,14 @@ bool processResponseFromRemote(OperationContext* opCtx,
             }
 
             return true;
+        }
+    }
+
+    if (batchedCommandResponse.areQueryStatsMetricsSet()) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        for (const auto& metrics : batchedCommandResponse.getQueryStatsMetrics()) {
+            opDebug.getQueryStatsInfo(metrics.getOriginalOpIndex())
+                .additiveMetrics.aggregateCursorMetrics(metrics.getMetrics());
         }
     }
 
@@ -739,6 +750,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
     BatchWriteOp batchOp(opCtx, clientRequest);
 
+    // Register query stats key
+    unified_write_executor::WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+        opCtx, WriteCommandRef{clientRequest});
+
     // Current batch status
     bool refreshedTargeter = false;
     int rounds = 0;
@@ -913,6 +928,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     stats->noteTargetedCollectionIsSharded(targeter.isTargetedCollectionSharded());
 
     batchOp.buildClientResponse(clientResponse);
+
+    CurOp::get(opCtx)->setEndOfOpMetricsForBatchWrites();
+    collectQueryStatsMongosBatchWrites(opCtx);
 
     LOGV2_DEBUG(22910,
                 4,

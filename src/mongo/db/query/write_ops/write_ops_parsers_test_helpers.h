@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/query/write_ops/query_stats_metrics_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/modules.h"
 
@@ -49,5 +50,13 @@ namespace mongo {
  * }
  */
 OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence);
+
+/**
+ * Helper to create a QueryStatsMetrics object with all required fields populated.
+ */
+write_ops::QueryStatsMetrics makeQueryStatsMetrics(int originalOpIndex,
+                                                   long long keysExamined,
+                                                   long long docsExamined,
+                                                   long long nMatched);
 
 }  // namespace mongo
