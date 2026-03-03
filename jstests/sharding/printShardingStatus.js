@@ -113,8 +113,11 @@ config.getCollectionInfos().forEach(function (c) {
         return;
     }
 
-    // Create collection with options.
-    assert.commandWorked(configCopy.createCollection(c.name, c.options));
+    // Create collection with options. Remove 'recordIdsReplicated' as it's incompatible
+    // with the clusterAllCollectionsByDefault failpoint used in sharding_clustered_collections suite.
+    let createOptions = Object.assign({}, c.options);
+    delete createOptions.recordIdsReplicated;
+    assert.commandWorked(configCopy.createCollection(c.name, createOptions));
     // Clone the docs.
     config
         .getCollection(c.name)
