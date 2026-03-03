@@ -168,6 +168,118 @@ TEST(UnitTestSelfTest, BSONElementComparisons) {
     ASSERT_BSONELT_GTE(a, a);
 }
 
+TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusWithOK) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{8};
+    ASSERT_THAT(sw, match::StatusIsOK());
+}
+
+TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusOK) {
+    namespace match = mongo::unittest::match;
+    auto s = mongo::Status::OK();
+    ASSERT_THAT(s, match::StatusIsOK());
+}
+
+TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusError) {
+    namespace match = mongo::unittest::match;
+    auto s = mongo::Status{mongo::ErrorCodes::CommandFailed, "failed"};
+    ASSERT_THAT(s, match::Not(match::StatusIsOK()));
+}
+
+TEST(UnitTestMatcherTest, StatusIsOKMatcherStatusWithError) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{mongo::Status{mongo::ErrorCodes::CommandFailed, "failed"}};
+    ASSERT_THAT(sw, match::Not(match::StatusIsOK()));
+}
+
+TEST(UnitTestMatcherTest, StatusIsOKMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(match::StatusIsOK()), "is OK");
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(match::Not(match::StatusIsOK())),
+              "is not OK");
+    ASSERT_EQ(match::DescribeMatcher<mongo::Status>(match::StatusIsOK()), "is OK");
+    ASSERT_EQ(match::DescribeMatcher<mongo::Status>(match::Not(match::StatusIsOK())), "is not OK");
+}
+
+TEST(UnitTestMatcherTest, StatusIsMatcherStatusOK) {
+    namespace match = mongo::unittest::match;
+    auto s = mongo::Status::OK();
+    ASSERT_THAT(s, match::StatusIs(match::Eq(mongo::ErrorCodes::OK), match::Eq("")));
+}
+
+TEST(UnitTestMatcherTest, StatusIsMatcherStatusError) {
+    namespace match = mongo::unittest::match;
+    auto s = mongo::Status{mongo::ErrorCodes::CommandFailed, "failed"};
+    ASSERT_THAT(s,
+                match::StatusIs(match::Eq(mongo::ErrorCodes::CommandFailed), match::Eq("failed")));
+}
+
+TEST(UnitTestMatcherTest, StatusIsMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_EQ(match::DescribeMatcher<mongo::Status>(
+                  match::StatusIs(mongo::ErrorCodes::CommandFailed, "failed")),
+              "has code which is equal to CommandFailed and reason which is equal to \"failed\"");
+    ASSERT_EQ(
+        match::DescribeMatcher<mongo::Status>(
+            match::Not(match::StatusIs(mongo::ErrorCodes::CommandFailed, "failed"))),
+        "not (has code which is equal to CommandFailed and reason which is equal to \"failed\")");
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasValueMatcherWithValue) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{8};
+    ASSERT_THAT(sw, match::StatusWithHasValue(match::Eq(8)));
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasValueMatcherWithError) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{mongo::Status{mongo::ErrorCodes::CommandFailed, "failed"}};
+    ASSERT_THAT(sw, match::Not(match::StatusWithHasValue(match::Eq(8))));
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasValueMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_EQ(
+        match::DescribeMatcher<mongo::StatusWith<int>>(match::StatusWithHasValue(match::Eq(8))),
+        "has an OK status with value which is equal to 8");
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(
+                  match::Not(match::StatusWithHasValue(match::Eq(8)))),
+              "not (has an OK status with value which is equal to 8)");
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasStatusMatcherWithValue) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{8};
+    ASSERT_THAT(sw,
+                match::Not(match::StatusWithHasStatus(
+                    match::StatusIs(mongo::ErrorCodes::CommandFailed, match::A<std::string>()))));
+    ASSERT_THAT(sw, match::StatusWithHasStatus(match::StatusIsOK()));
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasStatusMatcherWithError) {
+    namespace match = mongo::unittest::match;
+    auto sw = mongo::StatusWith<int>{mongo::Status{mongo::ErrorCodes::CommandFailed, "failed"}};
+    ASSERT_THAT(sw, match::Not(match::StatusWithHasStatus(match::StatusIsOK())));
+    ASSERT_THAT(sw,
+                match::StatusWithHasStatus(
+                    match::StatusIs(mongo::ErrorCodes::CommandFailed, match::A<std::string>())));
+}
+
+TEST(UnitTestMatcherTest, StatusWithHasStatusMatcherDescription) {
+    namespace match = mongo::unittest::match;
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(
+                  match::StatusWithHasStatus(match::StatusIsOK())),
+              "is a StatusWith whose status is OK");
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(match::Not(match::StatusWithHasStatus(
+                  match::StatusIs(mongo::ErrorCodes::CommandFailed, match::A<std::string>())))),
+              "isn't a StatusWith whose status has code which is equal to CommandFailed and reason "
+              "which is anything");
+    ASSERT_EQ(match::DescribeMatcher<mongo::StatusWith<int>>(match::StatusWithHasStatus(
+                  match::StatusIs(mongo::ErrorCodes::CommandFailed, match::A<std::string>()))),
+              "is a StatusWith whose status has code which is equal to CommandFailed and reason "
+              "which is anything");
+}
+
 class UnitTestFormatTest : public mongo::unittest::Test {
 public:
     template <template <typename...> class Optional, typename T, typename... As>

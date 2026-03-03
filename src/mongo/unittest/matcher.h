@@ -55,6 +55,11 @@ using namespace ::testing;
 using ::testing::Matcher;
 
 namespace MONGO_MOD_FILE_PRIVATE match_details {
+inline std::string maybeNegate(bool negation, std::string str) {
+    if (negation)
+        return fmt::format("not ({})", str);
+    return str;
+}
 
 /**
  * Implementation of the `Throws` matcher.
@@ -132,11 +137,70 @@ MATCHER_P(MatchesPcreRegex,
  * Example:
  *  ASSERT_THAT(status, StatusIs(Eq(ErrorCodes::InternalError), ContainsRegex("ouch")));
  */
-MATCHER_P2(StatusIs, code, reason, "") {
+MATCHER_P2(StatusIs,
+           code,
+           reason,
+           match_details::maybeNegate(negation,
+                                      fmt::format("has code which {} and reason which {}",
+                                                  testing::DescribeMatcher<ErrorCodes::Error>(code),
+                                                  testing::DescribeMatcher<std::string>(reason)))) {
     return ExplainMatchResult(
         AllOf(Property("code", &Status::code, code), Property("reason", &Status::reason, reason)),
         arg,
         result_listener);
+}
+
+/**
+ * `StatusIsOK()` matches if a `Status` is OK.
+ *
+ * Example:
+ *  ASSERT_THAT(status, StatusIsOK());
+ */
+MATCHER(StatusIsOK, negation ? "is not OK" : "is OK") {
+    return arg.isOK();
+}
+
+/**
+ * `StatusWithHasValue(value)` matches a `StatusWith` that is OK and whose
+ * value matches the given matcher.
+ *
+ * Example:
+ *  StatusWith<int> sw16{16};
+ *  StatusWith<int> swError{Status{ErrorCodes::CommandFailed, "error"}};
+ *  ASSERT_THAT(sw16, StatusWithHasValue(16));
+ *  ASSERT_THAT(swError, Not(StatusWithHasValue(16)));
+ */
+MATCHER_P(
+    StatusWithHasValue,
+    value,
+    match_details::maybeNegate(
+        negation,
+        fmt::format(
+            "has an OK status with value which {}",
+            testing::DescribeMatcher<typename std::remove_cvref_t<arg_type>::value_type>(value)))) {
+    if (!arg.isOK())
+        return false;
+
+    return ExplainMatchResult(value, arg.getValue(), result_listener);
+}
+
+
+/**
+ * `StatusWithHasStatus(status)` matches a `StatusWith` whose status matches
+ * the given matcher.
+ *
+ * Example:
+ *  StatusWith<int> sw13{13};
+ *  StatusWith<int> swError{Status{ErrorCodes::CommandFailed, "error"}};
+ *  ASSERT_THAT(sw13, StatusWithHasStatus(StatusIsOK()));
+ *  ASSERT_THAT(swError, StatusWithHasStatus(StatusIs(ErrorCodes::CommandFailed, _)));
+ */
+MATCHER_P(StatusWithHasStatus,
+          status,
+          fmt::format("{} a StatusWith whose status {}",
+                      negation ? "isn't" : "is",
+                      testing::DescribeMatcher<Status>(status))) {
+    return ExplainMatchResult(status, arg.getStatus(), result_listener);
 }
 
 /**
