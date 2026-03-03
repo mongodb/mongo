@@ -119,10 +119,14 @@ struct CompDesc {
     }
 };
 
-using TimeSorterAscMin = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMin>;
-using TimeSorterAscMax = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMax>;
-using TimeSorterDescMin = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMin>;
-using TimeSorterDescMax = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMax>;
+using TimeSorterAscMin =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMin>;
+using TimeSorterAscMax =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMax>;
+using TimeSorterDescMin =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerMin>;
+using TimeSorterDescMax =
+    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerMax>;
 }  // namespace
 
 const DocumentSourceSort::SortStageOptions DocumentSourceSort::kDefaultOptions = {};
@@ -377,6 +381,34 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     return make_intrusive<DocumentSourceSort>(pExpCtx, sortOrder, std::move(options));
 }
 
+template <typename TimeSorter>
+auto makeSorter(const ExpressionContext& expCtx,
+                const DocumentSourceSort& ds,
+                const SortOptions& opts,
+                long long boundOffset) {
+    using Comp = std::conditional_t<std::is_same_v<TimeSorter, TimeSorterAscMin> ||
+                                        std::is_same_v<TimeSorter, TimeSorterAscMax>,
+                                    CompAsc,
+                                    CompDesc>;
+
+    using BoundMaker = std::conditional_t<std::is_same_v<TimeSorter, TimeSorterAscMin> ||
+                                              std::is_same_v<TimeSorter, TimeSorterDescMin>,
+                                          BoundMakerMin,
+                                          BoundMakerMax>;
+    return std::make_shared<TimeSorter>(
+        opts,
+        Comp{},
+        BoundMaker{boundOffset},
+        expCtx.getAllowDiskUse()
+            ? std::make_shared<
+                  sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document, Comp>>(
+                  expCtx.getTempDir(),
+                  ds._sortExecutor->getSorterFileStats(),
+                  /*dbName=*/boost::none,
+                  sorter::kLatestChecksumVersion)
+            : nullptr);
+};
+
 boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     SortPattern pat,
     StringData boundBase,
@@ -397,30 +429,18 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         opts.Limit(limit.value());
     }
 
-    auto spiller = expCtx->getAllowDiskUse()
-        ? std::make_shared<
-              sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
-              expCtx->getTempDir(),
-              ds->_sortExecutor->getSorterFileStats(),
-              /*dbName=*/boost::none,
-              sorter::kLatestChecksumVersion)
-        : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
-                opts, CompAsc{}, BoundMakerMin{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterAscMin>(*expCtx, *ds, opts, boundOffset);
         } else {
-            ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
-                opts, CompDesc{}, BoundMakerMin{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterDescMin>(*expCtx, *ds, opts, boundOffset);
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
-                opts, CompAsc{}, BoundMakerMax{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterAscMax>(*expCtx, *ds, opts, boundOffset);
         } else {
-            ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
-                opts, CompDesc{}, BoundMakerMax{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterDescMax>(*expCtx, *ds, opts, boundOffset);
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -435,7 +455,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         ds->_timeSorterPartitionKeyGen =
             std::make_shared<SortKeyGenerator>(std::move(partitionKey), expCtx->getCollator());
     }
-
     return ds;
 }
 
@@ -505,30 +524,18 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         opts.Limit(limitElem.numberLong());
     }
 
-    auto spiller = expCtx->getAllowDiskUse()
-        ? std::make_shared<
-              sorter::FileBasedSorterSpiller<DocumentSourceSort::SortableDate, Document>>(
-              expCtx->getTempDir(),
-              ds->_sortExecutor->getSorterFileStats(),
-              /*dbName=*/boost::none,
-              sorter::kLatestChecksumVersion)
-        : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
-                opts, CompAsc{}, BoundMakerMin{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterAscMin>(*expCtx, *ds, opts, boundOffset);
         } else {
-            ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
-                opts, CompDesc{}, BoundMakerMin{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterDescMin>(*expCtx, *ds, opts, boundOffset);
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
-                opts, CompAsc{}, BoundMakerMax{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterAscMax>(*expCtx, *ds, opts, boundOffset);
         } else {
-            ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
-                opts, CompDesc{}, BoundMakerMax{boundOffset}, std::move(spiller));
+            ds->_timeSorter = makeSorter<TimeSorterDescMax>(*expCtx, *ds, opts, boundOffset);
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -565,12 +572,12 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distri
 
 bool DocumentSourceSort::canRunInParallelBeforeWriteStage(
     const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const {
-    // This is an interesting special case. If there are no further stages which require merging the
-    // streams into one, a $sort should not require it. This is only the case because the sort order
-    // doesn't matter for a pipeline ending with a write stage. We may encounter it here as an
-    // intermediate stage before a final $group with a $sort, which would make sense. Should we
-    // extend our analysis to detect if an exchange is appropriate in a general pipeline, a $sort
-    // would generally require merging the streams before producing output.
+    // This is an interesting special case. If there are no further stages which require merging
+    // the streams into one, a $sort should not require it. This is only the case because the
+    // sort order doesn't matter for a pipeline ending with a write stage. We may encounter it
+    // here as an intermediate stage before a final $group with a $sort, which would make sense.
+    // Should we extend our analysis to detect if an exchange is appropriate in a general
+    // pipeline, a $sort would generally require merging the streams before producing output.
     return false;
 }
 

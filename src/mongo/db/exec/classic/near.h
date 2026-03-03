@@ -230,7 +230,8 @@ private:
     };
 
     SorterFileStats _sorterFileStats;
-    using ResultBufferSorter = BoundedSorter<SorterKey, SorterValue, NoOpBound>;
+    using ResultBufferSorter =
+        BoundedSorter<SorterKey, SorterValue, SorterKeyComparator, NoOpBound>;
     ResultBufferSorter _resultBuffer;
 
     // Stats

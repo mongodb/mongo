@@ -31,7 +31,6 @@
 #include "mongo/db/exec/sort_executor.h"
 
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 
@@ -39,21 +38,16 @@ namespace mongo {
 template <typename T>
 std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     auto opts = makeSortOptions();
-    SortKeyComparator sortKeyComparator{_sortPattern};
-    std::function<int(const Value&, const Value&)> comparator =
-        [sortKeyComparator](const Value& lhs, const Value& rhs) -> int {
-        return sortKeyComparator(lhs, rhs);
-    };
-    return Sorter<Value, T>::make(opts,
-                                  comparator,
-                                  (opts.tempDir)
-                                      ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T>>(
-                                            *opts.tempDir,
-                                            _sorterFileStats.get(),
-                                            /*dbName=*/boost::none,
-                                            sorter::kLatestChecksumVersion)
-                                      : nullptr,
-                                  /*settings=*/{});
+    return Sorter<Value, T>::template make<Comparator>(
+        opts,
+        Comparator(_sortPattern),
+        (opts.tempDir) ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T, Comparator>>(
+                             *opts.tempDir,
+                             _sorterFileStats.get(),
+                             /*dbName=*/boost::none,
+                             sorter::kLatestChecksumVersion)
+                       : nullptr,
+        /*settings=*/{});
 }
 template class SortExecutor<Document>;
 template class SortExecutor<SortableWorkingSetMember>;

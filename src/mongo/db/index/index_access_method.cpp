@@ -56,6 +56,8 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sorter/container_based_spiller.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -228,7 +230,6 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 
     return multikeyPaths;
 }
-
 }  // namespace
 
 auto& insertFailedDueToDuplicateKeyError =
@@ -927,7 +928,8 @@ public:
     using ShouldRelaxConstraintsFn = IndexAccessMethod::ShouldRelaxConstraintsFn;
     using YieldFn = IndexAccessMethod::YieldFn;
     using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
-    using Spiller = mongo::SorterSpiller<key_string::Value, mongo::NullValue>;
+    using Spiller =
+        mongo::SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
 
     // TODO SERVER-118936: Remove IndexBuildMethodEnum method parameter.
     BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -1409,18 +1411,14 @@ std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(
     const SortOptions& opts,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
-    std::function<int(const key_string::Value&, const key_string::Value&)> comparator =
-        [](const key_string::Value& lhs, const key_string::Value& rhs) -> int {
-        return lhs.compare(rhs);
-    };
     return ranges
         ? Sorter::makeFromExistingRanges(std::string{spiller->getStorage().getStorageIdentifier()},
                                          *ranges,
                                          opts,
-                                         comparator,
+                                         BtreeExternalSortComparison(),
                                          spiller,
                                          _makeSorterSettings())
-        : Sorter::make(opts, comparator, spiller, _makeSorterSettings());
+        : Sorter::make(opts, BtreeExternalSortComparison(), spiller, _makeSorterSettings());
 }
 
 BulkBuilderImpl::Sorter::Settings BulkBuilderImpl::_makeSorterSettings() const {
@@ -1430,13 +1428,15 @@ BulkBuilderImpl::Sorter::Settings BulkBuilderImpl::_makeSorterSettings() const {
          _iam->getSortedDataInterface()->rsKeyFormat()},
         {});
 }
+
 }  // namespace
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexCatalogEntry* entry,
-    std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
+    std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+        spiller,
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     const DatabaseName& dbName,

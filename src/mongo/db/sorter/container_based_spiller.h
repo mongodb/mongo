@@ -361,8 +361,8 @@ private:
     int64_t _currKey;
 };
 
-template <typename Key, typename Value>
-class ContainerBasedSpiller : public SorterSpillerBase<Key, Value> {
+template <typename Key, typename Value, typename Comparator>
+class ContainerBasedSpiller : public SorterSpillerBase<Key, Value, Comparator> {
 public:
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
@@ -372,16 +372,17 @@ public:
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
                           int64_t batchSize)
-        : SorterSpillerBase<Key, Value>(std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
-              opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)),
+        : SorterSpillerBase<Key, Value, Comparator>(
+              std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
+                  opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)),
           _opCtx(opCtx),
           _batchSize(batchSize) {}
 
     void mergeSpills(const SortOptions& opts,
-                     const SorterSpillerBase<Key, Value>::Settings& settings,
+                     const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
                      SorterStats& stats,
                      std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
-                     SorterSpillerBase<Key, Value>::Comparator comp,
+                     Comparator comp,
                      std::size_t numTargetedSpills,
                      std::size_t numParallelSpills) override {
         std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
@@ -430,7 +431,7 @@ private:
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
-        const SorterSpillerBase<Key, Value>::Settings& settings,
+        const SorterSpillerBase<Key, Value, Comparator>::Settings& settings,
         std::span<std::pair<Key, Value>> data,
         uint32_t idx) override {
         auto writer = this->_storage->makeWriter(opts, settings);

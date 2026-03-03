@@ -102,20 +102,17 @@ SortOptions BucketAutoStage::makeSortOptions() {
 GetNextResult BucketAutoStage::populateSorter() {
     if (!_sorter) {
         auto opts = makeSortOptions();
-        std::function<int(const Value&, const Value&)> comparator =
-            [valueComp = pExpCtx->getValueComparator()](const Value& lhs, const Value& rhs) -> int {
-            return valueComp.compare(lhs, rhs);
-        };
-        _sorter = Sorter<Value, Document>::make(
+        _sorter = Sorter<Value, Document>::template make<Comparator>(
             opts,
-            comparator,
-            (opts.tempDir) ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document>>(
-                                 *opts.tempDir,
-                                 &_sorterFileStats,
-                                 /*dbName=*/boost::none,
-                                 sorter::kLatestChecksumVersion)
-                           : nullptr,
-            /*setting=*/{});
+            Comparator(pExpCtx->getValueComparator()),
+            (opts.tempDir)
+                ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document, Comparator>>(
+                      *opts.tempDir,
+                      &_sorterFileStats,
+                      /*dbName=*/boost::none,
+                      sorter::kLatestChecksumVersion)
+                : nullptr,
+            /*settings=*/{});
     }
 
     auto next = pSource->getNext();

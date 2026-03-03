@@ -167,8 +167,8 @@ vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) 
         // the algorithm to spill again here so that all of the data is on disk when we sort it.
         spill();
 
-        std::function<int(const Value&, const Value&)> comparator =
-            [valueComparator = ValueComparator()](const Value& lhs, const Value& rhs) -> int {
+        auto comparator = [valueComparator = ValueComparator()](const Value& lhs,
+                                                                const Value& rhs) -> int {
             return valueComparator.compare(lhs, rhs);
         };
 

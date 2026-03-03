@@ -54,16 +54,19 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
       _sorterFileStats(/*sorterTracker=*/nullptr),
-      _resultBuffer(makeSortOptions(),
-                    SorterKeyComparator{},
-                    NoOpBound{},
-                    (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
-                        ? std::make_shared<sorter::FileBasedSorterSpiller<SorterKey, SorterValue>>(
-                              expCtx->getTempDir(),
-                              &_sorterFileStats,
-                              /*dbName=*/boost::none,
-                              sorter::kLatestChecksumVersion)
-                        : nullptr),
+      _resultBuffer(
+          makeSortOptions(),
+          SorterKeyComparator{},
+          NoOpBound{},
+          (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled())
+              ? std::make_shared<
+                    sorter::FileBasedSorterSpiller<SorterKey, SorterValue, SorterKeyComparator>>(
+                    expCtx->getTempDir(),
+                    &_sorterFileStats,
+                    /*dbName=*/boost::none,
+                    sorter::kLatestChecksumVersion)
+              : nullptr,
+          /*settings=*/{}),
       _stageType(type),
       _nextInterval(nullptr) {}
 

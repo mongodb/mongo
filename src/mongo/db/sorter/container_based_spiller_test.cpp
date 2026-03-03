@@ -566,7 +566,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
     SorterContainerStats stats{nullptr};
 
-    ContainerBasedSpiller<IntWrapper, NullValue> spiller{
+    ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
         *shard_role_details::getRecoveryUnit(opCtx.get()),
         collPtr,
@@ -579,10 +579,14 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
     std::span span{data};
 
-    auto it1 = spiller.spill(
-        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(0, 2), 0);
-    auto it2 = spiller.spill(
-        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(2, 2), 0);
+    auto it1 = spiller.spill(SortOptions{},
+                             SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                             span.subspan(0, 2),
+                             0);
+    auto it2 = spiller.spill(SortOptions{},
+                             SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                             span.subspan(2, 2),
+                             0);
 
     ASSERT_TRUE(it1->more());
     EXPECT_EQ(it1->next().first, 50);
@@ -609,7 +613,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
     SorterContainerStats containerStats{nullptr};
 
-    ContainerBasedSpiller<IntWrapper, NullValue> spiller{
+    ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
         *shard_role_details::getRecoveryUnit(opCtx.get()),
         collPtr,
@@ -624,22 +628,30 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
     std::span<std::pair<IntWrapper, NullValue>> span{data};
 
     std::vector<std::shared_ptr<sorter::Iterator<IntWrapper, NullValue>>> iterators;
-    iterators.push_back(spiller.spill(
-        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(0, 2), 0));
-    iterators.push_back(spiller.spill(
-        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(2, 2), 0));
-    iterators.push_back(spiller.spill(
-        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(4, 1), 0));
+    iterators.push_back(
+        spiller.spill(SortOptions{},
+                      SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                      span.subspan(0, 2),
+                      0));
+    iterators.push_back(
+        spiller.spill(SortOptions{},
+                      SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                      span.subspan(2, 2),
+                      0));
+    iterators.push_back(
+        spiller.spill(SortOptions{},
+                      SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                      span.subspan(4, 1),
+                      0));
 
     SorterStats sorterStats{nullptr};
-    spiller.mergeSpills(
-        SortOptions{},
-        SorterSpiller<IntWrapper, NullValue>::Settings{},
-        sorterStats,
-        iterators,
-        [](const IntWrapper& left, const IntWrapper& right) { return IWComparator{}(left, right); },
-        2,
-        2);
+    spiller.mergeSpills(SortOptions{},
+                        SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                        sorterStats,
+                        iterators,
+                        IWComparator(ASC),
+                        2,
+                        2);
 
     EXPECT_EQ(iterators.size(), 2);
     EXPECT_EQ(container.entries().size(), data.size());
@@ -673,7 +685,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
     ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
     SorterContainerStats containerStats{nullptr};
 
-    ContainerBasedSpiller<IntWrapper, NullValue> spiller{
+    ContainerBasedSpiller<IntWrapper, NullValue, IWComparator> spiller{
         *opCtx,
         *shard_role_details::getRecoveryUnit(opCtx.get()),
         collPtr,
@@ -697,21 +709,21 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
 
     std::vector<std::shared_ptr<sorter::Iterator<IntWrapper, NullValue>>> iterators;
     for (size_t i = 0; i < data.size(); ++i) {
-        iterators.push_back(spiller.spill(SortOptions{},
-                                          SorterSpiller<IntWrapper, NullValue>::Settings{},
-                                          span.subspan(i, 1),
-                                          0));
+        iterators.push_back(
+            spiller.spill(SortOptions{},
+                          SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                          span.subspan(i, 1),
+                          0));
     }
 
     SorterStats sorterStats{nullptr};
-    spiller.mergeSpills(
-        SortOptions{},
-        SorterSpiller<IntWrapper, NullValue>::Settings{},
-        sorterStats,
-        iterators,
-        [](const IntWrapper& left, const IntWrapper& right) { return IWComparator{}(left, right); },
-        3,
-        2);
+    spiller.mergeSpills(SortOptions{},
+                        SorterSpiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                        sorterStats,
+                        iterators,
+                        IWComparator(ASC),
+                        3,
+                        2);
 
     EXPECT_EQ(iterators.size(), 3);
     EXPECT_EQ(container.entries().size(), data.size());

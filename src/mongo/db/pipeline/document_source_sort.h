@@ -281,6 +281,12 @@ private:
 
     // Whether to include metadata including the sort key in the output documents from this stage.
     bool _outputSortKeyMetadata = false;
+
+    template <typename TimeSorter>
+    friend auto makeSorter(const ExpressionContext& expCtx,
+                           const DocumentSourceSort& ds,
+                           const SortOptions& opts,
+                           long long boundOffset);
 };
 
 }  // namespace mongo

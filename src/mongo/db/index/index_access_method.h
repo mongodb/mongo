@@ -61,6 +61,11 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
+struct BtreeExternalSortComparison {
+    int operator()(const key_string::Value& l, const key_string::Value& r) const {
+        return l.compare(r);
+    }
+};
 /**
  * An IndexAccessMethod is the interface through which all the mutation, lookup, and
  * traversal of index entries is done. The class is designed so that the underlying index
@@ -304,7 +309,9 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
-        std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
+        std::shared_ptr<
+            SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+            spiller,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,
@@ -673,7 +680,9 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const IndexCatalogEntry* entry,
-        std::shared_ptr<SorterSpiller<key_string::Value, mongo::NullValue>> spiller,
+        std::shared_ptr<
+            SorterSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
+            spiller,
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         const DatabaseName& dbName,

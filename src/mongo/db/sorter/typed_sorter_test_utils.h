@@ -66,18 +66,18 @@ struct SpillStorageState {
     IWComparator comp{ASC};
 };
 
-inline std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper>> makeFileSorterSpiller(
-    const SortOptions& opts,
-    SorterFileStats* fileStats,
-    const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
-    std::string storageIdentifier = "") {
+inline std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
+makeFileSorterSpiller(const SortOptions& opts,
+                      SorterFileStats* fileStats,
+                      const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
+                      std::string storageIdentifier = "") {
     ASSERT(opts.tempDir);
 
     if (storageIdentifier.empty()) {
-        return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(
+        return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
             *opts.tempDir, fileStats, /*dbName=*/boost::none, checksumVersion);
     }
-    return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(
+    return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
         std::make_shared<SorterFile>(*opts.tempDir / storageIdentifier, fileStats),
         *opts.tempDir,
         /*dbName=*/boost::none,
@@ -97,10 +97,10 @@ concept StorageTraits = requires(Traits& traits,
     { Traits::kCorruptedStorageErrorCode } -> std::convertible_to<int>;
     {
         traits.makeSpiller(opts, checksumVersion)
-    } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>>;
+    } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>>;
     {
         traits.makeSpillerForResume(opts, checksumVersion, storageIdentifier)
-    } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>>;
+    } -> std::same_as<std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>>;
     {
         traits.makeWriter(opts)
     } -> std::same_as<std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>>>;
@@ -116,18 +116,19 @@ struct FileTraits {
     static constexpr int kEmptyStorageErrorCode = 16815;
     static constexpr int kCorruptedStorageErrorCode = 16817;
 
-    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpiller(
+    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>> makeSpiller(
         const SortOptions& opts,
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
-        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(
+        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
             makeFileSorterSpiller(opts, /*fileStats=*/nullptr, checksumVersion));
     }
 
-    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpillerForResume(
+    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>
+    makeSpillerForResume(
         const SortOptions& opts,
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
         const std::string& storageIdentifier = "") {
-        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(
+        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
             makeFileSorterSpiller(opts, /*fileStats=*/nullptr, checksumVersion, storageIdentifier));
     }
 
@@ -200,10 +201,10 @@ struct ContainerTraits {
         _writerTable = _makeTemporaryRecordStore();
     }
 
-    std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpiller(
+    std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>> makeSpiller(
         const SortOptions& opts,
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
-        using Spiller = ContainerBasedSpiller<IntWrapper, IntWrapper>;
+        using Spiller = ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>;
         struct SpillerOwner {
             std::shared_ptr<TemporaryRecordStore> table;
             Spiller spiller;
@@ -227,13 +228,14 @@ struct ContainerTraits {
                                checksumVersion,
                                insertionBatchSize),
         });
-        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>>(owner, &owner->spiller);
+        return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
+            owner, &owner->spiller);
     }
 
-    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper>> makeSpillerForResume(
-        const SortOptions& opts,
-        const SorterChecksumVersion,
-        const std::string& storageIdentifier) {
+    static std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>
+    makeSpillerForResume(const SortOptions& opts,
+                         const SorterChecksumVersion,
+                         const std::string& storageIdentifier) {
         MONGO_UNIMPLEMENTED;
     }
 

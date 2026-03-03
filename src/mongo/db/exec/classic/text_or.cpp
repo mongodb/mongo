@@ -460,14 +460,11 @@ void TextOrStage::initSorter() {
     _sorterStats = std::make_unique<SorterFileStats>(/*sorterTracker=*/nullptr);
     auto opts =
         SortOptions{}.MaxMemoryUsageBytes(kMaxMemoryUsageForSorter).TempDir(expCtx()->getTempDir());
-    std::function<int(const RecordId&, const RecordId&)> comparator =
-        [](const RecordId& lhs, const RecordId& rhs) -> int {
-        return lhs.compare(rhs);
-    };
-    _sorter = Sorter<RecordId, TextRecordDataForSorter>::make(
+    _sorter = Sorter<RecordId, TextRecordDataForSorter>::template make<Comparator>(
         opts,
-        comparator,
-        std::make_shared<sorter::FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
+        Comparator(),
+        std::make_shared<
+            sorter::FileBasedSorterSpiller<RecordId, TextRecordDataForSorter, Comparator>>(
             *opts.tempDir,
             _sorterStats.get(),
             /*dbName=*/boost::none,
