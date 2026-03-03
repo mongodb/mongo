@@ -1178,19 +1178,19 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
     }
 }
 
-UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) {
+boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx,
+                                                const NamespaceString& ns) {
     const bool useRegistry =
         resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     if (useRegistry) {
-        auto op = LocalReshardingOperationsRegistry::get().getOperation(ns);
-        uassert(ErrorCodes::NoSuchReshardCollection,
-                "Could not find resharding-related metadata that matches the given namespace",
-                op);
+        if (auto op = LocalReshardingOperationsRegistry::get().getOperation(ns)) {
+            return op->metadata.getReshardingUUID();
+        }
 
-        return op->metadata.getReshardingUUID();
+        return boost::none;
     }
 
     repl::ReadConcernArgs::get(opCtx) =
@@ -1198,12 +1198,20 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
 
     const auto collEntry =
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, ns);
+    if (collEntry.getReshardingFields()) {
+        return collEntry.getReshardingFields()->getReshardingUUID();
+    }
+
+    return boost::none;
+}
+
+UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) {
+    auto reshardingUUID = tryRetrieveReshardingUUID(opCtx, ns);
 
     uassert(ErrorCodes::NoSuchReshardCollection,
             "Could not find resharding-related metadata that matches the given namespace",
-            collEntry.getReshardingFields());
-
-    return collEntry.getReshardingFields()->getReshardingUUID();
+            reshardingUUID);
+    return *reshardingUUID;
 }
 
 }  // namespace resharding

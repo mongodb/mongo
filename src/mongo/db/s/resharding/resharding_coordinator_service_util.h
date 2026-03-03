@@ -170,6 +170,8 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
     boost::optional<OID> newCollectionEpoch,
     boost::optional<Timestamp> newCollectionTimestamp);
 
+boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
+
 UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 }  // namespace resharding
 

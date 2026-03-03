@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -107,19 +108,13 @@ public:
                     "_configsvrCleanupReshardCollection can only be run on config servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-            repl::ReadConcernArgs::get(opCtx) =
-                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-            auto collEntry = catalogClient->getCollection(opCtx, ns());
-            if (!collEntry.getReshardingFields()) {
-                // If the collection entry doesn't have resharding fields, we assume that the
-                // resharding operation has already been cleaned up.
+            auto reshardingUUID = resharding::tryRetrieveReshardingUUID(opCtx, ns());
+            if (!reshardingUUID) {
+                // The resharding operation has already been cleaned up.
                 return;
             }
 
-            ReshardingCoordinatorCleaner cleaner(
-                ns(), collEntry.getReshardingFields()->getReshardingUUID());
+            ReshardingCoordinatorCleaner cleaner(ns(), *reshardingUUID);
             cleaner.clean(opCtx);
 
             ShardingCatalogManager::get(opCtx)
@@ -130,7 +125,9 @@ public:
                             opCtx, CollectionType::ConfigNS, update, txnNumber);
                     });
 
-            collEntry = catalogClient->getCollection(opCtx, ns());
+            auto collEntry =
+                ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx,
+                                                                                        ns());
 
             uassert(
                 5403504,
