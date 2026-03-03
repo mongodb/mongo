@@ -46,6 +46,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/waiter_list.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -291,6 +292,16 @@ public:
                                                         const ChunkVersion& shardVersion,
                                                         const UUID& collectionUUID);
 
+    /*
+     * This provides a mechanism by which waiters for a given shard version can wait until the
+     * provided version becomes available on the shard.
+     *
+     * The returned future will also wait for any critical section to be released if at the time of
+     * the wait there happened to be an active critical section.
+     */
+    SharedSemiFuture<void> registerWaiterForChunkVersion(OperationContext* opCtx,
+                                                         const ShardVersion& expectedVersion) const;
+
     enum class AuthoritativeState {
         /*
          * The CSS is non-authoritative, meaning refreshes have to undergo the legacy protocol
@@ -397,6 +408,11 @@ private:
     // Tracks ongoing placement version recover/refresh. Eventually set to the semifuture to wait on
     // and a CancellationSource to cancel it
     boost::optional<PlacementVersionRecoverOrRefresh> _placementVersionInRecoverOrRefresh;
+
+    // List of waiters currently waiting for the CSS/CSR to have the required placement version.
+    // This is mutable since we don't need to acquire the CSR in an exclusive state as it will not
+    // perform any modifications to the underlying data.
+    mutable WaiterList<ChunkVersion> _shardVersionWaiters;
 };
 
 /**

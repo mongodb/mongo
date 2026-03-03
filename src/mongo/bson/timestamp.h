@@ -157,6 +157,14 @@ public:
     /// Returns BSON("" << *this)
     BSONObj toBSON() const;
 
+    /**
+     * Hash function compatible with absl::Hash for absl::unordered_{map,set}
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const Timestamp& ts) {
+        return H::combine(std::move(h), ts.secs, ts.i);
+    }
+
 private:
     std::tuple<unsigned, unsigned> tie() const {
         return std::tie(secs, i);

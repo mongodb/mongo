@@ -127,6 +127,27 @@ public:
         return CollectionMetadata(std::move(cm), collectionShardId);
     }
 
+    static CollectionMetadata changeShardVersion(const CollectionMetadata& metadata,
+                                                 const ChunkVersion& newVersion) {
+        auto range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
+        auto chunk =
+            ChunkType(metadata.getUUID(), std::move(range), newVersion, metadata.shardId());
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(
+            RoutingTableHistory::makeNew(metadata.getChunkManager()->getNss(),
+                                         metadata.getUUID(),
+                                         kShardKeyPattern,
+                                         false, /* unsplittable */
+                                         nullptr,
+                                         false,
+                                         newVersion.epoch(),
+                                         newVersion.getTimestamp(),
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
+                                         true,
+                                         {std::move(chunk)})));
+        return CollectionMetadata{cm, metadata.shardId()};
+    }
+
     uint64_t getNumMetadataManagerChanges(CollectionShardingRuntime& csr) {
         return csr._numMetadataManagerChanges;
     }
@@ -636,6 +657,98 @@ TEST_F(CollectionShardingRuntimeTest, InvalidateRangePreserversUntrackedCollecti
     ASSERT_FALSE(ownershipFilter.isRangePreserverStillValid());
 }
 
+TEST_F(CollectionShardingRuntimeTest, WaiterFunctionalityWorksWithCSRStateChanges) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    auto future = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+
+    ASSERT_TRUE(future.isReady());
+
+    future = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+
+    ASSERT_TRUE(future.isReady());
+}
+
+TEST_F(CollectionShardingRuntimeTest, MultipleWaiterFunctionalityWorksWithCSRStateChanges) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    auto future1 = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+    auto future2 = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+    auto future3 = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+
+    ASSERT_FALSE(future1.isReady());
+    ASSERT_FALSE(future2.isReady());
+    ASSERT_FALSE(future3.isReady());
+
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+
+    ASSERT_TRUE(future1.isReady());
+    ASSERT_TRUE(future2.isReady());
+    ASSERT_TRUE(future3.isReady());
+}
+
+TEST_F(CollectionShardingRuntimeTest, VersionWaiterAlsoWaitsForCriticalSectionRelease) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    csr.enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
+    csr.enterCriticalSectionCommitPhase(opCtx, BSONObj());
+
+    auto future = csr.registerWaiterForChunkVersion(
+        opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+
+    sleepmillis(200);
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.exitCriticalSection(opCtx, BSONObj());
+
+    future.get();
+}
+
+TEST_F(CollectionShardingRuntimeTest, WaiterFunctionalityWakesEarlierVersions) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+
+    auto collMetadata = makeShardedMetadata(opCtx);
+
+    auto targetVersion = collMetadata.getCollPlacementVersion();
+
+    auto future =
+        csr.registerWaiterForChunkVersion(opCtx, ShardVersionFactory::make(targetVersion));
+
+    ASSERT_FALSE(future.isReady());
+
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+
+    ASSERT_FALSE(future.isReady());
+
+    auto newVersion = targetVersion;
+    newVersion.incMajor();
+    ASSERT_EQ(targetVersion <=> newVersion, std::partial_ordering::less);
+
+    auto newMetadata = changeShardVersion(collMetadata, newVersion);
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, std::move(newMetadata));
+
+    // Waiter should now be woken as it waited on a previous version.
+    ASSERT_TRUE(future.isReady());
+    future.get();
+}
 
 class CollectionShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {

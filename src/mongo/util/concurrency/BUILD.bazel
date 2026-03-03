@@ -172,6 +172,14 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "waiter_list_test",
+    srcs = [
+        "waiter_list_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+)
+
+mongo_cc_unit_test(
     name = "ticket_semaphore_test",
     srcs = [
         "ticket_semaphore_test.cpp",

@@ -47,6 +47,8 @@
 #include <limits>
 #include <string>
 
+#include <absl/hash/hash.h>
+
 namespace mongo {
 
 /**
@@ -259,6 +261,11 @@ public:
     void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
+
+    template <typename H>
+    friend H AbslHashValue(H h, const ChunkVersion& chunkVersion) {
+        return H::combine(std::move(h), chunkVersion._timestamp, chunkVersion._combined);
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {

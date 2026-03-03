@@ -418,6 +418,14 @@ void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
     } else if (newMetadata.hasRoutingTable()) {
         _metadataManager->setFilteringMetadata(std::move(newMetadata));
     }
+    auto newChunkVersion = _metadataManager->getActivePlacementVersion();
+    // Wake waiters on the target version as well as any others that had a comparably lesser
+    // version.
+    _shardVersionWaiters.notifyWaiters(newChunkVersion);
+    _shardVersionWaiters.notifyWaitersBasedOnPredicate([&](const ChunkVersion& waitingVersion) {
+        auto result = waitingVersion <=> newChunkVersion;
+        return result == std::partial_ordering::less;
+    });
     // We reset the state on whether we are authoritative or not and delegate it to the parent
     // caller on whether the CSS is now authoritative.
     _authoritativeState = AuthoritativeState::kNonAuthoritative;
@@ -718,6 +726,41 @@ boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getMetadataRe
 void CollectionShardingRuntime::resetPlacementVersionRecoverRefreshFuture() {
     invariant(_placementVersionInRecoverOrRefresh);
     _placementVersionInRecoverOrRefresh = boost::none;
+}
+
+SharedSemiFuture<void> CollectionShardingRuntime::registerWaiterForChunkVersion(
+    OperationContext* opCtx, const ShardVersion& expectedVersion) const {
+    const auto expectedChunkVersion = expectedVersion.placementVersion();
+    if (auto optCollDescr = getCurrentMetadataIfKnown()) {
+        auto chunkVersion = optCollDescr->getShardPlacementVersion();
+        // If we already are in this version return an immediately fulfilled future, no need to add
+        // a waiter to the list. The same can be done if the target version is comparable
+        // and earlier than the current one on the CSR.
+        if (expectedChunkVersion == chunkVersion ||
+            (expectedChunkVersion <=> chunkVersion) == std::partial_ordering::less) {
+            // Wait until the critical section is released before returning as well if it is taken.
+            if (auto fut = _critSec.getSignal(ShardingMigrationCriticalSection::kWrite)) {
+                return *fut;
+            }
+            return SemiFuture<void>::makeReady().share();
+        }
+    }
+    auto versionFut = _shardVersionWaiters.waitFor(expectedChunkVersion);
+    // Get the future for the critical section to wait for since the version is being actively
+    // modified. This will trigger the waiter only when the current critical section is released and
+    // the version also matches.
+    //
+    // We use kWrite here since this will always return the signal. Using kRead would sometimes not
+    // cause the signal to be returned as it is compatible, but as the version isn't it means we
+    // nonetheless will have to wait for the critical section to be released since it's being
+    // actively modified.
+    if (auto fut = _critSec.getSignal(ShardingMigrationCriticalSection::kWrite)) {
+        const auto& executor = Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor();
+        auto execFut = fut->thenRunOn(executor);
+        auto execVersionFut = versionFut.thenRunOn(executor);
+        return whenAllSucceed(std::move(execFut), std::move(execVersionFut)).share();
+    }
+    return versionFut;
 }
 
 CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuthoritativeState()
