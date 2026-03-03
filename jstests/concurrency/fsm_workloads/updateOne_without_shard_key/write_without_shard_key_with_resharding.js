@@ -13,7 +13,7 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {executeReshardCollection} from "jstests/concurrency/fsm_libs/reshard_collection_util.js";
+import {executeReshardCollection} from "jstests/concurrency/reshard_collection_util/reshard_collection_util.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
