@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,16 +29,14 @@ def process_bep(bep_path):
 
 def _relink_binaries_with_symbols(failed_test_labels: list[str]):
     print("Rebuilding tests with --remote_download_outputs=toplevel...")
-    bazel_build_flags = ""
+    bazel_build_flags = []
     if os.path.isfile(".bazel_build_flags"):
         with open(".bazel_build_flags", "r", encoding="utf-8") as f:
-            bazel_build_flags = f.read().strip()
+            bazel_build_flags = shlex.split(f.read())
 
-    bazel_build_flags += " --remote_download_outputs=toplevel"
+    bazel_build_flags.append("--remote_download_outputs=toplevel")
 
-    relink_command = [
-        arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_test_labels] if arg
-    ]
+    relink_command = ["bazel", "build", *bazel_build_flags, *failed_test_labels]
 
     print(f"Running command: {' '.join(relink_command)}")
     subprocess.run(
