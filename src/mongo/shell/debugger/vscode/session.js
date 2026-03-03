@@ -256,6 +256,27 @@ class MongoShellDebugSession extends DebugSession {
             .catch((err) => this.sendErrorResponse(response, 1012, `Continue failed: ${err.message}`));
     }
 
+    // Step Over (Next) - stub with auto-continue
+    nextRequest(response, args) {
+        this.log("Step over is not supported in this debugger. Use continue instead.", "console");
+        // Auto-continue to provide seamless UX
+        this.continueRequest(response, args);
+    }
+
+    // Step In - stub with auto-continue
+    stepInRequest(response, args) {
+        this.log("Step in is not supported in this debugger. Use continue instead.", "console");
+        // Auto-continue to provide seamless UX
+        this.continueRequest(response, args);
+    }
+
+    // Step Out - stub with auto-continue
+    stepOutRequest(response, args) {
+        this.log("Step out is not supported in this debugger. Use continue instead.", "console");
+        // Auto-continue to provide seamless UX
+        this.continueRequest(response, args);
+    }
+
     threadsRequest(response) {
         response.body = {
             threads: [{id: THREAD_ID, name: "MongoDB Shell"}],
