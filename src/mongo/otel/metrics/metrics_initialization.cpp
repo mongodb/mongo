@@ -39,6 +39,9 @@
 #include "mongo/stdx/chrono.h"
 
 #include <google/protobuf/message.h>
+#ifdef MONGO_CONFIG_GRPC
+#include <grpcpp/ext/otel_plugin.h>
+#endif
 #include <opentelemetry/exporters/otlp/otlp_file_client.h>
 #include <opentelemetry/exporters/otlp/otlp_file_client_options.h>
 #include <opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h>
@@ -193,6 +196,17 @@ Status initialize() {
         auto provider = metrics_api::Provider::GetMeterProvider();
         invariant(provider);
         MetricsService::instance().initialize(*provider);
+
+#ifdef MONGO_CONFIG_GRPC
+        // Register gRPC OpenTelemetry plugin globally
+        auto grpcStatus =
+            grpc::OpenTelemetryPluginBuilder().SetMeterProvider(provider).BuildAndRegisterGlobal();
+        if (!grpcStatus.ok()) {
+            LOGV2_WARNING(12022600,
+                          "Failed to register gRPC OTel plugin",
+                          "status"_attr = grpcStatus.ToString());
+        }
+#endif
 
         return Status::OK();
     } catch (...) {

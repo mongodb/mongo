@@ -43,6 +43,13 @@ mongo_cc_library(
             ],
             "//conditions:default": [],
         },
+    ) + select(
+        {
+            "//bazel/config:build_grpc_enabled": [
+                "@com_github_grpc_grpc//:grpcpp_otel_plugin",
+            ],
+            "//conditions:default": [],
+        },
     ),
 )
 

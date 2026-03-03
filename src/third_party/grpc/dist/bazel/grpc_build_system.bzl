@@ -77,7 +77,7 @@ def _get_external_deps(external_deps):
         elif dep.startswith("google/"):
             ret.append("@com_google_googleapis//" + dep)
         elif dep.startswith("otel/"):
-            ret.append(dep.replace("otel/", "@io_opentelemetry_cpp//"))
+            ret.append(dep.replace("otel/", "@@//src/third_party/opentelemetry-cpp/"))
         elif dep.startswith("google_cloud_cpp"):
             ret.append(dep.replace("google_cloud_cpp", "@google_cloud_cpp//"))
         elif dep == "libprotobuf_mutator":

@@ -1903,6 +1903,7 @@ def _impl(ctx):
                     "-Wno-restrict",
                     "-Wno-dangling-pointer",
                     "-Wno-implicit-fallthrough",
+                    "-Wno-template-id-cdtor",
                 ])],
             ),
             flag_set(
