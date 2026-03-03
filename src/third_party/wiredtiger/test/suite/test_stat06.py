@@ -39,19 +39,11 @@ class test_stat06(wttest.WiredTigerTestCase):
         return 'statistics=(none)'
 
     def test_stats_on(self):
-        # FIXME-WT-15439: force content before closing, needed to create initial checkpoint
-        if self.runningHook('disagg'):
-            self.session.create('table:_ignore')
-            self.session.checkpoint()
         self.close_conn()
         self.conn = self.wiredtiger_open(None, "statistics=(fast)")
         self.stats_gathered(True)
 
     def test_stats_off(self):
-        # FIXME-WT-15439: force content before closing, needed to create initial checkpoint
-        if self.runningHook('disagg'):
-            self.session.create('table:_ignore')
-            self.session.checkpoint()
         self.close_conn()
         self.conn = self.wiredtiger_open(None, "statistics=(none),statistics_log=(json)")
         self.stats_gathered(False)
