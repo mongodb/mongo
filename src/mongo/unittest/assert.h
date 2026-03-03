@@ -100,52 +100,71 @@ MONGO_MOD_PUBLIC;
  * Approximate equality assertion. Useful for comparisons on limited precision floating point
  * values.
  */
-#define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_NEAR(a, b, ABSOLUTE_ERR)
+#define ASSERT_APPROX_EQUAL(a, b, absoluteErr) ASSERT_NEAR(a, b, absoluteErr)
 
 /**
- * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
- *
- * If "EXPRESSION" throws no exception, or one that is neither of type "EXCEPTION_TYPE" nor
- * of a subtype of "EXCEPTION_TYPE", the test is considered a failure and further evaluation
- * halts.
+ * Verify that the evaluation of `expression` throws an exception of type `exceptionType` and
+ * is matched by `matcher`.
  */
-#define ASSERT_THROWS(EXPRESSION, TYPE) ASSERT_THROW((void)(EXPRESSION), TYPE)
+#define ASSERT_THROWS_EXCEPTION_MATCHING(expression, exceptionType, matcher)            \
+    if (auto failureMessage_macro_ =                                                    \
+            ::mongo::unittest::assert_details::evaluateExceptionMatcher<exceptionType>( \
+                [&] { (void)(expression); }, #expression, matcher);                     \
+        !failureMessage_macro_) {                                                       \
+    } else                                                                              \
+        FAIL(*failureMessage_macro_)
 
 /**
- * Verify that the evaluation of "EXPRESSION" does not throw any exceptions.
+ * Verify that the evaluation of `expression` throws an exception of type `exceptionType`.
  *
- * If "EXPRESSION" throws an exception the test is considered a failure and further evaluation
+ * If `expression` throws no exception, or one that is neither of type `exceptionType` nor
+ * of a subtype of `exceptionType`, the test is considered a failure and further evaluation
  * halts.
  */
-#define ASSERT_DOES_NOT_THROW(EXPRESSION) ASSERT_NO_THROW(EXPRESSION)
+#define ASSERT_THROWS(expression, exceptionType) \
+    ASSERT_THROWS_EXCEPTION_MATCHING(expression, exceptionType, ::testing::A<exceptionType>())
+
+/**
+ * Verify that the evaluation of `expression` does not throw any exceptions.
+ *
+ * If `expression` throws an exception the test is considered a failure and further evaluation
+ * halts.
+ */
+#define ASSERT_DOES_NOT_THROW(expression) ASSERT_NO_THROW(expression)
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
- * does not return a string equal to EXPECTED_WHAT.
+ * does not return a string equal to expectedWhat.
  * TODO(gtest) Consider using ASSERT_THROWS_WITH_CHECK(...) but with gtest output formatting.
  */
-#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                          \
-                ::mongo::unittest::match::Throws<EXCEPTION_TYPE>(     \
-                    ::testing::Property(&EXCEPTION_TYPE::what, ::testing::StrEq(EXPECTED_WHAT))))
+#define ASSERT_THROWS_WHAT(expression, exceptionType, expectedWhat) \
+    ASSERT_THROWS_EXCEPTION_MATCHING(                               \
+        expression,                                                 \
+        exceptionType,                                              \
+        ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat)))
+
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
- * does not return an error code equal to EXPECTED_CODE.
+ * does not return an error code equal to expectedCode.
  */
-#define ASSERT_THROWS_CODE(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                          \
-                ::mongo::unittest::match::Throws<EXCEPTION_TYPE>(     \
-                    ::testing::Property(&EXCEPTION_TYPE::code, EXPECTED_CODE)))
+#define ASSERT_THROWS_CODE(expression, exceptionType, expectedCode) \
+    ASSERT_THROWS_EXCEPTION_MATCHING(                               \
+        expression,                                                 \
+        exceptionType,                                              \
+        ::testing::Property("code", &exceptionType::code, expectedCode))
+
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
- * does not return an error code equal to EXPECTED_CODE or if calling what() on the thrown exception
- * does not return a string equal to EXPECTED_WHAT.
+ * does not return an error code equal to expectedCode or if calling what() on the thrown exception
+ * does not return a string equal to expectedWhat.
  */
-#define ASSERT_THROWS_CODE_AND_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                                                  \
-                ::mongo::unittest::match::Throws<EXCEPTION_TYPE>(::testing::AllOf(            \
-                    ::testing::Property(&EXCEPTION_TYPE::code, EXPECTED_CODE),                \
-                    ::testing::Property(&EXCEPTION_TYPE::what, ::testing::StrEq(EXPECTED_WHAT)))))
+#define ASSERT_THROWS_CODE_AND_WHAT(expression, exceptionType, expectedCode, expectedWhat) \
+    ASSERT_THROWS_EXCEPTION_MATCHING(                                                      \
+        expression,                                                                        \
+        exceptionType,                                                                     \
+        ::testing::AllOf(                                                                  \
+            ::testing::Property("code", &exceptionType::code, expectedCode),               \
+            ::testing::Property("what", &exceptionType::what, ::testing::StrEq(expectedWhat))))
 
 /**
  * Compiles if expr doesn't compile.
@@ -216,6 +235,26 @@ MONGO_MOD_PUBLIC;
     ASSERT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
 
 namespace mongo::unittest {
+namespace assert_details {
+template <typename Exception>
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS inline boost::optional<std::string> evaluateExceptionMatcher(
+    std::invocable auto expression,
+    StringData expressionText,
+    testing::Matcher<Exception> matcher) {
+    if (testing::StringMatchResultListener listener;
+        !testing::ExplainMatchResult(match::Throws<Exception>(matcher), expression, &listener)) {
+        return fmt::format(
+            "Expected: {} throws an exception of type {} which {}\n"
+            "  Actual: {}",
+            expressionText,
+            demangleName(typeid(Exception)),
+            testing::DescribeMatcher<Exception>(matcher),
+            listener.str());
+    }
+
+    return boost::none;
+}
+}  // namespace assert_details
 
 /**
  * Get the value out of a StatusWith<T>, or throw an exception if it is not OK.

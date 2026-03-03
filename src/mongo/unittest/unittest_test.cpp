@@ -358,6 +358,16 @@ TEST_F(ExceptionMatcherTest, TestAssertThrowsCodeSuccess) {
     ASSERT_THROWS_CODE(doThrow(), mongo::DBException, mongo::ErrorCodes::CommandFailed);
 }
 
+TEST_F(ExceptionMatcherTest, TestAssertThrowsNotCalledTwice) {
+    int nthTime = 0;
+    auto notIdempotent = [&]() {
+        if (nthTime++ == 0)
+            doThrowStdRuntimeError();
+    };
+    ASSERT_THROWS(notIdempotent(), std::runtime_error);
+    ASSERT_EQ(nthTime, 1);
+}
+
 TEST_F(ExceptionMatcherTest, TestAssertThrowsCodeAndWhatSuccess) {
     ASSERT_THROWS_CODE_AND_WHAT(
         doThrow(), mongo::DBException, mongo::ErrorCodes::CommandFailed, "failure message");
