@@ -389,6 +389,9 @@ fcv:
     - src/mongo/db/commands/set_feature_compatibility_version*
     - src/mongo/db/op_observer/fcv_op_observer*
     - src/mongo/unittest/ensure_fcv.h
+    - src/mongo/db/commands/set_feature_compatibility_version_steps/fcv_step.*
+    - src/mongo/db/commands/set_feature_compatibility_version_steps/fcv_step_test.*
+    - src/mongo/db/commands/set_feature_compatibility_version_steps/legacy_fcv_step.*
 
 access_control:
   meta:

@@ -46,6 +46,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/commands/set_feature_compatibility_version_steps/fcv_step.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -1138,6 +1139,9 @@ private:
             uasserted(ErrorCodes::CannotUpgrade,
                       "Simulated dry-run validation failure via fail point.");
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .userCollectionsUassertsForUpgrade(opCtx, originalVersion, requestedVersion);
     }
 
     // This helper function is for any actions that should be done before taking the global lock in
@@ -1149,6 +1153,10 @@ private:
         const multiversion::FeatureCompatibilityVersion requestedVersion,
         boost::optional<Timestamp> changeTimestamp) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
+        const auto originalVersion =
+            getTransitionFCVInfo(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                .from;
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (role && role->has(ClusterRole::ConfigServer)) {
@@ -1158,6 +1166,9 @@ private:
         if (role && role->has(ClusterRole::ShardServer)) {
             // Shard server role actions.
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .prepareToUpgradeActionsBeforeGlobalLock(opCtx, originalVersion, requestedVersion);
     }
 
     // This helper function is for any user collections creations, changes or deletions that need
@@ -1186,6 +1197,9 @@ private:
                     return collection->shouldRemoveLegacyTimeseriesBucketingParametersHaveChanged();
                 });
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .userCollectionsWorkForUpgrade(opCtx, originalVersion, requestedVersion);
     }
 
     // This helper function is for updating server metadata to make sure the new features in the
@@ -1213,6 +1227,9 @@ private:
         }
 
         _cleanUpDeprecatedCatalogMetadata(opCtx);
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .upgradeServerMetadata(opCtx, originalVersion, requestedVersion);
     }
 
     // TODO(SERVER-100328): remove after 9.0 is branched.
@@ -1356,6 +1373,11 @@ private:
     // This helper function is for any actions that should be done before taking the global lock in
     // S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx, const FCV requestedVersion) {
+        const auto originalVersion =
+            getTransitionFCVInfo(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
+                .from;
+
         auto role = ShardingState::get(opCtx)->pollClusterRole();
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
@@ -1366,6 +1388,9 @@ private:
         if (role && role->has(ClusterRole::ShardServer)) {
             // Shard server role actions.
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .prepareToDowngradeActions(opCtx, originalVersion, requestedVersion);
     }
 
     /**
@@ -1573,6 +1598,9 @@ private:
                     });
             }
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .userCollectionsUassertsForDowngrade(opCtx, originalVersion, requestedVersion);
     }
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
@@ -1722,6 +1750,9 @@ private:
         if (role && role->has(ClusterRole::ShardServer)) {
             abortAllMultiUpdateCoordinators(opCtx, requestedVersion, originalVersion);
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext())
+            .internalServerCleanupForDowngrade(opCtx, originalVersion, requestedVersion);
     }
 
     void abortAllMultiUpdateCoordinators(OperationContext* opCtx,
@@ -2023,6 +2054,8 @@ private:
                 .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
                     opCtx);
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext()).finalizeUpgrade(opCtx, requestedVersion);
     }
 
     // _finalizeDowngrade is analogous to _finalizeUpgrade, but runs on downgrade. As with
@@ -2072,6 +2105,8 @@ private:
                     opCtx);
             service.dropQueryShapeRepresentativeQueriesCollection(opCtx);
         }
+
+        FCVStepRegistry::get(opCtx->getServiceContext()).finalizeDowngrade(opCtx, requestedVersion);
     }
     void _forwardDryRunRequestToShards(OperationContext* opCtx,
                                        const SetFeatureCompatibilityVersion& request) {

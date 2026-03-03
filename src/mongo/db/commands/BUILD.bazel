@@ -1031,6 +1031,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:user",
         "//src/mongo/db/auth:user_document_parser",
         "//src/mongo/db/commands/query_cmd:map_reduce_agg",
+        "//src/mongo/db/commands/set_feature_compatibility_version_steps",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager",
         "//src/mongo/db/index_builds:index_builds_coordinator",
         "//src/mongo/db/pipeline",

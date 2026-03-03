@@ -1,0 +1,34 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "set_feature_compatibility_version_steps",
+    srcs = [
+        "fcv_step.cpp",
+        "legacy_fcv_step.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "fcv_step_test",
+    srcs = [
+        "fcv_step_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/commands/set_feature_compatibility_version_steps",
+    ],
+)

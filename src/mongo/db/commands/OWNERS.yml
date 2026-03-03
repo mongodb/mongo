@@ -99,6 +99,9 @@ filters:
   - "*set_feature_compatibility_version*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "*fcv_step*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "snapshot_management*":
     approvers:
       - 10gen/server-replication-reviewers
