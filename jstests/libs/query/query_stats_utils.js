@@ -1170,6 +1170,102 @@ export function getNumberOfGetMoresUntilNextDocForChangeStream(cursor) {
 }
 
 /**
+ * Gets the first queryShapeHash from slow query logs matching the given comment.
+ *
+ * @param {object} params
+ * @param {object} params.testDB - The database connection to check slow logs on.
+ * @param {string} params.queryComment - The comment used to identify the query.
+ * @param {object} [params.options] - Options passed through to getSlowQueryLogs.
+ * @returns {string|null} The queryShapeHash, or null if no matching logs found.
+ */
+export function getQueryShapeHashFromSlowLogs({testDB, queryComment, options = {}}) {
+    const logs = getSlowQueryLogs(testDB, queryComment, options);
+    if (logs.length === 0) {
+        return null;
+    }
+    return logs[0].attr.queryShapeHash;
+}
+
+/**
+ * Gets all distinct queryShapeHashes from slow query logs matching the given comment.
+ * Asserts that every matching log entry has a non-null queryShapeHash.
+ *
+ * @param {object} params
+ * @param {object} params.testDB - The database connection to check slow logs on.
+ * @param {string} params.queryComment - The comment used to identify the query.
+ * @param {object} [params.options] - Options passed through to getSlowQueryLogs.
+ * @returns {Set<string>} A Set of queryShapeHash values found in the matching logs.
+ */
+export function getQueryShapeHashSetFromSlowLogs({testDB, queryComment, options = {}}) {
+    const logs = getSlowQueryLogs(testDB, queryComment, options);
+    const hashes = logs.map((log) => log.attr.queryShapeHash);
+    assert(
+        hashes.every((hash) => hash !== null && hash !== undefined),
+        `All slow query log entries should have a queryShapeHash, but got: ${tojson(hashes)}`,
+    );
+    return new Set(hashes);
+}
+
+/**
+ * Resets test collections for update query stats tests on a sharded cluster.
+ *
+ * Drops and re-populates both an unsharded and sharded collection, creates indexes,
+ * and optionally splits/moves chunks for multi-shard tests.
+ *
+ * @param {object} options
+ * @param {object} options.routerDB - The router (mongos) database connection.
+ * @param {string} options.unshardedCollName - The unsharded collection name.
+ * @param {string} options.shardedCollName - The sharded collection name.
+ * @param {Array} options.testDocuments - Documents to insert into both collections.
+ * @param {object} [options.shardKey={v: 1}] - The shard key to use.
+ * @param {object} [options.st=null] - The ShardingTest instance (required if splitMiddle is set).
+ * @param {object} [options.splitMiddle=null] - The split point (e.g., {v: 4}). If set, chunks will
+ *     be split and the upper chunk moved to shard1.
+ * @param {object} [options.moveChunkFind=null] - The find query for moveChunk (e.g., {v: 5}).
+ *     Required if splitMiddle is set.
+ */
+export function resetUpdateTestCollections({
+    routerDB,
+    unshardedCollName,
+    shardedCollName,
+    testDocuments,
+    shardKey = {v: 1},
+    st = null,
+    splitMiddle = null,
+    moveChunkFind = null,
+}) {
+    // Reset unsharded collection.
+    const unshardedColl = routerDB[unshardedCollName];
+    unshardedColl.drop();
+    assert.commandWorked(unshardedColl.insert(testDocuments));
+    assert.commandWorked(routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}));
+
+    // Reset sharded collection.
+    const shardedColl = routerDB[shardedCollName];
+    shardedColl.drop();
+    assert.commandWorked(shardedColl.insert(testDocuments));
+
+    // Create indexes.
+    unshardedColl.createIndex(shardKey);
+    shardedColl.createIndex(shardKey);
+
+    // Shard the sharded collection.
+    assert.commandWorked(routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
+
+    // Optionally split and move chunks to distribute data across shards.
+    if (splitMiddle && st) {
+        assert.commandWorked(routerDB.adminCommand({split: shardedColl.getFullName(), middle: splitMiddle}));
+        assert.commandWorked(
+            routerDB.adminCommand({
+                moveChunk: shardedColl.getFullName(),
+                find: moveChunkFind,
+                to: st.shard1.shardName,
+            }),
+        );
+    }
+}
+
+/**
  * Filters slow query logs for commands with a specific comment.
  *
  * @param {object} testDB - The database connection to get logs from.

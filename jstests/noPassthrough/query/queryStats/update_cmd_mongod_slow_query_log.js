@@ -6,7 +6,11 @@
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
-import {getSlowQueryLogs} from "jstests/libs/query/query_stats_utils.js";
+import {
+    getQueryShapeHashFromSlowLogs,
+    getQueryShapeHashSetFromSlowLogs,
+    resetUpdateTestCollections,
+} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test data to insert into collections
@@ -60,42 +64,16 @@ describe("Query Shape Hash Output Tests", function () {
     });
 
     beforeEach(function () {
-        // Reset collections.
-        const unshardedColl = this.routerDB[this.collNames.unsharded];
-        unshardedColl.drop();
-        assert.commandWorked(unshardedColl.insert(testDocuments));
-        assert.commandWorked(this.routerDB.adminCommand({untrackUnshardedCollection: unshardedColl.getFullName()}));
-
-        const shardedColl = this.routerDB[this.collNames.sharded];
-        shardedColl.drop();
-        assert.commandWorked(shardedColl.insert(testDocuments));
-
-        // Create indexes.
-        this.routerDB[this.collNames.unsharded].createIndex({v: 1});
-        this.routerDB[this.collNames.sharded].createIndex({v: 1});
-
-        assert.commandWorked(this.routerDB.adminCommand({shardCollection: shardedColl.getFullName(), key: {v: 1}}));
-        // Split and move chunks to ensure data is on both shards.
-        assert.commandWorked(this.routerDB.adminCommand({split: shardedColl.getFullName(), middle: {v: 4}}));
-        assert.commandWorked(
-            this.routerDB.adminCommand({
-                moveChunk: shardedColl.getFullName(),
-                find: {v: 5},
-                to: this.st.shard1.shardName,
-            }),
-        );
+        resetUpdateTestCollections({
+            routerDB: this.routerDB,
+            unshardedCollName: this.collNames.unsharded,
+            shardedCollName: this.collNames.sharded,
+            testDocuments: testDocuments,
+            st: this.st,
+            splitMiddle: {v: 4},
+            moveChunkFind: {v: 5},
+        });
     });
-
-    function getQueryShapeHashFromLogs(queryComment, testDB, serverName) {
-        const logs = getSlowQueryLogs(testDB, queryComment, {commandType: "update"});
-        if (logs.length === 0) {
-            jsTest.log.info(`No slow query logs found for comment '${queryComment}' on ${serverName}`);
-            return null;
-        }
-        const hash = logs[0].attr.queryShapeHash;
-        jsTest.log.info(`Found queryShapeHash on ${serverName}: ${hash}`);
-        return hash;
-    }
 
     function runUpdateAndAssertHashOnMongod(ctx, collName, updateSpec, testDescription, isShardedColl = false) {
         const comment = `${testDescription.replace(/\s+/g, "_")}_${UUID().toString()}`;
@@ -111,11 +89,19 @@ describe("Query Shape Hash Output Tests", function () {
 
         assert.commandWorked(ctx.routerDB.runCommand(updateCmd));
 
-        const shard0Hash = getQueryShapeHashFromLogs(comment, ctx.shard0DB, "mongod (shard0)");
+        const shard0Hash = getQueryShapeHashFromSlowLogs({
+            testDB: ctx.shard0DB,
+            queryComment: comment,
+            options: {commandType: "update"},
+        });
         assert.neq(shard0Hash, null, `Shard0 queryShapeHash should not be null: ${testDescription}`);
 
         if (isShardedColl) {
-            const shard1Hash = getQueryShapeHashFromLogs(comment, ctx.shard1DB, "mongod (shard1)");
+            const shard1Hash = getQueryShapeHashFromSlowLogs({
+                testDB: ctx.shard1DB,
+                queryComment: comment,
+                options: {commandType: "update"},
+            });
             assert.neq(shard1Hash, null, `Shard1 queryShapeHash should not be null: ${testDescription}`);
         }
     }
@@ -229,14 +215,12 @@ describe("Query Shape Hash Output Tests", function () {
                     comment: comment,
                 }),
             );
-            const shardLogs = getSlowQueryLogs(this.shard0DB, comment, {commandType: "update"});
-            const shardHashes = shardLogs.map((log) => log.attr.queryShapeHash || null);
-
-            assert.eq(shardLogs.length, 3, "Shard should log one entry per update op.");
-            assert(
-                shardHashes.every((hash) => hash !== null && hash !== undefined),
-                `All 3 updates should have queryShapeHash: ${tojson(shardHashes)}`,
-            );
+            const shardHashes = getQueryShapeHashSetFromSlowLogs({
+                testDB: this.shard0DB,
+                queryComment: comment,
+                options: {commandType: "update"},
+            });
+            assert.eq(shardHashes.size, 3, "Shard should log one entry per update op.");
         });
 
         it("batched updates on sharded collection", function () {
@@ -254,22 +238,18 @@ describe("Query Shape Hash Output Tests", function () {
                     comment: comment,
                 }),
             );
-            const shard0Logs = getSlowQueryLogs(this.shard0DB, comment, {commandType: "update"});
-            const shard1Logs = getSlowQueryLogs(this.shard1DB, comment, {commandType: "update"});
-
-            const shard0Hashes = shard0Logs.map((log) => log.attr.queryShapeHash || null);
-            const shard1Hashes = shard1Logs.map((log) => log.attr.queryShapeHash || null);
-
-            assert.eq(shard0Logs.length, 3, "Shard0 should log one entry per update");
-            assert.eq(shard1Logs.length, 3, "Shard1 should log one entry per update");
-            assert(
-                shard0Hashes.every((hash) => hash !== null && hash !== undefined),
-                `All 3 updates on shard0 should have queryShapeHash: ${tojson(shard0Hashes)}`,
-            );
-            assert(
-                shard1Hashes.every((hash) => hash !== null && hash !== undefined),
-                `All 3 updates on shard1 should have queryShapeHash: ${tojson(shard1Hashes)}`,
-            );
+            const shard0Hashes = getQueryShapeHashSetFromSlowLogs({
+                testDB: this.shard0DB,
+                queryComment: comment,
+                options: {commandType: "update"},
+            });
+            const shard1Hashes = getQueryShapeHashSetFromSlowLogs({
+                testDB: this.shard1DB,
+                queryComment: comment,
+                options: {commandType: "update"},
+            });
+            assert.eq(shard0Hashes.size, 3, "Shard0 should log one entry per update");
+            assert.eq(shard1Hashes.size, 3, "Shard1 should log one entry per update");
         });
     });
 });
