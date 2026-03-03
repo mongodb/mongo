@@ -1,0 +1,44 @@
+/**
+ * Assertions PBT
+ */
+
+/**
+ * Compare the results of a query against a timeseries collection and standard collection which should be identical.
+ *
+ * @param {DBCollection} tsColl timeseries collection representing "actual" state
+ * @param {DBCollection} ctrlColl standard collection uses as control representing "expected" state
+ * @param {DBCollection} bucketColl raw timeseries bucket collection
+ * @param {Object} query query specification
+ */
+export function assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query = {}) {
+    const timeField = tsColl.getMetadata().options.timeseries.timeField;
+    const metaField = tsColl.getMetadata().options.timeseries.metaField;
+    const tsDocs = tsColl.find(query).sort({_id: 1}).toArray();
+    const ctrlDocs = ctrlColl.find(query).sort({_id: 1}).toArray();
+
+    if (tsDocs.length != ctrlDocs.length) {
+        jsTest.log.warning("The tsColl and ctrlColl size differs", {
+            tsDocLength: tsDocs.length,
+            ctrlDocsLength: ctrlDocs.length,
+        });
+        // push a dummy document into the smaller collection to force a difference
+        if (tsDocs.length < ctrlDocs.length) {
+            tsDocs.push({});
+        } else {
+            ctrlDocs.push({});
+        }
+    }
+
+    for (let i = 0; i < Math.min(tsDocs.length, ctrlDocs.length); ++i) {
+        const bucket = bucketColl.findOne({
+            [metaField]: tsDocs[i][metaField],
+            [`control.min.${timeField}`]: {$lte: tsDocs[i][timeField]},
+            [`control.max.${timeField}`]: {$gte: tsDocs[i][timeField]},
+        });
+        assert.docEq(ctrlDocs[i], tsDocs[i], {
+            message: "tsColl and ctrlColl diverged, expected is ctrlDoc, actual is tsDoc",
+            documentIndex: i,
+            bucket: bucket,
+        });
+    }
+}

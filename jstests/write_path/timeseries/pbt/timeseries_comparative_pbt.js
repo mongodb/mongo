@@ -17,6 +17,7 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";
+import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/assertions.js";
 
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
@@ -45,13 +46,6 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         tsColl.drop();
     });
 
-    function assertCollectionsMatch() {
-        const tsDocs = tsColl.find().sort({_id: 1}).toArray();
-        const ctrlDocs = ctrlColl.find().sort({_id: 1}).toArray();
-
-        assert.sameMembers(ctrlDocs, tsDocs, "tsColl and ctrlColl diverged: timeseries vs control differ");
-    }
-
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete", () => {
         const metaValue = "metavalu";
 
@@ -73,7 +67,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
             fc.property(programArb, (cmds) => {
                 const model = makeEmptyModel();
                 fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
-                assertCollectionsMatch();
+                assertCollectionsMatch(tsColl, ctrlColl, bucketColl);
             }),
             {numRuns: 50},
         );
