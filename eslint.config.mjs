@@ -1,22 +1,11 @@
-import {FlatCompat} from "@eslint/eslintrc";
-import js from "@eslint/js";
 import {default as mongodb_plugin} from "eslint-plugin-mongodb";
+import js from "@eslint/js";
 import globals from "globals";
-import path from "node:path";
-import {fileURLToPath} from "node:url";
 
 import vscodeDebuggerConfig from "./src/mongo/shell/debugger/vscode/eslint.config.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all,
-});
-
 export default [
-    ...compat.extends("eslint:recommended"),
+    js.configs.recommended,
     {
         ignores: ["src/mongo/gotools/*", "**/*.tpl.js", "jstests/third_party/**/*.js"],
     },

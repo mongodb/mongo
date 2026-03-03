@@ -16,11 +16,11 @@ devDependencies:
     specifier: 3.2.0
     version: 3.2.0
   '@eslint/js':
-    specifier: ^9
-    version: 9.19.0
+    specifier: ^10
+    version: 10.0.2
   eslint:
-    specifier: 9.19.0
-    version: 9.19.0
+    specifier: 10.0.2
+    version: 10.0.2
   eslint-formatter-unix:
     specifier: ^8.40.0
     version: 8.40.0
