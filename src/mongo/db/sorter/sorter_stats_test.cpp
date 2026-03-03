@@ -41,6 +41,10 @@ TEST(SorterStatsTest, Basics) {
     ASSERT_EQ(sorterStats.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
 
+    sorterStats.incrementMergedSpills();
+    ASSERT_EQ(sorterStats.mergedSpills(), 1);
+    ASSERT_EQ(sorterTracker.mergedSpills.load(), 1);
+
     sorterStats.incrementSpilledKeyValuePairs(10);
     ASSERT_EQ(sorterStats.spilledKeyValuePairs(), 10);
     ASSERT_EQ(sorterTracker.spilledKeyValuePairs.load(), 10);
@@ -125,6 +129,19 @@ TEST(SorterStatsTest, MultipleSortersSpilledRanges) {
     sorterStats3.setSpilledRanges(10);
     ASSERT_EQ(sorterStats3.spilledRanges(), 10);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 12);
+}
+
+TEST(SorterStatsTest, MultipleSortersMergedSpills) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats1(&sorterTracker);
+    SorterStats sorterStats2(&sorterTracker);
+
+    sorterStats1.incrementMergedSpills();
+    sorterStats1.incrementMergedSpills();
+    sorterStats2.incrementMergedSpills();
+    ASSERT_EQ(sorterStats1.mergedSpills(), 2);
+    ASSERT_EQ(sorterStats2.mergedSpills(), 1);
+    ASSERT_EQ(sorterTracker.mergedSpills.load(), 3);
 }
 
 TEST(SorterStatsTest, SingleSorterSpilledKeyValuePairs) {

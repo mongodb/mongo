@@ -478,6 +478,43 @@ TYPED_TEST(MakeFromExistingRangesTest, NextWithDeferredValues) {
     ASSERT_FALSE(iter->more());
 }
 
+TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
+    unittest::TempDir storageLocation = makeTempDir();
+    auto opts = SortOptions().TempDir(storageLocation.path());
+
+    auto spiller = this->storage().makeSpiller(opts);
+    using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
+
+    constexpr size_t kInitialRanges = 7;
+    constexpr size_t kNumTargetedSpills = 2;
+    constexpr size_t kNumParallelSpills = 3;
+    // [1, 2, 3, 4, 5, 6, 7] initial
+    // [123, 456, 7]         3 merges
+    // [1234567]             1 merge
+    constexpr size_t kExpectedMergedSpills = 4;
+
+    std::vector<IteratorPtr> ranges;
+    ranges.reserve(kInitialRanges);
+    for (size_t i = 0; i < kInitialRanges; ++i) {
+        std::vector<IWPair> oneRecord{{static_cast<int>(i), -static_cast<int>(i)}};
+        ranges.push_back(spiller->spill(opts, IWSorter::Settings{}, oneRecord, 0));
+    }
+
+    SorterTracker tracker;
+    SorterStats sorterStats{&tracker};
+    spiller->mergeSpills(opts,
+                         IWSorter::Settings{},
+                         sorterStats,
+                         ranges,
+                         IWComparator(ASC),
+                         kNumTargetedSpills,
+                         kNumParallelSpills);
+
+    ASSERT_LTE(ranges.size(), kNumTargetedSpills);
+    ASSERT_EQ(sorterStats.mergedSpills(), kExpectedMergedSpills);
+    ASSERT_EQ(tracker.mergedSpills.loadRelaxed(), kExpectedMergedSpills);
+}
+
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
     unittest::TempDir storageLocation = makeTempDir();
     auto opts = SortOptions().TempDir(storageLocation.path());

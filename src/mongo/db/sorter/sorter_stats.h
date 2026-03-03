@@ -42,6 +42,7 @@ namespace mongo {
  */
 struct SorterTracker {
     AtomicWord<long long> spilledRanges{0};
+    AtomicWord<long long> mergedSpills{0};
     AtomicWord<long long> spilledKeyValuePairs{0};
     AtomicWord<long long> bytesSpilled{0};
     AtomicWord<long long> bytesSpilledUncompressed{0};
@@ -112,6 +113,9 @@ public:
     void setSpilledRanges(uint64_t spills);
     uint64_t spilledRanges() const;
 
+    void incrementMergedSpills();
+    uint64_t mergedSpills() const;
+
     void incrementSpilledKeyValuePairs(uint64_t keyValuePairs);
     uint64_t spilledKeyValuePairs() const;
 
@@ -129,6 +133,7 @@ public:
 
 private:
     uint64_t _spilledRanges = 0;         // Number of spills.
+    uint64_t _mergedSpills = 0;          // Number of times spilled ranges were merged.
     uint64_t _spilledKeyValuePairs = 0;  // Number of spilled pairs.
     uint64_t _numSorted = 0;             // Number of keys sorted.
     uint64_t _bytesSorted = 0;           // Total bytes of data sorted.

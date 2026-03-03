@@ -163,6 +163,7 @@ public:
         builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
         builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
         builder.append("spilledRanges", sorterTracker.spilledRanges.loadRelaxed());
+        builder.append("mergedSpills", sorterTracker.mergedSpills.loadRelaxed());
         builder.append("bytesSpilledUncompressed",
                        sorterTracker.bytesSpilledUncompressed.loadRelaxed());
         builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());

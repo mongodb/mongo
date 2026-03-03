@@ -90,6 +90,17 @@ uint64_t SorterStats::spilledRanges() const {
     return _spilledRanges;
 }
 
+void SorterStats::incrementMergedSpills() {
+    _mergedSpills++;
+    if (_sorterTracker) {
+        _sorterTracker->mergedSpills.fetchAndAdd(1);
+    }
+}
+
+uint64_t SorterStats::mergedSpills() const {
+    return _mergedSpills;
+}
+
 void SorterStats::incrementSpilledKeyValuePairs(uint64_t records) {
     _spilledKeyValuePairs += records;
     if (_sorterTracker) {

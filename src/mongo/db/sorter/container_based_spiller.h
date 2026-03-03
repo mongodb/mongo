@@ -415,6 +415,7 @@ public:
                 _current += numSpilled;
                 _containerBasedStorage().updateCurrKey(_current);
 
+                stats.incrementMergedSpills();
                 stats.incrementSpilledRanges();
                 stats.incrementSpilledKeyValuePairs(numSpilled);
             }

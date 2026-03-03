@@ -614,6 +614,7 @@ void FileBasedSorterSpiller<Key, Value>::mergeSpills(
                 ++pairCount;
             }
             iters.push_back(writer->done());
+            sorterStats.incrementMergedSpills();
             sorterStats.incrementSpilledRanges();
             sorterStats.incrementSpilledKeyValuePairs(pairCount);
         }
