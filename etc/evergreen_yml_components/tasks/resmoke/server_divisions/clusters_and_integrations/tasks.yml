@@ -3135,23 +3135,21 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
-  # TODO (SERVER-120742): Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_sharding_jscore_passthrough_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_catalog_and_routing",
-  #       "default",
-  #       "large",
-  #       "clustered_collections",
-  #       "requires_extra_system_deps",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_sharding_jscore_passthrough
-  #         use_large_distro: "true"
+  - <<: *gen_task_template
+    name: disagg_sharding_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharding_jscore_passthrough
+          use_large_distro: "true"
 
   # TODO (SERVER-120830): Reenable suite with only passing tests.
   # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
@@ -3204,30 +3202,28 @@ tasks:
           use_large_distro: "true"
           resmoke_jobs_max: 2
 
-  # TODO (SERVER-120853): Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_concurrency_sharded_replication_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_catalog_and_routing",
-  #       "default",
-  #       "incompatible_mac",
-  #       "incompatible_ppc",
-  #       "incompatible_s390x",
-  #       "incompatible_debug_mode",
-  #       "concurrency",
-  #       "common",
-  #       "read_concern_maj",
-  #       "large",
-  #       "sharded",
-  #       "requires_extra_system_deps",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_concurrency_sharded_replication
-  #         use_large_distro: "true"
+  - <<: *gen_task_template
+    name: disagg_concurrency_sharded_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_concurrency_sharded_replication
+          use_large_distro: "true"
 
   - <<: *gen_task_template
     name: disagg_concurrency_sharded_replication_with_balancer_gen
@@ -3252,55 +3248,51 @@ tasks:
           suite: disagg_concurrency_sharded_replication_with_balancer
           use_large_distro: "true"
 
-  # TODO (SERVER-120416): Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_concurrency_sharded_causal_consistency_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_catalog_and_routing",
-  #       "default",
-  #       "incompatible_mac",
-  #       "incompatible_ppc",
-  #       "incompatible_s390x",
-  #       "incompatible_debug_mode",
-  #       "concurrency",
-  #       "common",
-  #       "read_concern_maj",
-  #       "large",
-  #       "sharded",
-  #       "requires_extra_system_deps",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_concurrency_sharded_causal_consistency
-  #         use_large_distro: "true"
+  - <<: *gen_task_template
+    name: disagg_concurrency_sharded_causal_consistency_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_concurrency_sharded_causal_consistency
+          use_large_distro: "true"
 
-  # TODO (SERVER-120758): Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_concurrency_sharded_causal_consistency_with_balancer_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_catalog_and_routing",
-  #       "default",
-  #       "incompatible_mac",
-  #       "incompatible_ppc",
-  #       "incompatible_s390x",
-  #       "incompatible_debug_mode",
-  #       "concurrency",
-  #       "common",
-  #       "read_concern_maj",
-  #       "large",
-  #       "sharded",
-  #       "requires_extra_system_deps",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_concurrency_sharded_causal_consistency_with_balancer
-  #         use_large_distro: "true"
+  - <<: *gen_task_template
+    name: disagg_concurrency_sharded_causal_consistency_with_balancer_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "read_concern_maj",
+        "large",
+        "sharded",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_concurrency_sharded_causal_consistency_with_balancer
+          use_large_distro: "true"
 
   # TODO (SERVER-120728) Reenable suite with only passing tests.
   # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
