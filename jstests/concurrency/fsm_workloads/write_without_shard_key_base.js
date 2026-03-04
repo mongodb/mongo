@@ -352,7 +352,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // If sorting, ensure that the correct document is modified.
         if (doSort) {
             sortVal = {[this.secondaryDocField]: this.generateRandomInt(0, 1) === 0 ? -1 : 1};
-            sortDoc = db[collName].find(query).sort(sortVal)[0];
+            // Need to specify batch count that is larger than the total number of records to
+            // prevent getMore command from being issued since stepdown suites ban it.
+            sortDoc = db[collName].find(query).sort(sortVal).batchSize(1e6)[0];
         }
 
         let res;
