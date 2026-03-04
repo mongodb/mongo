@@ -78,3 +78,7 @@ patch_aliases:
   - alias: coverity_scan
     variant: bv_coverity_analysis
     task: run_coverity
+  - alias: release_smoke_test
+    description: "Runs release smoke tests"
+    variant: ".*"
+    task: "^(crypt_create_lib|package|test_packages|jscore)$"
