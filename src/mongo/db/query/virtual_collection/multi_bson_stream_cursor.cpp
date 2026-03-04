@@ -94,8 +94,12 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
             // Cases 3: get the rest of size. This collapses case 3 into case 2.
             if (availBytes < kSizeSize) {
                 remBytes = kSizeSize - availBytes;
-                // TODO SERVER-111117 It seems like we should check that we have enough room in the
-                // buffer to accomodate the rest of the size.
+                // No space check needed: we are looking at whether there is guaranteed to be room
+                // in the buffer for just the 4-byte word (encoding the total number of bytes in the
+                // object) that appears before the actual BSON object. remBytes is at most 3 (since
+                // availBytes >= 1), and _bufEnd is at most _bufSize/2 here because these leftover
+                // bytes can only originate from a block read, which fills only the first half of
+                // the buffer. Since _bufSize >= 8KB, there is always room to spare.
                 readBytes = _streamReader->readBytes(remBytes, (_buffer.get() + _bufEnd));
                 if (MONGO_unlikely(readBytes < remBytes)) {
                     uasserted(
