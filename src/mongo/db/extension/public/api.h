@@ -506,6 +506,45 @@ typedef struct MongoExtensionExpandedArray {
 } MongoExtensionExpandedArray;
 
 /**
+ * MongoExtensionExpandedArrayContainer wraps an extension-implemented array that must be
+ * transferred into a Host pre-allocated array.
+ *
+ * This container allows extensions to provide expanded arrays of ParseNodes or AstNodes to the
+ * Host. The Host pre-allocates the target array and the extension transfers ownership of the
+ * elements into it.
+ */
+typedef struct MongoExtensionExpandedArrayContainer {
+    const struct MongoExtensionExpandedArrayContainerVTable* const vtable;
+} MongoExtensionExpandedArrayContainer;
+
+/**
+ * Virtual function table for MongoExtensionExpandedArrayContainer.
+ */
+typedef struct MongoExtensionExpandedArrayContainerVTable {
+    /**
+     * Destroy `container` and free all associated resources.
+     */
+    void (*destroy)(MongoExtensionExpandedArrayContainer* container);
+
+    /**
+     * Returns the number of elements in the ExpandedArrayContainer.
+     * Callers must first obtain the size before calling transfer() in order to
+     * pre-allocate the target output array.
+     */
+    size_t (*size)(const MongoExtensionExpandedArrayContainer* container);
+
+    /**
+     * Transfers ownership of the underlying ExpandedArrayContainer's elements into
+     * the target array.
+     * Callers must first obtain the size of the array in order to pre-allocate the
+     * target output array.
+     * Ownership of the pointers within the array elements is transferred to the caller.
+     * It is an error to provide an incorrectly sized output array.
+     */
+    MongoExtensionStatus* (*transfer)(MongoExtensionExpandedArrayContainer* container,
+                                      MongoExtensionExpandedArray* array);
+} MongoExtensionExpandedArrayContainerVTable;
+/**
  * MongoExtensionAggStageParseNode is responsible for validating the user provided syntax,
  * generating a query shape, and expanding into a resolved list of nodes that can be either AST
  * nodes or other parse nodes (which will eventually resolve to AST nodes through recursive
@@ -538,31 +577,17 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
                                              MongoExtensionByteBuf** queryShape);
 
     /**
-     * Returns the size (number of nodes) of the ParseNode's expansion. Callers must first get the
-     * expansion size before calling expand() so that they can pre-allocate the ExpandedArrayElement
-     * array which is then populated by the extension.
-     */
-    size_t (*get_expanded_size)(const MongoExtensionAggStageParseNode* parseNode);
-
-    /**
-     * Populates the MongoExtensionExpandedArray with the stage's expansion.
+     * Populates the MongoExtensionExpandedArrayContainer with the stage's expansion.
      *
-     * If a stage does not desugar, the ExpandedArray will contain a single AstNode representation
-     * for this ParseNode. If a stage desugars into multiple stages, the ExpandedArray will contain
+     * If a stage does not desugar, the container will contain a single AstNode representation
+     * for this ParseNode. If a stage desugars into multiple stages, the container will contain
      * the component stages' representation.
      *
-     * The expanded array must contain at least one element.
-     *
-     * The caller must first get the expansion size and allocate the ExpandedArray
-     * elements buffer with the correct size before calling expand() with the allocated buffer which
-     * will be populated with the elements.
-     *
-     * The caller is responsible for fully expanding the returned expanded array recursively.
-     *
-     * Ownership of the pointers within the array elements is transferred to the caller.
+     * The expanded array must contain at least one element. The caller retains ownership of the
+     * container and is responsible for fully expanding the returned expanded array recursively.
      */
     MongoExtensionStatus* (*expand)(const MongoExtensionAggStageParseNode* parseNode,
-                                    MongoExtensionExpandedArray* expanded);
+                                    MongoExtensionExpandedArrayContainer** output);
 
     /**
      * Clones the parse node. Ownership of the output pointer is transferred to the caller.

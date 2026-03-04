@@ -152,42 +152,12 @@ public:
 };
 
 using AggStageErrorFixtureDeathTest = AggStageErrorFixture;
-DEATH_TEST_F(AggStageErrorFixtureDeathTest, EmptyDesugarExpansionFails, "11113803") {
+DEATH_TEST_F(AggStageErrorFixtureDeathTest, EmptyDesugarExpansionFails, "11591602") {
     auto emptyDesugarParseNode =
         new ExtensionAggStageParseNodeAdapter(shared_test_stages::DesugarToEmptyParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{emptyDesugarParseNode};
 
     [[maybe_unused]] auto expanded = handle->expand();
-}
-
-TEST_F(AggStageErrorFixture, GetExpandedSizeLessThanActualExpansionSizeFails) {
-    auto getExpandedSizeLessThanActualExpansionSizeParseNode =
-        new ExtensionAggStageParseNodeAdapter(
-            shared_test_stages::GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
-    auto handle =
-        extension::AggStageParseNodeHandle{getExpandedSizeLessThanActualExpansionSizeParseNode};
-
-    ASSERT_THROWS_CODE(
-        [&] {
-            [[maybe_unused]] auto expanded = handle->expand();
-        }(),
-        DBException,
-        11113802);
-}
-
-TEST_F(AggStageErrorFixture, GetExpandedSizeGreaterThanActualExpansionSizeFails) {
-    auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
-        new ExtensionAggStageParseNodeAdapter(
-            shared_test_stages::GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
-    auto handle =
-        extension::AggStageParseNodeHandle{getExpandedSizeGreaterThanActualExpansionSizeParseNode};
-
-    ASSERT_THROWS_CODE(
-        [&] {
-            [[maybe_unused]] auto expanded = handle->expand();
-        }(),
-        DBException,
-        11113802);
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, DescriptorAndParseNodeNameMismatchFails, "11217602") {
@@ -209,12 +179,6 @@ DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "112176
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
-
-DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
-    auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
-    vtable.get_expanded_size = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 

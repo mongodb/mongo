@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/assert_util.h"
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
+#include "mongo/db/extension/sdk/expanded_array_container.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
@@ -497,11 +498,17 @@ private:
         });
     };
 
-    static size_t _extGetExpandedSize(const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
-        return static_cast<const ExtensionAggStageParseNodeAdapter*>(parseNode)
-            ->getImpl()
-            .getExpandedSize();
-    }
+    /**
+     * Expands the provided parse node into one or more AST or parse nodes.
+     *
+     * The resultant expanded container is allocated by this function. If expansion fails, an error
+     * status is returned and no container is allocated.
+     *
+     * The caller is responsible for freeing any memory used by the extension during `expand()`.
+     */
+    static ::MongoExtensionStatus* _extExpand(
+        const ::MongoExtensionAggStageParseNode* parseNode,
+        ::MongoExtensionExpandedArrayContainer** expanded) noexcept;
 
     static ::MongoExtensionStatus* _extClone(const ::MongoExtensionAggStageParseNode* parseNode,
                                              ::MongoExtensionAggStageParseNode** output) noexcept {
@@ -542,7 +549,6 @@ private:
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
         .get_query_shape = &_extGetQueryShape,
-        .get_expanded_size = &_extGetExpandedSize,
         .expand = &_extExpand,
         .clone = &_extClone,
         .to_bson_for_log = &_extToBsonForLog};

@@ -110,19 +110,15 @@ struct RaiiAsArrayElem<VariantNodeHandle> {
 
 ::MongoExtensionStatus* ExtensionAggStageParseNodeAdapter::_extExpand(
     const ::MongoExtensionAggStageParseNode* parseNode,
-    ::MongoExtensionExpandedArray* expanded) noexcept {
+    ::MongoExtensionExpandedArrayContainer** expanded) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
-        const auto& impl =
-            static_cast<const ExtensionAggStageParseNodeAdapter*>(parseNode)->getImpl();
-        const auto expandedSize = impl.getExpandedSize();
-        sdk_tassert(11113801,
-                    (str::stream()
-                     << "MongoExtensionExpandedArray.size must equal required size: "
-                     << "got " << expanded->size << ", but required " << expandedSize),
-                    expanded->size == expandedSize);
-
-        auto expandedNodes = impl.expand();
-        raiiVectorToAbiArray(std::move(expandedNodes), *expanded);
+        auto expandedNodes =
+            static_cast<const ExtensionAggStageParseNodeAdapter*>(parseNode)->getImpl().expand();
+        sdk_tassert(11591602,
+                    "AggStageParseNode expand() must return at least one element",
+                    !expandedNodes.empty());
+        *expanded = new ExtensionExpandedArrayContainerAdapter(
+            ExpandedArrayContainer(std::move(expandedNodes)));
     });
 }
 

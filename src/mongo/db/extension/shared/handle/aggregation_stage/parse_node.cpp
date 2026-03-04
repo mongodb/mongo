@@ -30,6 +30,7 @@
 
 #include "mongo/db/extension/shared/array/abi_array_to_raii_vector.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/expanded_array_container.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -87,13 +88,15 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
 };
 
 std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
-    // Host allocates buffer with the expected size.
-    const auto expandedSize = getExpandedSize();
-    tassert(11113803, "AggStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
-    std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
-    ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
-    invokeCAndConvertStatusToException([&] { return _vtable().expand(get(), &expandedArray); });
-    return abiArrayToRaiiVector(expandedArray);
+    ::MongoExtensionExpandedArrayContainer* container = nullptr;
+    invokeCAndConvertStatusToException([&]() { return _vtable().expand(get(), &container); });
+    tassert(11113803, "Container cannot be null after expand()", container != nullptr);
+    ExpandedArrayContainerHandle handle(container);
+    return handle->transfer();
+}
+
+std::vector<VariantNodeHandle> expandedArrayToRaiiVector(::MongoExtensionExpandedArray& arr) {
+    return abiArrayToRaiiVector(arr);
 }
 
 AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {

@@ -112,38 +112,18 @@ DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetQuery
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST(HostParseNodeVTableTestDeathTest,
-           InvalidParseNodeVTableFailsGetExpandedSize,
-           "11113800") {
-    auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
-    vtable.get_expanded_size = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
-};
-
 DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
     AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST(HostParseNodeTestDeathTest, HostGetExpandedSizeUnimplemented, "11113803") {
-    auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}));
-    auto handle = AggStageParseNodeHandle{noOpParseNode};
-
-    ASSERT_EQ(handle.get()->vtable->get_expanded_size(noOpParseNode), 0);
-
-    // get_expanded_size cannot tassert because the return type is size_t, but the host
-    // implementation of get_expanded_size still correctly fails because this expand call checks
-    // that the return value of get_expanded_size is > 0.
-    [[maybe_unused]] auto expanded = handle->expand();
-}
-
 DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
     auto noOpParseNode = new host::HostAggStageParseNodeAdapter(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
-    ::MongoExtensionExpandedArray expanded = {};
-    handle.get()->vtable->expand(noOpParseNode, &expanded);
+    ::MongoExtensionExpandedArrayContainer* container = nullptr;
+    handle.get()->vtable->expand(noOpParseNode, &container);
 }
 
 TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodePreservesSpec) {

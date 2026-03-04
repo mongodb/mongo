@@ -177,18 +177,9 @@ private:
         });
     };
 
-    static size_t _hostGetExpandedSize(
-        const ::MongoExtensionAggStageParseNode* parseNode) noexcept {
-        // This function should not be called, but tassert cannot be used because C++ errors must
-        // not propagate across the C ABI boundary and the return type of this function is size_t.
-        // Since the invariant that get_expansion_size returns a size > 0 is enforced elsewhere,
-        // this return value still results in an error.
-        return 0;
-    }
-
     static ::MongoExtensionStatus* _hostExpand(
         const ::MongoExtensionAggStageParseNode* parseNode,
-        ::MongoExtensionExpandedArray* outExpanded) noexcept {
+        ::MongoExtensionExpandedArrayContainer** outExpanded) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(10977801,
                       "_hostExpand should not be called. Ensure that parseNode is "
@@ -222,7 +213,6 @@ private:
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
         .get_query_shape = &_hostGetQueryShape,
-        .get_expanded_size = &_hostGetExpandedSize,
         .expand = &_hostExpand,
         .clone = &_hostClone,
         .to_bson_for_log = &_hostToBsonForLog};
