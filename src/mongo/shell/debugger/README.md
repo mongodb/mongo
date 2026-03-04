@@ -1,5 +1,9 @@
 # JS Debugging in the MongoDB Shell
 
+> The [**VSCode Extension**](./vscode/README.md) provides interactive functionality using the VSCode UI.
+>
+> The remainder documents the supported `debugger` statement callbacks.
+
 Use the `--shellJSDebugMode` flag for resmoke (or the `--jsDebugMode` flag directly on the mongo shell) to trigger an interactive debug prompt when `debugger` statements are hit in JS test code.
 
 Sample JS Test:
@@ -15,22 +19,22 @@ assert.eq(q, "foo");
 print("Test Passed!");
 ```
 
-Running this test from the shell will fail since `x != 7`, and the `debugger` is a no-op (does not have any callback handler):
+Running this test will fail since `x != 7`, and the `debugger` is a no-op (does not have any callback handler):
 
 ```bash
-./bazel-bin/install/bin/mongo --nodb jstests/my_test.js
+buildscripts/resmoke.py run --suites=no_passthrough jstests/my_test.js
 ```
 
 Output:
 
 ```
-Test Passed!
+[js_test:my_test] Test Passed!
 ```
 
-Run with the `--jsDebugMode` flag:
+Run with the `--shellJSDebugMode` flag:
 
 ```bash
-./bazel-bin/install/bin/mongo --nodb --jsDebugMode jstests/my_test.js
+buildscripts/resmoke.py run --suites=no_passthrough --shellJSDebugMode jstests/my_test.js
 ```
 
 Should pause first at line 5, and prompt the user for input:
@@ -73,29 +77,6 @@ Send a `dbcont` command to continue execution, and now the test passes!
 ```
 JSDEBUG@jstests/my_test.js:5> dbcont
 JSDEBUG> Continuing execution...
-Test Passed!
-All pids dead / alive (0):
-Searching for files in: /home/ubuntu/mongo
-```
-
-## Resmoke
-
-Use the `--shellJSDebugMode` flag in resmoke to stop on debugger statements:
-
-```bash
-buildscripts/resmoke.py run --suites=no_passthrough --shellJSDebugMode jstests/my_test.js
-```
-
-Update variables `x` and `q` to repair the failing assertions:
-
-```
-JSDEBUG> JavaScript execution paused in 'debugger' statement.
-JSDEBUG> Type 'dbcont' to continue
-JSDEBUG@jstests/my_test.js:5> x = 7
-7
-JSDEBUG@jstests/my_test.js:5> q = "foo"
-foo
-JSDEBUG@jstests/my_test.js:5> dbcont
 [js_test:my_test] Test Passed!
 ```
 

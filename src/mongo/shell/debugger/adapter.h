@@ -43,21 +43,24 @@ using namespace protocol;
 
 class DebugAdapter : public RequestHandler {
 
-public:
-    static Status connect();
-    static void disconnect();
+private:
     static void sendMessage(std::string json);
     static void sendMessage(const Response& response);
     static void sendMessage(const Event& event);
+
+public:
+    static Status connect();
+    static void disconnect();
 
     static void handleMessagesThread();
 
     // Wait for the debugger to be configured before continuing execution
     static void waitForHandshake();
 
+    // Send a StoppedEvent to the client
     static void sendPause();
 
-    // visitors
+    // RequestHandler visitors
     void handleRequest(ConfigurationDoneRequest& request) override;
     void handleRequest(SetBreakpointsRequest& request) override;
     void handleRequest(ContinueRequest& request) override;

@@ -2,7 +2,7 @@
   "name": "mongo-shell-debugger",
   "displayName": "MongoDB Shell Debugger",
   "description": "Debug JavaScript code in MongoDB Shell (MozJS)",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "mongodb",
   "repository": {
     "type": "git",
@@ -21,6 +21,10 @@
     "mongo-shell"
   ],
   "main": "./extension.js",
+  "files": [
+    "*.js",
+    "README.md"
+  ],
   "activationEvents": [
     "onDebug",
     "onDebugResolve:mongo-shell",

@@ -38,17 +38,9 @@ namespace debugger {
 namespace protocol {
 
 
-Message::Message(int seq) : seq(seq) {}
-
 /**
  * Request
  */
-
-Request::Request(const PartialRequest& partial)
-    : Message(partial.seq), command(partial.command), arguments(partial.arguments) {}
-
-PartialRequest::PartialRequest(int seq, BSONObj args, std::string command)
-    : seq(seq), command(command), arguments(args) {}
 
 std::shared_ptr<Request> Request::fromJSON(std::string line) {
     BSONObj obj = fromjson(line);
@@ -85,9 +77,6 @@ std::shared_ptr<Request> Request::fromJSON(std::string line) {
 /**
  * ConfigurationDoneRequest
  */
-
-ConfigurationDoneRequest::ConfigurationDoneRequest(const PartialRequest& partial)
-    : VisitableRequest(partial) {}
 
 Response ConfigurationDoneRequest::response() {
     return Response::Ack(*this);
@@ -146,8 +135,6 @@ Response SetBreakpointsRequest::response() {
  * ContinueRequest
  */
 
-ContinueRequest::ContinueRequest(const PartialRequest& partial) : VisitableRequest(partial) {}
-
 Response ContinueRequest::response() {
     BSONObjBuilder responseBuilder;
     responseBuilder.append("type", "response");
@@ -162,8 +149,6 @@ Response ContinueRequest::response() {
 /**
  * StackTraceRequest
  */
-
-StackTraceRequest::StackTraceRequest(const PartialRequest& partial) : VisitableRequest(partial) {}
 
 Response StackTraceRequest::response(std::string script, int line) {
     BSONObjBuilder responseBuilder;
@@ -221,9 +206,9 @@ Response ScopesRequest::response(std::vector<Scope> scopes) {
     return response;
 }
 
-Scope::Scope(std::string name, int variablesReference, bool expensive)
-    : name(name), variablesReference(variablesReference), expensive(expensive) {};
-
+/**
+ * Scope
+ */
 BSONObj Scope::toBSON() const {
     BSONObjBuilder obj;
     obj.append("name", name);
@@ -260,8 +245,9 @@ Response VariablesRequest::response(std::vector<Variable> variables) {
     return response;
 }
 
-Variable::Variable(std::string name, std::string value, std::string type, int variablesReference)
-    : name(name), value(value), type(type), variablesReference(variablesReference) {};
+/**
+ * Variable
+ */
 
 BSONObj Variable::toBSON() const {
     BSONObjBuilder obj;
@@ -271,11 +257,6 @@ BSONObj Variable::toBSON() const {
     obj.append("variablesReference", variablesReference);
     return obj.obj();
 }
-
-/**
- * UnknownRequest
- */
-UnknownRequest::UnknownRequest(const PartialRequest& partial) : VisitableRequest(partial) {}
 
 /**
  * StoppedEvent
@@ -297,8 +278,6 @@ std::string StoppedEvent::getJson() const {
 /**
  * Response
  */
-
-Response::Response(int seq, BSONObj obj) : Message(seq), bson(obj) {}
 
 std::string Response::getJson() const {
     return bson.jsonString(LegacyStrict);

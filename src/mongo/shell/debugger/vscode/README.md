@@ -1,30 +1,42 @@
 # VSCode Extension for Debugging JS in the Mongo Shell
 
+Use VSCode's Debugger UI with resmoke's `--shellJSDebugMode` flag.
+
+![example.png](./example.png)
+
 ## Install
 
-Run the following to compile and install the latest extension:
+Run the following to package and install the latest extension:
 
 ```bash
 ./src/mongo/shell/debugger/vscode/install.sh
 ```
 
-Add a "mongo-shell" type configuration in your `~/.vscode/launch.json` file:
+You'll see something like the following upon completion:
 
-```json
-{
-  "version": "0.1.0",
-  "configurations": [
-    {
-      "type": "mongo-shell",
-      "request": "attach",
-      "name": "Attach to MongoDB Shell",
-      "debugPort": 9229
-    }
-  ]
-}
+```
+ DONE  Packaged: /home/ubuntu/mongo/src/mongo/shell/debugger/vscode/mongo-shell-debugger-1.0.0.vsix (7 files, 8.88 KB)
+Installing extensions on SSH: steve-mcclure-0ed.workstations.build.10gen.cc...
+Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 ```
 
-Restart VSCode, or use CMD+SHIFT+P and select "Developer: Reload Window".
+> **One-time setup: Launch Configuration**
+>
+> Add a "mongo-shell" type configuration in your `~/.vscode/launch.json` file:
+>
+> ```json
+> {
+>   "version": "0.1.0",
+>   "configurations": [
+>     {
+>       "type": "mongo-shell",
+>       "request": "attach",
+>       "name": "Attach to MongoDB Shell",
+>       "debugPort": 9229
+>     }
+>   ]
+> }
+> ```
 
 ## Usage
 
@@ -40,7 +52,7 @@ Restart VSCode, or use CMD+SHIFT+P and select "Developer: Reload Window".
    Use resmoke's --shellJSDebugMode flag when running a JS test file to stop on breakpoints.
    ```
 4. Run resmoke with the `--shellJSDebugMode` flag to stop on the breakpoints.
-5. Use VSCode's breakpoint UI to navigate (continue, step, etc).
+5. Use VSCode's breakpoint UI to navigate (continue, inspect scope variables, etc).
 
 ## Architecture
 

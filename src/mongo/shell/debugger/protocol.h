@@ -65,14 +65,18 @@ public:
 };
 
 /**
+ * Support for the Debug Adapter Protocol.
  * https://microsoft.github.io/debug-adapter-protocol//specification.html
+ *
+ * This is incomplete (does not implement the full spec) and supports only those with concrete use
+ * cases.
  */
 
-// Base Protocol
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_ProtocolMessage
 class Message {
 public:
     int seq;
-    Message(int seq);
+    Message(int seq) : seq(seq) {};
 };
 
 class PartialRequest {
@@ -80,21 +84,27 @@ public:
     int seq;
     std::string command;
     BSONObj arguments;
-    PartialRequest(int seq, BSONObj args, std::string command);
+    PartialRequest(int seq, BSONObj args, std::string command)
+        : seq(seq), command(command), arguments(args) {};
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Request
 class Request : public Message {
 public:
     std::string command;
     BSONObj arguments;
 
     virtual void handleRequest(RequestHandler& visitor) = 0;
-    Request(const PartialRequest& partial);
+    Request(const PartialRequest& partial)
+        : Message(partial.seq), command(partial.command), arguments(partial.arguments) {};
 
     static std::shared_ptr<Request> fromJSON(std::string json);
     virtual ~Request() = default;
 };
 
+/**
+ * Visitor pattern to use double-dispatch on the matching request type
+ */
 template <typename Derived>
 class VisitableRequest : public Request {
 public:
@@ -104,22 +114,25 @@ public:
     }
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Response
 class Response : public Message {
 public:
     const BSONObj bson;
-    Response(int seq, BSONObj obj);
+    Response(int seq, BSONObj obj) : Message(seq), bson(obj) {}
     std::string getJson() const;
 
     static Response Ack(Message msg);
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone
 class ConfigurationDoneRequest : public VisitableRequest<ConfigurationDoneRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "configurationDone";
-    ConfigurationDoneRequest(const PartialRequest& partial);
+    ConfigurationDoneRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
     Response response();
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints
 class SetBreakpointsRequest : public VisitableRequest<SetBreakpointsRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "setBreakpoints";
@@ -130,30 +143,35 @@ public:
     Response response();
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue
 class ContinueRequest : public VisitableRequest<ContinueRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "continue";
-    ContinueRequest(const PartialRequest& partial);
+    ContinueRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
     Response response();
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace
 class StackTraceRequest : public VisitableRequest<StackTraceRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "stackTrace";
-    StackTraceRequest(const PartialRequest& partial);
+    StackTraceRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
     Response response(std::string script, int line);
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Scope
 class Scope {
     std::string name;
     int variablesReference;
     bool expensive;
 
 public:
-    Scope(std::string name, int variablesReference, bool expensive);
+    Scope(std::string name, int variablesReference, bool expensive)
+        : name(name), variablesReference(variablesReference), expensive(expensive) {};
     BSONObj toBSON() const;
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Scopes
 class ScopesRequest : public VisitableRequest<ScopesRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "scopes";
@@ -163,6 +181,7 @@ public:
     Response response(std::vector<Scope> scopes);
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable
 class Variable {
     std::string name;
     std::string value;
@@ -170,10 +189,12 @@ class Variable {
     int variablesReference;
 
 public:
-    Variable(std::string name, std::string value, std::string type, int variablesReference);
+    Variable(std::string name, std::string value, std::string type, int variablesReference)
+        : name(name), value(value), type(type), variablesReference(variablesReference) {};
     BSONObj toBSON() const;
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables
 class VariablesRequest : public VisitableRequest<VariablesRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "variables";
@@ -183,16 +204,19 @@ public:
     Response response(std::vector<Variable> variables);
 };
 
+// Not technically in the spec, but allows us to use a Null Object pattern on non-matches
 class UnknownRequest : public VisitableRequest<UnknownRequest> {
 public:
-    UnknownRequest(const PartialRequest& partial);
+    UnknownRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Event
 class Event {
 public:
     virtual std::string getJson() const = 0;
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped
 class StoppedEvent : public Event {
 public:
     std::string getJson() const override;

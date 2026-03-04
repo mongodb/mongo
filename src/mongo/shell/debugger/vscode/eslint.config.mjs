@@ -11,13 +11,4 @@ export default {
             ...globals.es2021,
         },
     },
-    rules: {
-        "no-unused-vars": [
-            "error",
-            {
-                argsIgnorePattern: "^_",
-                caughtErrors: "all",
-            },
-        ],
-    },
 };

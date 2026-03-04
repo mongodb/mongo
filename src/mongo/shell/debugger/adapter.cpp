@@ -132,6 +132,7 @@ void DebugAdapter::sendMessage(std::string json) {
 void DebugAdapter::sendMessage(const Response& response) {
     sendMessage(response.getJson());
 }
+
 void DebugAdapter::sendMessage(const Event& event) {
     sendMessage(event.getJson());
 }
@@ -170,7 +171,6 @@ void DebugAdapter::handleMessagesThread() {
 
     DebugAdapter::disconnect();
 }
-
 
 Status DebugAdapter::connect() {
 #ifdef _WIN32

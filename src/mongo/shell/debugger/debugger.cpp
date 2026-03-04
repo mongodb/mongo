@@ -43,8 +43,9 @@
 #include <js/Conversions.h>
 #include <js/SourceText.h>
 
-// Forward declarations for generated JS files
 namespace mongo {
+
+// Forward declarations for generated JS files
 namespace JSFiles {
 extern const JSFile onDebuggerStatement;
 extern const JSFile onNewScript;
@@ -83,8 +84,9 @@ static std::unique_ptr<JS::PersistentRooted<JSObject*>> _debuggerGlobal;
 // Pending breakpoints: map from source URL to set of line numbers
 static std::map<std::string, std::set<int>> _pendingBreakpoints;
 
-DebuggerObject::DebuggerObject(JSContext* cx, JS::HandleObject debugger)
-    : _cx(cx), _debugger(cx, debugger) {}
+/**
+ *  DebuggerObject
+ */
 
 DebuggerObject DebuggerObject::create(JSContext* cx, JS::RootedObject const& global) {
 
@@ -144,8 +146,7 @@ bool DebuggerObject::onDebuggerStatementCallback(JSContext* cx, unsigned argc, J
 bool DebuggerObject::isPausedCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     args.rval().setBoolean(_paused.load());
-
-    return true;  // this is independent of the JS return value
+    return true;
 };
 
 /**
@@ -153,7 +154,6 @@ bool DebuggerObject::isPausedCallback(JSContext* cx, unsigned argc, JS::Value* v
  */
 bool DebuggerObject::hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-
     args.rval().setBoolean(_hasEvalRequest.load());
     return true;
 }
@@ -469,6 +469,47 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
     return status;
 }
 
+Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
+    Status status = Status::OK();
+
+    status = registerNativeFunction(
+        _cx, global, "__getPendingBreakpoints", DebuggerObject::getPendingBreakpointsCallback, 1);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__onScriptSetBreakpoint", DebuggerScript::breakpointHandler, 1);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    JS::RootedValue onNewScript(_cx);
+    status = compileJSCodeBlock(::mongo::JSFiles::onNewScript, &onNewScript);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (!JS_SetProperty(_cx, _debugger, "onNewScript", onNewScript)) {
+        return Status(ErrorCodes::JSInterpreterFailure, "Failed to set onNewScript");
+    }
+
+    return Status::OK();
+}
+
+void DebuggerObject::setBreakpoints(SetBreakpointsRequest request) {
+
+    // Assume that all breakpoints are set before running the shell.
+    // This means that the scripts that the breakpoints are in have not been loaded yet.
+    // Store these pending breakpoints to register later via debugger.onNewScript.
+    _pendingBreakpoints[request.source].clear();
+    for (int line : request.lines) {
+        _pendingBreakpoints[request.source].insert(line);
+    }
+
+    // TODO: Try to apply to already-loaded scripts, where users add more breakpoints as they go
+}
+
 Status DebuggerObject::compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out) {
     auto code = std::string(toStdStringViewForInterop(jsfile.source));
     auto name = jsfile.name;
@@ -494,7 +535,6 @@ Status DebuggerObject::compileJSCodeBlock(const char* code,
     return Status::OK();
 }
 
-
 Status DebuggerObject::registerNativeFunction(
     JSContext* cx, JS::HandleObject global, const char* name, JSNative func, unsigned argc) {
     JS::RootedFunction jsFunc(cx, JS_NewFunction(cx, func, argc, 0, name));
@@ -513,7 +553,9 @@ Status DebuggerObject::registerNativeFunction(
     return Status::OK();
 }
 
-DebuggerFrame::DebuggerFrame(JSContext* cx) : _cx(cx) {}
+/**
+ *  DebuggerFrame
+ */
 
 // Currently this just queries the context for a "__pausedLocation" property of the form {script,
 // line}. Relying on JS here drastically reduces LOC to otherwise retrieve those in C++.
@@ -561,10 +603,14 @@ int DebuggerFrame::getLineNumber() {
     return 0;
 }
 
+/**
+ * DebuggerScript
+ */
+
 bool DebuggerScript::breakpointHandler(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
-    // Get current frame information (THIS IS MISSING!)
+    // Get current frame information
     DebuggerFrame frame(cx);
     _pausedScript = frame.getScriptUrl();
     _pausedLine = frame.getLineNumber();
@@ -581,46 +627,9 @@ bool DebuggerScript::breakpointHandler(JSContext* cx, unsigned argc, JS::Value* 
     return true;
 }
 
-Status DebuggerObject::setOnNewScriptCallback(JS::RootedObject const& global) {
-    Status status = Status::OK();
-
-    status = registerNativeFunction(
-        _cx, global, "__getPendingBreakpoints", DebuggerObject::getPendingBreakpointsCallback, 1);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = registerNativeFunction(
-        _cx, global, "__onScriptSetBreakpoint", DebuggerScript::breakpointHandler, 1);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    JS::RootedValue onNewScript(_cx);
-    status = compileJSCodeBlock(::mongo::JSFiles::onNewScript, &onNewScript);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (!JS_SetProperty(_cx, _debugger, "onNewScript", onNewScript)) {
-        return Status(ErrorCodes::JSInterpreterFailure, "Failed to set onNewScript");
-    }
-
-    return Status::OK();
-}
-
-void DebuggerObject::setBreakpoints(SetBreakpointsRequest request) {
-
-    // Assume that all breakpoints are set before running the shell.
-    // This means that the scripts that the breakpoints are in have not been loaded yet.
-    // Store these pending breakpoints to register later via debugger.onNewScript.
-    _pendingBreakpoints[request.source].clear();
-    for (int line : request.lines) {
-        _pendingBreakpoints[request.source].insert(line);
-    }
-
-    // TODO: Try to apply to already-loaded scripts, where users add more breakpoints as they go
-}
+/**
+ * DebuggerGlobal
+ */
 
 void DebuggerGlobal::setBreakpoints(SetBreakpointsRequest request) {
     _debuggerObject->setBreakpoints(request);

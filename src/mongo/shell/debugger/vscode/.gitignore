@@ -1,1 +1,4 @@
 node_modules/
+
+// just in case these are left around during install, we don't want these being committed
+*.vsix

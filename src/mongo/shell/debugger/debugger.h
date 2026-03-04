@@ -63,10 +63,11 @@ public:
 };
 
 /**
- * Facade interface of https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html
- * and its relevant functionality.
+ * Facade interface of the Debugger Object and its relevant functionality.
+ * https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger/index.html
  */
 class DebuggerObject {
+private:
     JSContext* _cx;
     JS::PersistentRooted<JSObject*> _debugger;
 
@@ -78,10 +79,10 @@ class DebuggerObject {
     static bool storeEvalResult(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeScopesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeVariablesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);
-    static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     // Helper: Register a native function in the debugger compartment.
     Status registerNativeFunction(
@@ -92,37 +93,36 @@ class DebuggerObject {
     Status compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out);
 
 public:
-    DebuggerObject(JSContext* cx, JS::HandleObject debugger);
+    DebuggerObject(JSContext* cx, JS::HandleObject debugger) : _cx(cx), _debugger(cx, debugger) {};
 
     // Create a Debugger instance in the compartment.
     static DebuggerObject create(JSContext* cx, JS::RootedObject const& global);
 
     // Add a global object for this Debugger instance to debug.
-    // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#adddebuggee-global
+    // https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger/index.html#debugger-api-debugger-add-debuggee
     Status addDebuggee(JS::RootedObject const& global);
 
     // Set the "onDebuggerStatement" callback in the compartment
-    // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#ondebuggerstatement-frame
+    // https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger/index.html
     Status setOnDebuggerStatementCallback(JS::RootedObject const& global);
 
     // Set the "onNewScript" callback in the compartment
-    // https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.html#onnewscript-script-global
+    // https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger/index.html
     Status setOnNewScriptCallback(JS::RootedObject const& global);
 
     // Set breakpoints for the given request
     void setBreakpoints(SetBreakpointsRequest request);
 };
 
-
 /**
- * Facade interface of https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.Frame.html
- * and its relevant functionality.
+ * Facade interface of Debugger.Frame and its relevant functionality.
+ * https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger.frame/index.html
  */
 class DebuggerFrame {
     JSContext* _cx;
 
 public:
-    DebuggerFrame(JSContext* cx);
+    DebuggerFrame(JSContext* cx) : _cx(cx) {};
 
     // Return the script url of the frame instance.
     // Will look something like "jstests/my_test.js".
@@ -134,11 +134,12 @@ public:
 };
 
 /**
- * Facade interface of https://firefox-source-docs.mozilla.org/js/Debugger/Debugger.Script.html
- * and its relevant functionality.
+ * Facade interface of Debugger.Script and its relevant functionality.
+ * https://firefox-source-docs.mozilla.org/devtools-user/debugger-api/debugger.script/index.html
  */
 class DebuggerScript {
 public:
+    // Callback handler to the `setBreakpoint(offset, handler)` method
     static bool breakpointHandler(JSContext* cx, unsigned argc, JS::Value* vp);
 };
 

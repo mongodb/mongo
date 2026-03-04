@@ -30,7 +30,6 @@ class MongoShellDebugSession extends DebugSession {
         this.debugConnection = null;
         this.debugServer = null;
         this.connected = false;
-        this.configurationDoneResponse = null;
 
         // Handles for variables
         this.breakpoints = new Map();
@@ -40,22 +39,25 @@ class MongoShellDebugSession extends DebugSession {
         this.pendingRequests = new Map();
     }
 
-    // Initialize - tell VSCode what we support
-    initializeRequest(response, _args) {
+    /**
+     * Initialize - tell VSCode what we support
+     * @param {DebugProtocol.InitializeResponse} response
+     * @overload
+     */
+    initializeRequest(response) {
         response.body = {
             supportsConfigurationDoneRequest: true,
-            supportsEvaluateForHovers: true,
-            supportsSetVariable: true,
-            supportsConditionalBreakpoints: true,
-            supportsLogPoints: true,
-            supportsBreakpointLocationsRequest: true,
-            supportsTerminateRequest: true,
         };
         this.sendResponse(response);
         this.sendEvent(new InitializedEvent());
     }
 
-    // Attach - start a debug server, listening for a mongo shell to attach to
+    /**
+     * Attach - start a debug server, listening for a mongo shell to attach to
+     * @param {DebugProtocol.AttachResponse} response
+     * @param {DebugProtocol.AttachRequestArguments} args
+     * @overload
+     */
     async attachRequest(response, args) {
         try {
             await this.startDebugServer(args.debugPort || 9229);
@@ -73,7 +75,7 @@ class MongoShellDebugSession extends DebugSession {
             this.debugServer = net.createServer((socket) => {
                 this.debugConnection = socket;
                 this.connected = true;
-                this.setupDebugConnection();
+                this.#setupDebugConnection();
             });
 
             this.debugServer.listen(port, "localhost", () => {
@@ -86,7 +88,7 @@ class MongoShellDebugSession extends DebugSession {
     }
 
     // Set up message handling for debug protocol
-    setupDebugConnection() {
+    #setupDebugConnection() {
         let msgBuffer = "";
         this.debugConnection.on("data", (data) => {
             msgBuffer += data.toString();
@@ -119,8 +121,9 @@ class MongoShellDebugSession extends DebugSession {
         this.sendDeferredConfigurationDoneRequest();
     }
 
+    // Send the stored configurationDone request to the attached shells
     sendDeferredConfigurationDoneRequest() {
-        const response = this.configurationDoneResponse;
+        const response = {}; // just an acknowledgement
         this.sendCommand("configurationDone", {})
             .then(() => this.sendResponse(response))
             .catch((err) => {
@@ -134,7 +137,12 @@ class MongoShellDebugSession extends DebugSession {
         this.sendEvent(new OutputEvent(text + "\n", category));
     }
 
-    disconnectRequest(response, _args) {
+    /**
+     * Disconnect Request
+     * @param {DebugProtocol.DisconnectResponse} response
+     * @overload
+     */
+    disconnectRequest(response) {
         this.cleanup();
         this.sendResponse(response);
     }
@@ -154,7 +162,12 @@ class MongoShellDebugSession extends DebugSession {
         this.connected = false;
     }
 
-    // Set breakpoints
+    /**
+     * Breakpoints Request
+     * @param {DebugProtocol.SetBreakpointsResponse} response
+     * @param {DebugProtocol.SetBreakpointsArguments} args
+     * @overload
+     */
     setBreakPointsRequest(response, args) {
         let filePath = args.source.path;
         const mongoRepo = process.env["MONGO_REPO"];
@@ -271,46 +284,69 @@ class MongoShellDebugSession extends DebugSession {
         }
     }
 
-    configurationDoneRequest(response, _args) {
-        // The DAP is expected to be started up before shells are launched for it to attach to.
-        // Store this response to reuse and pass to each new shell for a handshake
-        this.configurationDoneResponse = response;
-    }
-
-    // Pause execution
-    pauseRequest(response, _args, _request) {
+    /**
+     * Pause Request
+     * @param {DebugProtocol.PauseResponse} response
+     * @overload
+     */
+    pauseRequest(response) {
         this.sendCommand("pause", {})
             .then(() => this.sendResponse(response))
             .catch((err) => this.sendErrorResponse(response, 1010, `Pause failed: ${err.message}`));
     }
 
-    continueRequest(response, _args) {
+    /**
+     * Continue Request
+     * @param {DebugProtocol.ContinueResponse} response
+     * @overload
+     */
+    continueRequest(response) {
         this.sendCommand("continue", {})
             .then(() => this.sendResponse(response))
             .catch((err) => this.sendErrorResponse(response, 1012, `Continue failed: ${err.message}`));
     }
 
-    // Step Over (Next) - stub with auto-continue
+    /**
+     * Step Over (Next) - stub with auto-continue
+     * @param {DebugProtocol.NextResponse} response
+     * @param {DebugProtocol.NextArguments} args
+     * @overload
+     */
     nextRequest(response, args) {
         this.log("Step over is not supported in this debugger. Use continue instead.", "console");
         // Auto-continue to provide seamless UX
         this.continueRequest(response, args);
     }
 
-    // Step In - stub with auto-continue
+    /**
+     * Step In - stub with auto-continue
+     * @param {DebugProtocol.StepInResponse} response
+     * @param {DebugProtocol.StepInArguments} args
+     * @overload
+     */
     stepInRequest(response, args) {
         this.log("Step in is not supported in this debugger. Use continue instead.", "console");
         // Auto-continue to provide seamless UX
         this.continueRequest(response, args);
     }
 
-    // Step Out - stub with auto-continue
+    /**
+     * Step Out - stub with auto-continue
+     * @param {DebugProtocol.StepOutResponse} response
+     * @param {DebugProtocol.StepOutResponse} args
+     * @overload
+     */
     stepOutRequest(response, args) {
         this.log("Step out is not supported in this debugger. Use continue instead.", "console");
         // Auto-continue to provide seamless UX
         this.continueRequest(response, args);
     }
 
+    /**
+     * Threads Request
+     * @param {DebugProtocol.ThreadsResponse} response
+     * @overload
+     */
     threadsRequest(response) {
         response.body = {
             threads: [{id: THREAD_ID, name: "MongoDB Shell"}],
@@ -318,7 +354,12 @@ class MongoShellDebugSession extends DebugSession {
         this.sendResponse(response);
     }
 
-    stackTraceRequest(response, _args) {
+    /**
+     * StackTrace Request
+     * @param {DebugProtocol.StackTraceResponse} response
+     * @overload
+     */
+    stackTraceRequest(response) {
         this.sendCommand("stackTrace", {})
             .then((result) => {
                 // Convert relative paths back to absolute paths so VSCode can open it
@@ -340,6 +381,12 @@ class MongoShellDebugSession extends DebugSession {
             .catch((err) => this.sendErrorResponse(response, 1013, `Stack trace failed: ${err.message}`));
     }
 
+    /**
+     * Scopes Request
+     * @param {DebugProtocol.ScopesResponse} response
+     * @param {DebugProtocol.ScopesArguments} args
+     * @overload
+     */
     scopesRequest(response, args) {
         this.sendCommand("scopes", {frameId: args.frameId})
             .then((result) => {
@@ -349,6 +396,12 @@ class MongoShellDebugSession extends DebugSession {
             .catch((err) => this.sendErrorResponse(response, 1014, `Scopes failed: ${err.message}`));
     }
 
+    /**
+     * Variables Request
+     * @param {DebugProtocol.VariablesResponse} response
+     * @param {DebugProtocol.VariablesArguments} args
+     * @overload
+     */
     variablesRequest(response, args) {
         this.sendCommand("variables", {variablesReference: args.variablesReference})
             .then((result) => {
