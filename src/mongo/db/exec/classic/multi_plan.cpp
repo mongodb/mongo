@@ -409,9 +409,12 @@ Status MultiPlanStage::pickBestPlan() {
                 "bestSolution"_attr = redact(bestSolution->toString()),
                 "bestSolutionHash"_attr = bestSolution->hash());
 
-    auto explainer =
-        plan_explainer_factory::make(bestCandidate.root, bestSolution->_enumeratorExplainInfo);
-    LOGV2_DEBUG(20591, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
+    if (logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2))) {
+        // We only want to create the explainer if we are actually going to log the plan summary.
+        auto explainer =
+            plan_explainer_factory::make(bestCandidate.root, bestSolution->_enumeratorExplainInfo);
+        LOGV2_DEBUG(20591, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
+    }
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
@@ -579,9 +582,6 @@ bool MultiPlanStage::hasBackupPlan() const {
             _candidates[_bestPlanIdx].root->getStats();
         planExplainerData.multiPlannerWinningPlanScore = getCandidateScore(_bestPlanIdx);
         if (hasBackupPlan()) {
-            // TODO SERVER-117371. Not considering the backup plan as rejected means it won't be
-            // explained. It also means that if the best plan fails due to memory limits and we
-            // switch to the backup plan, we won't be able to explain that either.
             candidateOffset = 2;
         }
     }
@@ -679,6 +679,9 @@ unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
     unique_ptr<PlanStageStats> ret =
         std::make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
     ret->specific = std::make_unique<MultiPlanStats>(_specificStats);
+    // Children will have 2 plans if we have a backup plan, and 1 plan if we don't.
+    // We will only have a backup plan if has not been executed, otherwise it'd have been
+    // either removed or used as the best plan.
     for (auto&& child : _children) {
         ret->children.emplace_back(child->getStats());
     }

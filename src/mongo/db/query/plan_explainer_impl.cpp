@@ -812,7 +812,7 @@ const PlanExplainer::ExplainVersion& PlanExplainerImpl::getVersion() const {
 
 bool PlanExplainerImpl::areThereRejectedPlansToExplain() const {
     return _explainData.rejectedPlansWithStages.size() > 0 ||
-        // TODO SERVER-117371. This shouldn't be needed if backup plan were considered rejected.
+        // This is needed because the backup plan may still belong in the multi plan stage.
         _explainData.multiPlannerWinningPlanTrialStats ||
         getStageByType(_root, STAGE_MULTI_PLAN) != nullptr;
     ;
