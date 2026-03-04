@@ -16,7 +16,7 @@ export var FeatureFlagUtil = (function() {
         // to obtain the correct connection to a mongod.
         const getMongodConn = (db) => {
             if (!FixtureHelpers.isMongos(db)) {
-                return db;
+                return {conn: db, shouldClose: false};
             }
 
             // For sharded cluster get a connection to the config server through a Mongo
@@ -25,9 +25,12 @@ export var FeatureFlagUtil = (function() {
             // should guarantee that subsequent operations on the connection are retried in the
             // event of network errors in suites where that possibility exists.
             return retryOnRetryableError(() => {
-                return new Mongo(FixtureHelpers.getConfigServerConnString(db),
-                                 undefined /*encryptedDBClientCallback */,
-                                 {gRPC: false});
+                const conn = new Mongo(
+                    FixtureHelpers.getConfigServerConnString(db),
+                    undefined /*encryptedDBClientCallback */,
+                    {gRPC: false},
+                );
+                return {conn, shouldClose: true};
             });
         };
         try {
@@ -45,9 +48,19 @@ export var FeatureFlagUtil = (function() {
         }
     }
 
-    function _getAuthenticatedConnectionToMongod(db) {
-        let mongodConn = _getConnectionToMongod(db);
-        return mongodConn;
+    function _withConnectionToMongod(db, callback) {
+        const {conn, shouldClose} = _getConnectionToMongod(db);
+        try {
+            return callback(conn, shouldClose);
+        } finally {
+            if (shouldClose) {
+                try {
+                    conn.close();
+                } catch (closeErr) {
+                    // Best-effort close to avoid masking the original error path.
+                }
+            }
+        }
     }
 
     function _getFullFeatureFlagName(featureFlagName) {
@@ -99,15 +112,14 @@ export var FeatureFlagUtil = (function() {
     }
 
     function getFeatureFlagDoc(db, flagName) {
-        const conn = _getAuthenticatedConnectionToMongod(db);
-        return _getFeatureFlagDoc(conn, flagName);
+        return _withConnectionToMongod(db, (conn) => _getFeatureFlagDoc(conn, flagName));
     }
 
     function getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) {
         // TODO (SERVER-102609): Remove _getStatusLegacy() once v9.0 becomes last-LTS.
         return flagDoc.hasOwnProperty("currentlyEnabled")
             ? _getStatus(ignoreFCV, flagDoc)
-            : _getStatusLegacy(_getAuthenticatedConnectionToMongod(db), ignoreFCV, flagDoc);
+            : _withConnectionToMongod(db, (conn) => _getStatusLegacy(conn, ignoreFCV, flagDoc));
     }
 
     /**
@@ -127,9 +139,15 @@ export var FeatureFlagUtil = (function() {
     function getStatus(db, featureFlag, ignoreFCV) {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
         // a mongod.
-        const conn = _getAuthenticatedConnectionToMongod(db);
-        const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
-        return flagDoc ? getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) : FlagStatus.kNotFound;
+        return _withConnectionToMongod(db, (conn) => {
+            const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
+            if (!flagDoc) {
+                return FlagStatus.kNotFound;
+            }
+            return flagDoc.hasOwnProperty("currentlyEnabled")
+                ? _getStatus(ignoreFCV, flagDoc)
+                : _getStatusLegacy(conn, ignoreFCV, flagDoc);
+        });
     }
 
     /**
