@@ -44,3 +44,25 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )
+
+mongo_cc_library(
+    name = "document_transformation",
+    srcs = [
+        "document_transformation.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "document_transformation_test",
+    srcs = [
+        "document_transformation_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":document_transformation",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
