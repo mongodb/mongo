@@ -56,7 +56,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gFindShardsOnConfigTimeoutMS
-        default: 15000
+        default: 20000
         validator:
             gte: 0
         redact: false
