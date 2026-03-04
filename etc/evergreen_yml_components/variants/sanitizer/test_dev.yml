@@ -96,7 +96,6 @@ variables:
       --pgo_profile_use=False
       --bolt_profile_use=False
       --opt=on
-      --build_otel=True
       --jobs=1600
     unittest_library_compile_flags: >-
       --linkstatic=False
