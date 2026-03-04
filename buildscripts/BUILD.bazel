@@ -547,5 +547,9 @@ py_binary(
             "opentelemetry-exporter-otlp-proto-http",
             group = "testing",
         ),
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
     ],
 )
