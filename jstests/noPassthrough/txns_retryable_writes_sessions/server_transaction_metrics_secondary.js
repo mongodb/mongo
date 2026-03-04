@@ -3,6 +3,7 @@
 //   uses_transactions,
 //   disables_test_commands,
 // ]
+import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.enableTestCommands = false;
@@ -75,4 +76,12 @@ assert.eq(0, metrics.totalStarted);
 jsTestLog("Done trying transaction on secondary.");
 secondarySession.endSession();
 
-replTest.stopSet();
+// Disagg does not support fsync with lock, which `stopSet()` uses for checkDBHash. Although
+// checkDBHash normally tolerates this by running with allowFsyncFailure: true, this test disables
+// test commands, so fsync failures are no longer ignored.
+const supportsCheckDBHash = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+    primary,
+    "supportsLocalCollections",
+    true,
+);
+replTest.stopSet(undefined /* signal */, undefined /* forRestart */, {skipCheckDBHashes: !supportsCheckDBHash});

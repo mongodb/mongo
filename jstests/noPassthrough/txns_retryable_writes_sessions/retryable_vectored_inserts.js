@@ -56,6 +56,12 @@ assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
 // Retry on primary
 assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
 
+if (TestData.doesNotSupportGracefulStepdown) {
+    jsTestLog("Skipping failover/restart portions.");
+    replTest.stopSet();
+    quit();
+}
+
 // Make sure we can retry when the command failed somewhere in the middle.
 const brokenBatchLSID = {
     id: UUID(),

@@ -102,12 +102,13 @@ function runTest(externalConn, internalConn = undefined) {
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id.
+    const txnNumberLsidInTxn = NumberLong(txnNumber++);
     assert.commandWorked(
         testDB.runCommand({
             update: coll.getName(),
             updates: [update],
             lsid: lsid,
-            txnNumber: NumberLong(txnNumber++),
+            txnNumber: txnNumberLsidInTxn,
             startTransaction: true,
             autocommit: false,
         }),
@@ -116,12 +117,13 @@ function runTest(externalConn, internalConn = undefined) {
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id and txnUUID.
+    const txnNumberLsidWithUUIDInTxn = NumberLong(txnNumber++);
     assert.commandWorked(
         testDB.runCommand({
             update: coll.getName(),
             updates: [update],
             lsid: lsidWithUUID,
-            txnNumber: NumberLong(txnNumber++),
+            txnNumber: txnNumberLsidWithUUIDInTxn,
             startTransaction: true,
             autocommit: false,
         }),
@@ -130,12 +132,13 @@ function runTest(externalConn, internalConn = undefined) {
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id, txnUUID and txnNumber.
+    const txnNumberLsidWithUUIDAndTxnNumInTxn = NumberLong(txnNumber++);
     assert.commandWorked(
         testDB.runCommand({
             update: coll.getName(),
             updates: [update],
             lsid: lsidWithUUIDAndTxnNum,
-            txnNumber: NumberLong(txnNumber++),
+            txnNumber: txnNumberLsidWithUUIDAndTxnNumInTxn,
             startTransaction: true,
             autocommit: false,
         }),
@@ -147,6 +150,29 @@ function runTest(externalConn, internalConn = undefined) {
     }
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
+
+    // Abort the transactions we started above before shutting down the fixture so that
+    // there are no dangling transactions that hold onto locks that can interfere with the
+    // validation hooks that run when the test finishes.
+    assert.commandWorked(
+        testDB.adminCommand({abortTransaction: 1, lsid: lsid, txnNumber: txnNumberLsidInTxn, autocommit: false}),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({
+            abortTransaction: 1,
+            lsid: lsidWithUUID,
+            txnNumber: txnNumberLsidWithUUIDInTxn,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({
+            abortTransaction: 1,
+            lsid: lsidWithUUIDAndTxnNum,
+            txnNumber: txnNumberLsidWithUUIDAndTxnNumInTxn,
+            autocommit: false,
+        }),
+    );
 }
 
 jsTest.log("Tests the retryable write counts in mongos and mongod serverStatus output for a sharded cluster.");

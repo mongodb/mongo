@@ -31,6 +31,15 @@ const lsid = {
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
 
+    assert.commandWorked(
+        primary.adminCommand({
+            abortTransaction: 1,
+            lsid: commandObj.lsid,
+            txnNumber: commandObj.txnNumber,
+            autocommit: false,
+        }),
+    );
+
     rst.stopSet();
 }
 
@@ -49,6 +58,15 @@ const lsid = {
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
+
+    assert.commandWorked(
+        st.s.adminCommand({
+            abortTransaction: 1,
+            lsid: commandObj.lsid,
+            txnNumber: commandObj.txnNumber,
+            autocommit: false,
+        }),
+    );
 
     st.stop();
 }
