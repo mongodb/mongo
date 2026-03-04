@@ -291,6 +291,14 @@ export class MagicRestoreTest {
      */
     static runMagicRestoreNode(pipeDir, backupDbPath, options = {}) {
         const {pipePath} = MagicRestoreTest._generateMagicRestorePipePath(pipeDir);
+
+        // If the restore takes longer than minSnapshotHistoryWindowInSeconds, we may get a
+        // SnapshotTooOld error when running doing the post-restore consistency check.
+        // While this doesn't eliminate the race condition, it makes it highly unlikely.
+        options.setParameter ||= {};
+        options.setParameter.minSnapshotHistoryWindowInSeconds ||= 3600; // 1 hour
+        options.setParameter.logComponentVerbosity ||= tojson({replication: 3});
+
         // Magic restore will exit the mongod process cleanly. 'runMongod' may acquire a connection
         // to mongod before it exits, and so we wait for the process to exit in the 'assert.soon'
         // below. If mongod exits before we acquire a connection, 'conn' will be null. In this case,
