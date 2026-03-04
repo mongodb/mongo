@@ -49,6 +49,7 @@ mongo_cc_library(
     name = "document_transformation",
     srcs = [
         "document_transformation.cpp",
+        "document_transformation_helpers.cpp",
     ],
     deps = [
         "//src/mongo/db:query_expressions",

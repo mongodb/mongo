@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -107,6 +108,321 @@ TEST(DocumentTransformationTest, WorksWithOverloadedVisitor) {
     EXPECT_EQ(preserved, "preserve"_sd);
     EXPECT_EQ(modified, "modify"_sd);
     EXPECT_EQ(renamed, std::make_pair("renameTo"s, "renameFrom"s));
+}
+
+class TestVisitor : public DocumentOperationVisitor {
+public:
+    void operator()(const ReplaceRoot& op) override {
+        ASSERT_FALSE(replacedRoot);
+        replacedRoot = true;
+    }
+    void operator()(const PreservePath& op) override {
+        ASSERT_TRUE(replacedRoot);
+        preserved.emplace_back(op.getPath());
+    }
+    void operator()(const ModifyPath& op) override {
+        modified.emplace_back(op.getPath());
+    }
+    void operator()(const RenamePath& op) override {
+        renamed.emplace_back(op.getNewPath(), op.getOldPath());
+    }
+
+    bool replacedRoot{false};
+    std::vector<std::string> preserved;
+    std::vector<std::string> modified;
+    std::vector<std::pair<std::string, std::string>> renamed;
+};
+
+GetModPathsReturn roundtrip(const GetModPathsReturn& modPaths) {
+    struct RoundtripHelper {
+        RoundtripHelper(const GetModPathsReturn& modPaths) : modPaths(modPaths) {}
+        void describeTransformation(DocumentOperationVisitor& visitor) const {
+            document_transformation::describeGetModPathsReturn(visitor, modPaths);
+        }
+        const GetModPathsReturn& modPaths;
+    };
+    return toGetModPathsReturn(RoundtripHelper(modPaths));
+}
+
+void assertRoundtripsCleanly(const GetModPathsReturn& modPaths) {
+    auto converted = roundtrip(modPaths);
+    EXPECT_EQ(modPaths.type, converted.type);
+    EXPECT_EQ(modPaths.paths, converted.paths);
+    EXPECT_EQ(modPaths.renames, converted.renames);
+    EXPECT_EQ(modPaths.complexRenames, converted.complexRenames);
+}
+
+TEST(DocumentTransformationTest, FromAllPaths) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kAllPaths,
+        {},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromNotSupported) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kNotSupported,
+        {},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    EXPECT_EQ(GetModPathsReturn::Type::kAllPaths, roundtrip(modPaths).type);
+}
+
+TEST(DocumentTransformationTest, FromEmptyAllExcept) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kAllExcept,
+        {},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    EXPECT_EQ(GetModPathsReturn::Type::kAllPaths, roundtrip(modPaths).type);
+}
+
+TEST(DocumentTransformationTest, FromAllExcept) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kAllExcept,
+        {"a"},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromAllExceptWithSimpleRename) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kAllExcept,
+        {"a"},
+        {{"b", "c"}},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("b"s, "c"s)));
+    assertRoundtripsCleanly(modPaths);
+}
+
+
+TEST(DocumentTransformationTest, FromAllExceptWithComplexRename) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kAllExcept,
+        {"a"},
+        {},
+        {{"b", "c.d"}},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_TRUE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("b"s, "c.d"s)));
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromEmptyFiniteSet) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kFiniteSet,
+        {},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_FALSE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromFiniteSet) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kFiniteSet,
+        {"a"},
+        {},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_FALSE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromFiniteSetWithSimpleRename) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kFiniteSet,
+        {"a"},
+        {{"b", "c"}},
+        {},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_FALSE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("b"s, "c"s)));
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, FromFiniteSetWithComplexRename) {
+    GetModPathsReturn modPaths{
+        GetModPathsReturn::Type::kFiniteSet,
+        {"a", "b"},
+        {},
+        {{"b", "c.d"}},
+    };
+
+    TestVisitor visitor;
+    describeGetModPathsReturn(visitor, modPaths);
+
+    EXPECT_FALSE(visitor.replacedRoot);
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"s));
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("b"s, "c.d"s)));
+    assertRoundtripsCleanly(modPaths);
+}
+
+TEST(DocumentTransformationTest, DescribeInclusionPathsWithoutPrefix) {
+    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+
+    TestVisitor visitor;
+    visitor(ReplaceRoot{});
+    document_transformation::describeProjectedPaths(
+        visitor, paths.begin(), paths.end(), {}, /* isInclusion */ true);
+
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeInclusionPathsWithPrefix) {
+    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+
+    TestVisitor visitor;
+    visitor(ReplaceRoot{});
+    document_transformation::describeProjectedPaths(
+        visitor, paths.begin(), paths.end(), "root", /* isInclusion */ true);
+
+    EXPECT_THAT(visitor.preserved, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeExclusionPathsWithoutPrefix) {
+    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+
+    TestVisitor visitor;
+    document_transformation::describeProjectedPaths(
+        visitor, paths.begin(), paths.end(), {}, /* isInclusion */ false);
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeExclusionPathsWithPrefix) {
+    std::vector<StringData> paths{"a"_sd, "b.c"_sd};
+
+    TestVisitor visitor;
+    document_transformation::describeProjectedPaths(
+        visitor, paths.begin(), paths.end(), "root", /* isInclusion */ false);
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsWithoutPrefix) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionConstant::create(expCtx.get(), Value(1));
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("a"_sd, "b.c"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsWithPrefix) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionConstant::create(expCtx.get(), Value(1));
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), "root");
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, UnorderedElementsAre("root.a"_sd, "root.b.c"_sd));
+    EXPECT_THAT(visitor.renamed, IsEmpty());
+}
+
+TEST(DocumentTransformationTest, DescribeComputedPathsRenames) {
+    auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+    auto expr = ExpressionFieldPath::parse(expCtx.get(), "$x.y", expCtx->variablesParseState);
+    StringMap<boost::intrusive_ptr<Expression>> paths{{"a"s, expr}, {"b.c"s, expr}};
+
+    TestVisitor visitor;
+    document_transformation::describeComputedPaths(visitor, paths.begin(), paths.end(), {});
+
+    EXPECT_THAT(visitor.preserved, IsEmpty());
+    EXPECT_THAT(visitor.modified, IsEmpty());
+    EXPECT_THAT(visitor.renamed, UnorderedElementsAre(Pair("a"s, "x.y"s), Pair("b.c"s, "x.y"s)));
 }
 
 }  // namespace
