@@ -71,6 +71,9 @@ void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
                                     .Long();
         EXPECT_EQ(persistedCount, expectedCount);
         EXPECT_EQ(persistedSize, expectedSize);
+
+        // TODO SERVER-120540: Introduce validation for valid-as-of beyond its basic presence.
+        ASSERT_TRUE(persisted.hasField(ReplicatedFastCountManager::kValidAsOfKey));
     }
 }
 

@@ -84,6 +84,7 @@ class MONGO_MOD_PUBLIC ReplicatedFastCountManager {
     struct StoredSizeCount {
         CollectionSizeCount sizeCount;
         bool dirty{false};  // Indicates if flush is needed.
+        Timestamp validAsOf;
     };
 
     using FastSizeCountMap = absl::flat_hash_map<UUID, StoredSizeCount>;
@@ -107,6 +108,7 @@ public:
     inline static StringData kMetaDataKey = "meta"_sd;
     inline static StringData kSizeKey = "sz"_sd;
     inline static StringData kCountKey = "ct"_sd;
+    inline static StringData kValidAsOfKey = "valid-as-of"_sd;
 
     /**
      * Spawns fastcount thread.
@@ -198,18 +200,21 @@ private:
                            const CollectionPtr& fastCountColl,
                            const UUID& uuid,
                            const CollectionSizeCount& sizeCount,
-                           RecordId recordId);
+                           const Timestamp& validAsOfTS,
+                           const RecordId& recordId);
 
     void _updateOneMetadata(OperationContext* opCtx,
                             const CollectionPtr& fastCountColl,
                             const Snapshotted<BSONObj>& doc,
                             const UUID& uuid,
-                            RecordId recordId,
-                            const CollectionSizeCount& sizeCount);
+                            const CollectionSizeCount& sizeCount,
+                            const Timestamp& validAsOfTS,
+                            const RecordId& recordId);
     void _insertOneMetadata(OperationContext* opCtx,
                             const CollectionPtr& fastCountColl,
                             const UUID& uuid,
-                            const CollectionSizeCount& sizeCount);
+                            const CollectionSizeCount& sizeCount,
+                            const Timestamp& validAsOfTS);
 
     /**
      * Acquire the fastcount collection that underpins this class with write intent.
@@ -235,7 +240,9 @@ private:
     /**
      * Formats and returns the document to write to the fastcount collection.
      */
-    BSONObj _getDocForWrite(const UUID& uuid, const CollectionSizeCount& sizeCount) const;
+    BSONObj _getDocForWrite(const UUID& uuid,
+                            const CollectionSizeCount& sizeCount,
+                            const Timestamp& validAsOfTS) const;
 
     /**
      * Generates a key (RecordId) into the fastcount collection given a user

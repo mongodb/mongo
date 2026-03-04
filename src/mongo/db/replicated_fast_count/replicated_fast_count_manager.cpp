@@ -107,6 +107,7 @@ int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
         auto& meta = _metadata[uuid];
         meta.sizeCount.count = data.getField(kMetaDataKey).Obj().getField(kCountKey).Long();
         meta.sizeCount.size = data.getField(kMetaDataKey).Obj().getField(kSizeKey).Long();
+        meta.validAsOf = data.getField(kValidAsOfKey).timestamp();
     }
     return numRecordsScanned;
 }
@@ -147,6 +148,9 @@ void ReplicatedFastCountManager::commit(
         stored.sizeCount.count += metadata.count;
         stored.sizeCount.size += metadata.size;
         stored.dirty = true;
+        if (commitTime) {
+            stored.validAsOf = commitTime.get();
+        }
         // TODO SERVER-120203: Re-enable this invariant once outstanding bugs are fixed.
         // invariant(stored.sizeCount.size >= 0 && stored.sizeCount.count >= 0,
         //           fmt::format("Expected fast count size and count to be non-negative, but saw
@@ -231,8 +235,12 @@ void ReplicatedFastCountManager::_doFlush(OperationContext* opCtx,
                                           const FastSizeCountMap& dirtyMetadata) {
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
     for (auto&& [metadataKey, metadataVal] : dirtyMetadata) {
-        _writeOneMetadata(
-            opCtx, coll, metadataKey, metadataVal.sizeCount, _keyForUUID(metadataKey));
+        _writeOneMetadata(opCtx,
+                          coll,
+                          metadataKey,
+                          metadataVal.sizeCount,
+                          metadataVal.validAsOf,
+                          _keyForUUID(metadataKey));
     }
     wuow.commit();
 }
@@ -290,14 +298,15 @@ void ReplicatedFastCountManager::_writeOneMetadata(OperationContext* opCtx,
                                                    const CollectionPtr& fastCountColl,
                                                    const UUID& uuid,
                                                    const CollectionSizeCount& sizeCount,
-                                                   const RecordId recordId) {
+                                                   const Timestamp& validAsOfTS,
+                                                   const RecordId& recordId) {
     Snapshotted<BSONObj> doc;
     bool exists = fastCountColl->findDoc(opCtx, recordId, &doc);
 
     if (exists) {
-        _updateOneMetadata(opCtx, fastCountColl, doc, uuid, recordId, sizeCount);
+        _updateOneMetadata(opCtx, fastCountColl, doc, uuid, sizeCount, validAsOfTS, recordId);
     } else {
-        _insertOneMetadata(opCtx, fastCountColl, uuid, sizeCount);
+        _insertOneMetadata(opCtx, fastCountColl, uuid, sizeCount, validAsOfTS);
     }
 }
 
@@ -305,14 +314,15 @@ void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
                                                     const CollectionPtr& fastCountColl,
                                                     const Snapshotted<BSONObj>& doc,
                                                     const UUID& uuid,
-                                                    const RecordId recordId,
-                                                    const CollectionSizeCount& sizeCount) {
+                                                    const CollectionSizeCount& sizeCount,
+                                                    const Timestamp& validAsOfTS,
+                                                    const RecordId& recordId) {
     // TODO SERVER-117886: Manually performing update without query system. This would be nice to
     // avoid extra dependencies but might be too tricky to get right.
     CollectionUpdateArgs args(doc.value());
     // TODO SERVER-117654: When we also store timestamp we should be able to recover/combine data
     // from old doc to keep this accurate.
-    const BSONObj newDoc = _getDocForWrite(uuid, sizeCount);
+    const BSONObj newDoc = _getDocForWrite(uuid, sizeCount, validAsOfTS);
 
     const auto diff = doc_diff::computeOplogDiff(doc.value(), newDoc, /*padding=*/0);
     invariant(
@@ -335,13 +345,14 @@ void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
 void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
                                                     const CollectionPtr& fastCountColl,
                                                     const UUID& uuid,
-                                                    const CollectionSizeCount& sizeCount) {
+                                                    const CollectionSizeCount& sizeCount,
+                                                    const Timestamp& validAsOfTS) {
     // TODO SERVER-118529: Consider error handling more carefully here.
-    uassertStatusOK(
-        collection_internal::insertDocument(opCtx,
-                                            fastCountColl,
-                                            InsertStatement(_getDocForWrite(uuid, sizeCount)),
-                                            /*opDebug=*/nullptr));
+    uassertStatusOK(collection_internal::insertDocument(
+        opCtx,
+        fastCountColl,
+        InsertStatement(_getDocForWrite(uuid, sizeCount, validAsOfTS)),
+        /*opDebug=*/nullptr));
 }
 
 boost::optional<CollectionOrViewAcquisition>
@@ -379,8 +390,9 @@ ReplicatedFastCountManager::_acquireFastCountCollectionForRead(OperationContext*
 }
 
 BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
-                                                    const CollectionSizeCount& sizeCount) const {
-    return BSON("_id" << uuid << kMetaDataKey
+                                                    const CollectionSizeCount& sizeCount,
+                                                    const Timestamp& validAsOfTS) const {
+    return BSON("_id" << uuid << kValidAsOfKey << validAsOfTS << kMetaDataKey
                       << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
 }
 

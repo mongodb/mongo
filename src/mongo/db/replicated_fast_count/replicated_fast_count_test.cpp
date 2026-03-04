@@ -495,7 +495,8 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
         ASSERT_OK(Helpers::insert(
             _opCtx,
             *fastCountColl,
-            BSON("_id" << uuid1 << ReplicatedFastCountManager::kMetaDataKey
+            BSON("_id" << uuid1 << ReplicatedFastCountManager::kValidAsOfKey << Timestamp(1, 1)
+                       << ReplicatedFastCountManager::kMetaDataKey
                        << BSON(ReplicatedFastCountManager::kCountKey
                                << expectedCount1 << ReplicatedFastCountManager::kSizeKey
                                << expectedSize1))));
@@ -503,7 +504,8 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
         ASSERT_OK(Helpers::insert(
             _opCtx,
             *fastCountColl,
-            BSON("_id" << uuid2 << ReplicatedFastCountManager::kMetaDataKey
+            BSON("_id" << uuid2 << ReplicatedFastCountManager::kValidAsOfKey << Timestamp(1, 1)
+                       << ReplicatedFastCountManager::kMetaDataKey
                        << BSON(ReplicatedFastCountManager::kCountKey
                                << expectedCount2 << ReplicatedFastCountManager::kSizeKey
                                << expectedSize2))));
