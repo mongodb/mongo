@@ -73,7 +73,7 @@ class TestDecodeDeltaPage(unittest.TestCase):
             nbytes = os.path.getsize(page_path)
 
             page = btree_format.WTPage.parse(b, nbytes, opts)
-            
+
             page.print_page(opts)
 
             # Verify the parse succeeded and we can inspect the page
@@ -117,4 +117,3 @@ class TestDecodeDeltaPage(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

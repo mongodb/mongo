@@ -25,11 +25,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+
 import pprint
 import enum
 import io
 import json
 import logging
+
 from dataclasses import dataclass
 from typing import Optional, List, Union, Final
 
@@ -40,6 +42,19 @@ from py_common.printer import Printer, binary_to_pretty_string, raw_bytes, dumpr
 from py_common.snappy_util import snappy_decompress_page
 
 logger = logging.getLogger(__name__)
+
+try:
+    import crc32c
+    HAVE_CRC32C = True
+except ImportError:
+    HAVE_CRC32C = False
+
+try:
+    import bson
+    HAVE_BSON = True
+except ImportError:
+    bson = None
+    HAVE_BSON = False
 
 #
 # Block File Header
@@ -166,7 +181,7 @@ class PageHeader(object):
             f"  page flags: {str(self.flags)}\n"
             f"  version: {str(self.version)}"
         )
-        
+
         return header_string
 #
 # Block
@@ -208,7 +223,7 @@ class BlockHeader(object):
         h.flags = BlockFlags(b.read_uint8())
         h.unused = int.from_bytes(b.read(3), byteorder='little')
         return h
-    
+
     def __str__(self):
         header_string = (
             f"Block Header:\n"
@@ -228,8 +243,8 @@ class BlockDisaggFlags(enum.IntFlag):
 
 class BlockDisaggHeader(object):
     '''
-    A block header (WT_BLOCK_DISAGG_HEADER). Disagg uses additional header fields in the block 
-    header in comparison to standard WiredTiger blocks. This class should only be used for disagg 
+    A block header (WT_BLOCK_DISAGG_HEADER). Disagg uses additional header fields in the block
+    header in comparison to standard WiredTiger blocks. This class should only be used for disagg
     blocks.
     '''
     magic: int
@@ -274,7 +289,7 @@ class BlockDisaggHeader(object):
         h.flags = BlockDisaggFlags(b.read_uint8())
         h.unused = int.from_bytes(b.read(2), byteorder='little')
         return h
-    
+
     def __str__(self):
         header_string = (
             f"Block Disagg Header:\n"
@@ -286,9 +301,9 @@ class BlockDisaggHeader(object):
             f"  previous_checksum: {str(self.previous_checksum)}\n"
             f"  flags: {str(self.flags)}"
         )
-        
+
         return header_string
-    
+
 #
 # Extent List
 #
@@ -401,7 +416,7 @@ class Cell(object):
     size_stop_ts: int
     size_start_txn: int
     size_stop_txn: int
-    
+
     # Flag used for delta updates in disagg.
     delta_flag: Optional[int]
 
@@ -447,7 +462,7 @@ class Cell(object):
         self.stop_ts = None
         self.start_txn = None
         self.stop_txn = None
-        
+
         self.delta_flag = None
 
     def _parse_timestamps(self, b: binary_data.BinaryFile):
@@ -485,7 +500,7 @@ class Cell(object):
 
     def has_timestamps(self) -> bool:
         return self.extra_descriptor != 0
-    
+
     @staticmethod
     def parse(b: binary_data.BinaryFile, is_delta: bool = False, ignore_unsupported: bool = False) -> 'Cell':
         '''
@@ -521,10 +536,10 @@ class Cell(object):
                     l = b.read_packed_uint64()
                 else:
                     l = b.read_long_length()
-                    
-                # Delta pages use the value_format 'uB'. Since we explicitly set the 'u' config we 
-                # store an extra variable length encoded size byte to indicate the size of this 
-                # value. In this case this is the real value length we're interested in. The 'B' 
+
+                # Delta pages use the value_format 'uB'. Since we explicitly set the 'u' config we
+                # store an extra variable length encoded size byte to indicate the size of this
+                # value. In this case this is the real value length we're interested in. The 'B'
                 # byte is stored at the end.
                 if is_delta:
                     l = b.read_packed_uint64()
@@ -579,7 +594,7 @@ class Cell(object):
         if is_delta and cell.cell_type == CellType.WT_CELL_VALUE:
             cell.data = b.read(l)
             cell.delta_flag = b.read_uint8()
-        else: 
+        else:
             cell.data = b.read(l)
         return cell
 
@@ -589,7 +604,7 @@ class Cell(object):
         Check if this cell belongs to a prepared transaction.
         '''
         return self.extra_descriptor & Cell.WT_CELL_PREPARE != 0
-    
+
     def descriptor_string(self) -> str:
         desc_str = f'desc: 0x{self.descriptor:x} '
         if self.extra_descriptor != 0:
@@ -597,9 +612,9 @@ class Cell(object):
             # process_timestamps(p, cell, pagestats)
         if self.run_length is not None:
             desc_str += f'runlength/addr: {binary_data.d_and_h(self.run_length)} '
-        
+
         return desc_str
-    
+
     def type_string(self) -> str:
         type_str = '? unknown type'
         if self.is_address:
@@ -610,7 +625,7 @@ class Cell(object):
             type_str = 'val '
         elif self.is_unsupported and self.cell_type != None:
             type_str = f'celltype = {self.cell_type.value}, cellname = {self.cell_type.name} not implemented'
-            
+
         if self.is_overflow:
             type_str = f'overflow {type_str}'
         if self.is_short:
@@ -619,15 +634,15 @@ class Cell(object):
             type_str += f'prefix={hex(self.prefix)}'
         if not self.is_unsupported:
             type_str += f'{len(self.data)} bytes'
-        
+
         return type_str
-    
+
     def is_valid_type(self) -> bool:
         if self.is_address or self.is_key or self.is_value or self.is_unsupported:
             return True
         return False
-    
-    
+
+
     def print_timestamps(self, p):
         if self.extra_descriptor == 0:
             return
@@ -649,16 +664,17 @@ class Cell(object):
             p.rint_v(' stop txn: ' + binary_data.txn(self.stop_txn))
         if self.durable_stop_ts is not None:
             p.rint_v(' durable stop ts: ' + binary_data.ts(self.durable_stop_ts))
-    
+
     def process_timestamps(self, pagestats: PageStats):
         pagestats.process_timestamps(self)
-        
+
 
 class DisaggAddrFlags(enum.IntFlag):
     '''
     Flags for address cookies in disaggregated storage from block.h.
     '''
     WT_BLOCK_DISAGG_ADDR_FLAG_DELTA = 0x1
+
 class DisaggAddr(object):
     '''
     A disaggregated storage address cookie (WT_BLOCK_DISAGG_ADDRESS_COOKIE).
@@ -671,7 +687,7 @@ class DisaggAddr(object):
     base_lsn: int
     size: int
     checksum: int
-    
+
     def __init__(self) -> None:
         self.version = 0
         self.min_version = 0
@@ -681,22 +697,22 @@ class DisaggAddr(object):
         self.base_lsn = 0
         self.size = 0
         self.checksum = 0
-        
+
     @staticmethod
     def parse(b: bytes) -> 'DisaggAddr':
         '''
         Parse a packed address cookie.
         '''
         addr = DisaggAddr()
-        
+
         # The first byte contains the version and min_version packed into 4b chunks.
         # See block_disagg_addr.c and int4bitpack_inline.h for implementation details.
         version_array = binary_data.unpack_4b_array((b[:1]), 2)
         addr.version = version_array[0]
         addr.min_version = version_array[1]
-        
+
         b = b[1:]
-        
+
         addr.page_id, b = binary_data.unpack_int(b)
         flags, b = binary_data.unpack_int(b)
         addr.flags = DisaggAddrFlags(flags)
@@ -704,9 +720,9 @@ class DisaggAddr(object):
         addr.base_lsn, b = binary_data.unpack_int(b)
         addr.size, b = binary_data.unpack_int(b)
         addr.checksum = int.from_bytes(b, 'little')
-        
+
         return addr
-    
+
     def __str__(self):
         addr_string = (
             f"Disagg Page Address:\n"
@@ -719,6 +735,36 @@ class DisaggAddr(object):
             f"  checksum: {hex(self.checksum)}\n"
         )
         return addr_string
+
+
+def verify_block_checksum(b: binary_data.BinaryFile, disk_pos: int, disk_size: int, page, opts) -> bool:
+    """Validate block checksum using crc32c when available."""
+    if not HAVE_CRC32C:
+        return True
+
+    savepos = b.tell()
+    b.seek(disk_pos)
+    if (opts.disagg and page.block_header.flags & BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM) \
+        or (not opts.disagg and page.block_header.flags & BlockFlags.WT_BLOCK_DATA_CKSUM):
+        check_size = disk_size
+    else:
+        check_size = 64
+
+    data = bytearray(b.read(check_size))
+    b.seek(savepos)
+
+    # Zero-out the checksum field
+    data[32] = data[33] = data[34] = data[35] = 0
+    if len(data) < check_size:
+        logger.error('? reached EOF before the end of the block')
+        return False
+
+    checksum = crc32c.crc32c(data)
+    if checksum != page.block_header.checksum:
+        logger.error(f'? the calculated checksum {hex(checksum)} does not match header checksum {page.block_header.checksum}')
+        return opts.cont
+
+    return True
 
 
 @dataclass
@@ -786,36 +832,8 @@ class WTPage:
 
         pagestats = PageStats()
 
-        # Optional dependency: crc32c
-        have_crc32c = False
-        try:
-            import crc32c
-            have_crc32c = True
-        except ImportError:
-            logger.warning("could not import crc32c, skipping checksum validation")
-            pass
-
-        # Verify the checksum
-        if have_crc32c:
-            savepos = b.tell()
-            b.seek(disk_pos)
-            if (opts.disagg and page.block_header.flags & BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM) \
-                or (not opts.disagg and page.block_header.flags & BlockFlags.WT_BLOCK_DATA_CKSUM):
-                check_size = disk_size
-            else:
-                check_size = 64
-            data = bytearray(b.read(check_size))
-            b.seek(savepos)
-            # Zero-out the checksum field
-            data[32] = data[33] = data[34] = data[35] = 0
-            if len(data) < check_size:
-                logger.error('? reached EOF before the end of the block')
-                return page
-            checksum = crc32c.crc32c(data)
-            if checksum != page.block_header.checksum:
-                logger.error(f'? the calculated checksum {hex(checksum)} does not match header checksum {page.block_header.checksum}')
-                if (not opts.cont):
-                    return page
+        if not verify_block_checksum(b, disk_pos, disk_size, page, opts):
+            return page
 
         # Skip the rest if we don't want to display the data
         skip_data = opts.skip_data
@@ -861,11 +879,11 @@ class WTPage:
         p = Printer(self.raw_bytes, opts)
         p.rint(self.page_header)
         p.rint(self.block_header)
-        
+
         # Don't print the cell data unless configured.
         if not opts.verbose:
             return
-        
+
         if self.page_header.type == PageType.WT_PAGE_INVALID:
             pass    # a blank page: TODO maybe should check that it's all zeros?
         elif self.page_header.type == PageType.WT_PAGE_BLOCK_MANAGER:
@@ -880,20 +898,10 @@ class WTPage:
         else:
             logger.warning(f'? unimplemented decode for page type {self.page_header.type}')
             p.rint_v(binary_to_pretty_string(self.raw_bytes))
-        
+
         return
 
     def print_cells(self, p, opts):
-        # Optional dependency: bson
-        have_bson = False
-        bson = None
-        if opts.bson:
-            try:
-                import bson
-                have_bson = True
-            except ImportError as e:
-                logger.error(f'Failed to import bson: {e}\n Please install pymongo.')
-
         for cellnum, cell in enumerate(self.cells):
             p.begin_cell(cellnum)
             p.rint_v(cell.descriptor_string())
@@ -903,7 +911,7 @@ class WTPage:
             # Print the contents of the cell.
             try:
                 # Attempt the decode the cell as BSON.
-                if (cell.is_value and opts.bson and have_bson):
+                if (cell.is_value and opts.bson and HAVE_BSON):
                     decoded_data = bson.BSON(cell.data).decode()
                     p.rint_v(pprint.pformat(decoded_data, indent=2))
                 # If the cell is an address and we're in disagg mode, print the cell as a DisaggAddr
@@ -913,15 +921,18 @@ class WTPage:
                     p.rint(json.dumps(addr.__dict__))
                 else:
                     p.rint_v(raw_bytes(cell.data))
-            except bson.InvalidBSON as e:
-                p.rint_v(f"cannot decode cell as BSON: {e}")
-                p.rint_v(raw_bytes(cell.data))
             except (IndexError, ValueError):
                 # FIXME-WT-13000 theres a bug in raw_bytes
                 pass
-            
+            except Exception as e:
+                if HAVE_BSON and isinstance(e, bson.InvalidBSON):
+                    p.rint_v(f"cannot decode cell as BSON: {e}")
+                    p.rint_v(raw_bytes(cell.data))
+                else:
+                    raise
+
             p.end_cell()
-            
+
     def print_extents(self, p, opts):
         p.rint_ext('extent list follows:')
         for extnum, extent in enumerate(self.extents):
@@ -931,9 +942,9 @@ class WTPage:
     def is_delta(self):
         if not isinstance(self.block_header, BlockDisaggHeader):
             return False
-        
+
         return self.block_header.magic == BlockDisaggHeader.WT_BLOCK_DISAGG_MAGIC_DELTA
-        
+
     def decode_rows(self, b, p , pagestats) -> List[Cell]:
         cells = []
         for cellnum in range(0, self.page_header.entries):
@@ -944,21 +955,21 @@ class WTPage:
 
             cell = Cell.parse(b, is_delta=self.is_delta(), ignore_unsupported=True)
             cells.append(cell)
-            
+
             if cell.has_timestamps():
                 cell.process_timestamps(pagestats)
 
             if cell.is_key:
                 pagestats.num_keys += 1
                 pagestats.keys_sz += len(cell.data)
-            
+
             # If the cell cannot be decoded as a valid type, dump the raw bytes and raise an error.
             if not cell.is_valid_type():
                 dumpraw(p, b, cellpos)
                 raise ValueError('Unexpected cell type')
-        
+
         return cells
-        
+
     def decode_extlist(self, b) -> List[ExtentItem]:
         # Written by block_ext.c
         extents = []
@@ -976,7 +987,7 @@ class WTPage:
             extent = ExtentItem.parse(b)
             extents.append(extent)
             extra_stuff = ''
-            
+
             if cellnum == 0:
                 extra_stuff += '  # magic number'
                 if not extent.is_magic():
@@ -1015,13 +1026,12 @@ class WTPage:
                 else:
                     logger.error(f'Unexpected size={extent.size} has no meaning here')
                     okay = False
-            
+
             extent.extra_stuff = extra_stuff
             if not extent.is_magic():
                 lastoff = extent.offset
 
             if extent.is_end_of_list() or not okay:
                 break
-        
-        return extents
 
+        return extents

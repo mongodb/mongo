@@ -1,8 +1,11 @@
-import traceback
-import sys
+import logging
+
 from py_common import binary_data, btree_format
 from py_common.printer import Printer
 from py_common.stats import PageStats
+
+
+logger = logging.getLogger(__name__)
 
 
 def file_header_decode(p, b):
@@ -75,14 +78,13 @@ def wtdecode_file_object(b, opts, nbytes):
             exit(1)
         except Exception:
             p.rint(f'ERROR decoding block at {binary_data.d_and_h(startblock)}')
-            if opts.debug:
-                traceback.print_exception(*sys.exc_info())
+            logger.debug('Exception while decoding block', exc_info=True)
         pos = b.tell()
-        
+
         # If we're in attached storage mode align the file pointer on a 512 byte boundary.
         if not opts.disagg:
             pos = (pos + 0x1FF) & ~(0x1FF)
-            
+
         if startblock == pos:
             startblock += 0x200
         else:

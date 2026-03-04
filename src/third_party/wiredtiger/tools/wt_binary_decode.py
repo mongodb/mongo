@@ -32,91 +32,204 @@
 # see "wt dump" for that.  But this is standalone (doesn't require linkage with any WT
 # libraries), and may be useful as 1) a learning tool 2) quick way to hack/extend dumping.
 
-import logging, os, sys
+import argparse
+import logging
+import os
+import sys
+import collections
+
+from contextlib import nullcontext
 from py_common import mdb_log_parse
-from py_common import binary_data, page_service
+from py_common import binary_data
+from py_common import btree_format
+from py_common import snappy_util
 from py_common import file_format
+from py_common import page_service
+from py_common import sqlite_format
 
 logger = logging.getLogger(__name__)
 
-decode_version = "2023-03-03.0"
-
-
-_python3 = (sys.version_info >= (3, 0, 0))
-
-if not _python3:
-    raise Exception('This script requires Python 3')
+decode_version = '2026-03-01.0'
 
 ################################################################
 
+def open_input_file(filename, mode):
+    if filename == '-':
+        stream = sys.stdin if 'b' not in mode else sys.stdin.buffer
+        return nullcontext(stream)
+    return open(filename, mode)
+
+
+def open_output_file(filename, mode):
+    return open(filename, mode) if filename else nullcontext()
+
+
+def decode_dumpin_input(opts):
+    opts.fragment = True
+    with open_input_file(opts.filename, 'r') as infile:
+        mdb_log_parse.process_logs(infile, opts)
+
+
+def decode_disagg_table_input(opts):
+    opts.disagg = True
+    opts.fragment = True
+    with open_input_file(opts.filename, 'r') as infile:
+        page_service.process_disagg_table(infile, opts)
+
+
+def decode_sqlite_input(opts):
+    logger.info('Detected SQLite3 input format.')
+    opts.disagg = True
+    opts.fragment = True
+    sqlite_format.process_sqlite_file(opts.filename, opts)
+
+
+def decode_wt_binary_input(opts):
+    nbytes = 0 if opts.filename == '-' else os.path.getsize(opts.filename)
+    input_name = 'stdin' if opts.filename == '-' else opts.filename
+    input_size = 'unknown' if opts.filename == '-' else hex(nbytes)
+    print(f'{input_name}, position {hex(opts.offset)}, size {input_size}, '
+          f'pagelimit {opts.pages}')
+    with open_input_file(opts.filename, 'rb') as fileobj:
+        file_format.wtdecode_file_object(binary_data.BinaryFile(fileobj),
+                                         opts,
+                                         nbytes)
+
+
 def wtdecode(opts):
     if opts.dumpin:
-        opts.fragment = True
-        if opts.filename == '-':
-            mdb_log_parse.process_logs(sys.stdin, opts)
-        else:
-            with open(opts.filename, "r") as infile:
-                mdb_log_parse.process_logs(infile, opts)
+        decode_dumpin_input(opts)
     elif opts.disagg_table:
-        opts.disagg = True
-        opts.fragment = True
-        if opts.filename == '-':
-            page_service.process_disagg_table(sys.stdin, opts)
-        else:
-            with open(opts.filename, "r") as infile:
-                page_service.process_disagg_table(infile, opts)
-        
-    elif opts.filename == '-':
-        nbytes = 0      # unknown length
-        print('stdin, position ' + hex(opts.offset) + ', pagelimit ' +  str(opts.pages))
-        file_format.wtdecode_file_object(binary_data.BinaryFile(sys.stdin.buffer), opts, nbytes)
+        decode_disagg_table_input(opts)
+    elif sqlite_format.is_sqlite3_file(opts.filename):
+        decode_sqlite_input(opts)
     else:
-        nbytes = os.path.getsize(opts.filename)
-        print(opts.filename + ', position ' + hex(opts.offset) + '/' + hex(nbytes) + ', pagelimit ' +  str(opts.pages))
-        with open(opts.filename, "rb") as fileobj:
-            file_format.wtdecode_file_object(binary_data.BinaryFile(fileobj), opts, nbytes)
+        decode_wt_binary_input(opts)
+
+
+def feature_check(opts):
+    Feature = collections.namedtuple('Feature',
+                                     ['available', 'requested', 'message'])
+    features = [
+        Feature(btree_format.HAVE_BSON, opts.bson,
+                'BSON decoding (--bson) is not available. '
+                'BSON-encoded cell values will be shown as raw bytes. '
+                'Please install the bson library (pip install pymongo).'),
+        Feature(snappy_util.HAVE_SNAPPY, True,
+                'Snappy decompression is not available. '
+                'Compressed pages will not be decompressed. '
+                'Please install the snappy library (pip install python-snappy).'),
+        Feature(btree_format.HAVE_CRC32C, True,
+                'CRC32C library is not available. '
+                'Checksums will not be verified. '
+                'Please install the crc32c library (pip install crc32c).')
+    ]
+
+    for feature in features:
+        if not feature.available and feature.requested:
+            logger.warning(feature.message)
+
 
 def get_arg_parser():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--bytes', help="show bytes alongside decoding", action='store_true')
-    parser.add_argument('--bson', help="decode cell values as bson data", action='store_true')
-    parser.add_argument("-c", "--csv", type=argparse.FileType('w'), dest='output', help="output filename for summary of page statistics in CSV format", action='store')
-    parser.add_argument('--continue', help="continue on checksum failure", dest='cont', action='store_true')
-    parser.add_argument('-D', '--debug', help="debug this tool", action='store_true')
-    parser.add_argument('-d', '--dumpin', help="input is hex dump (may be embedded in log messages)", action='store_true')
-    parser.add_argument('--disagg_table', help="input is a full disagg table from the GetTableAtLSN endpoint on the Object Read Proxy (ORP). \
-        The table can be downloaded from S3 as a jsonl file containing all of the pages linked to a table_id. ", action='store_true')
-    parser.add_argument('--disagg', help="input comes from disaggregated storage", action='store_true')
-    parser.add_argument('--ext', help="dump only the extent lists", action='store_true')
-    parser.add_argument('-f', '--fragment', help="input file is a fragment, does not have a WT file header", action='store_true')
-    parser.add_argument('--keyfile', help="Keyfile path used for mongodb encryption", type=str)
-    parser.add_argument('--log', help="Debug logs for decoding logic", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='INFO')
-    parser.add_argument('-o', '--offset', help="seek offset before decoding", type=int, default=0)
-    parser.add_argument('-p', '--pages', help="number of pages to decode", type=int, default=0)
-    parser.add_argument('-v', '--verbose', help="print things about data, not just the headers", action='store_true')
-    parser.add_argument('-s', '--split', help="split output to also show raw bytes", action='store_true')
-    parser.add_argument('--skip-data', help="do not read/process data", action='store_true')
-    parser.add_argument('-V', '--version', help="print version number of this program", action='store_true')
-    parser.add_argument('filename', help="file name or '-' for stdin")
+    parser = argparse.ArgumentParser(description='Decode WiredTiger binary data')
+
+    # Misc arguments
+    parser.add_argument('-V', '--version',
+        action='version',
+        version=f'wt_binary_decode version: {decode_version}',
+        help='print version number of this program')
+
+    # Positional argument for input file (or '-' for stdin)
+    parser.add_argument('filename',
+        help="input file name or '-' for stdin")
+
+    # Arguments that control input
+    inargs = parser.add_argument_group('input options')
+    inargs.add_argument('-d', '--dumpin',
+        action='store_true',
+        help='input is hex dump (may be embedded in log messages)')
+    inargs.add_argument('--bson',
+        action='store_true',
+        help='decode cell values as BSON data (requires bson library)')
+    inargs.add_argument('--disagg-table',
+        action='store_true',
+        help=('input is a full disagg table from the GetTableAtLSN endpoint '
+              'on the Object Read Proxy (ORP). '
+              'The table can be downloaded from S3 as a jsonl file '
+              'containing all of the pages linked to a table_id.'))
+    inargs.add_argument('--disagg',
+        action='store_true',
+        help='input comes from disaggregated storage')
+    inargs.add_argument('-f', '--fragment',
+        action='store_true',
+        help='input file is a fragment, does not have a WT file header')
+    inargs.add_argument('-o', '--offset',
+        type=int,
+        default=0,
+        help='seek offset before decoding')
+    inargs.add_argument('--page-id',
+        type=int,
+        default=None,
+        help=('for sqlite3 input, decode only the selected page_id; if '
+              '--lsn is not set, the most recent lsn is used'))
+    inargs.add_argument('--lsn',
+        type=int,
+        default=None,
+          help=('for sqlite3 input, decode only the record with this lsn; '
+                'when set, delta-chain traversal is disabled'))
+    inargs.add_argument('-p', '--pages',
+        type=int,
+        default=0,
+        help='number of pages to decode')
+    inargs.add_argument('--skip-data',
+        action='store_true',
+        help='do not read/process data')
+    inargs.add_argument('--keyfile',
+        type=str,
+        help='Keyfile path used for mongodb encryption')
+
+    # Arguments that control output
+    outargs = parser.add_argument_group('output options')
+    outargs.add_argument('-v', '--verbose',
+        action='count',
+        default=0,
+        help='verbose output (repeat for more verbosity: -v, -vv)')
+    outargs.add_argument('-b', '--bytes',
+        action='store_true',
+        help='show bytes alongside decoding')
+    outargs.add_argument('-c', '--csv',
+        type=str,
+        dest='output',
+        action='store',
+        help='output filename for summary of page statistics in CSV format')
+    outargs.add_argument('--continue',
+        dest='cont',
+        action='store_true',
+        help='continue on checksum failure')
+    outargs.add_argument('--ext',
+        action='store_true',
+        help='dump only the extent lists')
+    outargs.add_argument('-s', '--split',
+        action='store_true',
+        help='split output to also show raw bytes')
+
     return parser
+
 
 # Only run the main code if this file is not imported.
 if __name__ == '__main__':
     parser = get_arg_parser()
     opts = parser.parse_args()
 
-    logging.basicConfig(level=opts.log.upper(), format='[%(levelname)s] %(message)s')
-    
-    if opts.version:
-        print('wt_binary_decode version "{}"'.format(decode_version))
-        sys.exit(0)
+    log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+    level = log_levels[min(opts.verbose, len(log_levels) - 1)]
+    logging.basicConfig(level=level, format='[%(levelname)s] %(message)s')
+
+    feature_check(opts)
 
     try:
-        wtdecode(opts)
-    except KeyboardInterrupt:
+        with open_output_file(opts.output, 'w') as output_file:
+            opts.output = output_file
+            wtdecode(opts)
+    except (KeyboardInterrupt, BrokenPipeError):
         pass
-    except BrokenPipeError:
-        pass
-
-    sys.exit(0)

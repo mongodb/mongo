@@ -33,29 +33,17 @@ from py_common import binary_data
 
 logger = logging.getLogger(__name__)
 
-have_snappy = False
+try:
+    import snappy
+    HAVE_SNAPPY = True
+except:
+    HAVE_SNAPPY = False
+
 
 def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length, disk_size, disk_pos, opts) -> bytearray:
-    # Optional dependency: python-snappy
-    try:
-        import snappy
-        global have_snappy
-        have_snappy = True
-    except:
-        # Try to install it automatically
-        logger.warning('python-snappy not found, attempting to install...')
-        try:
-            import subprocess
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'python-snappy'])
-            import snappy
-            have_snappy = True
-            logger.info('Successfully installed python-snappy')
-        except Exception as e:
-            logger.warning(f'Failed to install python-snappy: {e}')
-            logger.warning('Compressed pages will not be readable.')
-
-    if not have_snappy:
+    if not HAVE_SNAPPY:
         raise ModuleNotFoundError('python-snappy is required to decode compressed pages')
+
     try:
         compress_skip = 64
         # The first few bytes are uncompressed
@@ -107,12 +95,11 @@ def snappy_decompress_page(b: binary_data.BinaryFile, page_header, header_length
             compressed_data = compressed_data_full[:min(compressed_byte_count, len(compressed_data_full))]
             print_snappy_diagnostics(compressed_data, compressed_byte_count, page_header, compress_skip)
             return payload_data
-    except:
-        logger.error('? The page failed to uncompress')
-        if opts.debug:
-            traceback.print_exception(*sys.exc_info())
+    except Exception as e:
+        logger.error(f'? The page failed to uncompress: {e}')
+        logger.debug('Snappy decompression failed', exc_info=True)
         return payload_data
-    
+
     return payload_data
 
 def decode_snappy_varint(data):
