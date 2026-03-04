@@ -438,6 +438,94 @@ std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
     const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo, tenantId);
     return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
 }
+
+inline boost::optional<query_shape::DeferredQueryShape> computeQueryShape(
+    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const write_ops::UpdateCommandRequest& wholeOp,
+    const ParsedUpdate& parsedUpdate) {
+    // Skip computing the shape when the feature flag is disabled.
+    if (!feature_flags::gFeatureFlagQueryStatsUpdateCommand.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return boost::none;
+    }
+
+    // Skip computing the shape with encrypted fields as indicated by the inclusion of
+    // encryptionInformation. It is important to do this before canonicalizing and optimizing the
+    // query, each of which would alter the query shape.
+    if (wholeOp.getEncryptionInformation()) {
+        return boost::none;
+    }
+
+    // Skip unsupported update types, such as delta and transform.
+    auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
+    switch (modType) {
+        case write_ops::UpdateModification::Type::kReplacement:
+        case write_ops::UpdateModification::Type::kModifier:
+        case write_ops::UpdateModification::Type::kPipeline:
+            break;
+        default:
+            return boost::none;
+    }
+
+    // Compute QueryShapeHash and record it in CurOp.
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::UpdateCmdShape>(
+            wholeOp, parsedUpdate, expCtx);
+    }};
+
+    return deferredShape;
+}
+
+inline void storeQueryShapeHash(OperationContext* opCtx,
+                                const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                const write_ops::UpdateCommandRequest& wholeOp,
+                                const ParsedUpdate& parsedUpdate,
+                                const query_shape::DeferredQueryShape& deferredShape) {
+    // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
+    // downstream yet until we support updates in PQS. Using std::ignore to indicate that discarding
+    // the returned QSH is intended.
+    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
+            // TODO(SERVER-102484): Provide fast path QueryShape and QueryShapeHash computation for
+            // Express queries.
+            if (!parsedUpdate.hasParsedFindCommand()) {
+                return boost::none;
+            }
+            // We want to compute queryShapeHash for updates even for internal queries so slow
+            // query logs will contain the hash value.
+            return shape_helpers::computeQueryShapeHash(
+                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
+        });
+}
+
+void computeShapeAndRegisterQueryStats(OperationContext* opCtx,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       const CollectionAcquisition& collection,
+                                       const write_ops::UpdateCommandRequest& wholeOp,
+                                       const ParsedUpdate& parsedUpdate) {
+    const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
+        computeQueryShape(opCtx, expCtx, wholeOp, parsedUpdate);
+
+    if (!maybeDeferredShape) {
+        return;
+    }
+
+    const auto& deferredShape = maybeDeferredShape.get();
+    storeQueryShapeHash(opCtx, expCtx, wholeOp, parsedUpdate, deferredShape);
+
+    // Register query stats collection.
+    query_stats::registerWriteRequest(opCtx, wholeOp.getNamespace(), [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
+        return std::make_unique<query_stats::UpdateKey>(expCtx,
+                                                        wholeOp,
+                                                        parsedUpdate.getRequest()->getHint(),
+                                                        std::move(deferredShape->getValue()),
+                                                        collection.getCollectionType());
+    });
+}
+
 }  // namespace
 
 bool handleError(OperationContext* opCtx,
@@ -1404,71 +1492,6 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
     return result;
 }
 
-void registerRequestForQueryStats(OperationContext* opCtx,
-                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const NamespaceString& ns,
-                                  const CollectionAcquisition& collection,
-                                  const write_ops::UpdateCommandRequest& wholeOp,
-                                  const ParsedUpdate& parsedUpdate) {
-    // Skip registering for query stats when the feature flag is disabled.
-    if (!feature_flags::gFeatureFlagQueryStatsUpdateCommand.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return;
-    }
-
-    // Skip registering the request with encrypted fields as indicated by the inclusion of
-    // encryptionInformation. It is important to do this before canonicalizing and optimizing the
-    // query, each of which would alter the query shape.
-    if (wholeOp.getEncryptionInformation()) {
-        return;
-    }
-
-    // Skip unsupported update types, such as delta and transform.
-    auto modType = parsedUpdate.getRequest()->getUpdateModification().type();
-    switch (modType) {
-        case write_ops::UpdateModification::Type::kReplacement:
-        case write_ops::UpdateModification::Type::kModifier:
-        case write_ops::UpdateModification::Type::kPipeline:
-            break;
-        default:
-            return;
-    }
-
-    // Compute QueryShapeHash and record it in CurOp.
-    query_shape::DeferredQueryShape deferredShape{[&]() {
-        return shape_helpers::tryMakeShape<query_shape::UpdateCmdShape>(
-            wholeOp, parsedUpdate, expCtx);
-    }};
-
-    // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
-    // downstream yet until we support updates in PQS. Using std::ignore to indicate that discarding
-    // the returned QSH is intended.
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
-            // TODO(SERVER-102484): Provide fast path QueryShape and QueryShapeHash computation for
-            // Express queries.
-            if (!parsedUpdate.hasParsedFindCommand()) {
-                return boost::none;
-            }
-            // We want to compute queryShapeHash for updates even for internal queries so slow
-            // query logs will contain the hash value.
-            return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
-        });
-
-
-    // Register query stats collection.
-    query_stats::registerWriteRequest(opCtx, ns, [&]() {
-        uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
-        return std::make_unique<query_stats::UpdateKey>(expCtx,
-                                                        wholeOp,
-                                                        parsedUpdate.getRequest()->getHint(),
-                                                        std::move(deferredShape->getValue()),
-                                                        collection.getCollectionType());
-    });
-}
-
 /**
  * Performs a single update, sometimes retrying failure due to WriteConflictException.
  */
@@ -1577,7 +1600,7 @@ static SingleWriteResult performSingleUpdateOp(
     // available for computing query shape.
     // TODO SERVER-119643 Enable query stats for timeseries updates.
     if (!isRequestToTimeseries) {
-        registerRequestForQueryStats(opCtx, expCtx, ns, collection, wholeOp, parsedUpdate);
+        computeShapeAndRegisterQueryStats(opCtx, expCtx, collection, wholeOp, parsedUpdate);
     }
 
     std::unique_ptr<CanonicalUpdate> canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
@@ -2478,12 +2501,13 @@ void explainUpdate(OperationContext* opCtx,
     // command. Inside 'parsedUpdate', the parsed preoptimized query and the update driver are
     // available for computing query shape.
 
-    // TODO(SERVER-111843): We only need to compute the query hash for explain, registration is
-    // unnecessary. Clean this up once registerRequestForQueryStats is refactored
     // TODO SERVER-119643: Compute the queryShapeHash for timeseries updates after it is supported.
     if (updateOp && !isTimeseriesViewRequest) {
-        registerRequestForQueryStats(
-            opCtx, expCtx, updateRequest.getNamespaceString(), collection, *updateOp, parsedUpdate);
+        const boost::optional<query_shape::DeferredQueryShape>& maybeDeferredShape =
+            computeQueryShape(opCtx, expCtx, *updateOp, parsedUpdate);
+        if (maybeDeferredShape) {
+            storeQueryShapeHash(opCtx, expCtx, *updateOp, parsedUpdate, maybeDeferredShape.get());
+        }
     }
 
     auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
