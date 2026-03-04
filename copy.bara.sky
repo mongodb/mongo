@@ -29,6 +29,7 @@ def make_workflow(workflow_name, destination_url, source_ref, destination_ref):
             "sbom.private.json",
             ".augment/**",
             ".cursor/**",
+            ".claude/**",
             "AGENTS.md",
             ".github/CODEOWNERS",
             "monguard/**",

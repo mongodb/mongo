@@ -31,6 +31,7 @@ EXCLUDED_PATTERNS = [
     "sbom.private.json",
     ".augment/",
     ".cursor/",
+    ".claude/",
     "AGENTS.md",
     ".github/CODEOWNERS",
     "monguard/",
