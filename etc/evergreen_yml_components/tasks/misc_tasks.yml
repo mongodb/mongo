@@ -847,7 +847,11 @@ tasks:
 
   # Check that the mutational fuzzer can parse JS files modified in a patch build.
   - name: lint_fuzzer_sanity_patch
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+    tags:
+      [
+        "assigned_to_jira_team_devprod_correctness",
+        "development_critical_single_variant",
+      ]
     patch_only: true
     commands:
       - command: manifest.load
