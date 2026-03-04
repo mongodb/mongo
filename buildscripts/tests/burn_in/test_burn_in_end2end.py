@@ -9,7 +9,10 @@ import yaml
 import buildscripts.burn_in_tests as under_test
 
 
-@unittest.skipUnless(platform.system() == "Linux", "Burn-in task generation only runs on Linux")
+@unittest.skipUnless(
+    platform.system() == "Linux" and platform.machine().lower() not in {"ppc64le", "s390x"},
+    "Burn-in task generation only runs on x86/arm Linux",
+)
 class TestBurnInTestsEnd2End(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
