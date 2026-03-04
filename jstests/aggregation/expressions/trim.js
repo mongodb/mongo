@@ -186,3 +186,11 @@ for (const op of ["$trim", "$ltrim", "$rtrim"]) {
     assertErrorCode(coll, [{$project: {x: {[op]: {input: "$_id"}}}}], 50699);
     assertErrorCode(coll, [{$project: {x: {[op]: {input: "$nonObject", chars: "$_id"}}}}], 50700);
 }
+
+assert(coll.drop());
+assert.commandWorked(coll.insert([{_id: 0, str: " x "}]));
+
+// Test that characters limit is triggered correctly (for all of $trim, $ltrim, $rtrim).
+for (const op of ["$trim", "$ltrim", "$rtrim"]) {
+    assertErrorCode(coll, [{$project: {x: {[op]: {input: "$str", chars: " ".repeat(4097)}}}}], 12066800);
+}

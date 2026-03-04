@@ -276,9 +276,17 @@ Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* vari
                           << typeName(unvalidatedUserChars.getType()) << ") instead.",
             unvalidatedUserChars.getType() == BSONType::string);
 
+    auto unvalidatedUserCharsStringData = unvalidatedUserChars.getStringData();
+    uassert(12066800,
+            str::stream() << expr.getName() << " requires 'chars' to be not greater than "
+                          << str_trim_utils::kMaximumAllowedTrimStringBytes << " bytes, got "
+                          << unvalidatedUserCharsStringData.length() << " bytes instead.",
+            unvalidatedUserCharsStringData.length() <=
+                str_trim_utils::kMaximumAllowedTrimStringBytes);
+
     return Value(str_trim_utils::doTrim(
         input,
-        str_trim_utils::extractCodePointsFromChars(unvalidatedUserChars.getStringData()),
+        str_trim_utils::extractCodePointsFromChars(unvalidatedUserCharsStringData),
         trimType == ExpressionTrim::TrimType::kBoth || trimType == ExpressionTrim::TrimType::kLeft,
         trimType == ExpressionTrim::TrimType::kBoth ||
             trimType == ExpressionTrim::TrimType::kRight));
