@@ -798,12 +798,30 @@ class SuiteFinder(object):
         if _config.NOOP_MONGO_D_S_PROCESSES:
             make_external(suite)
 
-        # Mutate the suite config as required by our own (resmokes) config. Pull this out into its own
-        # function if it gets too big.
-        if _config.FUZZ_RUNTIME_PARAMS:
-            suite["executor"].setdefault("hooks", []).append({"class": "FuzzRuntimeParameters"})
+        _apply_config_mutations(suite)
 
         return suite
+
+
+def _apply_config_mutations(suite):
+    """Mutate the suite config as required by resmoke CLI flags.
+
+    This handles cases where CLI options (like config fuzzing) need to inject or adjust hooks
+    in the suite definition that was loaded from YAML.
+    """
+    # --fuzzRuntimeParams adds a hook that periodically calls setParameter on running nodes.
+    # The other fuzzing flags (--fuzzMongodConfigs, --fuzzMongosConfigs) only affect startup
+    # parameters so they don't need an additional hook.
+    if _config.FUZZ_RUNTIME_PARAMS:
+        suite["executor"].setdefault("hooks", []).append({"class": "FuzzRuntimeParameters"})
+
+    # Any flavor of config fuzzing (startup or runtime) can set internalQueryStatsRateLimit
+    # to 0 or internalQueryStatsCacheSize to "0MB", which disables query stats collection.
+    # Tell the RunQueryStats hook to tolerate this gracefully instead of failing the test.
+    if _config.FUZZ_MONGOD_CONFIGS or _config.FUZZ_MONGOS_CONFIGS or _config.FUZZ_RUNTIME_PARAMS:
+        for hook in suite["executor"].get("hooks", []):
+            if isinstance(hook, dict) and hook.get("class") == "RunQueryStats":
+                hook["allow_feature_not_supported"] = True
 
 
 def get_suite(suite_name_or_path) -> _suite.Suite:

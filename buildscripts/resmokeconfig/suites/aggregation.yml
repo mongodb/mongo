@@ -1,4 +1,6 @@
 test_kind: js_test
+description: |
+  This suite runs the tests in the aggregation sub-directory against a standalone mongod fixture.
 
 selector:
   roots:
@@ -15,6 +17,9 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20
@@ -23,3 +28,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1
+        internalQueryStatsErrorsAreCommandFatal: true

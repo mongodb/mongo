@@ -234,12 +234,19 @@ boost::optional<Document> QueryStatsStage::toDocument(
         // to investigate and resolve them.
         // Within this case however, we want to avoid failing on errors that are because the query
         // feature is disallowed, as these errors do not suggest that anything needs to be
-        // investigated / fixed. The QueryFeatureNotAllowed error occurs when a query was run
-        // (and the query stats were recorded) that needed a higher FCV, but later the cluster
-        // FCV was dropped, and then the query stats were requested and the server can no longer
-        // parse that query that needed the higher FCV.
+        // investigated / fixed:
+        //  - The QueryFeatureNotAllowed error occurs when a query was run (and the query stats were
+        //  recorded) that needed a higher FCV, but later the cluster FCV was dropped, and then the
+        //  query stats were requested and the server can no longer parse that query that needed the
+        //  higher FCV.
+        //  - The BSONObjectTooLarge error can occur if a test issues a very large query, which some
+        //  tests do on purpose. The query shape reported here can be bigger than the original query
+        //  due to hmac application or other format changes. So this is not a concerning failure
+        //  mode.
         if ((kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) &&
-            (ex.code() != ErrorCodes::QueryFeatureNotAllowed)) {
+            ex.code() != ErrorCodes::QueryFeatureNotAllowed &&
+            ex.code() != ErrorCodes::BSONObjectTooLarge &&
+            ex.code() != 16490 /* Document grew too large - before hitting BSON */) {
             auto keyString = std::to_string(hash);
             uasserted(Status{
                 QueryStatsFailedToRecordInfo(
