@@ -47,6 +47,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/wildcard_test_utils.h"
@@ -110,22 +111,6 @@ bool operator!=(const ProvidedSortSet& lhs, const ProvidedSortSet& rhs) {
 namespace {
 
 using namespace mongo;
-/**
- * Make a minimal IndexEntry from just a key pattern. A dummy name will be added if none provided.
- */
-IndexEntry buildSimpleIndexEntry(const BSONObj& kp, std::string name = "test_foo") {
-    return {kp,
-            IndexNames::nameToType(IndexNames::findPluginName(kp)),
-            IndexConfig::kLatestIndexVersion,
-            false,
-            {},
-            {},
-            false,
-            false,
-            CoreIndexInfo::Identifier(std::move(name)),
-            {},
-            nullptr};
-}
 
 void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& secondaryNssVector,
                                     const std::vector<NamespaceStringOrUUID>& expectedNssVector) {

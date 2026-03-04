@@ -99,6 +99,9 @@ void visit(F&& f, const QuerySolutionNode& node) {
         case STAGE_EQ_LOOKUP_UNWIND:
             f(static_cast<const EqLookupUnwindNode&>(node));
             break;
+        case STAGE_DISTINCT_SCAN:
+            f(static_cast<const DistinctNode&>(node));
+            break;
         default:
             f(node);
             break;
@@ -197,20 +200,37 @@ public:
 static_assert(HasPreVisit<LookupUnwindRule, EqLookupUnwindNode>);
 
 /**
- * This rule matches when:
- * 1. There is at least one IXSCAN in the tree.
- *
- * TODO SERVER-117622: Implement this rule.
+ * This rule matches:
+ * 1. A query solution that has at least one DISTINCT_SCAN node.
  */
-class IxScanRule {
+class DistinctScanRule {
 public:
-    void preVisit(RuleEngine& engine, const IndexScanNode& node) {
+    void preVisit(RuleEngine& engine, const DistinctNode& node) {
         engine.match();
     }
 };
-static_assert(HasPreVisit<IxScanRule, IndexScanNode>);
+static_assert(HasPreVisit<DistinctScanRule, DistinctNode>);
+
+/**
+ * This rule matches:
+ * 1. A query solution that has at least one IXSCAN, whose selected key pattern contains both a
+ * hashed index and a dotted path for it (SERVER-99889).
+ */
+class HashedIndexScanPatternRule {
+public:
+    void preVisit(RuleEngine& engine, const IndexScanNode& node) {
+        if (indexHasHashedPathPrefixOfNonHashedPath(node.index.keyPattern)) {
+            engine.match();
+        }
+    }
+};
+static_assert(HasPreVisit<HashedIndexScanPatternRule, IndexScanNode>);
 
 }  // namespace
+
+bool isPlanSbeEligible(const QuerySolution* solution) {
+    return !treeMatchesAny(solution, DistinctScanRule(), HashedIndexScanPatternRule());
+}
 
 EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
     LOGV2_DEBUG(11986305,
@@ -220,6 +240,28 @@ EngineChoice engineSelectionForPlan(const QuerySolution* solution) {
     return treeMatchesAny(solution, LookupUnwindRule(), LookupRule(), GroupRule())
         ? EngineChoice::kSbe
         : EngineChoice::kClassic;
+}
+
+bool indexHasHashedPathPrefixOfNonHashedPath(const BSONObj& keyPattern) {
+    boost::optional<StringData> hashedPath;
+    for (const auto& elt : keyPattern) {
+        if (elt.valueStringDataSafe() == "hashed") {
+            // Indexes may only contain one hashed field.
+            hashedPath = elt.fieldNameStringData();
+            break;
+        }
+    }
+    if (hashedPath == boost::none) {
+        // No hashed fields in the index.
+        return false;
+    }
+    // Check if 'hashedPath' is a path prefix for any field in the index.
+    for (const auto& elt : keyPattern) {
+        if (expression::isPathPrefixOf(hashedPath.get(), elt.fieldNameStringData())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace mongo

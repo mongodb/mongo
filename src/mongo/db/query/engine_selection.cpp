@@ -52,37 +52,6 @@
 namespace mongo {
 namespace {
 /**
- * Returns true iff 'descriptor' has fields A and B where all of the following hold
- *
- *   - A is a path prefix of B
- *   - A is a hashed field in the index
- *   - B is a non-hashed field in the index
- *
- * TODO SERVER-99889 this is a workaround for an SBE stage builder bug.
- */
-bool indexHasHashedPathPrefixOfNonHashedPath(const IndexDescriptor* descriptor) {
-    boost::optional<StringData> hashedPath;
-    for (const auto& elt : descriptor->keyPattern()) {
-        if (elt.valueStringDataSafe() == "hashed") {
-            // Indexes may only contain one hashed field.
-            hashedPath = elt.fieldNameStringData();
-            break;
-        }
-    }
-    if (hashedPath == boost::none) {
-        // No hashed fields in the index.
-        return false;
-    }
-    // Check if 'hashedPath' is a path prefix for any field in the index.
-    for (const auto& elt : descriptor->keyPattern()) {
-        if (expression::isPathPrefixOf(hashedPath.get(), elt.fieldNameStringData())) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
  * Returns true if 'collection' has an index that contains two fields, one of which is a path prefix
  * of the other, where the prefix field is hashed. Indexes can only contain one hashed field.
  *
@@ -102,28 +71,11 @@ bool collectionHasIndexWithHashedPathPrefixOfNonHashedPath(const CollectionPtr& 
         indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIter->more()) {
         const IndexCatalogEntry* entry = indexIter->next();
-        if (indexHasHashedPathPrefixOfNonHashedPath(entry->descriptor())) {
+        if (indexHasHashedPathPrefixOfNonHashedPath(entry->descriptor()->keyPattern())) {
             return true;
         }
     }
     return false;
-}
-
-bool hasNodeOfType(const QuerySolutionNode* node, StageType type) {
-    if (node->getType() == type) {
-        return true;
-    }
-    for (auto&& child : node->children) {
-        if (hasNodeOfType(child.get(), type)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isPlanSbeEligible(const QuerySolution* solution) {
-    // Distinct scan plans not supported in SBE.
-    return !hasNodeOfType(solution->root(), StageType::STAGE_DISTINCT_SCAN);
 }
 
 /**
@@ -180,7 +132,8 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
 
     // Queries against collections with a particular shape of compound hashed indexes are not
     // supported.
-    if (collection && collectionHasIndexWithHashedPathPrefixOfNonHashedPath(collection, expCtx)) {
+    if (!feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled() && collection &&
+        collectionHasIndexWithHashedPathPrefixOfNonHashedPath(collection, expCtx)) {
         return false;
     }
 

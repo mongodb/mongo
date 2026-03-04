@@ -29,30 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/engine_selection.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
- * Returns 'false' for query plans that can not be executed in SBE.
+ * Make a minimal IndexEntry from just a key pattern. A dummy name will be added if none provided.
  */
-bool isPlanSbeEligible(const QuerySolution* solution);
-
-/**
- * Returns the engine of choice for executing the specified query plan.
- */
-EngineChoice engineSelectionForPlan(const QuerySolution* solution);
-
-/**
- * Returns true iff 'keyPattern' has fields A and B where all of the following hold
- *
- *   - A is a path prefix of B
- *   - A is a hashed field in the index
- *   - B is a non-hashed field in the index
- *
- * TODO SERVER-99889 this is a workaround for an SBE stage builder bug.
- */
-bool indexHasHashedPathPrefixOfNonHashedPath(const BSONObj& keyPattern);
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, std::string name = "test_foo");
 
 }  // namespace mongo

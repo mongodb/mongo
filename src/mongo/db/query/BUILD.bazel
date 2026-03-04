@@ -627,6 +627,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:query_exec",
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/compiler/physical_model/query_solution:query_solution_test_util",
     ],
 )
 

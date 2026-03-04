@@ -33,8 +33,19 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":query_solution",
+        ":query_solution_test_util",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query:query_test_service_context",
-        "//src/mongo/db/query/collation:collator_interface_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_solution_test_util",
+    srcs = [
+        "query_solution_test_util.cpp",
+    ],
+    deps = [
+        ":query_solution",
+        "//src/mongo:base",
     ],
 )

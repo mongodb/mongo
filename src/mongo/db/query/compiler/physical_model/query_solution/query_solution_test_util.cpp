@@ -27,32 +27,37 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution_test_util.h"
 
-#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/engine_selection.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
 /**
- * Returns 'false' for query plans that can not be executed in SBE.
+ * Make a minimal IndexEntry from just a key pattern. A dummy name will be added if none provided.
  */
-bool isPlanSbeEligible(const QuerySolution* solution);
-
-/**
- * Returns the engine of choice for executing the specified query plan.
- */
-EngineChoice engineSelectionForPlan(const QuerySolution* solution);
-
-/**
- * Returns true iff 'keyPattern' has fields A and B where all of the following hold
- *
- *   - A is a path prefix of B
- *   - A is a hashed field in the index
- *   - B is a non-hashed field in the index
- *
- * TODO SERVER-99889 this is a workaround for an SBE stage builder bug.
- */
-bool indexHasHashedPathPrefixOfNonHashedPath(const BSONObj& keyPattern);
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, std::string name) {
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            IndexConfig::kLatestIndexVersion,
+            false,
+            {},
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier(std::move(name)),
+            {},
+            nullptr};
+}
 
 }  // namespace mongo
