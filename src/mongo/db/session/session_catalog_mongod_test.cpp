@@ -38,10 +38,15 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_mock.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
@@ -52,6 +57,25 @@
 
 namespace mongo {
 namespace {
+
+class TestPersistenceProviderCustomizableSupportImageCollection
+    : public mongo::rss::AttachedPersistenceProvider {
+public:
+    explicit TestPersistenceProviderCustomizableSupportImageCollection(bool supportsImageCollection)
+        : mongo::rss::AttachedPersistenceProvider(),
+          _supportsFindAndModifyImageCollection(supportsImageCollection) {}
+
+    std::string name() const override {
+        return "TestPersistenceProviderCustomizableSupportImageCollection";
+    }
+
+    bool supportsFindAndModifyImageCollection() const override {
+        return _supportsFindAndModifyImageCollection;
+    }
+
+private:
+    bool _supportsFindAndModifyImageCollection;
+};
 
 class MongoDSessionCatalogTest : public ServiceContextMongoDTest {
 protected:
@@ -103,6 +127,62 @@ TEST_F(MongoDSessionCatalogTest, ReapSomeExpiredSomeNot) {
         _opCtx, *_collection, clock()->now() - Minutes{30});
 
     ASSERT_EQ(2, numReaped);
+}
+
+TEST_F(MongoDSessionCatalogTest, StepUpCreatesConfigImageCollectionIfSupported) {
+    const auto service = getServiceContext();
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
+
+    auto testProvider = std::make_unique<TestPersistenceProviderCustomizableSupportImageCollection>(
+        true /* supportsImageCollection */);
+    auto& rss = rss::ReplicatedStorageService::get(service);
+    rss.setPersistenceProvider(std::move(testProvider));
+
+    // Verify that the image collection does not exist before setup. checkIfNamespaceExists
+    // returns OK when the namespace does not exist, and NamespaceExists when it does.
+    ASSERT_OK(catalog::checkIfNamespaceExists(_opCtx, NamespaceString::kConfigImagesNamespace));
+
+    MongoDSessionCatalog::set(
+        service,
+        std::make_unique<MongoDSessionCatalog>(
+            std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    // Verify that the image collection exists after stepup.
+    ASSERT_EQ(catalog::checkIfNamespaceExists(_opCtx, NamespaceString::kConfigImagesNamespace),
+              ErrorCodes::NamespaceExists);
+
+    // To test idempotency, step up again.
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    // Verify that the image collection still exists.
+    ASSERT_EQ(catalog::checkIfNamespaceExists(_opCtx, NamespaceString::kConfigImagesNamespace),
+              ErrorCodes::NamespaceExists);
+}
+
+TEST_F(MongoDSessionCatalogTest, StepUpDoesNotCreateConfigImageCollectionIfNotSupported) {
+    const auto service = getServiceContext();
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
+
+    auto testProvider = std::make_unique<TestPersistenceProviderCustomizableSupportImageCollection>(
+        false /* supportsImageCollection */);
+    auto& rss = rss::ReplicatedStorageService::get(service);
+    rss.setPersistenceProvider(std::move(testProvider));
+
+    // Verify that the image collection does not exist before setup. checkIfNamespaceExists
+    // returns OK when the namespace does not exist, and NamespaceExists when it does.
+    ASSERT_OK(catalog::checkIfNamespaceExists(_opCtx, NamespaceString::kConfigImagesNamespace));
+
+    MongoDSessionCatalog::set(
+        service,
+        std::make_unique<MongoDSessionCatalog>(
+            std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    // Verify that the image collection does not exist after stepup.
+    ASSERT_OK(catalog::checkIfNamespaceExists(_opCtx, NamespaceString::kConfigImagesNamespace));
 }
 
 }  // namespace

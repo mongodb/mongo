@@ -54,6 +54,7 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_transactions_reap_service.h"
@@ -631,7 +632,10 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx, this, _ti.get());
 
     createTransactionTable(opCtx);
-    createRetryableFindAndModifyTable(opCtx);
+    auto& rss = rss::ReplicatedStorageService::get(opCtx);
+    if (rss.getPersistenceProvider().supportsFindAndModifyImageCollection()) {
+        createRetryableFindAndModifyTable(opCtx);
+    }
 }
 
 void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationContext* opCtx,

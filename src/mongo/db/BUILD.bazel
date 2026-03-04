@@ -3175,6 +3175,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:logical_session_cache_impl",
         "//src/mongo/db/session:logical_session_id_helpers",
