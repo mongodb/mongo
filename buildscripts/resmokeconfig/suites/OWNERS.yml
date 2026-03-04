@@ -234,6 +234,9 @@ filters:
   - "ssl*.yml":
     approvers:
       - 10gen/server-security
+  - "analyze_shard_key_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-cluster-scalability
   - "timeseries_write_pbt.yml":
     approvers:
       - 10gen/server-timeseries-testing
