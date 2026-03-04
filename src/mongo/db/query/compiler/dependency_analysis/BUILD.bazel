@@ -67,3 +67,25 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )
+
+mongo_cc_library(
+    name = "pipeline_dependency_graph",
+    srcs = [
+        "pipeline_dependency_graph.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "pipeline_dependency_graph_test",
+    srcs = [
+        "pipeline_dependency_graph_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":pipeline_dependency_graph",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)
