@@ -176,7 +176,7 @@ public:
     /**
      * Returns true iff the validation was *asked* to enforce the fast size, whether it actually
      * does depends on what collection is being validated and what the other options are. See
-     * ValidateState::shouldEnforceFastCountOrSize().
+     * ValidateState::shouldEnforceFastCount().
      */
     bool enforceFastSizeRequested() const {
         return _validateMode == ValidateMode::kForegroundFullEnforceFastSize ||
