@@ -31,13 +31,10 @@
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
-#include "mongo/db/admission/execution_control/throughput_probing.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/ticketholder.h"  // IWYU pragma: keep
 
-#include <algorithm>
-#include <array>
 #include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -94,7 +91,9 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 delinquentCb,
                 acquisitionCb,
                 waitedAcquisitionCb,
-                releaseCb),
+                releaseCb,
+                TicketHolder::ResizePolicy::kGradual,
+                TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions),
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions),
@@ -103,7 +102,9 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
                 delinquentCb,
                 acquisitionCb,
                 waitedAcquisitionCb,
-                releaseCb)},
+                releaseCb,
+                TicketHolder::ResizePolicy::kGradual,
+                TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions)},
         algorithm);
 }
 

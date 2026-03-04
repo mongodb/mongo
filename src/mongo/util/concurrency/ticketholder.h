@@ -81,6 +81,16 @@ public:
     enum class ResizePolicy { kGradual = 0, kImmediate };
 
     /**
+     * Specifies Type of semaphore to be used by the ticketing system for a specific ticket pool.
+     *
+     * kCompeting: uses an unordered semaphore where waiters compete among themself in order to get
+     * a ticket.
+     * kPrioritizeFewestAdmissions: uses ordered semaphore where waiters are sorted by
+     * number of admissions.
+     */
+    enum class SemaphoreType { kCompeting = 0, kPrioritizeFewestAdmissions };
+
+    /**
      * The default value for maxQueueDepth. It it set to the default max connection amount, which is
      * practically infinite for the purpose of the ticket holder.
      */
@@ -95,7 +105,7 @@ public:
                  WaitedAcquisitionCallback waitedAcquisitionCallback = nullptr,
                  ReleaseCallback releaseCallback = nullptr,
                  ResizePolicy resizePolicy = ResizePolicy::kGradual,
-                 std::unique_ptr<TicketSemaphore> semaphore = nullptr);
+                 SemaphoreType semaphore = SemaphoreType::kCompeting);
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.

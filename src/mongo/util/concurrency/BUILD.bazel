@@ -48,6 +48,7 @@ idl_generator(
 mongo_cc_library(
     name = "ticket_semaphore",
     srcs = [
+        "ordered_ticket_semaphore.cpp",
         "unordered_ticket_semaphore.cpp",
     ],
     hdrs = [
@@ -188,6 +189,22 @@ mongo_cc_unit_test(
     deps = [
         ":ticket_semaphore",
         "//src/mongo/db:server_options",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/unittest",
+        "//src/mongo/util:packaged_task",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ordered_ticket_semaphore_test",
+    srcs = [
+        "ordered_ticket_semaphore_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":ticketholder",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/shard_role:service_context_non_d",

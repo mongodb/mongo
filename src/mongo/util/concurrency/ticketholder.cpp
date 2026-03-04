@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/ordered_ticket_semaphore.h"
 #include "mongo/util/concurrency/ticketholder_parameters_gen.h"
 #include "mongo/util/concurrency/unordered_ticket_semaphore.h"
 #include "mongo/util/duration.h"
@@ -51,7 +52,7 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            WaitedAcquisitionCallback waitedAcquisitionCallback,
                            ReleaseCallback releaseCallback,
                            ResizePolicy resizePolicy,
-                           std::unique_ptr<TicketSemaphore> semaphore)
+                           SemaphoreType semaphore)
     : _trackPeakUsed(trackPeakUsed),
       _resizePolicy(resizePolicy),
       _tickSource(serviceContext->getTickSource()),
@@ -60,8 +61,14 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
       _reportAcquisitionOpCallback(acquisitionCallback),
       _reportWaitedAcquisitionOpCallback(waitedAcquisitionCallback),
       _reportReleaseOpCallback(releaseCallback) {
-    _semaphore = semaphore ? std::move(semaphore)
-                           : std::make_unique<UnorderedTicketSemaphore>(numTickets, maxQueueDepth);
+    switch (semaphore) {
+        case SemaphoreType::kCompeting:
+            _semaphore = std::make_unique<UnorderedTicketSemaphore>(numTickets, maxQueueDepth);
+            break;
+        case SemaphoreType::kPrioritizeFewestAdmissions:
+            _semaphore = std::make_unique<OrderedTicketSemaphore>(numTickets, maxQueueDepth);
+            break;
+    }
     _enabledDelinquent = gFeatureFlagRecordDelinquentMetrics.isEnabled();
     _delinquentMs = Milliseconds(gDelinquentAcquisitionIntervalMillis.load());
 }
