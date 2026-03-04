@@ -105,8 +105,8 @@ int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
         ++numRecordsScanned;
 
         auto& meta = _metadata[uuid];
-        meta.sizeCount.count = data.getField(kCountKey).Long();
-        meta.sizeCount.size = data.getField(kSizeKey).Long();
+        meta.sizeCount.count = data.getField(kMetaDataKey).Obj().getField(kCountKey).Long();
+        meta.sizeCount.size = data.getField(kMetaDataKey).Obj().getField(kSizeKey).Long();
     }
     return numRecordsScanned;
 }
@@ -346,14 +346,13 @@ void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
 
 boost::optional<CollectionOrViewAcquisition>
 ReplicatedFastCountManager::_acquireFastCountCollectionForWrite(OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kSystemReplicatedFastCountStore),
-                                    AcquisitionPrerequisites::OperationType::kWrite),
-                                LockMode::MODE_IX);
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            AcquisitionPrerequisites::OperationType::kWrite),
+        LockMode::MODE_IX);
 
     if (acquisition.getCollectionPtr()) {
         return acquisition;
@@ -364,14 +363,13 @@ ReplicatedFastCountManager::_acquireFastCountCollectionForWrite(OperationContext
 
 boost::optional<CollectionOrViewAcquisition>
 ReplicatedFastCountManager::_acquireFastCountCollectionForRead(OperationContext* opCtx) {
-    CollectionOrViewAcquisition acquisition =
-        acquireCollectionOrView(opCtx,
-                                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                    opCtx,
-                                    NamespaceString::makeGlobalConfigCollection(
-                                        NamespaceString::kSystemReplicatedFastCountStore),
-                                    AcquisitionPrerequisites::OperationType::kRead),
-                                LockMode::MODE_IS);
+    CollectionOrViewAcquisition acquisition = acquireCollectionOrView(
+        opCtx,
+        CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            AcquisitionPrerequisites::OperationType::kRead),
+        LockMode::MODE_IS);
 
     if (acquisition.getCollectionPtr()) {
         return acquisition;
@@ -382,7 +380,8 @@ ReplicatedFastCountManager::_acquireFastCountCollectionForRead(OperationContext*
 
 BSONObj ReplicatedFastCountManager::_getDocForWrite(const UUID& uuid,
                                                     const CollectionSizeCount& sizeCount) const {
-    return BSON("_id" << uuid << kCountKey << sizeCount.count << kSizeKey << sizeCount.size);
+    return BSON("_id" << uuid << kMetaDataKey
+                      << BSON(kCountKey << sizeCount.count << kSizeKey << sizeCount.size));
 }
 
 RecordId ReplicatedFastCountManager::_keyForUUID(const UUID& uuid) const {

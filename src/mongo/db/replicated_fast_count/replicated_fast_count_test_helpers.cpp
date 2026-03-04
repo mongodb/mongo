@@ -49,10 +49,10 @@ void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
                                                 int64_t expectedCount,
                                                 int64_t expectedSize) {
     {
-        AutoGetCollection fastCountColl(opCtx,
-                                        NamespaceString::makeGlobalConfigCollection(
-                                            NamespaceString::kSystemReplicatedFastCountStore),
-                                        LockMode::MODE_IS);
+        AutoGetCollection fastCountColl(
+            opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            LockMode::MODE_IS);
 
         BSONObj persisted;
         bool found = Helpers::findById(opCtx, fastCountColl->ns(), BSON("_id" << uuid), persisted);
@@ -61,8 +61,14 @@ void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
         if (!expectPersisted) {
             return;
         }
-        int64_t persistedCount = persisted.getField(ReplicatedFastCountManager::kCountKey).Long();
-        int64_t persistedSize = persisted.getField(ReplicatedFastCountManager::kSizeKey).Long();
+        int64_t persistedCount = persisted.getField(ReplicatedFastCountManager::kMetaDataKey)
+                                     .Obj()
+                                     .getField(ReplicatedFastCountManager::kCountKey)
+                                     .Long();
+        int64_t persistedSize = persisted.getField(ReplicatedFastCountManager::kMetaDataKey)
+                                    .Obj()
+                                    .getField(ReplicatedFastCountManager::kSizeKey)
+                                    .Long();
         EXPECT_EQ(persistedCount, expectedCount);
         EXPECT_EQ(persistedSize, expectedSize);
     }
@@ -324,8 +330,13 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
             case FastCountOpType::kInsert: {
                 const auto& obj = innerEntry.getObject();
 
-                auto countElem = obj[ReplicatedFastCountManager::kCountKey];
-                auto sizeElem = obj[ReplicatedFastCountManager::kSizeKey];
+                auto metaElem = obj[ReplicatedFastCountManager::kMetaDataKey];
+                EXPECT_TRUE(metaElem.isABSONObj())
+                    << "Meta field not numeric for UUID " << uuid << ": " << metaElem;
+
+                auto metaObj = metaElem.Obj();
+                auto countElem = metaObj[ReplicatedFastCountManager::kCountKey];
+                auto sizeElem = metaObj[ReplicatedFastCountManager::kSizeKey];
 
                 EXPECT_TRUE(countElem.isNumber())
                     << "Count field not numeric for UUID " << uuid << ": " << countElem;
@@ -348,7 +359,11 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
             case FastCountOpType::kUpdate: {
                 const auto& obj = innerEntry.getObject();
 
-                auto sizeElem = obj["diff"]["u"][ReplicatedFastCountManager::kSizeKey];
+                std::string kSubDiffSectionFieldPrefix = "s";
+                auto sizeElem =
+                    obj["diff"]
+                       [kSubDiffSectionFieldPrefix + ReplicatedFastCountManager::kMetaDataKey]["u"]
+                       [ReplicatedFastCountManager::kSizeKey];
                 EXPECT_TRUE(sizeElem.isNumber())
                     << "Size field not numeric for UUID " << uuid << ": " << sizeElem;
 

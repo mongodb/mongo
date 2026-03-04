@@ -134,8 +134,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
 }
 
 Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
-    const NamespaceString fastCountNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kSystemReplicatedFastCountStore);
+    const NamespaceString fastCountNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
     const auto catalog = CollectionCatalog::get(opCtx);
     if (!catalog->lookupCollectionByNamespace(opCtx, fastCountNss)) {
         return Status(ErrorCodes::NamespaceNotFound,

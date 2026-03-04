@@ -32,6 +32,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/unittest/death_test.h"
@@ -61,15 +62,14 @@ public:
 
 /**
  * Creates a replicated fast count collection using the global namespace string
- * kSystemReplicatedFastCountStore.
+ * kReplicatedFastCountStore.
  */
 void createReplicatedFastCountCollection(repl::StorageInterface* storageInterface,
                                          OperationContext* opCtx) {
-    ASSERT_OK(
-        storageInterface->createCollection(opCtx,
-                                           NamespaceString::makeGlobalConfigCollection(
-                                               NamespaceString::kSystemReplicatedFastCountStore),
-                                           CollectionOptions()));
+    ASSERT_OK(storageInterface->createCollection(
+        opCtx,
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()}));
 }
 }  // namespace
 

@@ -104,8 +104,9 @@ public:
      */
     void initializeFastCountCommitFn();
 
-    inline static StringData kSizeKey = "s"_sd;
-    inline static StringData kCountKey = "c"_sd;
+    inline static StringData kMetaDataKey = "meta"_sd;
+    inline static StringData kSizeKey = "sz"_sd;
+    inline static StringData kCountKey = "ct"_sd;
 
     /**
      * Spawns fastcount thread.

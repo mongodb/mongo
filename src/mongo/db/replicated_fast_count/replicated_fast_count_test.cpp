@@ -113,7 +113,7 @@ protected:
 };
 
 const NamespaceString replicatedFastCountStoreNss =
-    NamespaceString::makeGlobalConfigCollection(NamespaceString::kSystemReplicatedFastCountStore);
+    NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
 
 const std::function<BSONObj(int)> docGeneratorForInsert = [](int i) {
     return BSON("_id" << i << "x" << i);
@@ -461,10 +461,10 @@ TEST_F(ReplicatedFastCountTest, StartupFailsIfFastCountCollectionNotPresent) {
 
     {
         repl::UnreplicatedWritesBlock uwb(_opCtx);
-        ASSERT_OK(storageInterface()->dropCollection(
-            _opCtx,
-            NamespaceString::makeGlobalConfigCollection(
-                NamespaceString::kSystemReplicatedFastCountStore)));
+        ASSERT_OK(
+            storageInterface()->dropCollection(_opCtx,
+                                               NamespaceString::makeGlobalConfigCollection(
+                                                   NamespaceString::kReplicatedFastCountStore)));
     }
 
     ASSERT_THROWS_CODE(_fastCountManager->startup(_opCtx), DBException, 11718600);
@@ -484,10 +484,10 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
     const int64_t expectedSize2 = 250;
 
     {
-        AutoGetCollection fastCountColl(_opCtx,
-                                        NamespaceString::makeGlobalConfigCollection(
-                                            NamespaceString::kSystemReplicatedFastCountStore),
-                                        LockMode::MODE_IX);
+        AutoGetCollection fastCountColl(
+            _opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            LockMode::MODE_IX);
         ASSERT(fastCountColl);
 
         WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
@@ -495,14 +495,18 @@ TEST_F(ReplicatedFastCountTest, InitializePopulatesMetadataFromExistingInternalC
         ASSERT_OK(Helpers::insert(
             _opCtx,
             *fastCountColl,
-            BSON("_id" << uuid1 << ReplicatedFastCountManager::kCountKey << expectedCount1
-                       << ReplicatedFastCountManager::kSizeKey << expectedSize1)));
+            BSON("_id" << uuid1 << ReplicatedFastCountManager::kMetaDataKey
+                       << BSON(ReplicatedFastCountManager::kCountKey
+                               << expectedCount1 << ReplicatedFastCountManager::kSizeKey
+                               << expectedSize1))));
 
         ASSERT_OK(Helpers::insert(
             _opCtx,
             *fastCountColl,
-            BSON("_id" << uuid2 << ReplicatedFastCountManager::kCountKey << expectedCount2
-                       << ReplicatedFastCountManager::kSizeKey << expectedSize2)));
+            BSON("_id" << uuid2 << ReplicatedFastCountManager::kMetaDataKey
+                       << BSON(ReplicatedFastCountManager::kCountKey
+                               << expectedCount2 << ReplicatedFastCountManager::kSizeKey
+                               << expectedSize2))));
 
         wuow.commit();
     }

@@ -45,14 +45,13 @@ Status createFastcountCollection(OperationContext* opCtx) {
         WriteUnitOfWork wuow(opCtx);
         Status createCollectionStatus = createCollection(
             opCtx,
-            NamespaceString::makeGlobalConfigCollection(
-                NamespaceString::kSystemReplicatedFastCountStore),
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
             CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()},
             BSONObj{});
         uassert(11757500,
                 str::stream() << "Failed to create the replicated fast count collection: "
                               << NamespaceString::makeGlobalConfigCollection(
-                                     NamespaceString::kSystemReplicatedFastCountStore)
+                                     NamespaceString::kReplicatedFastCountStore)
                                      .toStringForErrorMsg()
                               << causedBy(createCollectionStatus.reason()) << "code"
                               << createCollectionStatus.code(),
@@ -63,13 +62,13 @@ Status createFastcountCollection(OperationContext* opCtx) {
             LOGV2(11718601,
                   "Created internal fastcount collection.",
                   "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                                  NamespaceString::kSystemReplicatedFastCountStore)
+                                  NamespaceString::kReplicatedFastCountStore)
                                   .toStringForErrorMsg());
         } else if (createCollectionStatus.code() == ErrorCodes::NamespaceExists) {
             LOGV2(11886900,
                   "Internal fastcount collection already exists.",
                   "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                                  NamespaceString::kSystemReplicatedFastCountStore)
+                                  NamespaceString::kReplicatedFastCountStore)
                                   .toStringForErrorMsg());
         }
 
