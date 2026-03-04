@@ -517,11 +517,25 @@ void BatchedCommandResponse::setQueryStatsMetrics(
 }
 
 std::shared_ptr<const ErrorExtraInfo> MultipleErrorsOccurredInfo::parse(const BSONObj& obj) {
-    // The server never receives this error as a response from another node, so there is never
-    // need to parse it.
-    uasserted(645200,
-              "The MultipleErrorsOccurred error should never be used for intra-cluster "
-              "communication");
+    BSONElement causedByElem;
+
+    if (auto errInfoElem = obj.getField(write_ops::WriteError::kErrInfoFieldName);
+        errInfoElem.type() == BSONType::object) {
+        causedByElem = errInfoElem.Obj().getField("causedBy");
+    } else {
+        causedByElem = obj.getField("causedBy");  // failCommand/legacy shape
+    }
+
+    uassert(645200,
+            "Failed to parse MultipleErrorsOccurredInfo: expected array field "
+            "'errInfo.causedBy' (or legacy 'causedBy')",
+            causedByElem.type() == BSONType::array);
+
+    BSONArrayBuilder arrBuilder;
+    for (const auto& elem : causedByElem.Array()) {
+        arrBuilder.append(elem);
+    }
+    return std::make_shared<MultipleErrorsOccurredInfo>(arrBuilder.arr());
 }
 
 void MultipleErrorsOccurredInfo::serialize(BSONObjBuilder* bob) const {
