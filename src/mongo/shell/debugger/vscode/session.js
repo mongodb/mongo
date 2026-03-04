@@ -169,11 +169,21 @@ class MongoShellDebugSession extends DebugSession {
             logMessage: bp.logMessage,
         }));
 
+        if (this.connected) {
+            // Unfortunately the UI still marks this as a red dot in the file.
+            // Would be better if we could either not mark the breakpoint, or at least mark it unverified.
+            this.sendErrorResponse(
+                response,
+                1016,
+                "New breakpoints are not supported. Breakpoints must be set before the shell launches.",
+            );
+        }
+
         // If not connected yet (attach mode), return unverified breakpoints
         // They will be sent to the shell once it connects
         if (!this.connected) {
             const bps = lines.map((bp) => {
-                const breakpoint = new Breakpoint(false, bp.line, 0);
+                const breakpoint = new Breakpoint(false, bp.line, 0, args.source.path);
                 return breakpoint;
             });
 
@@ -182,23 +192,6 @@ class MongoShellDebugSession extends DebugSession {
             this.sendResponse(response);
             return;
         }
-
-        // Connected - send to shell
-        this.sendCommand("setBreakpoints", {source: filePath, lines})
-            .then((result) => {
-                const bps = result.breakpoints.map((bp) => {
-                    const breakpoint = new Breakpoint(bp.verified, bp.line, bp.column);
-                    breakpoint.id = bp.id;
-                    return breakpoint;
-                });
-
-                this.breakpoints.set(filePath, bps);
-                response.body = {breakpoints: bps};
-                this.sendResponse(response);
-            })
-            .catch((err) => {
-                this.sendErrorResponse(response, 1002, `Failed to set breakpoints: ${err.message}`);
-            });
     }
 
     // Send breakpoints that were set before shell connected

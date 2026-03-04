@@ -117,6 +117,11 @@ Response SetBreakpointsRequest::response() {
     responseBuilder.append("seq", seq);
 
     BSONObjBuilder bodyBuilder;
+
+    BSONObjBuilder sourceBuilder;
+    sourceBuilder.append("path", source);
+    BSONObj sourceObj = sourceBuilder.obj();
+
     BSONArrayBuilder breakpointsArr;
     // Create a breakpoint response for each requested line
     for (size_t i = 0; i < lines.size(); ++i) {
@@ -125,6 +130,8 @@ Response SetBreakpointsRequest::response() {
         bpBuilder.append("verified", true);
         bpBuilder.append("line", lines[i]);
         bpBuilder.append("column", 0);
+        bpBuilder.append("source", sourceObj);
+
         breakpointsArr.append(bpBuilder.obj());
     }
     bodyBuilder.append("breakpoints", breakpointsArr.arr());

@@ -66,7 +66,7 @@ TEST(SetBreakpointsRequest, parseRequestAndResponse) {
 
     auto response = request->response();
     std::string expectedResponse =
-        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : 1, "verified" : true, "line" : 5, "column" : 0 }, { "id" : 2, "verified" : true, "line" : 82, "column" : 0 } ] } })";
+        R"({ "type" : "response", "seq" : 17, "body" : { "breakpoints" : [ { "id" : 1, "verified" : true, "line" : 5, "column" : 0, "source" : { "path" : "jstests/my_test.js" } }, { "id" : 2, "verified" : true, "line" : 82, "column" : 0, "source" : { "path" : "jstests/my_test.js" } } ] } })";
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 
