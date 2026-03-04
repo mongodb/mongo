@@ -6,6 +6,10 @@
  *    requires_scripting,
  * ]
  */
+
+// TODO (SERVER-117871) remove this once the issue is fixed.
+TestData.pinToSingleMongos = true;
+
 // Given the output from the listDatabases command, ensures that the total size reported is the
 // sum of the individual db sizes.
 function verifySizeSum(listDatabasesOut) {
