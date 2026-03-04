@@ -5,6 +5,7 @@
  * @tags: [
  *   # The rollback can be slow on certain build variants (such as macOS and code coverage), which
  *   # can cause the targeted log messages to fall off the log buffer before we search for them.
+ *   # TODO SERVER-117062: remove gcov and macos tags once the change to configure ramLogLimits is backported
  *   incompatible_with_macos,
  *   incompatible_with_gcov,
  *   requires_index_build_resumability,
