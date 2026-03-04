@@ -31,6 +31,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -149,6 +151,9 @@ public:
                 "Are you explaining a write command on a secondary?",
                 commandCanRunHere(
                     opCtx, _dbName, _innerInvocation->definition(), inMultiDocumentTransaction));
+        ON_BLOCK_EXIT([&] {
+            aggregation_request_helper::restoreExplainOpDescription(opCtx, _outerRequest->body);
+        });
         _innerInvocation->explain(opCtx, _verbosity, result);
     }
 

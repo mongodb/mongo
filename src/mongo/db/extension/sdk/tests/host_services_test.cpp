@@ -85,6 +85,10 @@ public:
         return BSON("$nestedFilter" << BSON("filter" << matchNodeShape["$match"]));
     }
 
+    mongo::BSONObj toBsonForLog() const override {
+        return BSON(_name << _arguments);
+    }
+
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
         return std::make_unique<NestedFilterParseNode>(_arguments);
     }

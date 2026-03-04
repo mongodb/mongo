@@ -36,6 +36,7 @@
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -146,6 +147,11 @@ public:
         void _runAggCommand(OperationContext* opCtx,
                             BSONObjBuilder* result,
                             boost::optional<ExplainOptions::Verbosity> verbosity) {
+            if (auto pipelineForLog = _liteParsedPipeline.pipelineToBsonForLog()) {
+                aggregation_request_helper::updateOpDescriptionForLog(
+                    opCtx, _request.body, *pipelineForLog);
+            }
+
             const auto& nss = _aggregationRequest.getNamespace();
             uassertStatusOK(ClusterAggregate::runAggregate(opCtx,
                                                            ClusterAggregate::Namespaces{nss, nss},

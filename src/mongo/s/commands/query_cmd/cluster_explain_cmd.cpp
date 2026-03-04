@@ -40,6 +40,7 @@
 #include "mongo/db/commands/query_cmd/explain_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -142,6 +143,9 @@ public:
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
+        ON_BLOCK_EXIT([&] {
+            aggregation_request_helper::restoreExplainOpDescription(opCtx, _outerRequest->body);
+        });
         _innerInvocation->explain(opCtx, _verbosity, result);
     }
 

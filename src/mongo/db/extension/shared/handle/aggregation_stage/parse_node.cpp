@@ -106,6 +106,18 @@ AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {
     return AggStageParseNodeHandle(parseNodePtr);
 }
 
+BSONObj AggStageParseNodeAPI::toBsonForLog() const {
+    ::MongoExtensionByteBuf* buf{nullptr};
+    invokeCAndConvertStatusToException([&]() { return _vtable().to_bson_for_log(get(), &buf); });
+
+    tassert(11906800,
+            "Extension implementation of `to_bson_for_log` encountered nullptr",
+            buf != nullptr);
+
+    ExtensionByteBufHandle ownedBuf{buf};
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
+}
+
 template <>
 struct RaiiVectorElemType<::MongoExtensionDPLArrayElement> {
     using type = VariantDPLHandle;

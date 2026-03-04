@@ -358,6 +358,12 @@ public:
     }
 
     /**
+     * Returns the pipeline as a BSON array with each stage serialized via toBsonForLog(). Returns
+     * none if no stage has custom log serialization (i.e. no extension stages).
+     */
+    boost::optional<BSONArray> pipelineToBsonForLog() const;
+
+    /**
      * Replaces the stage at 'index' with the stages in 'newSources'. Returns the index after the
      * inserted block.
      */

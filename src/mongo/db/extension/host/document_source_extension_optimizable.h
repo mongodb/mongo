@@ -182,6 +182,14 @@ public:
                 getOriginalBson(), _parseNode->clone(), _nss, _options);
         }
 
+        bool hasCustomBsonForLog() const override {
+            return true;
+        }
+
+        BSONObj toBsonForLog() const override {
+            return _parseNode->toBsonForLog();
+        }
+
         // TODO SERVER-116021 Remove this override when extensions can handle views through
         // ViewPolicy.
         bool hasExtensionVectorSearchStage() const override;

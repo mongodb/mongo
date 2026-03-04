@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
@@ -44,6 +45,21 @@
 
 
 namespace mongo {
+
+boost::optional<BSONArray> LiteParsedPipeline::pipelineToBsonForLog() const {
+    const bool noCustomLogs =
+        std::none_of(_stageSpecs.begin(), _stageSpecs.end(), [](const auto& stage) {
+            return stage->hasCustomBsonForLog();
+        });
+    if (noCustomLogs) {
+        return boost::none;
+    }
+    BSONArrayBuilder builder;
+    for (const auto& stage : _stageSpecs) {
+        builder.append(stage->toBsonForLog());
+    }
+    return builder.arr();
+}
 
 ReadConcernSupportResult LiteParsedPipeline::supportsReadConcern(repl::ReadConcernLevel level,
                                                                  bool isImplicitDefault,

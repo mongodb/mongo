@@ -40,6 +40,7 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -267,6 +268,45 @@ bool hasMergeCursors(const AggregateCommandRequest& request) {
     return std::any_of(pipeline.begin(), pipeline.end(), [](const BSONObj& stage) {
         return stage.firstElementFieldNameStringData() == DocumentSourceMergeCursors::kStageName;
     });
+}
+
+BSONObj buildModifiedAggregateCommandForLog(const BSONObj& cmdObj,
+                                            const BSONArray& modifiedPipeline) {
+    BSONObjBuilder builder;
+    for (const auto& elem : cmdObj) {
+        if (elem.fieldNameStringData() == "pipeline") {
+            builder.append("pipeline", modifiedPipeline);
+        } else {
+            builder.append(elem);
+        }
+    }
+    return builder.obj();
+}
+
+void updateOpDescriptionForLog(OperationContext* opCtx,
+                               const BSONObj& cmdObj,
+                               const BSONArray& pipelineForLog) {
+    auto modifiedCmd = buildModifiedAggregateCommandForLog(cmdObj, pipelineForLog);
+    if (Client* client = opCtx->getClient()) {
+        stdx::lock_guard<Client> lk(*client);
+        CurOp::get(opCtx)->setOpDescription(lk, modifiedCmd);
+    }
+}
+
+void restoreExplainOpDescription(OperationContext* opCtx, const BSONObj& outerRequestBody) {
+    CurOp* curOp = CurOp::get(opCtx);
+    auto opDesc = curOp->opDescription();
+    if (!opDesc.hasField("explain")) {
+        BSONObjBuilder builder;
+        builder.append("explain", opDesc);
+        for (const auto& elem : outerRequestBody) {
+            if (elem.fieldNameStringData() != "explain") {
+                builder.append(elem);
+            }
+        }
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        curOp->setOpDescription(lk, builder.obj());
+    }
 }
 }  // namespace aggregation_request_helper
 

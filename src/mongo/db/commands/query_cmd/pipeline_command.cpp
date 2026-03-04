@@ -141,6 +141,10 @@ public:
                                                   request().getNamespace(),
                                                   request(),
                                                   false))) {
+            if (auto pipelineForLog = _liteParsedPipeline.pipelineToBsonForLog()) {
+                aggregation_request_helper::updateOpDescriptionForLog(
+                    opCtx, unparsedRequest().body, *pipelineForLog);
+            }
             auto externalDataSources = request().getExternalDataSources();
             // Support collection-less aggregate commands without $_externalDataSources.
             if (request().getNamespace().isCollectionlessAggregateNS()) {

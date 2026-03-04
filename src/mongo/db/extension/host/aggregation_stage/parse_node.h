@@ -70,6 +70,10 @@ public:
         return _spec;
     }
 
+    inline BSONObj toBsonForLog() const {
+        return _spec;
+    }
+
 private:
     BSONObj _spec;
 };
@@ -202,13 +206,26 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostToBsonForLog(
+        const ::MongoExtensionAggStageParseNode* parseNode,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+            const auto& impl =
+                static_cast<const HostAggStageParseNodeAdapter*>(parseNode)->getImpl();
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *output = new ByteBuf(impl.toBsonForLog());
+        });
+    }
+
     static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE = {
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
         .get_query_shape = &_hostGetQueryShape,
         .get_expanded_size = &_hostGetExpandedSize,
         .expand = &_hostExpand,
-        .clone = &_hostClone};
+        .clone = &_hostClone,
+        .to_bson_for_log = &_hostToBsonForLog};
 
     std::unique_ptr<AggStageParseNode> _parseNode;
 };

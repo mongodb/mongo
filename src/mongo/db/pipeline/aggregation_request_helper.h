@@ -149,6 +149,27 @@ void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Valu
  * Returns true if this aggregation request has a $mergeCursors stage.
  */
 bool hasMergeCursors(const AggregateCommandRequest& request);
+
+/**
+ * Builds a modified aggregate command object for logging by replacing the pipeline field with
+ * 'modifiedPipeline'.
+ */
+BSONObj buildModifiedAggregateCommandForLog(const BSONObj& cmdObj,
+                                            const BSONArray& modifiedPipeline);
+
+/**
+ * Updates the CurOp opDescription with the modified command object.
+ */
+void updateOpDescriptionForLog(OperationContext* opCtx,
+                               const BSONObj& cmdObj,
+                               const BSONArray& pipelineForLog);
+
+/**
+ * If the opDescription was replaced by an inner command (e.g. an aggregate with extension stages
+ * that set a custom opDescription via toBsonForLog), rewraps it in the outer explain so
+ * the slow query log shows "explain: {aggregate: ...}" rather than just the inner command.
+ */
+void restoreExplainOpDescription(OperationContext* opCtx, const BSONObj& outerRequestBody);
 }  // namespace aggregation_request_helper
 
 /**

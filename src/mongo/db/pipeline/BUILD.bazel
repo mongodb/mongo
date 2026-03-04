@@ -233,6 +233,7 @@ mongo_cc_library(
     ],
     deps = [
         ":document_sources_idl",
+        "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:security_token",
         "//src/mongo/db/exec/document_value",

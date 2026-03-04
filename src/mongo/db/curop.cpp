@@ -438,7 +438,9 @@ void CurOp::setGenericOpRequestDetails(
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
-    _opDescription = cmdObj;
+    if (_opDescription.isEmpty()) {
+        _opDescription = cmdObj;
+    }
     _command = command;
     _nss = std::move(nss);
 }

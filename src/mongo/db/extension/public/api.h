@@ -569,6 +569,14 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
      */
     MongoExtensionStatus* (*clone)(const MongoExtensionAggStageParseNode* parseNode,
                                    MongoExtensionAggStageParseNode** output);
+
+    /**
+     * Return a BSON spec to represent this stage in a slow query log. Ownership of the output
+     * buffer is transferred to the caller. Note that the stage needs to include the stage name in
+     * the resulting BSON, e.g. {$stageName: {spec}}.
+     */
+    MongoExtensionStatus* (*to_bson_for_log)(const MongoExtensionAggStageParseNode* parseNode,
+                                             MongoExtensionByteBuf** output);
 } MongoExtensionAggStageParseNodeVTable;
 
 /**

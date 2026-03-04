@@ -423,6 +423,10 @@ public:
 
     virtual std::unique_ptr<AggStageParseNode> clone() const = 0;
 
+    virtual BSONObj toBsonForLog() const {
+        return BSON(_name << BSONObj());
+    }
+
 protected:
     AggStageParseNode() = delete;  // No default constructor.
     explicit AggStageParseNode(std::string_view name) : _name(name) {}
@@ -509,6 +513,20 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extToBsonForLog(
+        const ::MongoExtensionAggStageParseNode* parseNode,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionAggStageParseNodeAdapter*>(parseNode)->getImpl();
+
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *output = new ByteBuf(impl.toBsonForLog());
+        });
+    }
+
     /**
      * Expands the provided parse node into one or more AST or parse nodes.
      *
@@ -526,7 +544,8 @@ private:
         .get_query_shape = &_extGetQueryShape,
         .get_expanded_size = &_extGetExpandedSize,
         .expand = &_extExpand,
-        .clone = &_extClone};
+        .clone = &_extClone,
+        .to_bson_for_log = &_extToBsonForLog};
     std::unique_ptr<AggStageParseNode> _parseNode;
 };
 

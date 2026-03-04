@@ -1454,6 +1454,10 @@ public:
         return _spec;
     }
 
+    BSONObj toBsonForLog() const override {
+        return BSON(_name << _spec);
+    }
+
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
         return std::make_unique<CloneableExtensionParseNode>(_spec);
     }
@@ -1545,6 +1549,10 @@ public:
 
     BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return _spec;
+    }
+
+    BSONObj toBsonForLog() const override {
+        return BSON(_name << _spec);
     }
 
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
@@ -1750,6 +1758,53 @@ TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfo) {
     handle->bindViewInfo(viewName);
 
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), viewName);
+}
+
+class CustomLogParseNode : public sdk::AggStageParseNode {
+public:
+    CustomLogParseNode(std::string_view stageName, BSONObj logSpec)
+        : sdk::AggStageParseNode(stageName), _logSpec(logSpec.getOwned()) {}
+
+    size_t getExpandedSize() const override {
+        return 1;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> expanded;
+        expanded.emplace_back(new sdk::ExtensionAggStageAstNodeAdapter(
+            shared_test_stages::TransformAggStageAstNode::make()));
+        return expanded;
+    }
+
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
+        return BSONObj();
+    }
+
+    BSONObj toBsonForLog() const override {
+        return BSON(
+            _name << BSON("customLogSummary" << true << "fieldCount" << _logSpec.nFields()));
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<CustomLogParseNode>(_name, _logSpec);
+    }
+
+private:
+    BSONObj _logSpec;
+};
+
+TEST_F(AggStageTest, ToBsonForLogIncludesCustomLogSummary) {
+    auto logSpec = BSON("secret" << "don't log this" << "field2" << 42);
+    auto parseNode = std::make_unique<CustomLogParseNode>("$customStage", logSpec);
+
+    BSONObj logOutput = parseNode->toBsonForLog();
+
+    ASSERT_TRUE(logOutput.hasField("$customStage"));
+    BSONObj loggedStage = logOutput.getObjectField("$customStage");
+    ASSERT_TRUE(loggedStage.getBoolField("customLogSummary"));
+    ASSERT_EQ(loggedStage.getIntField("fieldCount"), 2);
+    // Raw spec must not appear in log.
+    ASSERT_FALSE(loggedStage.hasField("secret"));
 }
 
 }  // namespace

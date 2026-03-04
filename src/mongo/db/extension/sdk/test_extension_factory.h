@@ -127,6 +127,10 @@ public:
         return BSON(_name << _arguments);
     }
 
+    mongo::BSONObj toBsonForLog() const override {
+        return BSON(_name << _arguments);
+    }
+
 protected:
     const mongo::BSONObj _arguments;
 };

@@ -325,6 +325,22 @@ public:
         return BSON(kNativeVectorSearchName << bob.obj());
     }
 
+    BSONObj toBsonForLog() const override {
+        BSONObjBuilder bob;
+        // We do not include queryVector to avoid spamming the slow query logs.
+        bob.append("path", _path);
+        bob.append("limit", _limit);
+        bob.append("metric", _metric);
+        bob.append("normalizeScore", _normalizeScore);
+        if (!_filter.isEmpty()) {
+            bob.append("filter", _filter);
+        }
+        if (_numCandidates) {
+            bob.append("numCandidates", *_numCandidates);
+        }
+        return BSON(kNativeVectorSearchName << bob.obj());
+    }
+
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
         return std::make_unique<NativeVectorSearchParseNode>(
             _path, _queryVector, _metric, _limit, _normalizeScore, _filter, _numCandidates);

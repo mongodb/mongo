@@ -588,6 +588,21 @@ public:
     }
 
     /**
+     * Returns true if this stage has a custom toBsonForLog() implementation.
+     */
+    virtual bool hasCustomBsonForLog() const {
+        return false;
+    }
+
+    /**
+     * Returns a BSON representation of this stage suitable for slow query logging.
+     * By default, returns the original BSON.
+     */
+    virtual BSONObj toBsonForLog() const {
+        return _originalBson.wrap();
+    }
+
+    /**
      * Returns a copy of the current LiteParsedDocumentSource.
      *
      * Cloning behavior depends on the ownership state of the original:

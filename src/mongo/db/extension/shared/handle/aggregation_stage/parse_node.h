@@ -124,6 +124,8 @@ public:
      */
     AggStageParseNodeHandle clone() const;
 
+    BSONObj toBsonForLog() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217600, "AggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(10977600,
@@ -134,6 +136,9 @@ public:
                 vtable.get_expanded_size != nullptr);
         tassert(10977601, "AggStageParseNode 'expand' is null", vtable.expand != nullptr);
         tassert(11565500, "AggStageParseNode 'clone' is null", vtable.clone != nullptr);
+        tassert(11906801,
+                "AggStageParseNode 'to_bson_for_log' is null",
+                vtable.to_bson_for_log != nullptr);
     }
 
 private:
