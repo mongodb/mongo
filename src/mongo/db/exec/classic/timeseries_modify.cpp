@@ -47,6 +47,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/resharding/resharding_destined_recipient_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/decorable.h"
 
@@ -368,28 +370,23 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(const BSONObj& newB
                                                              const BSONObj& oldMeasurement) {
     const auto& collDesc = collectionAcquisition().getShardingDescription();
 
-    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
-    if (!reshardingKeyPattern)
+    const bool useRegistry =
+        resharding::gFeatureFlagReshardingRegistry.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto destinedRecipients = useRegistry
+        ? resharding::getDestinedRecipientsIfPossiblyDifferent(
+              opCtx(), collectionAcquisition().nss(), oldBucket, newBucket)
+        : resharding::getDestinedRecipientsIfPossiblyDifferent(
+              opCtx(), collectionAcquisition().getPostReshardingPlacement(), oldBucket, newBucket);
+    if (!destinedRecipients) {
         return;
-
-    auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldBucket);
-    auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newBucket);
-
-    if (newShardKey.binaryEqual(oldShardKey))
-        return;
+    }
 
     FieldRefSet shardKeyPaths(collDesc.getKeyPatternFields());
     _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
-    auto& postReshardingPlacement = collectionAcquisition().getPostReshardingPlacement();
-    tassert(
-        11273400,
-        "Expected the post resharding placement to be available when a resharding key is present",
-        postReshardingPlacement.has_value());
-    auto oldRecipShard = postReshardingPlacement->getReshardingDestinedRecipient(oldBucket);
-    auto newRecipShard = postReshardingPlacement->getReshardingDestinedRecipient(newBucket);
-
-    if (oldRecipShard != newRecipShard) {
+    if (destinedRecipients->oldRecipient != destinedRecipients->newRecipient) {
         // We send the 'oldMeasurement' instead of the old bucket document to leverage timeseries
         // deleteOne because the delete can run inside an internal transaction.
         uasserted(
@@ -399,7 +396,7 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(const BSONObj& newB
                                        collectionPtr()->ns(),
                                        collectionPtr()->uuid(),
                                        newMeasurement,
-                                       oldRecipShard),
+                                       destinedRecipients->oldRecipient),
             "This update would cause the doc to change owning shards under the new shard key");
     }
 }
