@@ -84,7 +84,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         load_extensions=None,
         skip_extensions_signature_verification=False,
         router_endpoint_for_mongot: Optional[int] = None,
-        disagg_base_config=None,
         use_priority_ports=False,
     ):
         """Initialize ReplicaSetFixture."""
@@ -182,8 +181,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
 
-        self.disagg_base_config = disagg_base_config
-
         self.use_priority_ports = use_priority_ports
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
@@ -219,18 +216,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def setup(self):
         """Set up the replica set."""
-
-        if self.disagg_base_config:
-            # Wait for primary (first node) to get elected first before
-            # starting other nodes, otherwise the election can race.
-            self.nodes[0].setup()
-            self.nodes[0].await_ready()
-            self._await_primary()
-            for i in range(1, self.num_nodes):
-                self.nodes[i].setup()
-                self.nodes[i].await_ready()
-            return
-
         start_node = 0
         if self.use_auto_bootstrap_procedure:
             # We need to wait for the first node to finish auto-bootstrapping so that we can
