@@ -69,7 +69,7 @@ export function makeMeasurementDocArb(
     const dateMax = dateRange?.max ?? defaultDateMax;
 
     // Special-field generators
-    const idArb = fc.uuid({version: 4});
+    const idArb = fc.uuid({version: 7}).noBias();
     const timeArb = fc.date({min: dateMin, max: dateMax});
 
     // Parent metric arb used for meta (when not fixed) and for extra fields
@@ -205,7 +205,7 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         }
 
         // Streams for special fields (fixed length docCount)
-        const idStreamArb = fc.array(fc.uuid(), {
+        const idStreamArb = fc.array(fc.uuid({version: 7}).noBias(), {
             minLength: docCount,
             maxLength: docCount,
         });
