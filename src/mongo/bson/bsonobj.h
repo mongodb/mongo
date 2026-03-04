@@ -85,10 +85,17 @@ class LegacyStrictGenerator;
 
    See bsonspec.org.
 
-   Note that BSONObj's have a smart pointer capability built in -- so you can
-   pass them around by value.  The reference counts used to implement this
-   do not use locking, so copying and destroying BSONObj's are not thread-safe
-   operations.
+   A `BSONObj` may be passed cheaply by value, similarly to a `std::shared_ptr`.
+
+   An atomic refcount is kept in a heap-allocated struct, adjacent to its data.
+   It is safe to copy, destroy, or otherwise access a `BSONObj` object,
+   regardless of whether that object shares ownership of its data with other
+   `BSONObj` objects that might be accessed by other threads.
+
+   While access to the data pointed to by a `BSONObj` is thread-safe, the
+   `BSONObj` itself is unsynchronized. Multiple threads must not mutate
+   the same `BSONObj` object. For example, changing what a `BSONObj`
+   variable points to (via swap or assignment) would be unsafe.
 
  BSON object format:
 
