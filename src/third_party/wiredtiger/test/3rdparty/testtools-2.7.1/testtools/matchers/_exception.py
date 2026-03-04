@@ -98,7 +98,7 @@ class Raises(Matcher):
             return Mismatch(f'{matchee!r} returned {result!r}')
         # Catch all exceptions: Raises() should be able to match a
         # KeyboardInterrupt or SystemExit.
-        except:
+        except Exception:
             exc_info = sys.exc_info()
             if self.exception_matcher:
                 mismatch = self.exception_matcher.match(exc_info)

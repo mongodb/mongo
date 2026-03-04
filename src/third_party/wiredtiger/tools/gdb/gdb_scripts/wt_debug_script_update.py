@@ -84,7 +84,7 @@ def dump_update_chain(update_chain):
                 obj = bson.decode_all(val_bytes)[0]
                 if obj["_id"]['id'] and obj["_id"]["id"].subtype == 4:
                     obj["_id"]["id"] = obj["_id"]["id"].as_uuid()
-            except:
+            except Exception:
                 pass
         print('  ' + '\n  '.join(str(wt_val).split('\n')) + " " + str(obj) + " =>")
 

@@ -347,7 +347,7 @@ def createCallstackSeries(data, logfilename):
     # Let's open the log file.
     try:
         logfile = open(logfilename, "w");
-    except:
+    except Exception:
         logfile = sys.stdout;
 
     for row in data.itertuples():
@@ -362,7 +362,7 @@ def createCallstackSeries(data, logfilename):
                     = getIntervalData(intervalBeginningsStack, row, logfile);
                 if (error and (not errorReported)):
                     errorReported = reportDataError(logfile, logfilename);
-            except:
+            except Exception:
                 if (not errorReported):
                     errorReported = reportDataError(logfile, logfilename);
                 continue;
@@ -1167,7 +1167,7 @@ def parseConfigFile(fname):
 
     try:
         configFile = open(fname, "r");
-    except:
+    except Exception:
         print(color.BOLD + color.RED +
               "Could not open " + fname + " for reading." + color.END);
         return False;

@@ -40,7 +40,7 @@ try:
     # Windows does not getrlimit/setrlimit so we must catch the resource
     # module load
     import resource
-except:
+except Exception:
     None
 
 # test_schema03.py

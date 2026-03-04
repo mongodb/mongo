@@ -71,7 +71,7 @@ class IDLTestcase(unittest.TestCase):
 
         try:
             return idl.parser.parse(doc_str, "unknown", resolver)
-        except:
+        except Exception:
             self.fail("Failed to parse document:\n%s" % (doc_str))
 
     def _assert_parse(self, doc_str, parsed_doc):

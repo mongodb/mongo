@@ -464,7 +464,7 @@ class Runner:
         # make it work if line is None or is a plain string.
         try:
             prefix = simplify_path(self.wttopdir, line.prefix())
-        except:
+        except Exception:
             prefix = 'syscall.py: '
         print(prefix + s, file=sys.stderr)
 
@@ -472,7 +472,7 @@ class Runner:
         # make it work if line is None or is a plain string.
         try:
             prefix = simplify_path(self.wttopdir, line.range_prefix(lineto))
-        except:
+        except Exception:
             prefix = 'syscall.py: '
         print(prefix + s + '\n' + errfile.get_context(), file=sys.stderr)
 

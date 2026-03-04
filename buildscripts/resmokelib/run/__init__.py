@@ -895,7 +895,7 @@ class TestRunner(Subcommand):
                 }
             )
             return True
-        except:
+        except Exception:
             self._exec_logger.exception(
                 "Encountered an error when running %ss of suite %s.",
                 suite.test_kind,

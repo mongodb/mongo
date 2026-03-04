@@ -52,7 +52,7 @@ def _prepend_env_path(pathvar, s):
     last = ''
     try:
         last = ':' + os.environ[pathvar]
-    except:
+    except Exception:
         pass
     os.environ[pathvar] = s + last
 
@@ -60,14 +60,14 @@ def _prepend_env_path(pathvar, s):
 # If the path already works, don't change it.
 try:
     import wiredtiger
-except:
+except Exception:
     # We'll try hard to make the importing work, we'd like to runners
     # to be executable directly without having to set environment variables.
     sys.path.insert(0, os.path.join(wt_dir, 'lang', 'python'))
     sys.path.insert(0, os.path.join(wt_builddir, 'lang', 'python'))
     try:
         import wiredtiger
-    except:
+    except Exception:
         # If the WiredTiger libraries is not in our library search path,
         # we need to set it and retry.  However, the dynamic link
         # library has already cached its value, our only option is
@@ -91,7 +91,7 @@ except:
 
 try:
     import workgen
-except:
+except Exception:
     sys.path.insert(0, os.path.join(workgen_src, 'workgen'))
     sys.path.insert(0, os.path.join(wt_builddir, 'bench', 'workgen'))
     import workgen

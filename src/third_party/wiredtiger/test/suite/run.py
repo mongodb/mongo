@@ -370,7 +370,7 @@ if __name__ == '__main__':
                     left, right = args.pop(0).split('/')
                     batchnum = int(left)
                     batchtotal = int(right)
-                except:
+                except Exception:
                     print('batch argument should be nnn/nnn')
                     usage()
                     sys.exit(2)

@@ -97,6 +97,6 @@ class CleanEveryNTestCase(interface.DynamicTestCase):
             self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
-        except:
+        except Exception:
             self.logger.exception("Encountered an error while restarting the fixture.")
             raise

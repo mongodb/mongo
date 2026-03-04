@@ -82,7 +82,7 @@ class DynamicTestCase(testcase.TestCase):
             self.logger.error("{0} failed".format(self.description))
             test_report.addFailure(self, sys.exc_info())
             raise errors.TestFailure(err.args[0])
-        except:
+        except Exception:
             self.return_code = 2
             test_report.addFailure(self, sys.exc_info())
             raise

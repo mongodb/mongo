@@ -108,7 +108,7 @@ class ModifyFile:
     def remove(self, filename):
         try:
             os.remove(filename)
-        except:
+        except Exception:
             pass
 
     @contextmanager

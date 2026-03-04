@@ -83,7 +83,7 @@ class test_config02(wttest.WiredTigerTestCase):
         try:
             os.putenv('SOMEVAR', 'somevalue')
             os.unsetenv('SOMEVAR')
-        except:
+        except Exception:
             self.skipTest('putenv and/or unsetenv not support on this OS')
             return
         configarg = 'create'

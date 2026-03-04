@@ -41,7 +41,7 @@ def make_failure(exc_value):
     """Raise ``exc_value`` and return the failure."""
     try:
         raise exc_value
-    except:
+    except Exception:
         return Failure()
 
 

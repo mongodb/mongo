@@ -159,7 +159,7 @@ def per_module_scenarios(attribute_name, modules):
     for short_name, module_name in modules:
         try:
             mod = __import__(module_name, {}, {}, [''])
-        except:
+        except Exception:
             mod = sys.exc_info()
         scenarios.append((
             short_name, 

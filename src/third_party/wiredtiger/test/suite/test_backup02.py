@@ -76,7 +76,7 @@ class test_backup02(wttest.WiredTigerTestCase):
                 more_time = more_time - 0.1
                 for i in range(self.nops):
                     work_queue.put_nowait(('gu', i, my_data))
-        except:
+        except Exception:
             # Deplete the work queue if there's an error.
             while not work_queue.empty():
                 work_queue.get()

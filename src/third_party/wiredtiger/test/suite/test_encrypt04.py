@@ -154,7 +154,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
                 try:
                     expr()
                     completed = True
-                except:
+                except Exception:
                     pass
                 self.assertEqual(False, completed)
         return expect_okay

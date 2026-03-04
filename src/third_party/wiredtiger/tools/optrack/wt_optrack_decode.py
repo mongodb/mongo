@@ -66,7 +66,7 @@ def buildTranslationMap(mapFileName):
 
     try:
         mapFile = open(mapFileName, "r");
-    except:
+    except Exception:
         print(color.BOLD + color.RED);
         print("Could not open " + mapFileName + " for reading");
         print(color.END);
@@ -86,7 +86,7 @@ def buildTranslationMap(mapFileName):
 
         try:
             funcID = int(words[0]);
-        except:
+        except Exception:
             continue;
 
         funcName = words[1].strip();
@@ -123,7 +123,7 @@ def parseOneRecord(file):
 
     try:
         bytesRead = file.read(RECORD_SIZE);
-    except:
+    except Exception:
         return None;
 
     if (len(bytesRead) < RECORD_SIZE):
@@ -146,7 +146,7 @@ def validateHeader(file):
 
     try:
         bytesRead = file.read(MIN_HEADER_SIZE);
-    except:
+    except Exception:
         print(color.BOLD + color.RED +
               "failed read of input file" + color.END);
         raise
@@ -176,7 +176,7 @@ def validateHeader(file):
 
             padding, sec_from_epoch = struct.unpack('=IQ', bytesRead);
             return True, threadType, tsc_nsec, sec_from_epoch;
-        except:
+        except Exception:
             return False, -1;
     else:
         return False, -1, 1;
@@ -208,7 +208,7 @@ def parseFile(fileName):
     # Open the log file for reading
     try:
         file = open(fileName, "rb");
-    except:
+    except Exception:
         print(color.BOLD + color.RED +
               "Could not open " + fileName + " for reading" + color.END);
         raise
@@ -236,7 +236,7 @@ def parseFile(fileName):
     try:
         outputFileName = fileName + "-" + threadTypeString + ".txt";
         outputFile = open(outputFileName, "w");
-    except:
+    except Exception:
         print(color.BOLD + color.RED +
               "Could not open file " + outputfileName + ".txt for writing." +
               color.END);
@@ -263,7 +263,7 @@ def parseFile(fileName):
                                  + str(int(time))
                                  + "\n");
                 totalRecords += 1;
-            except:
+            except Exception:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback.print_exception(exc_type, exc_value, exc_traceback);
                 print(color.BOLD + color.RED);

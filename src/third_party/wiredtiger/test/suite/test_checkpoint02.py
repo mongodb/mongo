@@ -87,7 +87,7 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
                 t = op_thread(self.conn, uris, self.key_format, work_queue, done)
                 opthreads.append(t)
                 t.start()
-        except:
+        except Exception:
             # Deplete the work queue if there's an error.
             while not work_queue.empty():
                 work_queue.get()

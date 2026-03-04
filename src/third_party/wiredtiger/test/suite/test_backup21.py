@@ -74,7 +74,7 @@ class test_backup21(backup_base):
                 if iteration == self.ops/2:
                     iteration = 0
                     op = 'd'
-        except:
+        except Exception:
             # Deplete the work queue if there's an error.
             while not work_queue.empty():
                 work_queue.get()

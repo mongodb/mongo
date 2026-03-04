@@ -158,7 +158,7 @@ class ProcessTestCase(TestCase):
             self._execute(self.proc)
         except self.failureException:
             raise
-        except:
+        except Exception:
             self.logger.exception(
                 "Encountered an error running %s %s", self.test_kind, self.basename()
             )
@@ -169,7 +169,7 @@ class ProcessTestCase(TestCase):
         try:
             proc = self._make_process()
             return proc.as_command()
-        except:
+        except Exception:
             self.logger.exception(
                 "Encountered an error getting command for %s %s", self.test_kind, self.basename()
             )

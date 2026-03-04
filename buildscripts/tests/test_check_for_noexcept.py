@@ -486,7 +486,7 @@ void q() {
             """,
         )
 
-        for snippet in with_noexcept:
+        for snippet in with_noexcept Exception:
             all_moves = get_move_operations(snippet)
             noexcept = _noexcept_moves_only(all_moves)
             non_noexcept = _nonnoexcept_moves_only(all_moves)
@@ -495,7 +495,7 @@ void q() {
                 len(non_noexcept), 0, msg=f"Expected no non-noexcept move operation: {snippet}"
             )
 
-        for snippet in without_noexcept:
+        for snippet in without_noexcept Exception:
             all_moves = get_move_operations(snippet)
             noexcept = _noexcept_moves_only(all_moves)
             non_noexcept = _nonnoexcept_moves_only(all_moves)
@@ -521,12 +521,12 @@ void q() {
             _BASIC_NON_NOEXCEPT_MOVE_OPERATIONS + _BASIC_NON_NOEXCEPT_NON_MOVE_OPERATIONS
         )
 
-        for snippet in with_noexcept:
+        for snippet in with_noexcept Exception:
             self.assertGreater(
                 len(get_noexcepts(snippet)), 0, msg=f"Expected noexcept in snippet: {snippet}"
             )
 
-        for snippet in without_noexcept:
+        for snippet in without_noexcept Exception:
             self.assertEqual(
                 len(get_noexcepts(snippet)), 0, msg=f"Expected no noexcept in snippet: {snippet}"
             )

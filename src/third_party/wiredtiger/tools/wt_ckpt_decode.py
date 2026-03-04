@@ -88,7 +88,7 @@ def decode_arg(arg, allocsize):
             i, addr = unpack_int(addr)
             result.append(i)
             result_len += 1
-        except:
+        except Exception:
             break
 
     # Then we check the number of results against what we expect.

@@ -129,7 +129,7 @@ def make_test():
 def make_exception_info(exceptionFactory, *args, **kwargs):
     try:
         raise exceptionFactory(*args, **kwargs)
-    except:
+    except Exception:
         return sys.exc_info()
 
 

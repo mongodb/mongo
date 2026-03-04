@@ -221,7 +221,7 @@ class CachedProperty(Generic[TInstance, TResult]):
         self.wrapped = wrapped
         try:
             self.__doc__ = wrapped.__doc__
-        except:
+        except Exception:
             pass
 
     def __get__(self, instance: TInstance, instance_type: Any = None) -> TResult:

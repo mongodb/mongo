@@ -126,7 +126,7 @@ class TestReport(unittest.TestResult):
                 self.job_logger.info("Running %s...\n%s", basename, command)
             else:
                 self.job_logger.info("Running %s...", basename)
-        except:
+        except Exception:
             # This can happen in rare cases like in ProcessTestCase where the process building itself fails
             self.job_logger.exception("Failed to form command for test %s" % basename)
 

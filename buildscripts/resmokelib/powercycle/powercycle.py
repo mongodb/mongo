@@ -114,7 +114,7 @@ def exit_handler():
             with open(REPORT_JSON_FILE, "w") as jstream:
                 json.dump(REPORT_JSON, jstream)
             LOGGER.debug("Exit handler: report file contents %s", REPORT_JSON)
-        except:
+        except Exception:
             pass
 
     if EXIT_YML_FILE:
@@ -123,21 +123,21 @@ def exit_handler():
             with open(EXIT_YML_FILE, "w") as yaml_stream:
                 yaml.safe_dump(EXIT_YML, yaml_stream)
             LOGGER.debug("Exit handler: report file contents %s", EXIT_YML)
-        except:
+        except Exception:
             pass
 
     LOGGER.debug("Exit handler: Killing processes")
     try:
         Processes.kill_all()
         LOGGER.debug("Exit handler: Killing processes finished")
-    except:
+    except Exception:
         pass
 
     LOGGER.debug("Exit handler: Cleaning up temporary files")
     try:
         NamedTempFile.delete_all()
         LOGGER.debug("Exit handler: Cleaning up temporary files finished")
-    except:
+    except Exception:
         pass
 
 

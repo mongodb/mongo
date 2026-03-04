@@ -169,7 +169,7 @@ class MongoReleases(BaseModel):
         safe_load_result = yaml.safe_load(yaml_contents)
         try:
             return cls(**safe_load_result)
-        except:
+        except Exception:
             LOGGER.info(
                 "MongoReleases.from_yaml_file() failed\n"
                 f"yaml_file = {yaml_file}\n"

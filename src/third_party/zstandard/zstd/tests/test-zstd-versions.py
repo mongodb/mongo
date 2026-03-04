@@ -93,7 +93,7 @@ def dict_ok(tag, dict_name, sample):
         with open(sample, "rb") as i:
             subprocess.check_call(cmd, stdin=i, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except:
+    except Exception:
         return False
 
 

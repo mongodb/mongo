@@ -143,7 +143,7 @@ class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
         self.captureerr.check(self)     # check there is no error output so far
         try:
             results2 = list(self.session.open_cursor(self.uri2))
-        except:
+        except Exception:
             # Make sure there's some error, but we don't care what.
             self.captureerr.checkAdditionalPattern(self, '.')
             results2 = []

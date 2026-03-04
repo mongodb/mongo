@@ -57,7 +57,7 @@ class FileSpanExporter(SpanExporter):
                     json.dump(message, file, indent=2)
                 else:
                     json.dump(message, file, indent=None, separators=(",", ":"))
-        except:
+        except Exception:
             logger.exception("Failed to write OTEL metrics to file %s", file_name)
             return SpanExportResult.FAILURE
 

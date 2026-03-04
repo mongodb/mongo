@@ -58,7 +58,7 @@ def import_wiredtiger():
     '''
     try:
         from wiredtiger import wiredtiger_open
-    except:
+    except Exception:
         setup_python_path()
         from wiredtiger import wiredtiger_open
     return wiredtiger_open

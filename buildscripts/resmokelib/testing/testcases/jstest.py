@@ -210,7 +210,7 @@ class MultiClientsTestCase(interface.TestCase):
             """Run the jstest."""
             try:
                 threading.Thread.run(self)
-            except:
+            except Exception:
                 self.exc_info = sys.exc_info()
 
     def __init__(
@@ -278,7 +278,7 @@ class MultiClientsTestCase(interface.TestCase):
                 thread = self.ThreadWithException(target=test_case.run_test)
                 threads.append(thread)
                 thread.start()
-        except:
+        except Exception:
             self.logger.exception(
                 "Encountered an error starting threads for jstest %s.", self.basename()
             )

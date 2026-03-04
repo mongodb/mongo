@@ -125,7 +125,7 @@ def raw_bytes(b):
         if result != '':
             result += ' '
         return f'"{result + s.decode()}"'
-    except:
+    except Exception:
         pass
 
     # The earlier steps failed, so it must be binary data

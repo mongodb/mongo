@@ -133,7 +133,7 @@ def dump_update_chain(update_chain):
         if can_bson:
             try:
                 obj = bson.decode_all(val_bytes)[0]
-            except:
+            except Exception:
                 pass
         print("  " + "\n  ".join(str(wt_val).split("\n")) + " " + str(obj) + " =>")
 

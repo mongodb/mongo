@@ -15,7 +15,7 @@ def get_flags(namespace: str):
         raise Exception("Namespace doesn't exist.")
     try:
         return json.loads(r.text)
-    except:
+    except Exception:
         raise Exception("Couldn't parse flag json.")
 
 

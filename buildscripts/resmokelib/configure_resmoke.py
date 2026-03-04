@@ -914,7 +914,7 @@ flags in common: {common_set}
                 )
         except (KeyboardInterrupt, SystemExit):
             raise
-        except:
+        except Exception:
             # We want this as a catch all exception
             # If there is some problem setting up metrics we don't want resmoke to fail
             # We would rather just swallow the error
