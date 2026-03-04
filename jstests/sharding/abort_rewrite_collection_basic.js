@@ -1,16 +1,15 @@
 /**
  * Tests for basic functionality of the abort rewrite collection feature.
  *
- * TODO (SERVER-120392): remove does_not_support_stepdowns.
  * @tags: [
  *  requires_fcv_83,
- *  does_not_support_stepdowns,
  * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getReshardingCoordinatorMetrics} from "jstests/sharding/libs/reshard_collection_util.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2});
 
@@ -65,7 +64,7 @@ failpoint.off();
 awaitResult();
 
 // Confirm that the operation started and was cancelled.
-const metrics = st.config0.getDB("admin").serverStatus({}).shardingStatistics.rewriteCollection;
+const metrics = getReshardingCoordinatorMetrics(st.configRS, "rewriteCollection");
 
 assert.eq(metrics.countStarted, 1);
 assert.eq(metrics.countSucceeded, 0);

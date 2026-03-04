@@ -377,3 +377,22 @@ export class ReshardCollectionCmdTest {
         this._verifyAllShardingCollectionsRemoved(tempReshardingCollName);
     }
 }
+
+/**
+ * Returns resharding coordinator metrics summed across all config RS nodes for the given
+ * provenance. The operation counters (countStarted, etc.) are in-memory per-node accumulators
+ * that are never persisted, so summing gives correct totals regardless of failovers.
+ */
+export function getReshardingCoordinatorMetrics(configRS, provenance) {
+    const total = {countStarted: 0, countSucceeded: 0, countFailed: 0, countCanceled: 0};
+    for (const node of configRS.nodes) {
+        const m = node.getDB("admin").serverStatus({}).shardingStatistics[provenance];
+        if (m) {
+            total.countStarted += m.countStarted;
+            total.countSucceeded += m.countSucceeded;
+            total.countFailed += m.countFailed;
+            total.countCanceled += m.countCanceled;
+        }
+    }
+    return total;
+}

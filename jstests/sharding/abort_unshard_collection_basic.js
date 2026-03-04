@@ -12,6 +12,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getReshardingCoordinatorMetrics} from "jstests/sharding/libs/reshard_collection_util.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2});
 
@@ -65,7 +66,7 @@ assert.commandWorked(mongos.adminCommand({abortUnshardCollection: ns}));
 failpoint.off();
 awaitResult();
 
-const metrics = st.config0.getDB("admin").serverStatus({}).shardingStatistics.unshardCollection;
+const metrics = getReshardingCoordinatorMetrics(st.configRS, "unshardCollection");
 
 assert.eq(metrics.countStarted, 1);
 assert.eq(metrics.countSucceeded, 0);
