@@ -12,6 +12,7 @@ import bson
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
+from buildscripts.resmokelib.hang_analyzer.hang_analyzer import HangAnalyzer
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 from buildscripts.resmokelib.testing.hooks import interface
@@ -307,6 +308,33 @@ class _AddRemoveShardThread(threading.Thread):
     def resume(self):
         """Resume the thread."""
         self.__lifecycle.mark_test_started()
+
+    def _dump_stacks_on_timeout(self, reason):
+        """Run the hang analyzer to capture stacks before raising on a transition timeout.
+
+        This ensures we get diagnostics from the live processes before the subsequent
+        fixture teardown (SIGABRT) destroys the evidence.
+        """
+        pids = self._fixture.pids()
+        if not pids:
+            self.logger.warning("No fixture pids found; skipping hang analysis.")
+            return
+
+        self.logger.info("Running hang analyzer on fixture pids %s due to: %s", pids, reason)
+        try:
+            options = {
+                "dump_core": True,
+                "process_ids": ",".join([str(p) for p in pids]),
+                "kill_processes": False,
+                "debugger_output": None,
+                "process_match": "exact",
+                "max_disk_usage_percent": 90,
+                "go_process_names": "",
+                "process_names": "",
+            }
+            HangAnalyzer(options, task_id=None, logger=self.logger).execute()
+        except Exception:
+            self.logger.exception("Hang analyzer failed during transition timeout.")
 
     def _check_thread(self):
         if not self.is_alive():
@@ -762,6 +790,7 @@ class _AddRemoveShardThread(threading.Thread):
                 if time.time() - start_time > self.TRANSITION_TIMEOUT_SECS:
                     msg = "Could not " + msg + " with last response: " + str(res)
                     self.logger.error(msg)
+                    self._dump_stacks_on_timeout(msg)
                     raise errors.ServerFailure(msg)
 
                 if res["state"] == "ongoing":
