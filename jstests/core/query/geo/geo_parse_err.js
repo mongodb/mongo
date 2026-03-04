@@ -7,6 +7,7 @@
  *  multiversion_incompatible
  * ]
  */
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 let t = db.geo_parse_err;
 t.drop();
@@ -17,7 +18,7 @@ const bigCRS = {
     properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"},
 };
 
-t.createIndex({loc: indexname});
+t.createIndex({loc: indexname}, add2dsphereVersionIfNeeded());
 
 // parseFlatPoint
 let err = t.insert({loc: {type: "Point", coordinates: "hello"}});
