@@ -69,18 +69,19 @@ const originalUniqueStageMemory = assert.commandWorked(
 );
 
 const kMemoryLimit = 256 * 1024;
-setParameterOnAllNonConfigNodes(db.getMongo(), "internalIndexScanStageMaxMemoryBytes", kMemoryLimit);
-setParameterOnAllNonConfigNodes(db.getMongo(), "internalSlotBasedExecutionUniqueStageMaxMemoryBytes", kMemoryLimit);
-
-run_tests(coll, true /*expectFailure*/);
-
-setParameterOnAllNonConfigNodes(
-    db.getMongo(),
-    "internalIndexScanStageMaxMemoryBytes",
-    originalMergeSortStageMemory.internalIndexScanStageMaxMemoryBytes,
-);
-setParameterOnAllNonConfigNodes(
-    db.getMongo(),
-    "internalSlotBasedExecutionUniqueStageMaxMemoryBytes",
-    originalUniqueStageMemory.internalSlotBasedExecutionUniqueStageMaxMemoryBytes,
-);
+try {
+    setParameterOnAllNonConfigNodes(db.getMongo(), "internalIndexScanStageMaxMemoryBytes", kMemoryLimit);
+    setParameterOnAllNonConfigNodes(db.getMongo(), "internalSlotBasedExecutionUniqueStageMaxMemoryBytes", kMemoryLimit);
+    run_tests(coll, true /*expectFailure*/);
+} finally {
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalIndexScanStageMaxMemoryBytes",
+        originalMergeSortStageMemory.internalIndexScanStageMaxMemoryBytes,
+    );
+    setParameterOnAllNonConfigNodes(
+        db.getMongo(),
+        "internalSlotBasedExecutionUniqueStageMaxMemoryBytes",
+        originalUniqueStageMemory.internalSlotBasedExecutionUniqueStageMaxMemoryBytes,
+    );
+}

@@ -19,35 +19,36 @@ const origParamValue = assert.commandWorked(
     }),
 )["internalDocumentSourceDensifyMaxMemoryBytes"];
 
-// Lower limit for testing.
-setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", 1000);
+try {
+    // Lower limit for testing.
+    setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", 1000);
+    const coll = db[jsTestName()];
+    coll.drop();
+    let numDocs = 10;
+    // Create a string entirely of comma characters.
+    let longString = Array(101).toString();
+    let bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
+        bulk.insert({_id: i, val: i, part: longString + i});
+    }
+    bulk.execute();
 
-const coll = db[jsTestName()];
-coll.drop();
-let numDocs = 10;
-// Create a string entirely of comma characters.
-let longString = Array(101).toString();
-let bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < numDocs; i++) {
-    bulk.insert({_id: i, val: i, part: longString + i});
+    const pipeline = {
+        $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
+    };
+
+    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}), 6007200);
+
+    // Test that densify succeeds when the memory limit would be exceeded, but documents don't need to
+    // be densified.
+    coll.drop();
+    bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
+        bulk.insert({_id: i, otherVal: i, part: longString + i});
+    }
+    bulk.execute();
+    assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}));
+} finally {
+    // Reset limit for other tests.
+    setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", origParamValue);
 }
-bulk.execute();
-
-const pipeline = {
-    $densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}},
-};
-
-assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}), 6007200);
-
-// Test that densify succeeds when the memory limit would be exceeded, but documents don't need to
-// be densified.
-coll.drop();
-bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < numDocs; i++) {
-    bulk.insert({_id: i, otherVal: i, part: longString + i});
-}
-bulk.execute();
-assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [pipeline], cursor: {}}));
-
-// Reset limit for other tests.
-setParameterOnAllNonConfigNodes(db.getMongo(), "internalDocumentSourceDensifyMaxMemoryBytes", origParamValue);
