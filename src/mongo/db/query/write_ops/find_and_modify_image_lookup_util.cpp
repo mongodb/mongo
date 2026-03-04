@@ -137,9 +137,9 @@ boost::optional<BSONObj> fetchPreOrPostImageFromSnapshot(const repl::OplogEntry&
         if (inTxn) {
             return opTimestamp - 1;
         }
-        // TODO (SERVER-120074): For a retryable findAndModify executed outside a transaction,
+        // TODO (SERVER-120623): For a retryable findAndModify executed outside a transaction,
         // opTimestamp - 1 corresponds to to the oplog slot reserved for the forged pre/post noop
-        // oplog entry. Please refer to SERVER-120074 for why we currently should not read at this
+        // oplog entry. Please refer to SERVER-120623 for why we currently should not read at this
         // timestamp.
         uassert(12020801,
                 str::stream()

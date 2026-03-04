@@ -127,7 +127,7 @@ void testFetchPreOrPostImageFromSnapshot(
 }
 
 TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotBasic_RetryableWrite) {
-    // TODO (SERVER-120074): Once we go back to reading at opTimestamp - 1 instead, the expected
+    // TODO (SERVER-120623): Once we go back to reading at opTimestamp - 1 instead, the expected
     // atClusterTime below should be Timestamp(100, 1) instead.
 
     auto entryOpTime0 = repl::OpTime(Timestamp(100, 2), 5);
