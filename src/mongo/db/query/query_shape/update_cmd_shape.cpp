@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
@@ -55,21 +56,27 @@ BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOption
         return matchExpr ? matchExpr->serialize(opts) : BSONObj{};
     }
 
-    auto expCtx = ExpressionContextBuilder{}
-                      .ns(parsedUpdate.getRequest()->getNsString())
-                      .blankExpressionContext(true)
-                      .build();
-    auto swParseResult =
-        MatchExpressionParser::parse(parsedUpdate.getRequest()->getQuery(),
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    tassert(11193001,
-            str::stream() << "Failed to parse simple _id query during shapification: "
-                          << swParseResult.getStatus(),
-            swParseResult.isOK());
+    // Fast path for simple _id queries - we construct shape directly without parsing.
+    // We know the query is something like {_id: <value>} or {_id: {$eq: <value>}} as these are the
+    // only cases where we lack a ParsedFindCommand. If that changes, this function should be
+    // updated.
+    const auto& query = parsedUpdate.getRequest()->getQuery();
+    BSONElement idElem = query["_id"];
+    tassert(11569701, "Expected simple _id query", !idElem.eoo());
+    dassert(isSimpleIdQuery(query));
 
-    return swParseResult.getValue()->serialize(opts);
+    // If query is {_id: {$eq: <value>}}, get <value>.
+    BSONElement valueElem = idElem;
+    if (idElem.type() == BSONType::object &&
+        idElem.Obj().firstElementFieldNameStringData() == "$eq"_sd) {
+        valueElem = idElem.Obj().firstElement();
+    }
+
+    BSONObjBuilder result;
+    BSONObjBuilder idObj(result.subobjStart(opts.serializeFieldPath("_id")));
+    opts.appendLiteral(&idObj, "$eq", valueElem);
+    idObj.doneFast();
+    return result.obj();
 }
 
 /**

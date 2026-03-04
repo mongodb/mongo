@@ -2472,47 +2472,111 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
         "$db": "testDB"
     })"_sd);
 
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "command": "update",
-            "q": {
-                "_id": {
-                    "$eq": "?number"
-                }
-            },
-            "u": "?object",
-            "multi": false,
-            "upsert": false
-        })",
-        shape.toBson(_operationContext.get(),
-                     SerializationOptions::kDebugQueryShapeSerializeOptions,
-                     SerializationContext::stateDefault()));
+    auto eqShape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { _id: {$eq: 2 }}, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
 
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "command": "update",
-            "q": {
-                "_id": {
-                    "$eq": 1
-                }
-            },
-            "u": {
-                "?": "?"
-            },
-            "multi": false,
-            "upsert": false
-        })",
-        shape.toBson(_operationContext.get(),
-                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                     SerializationContext::stateDefault()));
+    for (auto* s : {&shape, &eqShape}) {
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "update",
+                "q": {
+                    "_id": {
+                        "$eq": "?number"
+                    }
+                },
+                "u": "?object",
+                "multi": false,
+                "upsert": false
+            })",
+            s->toBson(_operationContext.get(),
+                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
+
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "update",
+                "q": {
+                    "_id": {
+                        "$eq": 1
+                    }
+                },
+                "u": {
+                    "?": "?"
+                },
+                "multi": false,
+                "upsert": false
+            })",
+            s->toBson(_operationContext.get(),
+                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
+    }
+
+    auto objectShape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { _id: {a: 1} }, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    auto eqObjectShape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { _id: {$eq: {a: 1} }}, u: { foo: "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    for (auto* s : {&objectShape, &eqObjectShape}) {
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "update",
+                "q": {
+                    "_id": {
+                        "$eq": "?object"
+                    }
+                },
+                "u": "?object",
+                "multi": false,
+                "upsert": false
+            })",
+            s->toBson(_operationContext.get(),
+                      SerializationOptions::kDebugQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
+
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "update",
+                "q": {
+                    "_id": {
+                        "$eq": {"?": "?"}
+                    }
+                },
+                "u": {
+                    "?": "?"
+                },
+                "multi": false,
+                "upsert": false
+            })",
+            s->toBson(_operationContext.get(),
+                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault()));
+    }
 }
 
 TEST_F(UpdateCmdShapeTest, ReplacementUpdateShapeTokenization) {
