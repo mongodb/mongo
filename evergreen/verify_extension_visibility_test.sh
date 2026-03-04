@@ -110,7 +110,7 @@ ext_ldd="$(ldd_libs_basename "$EXT_SO")"
 # Base regex for allowed dependencies (common to both direct and transitive)
 # NOTE: This is still a shared object (dlopen), so libc + loader will be dynamic.
 # Policy exceptions: OpenSSL (libcrypto/libssl) may be dynamic. libgcc_s is allowed because the server dynamically links it.
-ALLOWED_DEPS_BASE='ld-linux.*\.so\.[0-9]+|libc\.so\.[0-9]+|libm\.so\.[0-9]+|libresolv\.so\.[0-9]+|libdl\.so\.[0-9]+|libpthread\.so\.[0-9]+|librt\.so\.[0-9]+|libcrypto\.so\.[0-9]+|libssl\.so\.[0-9]+|libgcc_s\.so\.[0-9]+|linux-vdso\.so\.[0-9]+'
+ALLOWED_DEPS_BASE='ld-linux.*\.so\.[0-9.]+|libc\.so\.[0-9.]+|libm\.so\.[0-9.]+|libresolv\.so\.[0-9.]+|libdl\.so\.[0-9.]+|libpthread\.so\.[0-9.]+|librt\.so\.[0-9.]+|libcrypto\.so\.[0-9.]+|libssl\.so\.[0-9.]+|libgcc_s\.so\.[0-9.]+|linux-vdso\.so\.[0-9.]+'
 
 # 2a) Check direct dependencies (DT_NEEDED) - stricter control
 # Direct dependencies are what the extension explicitly links against.
@@ -128,7 +128,7 @@ fi
 # Transitive deps come from libraries that the extension links against.
 # For example, if extension links OpenSSL, OpenSSL might pull in libz.
 # libz is allowed transitively (via OpenSSL) but not as a direct dependency.
-ALLOWED_TRANSITIVE_DEPS_REGEX="^(${ALLOWED_DEPS_BASE}|libz\.so\.[0-9]+)$"
+ALLOWED_TRANSITIVE_DEPS_REGEX="^(${ALLOWED_DEPS_BASE}|libz\.so\.[0-9.]+)$"
 
 unexpected_transitive_deps="$(echo "$ext_ldd" | grep -Ev "${ALLOWED_TRANSITIVE_DEPS_REGEX}" || true)"
 if [[ -n "$unexpected_transitive_deps" ]]; then

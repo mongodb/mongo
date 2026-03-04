@@ -81,7 +81,7 @@ info "extension dir: $EXT_DIR"
 
 # Collect all extension .so files except libno_symbol_bad_extension.so.
 mapfile -t so_files < <(
-    find "$EXT_DIR" -maxdepth 1 -name '*.so' ! -name '*no_symbol_bad_extension*' | sort
+    find "$EXT_DIR" -maxdepth 1 -name '*_extension*.so' ! -name '*no_symbol_bad_extension*' | sort
 )
 
 if [[ ${#so_files[@]} -eq 0 ]]; then
