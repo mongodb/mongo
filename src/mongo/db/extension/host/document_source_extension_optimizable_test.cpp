@@ -1993,6 +1993,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithDefaultStaticProperties)
     ASSERT_TRUE(staticProperties.getRequiresInputDocSource());
     ASSERT_EQ(staticProperties.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
     ASSERT_EQ(staticProperties.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
+    ASSERT_EQ(staticProperties.getStreamType(), MongoExtensionStreamTypeEnum::kStreaming);
     ASSERT_TRUE(staticProperties.getPreservesUpstreamMetadata());
     ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
     ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
@@ -2006,6 +2007,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithDefaultStaticProperties)
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
+    ASSERT_EQ(constraints.streamType, StageConstraints::StreamType::kStreaming);
     ASSERT_EQ(constraints.requiredPosition, StageConstraints::PositionRequirement::kNone);
     ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kNone);
     ASSERT_TRUE(constraints.requiresInputDocSource);
@@ -2130,8 +2132,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, StageWithNonDefaultSubPipelineStaticProperties) {
-    auto properties = BSON("allowedInUnionWith" << false << "allowedInLookup" << false
-                                                << "allowedInFacet" << false);
+    auto properties = BSON("streamType" << "blocking" << "allowedInUnionWith" << false
+                                        << "allowedInLookup" << false << "allowedInFacet" << false);
     auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
         std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties));
     auto astHandle = AggStageAstNodeHandle(astNode);
@@ -2145,6 +2147,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithNonDefaultSubPipelineSta
     ASSERT_FALSE(staticProperties.getAllowedInFacet());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
+    ASSERT_EQ(constraints.streamType, StageConstraints::StreamType::kBlocking);
     ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kNotAllowed);
     ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kNotAllowed);
     ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kNotAllowed);

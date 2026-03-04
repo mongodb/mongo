@@ -55,6 +55,13 @@ enums:
             kAnyShard: "anyShard"
             kRouter: "router"
             kAllShardHosts: "allShardHosts"
+    MongoExtensionStreamType:
+        description: >-
+            Whether this stage is streaming or blocking.
+        type: string
+        values:
+            kStreaming: "streaming"
+            kBlocking: "blocking"
     MongoExtensionPrivilegeResourcePattern:
         description: What resource the privilege applies to.
         type: string
@@ -98,6 +105,11 @@ structs:
             resources it may require, etc.)
         strict: false
         fields:
+            streamType:
+                description: >-
+                    Whether this stage is streaming or blocking.
+                type: MongoExtensionStreamType
+                default: kStreaming
             position:
                 description: What position the stage must occupy in the pipeline.
                 type: MongoExtensionPositionRequirement

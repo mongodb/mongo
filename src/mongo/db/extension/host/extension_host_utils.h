@@ -59,6 +59,16 @@ inline ActionType toActionType(const MongoExtensionPrivilegeActionEnum& action) 
     }
 }
 
+inline StageConstraints::StreamType toStreamType(MongoExtensionStreamTypeEnum streamType) {
+    switch (streamType) {
+        case MongoExtensionStreamTypeEnum::kStreaming:
+            return StageConstraints::StreamType::kStreaming;
+        case MongoExtensionStreamTypeEnum::kBlocking:
+            return StageConstraints::StreamType::kBlocking;
+    }
+    MONGO_UNREACHABLE_TASSERT(12006800);
+}
+
 inline boost::optional<StageConstraints::PositionRequirement> toPositionRequirement(
     MongoExtensionPositionRequirementEnum pos) {
     switch (pos) {

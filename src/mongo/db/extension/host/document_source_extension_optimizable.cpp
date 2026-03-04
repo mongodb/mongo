@@ -272,15 +272,16 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
     PipelineSplitState pipeState) const {
-    auto constraints = StageConstraints(StreamType::kStreaming,
-                                        PositionRequirement::kNone,
-                                        HostTypeRequirement::kNone,
-                                        DiskUseRequirement::kNoDiskUse,
-                                        FacetRequirement::kNotAllowed,
-                                        TransactionRequirement::kNotAllowed,
-                                        LookupRequirement::kNotAllowed,
-                                        UnionRequirement::kAllowed,
-                                        ChangeStreamRequirement::kDenylist);
+    auto constraints =
+        StageConstraints(static_properties_util::toStreamType(_properties.getStreamType()),
+                         PositionRequirement::kNone,
+                         HostTypeRequirement::kNone,
+                         DiskUseRequirement::kNoDiskUse,
+                         FacetRequirement::kNotAllowed,
+                         TransactionRequirement::kNotAllowed,
+                         LookupRequirement::kNotAllowed,
+                         UnionRequirement::kAllowed,
+                         ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;
 
     // Apply potential overrides from static properties.
