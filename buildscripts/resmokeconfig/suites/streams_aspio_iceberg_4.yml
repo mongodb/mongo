@@ -2,10 +2,12 @@ test_kind: js_test
 
 selector:
   roots:
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_one_partition.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_many_partitions.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_orders.js
-    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_orders_mixedoperations.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_inserts_updates.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_inserts_updates_1kb.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_only_inserts.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_initial_sync_updates.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_initial_sync_timespanning.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_benchmark_tpcc_partition_transforms.js
 
 executor:
   fixture:
