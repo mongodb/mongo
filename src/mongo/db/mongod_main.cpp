@@ -691,7 +691,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     // a concern as the cluster parameter initializer runs automatically.
     auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
     invariant(replCoord);
-    if (!replCoord->getSettings().isReplSet()) {
+    const bool isStandalone = !replCoord->getSettings().isReplSet();
+    if (isStandalone) {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                        TimedSectionId::standaloneClusterParams,
                                        &startupTimeElapsedBuilder);
@@ -706,12 +707,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     // Start up the replicated fast count manager thread on startup only if we are a standalone
     // node. In replica sets, we start this up as part of step-up. Supported primarily for testing
-    // purposes.
-    if (!rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup() &&
-        gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(startupOpCtx.get()),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        !replCoord->getSettings().isReplSet()) {
+    // purposes. We do not want to start this thread when we are running this binary in modal
+    // validate mode.
+    // TODO SERVER-120855: Revisit running the thread in standalone mode.
+    if (isReplicatedFastCountEnabled(startupOpCtx.get()) && isStandalone &&
+        !storageGlobalParams.validate) {
         uassertStatusOK(createFastcountCollection(startupOpCtx.get()));
         ReplicatedFastCountManager::get(startupOpCtx.get()->getServiceContext())
             .startup(startupOpCtx.get());
@@ -753,9 +753,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup(ExecutionEnvironment::Server);
     }
-
-    const auto isStandalone =
-        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
 
     if (storageGlobalParams.repair) {
         // Change stream collections can exist, even on a standalone, provided the standalone used
@@ -1929,9 +1926,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     // Shutdown the thread managing fast size and count information. This is only called for
-    // standalone nodes because replicated nodes call shutdown() during stepdown instead.
-    if (isReplicatedFastCountEnabled(opCtx) &&
-        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet()) {
+    // standalone nodes because replicated nodes call shutdown() during stepdown instead. We do not
+    // try to shut the thread down when this node is running in modal validate mode, as the thread
+    // is not started in that case.
+    // TODO SERVER-120855: Revisit running the thread in standalone mode.
+    const bool isStandalone =
+        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
+    if (isReplicatedFastCountEnabled(opCtx) && isStandalone && !storageGlobalParams.validate) {
         ReplicatedFastCountManager::get(serviceContext).shutdown(opCtx);
     }
 
