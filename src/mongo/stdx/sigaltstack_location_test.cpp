@@ -41,6 +41,7 @@
 #include <limits>
 
 #ifndef _WIN32
+#include <sys/resource.h>
 #include <sys/wait.h>
 #endif
 
@@ -68,6 +69,15 @@ int main() {
 
 namespace mongo::stdx {
 namespace {
+
+void disableCoreFile() {
+    rlimit lim{
+        .rlim_cur = 0,
+        .rlim_max = 0,
+    };
+    if (setrlimit(RLIMIT_CORE, &lim) == -1)
+        perror("setrlimit failed");
+}
 
 /** Make sure sig is unblocked. */
 void unblockSignal(int sig) {
@@ -251,6 +261,7 @@ int recursionDeathTest() {
         return static_cast<int>(mongo::ExitCode::fail);
     } else if (kidPid == 0) {
         // Child process: run the recursion test with no sigaltstack protection.
+        disableCoreFile();
         return recursionTestImpl(false);
     } else {
         // Parent process: expect child to die from a SIGSEGV.
