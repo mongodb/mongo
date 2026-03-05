@@ -217,7 +217,10 @@ public:
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
 
         const auto& nss = coll->ns();
         std::vector<OpObserver*>* observerQueue;
@@ -230,21 +233,18 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onInserts(opCtx,
-                         coll,
-                         begin,
-                         end,
-                         recordIds,
-                         fromMigrate,
-                         defaultFromMigrate,
-                         &opStateAccumulator);
+            o->onInserts(
+                opCtx, coll, begin, end, recordIds, fromMigrate, defaultFromMigrate, opAccumulator);
     }
 
     void onUpdate(OperationContext* const opCtx,
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
 
         const auto& nss = args.coll->ns();
         std::vector<OpObserver*>* observerQueue;
@@ -257,7 +257,7 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onUpdate(opCtx, args, &opStateAccumulator);
+            o->onUpdate(opCtx, args, opAccumulator);
     }
 
     void onDelete(OperationContext* const opCtx,
@@ -268,7 +268,10 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
 
         const auto& nss = coll->ns();
         std::vector<OpObserver*>* observerQueue;
@@ -281,7 +284,7 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onDelete(opCtx, coll, stmtId, doc, documentKey, args, &opStateAccumulator);
+            o->onDelete(opCtx, coll, stmtId, doc, documentKey, args, opAccumulator);
     }
 
     void onContainerInsert(OperationContext* opCtx,
@@ -558,7 +561,10 @@ public:
         Date_t wallClockTime,
         OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
         for (auto& observer : _observers) {
             observer->onTransactionPrepare(opCtx,
                                            reservedSlots,
@@ -566,7 +572,7 @@ public:
                                            applyOpsOperationAssignment,
                                            numberOfPrePostImagesToWrite,
                                            wallClockTime,
-                                           &opStateAccumulator);
+                                           opAccumulator);
         }
     }
 
@@ -614,7 +620,10 @@ public:
         }
 
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
 
         auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
         // After the commit, make sure the batch is clear so we don't attempt to commit the same
@@ -626,7 +635,7 @@ public:
         });
 
         for (auto& o : _observers) {
-            o->onBatchedWriteCommit(opCtx, oplogGroupingFormat, &opStateAccumulator);
+            o->onBatchedWriteCommit(opCtx, oplogGroupingFormat, opAccumulator);
         }
     }
 
