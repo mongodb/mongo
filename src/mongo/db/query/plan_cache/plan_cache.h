@@ -461,7 +461,7 @@ public:
               isNewEntryActive,
               shouldBeCreated,
               increasedPlanCacheDecisionMetrics] = [&]() {
-            if (internalQueryCacheDisableInactiveEntries.load()) {
+            if (internalQueryCacheDisableInactiveEntries.loadRelaxed()) {
                 // All entries are always active.
                 return std::make_tuple(key.planCacheShapeHash(),
                                        key.planCacheKeyHash(),
@@ -482,7 +482,7 @@ public:
                     newPlanCacheDecisionMetrics,
                     *cachedPlan.get(),
                     worksGrowthCoefficient.get_value_or(
-                        internalQueryCacheWorksGrowthCoefficient.load()),
+                        internalQueryCacheWorksGrowthCoefficient.loadRelaxed()),
                     callbacks);
 
                 // Avoid recomputing the hashes if we've got an old entry to grab them from.
@@ -559,7 +559,7 @@ public:
      * the number of older entries evicted as a result.
      */
     size_t deactivate(const KeyType& key) {
-        if (internalQueryCacheDisableInactiveEntries.load()) {
+        if (internalQueryCacheDisableInactiveEntries.loadRelaxed()) {
             // This is a noop if inactive entries are disabled.
             return 0;
         }
