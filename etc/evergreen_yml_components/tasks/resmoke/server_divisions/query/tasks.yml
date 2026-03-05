@@ -121,6 +121,7 @@ tasks:
         "release_critical",
         "aggregation",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -137,6 +138,7 @@ tasks:
         "aggregation",
         "auth",
         "common",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -309,6 +311,7 @@ tasks:
         "aggregation",
         "read_write_concern",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
@@ -357,6 +360,7 @@ tasks:
         "common",
         "sharded",
         "requires_large_host",
+        "has_bazel_target",
       ]
     commands:
       - func: "do setup"
