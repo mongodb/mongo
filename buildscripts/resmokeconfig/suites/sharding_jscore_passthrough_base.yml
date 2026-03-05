@@ -43,6 +43,9 @@ executor:
   config:
     shell_options: {}
   hooks:
+    # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+    # That way the fixture restart can't cause any trouble for the other hooks.
+    - class: RunQueryStats
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
@@ -57,7 +60,13 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1
+        internalQueryStatsErrorsAreCommandFatal: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        internalQueryStatsRateLimit: -1
+        internalQueryStatsWriteCmdSampleRate: 1
+        internalQueryStatsErrorsAreCommandFatal: true
     num_rs_nodes_per_shard: 1

@@ -66,7 +66,10 @@ let res = testDB.runCommand({
         },
     ],
 });
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+// On older binaries (multiversion tests) query stats key creation may encounter the
+// FailedToParse error before normal validation and re-throw it as a query stats error (9423101)
+// when internalQueryStatsErrorsAreCommandFatal is set.
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 9423101]);
 assert.neq(
     -1,
     res.errmsg.indexOf("Unknown $jsonSchema keyword"),
