@@ -95,7 +95,7 @@ public:
     SubplanStage(ExpressionContext* expCtx,
                  CollectionAcquisition collection,
                  WorkingSet* ws,
-                 CanonicalQuery* cq,
+                 const CanonicalQuery* cq,
                  PlanSelectionCallbacks PlanSelectionCallbacks);
 
     static bool canUseSubplanning(const CanonicalQuery& query);
@@ -206,7 +206,7 @@ private:
     WorkingSet* _ws;
 
     // Not owned here.
-    CanonicalQuery* _query;
+    const CanonicalQuery* _query;
 
     // If we successfully create a "composite solution" by planning each $or branch
     // independently, that solution is owned here.

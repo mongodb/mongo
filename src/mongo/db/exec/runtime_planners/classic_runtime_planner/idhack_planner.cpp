@@ -117,4 +117,8 @@ PlanRankingResult IdHackPlanner::extractPlanRankingResult() {
                              .plannerParams = extractPlannerParams()};
 }
 
+const QuerySolution* IdHackPlanner::querySolution() const {
+    // IDHACK queries bypass the planning process, and therefore don't have a 'QuerySolution'.
+    return nullptr;
+}
 }  // namespace mongo::classic_runtime_planner

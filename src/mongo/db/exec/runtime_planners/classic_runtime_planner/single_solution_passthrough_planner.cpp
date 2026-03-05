@@ -71,4 +71,8 @@ Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy
 std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extractQuerySolution() {
     return std::move(_querySolution);
 }
+
+const QuerySolution* SingleSolutionPassthroughPlanner::querySolution() const {
+    return _querySolution.get();
+}
 }  // namespace mongo::classic_runtime_planner

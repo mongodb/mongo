@@ -67,7 +67,7 @@ public:
     CachedPlanStage(ExpressionContext* expCtx,
                     CollectionAcquisition collection,
                     WorkingSet* ws,
-                    CanonicalQuery* cq,
+                    const CanonicalQuery* cq,
                     size_t decisionWorks,
                     std::unique_ptr<PlanStage> root,
                     size_t cachedPlanHash = 0);
@@ -128,7 +128,7 @@ private:
     WorkingSet* _ws;
 
     // Not owned.
-    CanonicalQuery* _canonicalQuery;
+    const CanonicalQuery* _canonicalQuery;
 
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.

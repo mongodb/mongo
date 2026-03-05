@@ -71,7 +71,7 @@ const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
                                  CollectionAcquisition collection,
                                  WorkingSet* ws,
-                                 CanonicalQuery* cq,
+                                 const CanonicalQuery* cq,
                                  size_t decisionWorks,
                                  std::unique_ptr<PlanStage> root,
                                  const size_t cachedPlanHash)

@@ -62,7 +62,7 @@ OperationContext* ClassicPlannerInterface::opCtx() {
     return _plannerData.opCtx;
 }
 
-CanonicalQuery* ClassicPlannerInterface::cq() {
+const CanonicalQuery* ClassicPlannerInterface::cq() const {
     return _plannerData.cq;
 }
 

@@ -54,4 +54,8 @@ Status CachedPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
 std::unique_ptr<QuerySolution> CachedPlanner::extractQuerySolution() {
     return std::move(_querySolution);
 }
+
+const QuerySolution* CachedPlanner::querySolution() const {
+    return _querySolution.get();
+}
 }  // namespace mongo::classic_runtime_planner

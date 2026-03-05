@@ -63,7 +63,7 @@ const char* SubplanStage::kStageType = "SUBPLAN";
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
                            CollectionAcquisition collection,
                            WorkingSet* ws,
-                           CanonicalQuery* cq,
+                           const CanonicalQuery* cq,
                            PlanSelectionCallbacks planSelectionCallbacks)
     : RequiresAllIndicesStage(kStageType, expCtx, collection),
       _ws(ws),

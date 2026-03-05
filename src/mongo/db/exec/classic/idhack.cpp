@@ -53,7 +53,7 @@ using std::unique_ptr;
 const char* IDHackStage::kStageType = "IDHACK";
 
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
-                         CanonicalQuery* query,
+                         const CanonicalQuery* query,
                          WorkingSet* ws,
                          CollectionAcquisition collection,
                          const IndexCatalogEntry* entry)

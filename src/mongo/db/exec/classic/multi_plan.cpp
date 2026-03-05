@@ -158,7 +158,7 @@ MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
                                CollectionAcquisition collection,
-                               CanonicalQuery* cq,
+                               const CanonicalQuery* cq,
                                OnPickBestPlan onPickBestPlan,
                                boost::optional<std::string> replanReason)
     : RequiresCollectionStage(kStageType, expCtx, collection),

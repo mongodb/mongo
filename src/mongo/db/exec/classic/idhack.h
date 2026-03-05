@@ -58,7 +58,7 @@ class IDHackStage final : public RequiresIndexStage {
 public:
     /** Takes ownership of all the arguments -collection. */
     IDHackStage(ExpressionContext* expCtx,
-                CanonicalQuery* query,
+                const CanonicalQuery* query,
                 WorkingSet* ws,
                 CollectionAcquisition collection,
                 const IndexCatalogEntry* entry);

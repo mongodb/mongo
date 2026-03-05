@@ -95,18 +95,22 @@ public:
      */
     SavedExecState extractExecState() &&;
 
+    /**
+     * State accessors.
+     */
+    virtual const QuerySolution* querySolution() const = 0;
+    const CanonicalQuery* cq() const;
+    PlanStage* getRoot() const;
+
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& qs);
 
-    PlanStage* getRoot() const;
     void setRoot(std::unique_ptr<PlanStage> root);
     std::unique_ptr<PlanStage> extractRoot() {
         return std::move(_root);
     }
 
     OperationContext* opCtx();
-    CanonicalQuery* cq();
-    QuerySolution* querySolution();
     const MultipleCollectionAccessor& collections() const;
     PlanYieldPolicy::YieldPolicy yieldPolicy() const;
     const QueryPlannerParams& plannerParams();
@@ -154,6 +158,8 @@ public:
     IdHackPlanner(PlannerData plannerData, const IndexCatalogEntry* entry);
     PlanRankingResult extractPlanRankingResult() override;
 
+    const QuerySolution* querySolution() const override;
+
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 
@@ -175,6 +181,8 @@ public:
                                      PlanExplainerData explainData,
                                      SavedExecState&& state);
 
+    const QuerySolution* querySolution() const override;
+
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 
@@ -192,6 +200,8 @@ public:
     CachedPlanner(PlannerData plannerData,
                   std::unique_ptr<CachedSolution> cachedSolution,
                   std::unique_ptr<QuerySolution> querySolution);
+
+    const QuerySolution* querySolution() const override;
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
@@ -245,6 +255,8 @@ public:
      */
     void abandonTrials();
 
+    const QuerySolution* querySolution() const override;
+
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
 
@@ -257,6 +269,8 @@ private:
 class SubPlanner final : public ClassicPlannerInterface {
 public:
     SubPlanner(PlannerData plannerData);
+
+    const QuerySolution* querySolution() const override;
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

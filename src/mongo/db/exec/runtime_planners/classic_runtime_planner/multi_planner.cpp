@@ -94,6 +94,10 @@ std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
     return nullptr;
 }
 
+const QuerySolution* MultiPlanner::querySolution() const {
+    return _multiplanStage->bestSolution();
+}
+
 PlanExplainerData MultiPlanner::extractExplainData() {
     auto explainData = _multiplanStage->extractPlanExplainerData();
     explainData.planStageQsnMap = std::move(_planStageQsnMap);

@@ -67,4 +67,8 @@ Status SubPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
 std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {
     return nullptr;
 }
+
+const QuerySolution* SubPlanner::querySolution() const {
+    return nullptr;
+}
 }  // namespace mongo::classic_runtime_planner

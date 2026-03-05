@@ -98,7 +98,7 @@ public:
      */
     MultiPlanStage(ExpressionContext* expCtx,
                    CollectionAcquisition collection,
-                   CanonicalQuery* cq,
+                   const CanonicalQuery* cq,
                    OnPickBestPlan onPickBestPlan,
                    boost::optional<std::string> replanReason = boost::none);
 
@@ -275,7 +275,7 @@ private:
 
     // The query that we're trying to figure out the best solution to.
     // not owned here
-    CanonicalQuery* _query;
+    const CanonicalQuery* _query;
 
     // Callback provided by the caller to invoke, passing the results of the plan selection trial
     // period.
