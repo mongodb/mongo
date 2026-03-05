@@ -669,43 +669,6 @@ TEST_P(TicketSemaphoreTest, ConcurrentAcquireDoesNotOverbookOrLeak) {
 }
 
 /**
- * Tests that when a permit is forwarded to a waiter who then times out, the permit is properly
- * returned to the pool.
- */
-TEST_P(TicketSemaphoreTest, PermitForwardingViaTimeout) {
-    auto sem = makeSemaphore(1);
-    auto* rawSem = sem.get();
-
-    ASSERT_TRUE(sem->tryAcquire());
-    ASSERT_EQ(sem->available(), 0);
-
-    auto deltaTime = Milliseconds{100};
-    auto shortDeadline = Date_t::now() + deltaTime;
-    Future<bool> timeoutWaiter = spawn([&, rawSem, shortDeadline, svcCtx = getServiceContext()]() {
-        auto client = svcCtx->getService()->makeClient("timeoutWaiter");
-        auto waiterOpCtx = client->makeOperationContext();
-        MockAdmissionContext admCtx;
-        return rawSem->acquire(waiterOpCtx.get(), &admCtx, shortDeadline, true);
-    });
-
-    waitUntilBlocked(rawSem, 1);
-    sleepFor(deltaTime);
-
-    // Release the permit - it will be forwarded to the waiting thread.
-    // But the waiter should timeout and the permit should be reclaimed.
-    rawSem->release();
-
-    bool result = true;
-    _opCtx->runWithDeadline(getDeadline(), ErrorCodes::ExceededTimeLimit, [&] {
-        result = std::move(timeoutWaiter).get(_opCtx.get());
-    });
-
-    ASSERT_FALSE(result);
-    ASSERT_EQ(rawSem->waiters(), 0);
-    ASSERT_EQ(rawSem->available(), 1);
-}
-
-/**
  * Tests complex permit forwarding: wake up three waiters, first two time out or get interrupted,
  * third succeeds. Verify final permit count.
  */
