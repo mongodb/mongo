@@ -454,8 +454,10 @@ TEST(AsioTransportLayer, ProxyUnixDomainSockets) {
     TestFixture tf(opts);
     const std::string expectedStandardPath =
         makeProxyUnixSockPath(opts.port, opts.unixProxySocketPrefix);
+    const std::string nonProxyPath = makeProxyUnixSockPath(12345, opts.unixProxySocketPrefix);
 
-    const auto depths = tf.tla().getListenerSocketBacklogQueueDepths();
+    auto& tl = tf.tla();
+    const auto depths = tl.getListenerSocketBacklogQueueDepths();
     auto unixSocketCount = std::count_if(
         depths.begin(), depths.end(), [](const auto& p) { return p.first.getType() == AF_UNIX; });
     ASSERT_EQ(unixSocketCount, 1);
@@ -467,6 +469,9 @@ TEST(AsioTransportLayer, ProxyUnixDomainSockets) {
                                 << expectedStandardPath
                                 << "\" in listener socket backlog queue depths (size="
                                 << depths.size() << ")";
+
+    ASSERT_TRUE(tl.isProxyUnixDomainSocket(expectedStandardPath));
+    ASSERT_FALSE(tl.isProxyUnixDomainSocket(nonProxyPath));
 }
 #endif  // _WIN32
 

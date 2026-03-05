@@ -32,6 +32,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"
@@ -230,7 +231,7 @@ public:
     }
 
 #ifndef _WIN32
-    bool isProxyUnixDomainSocket(StringData path, int port) const;
+    bool isProxyUnixDomainSocket(const std::string& path) const;
 #endif
 
     SessionManager* getSessionManager() const override {
@@ -357,6 +358,8 @@ private:
         State state{State::kNew};
     };
     Listener _listener;
+
+    stdx::unordered_set<std::string> _proxyUnixSocketAddrs;
 
     std::shared_ptr<SessionManager> _sessionManager;
 
