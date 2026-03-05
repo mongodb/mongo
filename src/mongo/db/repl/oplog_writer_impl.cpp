@@ -213,7 +213,7 @@ void OplogWriterImpl::_run() {
         priority.reset();
         opCtxHolder.reset();
 
-        opCtxHolder = cc().makeOperationContext();
+        opCtxHolder = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
         opCtx = opCtxHolder.get();
         priority.emplace(opCtx, AdmissionContext::Priority::kExempt);
     };

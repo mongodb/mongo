@@ -75,11 +75,16 @@ void OperationKiller::killOperation(OperationId opId) {
     }
 
     if (!isGenerallyAuthorizedToKill() && !isAuthorizedToKill(target)) {
-        // The client is not authotized to kill this operation
         return;
     }
 
-    serviceContext->killOperation(target, target->getOperationContext());
+    auto opCtx = target->getOperationContext();
+    if (opCtx->isKillOpsExempt()) {
+        LOGV2_DEBUG(11227300, 3, "Not killing exempt op", "opId"_attr = opId);
+        return;
+    }
+
+    serviceContext->killOperation(target, opCtx);
 
     LOGV2(20884, "Killed operation", "opId"_attr = opId);
 }

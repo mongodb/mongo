@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/operation_key_manager.h"
+#include "mongo/db/operation_killer.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -60,6 +61,14 @@ protected:
         int destroyClientCount = 0;
         int createOpCtxCount = 0;
         int destroyOpCtxCount = 0;
+    };
+
+    class CreateOpCtxObserver : public CountingClientObserver {
+        void onCreateOperationContext(OperationContext* opCtx) override {
+            CountingClientObserver::onCreateOperationContext(opCtx);
+            // By the time the observer sees the OpCtx, it should have a baton.
+            ASSERT_NE(opCtx->getBaton(), nullptr);
+        }
     };
 
     void setUp() override {
@@ -161,14 +170,6 @@ protected:
 };
 
 TEST_F(ServiceContextOpContextTest, MakeOperationContext) {
-    class CreateOpCtxObserver : public CountingClientObserver {
-        void onCreateOperationContext(OperationContext* opCtx) override {
-            CountingClientObserver::onCreateOperationContext(opCtx);
-            // By the time the observer sees the OpCtx, it should have a baton.
-            ASSERT_NE(opCtx->getBaton(), nullptr);
-        }
-    };
-
     auto observerUniq = std::make_unique<CreateOpCtxObserver>();
     auto observer = observerUniq.get();
     getServiceContext()->registerClientObserver(std::move(observerUniq));
@@ -176,12 +177,45 @@ TEST_F(ServiceContextOpContextTest, MakeOperationContext) {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
     ASSERT_NE(opCtx, nullptr);
+    ASSERT_FALSE(opCtx->isKillOpsExempt());
 
     ASSERT_EQ(observer->createOpCtxCount, 1);
 
     // The Client and OpCtx should be linked to each other.
     ASSERT_EQ(client->getOperationContext(), opCtx.get());
     ASSERT_EQ(opCtx->getClient(), client.get());
+
+    // We should be able to take a lock on the client.
+    ClientLock lk(client.get());
+    ASSERT_EQ(&*lk, client.get());
+}
+
+TEST_F(ServiceContextOpContextTest, MakeKillOpsExemptOperationContext) {
+    auto observerUniq = std::make_unique<CreateOpCtxObserver>();
+    auto observer = observerUniq.get();
+    getServiceContext()->registerClientObserver(std::move(observerUniq));
+
+    auto client = makeClient();
+    auto opCtx = client->getServiceContext()->makeKillOpsExemptOperationContext(client.get());
+    ASSERT_NE(opCtx, nullptr);
+    ASSERT_TRUE(opCtx->isKillOpsExempt());
+
+    ASSERT_EQ(observer->createOpCtxCount, 1);
+
+    // The Client and OpCtx should be linked to each other.
+    ASSERT_EQ(client->getOperationContext(), opCtx.get());
+    ASSERT_EQ(opCtx->getClient(), client.get());
+
+    // We should be able to take a lock on the client.
+    {
+        ClientLock lk(client.get());
+        ASSERT_EQ(&*lk, client.get());
+    }
+
+    // Verify we cannot kill the operation through an OperationKiller.
+    OperationKiller opKiller(client.get());
+    opKiller.killOperation(opCtx->getOpID());
+    ASSERT_FALSE(opCtx->isKillPending());
 }
 
 TEST_F(ServiceContextOpContextTest, MakeOperationContextCreatesOperationId) {

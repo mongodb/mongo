@@ -507,7 +507,7 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
     while (true) {  // Exits on message from OplogApplierBatcher.
         // Use a new operation context each iteration, as otherwise we may appear to use a single
         // collection name to refer to collections with different UUIDs.
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+        const auto opCtxPtr = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
         OperationContext& opCtx = *opCtxPtr;
 
         // The oplog applier is crucial for stability of the replica set. As a result we mark it as

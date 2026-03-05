@@ -15,8 +15,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
-var nodes = replSet.nodeList();
+let replSet = new ReplSetTest({name: "testSet", nodes: 3});
 replSet.startSet();
 var conf = replSet.getReplSetConfig();
 conf.members[2].priority = 0;
