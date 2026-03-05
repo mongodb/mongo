@@ -38,8 +38,8 @@ namespace mongo {
 namespace exec::expression {
 
 Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables) {
-    MutableDocument outputDoc;
     auto& expressions = expr.getChildExpressions();
+    MutableDocument outputDoc(expressions.size());
     for (auto&& pair : expressions) {
         outputDoc.addField(pair.first, pair.second->evaluate(root, variables));
     }
