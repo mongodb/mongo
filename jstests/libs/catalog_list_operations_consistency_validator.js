@@ -357,11 +357,6 @@ function validateListCatalogToListCollectionsConsistency(
     ignoreRecordIdsReplicatedOption,
     shouldAssert,
 ) {
-    // Sorting function to ignore irrelevant ordering differences while comparing.
-    function sortCollectionsInPlace(collectionList) {
-        return collectionList.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
     // TODO SERVER-101594 Remove the listCatalogMap indirection once 9.0 becomes lastLTS.
     // We create a map for looking up $listCatalog namespaces by name. This map is used to handle
     // legacy time series collections, which inherit their options from their buckets collection in
@@ -381,14 +376,30 @@ function validateListCatalogToListCollectionsConsistency(
         });
     }
 
+    // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
+    // TODO (SERVER-119864): Stop removing `e.options.recordIdsReplicated` once 'recordIdsReplicated'
+    // gets removed from collection options.
+    if (ignoreRecordIdsReplicatedOption) {
+        listCatalogMap.forEach((e) => {
+            delete e.info.recordIdsReplicated;
+            delete e.options.recordIdsReplicated;
+        });
+        listCollections.forEach((e) => {
+            delete e.info.recordIdsReplicated;
+            delete e.options.recordIdsReplicated;
+        });
+    }
+
+    // To accurately compare $listCatalog and listCollections entries, perform the following after
+    // removing conflicting fields:
+    // 1. Deduplicate $listCatalog entries to match the unique set returned by listCollections.
+    // 2. Sort both entry lists by name to ensure ordering differences do not affect the comparison.
+    function sortCollectionsInPlace(collectionList) {
+        return collectionList.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
     const listCollectionsFromListCatalog = removeDuplicateDocuments(sortCollectionsInPlace(listCatalogMap));
     const sortedListCollections = sortCollectionsInPlace([...listCollections]);
-
-    // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
-    if (ignoreRecordIdsReplicatedOption) {
-        listCollectionsFromListCatalog.forEach((e) => delete e.info.recordIdsReplicated);
-        sortedListCollections.forEach((e) => delete e.info.recordIdsReplicated);
-    }
 
     const equals = bsonUnorderedFieldArrayEquals(listCollectionsFromListCatalog, sortedListCollections);
     if (!equals) {
