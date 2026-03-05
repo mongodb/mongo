@@ -357,7 +357,7 @@ tasks:
       - func: "do setup"
       - func: "run streams tests"
         vars:
-          resmoke_jobs_max: 1
+          resmoke_jobs_max: 4
 
   - <<: *task_template
     name: streams_aspio_iceberg_2
@@ -372,7 +372,7 @@ tasks:
       - func: "do setup"
       - func: "run streams tests"
         vars:
-          resmoke_jobs_max: 1
+          resmoke_jobs_max: 4
 
   - <<: *task_template
     name: streams_aspio_iceberg_3
@@ -387,10 +387,10 @@ tasks:
       - func: "do setup"
       - func: "run streams tests"
         vars:
-          resmoke_jobs_max: 1
+          resmoke_jobs_max: 4
 
   - <<: *task_template
-    name: streams_aspio_iceberg_4
+    name: streams_aspio_iceberg_large
     tags:
       [
         "assigned_to_jira_team_streams",
@@ -417,7 +417,7 @@ tasks:
       - func: "do setup"
       - func: "run streams tests"
         vars:
-          resmoke_jobs_max: 1
+          resmoke_jobs_max: 4
 
   - <<: *task_template
     name: streams_aspio_utilities

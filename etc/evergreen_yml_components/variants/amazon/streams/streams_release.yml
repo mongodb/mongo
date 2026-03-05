@@ -59,7 +59,7 @@ buildvariants:
       - name: streams_aspio_iceberg_1
       - name: streams_aspio_iceberg_2
       - name: streams_aspio_iceberg_3
-      - name: streams_aspio_iceberg_4
+      - name: streams_aspio_iceberg_large
       - name: streams_aspio_iceberg_5
       - name: streams_aspio_utilities
       - name: streams_externaljs
@@ -126,7 +126,7 @@ buildvariants:
       - name: streams_aspio_iceberg_1
       - name: streams_aspio_iceberg_2
       - name: streams_aspio_iceberg_3
-      - name: streams_aspio_iceberg_4
+      - name: streams_aspio_iceberg_large
       - name: streams_aspio_iceberg_5
       - name: streams_aspio_utilities
       - name: streams_externaljs
