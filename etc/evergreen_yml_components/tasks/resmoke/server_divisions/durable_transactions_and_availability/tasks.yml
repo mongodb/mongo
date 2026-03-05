@@ -2531,6 +2531,8 @@ tasks:
         vars:
           suite: disagg_backup_restore_jscore_passthrough
           use_large_distro: "true"
+          # Running multiple jobs in parallel complicates getting a consistent view of the database via checkpoints.
+          resmoke_jobs_max: 1
 
   # TODO (SERVER-120736) Reenable suite with only passing tests.
   # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.

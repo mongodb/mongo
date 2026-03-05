@@ -77,6 +77,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         shard_logging_prefix=None,
         replicaset_logging_prefix=None,
         replset_name=None,
+        require_graceful_shutdown=False,
         use_auto_bootstrap_procedure=None,
         initial_sync_uninitialized_fcv=False,
         hide_initial_sync_node_from_conn_string=False,
@@ -148,6 +149,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
         self.replset_name = replset_name
+        self.require_graceful_shutdown = require_graceful_shutdown
         self.initial_sync_uninitialized_fcv = initial_sync_uninitialized_fcv
         self.hide_initial_sync_node_from_conn_string = hide_initial_sync_node_from_conn_string
         # Used by the enhanced multiversion system to signify multiversion mode.
@@ -557,7 +559,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary = self.nodes[0]
-        client = primary.mongo_client()
+        client: pymongo.MongoClient = primary.mongo_client()
 
         if deadline is None:
             deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
@@ -634,6 +636,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority")
         )
         admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
+
+        # TODO(SERVER-119066): Remove when no longer necessary
+        mongod_options = self.nodes[0].get_mongod_options()
+        disagg_enabled = mongod_options.get("set_parameters", {}).get(
+            "disaggregatedStorageEnabled", False
+        )
+        if disagg_enabled:
+            return
 
         for node in self.nodes:
             self.logger.info(
@@ -841,7 +851,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.teardown_counter += 1
         else:
             self.logger.error("Stopping the replica set fixture failed.")
-            raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
+            if self.require_graceful_shutdown:
+                raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
         """Return True if all nodes in the replica set are running."""

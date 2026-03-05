@@ -56,6 +56,7 @@ class Job(object):
         self.archival = archival
         self.suite_options = suite_options
         self.manager = FixtureTestCaseManager(test_queue_logger, self.fixture, job_num, self.report)
+        self.queue: Optional["TestQueue[Union[QueueElemRepeatTime, QueueElem]]"] = None
 
         # Don't check fixture.is_running() when using hooks that kill and restart fixtures, such
         # as ContinuousStepdown or KillReplicator. Even if the fixture is still running as
@@ -64,6 +65,10 @@ class Job(object):
         self._check_if_fixture_running = not any(
             hasattr(hook, "STOPS_FIXTURE") and hook.STOPS_FIXTURE for hook in self.hooks
         )
+
+        for hook in self.hooks:
+            assert not hook.job
+            hook.job = self
 
     @property
     def job_num(self) -> int:
@@ -101,6 +106,7 @@ class Job(object):
         # This will make it have the correct parent and traceid
         context.attach(parent_context)
 
+        self.queue = queue
         setup_succeeded = True
         if setup_flag is not None:
             try:

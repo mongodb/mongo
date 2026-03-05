@@ -2,11 +2,14 @@
 
 import sys
 import threading
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.testcases import interface as testcase
 from buildscripts.resmokelib.utils import registry
+
+if TYPE_CHECKING:
+    from buildscripts.resmokelib.testing.job import Job
 
 _HOOKS = {}  # type: ignore
 
@@ -28,6 +31,8 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
     # Whether the hook runs in the background of a test. Typically background jobs start their own threads,
     # except for Server-side background activity like initial sync, which is also considered background.
     IS_BACKGROUND = None
+
+    job: Optional["Job"] = None
 
     def __init__(self, hook_logger, fixture, description):
         """Initialize the Hook with the specified fixture."""
