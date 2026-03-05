@@ -432,8 +432,9 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                 cmrIndex->idx->unique()) {
                 indexForOplog->setPrepareUnique(boost::none);
             } else {
-                // Checks if the index key pattern conflicts with the shard key pattern.
-                if (shardKeyPattern) {
+                // Checks if the index key pattern conflicts with the shard key pattern only if the
+                // prepareUnique will be set to true.
+                if (shardKeyPattern && cmdIndex.getPrepareUnique().value()) {
                     if (!shardKeyPattern->isIndexUniquenessAndCollationCompatible(
                             cmrIndex->idx->keyPattern(), cmrIndex->idx->collation())) {
                         return {
