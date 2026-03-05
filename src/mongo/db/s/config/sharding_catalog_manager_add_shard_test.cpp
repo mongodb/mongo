@@ -164,7 +164,7 @@ protected:
         _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
         _skipBlockingDDLCoordinatorsDuringAddAndRemoveShardFP->setMode(FailPoint::off);
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         ConfigServerTestFixture::tearDown();
     }
 

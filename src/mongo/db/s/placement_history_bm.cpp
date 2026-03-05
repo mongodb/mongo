@@ -100,7 +100,7 @@ public:
     }
 
     ~BenchmarkConfigServerTestFixture() override {
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ShardingCatalogManager::get(operationContext())->shutDown();
         ConfigServerTestFixture::tearDown();

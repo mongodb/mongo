@@ -1008,12 +1008,12 @@ void ReplicationCoordinatorExternalStateImpl::onStepDownHook() {
 void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
-        TransactionCoordinatorService::get(_service)->interrupt();
+        TransactionCoordinatorService::get(_service)->interruptForStepDown();
     }
     if (ShardingState::get(_service)->enabled()) {
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
-            TransactionCoordinatorService::get(_service)->interrupt();
+            TransactionCoordinatorService::get(_service)->interruptForStepDown();
         }
 
         FilteringMetadataCache::get(_service)->onStepDown();

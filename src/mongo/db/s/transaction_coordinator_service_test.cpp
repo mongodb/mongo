@@ -253,7 +253,7 @@ class TransactionCoordinatorServiceInitializationTest
     : public TransactionCoordinatorServiceTestFixture {
 protected:
     void tearDown() override {
-        _testService.interrupt();
+        _testService.interruptForStepDown();
         executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
         _testService.shutdown();
 
@@ -385,7 +385,7 @@ TEST_F(TransactionCoordinatorServiceInitializationTest, InterruptBeforeInitializ
 
     // Should cancel all outstanding tasks (including the recovery task started by
     // initialize above, which has not yet run).
-    _testService.interrupt();
+    _testService.interruptForStepDown();
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     ASSERT_TRUE(_testService.pendingCleanup());
@@ -408,7 +408,7 @@ TEST_F(TransactionCoordinatorServiceInitializationTest, InitializingTwiceForSame
 TEST_F(TransactionCoordinatorServiceInitializationTest,
        CannotInitializeForOldTermAfterInterruption) {
     _testService.initializeIfNeeded(operationContext(), /* term */ 1);
-    _testService.interrupt();
+    _testService.interruptForStepDown();
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     // Note: Replication machinery should not call initialize for an old term
@@ -433,7 +433,7 @@ TEST_F(TransactionCoordinatorServiceInitializationTest,
        InterruptedNodeCleanupsDuringNextInitialization) {
     _testService.initializeIfNeeded(operationContext(), /* term */ 1);
 
-    _testService.interrupt();
+    _testService.interruptForStepDown();
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     ASSERT_TRUE(_testService.pendingCleanup());
@@ -447,7 +447,7 @@ TEST_F(TransactionCoordinatorServiceInitializationTest,
 TEST_F(TransactionCoordinatorServiceInitializationTest,
        OperationsFailsAfterServiceIsInterruptedUntilNextTerm) {
     _testService.initializeIfNeeded(operationContext(), /* term */ 1);
-    _testService.interrupt();
+    _testService.interruptForStepDown();
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 
     // Operations fails because service got interrupted.
@@ -497,7 +497,7 @@ protected:
     }
 
     void tearDown() override {
-        service()->interrupt();
+        service()->interruptForStepDown();
         executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
         service()->shutdown();
 

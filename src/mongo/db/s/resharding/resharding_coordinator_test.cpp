@@ -171,7 +171,7 @@ protected:
     }
 
     void tearDown() override {
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         ConfigServerTestFixture::tearDown();
     }
 

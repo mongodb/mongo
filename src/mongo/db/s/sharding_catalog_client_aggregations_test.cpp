@@ -112,7 +112,7 @@ public:
     }
 
     void tearDown() override {
-        TransactionCoordinatorService::get(operationContext())->interrupt();
+        TransactionCoordinatorService::get(operationContext())->interruptForStepDown();
         WaitForMajorityService::get(getServiceContext()).shutDown();
         ConfigServerTestFixture::tearDown();
     }

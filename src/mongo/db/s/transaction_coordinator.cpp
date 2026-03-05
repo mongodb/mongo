@@ -244,7 +244,7 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
                 std::move(opTime),
                 _lsid,
                 _txnNumberAndRetryCounter,
-                _cancellationSource.token());
+                _waitForMajorityCancellationSourceOnStepDown.token());
         })
         .thenRunOn(_scheduler->getExecutor())
         .then([this, self = shared_from_this(), apiParams] {
@@ -354,13 +354,14 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
         })
         .then([this, self = shared_from_this()](repl::OpTime opTime) {
             setDecisionPromise(*_decision, _decisionPromise);
-            return waitForMajorityWithHangFailpoint(_serviceContext,
-                                                    hangBeforeWaitingForDecisionWriteConcern,
-                                                    "hangBeforeWaitingForDecisionWriteConcern",
-                                                    std::move(opTime),
-                                                    _lsid,
-                                                    _txnNumberAndRetryCounter,
-                                                    _cancellationSource.token());
+            return waitForMajorityWithHangFailpoint(
+                _serviceContext,
+                hangBeforeWaitingForDecisionWriteConcern,
+                "hangBeforeWaitingForDecisionWriteConcern",
+                std::move(opTime),
+                _lsid,
+                _txnNumberAndRetryCounter,
+                _waitForMajorityCancellationSourceOnStepDown.token());
         })
         .then([this, self = shared_from_this(), apiParams] {
             {
@@ -545,8 +546,8 @@ void TransactionCoordinator::cancelIfCommitNotYetStarted() {
                                     "Transaction exceeded deadline or newer transaction started"});
 }
 
-void TransactionCoordinator::cancel() {
-    _cancellationSource.cancel();
+void TransactionCoordinator::cancelForStepDown() {
+    _waitForMajorityCancellationSourceOnStepDown.cancel();
 }
 
 bool TransactionCoordinator::_reserveKickOffCommitPromise() {
@@ -568,6 +569,18 @@ void TransactionCoordinator::_done(Status status) {
                         str::stream()
                             << "Coordinator " << _lsid << ':' << _txnNumberAndRetryCounter.toBSON()
                             << " stopped due to: " << status.reason());
+
+    // The 'CallbackCanceled' error code may only terminate a TransactionCoordinator continuation if
+    // the coordinator is stepping down from primary while awaiting majority write concern.
+    if (status == ErrorCodes::CallbackCanceled) {
+        invariant(status.reason() ==
+                  WaitForMajorityService::waitUntilMajorityCanceledStatus().reason());
+        invariant(_waitForMajorityCancellationSourceOnStepDown.token().isCanceled());
+        status = Status(ErrorCodes::InterruptedDueToReplStateChange,
+                        str::stream()
+                            << "Coordinator " << _lsid << ':' << _txnNumberAndRetryCounter.toBSON()
+                            << " stopped due to stepDown with: " << status.reason());
+    }
 
     LOGV2_DEBUG(22447,
                 3,
@@ -605,6 +618,20 @@ void TransactionCoordinator::_done(Status status) {
     }
 
     if (!status.isOK()) {
+        // If _participantsDurable is true, the TransactionCoordinator may have already sent a
+        // prepare command to at least one participant shard.
+        // Termination with an unexpected error (other than shutdown or stepping down) in this state
+        // could leave a prepared transaction stuck until the coordinator shuts down or steps down.
+        // In such cases, we issue a fatal assertion to ensure the problem is loudly reported and
+        // allow another coordinator to continue the commit path.
+        if (_participantsDurable && !status.isA<ErrorCategory::NotPrimaryError>() &&
+            !status.isA<ErrorCategory::ShutdownError>()) {
+            LOGV2_FATAL(11353000,
+                        "TransactionCoordinator encountered an unexpected termination error.",
+                        "sessionId"_attr = _lsid,
+                        "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
+                        "error"_attr = status);
+        }
         _completionPromise.setError(status);
     } else {
         _completionPromise.setFrom(_decisionPromise.getFuture().getNoThrow().getStatus());

@@ -82,11 +82,6 @@ std::unique_ptr<ThreadPool> makeThreadPool(StringData readOrWrite) {
     options.maxThreads = 2;
     return std::make_unique<ThreadPool>(options);
 }
-inline Status waitUntilMajorityCanceledStatus() {
-    static StaticImmortal s =
-        Status{ErrorCodes::CallbackCanceled, "WaitForMajorityService::waitUntilMajority canceled"};
-    return *s;
-}
 }  // namespace
 
 WaitForMajorityService::~WaitForMajorityService() {
@@ -188,7 +183,8 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
     }
 
     if (cancelToken.isCanceled()) {
-        return {SemiFuture<void>::makeReady(waitUntilMajorityCanceledStatus())};
+        return {
+            SemiFuture<void>::makeReady(WaitForMajorityService::waitUntilMajorityCanceledStatus())};
     }
 
     const bool wasEmpty = _queuedOpTimes.empty();
@@ -217,7 +213,7 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
         }
         auto clientGuard = _waitForMajorityCancellationClient->bind();
         if (!request->hasBeenProcessed.swap(true)) {
-            request->result.setError(waitUntilMajorityCanceledStatus());
+            request->result.setError(WaitForMajorityService::waitUntilMajorityCanceledStatus());
             stdx::lock_guard lk(_mutex);
             auto it = std::find_if(
                 std::begin(_queuedOpTimes),

@@ -181,6 +181,11 @@ public:
 
     static WaitForMajorityService& get(ServiceContext* service);
 
+    static Status waitUntilMajorityCanceledStatus() {
+        return Status{ErrorCodes::CallbackCanceled,
+                      "WaitForMajorityService::waitUntilMajority canceled"};
+    }
+
     /**
      * Sets up the background thread pool responsible for waiting for opTimes to be majority
      * committed.
