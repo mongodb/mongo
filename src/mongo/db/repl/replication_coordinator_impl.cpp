@@ -2764,6 +2764,12 @@ HostAndPort ReplicationCoordinatorImpl::getCurrentPrimaryHostAndPort() const {
     return primary ? primary->getHostAndPort() : HostAndPort();
 }
 
+HostAndPort ReplicationCoordinatorImpl::getCurrentPrimaryHostAndPortPriority() const {
+    stdx::lock_guard lock(_mutex);
+    auto primary = _topCoord->getCurrentPrimaryMember();
+    return primary ? primary->getHostAndPortPriority() : HostAndPort();
+}
+
 void ReplicationCoordinatorImpl::cancelCbkHandle(CallbackHandle activeHandle) {
     _replExecutor->cancel(activeHandle);
 }
@@ -2777,7 +2783,7 @@ BSONObj ReplicationCoordinatorImpl::runCmdOnPrimaryAndAwaitResponse(
     // About to make network and DBDirectClient (recursive) calls, so we should not hold any locks.
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    const auto primaryHostAndPort = getCurrentPrimaryHostAndPort();
+    const auto primaryHostAndPort = getCurrentPrimaryHostAndPortPriority();
     if (primaryHostAndPort.empty()) {
         uassertStatusOK(Status{ErrorCodes::NoConfigPrimary, "Primary is unknown/down."});
     }

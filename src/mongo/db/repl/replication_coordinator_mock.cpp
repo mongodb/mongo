@@ -856,6 +856,10 @@ HostAndPort ReplicationCoordinatorMock::getCurrentPrimaryHostAndPort() const {
     return HostAndPort();
 }
 
+HostAndPort ReplicationCoordinatorMock::getCurrentPrimaryHostAndPortPriority() const {
+    return HostAndPort();
+}
+
 void ReplicationCoordinatorMock::cancelCbkHandle(
     executor::TaskExecutor::CallbackHandle activeHandle) {
     MONGO_UNREACHABLE;

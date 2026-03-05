@@ -591,6 +591,10 @@ HostAndPort ReplicationCoordinatorNoOp::getCurrentPrimaryHostAndPort() const {
     MONGO_UNREACHABLE;
 }
 
+HostAndPort ReplicationCoordinatorNoOp::getCurrentPrimaryHostAndPortPriority() const {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::cancelCbkHandle(
     executor::TaskExecutor::CallbackHandle activeHandle) {
     MONGO_UNREACHABLE;

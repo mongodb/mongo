@@ -122,7 +122,7 @@ void writeToLocalShard(OperationContext* opCtx,
     uassertStatusOK(runWithRetryStrategy(
         opCtx, retryStrategy, [&](const TargetingMetadata&) -> RetryStrategy::Result<BSONObj> {
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            const auto primaryHostAndPort = replCoord->getCurrentPrimaryHostAndPort();
+            const auto primaryHostAndPort = replCoord->getCurrentPrimaryHostAndPortPriority();
             const auto cmdResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
                 opCtx,
                 batchedCommandRequest.getNS().dbName(),

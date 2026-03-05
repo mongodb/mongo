@@ -451,6 +451,8 @@ public:
 
     HostAndPort getCurrentPrimaryHostAndPort() const override;
 
+    HostAndPort getCurrentPrimaryHostAndPortPriority() const override;
+
     void cancelCbkHandle(executor::TaskExecutor::CallbackHandle activeHandle) override;
     BSONObj runCmdOnPrimaryAndAwaitResponse(OperationContext* opCtx,
                                             const DatabaseName& dbName,

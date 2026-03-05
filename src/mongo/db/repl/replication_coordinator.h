@@ -1173,6 +1173,14 @@ public:
      */
     virtual HostAndPort getCurrentPrimaryHostAndPort() const = 0;
 
+    /**
+     * Returns the HostAndPort of the current primary using the priority port if configured (and
+     * known by this node), or an empty HostAndPort if there is no primary. Note that the primary
+     * can change at any time and thus the result may be immediately stale unless run from the
+     * primary with the RSTL held.
+     */
+    virtual HostAndPort getCurrentPrimaryHostAndPortPriority() const = 0;
+
     /*
      * Cancels the callback referenced in the given callback handle.
      * This function expects the activeHandle to be valid.
@@ -1185,6 +1193,8 @@ public:
      * Runs the given command 'cmdObj' on primary and waits till the response for that command is
      * received. The node will execute the remote command using the repl task executor
      * (AsyncDBClient), even if it is primary itself.
+     *
+     * Note that this will use the priority port if it is available.
      *
      * - 'OnRemoteCmdScheduled' will be called once the remote command is scheduled.
      * - 'OnRemoteCmdComplete' will be called once the response for the remote command is received.
