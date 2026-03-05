@@ -83,6 +83,7 @@ buildvariants:
     tasks:
       - name: sync_repo_with_copybara
         priority: 50
+      - name: test_copybara_sync
 
   - name: create_sbom_and_pr
     display_name: "Generate SBOM files and create PR"
