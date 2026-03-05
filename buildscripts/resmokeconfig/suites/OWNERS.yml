@@ -129,6 +129,9 @@ filters:
   - "mongot*":
     approvers:
       - 10gen/query-integration-search
+  - "concurrency_with_mongot_extension*":
+    approvers:
+      - 10gen/query-integration-extensions-api
   - "multiversion*":
     approvers:
       - 10gen/server-jstest-infra

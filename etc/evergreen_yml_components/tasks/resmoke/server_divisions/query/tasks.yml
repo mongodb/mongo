@@ -1758,6 +1758,71 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *task_template
+    name: concurrency_with_mongot_extension_single_node
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          # Small number of tests (at least upon authoring), and concurrency tests are more resource
+          # intensive.
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: concurrency_with_mongot_extension_mongos
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          # Small number of tests (at least upon authoring), and concurrency tests are more resource
+          # intensive.
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
+    name: concurrency_with_mongot_extension_sharded_collections
+    tags:
+      [
+        "assigned_to_jira_team_server_query_integration",
+        "experimental",
+        "incompatible_windows",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "mongot_e2e_tests",
+        "requires_large_host",
+      ]
+    commands:
+      - func: "do setup"
+      - func: "get mongot version"
+      - func: "run tests"
+        vars:
+          # Small number of tests (at least upon authoring), and concurrency tests are more resource
+          # intensive.
+          resmoke_jobs_max: 1
+
+  - <<: *task_template
     name: search_ssl
     tags:
       [

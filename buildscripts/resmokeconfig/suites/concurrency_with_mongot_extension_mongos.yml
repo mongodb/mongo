@@ -1,0 +1,105 @@
+# Concurrency suite for testing extensions (currently just $vectorSearch) on a sharded cluster.
+#
+# Collections are *not* implicitly sharded in this suite.
+#
+# This suite runs Finite State Machine (FSM) workloads defined in
+# jstests/concurrency/mongot_fsm_workloads, against a fixture that includes the mongot extension.
+# This suite is designed to stress concurrency-focused edge cases. Tests use many worker threads to
+# generate concurrent traffic against the test fixture. The threads follow a FSM transition graph to
+# decide what actions to take.
+
+# Auth is required to set up mongot for the fixture.
+config_variables:
+  - &keyFile jstests/with_mongot/keyfile_for_testing
+  - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - &authOptions
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
+  - &shellOptions
+    authenticationDatabase: admin
+    authenticationMechanism: SCRAM-SHA-256
+    password: *keyFileData
+    username: __system
+    eval: jsTest.authenticate(db.getMongo())
+    global_vars:
+      TestData:
+        auth: true
+        authMechanism: SCRAM-SHA-256
+        keyFile: *keyFile
+        keyFileData: *keyFileData
+        runningWithBalancer: false
+        implicitlyShardOnCreateCollectionOnly: true
+
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/mongot_fsm_workloads/**/*.js
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      <<: *shellOptions
+      eval: >-
+        jsTest.authenticate(db.getMongo());
+  hooks:
+    # Note: CheckReplDBHashInBackground is not included because its before_suite
+    # method uses fixture.mongo_client() which doesn't support auth_options.
+    - class: ValidateCollections
+      shell_options:
+        <<: *shellOptions
+    - class: CheckShardFilteringMetadata
+      shell_options:
+        <<: *shellOptions
+    - class: CheckReplDBHash
+      shell_options:
+        <<: *shellOptions
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        <<: *shellOptions
+    - class: CheckOrphansDeleted
+      shell_options:
+        <<: *shellOptions
+    - class: CheckRoutingTableConsistency
+      shell_options:
+        <<: *shellOptions
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    auth_options: *authOptions
+    enable_balancer: false
+    launch_mongot: true
+    num_shards: 2
+    num_rs_nodes_per_shard: 3
+    num_mongos: 2
+    mongos_options:
+      keyFile: *keyFile
+      loadExtensions: mongot-extension
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        featureFlagExtensionsAPI: true
+        featureFlagVectorSearchExtension: true
+        featureFlagExtensionViewsAndUnionWith: false
+    mongod_options:
+      keyFile: *keyFile
+      loadExtensions: mongot-extension
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagExtensionsAPI: true
+        featureFlagVectorSearchExtension: true
+        # TODO SERVER-120179: enable this flag.
+        featureFlagExtensionViewsAndUnionWith: false
+        featureFlagEgressGrpcForSearch: true
+        useGrpcForSearch: 1
+        skipAuthenticationToMongot: true
