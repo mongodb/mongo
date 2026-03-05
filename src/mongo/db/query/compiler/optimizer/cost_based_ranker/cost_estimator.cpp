@@ -372,12 +372,9 @@ CostEstimate CostEstimator::filterCost(StageType stage,
     return filterIncrement * ce + incrementalFilterLeafCost * (numIncrementalFilterLeaves * ce);
 }
 
-const CostCoefficient CostEstimator::fetchFilterIncrement =
-    CostCoefficient{CostCoefficientType{435.38_ns}};
-const CostCoefficient CostEstimator::indexFilterIncrement =
-    CostCoefficient{CostCoefficientType{132.60_ns}};
-const CostCoefficient CostEstimator::collScanFilterIncrement =
-    CostCoefficient{CostCoefficientType{202.32_ns}};
+const CostCoefficient CostEstimator::fetchFilterIncrement = makeCostCoefficient(435.38ns);
+const CostCoefficient CostEstimator::indexFilterIncrement = makeCostCoefficient(132.60ns);
+const CostCoefficient CostEstimator::collScanFilterIncrement = makeCostCoefficient(202.32ns);
 
 // TODO(SERVER-114546): Use the calibrated coefficients once we estimate the number of
 // filter leaf evaluations.
@@ -385,91 +382,56 @@ const CostCoefficient CostEstimator::incrementalFetchFilterLeafCost = minCC;
 const CostCoefficient CostEstimator::incrementalIndexFilterLeafCost = minCC;
 const CostCoefficient CostEstimator::incrementalCollScanFilterLeafCost = minCC;
 
-const CostCoefficient CostEstimator::collScanForwardIncrement =
-    CostCoefficient{CostCoefficientType{399.23_ns}};
-const CostCoefficient CostEstimator::collScanBackwardIncrement =
-    CostCoefficient{CostCoefficientType{404.0_ns}};
+const CostCoefficient CostEstimator::collScanForwardIncrement = makeCostCoefficient(399.23ns);
+const CostCoefficient CostEstimator::collScanBackwardIncrement = makeCostCoefficient(404.0ns);
 
-const CostCoefficient CostEstimator::indexScanForwardExamineKey =
-    CostCoefficient{CostCoefficientType{435.55_ns}};
-const CostCoefficient CostEstimator::indexScanBackwardExamineKey =
-    CostCoefficient{CostCoefficientType{459.68_ns}};
-const CostCoefficient CostEstimator::incrementalFieldCost =
-    CostCoefficient{CostCoefficientType{51.25_ns}};
-const CostCoefficient CostEstimator::indexForwardSeek =
-    CostCoefficient{CostCoefficientType{1134.71_ns}};
-const CostCoefficient CostEstimator::indexBackwardSeek =
-    CostCoefficient{CostCoefficientType{1211.58_ns}};
+const CostCoefficient CostEstimator::indexScanForwardExamineKey = makeCostCoefficient(435.55ns);
+const CostCoefficient CostEstimator::indexScanBackwardExamineKey = makeCostCoefficient(459.68ns);
+const CostCoefficient CostEstimator::incrementalFieldCost = makeCostCoefficient(51.25ns);
+const CostCoefficient CostEstimator::indexForwardSeek = makeCostCoefficient(1134.71ns);
+const CostCoefficient CostEstimator::indexBackwardSeek = makeCostCoefficient(1211.58ns);
 
-const CostCoefficient CostEstimator::fetchIncrement =
-    CostCoefficient{CostCoefficientType{1232.20_ns}};
+const CostCoefficient CostEstimator::fetchIncrement = makeCostCoefficient(1232.20ns);
 
-const CostCoefficient CostEstimator::andHashBuild = CostCoefficient{CostCoefficientType{216.05_ns}};
-const CostCoefficient CostEstimator::andHashProbe = CostCoefficient{CostCoefficientType{180.35_ns}};
-const CostCoefficient CostEstimator::andHashOutput =
-    CostCoefficient{CostCoefficientType{281.46_ns}};
+const CostCoefficient CostEstimator::andHashBuild = makeCostCoefficient(216.05ns);
+const CostCoefficient CostEstimator::andHashProbe = makeCostCoefficient(180.35ns);
+const CostCoefficient CostEstimator::andHashOutput = makeCostCoefficient(281.46ns);
 
-const CostCoefficient CostEstimator::sortDefaultStartup =
-    CostCoefficient{CostCoefficientType{24067.01_ns}};
-const CostCoefficient CostEstimator::sortDefaultIncrement =
-    CostCoefficient{CostCoefficientType{216.73_ns}};
-const CostCoefficient CostEstimator::sortDefaultSpillIncrement =
-    CostCoefficient{CostCoefficientType{653.83_ns}};
-const CostCoefficient CostEstimator::sortDefaultLimitStartup =
-    CostCoefficient{CostCoefficientType{23761.57_ns}};
-const CostCoefficient CostEstimator::sortDefaultLimitC1 =
-    CostCoefficient{CostCoefficientType{764.58_ns}};
-const CostCoefficient CostEstimator::sortDefaultLimitC2 =
-    CostCoefficient{CostCoefficientType{15.81_ns}};
-const CostCoefficient CostEstimator::sortDefaultLimitC3 =
-    CostCoefficient{CostCoefficientType{233.36_ns}};
+const CostCoefficient CostEstimator::sortDefaultStartup = makeCostCoefficient(24067.01ns);
+const CostCoefficient CostEstimator::sortDefaultIncrement = makeCostCoefficient(216.73ns);
+const CostCoefficient CostEstimator::sortDefaultSpillIncrement = makeCostCoefficient(653.83ns);
+const CostCoefficient CostEstimator::sortDefaultLimitStartup = makeCostCoefficient(23761.57ns);
+const CostCoefficient CostEstimator::sortDefaultLimitC1 = makeCostCoefficient(764.58ns);
+const CostCoefficient CostEstimator::sortDefaultLimitC2 = makeCostCoefficient(15.81ns);
+const CostCoefficient CostEstimator::sortDefaultLimitC3 = makeCostCoefficient(233.36ns);
 
-const CostCoefficient CostEstimator::sortSimpleStartup =
-    CostCoefficient{CostCoefficientType{22324.54_ns}};
-const CostCoefficient CostEstimator::sortSimpleIncrement =
-    CostCoefficient{CostCoefficientType{163.56_ns}};
-const CostCoefficient CostEstimator::sortSimpleSpillIncrement =
-    CostCoefficient{CostCoefficientType{297.03_ns}};
-const CostCoefficient CostEstimator::sortSimpleLimitStartup =
-    CostCoefficient{CostCoefficientType{21813.35_ns}};
-const CostCoefficient CostEstimator::sortSimpleLimitC1 =
-    CostCoefficient{CostCoefficientType{739.81_ns}};
-const CostCoefficient CostEstimator::sortSimpleLimitC2 =
-    CostCoefficient{CostCoefficientType{11.67_ns}};
-const CostCoefficient CostEstimator::sortSimpleLimitC3 =
-    CostCoefficient{CostCoefficientType{164.50_ns}};
+const CostCoefficient CostEstimator::sortSimpleStartup = makeCostCoefficient(22324.54ns);
+const CostCoefficient CostEstimator::sortSimpleIncrement = makeCostCoefficient(163.56ns);
+const CostCoefficient CostEstimator::sortSimpleSpillIncrement = makeCostCoefficient(297.03ns);
+const CostCoefficient CostEstimator::sortSimpleLimitStartup = makeCostCoefficient(21813.35ns);
+const CostCoefficient CostEstimator::sortSimpleLimitC1 = makeCostCoefficient(739.81ns);
+const CostCoefficient CostEstimator::sortSimpleLimitC2 = makeCostCoefficient(11.67ns);
+const CostCoefficient CostEstimator::sortSimpleLimitC3 = makeCostCoefficient(164.50ns);
 
-const CostCoefficient CostEstimator::sortedMergeInput =
-    CostCoefficient{CostCoefficientType{481.48_ns}};
-const CostCoefficient CostEstimator::sortedMergeOutput =
-    CostCoefficient{CostCoefficientType{254.03_ns}};
+const CostCoefficient CostEstimator::sortedMergeInput = makeCostCoefficient(481.48ns);
+const CostCoefficient CostEstimator::sortedMergeOutput = makeCostCoefficient(254.03ns);
 
-const CostCoefficient CostEstimator::simpleProjectionIncrement =
-    CostCoefficient{CostCoefficientType{317.60_ns}};
-const CostCoefficient CostEstimator::coveredProjectionIncrement =
-    CostCoefficient{CostCoefficientType{216.77_ns}};
-const CostCoefficient CostEstimator::defaultProjectionIncrement =
-    CostCoefficient{CostCoefficientType{768.21_ns}};
+const CostCoefficient CostEstimator::simpleProjectionIncrement = makeCostCoefficient(317.60ns);
+const CostCoefficient CostEstimator::coveredProjectionIncrement = makeCostCoefficient(216.77ns);
+const CostCoefficient CostEstimator::defaultProjectionIncrement = makeCostCoefficient(768.21ns);
 
-const CostCoefficient CostEstimator::limitIncrement =
-    CostCoefficient{CostCoefficientType{109.50_ns}};
+const CostCoefficient CostEstimator::limitIncrement = makeCostCoefficient(109.50ns);
 
-const CostCoefficient CostEstimator::skipIncrement =
-    CostCoefficient{CostCoefficientType{127.41_ns}};
-const CostCoefficient CostEstimator::passIncrement =
-    CostCoefficient{CostCoefficientType{113.94_ns}};
+const CostCoefficient CostEstimator::skipIncrement = makeCostCoefficient(127.41ns);
+const CostCoefficient CostEstimator::passIncrement = makeCostCoefficient(113.94ns);
 
-const CostCoefficient CostEstimator::orIncrement = CostCoefficient{CostCoefficientType{211.52_ns}};
+const CostCoefficient CostEstimator::orIncrement = makeCostCoefficient(211.52ns);
 
-const CostCoefficient CostEstimator::andSortedInput =
-    CostCoefficient{CostCoefficientType{183.34_ns}};
-const CostCoefficient CostEstimator::andSortedOutput =
-    CostCoefficient{CostCoefficientType{362.22_ns}};
+const CostCoefficient CostEstimator::andSortedInput = makeCostCoefficient(183.34ns);
+const CostCoefficient CostEstimator::andSortedOutput = makeCostCoefficient(362.22ns);
 
 // Virtual scan costs are not calibrated.
-const CostCoefficient CostEstimator::virtScanStartup =
-    CostCoefficient{CostCoefficientType{200.0_ns}};
-const CostCoefficient CostEstimator::virtScanIncrement =
-    CostCoefficient{CostCoefficientType{100.3_ns}};
+const CostCoefficient CostEstimator::virtScanStartup = makeCostCoefficient(200.0ns);
+const CostCoefficient CostEstimator::virtScanIncrement = makeCostCoefficient(100.3ns);
 
 }  // namespace mongo::cost_based_ranker

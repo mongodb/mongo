@@ -36,6 +36,7 @@
 #include "mongo/util/fixed_string.h"
 #include "mongo/util/modules.h"
 
+#include <chrono>
 #include <compare>
 #include <limits>
 
@@ -43,11 +44,11 @@
 
 namespace mongo::cost_based_ranker {
 
-/**
- * Converts a nanosecond calibration measurement to milliseconds.
- */
-constexpr double operator""_ns(long double v) {
-    return static_cast<double>(v) * 1.0e-6;
+using std::literals::chrono_literals::operator""ns;
+
+template <typename Rep, typename Period>
+constexpr double toDoubleMillis(std::chrono::duration<Rep, Period> d) {
+    return duration_cast<std::chrono::duration<double, std::milli>>(d).count();
 }
 
 
@@ -140,10 +141,10 @@ struct CostCoefficientTagParam {
     // The smallest cost coefficient is equal to the cost of the fastest QE
     // operation. This is typically the cost of a simple binary comparison of a
     // scalar value.
-    static constexpr double kMin = 11.67_ns;
+    static constexpr double kMin = toDoubleMillis(11.67ns);
     // The maximum value of a cost coefficient is the most expensive operation per
     // document according to the cost model.
-    static constexpr double kMax = 1000000.0_ns;
+    static constexpr double kMax = toDoubleMillis(1e6ns);
     // TODO (SERVER-94981): Define this value based on cost model sensitivity.
     static constexpr double kEpsilon = 1.0e-5;
 };
@@ -503,6 +504,11 @@ public:
 
     friend CostEstimate operator*(const CostCoefficient& cc, const CardinalityEstimate& ce);
 };
+
+template <typename Rep, typename Period>
+constexpr CostCoefficient makeCostCoefficient(std::chrono::duration<Rep, Period> d) {
+    return CostCoefficient{CostCoefficientType{toDoubleMillis(d)}};
+}
 
 
 class SelectivityEstimate : public OptimizerEstimate<SelectivityType, SelectivityEstimate> {
