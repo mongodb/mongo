@@ -97,6 +97,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    NamespaceString nss,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
                                    boost::optional<size_t> cachedPlanHash,
+                                   boost::optional<std::string> replanReason,
                                    boost::optional<PlanExplainerData> maybeExplainData)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
@@ -104,8 +105,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(
-          plan_explainer_factory::make(_root.get(), cachedPlanHash, std::move(maybeExplainData))),
+      _planExplainer(plan_explainer_factory::make(
+          _root.get(), cachedPlanHash, std::move(replanReason), std::move(maybeExplainData))),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->getOperationContext() == _opCtx);

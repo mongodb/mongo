@@ -241,19 +241,23 @@ private:
                 workingSet.get(),
                 &planStageToQsnMap);
         }
-        return uassertStatusOK(
-            plan_executor_factory::make(_opCtx,
-                                        std::move(workingSet),
-                                        std::move(planStage),
-                                        std::move(solution),
-                                        std::move(_cq),
-                                        expCtx,
-                                        _collections.getMainCollectionAcquisition(),
-                                        _rankingResult.plannerParams->providedOptions,
-                                        std::move(nss),
-                                        _yieldPolicy,
-                                        _rankingResult.cachedPlanHash,
-                                        std::move(_rankingResult.maybeExplainData)));
+        return uassertStatusOK(plan_executor_factory::make(
+            _opCtx,
+            std::move(workingSet),
+            std::move(planStage),
+            std::move(solution),
+            std::move(_cq),
+            expCtx,
+            _collections.getMainCollectionAcquisition(),
+            _rankingResult.plannerParams->providedOptions,
+            std::move(nss),
+            _yieldPolicy,
+            _rankingResult.cachedPlanHash,
+            _rankingResult.plannerParams->replanningData.has_value()
+                ? boost::make_optional<std::string>(
+                      std::move(_rankingResult.plannerParams->replanningData->replanReason))
+                : boost::none,
+            std::move(_rankingResult.maybeExplainData)));
     }
 
     void extendSolutionWithPipeline(std::unique_ptr<QuerySolution>& solution) {

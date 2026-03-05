@@ -87,6 +87,13 @@ boost::optional<size_t> ClassicPlannerInterface::cachedPlanHash() const {
     return _plannerData.cachedPlanHash;
 }
 
+boost::optional<std::string> ClassicPlannerInterface::replanReason() const {
+    if (!_plannerData.plannerParams->replanningData) {
+        return boost::none;
+    }
+    return _plannerData.plannerParams->replanningData->replanReason;
+}
+
 WorkingSet* ClassicPlannerInterface::ws() const {
     return _plannerData.workingSet.get();
 }
@@ -267,6 +274,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
                                                        std::move(_nss),
                                                        yieldPolicy(),
                                                        cachedPlanHash(),
+                                                       replanReason(),
                                                        std::move(_planExplainerData)));
 }
 

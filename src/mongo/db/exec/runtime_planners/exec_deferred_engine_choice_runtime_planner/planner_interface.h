@@ -80,6 +80,12 @@ public:
     boost::optional<size_t> cachedPlanHash() {
         return _plannerData.cachedPlanHash;
     }
+    boost::optional<std::string> replanReason() {
+        if (!_plannerData.plannerParams->replanningData) {
+            return boost::none;
+        }
+        return _plannerData.plannerParams->replanningData->replanReason;
+    }
 
 protected:
     std::unique_ptr<WorkingSet> extractWs() {

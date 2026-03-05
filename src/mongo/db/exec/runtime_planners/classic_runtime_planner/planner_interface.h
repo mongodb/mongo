@@ -119,6 +119,7 @@ protected:
     }
     size_t plannerOptions() const;
     boost::optional<size_t> cachedPlanHash() const;
+    boost::optional<std::string> replanReason() const;
     WorkingSet* ws() const;
     std::unique_ptr<WorkingSet> extractWs() {
         return std::move(_plannerData.workingSet);

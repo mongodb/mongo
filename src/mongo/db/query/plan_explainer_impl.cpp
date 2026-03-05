@@ -956,24 +956,13 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                 break;
             }
             case STAGE_CACHED_PLAN: {
-                const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stage);
-                const CachedPlanStats* cachedStats =
-                    static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
-                statsOut->replanReason = cachedStats->replanReason;
-                // Nonnull replanReason indicates cached plan was less effecient than expected and
-                // an alternative plan was chosen.
-                statsOut->replanReason ? statsOut->fromPlanCache = false
-                                       : statsOut->fromPlanCache = true;
+                statsOut->fromPlanCache = true;
                 break;
             }
             case STAGE_MULTI_PLAN: {
                 const MultiPlanStage* multiPlan = static_cast<const MultiPlanStage*>(stage);
                 const MultiPlanStats* multiPlanStats =
                     static_cast<const MultiPlanStats*>(multiPlan->getSpecificStats());
-                tassert(8737700,
-                        "Replan reason has to be consistent if it already exists",
-                        !statsOut->replanReason ||
-                            statsOut->replanReason == multiPlanStats->replanReason);
                 statsOut->replanReason = multiPlanStats->replanReason;
                 statsOut->fromMultiPlanner = true;
                 break;

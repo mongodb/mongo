@@ -59,9 +59,11 @@ public:
         : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root,
                       boost::optional<size_t> cachedPlanHash,
+                      boost::optional<std::string> replanReason,
                       boost::optional<PlanExplainerData> maybeExplainData)
         : _root{root},
           _cachedPlanHash(cachedPlanHash),
+          _replanReason(std::move(replanReason)),
           _explainData(maybeExplainData.has_value() ? std::move(maybeExplainData.value())
                                                     : PlanExplainerData{}) {}
     const ExplainVersion& getVersion() const final;
@@ -86,6 +88,7 @@ private:
 
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
+    boost::optional<std::string> _replanReason;
     PlanExplainerData _explainData;
 };
 

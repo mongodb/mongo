@@ -88,7 +88,8 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
     size_t plannerOptions,
     NamespaceString nss = NamespaceString::kEmpty,
     std::unique_ptr<QuerySolution> qs = nullptr,
-    boost::optional<size_t> cachedPlanHash = boost::none);
+    boost::optional<size_t> cachedPlanHash = boost::none,
+    boost::optional<std::string> replanReason = boost::none);
 
 /**
  * This overload is provided for executors that do not need a CanonicalQuery. For example, the
@@ -120,6 +121,7 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
+    boost::optional<std::string> replanReason,
     boost::optional<PlanExplainerData> maybeExplainData);
 
 /**

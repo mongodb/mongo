@@ -155,6 +155,7 @@ public:
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash,
+                     boost::optional<std::string> replanReason,
                      boost::optional<PlanExplainerData> maybeExplainData);
 
     ~PlanExecutorImpl() override;

@@ -412,6 +412,14 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     bool cbrEnabled{false};
     QueryPlanRankerModeEnum planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
 
+    struct ReplanningData {
+        std::string replanReason;
+        bool shouldCache = false;
+        size_t oldPlanHash = 0;
+    };
+    // Populated if we are replanning.
+    boost::optional<ReplanningData> replanningData;
+
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
                                 const CollectionPtr& collection);

@@ -44,10 +44,12 @@
 namespace mongo::plan_explainer_factory {
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
-                                    boost::optional<size_t> cachedPlanHash = boost::none);
+                                    boost::optional<size_t> cachedPlanHash = boost::none,
+                                    boost::optional<std::string> replanReason = boost::none);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     boost::optional<size_t> cachedPlanHash,
+                                    boost::optional<std::string> replanReason,
                                     boost::optional<PlanExplainerData> maybeExplainData);
 
 std::unique_ptr<PlanExplainer> make(PlanStage* root,

@@ -56,7 +56,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<QuerySolution> qs,
-    boost::optional<size_t> cachedPlanHash) {
+    boost::optional<size_t> cachedPlanHash,
+    boost::optional<std::string> replanReason) {
     auto expCtx = cq->getExpCtx();
     return make(expCtx->getOperationContext(),
                 std::move(ws),
@@ -69,6 +70,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 cachedPlanHash,
+                std::move(replanReason),
                 boost::none /* maybeExplainData */);
 }
 
@@ -94,6 +96,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 boost::none /* cachedPlanHash */,
+                boost::none /* replanReason */,
                 boost::none /* maybeExplainData */);
 }
 
@@ -109,6 +112,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
+    boost::optional<std::string> replanReason,
     boost::optional<PlanExplainerData> maybeExplainData) {
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
@@ -122,6 +126,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              std::move(nss),
                                              yieldPolicy,
                                              cachedPlanHash,
+                                             std::move(replanReason),
                                              std::move(maybeExplainData));
         PlanExecutor::Deleter planDeleter(opCtx);
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
