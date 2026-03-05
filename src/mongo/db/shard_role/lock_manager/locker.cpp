@@ -358,8 +358,8 @@ void Locker::lockGlobal(OperationContext* opCtx, LockMode mode, Date_t deadline)
             auto beforeAcquire = Date_t::now();
             uassert(ErrorCodes::LockTimeout,
                     str::stream() << "Unable to acquire ticket with mode '" << mode
-                                  << "' within a max lock request timeout of '"
-                                  << Date_t::now() - beforeAcquire << "' milliseconds.",
+                                  << "' within the deadline. Timeout: '" << deadline - beforeAcquire
+                                  << "' milliseconds.",
                     _acquireTicket(opCtx, mode, deadline));
         }
         _modeForTicket = mode;
