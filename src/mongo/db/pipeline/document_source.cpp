@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -107,6 +108,12 @@ void DocumentSource::serializeToArray(std::vector<Value>& array,
     if (!entry.missing()) {
         array.push_back(std::move(entry));
     }
+}
+
+void DocumentSource::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    // Implement via conversion from GetModPathsReturn.
+    document_transformation::describeGetModPathsReturn(visitor, getModifiedPaths());
 }
 
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,

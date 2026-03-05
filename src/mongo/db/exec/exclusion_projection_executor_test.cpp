@@ -40,6 +40,7 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/record_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -677,5 +678,23 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotExtractWhenFieldIsNotPresent) {
     ASSERT_BSONOBJ_EQ(fromjson("{a: {b: false}, _id: true}"),
                       exclusion->serializeTransformation().toBson());
 }
+
+TEST(ExclusionProjectionExecutionTest, DescribeTransformation) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    for (auto includeId : {true, false}) {
+        auto exclusion =
+            makeExclusionProjectionWithDefaultPolicies(BSON("_id" << includeId << "a" << false));
+
+        auto converted = document_transformation::toGetModPathsReturn(*exclusion);
+        // Check that the describeTransformation provides at least the same information.
+        auto original = exclusion->getModifiedPaths();
+
+        EXPECT_EQ(original.type, converted.type);
+        EXPECT_EQ(original.paths, converted.paths);
+        EXPECT_EQ(original.renames, converted.renames);
+        EXPECT_EQ(original.complexRenames, converted.complexRenames);
+    }
+}
+
 }  // namespace
 }  // namespace mongo::projection_executor

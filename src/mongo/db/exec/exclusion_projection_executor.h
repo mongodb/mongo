@@ -98,6 +98,10 @@ public:
     std::pair<BSONObj, bool> extractProjectOnFieldAndRename(StringData oldName, StringData newName);
 
 protected:
+    Type getType() const override {
+        return Type::kExclusion;
+    }
+
     std::unique_ptr<ProjectionNode> makeChild(const std::string& fieldName) const override {
         return std::make_unique<ExclusionNode>(
             _policies, FieldPath::getFullyQualifiedPath(_pathToNode, fieldName));
@@ -257,6 +261,9 @@ public:
             return {DocumentSource::GetModPathsReturn::Type::kNotSupported, {}, {}};
         }
     }
+
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const override;
 
     boost::optional<std::set<FieldRef>> extractExhaustivePaths() const override {
         return boost::none;

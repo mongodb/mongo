@@ -86,6 +86,11 @@ DocumentSource::GetModPathsReturn SetMetadataTransformation::getModifiedPaths() 
     return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
 }
 
+void SetMetadataTransformation::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    // No field paths are modified.
+}
+
 DocumentSourceContainer::iterator SetMetadataTransformation::doOptimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
     return std::next(itr);

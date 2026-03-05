@@ -319,5 +319,36 @@ TEST_F(AddFieldsTest, AddFieldsRenameModifiesDestination) {
     ASSERT_EQUALS(renames->at("otherField"), "otherField");
 }
 
+TEST_F(AddFieldsTest, TestDescribeTransformation) {
+    using namespace mongo::document_transformation;
+    auto addFields = DocumentSourceAddFields::create(fromjson("{'a': 123, 'b': '$c', 'd': '$e.f'}"),
+                                                     getExpCtx());
+
+    int modifications = 0;
+    int renames = 0;
+    describeTransformation(OverloadedVisitor{
+                               [](const ReplaceRoot&) { FAIL("ReplaceRoot"); },
+                               [](const PreservePath&) { FAIL("PreservePath"); },
+                               [&modifications](const ModifyPath& op) {
+                                   modifications++;
+                                   EXPECT_EQ(op.getPath(), "a"_sd);
+                                   EXPECT_TRUE(op.isComputed());
+                               },
+                               [&renames](const RenamePath& op) {
+                                   renames++;
+                                   if (op.getNewPath() == "b") {
+                                       EXPECT_EQ(op.getOldPath(), "c"_sd);
+                                   } else {
+                                       EXPECT_EQ(op.getNewPath(), "d"_sd);
+                                       EXPECT_EQ(op.getOldPath(), "e.f"_sd);
+                                   }
+                               },
+                           },
+                           *addFields);
+
+    EXPECT_EQ(modifications, 1);
+    EXPECT_EQ(renames, 2);
+}
+
 }  // namespace
 }  // namespace mongo

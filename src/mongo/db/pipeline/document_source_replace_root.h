@@ -117,6 +117,11 @@ public:
         return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
     }
 
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const final {
+        visitor(document_transformation::ReplaceRoot{});
+    }
+
     const boost::intrusive_ptr<Expression>& getExpression() const {
         return _newRoot;
     }

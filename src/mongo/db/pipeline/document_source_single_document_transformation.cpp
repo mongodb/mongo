@@ -119,6 +119,11 @@ projection_executor::ExclusionNode& DocumentSourceSingleDocumentTransformation::
     return *ret;
 }
 
+void DocumentSourceSingleDocumentTransformation::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    _transformationProcessor->getTransformer().describeTransformation(visitor);
+}
+
 DocumentSourceContainer::iterator DocumentSourceSingleDocumentTransformation::maybeCoalesce(
     DocumentSourceContainer::iterator itr,
     DocumentSourceContainer* container,

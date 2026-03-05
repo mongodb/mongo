@@ -155,6 +155,9 @@ public:
                              StringMap<std::string>* renamedPaths,
                              StringMap<std::string>* complexRenamedPaths = nullptr) const;
 
+    virtual void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const;
+
     const std::string& getPath() const {
         return _pathToNode;
     }
@@ -180,6 +183,13 @@ public:
     }
 
 protected:
+    enum class Type {
+        kInclusion,
+        kExclusion,
+    };
+
+    virtual Type getType() const = 0;
+
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns
      * the child node if it already exists, or the newly-created child otherwise.

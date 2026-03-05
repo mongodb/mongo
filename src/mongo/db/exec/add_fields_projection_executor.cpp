@@ -282,4 +282,10 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
             pathToObj, Expression::parseObject(_expCtx.get(), subObj, variablesParseState));
     }
 }
+
+void AddFieldsProjectionExecutor::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    _root->describeTransformation(visitor);
+}
+
 }  // namespace mongo::projection_executor

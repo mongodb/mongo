@@ -284,4 +284,13 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
     return {BSONObj{}, false};
 }
 
+void InclusionProjectionExecutor::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    visitor(document_transformation::ReplaceRoot{});
+    if (_rootReplacementExpression) {
+        return;
+    }
+    _root->describeTransformation(visitor);
+}
+
 }  // namespace mongo::projection_executor

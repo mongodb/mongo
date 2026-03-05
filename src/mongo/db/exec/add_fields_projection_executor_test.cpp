@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -794,6 +795,28 @@ TEST(AddFieldsProjectionExecutorExecutionTest,
     ASSERT_EQ(extractedAddFields.nFields(), 0);
     ASSERT_EQ(deleteFlag, false);
     ASSERT_DOCUMENT_EQ(Document{inputProjection}, addFields.serializeTransformation());
+}
+
+TEST(AddFieldsProjectionExecutorTransformOps, DescribeTransformation) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addition(expCtx);
+    addition.parse(BSON("computed" << "value"
+                                   << "computedDotted.field" << "value"
+                                   << "newRename"
+                                   << "$oldRename"
+                                   << "newComplexRename"
+                                   << "$oldComplexRename.field"
+                                   << "newComputedRename.field"
+                                   << "$oldComputedRename"));
+
+    auto original = addition.getModifiedPaths();
+    // Check that the describeTransformation provides at least the same information.
+    auto converted = document_transformation::toGetModPathsReturn(addition);
+
+    EXPECT_EQ(original.type, converted.type);
+    EXPECT_EQ(original.paths, converted.paths);
+    EXPECT_EQ(original.renames, converted.renames);
+    EXPECT_EQ(original.complexRenames, converted.complexRenames);
 }
 
 }  // namespace

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
@@ -65,6 +66,8 @@ public:
     virtual DepsTracker::State addDependencies(DepsTracker* deps) const = 0;
     virtual void addVariableRefs(std::set<Variables::Id>* refs) const = 0;
     virtual DocumentSource::GetModPathsReturn getModifiedPaths() const = 0;
+    virtual void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const = 0;
 
     /**
      * Method used by optimize() to check if stage is a no-op.

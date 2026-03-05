@@ -92,6 +92,12 @@ DocumentSource::GetModPathsReturn GroupFromFirstDocumentTransformation::getModif
     return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 
+void GroupFromFirstDocumentTransformation::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    // Replaces the entire root, so all paths are modified.
+    visitor(document_transformation::ReplaceRoot{});
+}
+
 std::unique_ptr<GroupFromFirstDocumentTransformation> GroupFromFirstDocumentTransformation::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const std::string& groupId,

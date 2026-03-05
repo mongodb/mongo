@@ -41,6 +41,7 @@
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/record_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -1306,6 +1307,30 @@ TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
     ASSERT_THROWS_CODE(makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: '$c'}")),
                        AssertionException,
                        51752);
+}
+
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, DescribeTransformation) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    for (auto includeId : {true, false}) {
+        auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+            BSON("_id" << includeId << "computed" << "value"
+                       << "computedDotted.field" << "value"
+                       << "newRename"
+                       << "$oldRename"
+                       << "newComplexRename"
+                       << "$oldComplexRename.field"
+                       << "newComputedRename.field"
+                       << "$oldComputedRename"));
+
+        auto original = inclusion->getModifiedPaths();
+        // Check that the describeTransformation provides at least the same information.
+        auto converted = document_transformation::toGetModPathsReturn(*inclusion);
+
+        EXPECT_EQ(original.type, converted.type);
+        EXPECT_EQ(original.paths, converted.paths);
+        EXPECT_EQ(original.renames, converted.renames);
+        EXPECT_EQ(original.complexRenames, converted.complexRenames);
+    }
 }
 
 }  // namespace

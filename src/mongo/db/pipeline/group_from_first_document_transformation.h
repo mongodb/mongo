@@ -107,6 +107,9 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const final;
+
     static std::unique_ptr<GroupFromFirstDocumentTransformation> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::string& groupId,

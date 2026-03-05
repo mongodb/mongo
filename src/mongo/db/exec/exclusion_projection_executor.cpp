@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/exclusion_projection_executor.h"
 
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -84,4 +85,14 @@ ExclusionProjectionExecutor::ExclusionProjectionExecutor(
       _root((allowFastPath && !internalQueryDisableExclusionProjectionFastPath)
                 ? std::make_unique<FastPathEligibleExclusionNode>(policies)
                 : std::make_unique<ExclusionNode>(policies)) {}
+
+void ExclusionProjectionExecutor::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    if (_rootReplacementExpression) {
+        visitor(document_transformation::ReplaceRoot{});
+        return;
+    }
+    _root->describeTransformation(visitor);
+}
+
 }  // namespace mongo::projection_executor

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -315,6 +316,19 @@ void ProjectionNode::reportComputedPaths(OrderedPathSet* computedPaths,
         // example if 'a' is not an array, then 'a.b' will write to exactly one place
         // in the document.
         childPair.second->reportComputedPaths(computedPaths, nullptr, nullptr);
+    }
+}
+
+void ProjectionNode::describeTransformation(
+    document_transformation::DocumentOperationVisitor& visitor) const {
+    describeProjectedPaths(visitor,
+                           _projectedFields.begin(),
+                           _projectedFields.end(),
+                           _pathToNode,
+                           getType() == Type::kInclusion);
+    describeComputedPaths(visitor, _expressions.begin(), _expressions.end(), _pathToNode);
+    for (auto&& childPair : _children) {
+        childPair.second->describeTransformation(visitor);
     }
 }
 

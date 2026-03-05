@@ -154,6 +154,9 @@ public:
                 std::move(complexRenamedPaths)};
     }
 
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const override;
+
     /**
      * Add the specified fields to 'inputDoc'.
      *

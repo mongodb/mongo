@@ -140,6 +140,10 @@ public:
         StringData oldName, StringData newName, const std::set<StringData>& reservedNames);
 
 protected:
+    Type getType() const override {
+        return Type::kInclusion;
+    }
+
     // For inclusions, we can apply an optimization here by simply appending to the output document
     // via MutableDocument::addField, rather than always checking for existing fields via setField.
     void outputProjectedField(StringData field, Value val, MutableDocument* outputDoc) const final {
@@ -306,6 +310,9 @@ public:
                 std::move(renamedPaths),
                 std::move(complexRenamedPaths)};
     }
+
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const override;
 
     /**
      * Apply this exclusion projection to 'inputDoc'.

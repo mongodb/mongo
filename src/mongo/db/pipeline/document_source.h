@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/dependency_analysis/document_transformation.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -512,6 +513,9 @@ public:
     virtual GetModPathsReturn getModifiedPaths() const {
         return {GetModPathsReturn::Type::kNotSupported, OrderedPathSet{}, {}};
     }
+
+    virtual void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const;
 
     /**
      * Returns the expression context from the stage's context.

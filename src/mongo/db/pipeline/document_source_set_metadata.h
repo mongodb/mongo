@@ -66,6 +66,9 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
+    void describeTransformation(
+        document_transformation::DocumentOperationVisitor& visitor) const final;
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,

@@ -28,6 +28,7 @@ mongo_cc_library(
     ],
     deps = [
         ":dependencies",
+        ":document_transformation",
         "//src/mongo:base",
         "//src/mongo/db:query_expressions",
     ],
