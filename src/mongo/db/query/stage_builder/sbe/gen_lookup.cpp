@@ -1681,8 +1681,8 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
         if (!fieldEffect.isAllowedField(field)) {
             paths.emplace_back(field);
             nodes.emplace_back(ProjectNode::Drop{});
-        } else if ((!node->rightEmbeddingField || field != node->rightEmbeddingField->fullPath()) &&
-                   (!node->leftEmbeddingField || field != node->leftEmbeddingField->fullPath())) {
+        } else if ((!node->rightEmbeddingField || !node->rightEmbeddingField->isPrefixOf(field)) &&
+                   (!node->leftEmbeddingField || !node->leftEmbeddingField->isPrefixOf(field))) {
             // This field is not one of the embeddings, so it must be propagated from a child stream
             // that is not embedded.
             paths.emplace_back(field);
@@ -1802,13 +1802,13 @@ collectRequestedFields(const BinaryJoinEmbeddingNode* node,
         // If this side is not embedded, forward all the requested fields to it, provided that:
         // 1) this side if the main collection or the field is an explicit output of this side
         // 2) the field is not listed as one of the outputs of the other side
-        // 3) the field is not the embedding of the other side
+        // 3) the field doesn't start from the embedding of the other side
         if (!thisEmbedding) {
             for (auto& field : reqs.getFields()) {
                 if ((childHoldsMainCollection ||
                      (childFieldEffect && childFieldEffect->isAllowedField(field))) &&
                     (!otherChildFieldEffect || !otherChildFieldEffect->isAllowedField(field)) &&
-                    (!otherEmbedding || field != *otherEmbedding)) {
+                    (!otherEmbedding || !otherEmbedding->isPrefixOf(field))) {
                     targetSet.insert(field);
                 }
             }
