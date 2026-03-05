@@ -569,7 +569,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     _clientRequest.getUpdateRequest().getUpdates().at(writeOpRef.first));
 
                 registrar.setIncludeQueryStatsMetricsIfRequested(
-                    CurOp::get(_opCtx), writeOpRef.first, updates->back());
+                    _opCtx, writeOpRef.first, updates->back());
 
                 updates->back().setSampleId(targetedWrite->sampleId);
 

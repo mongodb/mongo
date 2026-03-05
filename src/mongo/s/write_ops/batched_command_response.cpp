@@ -513,7 +513,7 @@ const std::vector<write_ops::QueryStatsMetrics>& BatchedCommandResponse::getQuer
 
 void BatchedCommandResponse::setQueryStatsMetrics(
     std::vector<write_ops::QueryStatsMetrics>&& queryStatsMetrics) {
-    _queryStatsMetrics.emplace(queryStatsMetrics);
+    _queryStatsMetrics.emplace(std::move(queryStatsMetrics));
 }
 
 std::shared_ptr<const ErrorExtraInfo> MultipleErrorsOccurredInfo::parse(const BSONObj& obj) {

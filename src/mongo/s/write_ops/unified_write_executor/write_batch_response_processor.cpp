@@ -161,10 +161,52 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
             10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
 }
+
+void aggregateQueryStatsMetrics(OperationContext* opCtx, const WriteBatchResponse& response) {
+    // A reply is a direct response returned from a shard. It can be one of the following types --
+    // batch write, bulk write, or find-and-modify.
+    auto replyVisitor = OverloadedVisitor(
+        [&](const BatchWriteCommandReply& reply) {
+            auto& opDebug = CurOp::get(opCtx)->debug();
+            for (const auto& metrics : reply.queryStatsMetrics) {
+                tassert(11205000,
+                        str::stream() << "QueryStatsInfo must have been created for op index: "
+                                      << metrics.getOriginalOpIndex(),
+                        opDebug.hasQueryStatsInfo(metrics.getOriginalOpIndex()));
+                opDebug.getQueryStatsInfo(metrics.getOriginalOpIndex())
+                    .additiveMetrics.aggregateCursorMetrics(metrics.getMetrics());
+            }
+        },
+        // Recording query stats for bulkWrite commands is not yet supported.
+        [&](const BulkWriteCommandReply& reply) {},
+        // Recording query stats for findAndModify commands is not yet supported.
+        [&](const write_ops::FindAndModifyCommandReply& item) {});
+
+    // Visits the 'response' which is one of the following types -- empty, simple, or no-retry write
+    // batch. For each of the response types, we visit their replies again using the 'replyVisitor'
+    // defined above.
+    visit(OverloadedVisitor([&](const EmptyBatchResponse& res) {},
+                            [&](const SimpleWriteBatchResponse& res) {
+                                for (const auto& [shardId, shardResponse] : res.shardResponses) {
+                                    if (shardResponse.isOK()) {
+                                        visit(replyVisitor, shardResponse.getReply());
+                                    }
+                                }
+                            },
+                            [&](const NoRetryWriteBatchResponse& res) {
+                                if (res.isOK()) {
+                                    visit(replyVisitor, res.getReply());
+                                }
+                            }),
+          response);
+}
 }  // namespace
 
 ProcessorResult WriteBatchResponseProcessor::onWriteBatchResponse(
     OperationContext* opCtx, RoutingContext& routingCtx, const WriteBatchResponse& response) {
+    // If we are collecting query stats for any of the ops in this write batch,
+    // aggregate them into OpDebug now.
+    aggregateQueryStatsMetrics(opCtx, response);
     return visit(
         [&](const auto& responseData) -> ProcessorResult {
             return _onWriteBatchResponse(opCtx, routingCtx, responseData);
@@ -587,20 +629,6 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
                   result.items.emplace_back(op, FindAndModifyReplyItem{parsedReply, shardId});
               }),
           response.getReply());
-
-    // If we are collecting query stats for any of the ops in this write batch, aggregate them into
-    // OpDebug now.
-    if (auto* batchReply = get_if<BatchWriteCommandReply>(&response.getReply())) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-        for (const auto& metrics : batchReply->queryStatsMetrics) {
-            tassert(11205000,
-                    str::stream() << "QueryStatsInfo must have been created for op index: "
-                                  << metrics.getOriginalOpIndex(),
-                    opDebug.hasQueryStatsInfo(metrics.getOriginalOpIndex()));
-            opDebug.getQueryStatsInfo(metrics.getOriginalOpIndex())
-                .additiveMetrics.aggregateCursorMetrics(metrics.getMetrics());
-        }
-    }
 
     return result;
 }
@@ -1415,6 +1443,19 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
         resp.setWriteConcernError(new WriteConcernErrorDetail{totalWcError->toStatus()});
     }
 
+    // Append query stats metrics if the command is forwarded from router (the current node is a
+    // primary shard) such that router can receive and aggregate the metrics there.
+    // Otherwise, ignore if the current node is a router.
+    if (opCtx->isCommandForwardedFromRouter()) {
+        std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        opDebug.forEachQueryStatsInfoForBatchWrites(
+            [&queryStatsMetrics, &opDebug](size_t opIndex, const OpDebug::QueryStatsInfo&) {
+                queryStatsMetrics.emplace_back(write_ops::QueryStatsMetrics{
+                    static_cast<int32_t>(opIndex), opDebug.getCursorMetrics(opIndex)});
+            });
+        resp.setQueryStatsMetrics(std::move(queryStatsMetrics));
+    }
     return resp;
 }
 

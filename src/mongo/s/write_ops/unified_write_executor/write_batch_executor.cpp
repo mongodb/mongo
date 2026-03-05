@@ -389,7 +389,7 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
             for (auto& op : ops) {
                 auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
                 registrar.setIncludeQueryStatsMetricsIfRequested(
-                    CurOp::get(opCtx), op.getIndex(), updateOpEntry);
+                    opCtx, op.getIndex(), updateOpEntry);
 
                 auto sampleIdIt = sampleIds.find(getWriteOpId(op));
                 updateOpEntry.setSampleId(sampleIdIt != sampleIds.end()

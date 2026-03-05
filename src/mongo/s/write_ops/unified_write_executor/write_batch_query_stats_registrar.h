@@ -63,7 +63,7 @@ public:
      * requested for query stats metrics. It does nothing if the write op is not chosen, or we
      * already reach the limit.
      */
-    void setIncludeQueryStatsMetricsIfRequested(CurOp* curOp,
+    void setIncludeQueryStatsMetricsIfRequested(OperationContext* opCtx,
                                                 int opIndex,
                                                 write_ops::UpdateOpEntry& updateOpEntry);
 

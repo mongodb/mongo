@@ -1346,10 +1346,10 @@ static void appendResolvedViewsInfoImpl(
     }
 }
 
-CursorMetrics OpDebug::getCursorMetrics() const {
+CursorMetrics OpDebug::getCursorMetrics(size_t opIndex) const {
     CursorMetrics metrics;
 
-    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
+    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics(opIndex);
     metrics.setKeysExamined(additiveMetrics.keysExamined.value_or(0));
     metrics.setDocsExamined(additiveMetrics.docsExamined.value_or(0));
     metrics.setBytesRead(additiveMetrics.bytesRead.value_or(0));

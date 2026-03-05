@@ -338,6 +338,46 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
+TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+       RegisterRequestForShardsvrCoordinateMultiUpdateTest) {
+    bool skipRegistration = GetParam();
+
+    // Setting this to simulate the scenario that a primary shard receives a dispatched update
+    // command (_shardsvrCoordinateMultiUpdate) from the router and it has to act like a router.
+    opCtx->setCommandForwardedFromRouter();
+
+    const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
+    const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNTRACKED(), nss1DbVersion);
+
+    // Create a batch update request
+    auto update = fromjson(R"({
+        update: "testColl",
+        updates: [
+            { q: { x: {$eq: 3} }, u: { foo: "bar" }, multi: false, upsert: false },
+            { q: { x: {$eq: 3} }, u: { $set: { bar: "baz" } }, multi: false, upsert: false, includeQueryStatsMetricsForOpIndex: 42 },
+            { q: { x: {$eq: 3} }, u: [ {$set: { number: 42 }} ], multi: false, upsert: false }
+        ],
+        "$db": "testDB"
+        })"_sd);
+    auto updateCommandRequest = write_ops::UpdateCommandRequest::parse(std::move(update));
+    BatchedCommandRequest batchRequest(updateCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    // Asserts that none of the update ops is registered.
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    for (size_t opIndex = 0; opIndex < 3; opIndex++) {
+        ASSERT_FALSE(opDebug.hasQueryStatsInfo(opIndex));
+    }
+
+    // Asserts that the entry for index 42 is created. Since we are on a primary shard and it
+    // creates QueryStatsInfo only for returning the metrics back to the mongos, the entry does not
+    // have key and key hash.
+    ASSERT_TRUE(opDebug.hasQueryStatsInfo(42));
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(42).key);
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(42).keyHash);
+}
 
 INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
                          WriteBatchQueryStatsRegistrarRegisterRequestFixture,
@@ -353,16 +393,42 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
         opDebug.setQueryStatsInfoAtOpIndex(opIndex, std::move(qsi));
     };
 
+    // MongoS ignores and resets the op index field passed from client. If we decide not to record
+    // this op (as we do not register a query stats key for it), we assert that the op index field
+    // is cleared before sending to MongoD shards.
+    {
+        write_ops::UpdateOpEntry updateOpEntry;
+        updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 0, updateOpEntry);
+
+        ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+    }
+
+    // Similar to the above case, MongoS ignores and overwrites the op index passed from client if
+    // we decide to record this op. Asserts that the op index field is based on the position (1)
+    // rather than the op index passed from the client.
+    {
+        // Registering a mock query stats key to indicate that we decide to record this update op.
+        registerMockKey(CurOp::get(opCtx)->debug(), 1);
+
+        write_ops::UpdateOpEntry updateOpEntry;
+        updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 1, updateOpEntry);
+
+        ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 1);
+    }
+
     // Asserts that we are allowed to request metrics for update ops up to
     // kMaxBatchOpsMetricsRequested.
-    for (size_t opIndex = 0; opIndex < WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested;
+    for (size_t opIndex = 2;
+         opIndex < WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
          opIndex++) {
         registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
 
         write_ops::UpdateOpEntry updateOpEntry;
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(
-            CurOp::get(opCtx), opIndex, updateOpEntry);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, opIndex, updateOpEntry);
 
         // Asserts that the field includeQueryStatsMetricsForOpIndex has been set with 'opIndex'.
         // When a shard server receives this 'updateOpEntry', it will append cursor metrics in
@@ -373,16 +439,60 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
 
     // Asserts that after reaching the limit, we no longer request for metrics so as to prevent the
     // response growing beyond the allowed object size limit.
-    for (size_t opIndex = WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested;
+    for (size_t opIndex = WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
          opIndex < WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 10;
          opIndex++) {
         registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
 
         write_ops::UpdateOpEntry updateOpEntry;
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(
-            CurOp::get(opCtx), opIndex, updateOpEntry);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, opIndex, updateOpEntry);
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+    }
+}
+
+TEST_F(WriteBatchQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {
+    // Setting this to simulate the scenario that a primary shard receives a dispatched update
+    // command (_shardsvrCoordinateMultiUpdate) from the router and it has to act like a router.
+    opCtx->setCommandForwardedFromRouter();
+
+    WriteBatchQueryStatsRegistrar queryStatsRegistrar;
+
+    auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
+        OpDebug::QueryStatsInfo qsi;
+        qsi.key = std::make_unique<query_stats::MockKey>(opCtx);
+        qsi.keyHash = 42;
+        opDebug.setQueryStatsInfoAtOpIndex(opIndex, std::move(qsi));
+    };
+
+
+    // Primary shard simply lets the provided opIndex to pass through.
+    {
+        registerMockKey(CurOp::get(opCtx)->debug(), 100);
+
+        write_ops::UpdateOpEntry updateOpEntry;
+        updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 100, updateOpEntry);
+
+        // Asserts that the index in 'updateOpEntry' remain the same (42) and not be overwritten by
+        // provided opIndex (100).
+        ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 42);
+    }
+
+    // Primary shard simply lets the provided opIndex to pass through even when QueryStatsInfo is
+    // empty.
+    {
+        write_ops::UpdateOpEntry updateOpEntry;
+        updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 200, updateOpEntry);
+
+        // Asserts that the index in 'updateOpEntry' remain the same and not be unset by the empty
+        // QueryStatsInfo.
+        ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 42);
     }
 }
 

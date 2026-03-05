@@ -66,6 +66,11 @@ void parseAndRegisterUpdateOp(OperationContext* opCtx,
             return;
     }
 
+    // Skip if the update op is forwarded from router.
+    if (opCtx->isCommandForwardedFromRouter()) {
+        return;
+    }
+
     const write_ops::UpdateCommandRequest& wholeOp =
         updateOp.getCommand().getBatchedCommandRequest().getUpdateRequest();
 
@@ -209,12 +214,14 @@ void WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* op
     size_t nOps = cmdRef.getNumOps();
     for (size_t opIndex = 0; opIndex < nOps; opIndex++) {
         const auto& updateOp = cmdRef.getOp(opIndex).getUpdateOp();
-        parseAndRegisterUpdateOp(opCtx, updateOp.getNss(), opIndex, updateOp, skipRegistration);
-
-        // Create QueryStatsInfo if the 'updateOp' is requested for the metrics.
-        if (updateOp.getIncludeQueryStatsMetricsForOpIndex() &&
-            !opDebug.hasQueryStatsInfo(opIndex)) {
-            opDebug.setQueryStatsInfoAtOpIndex(opIndex, {});
+        if (opCtx->isCommandForwardedFromRouter()) {
+            // Create QueryStatsInfo if the 'updateOp' is requested for the metrics.
+            if (auto requestedOpIndex = updateOp.getIncludeQueryStatsMetricsForOpIndex();
+                requestedOpIndex) {
+                opDebug.setQueryStatsInfoAtOpIndex(*requestedOpIndex, {});
+            }
+        } else {
+            parseAndRegisterUpdateOp(opCtx, updateOp.getNss(), opIndex, updateOp, skipRegistration);
         }
     }
 
@@ -226,18 +233,26 @@ void WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* op
 }
 
 void WriteBatchQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
-    CurOp* curOp, int opIndex, write_ops::UpdateOpEntry& updateOpEntry) {
+    OperationContext* opCtx, int opIndex, write_ops::UpdateOpEntry& updateOpEntry) {
+    CurOp* curOp = CurOp::get(opCtx);
     if (isAggregationPipeline(curOp)) {
         return;
     }
-    bool requestQueryStatsFromRemotes = updateOpEntry.getIncludeQueryStatsMetricsForOpIndex() ||
+
+    // Pass through the original 'updateOpEntry' without setting or modifying the field.
+    if (opCtx->isCommandForwardedFromRouter()) {
+        return;
+    }
+
+    bool requestQueryStatsFromRemotes =
         query_stats::shouldRequestRemoteMetrics(curOp->debug(), opIndex);
     if (requestQueryStatsFromRemotes &&
         _numOpsWithMetricsRequested < kMaxBatchOpsMetricsRequested) {
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(opIndex);
         _numOpsWithMetricsRequested++;
     } else {
-        // Unset the flag if we have reached the request limit kMaxBatchOpsMetricsRequested.
+        // Explicitly unset it to stop propagating the field and ignore it, in case if the field is
+        // set from user.
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(boost::none);
     }
 }

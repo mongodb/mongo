@@ -342,7 +342,7 @@ public:
     /**
      * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
      */
-    MONGO_MOD_PRIVATE CursorMetrics getCursorMetrics() const;
+    MONGO_MOD_PRIVATE CursorMetrics getCursorMetrics(size_t opIndex = kCurrentOpIndex) const;
 
     /**
      * Convenience method that computes QueryShapeHash if '_queryShapeHash' has not been previously
