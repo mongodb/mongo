@@ -3,6 +3,7 @@ test_kind: bulk_write_cluster_js_test
 selector:
   roots:
     - jstests/core/**/*.js
+    # Not including jstests/core_sharding/**/*.js as the suite mirrors commands to a replica set.
   exclude_files:
     # These tests run in the jscore_txn passthrough suites.
     - jstests/core/txns/**/*.js

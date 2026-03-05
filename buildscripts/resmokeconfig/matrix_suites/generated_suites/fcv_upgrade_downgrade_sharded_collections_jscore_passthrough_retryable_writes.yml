@@ -195,6 +195,7 @@ selector:
     - jstests/core/shell/bench_test1.js
     - jstests/core/catalog/list_catalog_stage_consistency.js
     - jstests/core/query/query_settings/query_settings_size_limits.js
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
     - jstests/core/txns/**/*.js
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js
@@ -257,6 +258,7 @@ selector:
     - requires_collstats
   roots:
     - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
 test_kind: js_test

@@ -6,6 +6,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
 
@@ -194,6 +195,9 @@ selector:
     # This test assumes query settings representative queries are stored in the cluster parameter,
     # which is not the case if featureFlagPQSBackfill is on.
     - jstests/core/query/query_settings/query_settings_size_limits.js
+
+    # These tests run resharding, which can fail due to FCV change.
+    - jstests/core_sharding/analyze_shard_key/configure_query_analyzer_persistence.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
   exclude_files:
     # The following tests fail because a certain command or functionality is not supported on
     # mongos. This command or functionality is placed in a comment next to the failing test.
@@ -74,6 +75,9 @@ selector:
     - jstests/core/query/query_settings/query_settings_plan_cache.js
     # The following test doesn't support $lookup where one collection is sharded and the other is unsharded
     - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+    # These tests run analyzeShardKey and make assertions about configuration state, which may not
+    # be guaranteed by this suite as analyzeShardKey is run in the background.
+    - jstests/core_sharding/analyze_shard_key/**/*.js
 
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
