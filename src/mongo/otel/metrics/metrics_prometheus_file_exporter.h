@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/system_clock_source.h"
 
 #include <memory>
 #include <string>
@@ -46,6 +47,11 @@ struct PrometheusFileExporterOptions {
      * unwritable or writes suddenly becoming extremely slow.
      */
     int maxConsecutiveFailures = 10;
+
+    /**
+     * The clock to wait on for timeouts. Exposed for testing.
+     */
+    ClockSource* clockSource = SystemClockSource::get();
 
     /**
      * Used for testing delays and slowness in the file writer thread. This code will be executed

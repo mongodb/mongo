@@ -140,10 +140,36 @@ private:
     void _checkConsecutiveFailures(WithLock lock);
 
     /**
-     * Called from the failpoint, unlocks the lock, calls the provided callback, and locks again.
+     * Obtains `_mutex`, calls `triggerCondition`, and waits on `_condition` for `goalCondition`.
+     * This done in a way to handle any value for timeout, and takes into account the time to obtain
+     * the mutex.
+     */
+    bool _safeWaitForConditionWithTimeout(std::chrono::microseconds timeout,
+                                          function_ref<void()> triggerCondition,
+                                          function_ref<bool()> goalCondition);
+
+    /**
+     * Code for handling the failpoint. Note that `data` must contain one of "CallbackOnly",
+     * "UnlockOnly", "ForceFlush", or "Shutdown", all of which trigger slightly different
+     * behaviors. This is separated from the failpoint call so that it is not too distracting in the
+     * non-test code path.
+     */
+    void _testOnlyFailpointHandler(const BSONObj& data, stdx::unique_lock<stdx::timed_mutex>& lock);
+
+    /**
+     * Unlocks the lock, calls the provided callback, and locks again. This is called from the
+     * failpoint.
      */
     void _testOnlyUnlockAndCallCallback(stdx::unique_lock<stdx::timed_mutex>& lock);
 
+    /**
+     * Waits for the provided bool to be true, calls _testOnlyFailpointCallback, then waits for
+     * the next time the clock is advanced. This is used in the failpoint to make sure we
+     * timeout correctly in certain places.
+     */
+    void _testOnlyWaitOnBoolAndClock(bool& waitBool, stdx::unique_lock<stdx::timed_mutex>& lock);
+
+    ClockSource& _clockSource;
     // The name of the file to export to. This will export first to a file with this name + .tmp,
     // then rename it to this name.
     const std::string _filepath;
@@ -164,9 +190,15 @@ private:
     int _consecutiveFailures = 0;
 };
 
+ClockSource& safeDeref(ClockSource* clockSource) {
+    invariant(clockSource != nullptr);
+    return *clockSource;
+}
+
 PrometheusFileExporter::PrometheusFileExporter(const std::string& filepath,
                                                PrometheusFileExporterOptions options)
-    : _filepath(filepath),
+    : _clockSource(safeDeref(options.clockSource)),
+      _filepath(filepath),
       _tempFilepath(fmt::format("{}.tmp", _filepath)),
       _maxConsecutiveFailures(options.maxConsecutiveFailures),
       _testOnlyFailpointCallback(std::move(options.testOnlyFailpointCallback)) {}
@@ -203,7 +235,7 @@ Status PrometheusFileExporter::_startFileWriterThread() {
         stdx::unique_lock lock(_mutex);
         while (true) {
             metricsPrometheusFileExporterThreadCallback.execute(
-                [this, &lock](const BSONObj& data) { _testOnlyUnlockAndCallCallback(lock); });
+                [this, &lock](const BSONObj& data) { _testOnlyFailpointHandler(data, lock); });
             if (_shutdownStarted) {
                 _shutdownComplete = true;
                 _condition.notify_all();
@@ -297,28 +329,85 @@ ExportResult PrometheusFileExporter::Export(const ResourceMetrics& data) noexcep
     return ExportResult::kSuccess;
 }
 
+bool PrometheusFileExporter::_safeWaitForConditionWithTimeout(std::chrono::microseconds timeout,
+                                                              function_ref<void()> triggerCondition,
+                                                              function_ref<bool()> goalCondition) {
+    Date_t start = _clockSource.now();
+    // Time arithmetic will overflow if we're not careful, so figure out if we have essentially
+    // infinite timeout.
+    Microseconds maxNonInfiniteTimeout =
+        Microseconds::max() - Microseconds(start.toDurationSinceEpoch());
+    bool infiniteTimeout = maxNonInfiniteTimeout.count() <= timeout.count();
+    stdx::unique_lock lock =
+        infiniteTimeout ? stdx::unique_lock(_mutex) : stdx::unique_lock(_mutex, timeout);
+    if (!lock.owns_lock()) {
+        // We timed out without getting the lock.
+        return false;
+    }
+    triggerCondition();
+    _condition.notify_all();
+    if (infiniteTimeout) {
+        _condition.wait(lock, goalCondition);
+        return true;
+    }
+    return _clockSource.waitForConditionFor(_condition,
+                                            lock,
+                                            Microseconds(timeout.count()) -
+                                                (_clockSource.now() - start),
+                                            goalCondition);
+}
+
 bool PrometheusFileExporter::ForceFlush(std::chrono::microseconds timeout) noexcept {
-    // TODO SERVER-120797: Handle timeouts
     // Make sure we started the writer.
     invariant(_writer.joinable());
-    stdx::unique_lock lock(_mutex);
-    _flushNeeded = true;
-    _condition.notify_all();
-    _condition.wait(lock, [this]() { return _flushNeeded == false; });
-    return true;
+    return _safeWaitForConditionWithTimeout(
+        timeout,
+        /*triggerCondition=*/[this]() { _flushNeeded = true; },
+        /*goalCondition=*/[this]() { return _flushNeeded == false; });
 }
 
 bool PrometheusFileExporter::Shutdown(std::chrono::microseconds timeout) noexcept {
-    // TODO SERVER-120797: Handle timeouts
     // If we never started the writer thread, Shutdown is trivial.
     if (!_writer.joinable()) {
         return true;
     }
-    stdx::unique_lock lock(_mutex);
-    _shutdownStarted = true;
-    _condition.notify_all();
-    _condition.wait(lock, [this]() { return _shutdownComplete; });
-    return true;
+    return _safeWaitForConditionWithTimeout(
+        timeout,
+        /*triggerCondition=*/[this]() { _shutdownStarted = true; },
+        /*goalCondition=*/[this]() { return _shutdownComplete; });
+}
+
+void PrometheusFileExporter::_testOnlyFailpointHandler(const BSONObj& data,
+                                                       stdx::unique_lock<stdx::timed_mutex>& lock) {
+    invariant(_testOnlyFailpointCallback);
+    if (data["CallbackOnly"]) {
+        _testOnlyFailpointCallback();
+    } else if (data["UnlockOnly"]) {
+        _testOnlyUnlockAndCallCallback(lock);
+    } else if (data["ForceFlush"]) {
+        _testOnlyWaitOnBoolAndClock(_flushNeeded, lock);
+    } else if (data["Shutdown"]) {
+        _testOnlyWaitOnBoolAndClock(_shutdownStarted, lock);
+    } else {
+        LOGV2_FATAL(12079700, "Unexpected failpoint type.", "data"_attr = data);
+    }
+}
+
+void PrometheusFileExporter::_testOnlyWaitOnBoolAndClock(
+    bool& waitBool, stdx::unique_lock<stdx::timed_mutex>& unique_lock) {
+    // Wait for the waitBool.
+    _condition.wait(unique_lock, [&waitBool]() { return waitBool; });
+    // Trigger the callback.
+    _testOnlyFailpointCallback();
+    // Wait to proceed until the clock has been advanced again.
+    bool doneWaiting = false;
+    _clockSource.setAlarm(_clockSource.now() + Milliseconds(1),
+                          [this, &doneWaiting, &unique_lock]() {
+                              stdx::lock_guard lock(*unique_lock.mutex());
+                              doneWaiting = true;
+                              _condition.notify_all();
+                          });
+    _condition.wait(unique_lock, [&doneWaiting]() { return doneWaiting; });
 }
 
 void PrometheusFileExporter::_testOnlyUnlockAndCallCallback(

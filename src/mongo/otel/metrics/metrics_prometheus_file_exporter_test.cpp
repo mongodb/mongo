@@ -35,6 +35,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 
 #include <filesystem>
@@ -192,7 +193,8 @@ TEST_F(PrometheusFileExporterTest, SkippedExportIncrementsCounter) {
             future.wait();
         }});
 
-    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback");
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("UnlockOnly" << true));
     ASSERT_EQ(exporter->Export(makeResourceMetrics("first_metric", 10)), ExportResult::kSuccess);
     EXPECT_EQ(exporter->Export(makeResourceMetrics("second_metric", 10)), ExportResult::kSuccess);
 
@@ -229,12 +231,98 @@ TEST_F(PrometheusFileExporterTest, ForceFlushWithNoExport) {
     EXPECT_TRUE(exporter->ForceFlush());
 }
 
+TEST_F(PrometheusFileExporterTest, ForceFlushTimesOutWaitingMutex) {
+    // We use the first promise+future to guarantee that the writer thread holds the mutex, and the
+    // second to unblock it after we have timed out.
+    auto [promise1, future1] = makePromiseFuture<void>();
+    auto [promise2, future2] = makePromiseFuture<void>();
+    std::unique_ptr<PushMetricExporter> exporter =
+        makeExporter({.testOnlyFailpointCallback = [&promise1, &future1, &future2]() {
+            // Prevent issues in case we enter this twice
+            if (!future1.isReady()) {
+                promise1.emplaceValue();
+            }
+            future2.wait();
+        }});
+    // Force a flush to guarantee that the writer thread has entered its loop and is waiting on
+    // something to happen to wake up.
+    exporter->ForceFlush();
+
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("CallbackOnly" << true));
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("force_flush_test", 1)), ExportResult::kSuccess);
+    future1.wait();
+
+    EXPECT_FALSE(exporter->ForceFlush(std::chrono::milliseconds(10)));
+    promise2.emplaceValue();
+    // This should be fast now.
+    EXPECT_TRUE(exporter->ForceFlush());
+}
+
+TEST_F(PrometheusFileExporterTest, ForceFlushTimesOutWaitingForFlush) {
+    ClockSourceMock clockSource;
+    std::unique_ptr<PushMetricExporter> exporter =
+        makeExporter({.clockSource = &clockSource, .testOnlyFailpointCallback = [&clockSource]() {
+                          clockSource.advance(Milliseconds(100));
+                      }});
+
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("ForceFlush" << true));
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("force_flush_test", 1)), ExportResult::kSuccess);
+    EXPECT_FALSE(exporter->ForceFlush(std::chrono::milliseconds(1)));
+    // Advance the clock so the writer thread can keep going.
+    clockSource.advance(Milliseconds(100));
+}
+
 TEST_F(PrometheusFileExporterTest, ShutdownSucceeds) {
     std::unique_ptr<PushMetricExporter> exporter = makeExporter();
 
     EXPECT_TRUE(exporter->Shutdown());
     // A second call should be fine.
     EXPECT_TRUE(exporter->Shutdown());
+}
+
+TEST_F(PrometheusFileExporterTest, ShutdownTimesOutWaitingMutex) {
+    // We use the first promise+future to guarantee that the writer thread holds the mutex, and the
+    // second to unblock it after we have timed out.
+    auto [promise1, future1] = makePromiseFuture<void>();
+    auto [promise2, future2] = makePromiseFuture<void>();
+    std::unique_ptr<PushMetricExporter> exporter =
+        makeExporter({.testOnlyFailpointCallback = [&promise1, &future1, &future2]() {
+            // Prevent issues in case we enter this twice
+            if (!future1.isReady()) {
+                promise1.emplaceValue();
+            }
+            future2.wait();
+        }});
+    // Force a flush to guarantee that the writer thread has entered its loop and is waiting on
+    // something to happen to wake up.
+    exporter->ForceFlush();
+
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("CallbackOnly" << true));
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("force_flush_test", 1)), ExportResult::kSuccess);
+    future1.wait();
+
+    EXPECT_FALSE(exporter->Shutdown(std::chrono::milliseconds(10)));
+    promise2.emplaceValue();
+    // This should be fast now.
+    EXPECT_TRUE(exporter->Shutdown());
+}
+
+TEST_F(PrometheusFileExporterTest, ShutdownTimesOutWaitingForShutdown) {
+    ClockSourceMock clockSource;
+    std::unique_ptr<PushMetricExporter> exporter =
+        makeExporter({.clockSource = &clockSource, .testOnlyFailpointCallback = [&clockSource]() {
+                          clockSource.advance(Milliseconds(100));
+                      }});
+
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("Shutdown" << true));
+    ASSERT_EQ(exporter->Export(makeResourceMetrics("shutdown_test", 1)), ExportResult::kSuccess);
+    EXPECT_FALSE(exporter->Shutdown(std::chrono::milliseconds(1)));
+    // Advance the clock so the writer thread can keep going.
+    clockSource.advance(Milliseconds(100));
 }
 
 TEST_F(PrometheusFileExporterTest, InitFailsWhenTmpFileCannotBeCreated) {
@@ -378,7 +466,8 @@ TEST_F(PrometheusFileExporterTest, ExactlyMaxConsecutiveSkipsIsOk) {
                          future.wait();
                      }});
 
-    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback");
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("UnlockOnly" << true));
     // The first export can never be skipped as the exporter has not exported previously.
     EXPECT_EQ(exporter->Export(makeResourceMetrics("metric", 1)), ExportResult::kSuccess);
     EXPECT_EQ(exporter->Export(makeResourceMetrics("metric", 2)), ExportResult::kSuccess);
@@ -399,7 +488,8 @@ DEATH_TEST_F(PrometheusFileExporterDeathTest,
                          future.wait();
                      }});
 
-    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback");
+    FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
+                            BSON("UnlockOnly" << true));
     // The first export can never be skipped as the exporter has not exported previously.
     EXPECT_EQ(exporter->Export(makeResourceMetrics("metric", 1)), ExportResult::kSuccess);
     EXPECT_EQ(exporter->Export(makeResourceMetrics("metric", 2)), ExportResult::kSuccess);

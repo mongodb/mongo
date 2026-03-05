@@ -222,6 +222,7 @@ mongo_cc_unit_test(
     deps = [
         ":metrics_prometheus_file_exporter",
         ":metrics_test_util",
+        "//src/mongo/util:clock_source_mock",
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
         "//src/third_party/opentelemetry-cpp/sdk/src/resource",
     ],
