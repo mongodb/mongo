@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph_test_util.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
@@ -53,10 +54,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo {
+namespace mongo::pipeline::dependency_graph {
 namespace {
-
-using DependencyGraph = mongo::pipeline::dependency_graph::DependencyGraph;
 
 class PipelineDependencyGraphTest : public unittest::Test {
 protected:
@@ -75,21 +74,7 @@ protected:
      */
     template <typename F>
     void runTest(F&& func) {
-        auto sources = pipeline->getSources();
-        // Left to right
-        for (auto it = sources.begin(); it != sources.end(); ++it) {
-            func();
-            graph->recomputeFromStage(it, sources);
-        }
-        // Right to left
-        for (auto it = std::prev(sources.end());; --it) {
-            func();
-            graph->recomputeFromStage(it, sources);
-            if (it == sources.begin()) {
-                func();
-                break;
-            }
-        }
+        recomputeAndAssert(*graph, *pipeline, std::forward<F>(func));
     }
 
     std::unique_ptr<Pipeline> pipeline;
@@ -162,6 +147,7 @@ TEST_F(PipelineDependencyGraphTest, UnknownField) {
 
 TEST_F(PipelineDependencyGraphTest, UnknownComplex) {
     setPipeline("[{$match: { 'a.b': 'baz' }}]");
+
     runTest([&] {
         // Return nullptr to indicate it comes from document.
         ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b"), nullptr);
@@ -368,4 +354,4 @@ TEST_F(PipelineDependencyGraphTest, ComplexPathsMultiple) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::pipeline::dependency_graph

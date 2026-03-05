@@ -1,0 +1,82 @@
+VARIATION Shadowing
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": "foo"
+                }
+            }
+        },
+        {
+            "$set": {
+                "b": {
+                    "$const": "bar"
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "$const": "baz"
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": "baz"
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                },
+                "a:1": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1"
+                },
+                "a:1": {
+                    "declaringScope": "scope:0"
+                },
+                "b:3": {
+                    "declaringScope": "scope:1"
+                }
+            }
+        }
+    },
+    "$set:2": {
+        "scope:2": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:4": {
+                    "declaringScope": "scope:2"
+                },
+                "a:5": {
+                    "declaringScope": "scope:2"
+                },
+                "b:3": {
+                    "declaringScope": "scope:1"
+                }
+            }
+        }
+    },
+    "$match:3": {
+        "scope:2": "scope:2"
+    }
+}
+

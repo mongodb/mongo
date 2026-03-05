@@ -89,3 +89,18 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "pipeline_dependency_graph_golden_test",
+    srcs = [
+        "pipeline_dependency_graph_golden_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/test_output/query/compiler/dependency_analysis/pipeline_dependency_graph_golden_test:test_data",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":pipeline_dependency_graph",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+    ],
+)

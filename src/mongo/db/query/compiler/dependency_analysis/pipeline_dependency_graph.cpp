@@ -143,22 +143,16 @@ void DependencyGraph::recomputeFromStage(DocumentSourceContainer::const_iterator
 
 std::tuple<DependencyGraph::ScopeId, DependencyGraph::FieldId> DependencyGraph::earliestDescendants(
     StageId stageId) const {
-    ScopeId scopeId{0};
-    FieldId fieldId{0};
-
-    if (stageId.value > 0) {
-        // Invalidate scopes starting at the scope defined by the starting stage (if any).
-        // If the starting stage does not define a scope, invalidate from the next scope.
-        scopeId = _stages[stageId].scope;
-        if (_scopes[scopeId].stage != stageId) {
-            ++scopeId.value;
-        }
-        if (scopeId != _scopes.getNextId()) {
-            fieldId = _scopes[scopeId].missingField;
-        } else {
-            fieldId = _fields.getNextId();
-        }
+    if (stageId.value < 1) {
+        return {ScopeId{0}, FieldId{0}};
     }
+
+    ScopeId scopeId = _stages[stageId].nextNewScope;
+    FieldId fieldId = scopeId == _scopes.getNextId()
+        // No scope to invalidate so no fields to invalidate.
+        ? _fields.getNextId()
+        // Invalidate every field declared by or after the scope.
+        : _scopes[scopeId].missingField;
 
     return {scopeId, fieldId};
 }
@@ -189,13 +183,13 @@ void DependencyGraph::processStage(boost::intrusive_ptr<DocumentSource> document
 
     auto parentScopeId = _stages.empty() ? ScopeId::none() : _stages.back().scope;
 
+    const auto nextNewScopeId = _scopes.getNextId();
     auto scopeId = processScope(dsInfo, stageId, parentScopeId);
 
-    _stages.append(Stage{
-        scopeId,
-        std::move(documentSource),
-        dsInfo.isSingleDocumentTransformation(),
-    });
+    _stages.append(Stage{scopeId,
+                         std::move(documentSource),
+                         dsInfo.isSingleDocumentTransformation(),
+                         nextNewScopeId});
 }
 
 DependencyGraph::ScopeId DependencyGraph::processScope(const detail::DocumentSourceInfo& ds,
@@ -401,7 +395,122 @@ DependencyGraph::ParsedPath DependencyGraph::parsePath(PathRef path) const {
 }
 
 std::string DependencyGraph::toDebugString() const {
-    // TODO(SERVER-119838): Implement this and use for golden testing
-    MONGO_UNREACHABLE;
+    auto bson = toBSON();
+    return tojson(bson, ExtendedRelaxedV2_0_0, true /*pretty*/);
+}
+
+class DependencyGraph::Serializer {
+public:
+    Serializer(const DependencyGraph& graph) : _graph(graph) {}
+
+    BSONObj serializeToBson() {
+        BSONObjBuilder stagesBob;
+        for (StageId stageId{0}; stageId < _graph._stages.getNextId(); stageId.value++) {
+            const auto& stage = _graph._stages[stageId];
+            BSONObjBuilder stageBob = stagesBob.subobjStart(formatStage(stageId));
+            serializeScope(stage.scope, stageBob);
+        }
+        return stagesBob.obj();
+    }
+
+private:
+    using OrderedFieldId = int32_t;
+    using OrderedFields = std::vector<std::pair<detail::StringPool::Id, FieldId>>;
+
+    class OrderedFieldIdMap {
+    public:
+        OrderedFieldId get(FieldId fieldId) const {
+            auto [it, inserted] = _orderedFieldIds.emplace(fieldId, _nextOrderedFieldId);
+            if (inserted) {
+                ++_nextOrderedFieldId;
+            }
+            return it->second;
+        }
+
+    private:
+        // 'getModifiedPaths()' reports renames in an non-deterministic order so we assign each
+        // field a "normalized" ID after by sorting the fields within a scope.
+        mutable OrderedFieldId _nextOrderedFieldId{0};
+        mutable absl::flat_hash_map<FieldId, OrderedFieldId> _orderedFieldIds;
+    };
+
+    static OrderedFields sortedFields(const detail::FieldMap& fields) {
+        OrderedFields result(fields.begin(), fields.end());
+        std::sort(result.begin(), result.end(), [](auto& a, auto& b) { return a.first < b.first; });
+        return result;
+    }
+
+    void serializeScope(ScopeId scopeId, BSONObjBuilder& bob) {
+        const auto& scope = _graph._scopes[scopeId];
+        auto scopeName = formatScope(scopeId);
+        if (_visitedScopes.count(scopeId)) {
+            bob.append(scopeName, scopeName);
+        } else {
+            _visitedScopes.insert(scopeId);
+            BSONObjBuilder scopeBob = bob.subobjStart(scopeName);
+            scopeBob.append("exhaustiveScope", formatScope(scope.exhaustiveScope));
+            {
+                BSONObjBuilder fieldsBob = scopeBob.subobjStart("fields");
+                {
+                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(
+                        fmt::format("<missing>:{}", _orderedFieldIds.get(scope.missingField)));
+                    serializeField(scope.missingField, fieldObj);
+                }
+
+                // FieldMap doesn't guarantee any order. We need a stable order for golden testing.
+                for (const auto& [name, fieldId] : sortedFields(scope.fields)) {
+                    auto scopeFieldName = formatField(_graph._strings.get(name), fieldId);
+                    BSONObjBuilder fieldObj = fieldsBob.subobjStart(scopeFieldName);
+                    serializeField(fieldId, fieldObj);
+                }
+            }
+        }
+    }
+
+    void serializeField(FieldId fieldId, BSONObjBuilder& bob) {
+        const auto& field = _graph._fields[fieldId];
+        auto fieldScopeName = formatScope(field.declaringScope);
+        bob.append("declaringScope", fieldScopeName);
+        if (field.embeddedScope) {
+            serializeScope(field.embeddedScope, bob);
+        }
+    }
+
+    std::string formatStage(StageId stageId) const {
+        return fmt::format(
+            "{}:{}", _graph._stages[stageId].documentSource->getSourceName(), stageId.value);
+    }
+
+    std::string formatScope(ScopeId scopeId) const {
+        return fmt::format("scope:{}", scopeId.value);
+    }
+
+    std::string formatField(PathRef name, FieldId fieldId) const {
+        return fmt::format("{}:{}", name, _orderedFieldIds.get(fieldId));
+    }
+
+    std::string formatField(FieldId fieldId) const {
+        const auto& field = _graph._fields[fieldId];
+        const auto& fieldMap = _graph._scopes[field.declaringScope].fields;
+        auto fieldIt = std::find_if(fieldMap.begin(), fieldMap.end(), [fieldId](const auto& p) {
+            return p.second == fieldId;
+        });
+        if (fieldIt == fieldMap.end() &&
+            _graph._scopes[field.declaringScope].missingField == fieldId) {
+            return fmt::format("<missing>:{}", _orderedFieldIds.get(fieldId));
+        }
+        tassert(11937309, "Cannot find field in parent scope", fieldIt != fieldMap.end());
+        return formatField(_graph._strings.get(fieldIt->first), fieldIt->second);
+    }
+
+
+    const DependencyGraph& _graph;
+    absl::flat_hash_set<ScopeId> _visitedScopes;
+    OrderedFieldIdMap _orderedFieldIds;
+};
+
+BSONObj DependencyGraph::toBSON() const {
+    Serializer serializer{*this};
+    return serializer.serializeToBson();
 }
 }  // namespace mongo::pipeline::dependency_graph

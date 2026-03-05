@@ -1,0 +1,65 @@
+VARIATION Swap
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                },
+                "b": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": "$b",
+                "b": "$a"
+            }
+        },
+        {
+            "$match": {
+                "a": 1,
+                "b": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                },
+                "a:1": {
+                    "declaringScope": "scope:0"
+                },
+                "b:2": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:3": {
+                    "declaringScope": "scope:1"
+                },
+                "a:4": {
+                    "declaringScope": "scope:1"
+                },
+                "b:5": {
+                    "declaringScope": "scope:1"
+                }
+            }
+        }
+    },
+    "$match:2": {
+        "scope:1": "scope:1"
+    }
+}
+

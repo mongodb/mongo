@@ -157,15 +157,22 @@ struct Stage {
     // TODO(SERVER-119840): Track field dependencies
     Stage(ScopeId scope,
           boost::intrusive_ptr<DocumentSource> documentSource,
-          bool isSingleDocumentTransformation)
+          bool isSingleDocumentTransformation,
+          ScopeId nextNewScope)
         : documentSource(std::move(documentSource)),
           scope(scope),
+          nextNewScope(nextNewScope),
           isSingleDocumentTransformation(isSingleDocumentTransformation) {}
 
     boost::intrusive_ptr<DocumentSource> documentSource;
     // The scope representing visible definitions immediately _after_ this stage. Stages which
     // don't modify fields just inherit this from the previous stage.
     ScopeId scope;
+    // Points to the next new top-level scope. If this stage introduces a new scope, then
+    // scope == nextNewScope. Otherwise this either points to a real scope created by some later
+    // Stage, or to scopes.end(). Used only for finding the scope to invalidate before rebuilding
+    // the graph.
+    ScopeId nextNewScope;
     bool isSingleDocumentTransformation;
 };
 
@@ -329,6 +336,11 @@ public:
      */
     std::string toDebugString() const;
 
+    /**
+     * Generate a BSONObj which describes the graph.
+     */
+    BSONObj toBSON() const;
+
     size_t numStages() const {
         return _stages.size();
     }
@@ -344,6 +356,8 @@ private:
 
     using ParsedPath = boost::container::small_vector<detail::StringPool::Id, 8>;
     using ParsedPathView = std::span<detail::StringPool::Id>;
+
+    class Serializer;
 
     /**
      * Result from field lookup. If found, the fieldId field is set. If the looked up field was

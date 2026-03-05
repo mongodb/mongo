@@ -1,0 +1,53 @@
+VARIATION ExhaustiveStage
+input: {
+    "pipeline": [
+        {
+            "$replaceRoot": {
+                "newRoot": {
+                    "$const": {}
+                }
+            }
+        },
+        {
+            "$set": {
+                "b": {
+                    "$const": "bar"
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": "baz"
+            }
+        }
+    ]
+}
+output: {
+    "$replaceRoot:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:0",
+            "fields": {
+                "<missing>:1": {
+                    "declaringScope": "scope:1"
+                },
+                "b:2": {
+                    "declaringScope": "scope:1"
+                }
+            }
+        }
+    },
+    "$match:2": {
+        "scope:1": "scope:1"
+    }
+}
+

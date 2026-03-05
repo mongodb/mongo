@@ -1,0 +1,75 @@
+VARIATION ParentOverwritesEmbeddedScope
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "b": {
+                        "$const": 1
+                    },
+                    "c": {
+                        "$const": 2
+                    }
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "$const": 3
+                }
+            }
+        },
+        {
+            "$match": {
+                "a.b": 1
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "scope:1": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:2": {
+                                "declaringScope": "scope:1"
+                            },
+                            "b:3": {
+                                "declaringScope": "scope:1"
+                            },
+                            "c:4": {
+                                "declaringScope": "scope:1"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:2": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:5": {
+                    "declaringScope": "scope:2"
+                },
+                "a:6": {
+                    "declaringScope": "scope:2"
+                }
+            }
+        }
+    },
+    "$match:2": {
+        "scope:2": "scope:2"
+    }
+}
+

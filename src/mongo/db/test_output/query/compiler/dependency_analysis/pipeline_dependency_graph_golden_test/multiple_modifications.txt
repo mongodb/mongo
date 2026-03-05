@@ -1,0 +1,89 @@
+VARIATION MultipleModifications
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": "foo"
+                },
+                "b": {
+                    "$const": "bar"
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "$const": "foo2"
+                }
+            }
+        },
+        {
+            "$set": {
+                "b": {
+                    "$const": "bar2"
+                }
+            }
+        },
+        {
+            "$match": {
+                "a": "foo",
+                "b": "bar"
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                },
+                "a:1": {
+                    "declaringScope": "scope:0"
+                },
+                "b:2": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:3": {
+                    "declaringScope": "scope:1"
+                },
+                "a:4": {
+                    "declaringScope": "scope:1"
+                },
+                "b:2": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:2": {
+        "scope:2": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:5": {
+                    "declaringScope": "scope:2"
+                },
+                "a:4": {
+                    "declaringScope": "scope:1"
+                },
+                "b:6": {
+                    "declaringScope": "scope:2"
+                }
+            }
+        }
+    },
+    "$match:3": {
+        "scope:2": "scope:2"
+    }
+}
+

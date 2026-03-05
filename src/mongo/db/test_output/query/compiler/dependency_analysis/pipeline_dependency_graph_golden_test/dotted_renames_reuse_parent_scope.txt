@@ -1,0 +1,207 @@
+VARIATION RenamesWithDeepDottedPaths
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a1": {
+                    "b1": {
+                        "c1": {
+                            "d1": {
+                                "e1": {
+                                    "f1": "$a.b.c.d.e.f"
+                                }
+                            }
+                        }
+                    }
+                },
+                "b": "$foo1.bar1.baz1"
+            }
+        },
+        {
+            "$set": {
+                "a2": {
+                    "b2": {
+                        "c2": {
+                            "d2": {
+                                "e2": {
+                                    "f2": "$a1.b1.c1.d1.e1.f1"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "a.b.c.d.e.f": 0,
+                "a2.b2.c2.d2.e2.f2": 2
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$a2",
+                        "$a1.b2"
+                    ]
+                }
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0"
+                },
+                "a1:1": {
+                    "declaringScope": "scope:0",
+                    "scope:1": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:2": {
+                                "declaringScope": "scope:1"
+                            },
+                            "b1:3": {
+                                "declaringScope": "scope:1",
+                                "scope:2": {
+                                    "exhaustiveScope": "scope:-1",
+                                    "fields": {
+                                        "<missing>:4": {
+                                            "declaringScope": "scope:2"
+                                        },
+                                        "c1:5": {
+                                            "declaringScope": "scope:2",
+                                            "scope:3": {
+                                                "exhaustiveScope": "scope:-1",
+                                                "fields": {
+                                                    "<missing>:6": {
+                                                        "declaringScope": "scope:3"
+                                                    },
+                                                    "d1:7": {
+                                                        "declaringScope": "scope:3",
+                                                        "scope:4": {
+                                                            "exhaustiveScope": "scope:-1",
+                                                            "fields": {
+                                                                "<missing>:8": {
+                                                                    "declaringScope": "scope:4"
+                                                                },
+                                                                "e1:9": {
+                                                                    "declaringScope": "scope:4",
+                                                                    "scope:5": {
+                                                                        "exhaustiveScope": "scope:-1",
+                                                                        "fields": {
+                                                                            "<missing>:10": {
+                                                                                "declaringScope": "scope:5"
+                                                                            },
+                                                                            "f1:11": {
+                                                                                "declaringScope": "scope:5"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "b:12": {
+                    "declaringScope": "scope:0"
+                }
+            }
+        }
+    },
+    "$set:1": {
+        "scope:6": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:13": {
+                    "declaringScope": "scope:6"
+                },
+                "a1:1": {
+                    "declaringScope": "scope:0",
+                    "scope:1": "scope:1"
+                },
+                "b:12": {
+                    "declaringScope": "scope:0"
+                },
+                "a2:14": {
+                    "declaringScope": "scope:6",
+                    "scope:7": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:15": {
+                                "declaringScope": "scope:7"
+                            },
+                            "b2:16": {
+                                "declaringScope": "scope:7",
+                                "scope:8": {
+                                    "exhaustiveScope": "scope:-1",
+                                    "fields": {
+                                        "<missing>:17": {
+                                            "declaringScope": "scope:8"
+                                        },
+                                        "c2:18": {
+                                            "declaringScope": "scope:8",
+                                            "scope:9": {
+                                                "exhaustiveScope": "scope:-1",
+                                                "fields": {
+                                                    "<missing>:19": {
+                                                        "declaringScope": "scope:9"
+                                                    },
+                                                    "d2:20": {
+                                                        "declaringScope": "scope:9",
+                                                        "scope:10": {
+                                                            "exhaustiveScope": "scope:-1",
+                                                            "fields": {
+                                                                "<missing>:21": {
+                                                                    "declaringScope": "scope:10"
+                                                                },
+                                                                "e2:22": {
+                                                                    "declaringScope": "scope:10",
+                                                                    "scope:11": {
+                                                                        "exhaustiveScope": "scope:-1",
+                                                                        "fields": {
+                                                                            "<missing>:23": {
+                                                                                "declaringScope": "scope:11"
+                                                                            },
+                                                                            "f2:24": {
+                                                                                "declaringScope": "scope:11"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "$match:2": {
+        "scope:6": "scope:6"
+    },
+    "$match:3": {
+        "scope:6": "scope:6"
+    }
+}
+
