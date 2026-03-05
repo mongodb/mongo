@@ -47,6 +47,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include <asio/basic_socket_acceptor.hpp>
 #include <asio/generic/stream_protocol.hpp>
@@ -227,7 +228,7 @@ public:
     }
 
 #ifndef _WIN32
-    bool isProxyUnixDomainSocket(StringData path, int port) const;
+    bool isProxyUnixDomainSocket(const std::string& path) const;
 #endif
 
     SessionManager* getSessionManager() const override {
@@ -432,6 +433,8 @@ private:
     // priority port.
     const std::unique_ptr<ListenerInterface> _listenerInterfaceMainPort;
     const std::unique_ptr<ListenerInterface> _listenerInterfacePriorityPort;
+
+    stdx::unordered_set<std::string> _proxyUnixSocketAddrs;
 
     std::shared_ptr<SessionManager> _sessionManager;
 

@@ -1383,8 +1383,9 @@ Status AsioTransportLayer::setup() {
         if (!_listenerOptions.unixProxySocketPrefix.empty() && _listenerOptions.isIngress()) {
             listenAddrs.reserve(ports.size());
             for (auto port : ports) {
-                listenAddrs.emplace_back(
-                    makeProxyUnixSockPath(port, _listenerOptions.unixProxySocketPrefix));
+                auto path = makeProxyUnixSockPath(port, _listenerOptions.unixProxySocketPrefix);
+                listenAddrs.emplace_back(path);
+                _proxyUnixSocketAddrs.insert(path);
             }
         }
 #endif
@@ -1644,7 +1645,8 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
-            if (session->isConnectedToLoadBalancerPort()) {
+            if (session->isConnectedToLoadBalancerPort() ||
+                session->isConnectedToProxyUnixSocket()) {
                 // This session is not counted towards the number of accepted connections until the
                 // server receives the proxy header and moves the session to `SessionManager`.
                 // Therefore, the server may go above the ingress connection limits if it is waiting
@@ -1841,9 +1843,8 @@ BatonHandle AsioTransportLayer::makeBaton(OperationContext* opCtx) const {
 #endif
 
 #ifndef _WIN32
-bool AsioTransportLayer::isProxyUnixDomainSocket(StringData path, int port) const {
-    return !_listenerOptions.unixProxySocketPrefix.empty() &&
-        makeProxyUnixSockPath(port, _listenerOptions.unixProxySocketPrefix) == path;
+bool AsioTransportLayer::isProxyUnixDomainSocket(const std::string& path) const {
+    return _proxyUnixSocketAddrs.contains(path);
 }
 #endif
 

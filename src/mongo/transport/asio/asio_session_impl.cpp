@@ -223,7 +223,7 @@ CommonAsioSession::CommonAsioSession(
         }
 #ifndef _WIN32
         _isConnectedToProxyUnixSocket =
-            (!_localAddr.isIP() && tl->isProxyUnixDomainSocket(localAddrWithPort, _local.port()));
+            (!_localAddr.isIP() && tl->isProxyUnixDomainSocket(localAddrWithPort));
 #endif
     } catch (...) {
         LOGV2_DEBUG(9079002,
