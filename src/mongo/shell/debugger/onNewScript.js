@@ -39,49 +39,7 @@
                         line: frame.script?.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
                     };
 
-                    // Extract scope and variable information
-                    // First, clear any old data
-                    globalThis.__storeScopes([]);
-
-                    const scopes = [];
-                    let scopeId = 1; // Start from 1, 0 means no nested variables
-                    let env = frame.environment;
-
-                    while (env) {
-                        const scopeName = getScopeName(env);
-                        const isExpensive = scopeName === "Global";
-
-                        // Skip variable extraction for expensive scopes to avoid timeout
-                        // The global scope has a TON of stuff to sift through
-                        if (isExpensive) {
-                            env = env.parent;
-                            continue;
-                        }
-
-                        scopes.push({
-                            name: scopeName,
-                            variablesReference: scopeId,
-                            expensive: isExpensive,
-                        });
-
-                        // Get variable names for this scope
-                        const variables = [];
-                        const names = env.names();
-                        for (const name of names) {
-                            const debuggerObj = env.getVariable(name);
-                            const varRef = scopeId * 1_000 + variables.length + 1;
-                            let v = getVariable(name, debuggerObj, varRef);
-                            variables.push(v);
-                        }
-
-                        globalThis.__storeVariables(scopeId, variables);
-
-                        env = env.parent;
-                        scopeId++;
-                    }
-
-                    // Now store the scopes (but don't clear variables this time)
-                    globalThis.__storeScopes(scopes);
+                    processScopes(frame);
 
                     // Invoke the C++ callback
                     globalThis.__onScriptSetBreakpoint();
@@ -98,12 +56,56 @@
 
     // HELPER FUNCTIONS to parse variable/scope labeling
 
-    function getScopeName(env) {
+    // Extract scope and variable information
+    function processScopes(frame) {
+        // First, clear any old data
+        globalThis.__storeScopes([]);
+
+        const scopes = [];
+        let scopeId = 1; // Start from 1, 0 means no nested variables
+        let env = frame.environment;
+
+        while (env) {
+            const scopeName = getScopeName(env, scopeId);
+            const isExpensive = scopeName === "Global";
+
+            // Skip variable extraction for expensive scopes to avoid timeout
+            // The global scope has a TON of stuff to sift through
+            if (isExpensive) {
+                env = env.parent;
+                continue;
+            }
+
+            scopes.push({
+                name: scopeName,
+                variablesReference: scopeId,
+                expensive: isExpensive,
+            });
+
+            // Get variable names for this scope
+            const variables = [];
+            const names = env.names();
+            for (const name of names) {
+                const debuggerObj = env.getVariable(name);
+                const varRef = scopeId * 1_000 + variables.length + 1;
+                let v = getVariable(name, debuggerObj, varRef);
+                variables.push(v);
+            }
+
+            globalThis.__storeVariables(scopeId, variables);
+
+            env = env.parent;
+            scopeId++;
+        }
+
+        // Now store the scopes (but don't clear variables this time)
+        globalThis.__storeScopes(scopes);
+    }
+
+    function getScopeName(env, level) {
         switch (env.type) {
             case "declarative":
-                return "Local";
-            case "with":
-                return "With";
+                return ["Local", "Closure", "Script"][level - 1];
             case "object":
                 return "Global";
             default:
