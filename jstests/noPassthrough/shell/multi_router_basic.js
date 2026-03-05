@@ -1165,4 +1165,70 @@ testCase("Testing setParameters is broadcasted", () => {
     });
 });
 
+// ============================================================================
+// Test _mongo property on command results always points to MultiRouter
+// ============================================================================
+
+testCase("Test hello result _mongo points to MultiRouter", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    assert.eq(conn.isMultiRouter, true);
+
+    const result = conn.getDB("admin").runCommand({hello: 1});
+    assert.commandWorked(result);
+    assert(result._mongo, "hello result must have _mongo set");
+    assert.eq(result._mongo.isMultiRouter, true, "hello result _mongo must be the MultiRouter, not a raw mongos");
+});
+
+testCase("Test query result _mongo points to MultiRouter (exhausted cursor)", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    assert.eq(conn.isMultiRouter, true);
+
+    const db = conn.getDB("test");
+    const coll = db.coll;
+    coll.insert({x: 1, tag: "test123"});
+
+    const result = db.runCommand({find: "coll", filter: {tag: "test123"}});
+    assert.commandWorked(result);
+    assert(result.cursor, "find result must have a cursor");
+    assert.eq(result.cursor.id, 0, "small result set should produce an exhausted cursor (id 0)");
+    assert(result._mongo, "find result with exhausted cursor must have _mongo set");
+    assert.eq(
+        result._mongo.isMultiRouter,
+        true,
+        "find result _mongo must be the MultiRouter, not the raw mongos that served the query",
+    );
+
+    coll.drop();
+});
+
+testCase("Test find result _mongo points to MultiRouter within a transaction", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    assert.eq(conn.isMultiRouter, true);
+
+    const db = conn.getDB("test");
+    const coll = db.mongoResultTest;
+    coll.insert({x: 1, tag: "mongoResultTxn"});
+
+    const session = conn.startSession();
+    const sessionDB = session.getDatabase("test");
+
+    withRetryOnTransientTxnError(() => {
+        session.startTransaction();
+
+        const findResult = sessionDB.runCommand({find: "mongoResultTest", filter: {tag: "mongoResultTxn"}});
+        assert.commandWorked(findResult);
+        assert(findResult.cursor, "find result in transaction must have a cursor");
+        assert(findResult._mongo, "find result in transaction must have _mongo set");
+        assert.eq(findResult._mongo.isMultiRouter, true, "find result _mongo in transaction must be the MultiRouter");
+
+        assert.commandWorked(session.commitTransaction_forTesting());
+    });
+
+    session.endSession();
+    coll.drop();
+});
+
 st.stop();

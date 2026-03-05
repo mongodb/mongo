@@ -483,17 +483,23 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             this.advanceClusterTime(result.$clusterTime);
         }
 
+        // If the result has a hidden property _mongo, set it to the MultiRouterMongo instance
+        // This is used by several test utils that require to store locally the connection used to issue a previous command.
+        // Keep it as non-enumerable property to prevent it from polluting query results.
+        if (result && result._mongo) {
+            result = {...result};
+            Object.defineProperty(result, "_mongo", {
+                value: this,
+                enumerable: false,
+                writable: true,
+                configurable: true,
+            });
+        }
+
         // Track cursor-to-mongos mapping for aggregations and finds
         // After extracting the first connection randomly, we pin it for subsequent getMore commands
         if (result && result.cursor && result.cursor.id && !cmd.getMore) {
-            const isCursorInserted = this._cursorTracker.setConnectionUsedForCursor(result.cursor.id, mongo);
-            if (isCursorInserted) {
-                // Inject the MultiRouterMongo instance into the result so that DBCursor objects that are built on top of it will have a reference to the MultiRouterMongo instance.
-                // This will ensure any further "next" will run against the multi-router.
-                if (result._mongo) {
-                    result = {...result, _mongo: this};
-                }
-            }
+            this._cursorTracker.setConnectionUsedForCursor(result.cursor.id, mongo);
         }
 
         if (isQuerySettingsCommand(cmd) && result && result.ok) {
