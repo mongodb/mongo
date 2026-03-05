@@ -13,6 +13,7 @@
  */
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {add2dsphereVersionIfNeededForSpec} from "jstests/libs/query/geo_index_version_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const collName = jsTestName();
@@ -36,7 +37,7 @@ TimeseriesTest.run((insert) => {
         const coll = db.getCollection(collName);
         coll.drop();
 
-        const options = {sparse: true};
+        const options = add2dsphereVersionIfNeededForSpec(keyForCreate, {sparse: true});
         jsTestLog(
             "Setting up collection: " +
                 coll.getFullName() +

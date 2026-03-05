@@ -16,6 +16,7 @@
  */
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {runDoesntRewriteTest} from "jstests/core/timeseries/libs/timeseries_sort_util.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const geoCollName = jsTestName();
 const geoColl = db[geoCollName];
@@ -52,4 +53,8 @@ const indexes = [
     {t: 1, loc: "2dsphere"},
     {"m.a": 1, t: 1, loc: "2dsphere"},
 ];
-for (const ix of indexes) runDoesntRewriteTest({t: 1}, ix, ix, geoColl, [{$match: {"m.a": 7}}]);
+for (const ix of indexes) {
+    assert.commandWorked(geoColl.dropIndexes());
+    assert.commandWorked(geoColl.createIndex(ix, add2dsphereVersionIfNeeded()));
+    runDoesntRewriteTest({t: 1}, null /* Don't recreate index. */, ix, geoColl, [{$match: {"m.a": 7}}]);
+}
