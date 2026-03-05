@@ -50,6 +50,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              boost::optional<value::SlotId> collatorSlot,
                              PlanYieldPolicy* yieldPolicy,
                              PlanNodeId planNodeId,
+                             boost::optional<size_t> estimatedBuildCardinality,
                              bool participateInTrialRunTracking)
     : PlanStage("hj"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outerKey(std::move(outerKey)),
@@ -57,6 +58,7 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
       _innerKey(std::move(innerKey)),
       _innerProjects(std::move(innerProjects)),
       _collatorSlot(collatorSlot),
+      _estimatedBuildCardinality(estimatedBuildCardinality),
       _probeKey(_outerKey.size()),
       _probeProject(_outerProjects.size()) {
     if (_outerKey.size() != _innerKey.size()) {
@@ -130,6 +132,7 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
     _joinImpl.emplace(
         loadMemoryLimit(StageMemoryLimit::QuerySBEHashJoinApproxMemoryUseInBytesBeforeSpill),
         collator,
+        _estimatedBuildCardinality,
         _stats);
 }
 
@@ -262,6 +265,8 @@ std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) c
             .appendNumber("recursionDepthMax", specificStats->recursionDepthMax)
             .appendNumber("numFallbacksToBlockNestedLoopJoin",
                           specificStats->numFallbacksToBlockNestedLoopJoin)
+            .appendNumber("numProbeRecordsDiscarded",
+                          static_cast<long long>(specificStats->numProbeRecordsDiscarded))
             .appendNumber("spills", static_cast<long long>(spillingStats.getSpills()))
             .appendNumber("spilledRecords",
                           static_cast<long long>(spillingStats.getSpilledRecords()))

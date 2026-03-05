@@ -153,7 +153,7 @@ protected:
 
     std::unique_ptr<HybridHashJoin> makeHHJ(CollatorInterface* collator = nullptr) {
         stats = {};
-        return std::make_unique<HybridHashJoin>(kDefaultMemLimit, collator, stats);
+        return std::make_unique<HybridHashJoin>(kDefaultMemLimit, collator, boost::none, stats);
     }
 };
 
@@ -1055,5 +1055,119 @@ TEST_F(HybridHashJoinTestFixture, BlockNestedLoopJoinWithAlwaysEqualCollator) {
     ASSERT_EQ(matchedProbeIndices.size(), 40);
 }
 
+TEST_F(HybridHashJoinTestFixture, BloomFilterReducesProbeSpills) {
+    auto hhj = makeHHJ();
+
+    // Build side: insert keys that will force spilling
+    // We insert keys 0, 10, 20, 30, ... to create gaps
+    std::set<int64_t> buildKeys;
+    for (int i = 0; i < 250; ++i) {
+        int64_t key = i * 10;  // 0, 10, 20, 30, ...
+        std::string proj = "build_" + std::to_string(key);
+        hhj->addBuild(makeKeyRow(key), makeProjectRow(proj));
+        buildKeys.insert(key);
+    }
+    hhj->finishBuild();
+
+    ASSERT_TRUE(stats.usedDisk);
+
+    auto cursor = JoinCursor::empty();
+    // Probe with keys that DON'T exist in build side
+    // These should be filtered by the bloom filter and not spilled
+    for (int i = 0; i < 1000; ++i) {
+        int64_t key = i * 10 + 5;  // 5, 15, 25, 35, ... (not in build)
+        auto probeKeyRow = makeKeyRow(key);
+        auto probeProjectRow = makeProjectRow("probe_" + std::to_string(key));
+        hhj->probe(probeKeyRow, probeProjectRow, cursor);
+        // Should return empty cursor (no matches in memory)
+        auto result = cursor.next();
+        ASSERT_FALSE(result.has_value());
+    }
+
+    // Probe with keys that DO exist in build side
+    std::set<int64_t> matchedInMemory;
+    for (int i = 0; i < 250; ++i) {
+        int64_t key = i * 10;  // 0, 10, 20, ... (in build)
+        auto probeKeyRow = makeKeyRow(key);
+        auto probeProjectRow = makeProjectRow("probe_" + std::to_string(key));
+        hhj->probe(probeKeyRow, probeProjectRow, cursor);
+        while (auto matchOpt = cursor.next()) {
+            matchedInMemory.insert(getKeyValue(matchOpt->buildKeyRow));
+        }
+    }
+    hhj->finishProbe();
+
+    ASSERT_GT(stats.numProbeRecordsDiscarded, 0);
+
+    // Process spilled partitions
+    std::set<int64_t> matchedFromSpill;
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
+        while (auto matchOpt = cursorOpt->next()) {
+            matchedFromSpill.insert(getKeyValue(matchOpt->buildKeyRow));
+        }
+    }
+
+    // The keys that exist in build should all be matched (either in memory or from spill)
+    std::set<int64_t> allMatched;
+    allMatched.insert(matchedInMemory.begin(), matchedInMemory.end());
+    allMatched.insert(matchedFromSpill.begin(), matchedFromSpill.end());
+
+    // All probed keys that exist in build should be found
+    for (int i = 0; i < 250; ++i) {
+        int64_t key = i * 10;
+        ASSERT_TRUE(allMatched.count(key) > 0) << "Key " << key << " should have been matched";
+    }
+}
+
+TEST_F(HybridHashJoinTestFixture, BloomFilterWithStringKeys) {
+    auto hhj = makeHHJ();
+
+    // Build side with string keys
+    std::set<std::string> buildKeys;
+    for (int i = 0; i < 100; ++i) {
+        std::string key = "key_" + std::to_string(i * 2);  // Even numbers
+        hhj->addBuild(makeStringKeyRow(key), makeProjectRow("build_" + key));
+        buildKeys.insert(key);
+    }
+    hhj->finishBuild();
+
+    ASSERT_TRUE(stats.usedDisk);
+
+    auto cursor = JoinCursor::empty();
+    // Probe with odd-numbered keys (not in build) - should be filtered by bloom filter
+    for (int i = 0; i < 50; ++i) {
+        std::string key = "key_" + std::to_string(i * 2 + 1);  // Odd numbers
+        auto probeKeyRow = makeStringKeyRow(key);
+        auto probeProjectRow = makeProjectRow("probe_" + key);
+        hhj->probe(probeKeyRow, probeProjectRow, cursor);
+        // Should not match anything
+        ASSERT_FALSE(cursor.next().has_value());
+    }
+
+    // Probe with even-numbered keys (in build)
+    for (int i = 0; i < 50; ++i) {
+        std::string key = "key_" + std::to_string(i * 2);  // Even numbers
+        auto probeKeyRow = makeStringKeyRow(key);
+        auto probeProjectRow = makeProjectRow("probe_" + key);
+        hhj->probe(probeKeyRow, probeProjectRow, cursor);
+        while (cursor.next()) {
+            // Just drain the cursor
+        }
+    }
+    hhj->finishProbe();
+
+    ASSERT_GT(stats.numProbeRecordsDiscarded, 0);
+
+    // Process spilled partitions and verify correctness
+    while (auto cursorOpt = hhj->nextSpilledJoinCursor()) {
+        while (auto matchOpt = cursorOpt->next()) {
+            std::string buildKey = getStringValue(matchOpt->buildKeyRow);
+            std::string probeKey = getStringValue(matchOpt->probeKeyRow);
+            ASSERT_EQ(buildKey, probeKey);
+            ASSERT_TRUE(buildKeys.count(buildKey) > 0)
+                << "Matched key " << buildKey << " should be in build set";
+        }
+    }
+}
 }  // namespace
 }  // namespace mongo::sbe

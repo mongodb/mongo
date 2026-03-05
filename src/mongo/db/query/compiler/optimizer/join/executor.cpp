@@ -335,29 +335,32 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // Lower to SBE.
     // TODO SERVER-112232: Identify SBE suffixes that are eligible for pushdown & push them to the
     // SBE executor.
-    auto lower = [&model, &opCtx, yieldPolicy, &mca](
-                     NodeId baseNode, const QuerySolution& soln, bool prepare) {
-        auto& baseCQ = *model.graph.accessPathAt(baseNode);
-        auto baseNss = baseCQ.nss();
-        auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
-        auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
-            opCtx, mca, baseCQ, soln, sbeYieldPolicy.get());
-        if (prepare) {
-            // We don't need to prepare plans if we're not planning to execute them.
-            stage_builder::prepareSlotBasedExecutableTree(opCtx,
-                                                          planStagesAndData.first.get(),
-                                                          &planStagesAndData.second,
-                                                          baseCQ,
-                                                          mca,
-                                                          sbeYieldPolicy.get(),
-                                                          false /*preparingFromCache*/,
-                                                          nullptr /*remoteCursors*/);
-        }
-        return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
-    };
+    auto lower =
+        [&model, &opCtx, yieldPolicy, &mca](NodeId baseNode,
+                                            const QuerySolution& soln,
+                                            const cost_based_ranker::EstimateMap* estimates,
+                                            bool prepare) {
+            auto& baseCQ = *model.graph.accessPathAt(baseNode);
+            auto baseNss = baseCQ.nss();
+            auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
+            auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
+                opCtx, mca, baseCQ, soln, sbeYieldPolicy.get(), estimates);
+            if (prepare) {
+                // We don't need to prepare plans if we're not planning to execute them.
+                stage_builder::prepareSlotBasedExecutableTree(opCtx,
+                                                              planStagesAndData.first.get(),
+                                                              &planStagesAndData.second,
+                                                              baseCQ,
+                                                              mca,
+                                                              sbeYieldPolicy.get(),
+                                                              false /*preparingFromCache*/,
+                                                              nullptr /*remoteCursors*/);
+            }
+            return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
+        };
 
     auto [planStagesAndData, sbeYieldPolicy] =
-        lower(reordered.baseNode, *reordered.soln, true /* prepare */);
+        lower(reordered.baseNode, *reordered.soln, &reordered.estimates, true /* prepare */);
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(11083905,
                 5,
@@ -380,7 +383,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         for (auto&& rs : reordered.rejectedSolns) {
             auto soln = std::move(rs.first);
             auto baseNode = rs.second;
-            auto [stagesAndData, _] = lower(baseNode, *soln, false /* prepare */);
+            auto [stagesAndData, _] =
+                lower(baseNode, *soln, &reordered.estimates, false /* prepare */);
             rejectedPlans.push_back(JoinOptPlan{.soln = std::move(soln),
                                                 .stage = std::move(stagesAndData.first),
                                                 .data = std::move(stagesAndData.second)});

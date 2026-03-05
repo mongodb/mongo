@@ -74,6 +74,7 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
                              const MultipleCollectionAccessor& collections,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
-                             PlanYieldPolicy* yieldPolicy);
+                             PlanYieldPolicy* yieldPolicy,
+                             const cost_based_ranker::EstimateMap* estimates = nullptr);
 
 }  // namespace mongo::stage_builder

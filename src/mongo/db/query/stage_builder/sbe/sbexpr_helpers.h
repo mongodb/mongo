@@ -710,7 +710,8 @@ public:
                          const SbSlotVector& outerProjectSlots,
                          const SbSlotVector& innerCondSlots,
                          const SbSlotVector& innerProjectSlots,
-                         boost::optional<sbe::value::SlotId> collatorSlot);
+                         boost::optional<sbe::value::SlotId> collatorSlot,
+                         boost::optional<size_t> estimatedBuildCardinality);
 
     SbStage makeMergeJoin(SbStage outerStage,
                           SbStage innerStage,

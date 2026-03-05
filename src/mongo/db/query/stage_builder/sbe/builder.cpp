@@ -878,7 +878,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
                                              const CanonicalQuery& cq,
                                              const QuerySolution& solution,
-                                             PlanYieldPolicySBE* yieldPolicy)
+                                             PlanYieldPolicySBE* yieldPolicy,
+                                             const cost_based_ranker::EstimateMap* estimates)
     : BaseType(opCtx, cq, solution),
       _collections(collections),
       _mainNss(cq.nss()),
@@ -899,7 +900,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              _cq.getExpCtx(),
              _cq.getExpCtx()->getNeedsMerge(),
              _cq.getExpCtx()->getAllowDiskUse(),
-             *_cq.getExpCtx()->getIfrContext()) {
+             *_cq.getExpCtx()->getIfrContext()),
+      _estimates(estimates) {
     // Initialize '_data->queryCollator'.
     _data->queryCollator = cq.getCollatorShared();
 

@@ -327,6 +327,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_ts_second_ts_increment_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_unwind_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_variable_test.cpp",
+        "//src/mongo/db/exec/sbe/util:bloom_filter_test.cpp",
         "//src/mongo/db/exec/sbe/util:stage_results_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:block_test.cpp",
         "//src/mongo/db/exec/sbe/values:bsoncolumn_materializer_test.cpp",

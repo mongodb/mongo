@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/util/bloom_filter.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
@@ -222,8 +223,14 @@ struct SpilledPartition {
  */
 class HybridHashJoin {
 public:
-    HybridHashJoin(int64_t memLimit, CollatorInterface* collator, HashJoinStats& stats)
-        : _memLimit(memLimit), _collator(collator), _stats(stats) {
+    HybridHashJoin(int64_t memLimit,
+                   CollatorInterface* collator,
+                   boost::optional<size_t> estimatedBuildCardinality,
+                   HashJoinStats& stats)
+        : _memLimit(memLimit),
+          _collator(collator),
+          _estimatedBuildCardinality(estimatedBuildCardinality),
+          _stats(stats) {
         const HashedKeyHasher hasher{_collator};
         const HashedKeyEq equator{_collator};
         _ht.emplace(0, hasher, equator);
@@ -301,6 +308,12 @@ private:
 
     // In-memory hash table for the build side (used in both pure and hybrid modes).
     boost::optional<HHJTableType> _ht;
+
+    // Estimated cardinality of the build side
+    boost::optional<size_t> _estimatedBuildCardinality;
+
+    // Bloom filter for filtering out keys that are not in the spilled partitions
+    boost::optional<SplitBlockBloomFilter> _bloomFilter;
 
     // Current recursion depth for recursive partitioning. Higher levels use different
     // hash bits to avoid pathological re-partitioning of the same keys.

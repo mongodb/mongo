@@ -177,7 +177,8 @@ TEST_F(PlanSizeTest, HashJoin) {
                                       makeSV(),
                                       generateSlotId(),
                                       nullptr /* yieldPolicy */,
-                                      kEmptyPlanNodeId);
+                                      kEmptyPlanNodeId,
+                                      boost::none);
     assertPlanSize(*stage);
 }
 

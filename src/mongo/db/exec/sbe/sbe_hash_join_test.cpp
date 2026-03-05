@@ -126,7 +126,8 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
                                               innerProjectSlots,
                                               collatorSlot,
                                               nullptr /* yieldPolicy */,
-                                              kEmptyPlanNodeId);
+                                              kEmptyPlanNodeId,
+                                              boost::none);
 
     return std::make_pair(std::move(outputSlots), std::move(hashJoinStage));
 }
@@ -716,7 +717,8 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                          makeSV(innerProjSlot),
                                          boost::optional<value::SlotId>{useCollator, collatorSlot},
                                          nullptr /* yieldPolicy */,
-                                         kEmptyPlanNodeId);
+                                         kEmptyPlanNodeId,
+                                         boost::none);
 
                 return std::make_pair(
                     makeSV(innerCondSlot, outerCondSlot, innerProjSlot, outerProjSlot),

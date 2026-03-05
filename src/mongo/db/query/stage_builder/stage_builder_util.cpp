@@ -68,7 +68,8 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
                              const MultipleCollectionAccessor& collections,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
-                             PlanYieldPolicy* yieldPolicy) {
+                             PlanYieldPolicy* yieldPolicy,
+                             const cost_based_ranker::EstimateMap* estimates) {
     // Only QuerySolutions derived from queries parsed with context, or QuerySolutions derived from
     // queries that disallow extensions, can be properly executed. If the query does not have
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
@@ -78,8 +79,8 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);
     invariant(sbeYieldPolicy);
 
-    auto builder =
-        std::make_unique<SlotBasedStageBuilder>(opCtx, collections, cq, solution, sbeYieldPolicy);
+    auto builder = std::make_unique<SlotBasedStageBuilder>(
+        opCtx, collections, cq, solution, sbeYieldPolicy, estimates);
     auto [root, data] = builder->build(solution.root());
 
     return {std::move(root), std::move(data)};

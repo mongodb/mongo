@@ -81,6 +81,7 @@ public:
                   boost::optional<value::SlotId> collatorSlot,
                   PlanYieldPolicy* yieldPolicy,
                   PlanNodeId planNodeId,
+                  boost::optional<size_t> estimatedBuildCardinality,
                   bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -111,6 +112,7 @@ private:
     const value::SlotVector _innerKey;
     const value::SlotVector _innerProjects;
     const boost::optional<value::SlotId> _collatorSlot;
+    boost::optional<size_t> _estimatedBuildCardinality;
 
     // All defined values from the inner/outer sides.
     value::SlotAccessorMap _outAccessorMap;

@@ -2061,6 +2061,15 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
         }
     }
 
+    boost::optional<size_t> estimatedBuildCardinality = boost::none;
+
+    if (_estimates) {
+        if (auto it = _estimates->find(hashJoinEmbeddingNode->children[0].get());
+            it != _estimates->end()) {
+            estimatedBuildCardinality = static_cast<size_t>(it->second.outCE.toDouble());
+        }
+    }
+
     // Build the HashJoin stage that implements the hash join.
     auto hashJoinStage = b.makeHashJoin(std::move(rightPrjStage),
                                         std::move(leftPrjStage),
@@ -2068,7 +2077,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
                                         rightProjectSlots,
                                         leftPrjOutputs,
                                         leftProjectSlots,
-                                        boost::none);
+                                        boost::none,
+                                        estimatedBuildCardinality);
 
     // If there is at least one $expr equality, insert an extra filter layer that excludes records
     // matching due to treating missing values equal to 'null'.

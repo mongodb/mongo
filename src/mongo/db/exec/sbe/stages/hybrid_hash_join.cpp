@@ -47,6 +47,8 @@ static_assert(std::has_single_bit(kNumPartitions), "kNumPartitions must be a pow
 constexpr int kMaxRecursionDepth = 2;
 constexpr uint32_t kPartitionMask = (kNumPartitions - 1);
 constexpr int kNumBitsInPartitionMask = std::countr_one(kPartitionMask);
+constexpr size_t kMaxBloomFilterSize = 16 * 1024 * 1024;  // 16 MB
+constexpr size_t kMinBloomFilterSize = 32 * 1024;         // 32 KB
 
 // ==================== JoinCursor ====================
 
@@ -450,6 +452,10 @@ void HybridHashJoin::addBuild(value::MaterializedRow key, value::MaterializedRow
 
     if (_isSpilled[pIdx]) {
         // This partition is spilled; write to file using SortedFileWriter.
+
+        // Add to bloom filter for this spilled partition
+        _bloomFilter->insert(hash);
+
         _partitionSpills[pIdx]->buildSpill.writer->addAlreadySorted(key, project);
         _partitionSpills[pIdx]->buildSpill.size += memUsage - sizeof(size_t);
         _recordsAddedToWriter++;
@@ -478,11 +484,18 @@ void HybridHashJoin::addBuild(value::MaterializedRow key, value::MaterializedRow
  * the largest partitions until memory usage is under the limit.
  */
 void HybridHashJoin::enablePartitioning() {
-    // Initialize the partition buffers and metadata
+    // Initialize the partition buffers and metadata and bloom filter
     _partitionBuffers.resize(kNumPartitions);
     _partitionMemUsage.resize(kNumPartitions, 0);
     _isSpilled.resize(kNumPartitions, false);
     _partitionSpills.resize(kNumPartitions);
+
+    size_t optimalBloomFilterSize =
+        SplitBlockBloomFilter::optimalNumBytes(_estimatedBuildCardinality.value_or(0), 0.1);
+    size_t bloomFilterSize =
+        std::clamp(optimalBloomFilterSize, kMinBloomFilterSize, kMaxBloomFilterSize);
+    _bloomFilter.emplace(bloomFilterSize);
+    _memUsage += _bloomFilter->memoryUsage();
 
     _htBucketCountBeforePartitioning = _ht->bucket_count();
 
@@ -556,8 +569,11 @@ void HybridHashJoin::spillPartition(int pIdx) {
     auto spilledPartition = createSpilledPartition();
 
     auto& partitionBuffer = _partitionBuffers[pIdx];
+
     // Write (key, project) to disk; hash is not stored and will be recomputed when reading.
     for (auto& [hashedKey, project] : partitionBuffer) {
+        // Add to bloom filter
+        _bloomFilter->insert(hashedKey.hash);
         spilledPartition->buildSpill.writer->addAlreadySorted(hashedKey.key, project);
     }
     auto prevMemUsage = _partitionMemUsage[pIdx];
@@ -628,8 +644,14 @@ void HybridHashJoin::probe(value::MaterializedRow& key,
         int pIdx = getPartitionId(hash);
 
         if (_isSpilled[pIdx]) {
-            // This partition is spilled; write to file using SortedFileWriter.
+            // Check bloom filter first - if key is definitely not in build side, skip
+            if (!_bloomFilter->maybeContains(hash)) {
+                // Key definitely not in build side, no need to spill this probe row
+                _stats.numProbeRecordsDiscarded += 1;
+                return;
+            }
 
+            // This partition is spilled; write probe row to disk.
             auto memUsage = key.memUsageForSorter() + project.memUsageForSorter();
 
             _partitionSpills[pIdx]->probeSpill.writer->addAlreadySorted(key, project);
@@ -661,10 +683,16 @@ void HybridHashJoin::finishProbe() {
             updateSpillingStats(_recordsAddedToWriter);
             _recordsAddedToWriter = 0;
         }
+
+        // clear bloom filter
+        _bloomFilter.reset();
+        // We are setting _memUsage to 0 in the next step, so no need to subtract the bloom filter
+        // size here.
     }
 
     // Clear the in-memory hash table to free memory for spill processing
     _ht->clear();
+    _ht->rehash(0);
     _memUsage = 0;
 
     // Reset iterator for spilled partition processing
@@ -715,7 +743,7 @@ boost::optional<JoinCursor> HybridHashJoin::nextSpilledJoinCursor() {
         // progress
 
         std::unique_ptr<HybridHashJoin> join =
-            std::make_unique<HybridHashJoin>(_memLimit, _collator, _stats);
+            std::make_unique<HybridHashJoin>(_memLimit, _collator, boost::none, _stats);
         join->_recursionLevel = _recursionLevel + 1;
         join->_fileStats = _fileStats;
         _stats.recursionDepthMax = std::max(_stats.recursionDepthMax, 1 + _recursionLevel);
@@ -781,6 +809,7 @@ size_t HybridHashJoin::findNextSpilledPartitionIdx() {
  */
 void HybridHashJoin::reset() {
     _ht->clear();
+    _ht->rehash(0);
 
     _partitionBuffers.clear();
     _partitionBuffers.shrink_to_fit();
@@ -788,6 +817,7 @@ void HybridHashJoin::reset() {
     _isSpilled = {};
     _partitionSpills.clear();
     _partitionSpills.shrink_to_fit();
+    _bloomFilter.reset();
 
     _fileStats.reset();
     _memUsage = 0;

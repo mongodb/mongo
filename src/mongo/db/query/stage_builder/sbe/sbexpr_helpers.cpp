@@ -1176,7 +1176,8 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                 const SbSlotVector& outerProjectSlots,
                                 const SbSlotVector& innerCondSlots,
                                 const SbSlotVector& innerProjectSlots,
-                                boost::optional<sbe::value::SlotId> collatorSlot) {
+                                boost::optional<sbe::value::SlotId> collatorSlot,
+                                boost::optional<size_t> estimatedBuildCardinality) {
     return sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
                                           std::move(innerStage),
                                           lower(outerCondSlots),
@@ -1185,7 +1186,8 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                           lower(innerProjectSlots),
                                           collatorSlot,
                                           _state.yieldPolicy,
-                                          _nodeId);
+                                          _nodeId,
+                                          estimatedBuildCardinality);
 }
 
 SbStage SbBuilder::makeMergeJoin(SbStage outerStage,

@@ -873,7 +873,8 @@ public:
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
-                          PlanYieldPolicySBE* yieldPolicy);
+                          PlanYieldPolicySBE* yieldPolicy,
+                          const cost_based_ranker::EstimateMap* estimates = nullptr);
 
     /**
      * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
@@ -1226,6 +1227,8 @@ private:
 
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;
+
+    const cost_based_ranker::EstimateMap* _estimates;
 };  // class SlotBasedStageBuilder
 
 SbStage buildBlockToRow(SbStage stage, StageBuilderState& state, PlanStageSlots& outputs);
