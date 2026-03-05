@@ -204,7 +204,7 @@ teams:
   - name: "Replication"
     slack_tags:
       - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
-      - "<!subteam^S07K4GQ447P>" # @leads-replication - Leads
+      - "<!subteam^S0AK685U9TK>" # @rss-repl-triage - Leads + triagers
   - name: "Storage Execution"
     slack_tags:
       - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
