@@ -29,7 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/db/client.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -89,16 +88,16 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     _oplogIdent = std::string{oplog.getIdent()};
 
     stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
-    invariant(!_running);
-    _running = true;
+    invariant(!_oplog);
+    _oplog = &oplog;
     LOGV2(12035900, "Oplog visibility thread is starting");
     _oplogVisibilityThread =
-        stdx::thread([this, service = opCtx->getServiceContext()->getService(), &engine, &oplog] {
+        stdx::thread([this, service = opCtx->getServiceContext()->getService(), &engine] {
             Client::initThread("OplogVisibilityThread", service);
 
             stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
-            while (true) {
-                switch (_updateVisibility(lk, engine, *oplog.capped())) {
+            while (_oplog) {
+                switch (_updateVisibility(lk, engine, *_oplog->capped())) {
                     case VisibilityUpdateResult::NotUpdated:
                         continue;
                     case VisibilityUpdateResult::Updated:
@@ -107,22 +106,35 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                         // oplog entries will not become visible immediately upon insert, so we
                         // notify waiters here as well, when new oplog entries actually become
                         // visible to cursors.
-                        oplog.capped()->notifyWaitersIfNeeded();
+                        _oplog->capped()->notifyWaitersIfNeeded();
                         continue;
                     case VisibilityUpdateResult::Stopped:
                         return;
                 }
             }
+            LOGV2(22372, "Oplog visibility thread is stopping");
         });
 }
 
-void WiredTigerOplogManager::stop() {
+void WiredTigerOplogManager::stop(const RecordStore* oplog) {
     {
-        stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
-        if (!_running) {
+        std::lock_guard lk(_oplogVisibilityStateMutex);
+        if (!_oplog) {
             return;
         }
-        _running = false;
+
+        // There are three things which stop the manager: clean shutdown, destroying a
+        // WiredTigerRecordStore::Oplog instance, and *creating* a WiredTigerRecordStore::Oplog
+        // instance. Creating a new Oplog instance stops the existing thread (if any) and starts a
+        // new one, and this may happen before the old Oplog instance is destroyed. If this happens,
+        // the destruction of the old instance needs to not stop the new thread.
+        if (oplog && oplog != _oplog) {
+            LOGV2_DEBUG(11996400,
+                        1,
+                        "Not stopping oplog visiblity thread because oplog pointer did not match");
+            return;
+        }
+        _oplog = nullptr;
     }
 
     if (_oplogVisibilityThread.joinable()) {
@@ -207,8 +219,8 @@ WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVi
     stdx::unique_lock<stdx::mutex>& lk, const KVEngine& engine, const RecordStore::Capped& oplog) {
     {
         MONGO_IDLE_THREAD_BLOCK;
-        _oplogVisibilityThreadCV.wait(
-            lk, [this] { return !_running || _triggerOplogVisibilityUpdate; });
+        _oplogVisibilityThreadCV.wait(lk,
+                                      [this] { return !_oplog || _triggerOplogVisibilityUpdate; });
 
         // If we are not shutting down and nobody is actively waiting for the oplog to become
         // visible, delay a bit to batch more requests into one update and reduce system load.
@@ -222,15 +234,13 @@ WiredTigerOplogManager::VisibilityUpdateResult WiredTigerOplogManager::_updateVi
                    lk,
                    now.toSystemTimePoint(),
                    [this, &oplog] {
-                       return !_running || _opsWaitingForOplogVisibilityUpdate ||
-                           oplog.hasWaiters();
+                       return !_oplog || _opsWaitingForOplogVisibilityUpdate || oplog.hasWaiters();
                    })) {
             now += Milliseconds{1};
         }
     }
 
-    if (!_running) {
-        LOGV2(22372, "Oplog visibility thread is stopping");
+    if (!_oplog) {
         return VisibilityUpdateResult::Stopped;
     }
 

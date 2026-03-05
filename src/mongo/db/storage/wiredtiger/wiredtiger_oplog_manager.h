@@ -67,14 +67,19 @@ public:
 
     /**
      * Starts the oplog manager, initializing the oplog read timestamp with the highest oplog
-     * timestamp.
+     * timestamp. Every call to start() must be followed by at least one call to stop() before
+     * start() can be called again.
      */
     void start(OperationContext*, const KVEngine&, RecordStore& oplog, bool isReplSet);
 
     /**
-     * Stops the oplog manager.
+     * Stops the oplog manager if it is running for the given oplog.
+     *
+     * If `oplog` is non-null, the manager will only stop if `oplog` is the same record store as was
+     * passed to the most recent call to `start()`. If it is null, the manager will stop
+     * unconditionally.
      */
-    void stop();
+    void stop(const RecordStore* oplog);
 
     /**
      * Updates the oplog read timestamp if the visibility timestamp is behind the provided
@@ -112,6 +117,11 @@ public:
      */
     StringData getIdent() const;
 
+    bool isRunning_forTest() const {
+        std::lock_guard lk(_oplogVisibilityStateMutex);
+        return _oplog != nullptr;
+    }
+
 private:
     enum class VisibilityUpdateResult {
         NotUpdated,
@@ -139,8 +149,9 @@ private:
     // Protects the state below.
     mutable stdx::mutex _oplogVisibilityStateMutex;
 
-    // Whether this oplog manager is currently running.
-    bool _running = false;
+    // The record store which the thread is currently running for. May be null while the thread is
+    // running if the thread is in the process of shutting down.
+    RecordStore* _oplog = nullptr;
 
     // Whether an oplog to oplog visibility is being triggered.
     bool _triggerOplogVisibilityUpdate = false;

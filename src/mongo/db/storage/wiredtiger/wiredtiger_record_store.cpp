@@ -1463,7 +1463,7 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getRawCursor
 }
 
 WiredTigerRecordStore::Oplog::~Oplog() {
-    _kvEngine->getOplogManager()->stop();
+    _kvEngine->getOplogManager()->stop(this);
 }
 
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::Oplog::getCursor(

@@ -95,27 +95,36 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     return _engine->getRecordStore(opCtx.get(), nss, ident, recordStoreOptions, uuid);
 }
 
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
-    auto ret = newOplogRecordStoreNoInit();
-    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    auto oplog = static_cast<WiredTigerRecordStore::Oplog*>(ret.get());
-    _engine->getOplogManager()->start(opCtx.get(), *_engine, *oplog, _isReplSet);
-    return ret;
-}
-
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
+static const auto kOplogOptions = [] {
     RecordStore::Options oplogRecordStoreOptions;
     oplogRecordStoreOptions.isOplog = true;
     oplogRecordStoreOptions.isCapped = true;
     // Large enough not to exceed capped limits.
     oplogRecordStoreOptions.oplogMaxSize = 1024 * 1024 * 1024;
+    return oplogRecordStoreOptions;
+}();
+
+std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
+    std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     WriteUnitOfWork wuow(opCtx.get());
     const auto res = _engine->createRecordStore(
-        provider, ru, NamespaceString::kRsOplogNamespace, ident, oplogRecordStoreOptions);
+        provider, ru, NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
+    wuow.commit();
+    return _engine->getRecordStore(
+        opCtx.get(), NamespaceString::kRsOplogNamespace, ident, kOplogOptions, UUID::gen());
+}
+
+std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
+    std::string ident = _identForNs(redactTenant(NamespaceString::kRsOplogNamespace));
+    ServiceContext::UniqueOperationContext opCtx(newOperationContext());
+    auto& provider = rss::ReplicatedStorageService::get(opCtx.get()).getPersistenceProvider();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    WriteUnitOfWork wuow(opCtx.get());
+    const auto res = _engine->createRecordStore(
+        provider, ru, NamespaceString::kRsOplogNamespace, ident, kOplogOptions);
     wuow.commit();
 
     // Cannot use 'getRecordStore', which automatically starts the the oplog manager.
@@ -127,7 +136,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
                                              .engineName = std::string{kWiredTigerEngineName},
                                              .inMemory = false,
                                              // Large enough not to exceed capped limits.
-                                             .oplogMaxSize = oplogRecordStoreOptions.oplogMaxSize,
+                                             .oplogMaxSize = kOplogOptions.oplogMaxSize,
                                              .sizeStorer = nullptr,
                                              .tracksSizeAdjustments = true,
                                              .isLogged = true,

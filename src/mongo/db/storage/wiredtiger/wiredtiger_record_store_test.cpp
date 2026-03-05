@@ -31,10 +31,8 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -65,8 +63,6 @@
 
 #include <wiredtiger.h>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -272,7 +268,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
-    engine->getOplogManager()->stop();
+    engine->getOplogManager()->stop(nullptr);
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -308,7 +304,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
-    engine->getOplogManager()->stop();
+    engine->getOplogManager()->stop(nullptr);
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -558,6 +554,46 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     // Committing the write at timestamp "2" does not change the top of oplog result. A new query
     // with client 1 will see timestamp "3".
     ASSERT_EQ(tsThree, wtRS->getLatestTimestamp(ru1));
+}
+
+TEST(WiredTigerRecordStoreTest, OplogDestructorAutomaticallyStopsOplogManager) {
+    auto harnessHelper = newRecordStoreHarnessHelper();
+    auto oplogManager =
+        static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine())->getOplogManager();
+
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
+    auto rs(harnessHelper->newOplogRecordStore());
+    ASSERT_TRUE(oplogManager->isRunning_forTest());
+    rs.reset();
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
+}
+
+TEST(WiredTigerRecordStoreTest, OplogDestructorOnlyStopsCorrectOplogManager) {
+    auto harnessHelper = newRecordStoreHarnessHelper();
+    auto oplogManager =
+        static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine())->getOplogManager();
+
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
+
+    // Creating rs2 stops the thread for rs1 and starts it for itself, so destroying rs1 should not
+    // stop the thread.
+    auto rs1 = harnessHelper->newOplogRecordStore();
+    ASSERT_TRUE(oplogManager->isRunning_forTest());
+    auto rs2 = harnessHelper->newOplogRecordStore();
+    ASSERT_TRUE(oplogManager->isRunning_forTest());
+    rs1.reset();
+    ASSERT_TRUE(oplogManager->isRunning_forTest());
+    rs2.reset();
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
+
+    // Destroying rs2 first should stop the thread even though rs1 still exists
+    rs1 = harnessHelper->newOplogRecordStore();
+    rs2 = harnessHelper->newOplogRecordStore();
+    ASSERT_TRUE(oplogManager->isRunning_forTest());
+    rs2.reset();
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
+    rs1.reset();
+    ASSERT_FALSE(oplogManager->isRunning_forTest());
 }
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {

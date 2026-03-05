@@ -943,7 +943,7 @@ void WiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
         return;
     }
 
-    getOplogManager()->stop();
+    getOplogManager()->stop(nullptr);
 
     if (_sessionSweeper) {
         LOGV2(22318, "Shutting down session sweeper thread");
@@ -1795,7 +1795,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                                                  .isLogged = isLogged,
                                                  .forceUpdateWithFullDocument =
                                                      options.forceUpdateWithFullDocument});
-        getOplogManager()->stop();
+        getOplogManager()->stop(nullptr);
         getOplogManager()->start(opCtx, *this, *ret, _isReplSet);
     } else {
         bool isLogged = [&] {
