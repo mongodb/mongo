@@ -1185,5 +1185,8 @@ error_codes:
       categories: [SystemOverloadedError],
     }
 
+  # Error code to indicate that replanning the query is required
+  - {code: 490, name: ReplanningRequired, extra: ReplanningRequiredInfo}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

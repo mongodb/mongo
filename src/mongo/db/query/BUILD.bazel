@@ -18,6 +18,7 @@ mongo_cc_library(
     ],
     deps = [
         ":canonical_query_base",
+        ":replanning_required_info",
         "//src/mongo:base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/query/datetime:init_timezone_data",
@@ -765,5 +766,15 @@ mongo_cc_unit_test(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+    ],
+)
+
+mongo_cc_library(
+    name = "replanning_required_info",
+    srcs = [
+        "replanning_required_info.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
     ],
 )

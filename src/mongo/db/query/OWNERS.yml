@@ -284,3 +284,7 @@ filters:
   - "index_tag*":
     approvers:
       - 10gen/query-optimization
+  - "replanning_required_info*":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
