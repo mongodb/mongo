@@ -164,8 +164,8 @@ public:
         collScanParams.tailable = false;
 
         // Configure the delete stage.
-        auto deleteStageParams = std::make_unique<DeleteStageParams>();
-        deleteStageParams->isMulti = true;
+        DeleteStageParams deleteStageParams;
+        deleteStageParams.isMulti = true;
 
         WorkingSet ws;
         DeleteStage deleteStage(
@@ -239,9 +239,9 @@ public:
         qds->pushBack(id);
 
         // Configure the delete.
-        auto deleteParams = std::make_unique<DeleteStageParams>();
-        deleteParams->returnDeleted = true;
-        deleteParams->canonicalQuery = cq.get();
+        DeleteStageParams deleteParams;
+        deleteParams.returnDeleted = true;
+        deleteParams.canonicalQuery = cq.get();
 
         const auto deleteStage = std::make_unique<DeleteStage>(
             _expCtx.get(), std::move(deleteParams), ws.get(), coll, qds.release());

@@ -155,7 +155,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     return candidate;
 }
 
-// TODO SERVER-87466 Trigger replanning by throwing an exception, instead of creating another
+// TODO SERVER-120501 Trigger replanning by throwing an exception, instead of creating another
 // planner.
 std::unique_ptr<PlannerInterface> replan(
     PlannerDataForSBE plannerData,

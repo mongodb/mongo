@@ -65,7 +65,7 @@ public:
      */
     void addDeleteStage(ParsedDelete* parsedDelete,
                         projection_ast::Projection* projection,
-                        std::unique_ptr<DeleteStageParams> deleteStageParams);
+                        DeleteStageParams deleteStageParams);
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform updates.
      */

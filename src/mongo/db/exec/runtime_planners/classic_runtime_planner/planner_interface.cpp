@@ -97,7 +97,7 @@ SavedExecState ClassicPlannerInterface::extractExecState() && {
 
 void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
                                              projection_ast::Projection* projection,
-                                             std::unique_ptr<DeleteStageParams> deleteStageParams) {
+                                             DeleteStageParams deleteStageParams) {
     invariant(_state == kNotInitialized);
     invariant(collections().hasMainCollection());
     const auto& coll = collections().getMainCollectionAcquisition();
@@ -112,16 +112,16 @@ void ClassicPlannerInterface::addDeleteStage(ParsedDelete* parsedDelete,
              RecoveryUnit::State::kActiveNotInUnitOfWork) &&
         !opCtx()->inMultiDocumentTransaction() && !opCtx()->isRetryableWrite() &&
         !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
-        !collectionPtr->ns().isConfigDB() && deleteStageParams->isMulti &&
-        !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
-        deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc;
+        !collectionPtr->ns().isConfigDB() && deleteStageParams.isMulti &&
+        !deleteStageParams.fromMigrate && !deleteStageParams.returnDeleted &&
+        deleteStageParams.sort.isEmpty() && !deleteStageParams.numStatsForDoc;
 
     if (parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
         // Checks if the delete is on a time-series collection and cannot run on bucket
         // documents directly.
         _root = std::make_unique<TimeseriesModifyStage>(
             cq()->getExpCtxRaw(),
-            TimeseriesModifyParams(deleteStageParams.get()),
+            TimeseriesModifyParams(&deleteStageParams),
             ws(),
             std::move(_root),
             coll,

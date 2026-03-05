@@ -2642,7 +2642,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
                                                     AcquisitionPrerequisites::kWrite},
                                                    MODE_IX);
 
-        auto params = std::make_unique<DeleteStageParams>();
+        DeleteStageParams params;
         auto exec =
             InternalPlanner::deleteWithCollectionScan(operationContext(),
                                                       acquisition,

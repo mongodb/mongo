@@ -80,7 +80,7 @@ bool shouldRestartDeleteIfNoLongerMatches(const DeleteStageParams* params) {
 }  // namespace
 
 DeleteStage::DeleteStage(ExpressionContext* expCtx,
-                         std::unique_ptr<DeleteStageParams> params,
+                         DeleteStageParams params,
                          WorkingSet* ws,
                          CollectionAcquisition collection,
                          PlanStage* child)
@@ -88,7 +88,7 @@ DeleteStage::DeleteStage(ExpressionContext* expCtx,
 
 DeleteStage::DeleteStage(const char* stageType,
                          ExpressionContext* expCtx,
-                         std::unique_ptr<DeleteStageParams> params,
+                         DeleteStageParams params,
                          WorkingSet* ws,
                          CollectionAcquisition collection,
                          PlanStage* child)
@@ -102,7 +102,7 @@ DeleteStage::DeleteStage(const char* stageType,
 }
 
 bool DeleteStage::isEOF() const {
-    if (!_params->isMulti && _specificStats.docsDeleted > 0) {
+    if (!_params.isMulti && _specificStats.docsDeleted > 0) {
         return true;
     }
     return _idRetrying == WorkingSet::INVALID_ID && _idReturning == WorkingSet::INVALID_ID &&
@@ -118,7 +118,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // and prevented us from returning ADVANCED with the old version of the document.
     if (_idReturning != WorkingSet::INVALID_ID) {
         // We should only get here if we were trying to return something before.
-        tassert(11051648, "Expecting returnDeleter parameter set", _params->returnDeleted);
+        tassert(11051648, "Expecting returnDeleter parameter set", _params.returnDeleted);
 
         WorkingSetMember* member = _ws->get(_idReturning);
         tassert(11051647,
@@ -180,7 +180,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         "DeleteStage ensureStillMatches",
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collectionPtr(), opCtx(), _ws, id, _params->canonicalQuery);
+                collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -198,14 +198,14 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (!docStillMatches) {
         // Either the document has already been deleted, or it has been updated such that it no
         // longer matches the predicate.
-        if (shouldRestartDeleteIfNoLongerMatches(_params.get())) {
+        if (shouldRestartDeleteIfNoLongerMatches(&_params)) {
             throwWriteConflictException("Document no longer matches the predicate.");
         }
         return PlanStage::NEED_TIME;
     }
 
     bool writeToOrphan = false;
-    if (!_params->isExplain && !_params->fromMigrate) {
+    if (!_params.isExplain && !_params.fromMigrate) {
         auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
             member->doc.value(),
             "delete"_sd,
@@ -251,7 +251,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     }
 
     // Do the write, unless this is an explain.
-    if (!_params->isExplain) {
+    if (!_params.isExplain) {
         try {
             const auto ret = handlePlanStageYield(
                 expCtx(),
@@ -262,13 +262,13 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                         opCtx(),
                         collectionPtr(),
                         Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
-                        _params->stmtId,
+                        _params.stmtId,
                         recordId,
-                        _params->opDebug,
-                        writeToOrphan || _params->fromMigrate,
+                        _params.opDebug,
+                        writeToOrphan || _params.fromMigrate,
                         false,
-                        _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
-                                               : collection_internal::StoreDeletedDoc::Off,
+                        _params.returnDeleted ? collection_internal::StoreDeletedDoc::On
+                                              : collection_internal::StoreDeletedDoc::Off,
                         CheckRecordId::Off,
                         retryableWrite ? collection_internal::RetryableWrite::kYes
                                        : collection_internal::RetryableWrite::kNo);
@@ -299,10 +299,10 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             throw;
         }
     }
-    _specificStats.docsDeleted += _params->numStatsForDoc ? _params->numStatsForDoc(bsonObjDoc) : 1;
+    _specificStats.docsDeleted += _params.numStatsForDoc ? _params.numStatsForDoc(bsonObjDoc) : 1;
     _specificStats.bytesDeleted += bsonObjDoc.objsize();
 
-    if (_params->returnDeleted) {
+    if (_params.returnDeleted) {
         // After deleting the document, the RecordId associated with this member is invalid.
         // Remove the 'recordId' from the WorkingSetMember before returning it.
         member->recordId = RecordId();
@@ -325,7 +325,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             // Note we don't need to retry anything in this case since the delete already was
             // committed. However, we still need to return the deleted document (if it was
             // requested).
-            if (_params->returnDeleted) {
+            if (_params.returnDeleted) {
                 // member->obj should refer to the deleted document.
                 tassert(11051644,
                         "Expecting working set member to store an owned object.",
@@ -357,7 +357,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         }
     }
 
-    if (_params->returnDeleted) {
+    if (_params.returnDeleted) {
         // member->obj should refer to the deleted document.
         tassert(11051643,
                 "Expecting working set member to store an owned object",
@@ -382,10 +382,10 @@ void DeleteStage::doRestoreStateRequiresCollection() {
     // Single deletes never yield after having already deleted one document. Otherwise restore could
     // fail (e.g. due to a sharding placement change) and we'd fail to report in the response the
     // already deleted documents.
-    const bool singleDeleteAndAlreadyDeleted = !_params->isMulti && _specificStats.docsDeleted > 0;
+    const bool singleDeleteAndAlreadyDeleted = !_params.isMulti && _specificStats.docsDeleted > 0;
     tassert(7711600,
             "Single delete should never restore after having already deleted one document",
-            !singleDeleteAndAlreadyDeleted || _params->isExplain);
+            !singleDeleteAndAlreadyDeleted || _params.isExplain);
 
     _preWriteFilter.restoreState();
 }

@@ -233,9 +233,9 @@ public:
         std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
         CanonicalQuery* deleteParamsFilter = nullptr) {
         // DeleteStageParams must always be multi.
-        auto deleteParams = std::make_unique<DeleteStageParams>();
-        deleteParams->isMulti = true;
-        deleteParams->canonicalQuery = deleteParamsFilter;
+        DeleteStageParams deleteParams;
+        deleteParams.isMulti = true;
+        deleteParams.canonicalQuery = deleteParamsFilter;
 
         CollectionScanParams collScanParams;
         return std::make_unique<BatchedDeleteStage>(

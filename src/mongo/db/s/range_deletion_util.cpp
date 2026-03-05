@@ -151,10 +151,10 @@ StatusWith<std::pair<int, int>> deleteNextBatch(OperationContext* opCtx,
                 "range"_attr = redact(range.toString()),
                 "usingBatchedDeletes"_attr = usingBatchedDeletes);
 
-    auto deleteStageParams = std::make_unique<DeleteStageParams>();
-    deleteStageParams->fromMigrate = true;
-    deleteStageParams->isMulti = true;
-    deleteStageParams->returnDeleted = true;
+    DeleteStageParams deleteStageParams;
+    deleteStageParams.fromMigrate = true;
+    deleteStageParams.isMulti = true;
+    deleteStageParams.returnDeleted = true;
 
     auto batchedDeleteStageParams = std::make_unique<BatchedDeleteStageParams>();
 

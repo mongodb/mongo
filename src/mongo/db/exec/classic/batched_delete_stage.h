@@ -117,7 +117,7 @@ class BatchedDeleteStage final : public DeleteStage {
 public:
     static constexpr StringData kStageType = "BATCHED_DELETE"_sd;
     BatchedDeleteStage(ExpressionContext* expCtx,
-                       std::unique_ptr<DeleteStageParams> params,
+                       DeleteStageParams params,
                        std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
                        WorkingSet* ws,
                        CollectionAcquisition collection,

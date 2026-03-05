@@ -671,10 +671,10 @@ namespace {
 /**
  * Returns DeleteStageParams for deleteOne with fetch.
  */
-std::unique_ptr<DeleteStageParams> makeDeleteStageParamsForDeleteDocuments() {
-    auto deleteStageParams = std::make_unique<DeleteStageParams>();
-    deleteStageParams->isMulti = true;
-    deleteStageParams->returnDeleted = true;
+DeleteStageParams makeDeleteStageParamsForDeleteDocuments() {
+    DeleteStageParams deleteStageParams;
+    deleteStageParams.isMulti = true;
+    deleteStageParams.returnDeleted = true;
     return deleteStageParams;
 }
 

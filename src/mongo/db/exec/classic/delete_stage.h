@@ -113,14 +113,14 @@ public:
     static constexpr StringData kStageType = "DELETE"_sd;
 
     DeleteStage(ExpressionContext* expCtx,
-                std::unique_ptr<DeleteStageParams> params,
+                DeleteStageParams params,
                 WorkingSet* ws,
                 CollectionAcquisition collection,
                 PlanStage* child);
 
     DeleteStage(const char* stageType,
                 ExpressionContext* expCtx,
-                std::unique_ptr<DeleteStageParams> params,
+                DeleteStageParams params,
                 WorkingSet* ws,
                 CollectionAcquisition collection,
                 PlanStage* child);
@@ -143,7 +143,7 @@ protected:
 
     void doRestoreStateRequiresCollection() final;
 
-    std::unique_ptr<DeleteStageParams> _params;
+    DeleteStageParams _params;
 
     // Not owned by us.
     WorkingSet* _ws;

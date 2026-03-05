@@ -1505,18 +1505,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     const auto policy = parsedDelete->yieldPolicy();
 
-    auto deleteStageParams = std::make_unique<DeleteStageParams>();
-    deleteStageParams->isMulti = request->getMulti();
-    deleteStageParams->fromMigrate = request->getFromMigrate();
-    deleteStageParams->isExplain = request->getIsExplain();
-    deleteStageParams->returnDeleted = request->getReturnDeleted();
-    deleteStageParams->sort = request->getSort();
-    deleteStageParams->opDebug = opDebug;
-    deleteStageParams->stmtId = request->getStmtId();
+    DeleteStageParams deleteStageParams;
+    deleteStageParams.isMulti = request->getMulti();
+    deleteStageParams.fromMigrate = request->getFromMigrate();
+    deleteStageParams.isExplain = request->getIsExplain();
+    deleteStageParams.returnDeleted = request->getReturnDeleted();
+    deleteStageParams.sort = request->getSort();
+    deleteStageParams.opDebug = opDebug;
+    deleteStageParams.stmtId = request->getStmtId();
 
     if (parsedDelete->isRequestToTimeseries() &&
         !parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
-        deleteStageParams->numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
+        deleteStageParams.numStatsForDoc = timeseries::numMeasurementsForBucketCounter(
             collectionPtr->getTimeseriesOptions()->getTimeField());
     }
 
@@ -1540,7 +1540,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // The underlying query plan must preserve the record id, since it will be needed in order to
     // identify the record to update.
     cq->setForceGenerateRecordId(true);
-    deleteStageParams->canonicalQuery = cq.get();
+    deleteStageParams.canonicalQuery = cq.get();
 
     MultipleCollectionAccessor collections{coll};
     auto plannerParams =
@@ -1560,8 +1560,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
     auto result = uassertStatusOK(helper.prepare());
     setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
-    result->runtimePlanner->addDeleteStage(
-        parsedDelete, projection.get(), std::move(deleteStageParams));
+    result->runtimePlanner->addDeleteStage(parsedDelete, projection.get(), deleteStageParams);
     if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
         return status;
     }

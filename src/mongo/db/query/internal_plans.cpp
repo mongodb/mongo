@@ -274,7 +274,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithCollectionScan(
     OperationContext* opCtx,
     CollectionAcquisition coll,
-    std::unique_ptr<DeleteStageParams> params,
+    DeleteStageParams params,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     Direction direction,
     boost::optional<RecordIdBound> minRecord,
@@ -356,7 +356,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithIndexScan(
     OperationContext* opCtx,
     CollectionAcquisition coll,
-    std::unique_ptr<DeleteStageParams> params,
+    DeleteStageParams params,
     const IndexCatalogEntry* indexEntry,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -430,7 +430,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIn
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithShardKeyIndexScan(
     OperationContext* opCtx,
     CollectionAcquisition coll,
-    std::unique_ptr<DeleteStageParams> params,
+    DeleteStageParams params,
     const ShardKeyIndex& shardKeyIdx,
     const BSONObj& startKey,
     const BSONObj& endKey,
@@ -559,7 +559,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
 std::unique_ptr<PlanStage> InternalPlanner::_createAppropriateDeleteStage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     CollectionAcquisition coll,
-    std::unique_ptr<DeleteStageParams> params,
+    DeleteStageParams params,
     std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
     WorkingSet* ws,
     PlanStage* child) {

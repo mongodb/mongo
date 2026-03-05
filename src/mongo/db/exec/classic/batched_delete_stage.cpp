@@ -149,7 +149,7 @@ bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
 
 BatchedDeleteStage::BatchedDeleteStage(
     ExpressionContext* expCtx,
-    std::unique_ptr<DeleteStageParams> params,
+    DeleteStageParams params,
     std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams,
     WorkingSet* ws,
     CollectionAcquisition collection,
@@ -164,12 +164,12 @@ BatchedDeleteStage::BatchedDeleteStage(
       _passStagingComplete(false) {
     tassert(6303800,
             "batched deletions only support multi-document deletions (multi: true)",
-            _params->isMulti);
+            _params.isMulti);
     tassert(
-        6303803, "batched deletions do not support the 'sort' parameter", _params->sort.isEmpty());
+        6303803, "batched deletions do not support the 'sort' parameter", _params.sort.isEmpty());
     tassert(6303805,
             "batched deletions do not support the 'numStatsForDoc' parameter",
-            !_params->numStatsForDoc);
+            !_params.numStatsForDoc);
     tassert(6303807,
             "batch size parameters must be greater than or equal to zero",
             _batchedDeleteParams->targetStagedDocBytes >= 0 &&
@@ -208,7 +208,7 @@ PlanStage::StageState BatchedDeleteStage::doWork(WorkingSetID* out) {
         _commitStagedDeletes = _passStagingComplete || _batchTargetMet();
     }
 
-    if (!_params->isExplain && _commitStagedDeletes) {
+    if (!_params.isExplain && _commitStagedDeletes) {
         // Overwriting 'planStageState' potentially means throwing away the result produced from
         // staging. We expect to commit deletes after a new document is staged and the batch targets
         // are met (planStageState = PlanStage::NEED_TIME), after there are no more documents to
@@ -376,14 +376,14 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
             _stagedDeletesBuffer.at(_stagedDeletesBuffer.size() - 1 - *rBufferOffset);
         WorkingSetMember* member = _ws->get(workingSetMemberID);
 
-        bool writeToOrphan = _params->fromMigrate;
-        if (!_params->fromMigrate) {
+        bool writeToOrphan = _params.fromMigrate;
+        if (!_params.fromMigrate) {
             using write_stage_common::PreWriteFilter;
             const PreWriteFilter::Action action = [&]() {
                 // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
                 // Different documents may have different snapshots.
                 const bool docStillMatches = ensureStillMatchesAndUpdateStats(
-                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
+                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params.canonicalQuery);
 
                 // Warning: if docStillMatches is false, the WSM's underlying Document/BSONObj is no
                 // longer valid.
@@ -430,13 +430,13 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
             opCtx(),
             collectionPtr(),
             Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
-            _params->stmtId,
+            _params.stmtId,
             member->recordId,
-            _params->opDebug,
+            _params.opDebug,
             writeToOrphan,
             false,
-            _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
-                                   : collection_internal::StoreDeletedDoc::Off,
+            _params.returnDeleted ? collection_internal::StoreDeletedDoc::On
+                                  : collection_internal::StoreDeletedDoc::Off,
             CheckRecordId::Off,
             retryableWrite ? collection_internal::RetryableWrite::kYes
                            : collection_internal::RetryableWrite::kNo);
@@ -496,7 +496,7 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
     // a fetch. We should always get fetched data, and never just key data.
     tassert(11051660, "Expect WorkingSetMember to have object", member->hasObj());
 
-    if (_params->isExplain) {
+    if (_params.isExplain) {
         // Populate 'nWouldDelete' for 'executionStats'.
         _specificStats.docsDeleted += 1;
         return;
