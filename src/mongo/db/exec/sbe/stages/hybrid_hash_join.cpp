@@ -44,7 +44,7 @@ namespace sbe {
 constexpr size_t kNumPartitions = 256;
 static_assert(std::has_single_bit(kNumPartitions), "kNumPartitions must be a power of two");
 
-constexpr int kMaxRecursionDepth = 2;
+constexpr int kMaxRecursionDepth = 1;
 constexpr uint32_t kPartitionMask = (kNumPartitions - 1);
 constexpr int kNumBitsInPartitionMask = std::countr_one(kPartitionMask);
 constexpr size_t kMaxBloomFilterSize = 16 * 1024 * 1024;  // 16 MB
