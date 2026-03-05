@@ -3,6 +3,7 @@ import sys
 import tempfile
 import traceback
 import unittest
+from unittest.mock import patch
 
 from buildscripts import sync_repo_with_copybara
 
@@ -295,6 +296,197 @@ class TestBranchFunctions(unittest.TestCase):
                     return
 
             self.fail(f"{test_name}: FAIL!")
+
+
+class TestSkyExclusionChecks(unittest.TestCase):
+    def test_extract_sky_excluded_patterns(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    """
+                    origin_files = glob(["**"], exclude = [
+                        "src/mongo/db/modules/**",
+                        "buildscripts/modules/**",
+                        ".github/workflows/**",
+                        "src/third_party/private/**",
+                        ".augment/**",
+                        ".cursor/**",
+                        "AGENTS.md",
+                        ".github/CODEOWNERS",
+                        "monguard/**",
+                    ])
+                    """
+                )
+            patterns = sync_repo_with_copybara.extract_sky_excluded_patterns(sky_path)
+            self.assertIn("src/mongo/db/modules/**", patterns)
+            self.assertIn("AGENTS.md", patterns)
+
+    def test_check_script_exclusions_match_sky_passes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    """
+                    origin_files = glob(["**"], exclude = [
+                        "src/mongo/db/modules/**",
+                        "buildscripts/modules/**",
+                        ".github/workflows/**",
+                        "src/third_party/private/**",
+                        ".augment/**",
+                        ".cursor/**",
+                        "AGENTS.md",
+                        ".github/CODEOWNERS",
+                        "monguard/**",
+                    ])
+                    """
+                )
+            sync_repo_with_copybara.check_script_exclusions_match_sky(sky_path)
+
+    def test_check_script_exclusions_match_sky_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    """
+                    origin_files = glob(["**"], exclude = [
+                        "src/mongo/db/modules/**",
+                        "buildscripts/modules/**",
+                    ])
+                    """
+                )
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.check_script_exclusions_match_sky(sky_path)
+
+    def test_pin_prod_workflow_ref_to_commit(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "master"\n'
+                    'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")\n'
+                )
+            sync_repo_with_copybara.pin_prod_workflow_ref_to_commit(sky_path, "abc123")
+            with open(sky_path, "r") as f:
+                rewritten = f.read()
+            self.assertIn(
+                f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "abc123"', rewritten
+            )
+
+    def test_pin_prod_workflow_ref_to_commit_reuses_existing_variable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    f"""
+                    {sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "oldsha"
+                    make_workflow("prod", prodUrl, {sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE}, "master")
+                    """
+                )
+            sync_repo_with_copybara.pin_prod_workflow_ref_to_commit(sky_path, "newsha")
+            with open(sky_path, "r") as f:
+                rewritten = f.read()
+            self.assertEqual(rewritten.count(sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE), 2)
+            self.assertIn(
+                f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "newsha"',
+                rewritten,
+            )
+
+    def test_pin_prod_workflow_ref_to_commit_fails_if_variable_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write('make_workflow("prod", prodUrl, "master", "master")')
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.pin_prod_workflow_ref_to_commit(sky_path, "abc123")
+
+    def test_get_prod_pinned_source_ref(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "v8.0"\n'
+                    'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")\n'
+                )
+
+            pinned_ref = sync_repo_with_copybara.get_prod_pinned_source_ref(sky_path)
+            self.assertEqual(pinned_ref, "v8.0")
+
+    def test_get_prod_pinned_source_ref_fails_if_variable_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write('make_workflow("prod", prodUrl, "master", "master")')
+
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.get_prod_pinned_source_ref(sky_path)
+
+    @patch("buildscripts.sync_repo_with_copybara.pin_prod_workflow_ref_to_commit")
+    @patch("buildscripts.sync_repo_with_copybara.run_command")
+    def test_get_prod_copybara_config_uses_ref_from_sky_file(self, mock_run_command, mock_pin_ref):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "v8.0"\n'
+                    'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")\n'
+                )
+
+            mock_run_command.side_effect = [
+                "",
+                "deadbeef123\n",
+                'sourceUrl = "https://github.com/10gen/mongo.git"\n',
+            ]
+
+            config_file = sync_repo_with_copybara.get_prod_copybara_config_from_master(tmpdir)
+
+            self.assertEqual(
+                config_file, os.path.join(tmpdir, "tmp_copybara_config_from_master.sky")
+            )
+            self.assertEqual(mock_run_command.call_args_list[0].args[0], "git fetch origin v8.0")
+            self.assertEqual(
+                mock_run_command.call_args_list[1].args[0], "git rev-parse origin/v8.0"
+            )
+            self.assertEqual(
+                mock_run_command.call_args_list[2].args[0],
+                "git --no-pager show deadbeef123:copy.bara.sky",
+            )
+            mock_pin_ref.assert_called_once_with(config_file, "deadbeef123")
+
+    @patch("buildscripts.sync_repo_with_copybara.run_command")
+    def test_get_prod_copybara_config_keeps_destination_on_original_prod_ref(
+        self, mock_run_command
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = os.path.join(tmpdir, "copy.bara.sky")
+            with open(sky_path, "w") as f:
+                f.write(
+                    f'{sync_repo_with_copybara.PROD_PINNED_REF_VARIABLE} = "master"\n'
+                    'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")\n'
+                )
+
+            mock_run_command.side_effect = [
+                "",
+                "deadbeef123\n",
+                (
+                    'prodRefForPinnedSourceCommit = "master"\n'
+                    'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")\n'
+                ),
+            ]
+
+            config_file = sync_repo_with_copybara.get_prod_copybara_config_from_master(tmpdir)
+
+            with open(config_file, "r") as f:
+                generated_config = f.read()
+
+            self.assertIn(
+                'prodRefForPinnedSourceCommit = "deadbeef123"',
+                generated_config,
+            )
+            self.assertIn(
+                'make_workflow("prod", prodUrl, prodRefForPinnedSourceCommit, "master")',
+                generated_config,
+            )
 
 
 if __name__ == "__main__":
