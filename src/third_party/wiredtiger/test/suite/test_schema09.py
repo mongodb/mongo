@@ -28,6 +28,7 @@
 
 import wttest, wiredtiger
 from suite_subprocess import suite_subprocess
+from wtscenario import make_scenarios
 
 # test_schema09.py
 #    Test that incomplete tables are properly cleaned up during recovery.
@@ -43,9 +44,34 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('create table')
         self.session.create(self.tablename, 'key_format=5s,value_format=HQ,exclusive=true')
 
-    def subprocess_func(self):
-        self.conn.reconfigure("debug_mode=(crash_point_colgroup=true)")
+    # Each of these crash points will result in incomplete metadata states during recovery.
+    # __metadata_clean_incomplete_table should force drop any incomplete tables, allowing
+    # new tables with the same name to be created.
+    crash_point_values = [
+        ('before_insert_file',      dict(crash_point='before_insert_file')),
+        ('before_insert_colgroup',  dict(crash_point='before_insert_colgroup')),
+        ('after_drop_file',         dict(crash_point='after_drop_file')),
+        ('after_drop_colgroup',     dict(crash_point='after_drop_colgroup')),
+    ]
+    scenarios = make_scenarios(crash_point_values)
+
+    def subprocess_crash_point_before_insert_file(self):
+        self.conn.reconfigure("debug_mode=(crash_point=(before_insert_file=true))")
         self.create_table() # Expected to fail
+
+    def subprocess_crash_point_before_insert_colgroup(self):
+        self.conn.reconfigure("debug_mode=(crash_point=(before_insert_colgroup=true))")
+        self.create_table() # Expected to fail
+
+    def subprocess_crash_point_after_drop_file(self):
+        self.conn.reconfigure("debug_mode=(crash_point=(after_drop_file=true))")
+        self.create_table()
+        self.session.drop(self.tablename, None) # Expected to fail
+
+    def subprocess_crash_point_after_drop_colgroup(self):
+        self.conn.reconfigure("debug_mode=(crash_point=(after_drop_colgroup=true))")
+        self.create_table()
+        self.session.drop(self.tablename, None) # Expected to fail
 
     def check_metadata_entry(self, exists):
         expect_search = 0 if exists else wiredtiger.WT_NOTFOUND
@@ -58,29 +84,33 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(meta_cursor.search(), expect_search)
         meta_cursor.close()
 
-    def test_schema(self):
+    def test_schema09(self):
         self.close_conn()
 
-        subdir = 'SUBPROCESS'
-        [ignore_result, new_home_dir] = self.run_subprocess_function(subdir,
-            'test_schema09.test_schema09.subprocess_func', silent=True)
-
+        subdir = f'SUBPROCESS_crash_point_{self.crash_point}'
+        func = f'test_schema09.test_schema09.subprocess_crash_point_{self.crash_point}'
+        [ignore_result, new_home_dir] = self.run_subprocess_function(
+            subdir, func, silent=True)
 
         with self.expectedStdoutPattern('removing incomplete table'):
             self.conn = self.setUpConnectionOpen(new_home_dir)
         self.session = self.setUpSessionOpen(self.conn)
 
-        self.conn.reconfigure("debug_mode=(crash_point_colgroup=false)")
+        self.conn.reconfigure(f"debug_mode=(crash_point=({self.crash_point}=false))")
         self.check_metadata_entry(False)
 
         # Test that we can't open a cursor on the table.
         self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: self.session.open_cursor(self.tablename, None))
+            wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(self.tablename, None))
 
         # Test that we can't drop the table.
         self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: self.session.drop(self.tablename, None))
+            wiredtiger.WiredTigerError,
+            lambda: self.session.drop(self.tablename, None))
 
         # Test that we can create the table.
         self.create_table()
         self.check_metadata_entry(True)
+        self.session.drop(self.tablename, None)
+        self.check_metadata_entry(False)

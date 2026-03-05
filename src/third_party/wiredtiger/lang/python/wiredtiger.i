@@ -205,14 +205,6 @@ from packing import pack, unpack
 	$1 = &val;
 }
 
-/* Why do we need an explicit conversion for plh_put - doesn't the previous typemap cover this? */
-%typemap(in) struct __wt_item *buf (WT_ITEM item) {
-	if (unpackBytesOrString($input, &item.data, &item.size) != 0)
-		SWIG_exception_fail(SWIG_AttributeError,
-		  "bad string value for WT_ITEM");
-	$1 = &item;
-}
-
 /*
  * This typemap removes the three last arguments for plh_get, and uses local variables for them instead.
  * The local variables will be used in the matching argout typemap.
@@ -724,8 +716,11 @@ NOTFOUND_OK(__wt_cursor::largest_key)
 ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
 ANY_OK(__wt_page_log_discard_args::__wt_page_log_discard_args)
-ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
+ANY_OK(__wt_page_log_discard_args::~__wt_page_log_discard_args)
 ANY_OK(__wt_page_log_put_args::__wt_page_log_put_args)
+ANY_OK(__wt_page_log_put_args::~__wt_page_log_put_args)
+ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
+ANY_OK(__wt_page_log_get_args::~__wt_page_log_get_args)
 
 COMPARE_OK(__wt_cursor::_compare)
 COMPARE_OK(__wt_cursor::_equals)
@@ -767,26 +762,6 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 %ignore __wt_page_log::get_complete_checkpoint(WT_PAGE_LOG *, int *);
 %ignore __wt_page_log::get_open_checkpoint(WT_PAGE_LOG *, int *);
-
-/* TODO: workaround for issues with getting a Python version of structs working. */
-%ignore __wt_page_log_discard_args::lsn;
-%ignore __wt_page_log_discard_args::backlink_lsn;
-%ignore __wt_page_log_discard_args::base_lsn;
-%ignore __wt_page_log_discard_args::backlink_checkpoint_id;
-%ignore __wt_page_log_discard_args::base_checkpoint_id;
-%ignore __wt_page_log_discard_args::lsn_frontier;
-%ignore __wt_page_log_put_args::backlink_lsn;
-%ignore __wt_page_log_put_args::base_lsn;
-%ignore __wt_page_log_put_args::backlink_checkpoint_id;
-%ignore __wt_page_log_put_args::base_checkpoint_id;
-%ignore __wt_page_log_put_args::flags;
-%ignore __wt_page_log_put_args::lsn;
-%ignore __wt_page_log_get_args::lsn;
-%ignore __wt_page_log_get_args::backlink_lsn;
-%ignore __wt_page_log_get_args::base_lsn;
-%ignore __wt_page_log_get_args::backlink_checkpoint_id;
-%ignore __wt_page_log_get_args::base_checkpoint_id;
-%ignore __wt_page_log_get_args::lsn_frontier;
 
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, compare, (self, other))
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, equals, (self, other))
@@ -1272,7 +1247,7 @@ SIDESTEP_METHOD(__wt_page_log, terminate,
   (self, session))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_put,
-  (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, WT_ITEM *buf),
+  (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, const WT_ITEM *buf),
   (self, session, page_id, checkpoint_id, put_args, buf))
 
 SIDESTEP_METHOD(__wt_page_log_handle, plh_get,
@@ -1503,6 +1478,33 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(FileSystem) __wt_file_system;
 
 %include "wiredtiger.h"
+
+%extend __wt_page_log_discard_args {
+	__wt_page_log_discard_args() {
+		return (struct __wt_page_log_discard_args *)calloc(1, sizeof(struct __wt_page_log_discard_args));
+	}
+	~__wt_page_log_discard_args() {
+		free($self);
+	}
+}
+
+%extend __wt_page_log_put_args {
+	__wt_page_log_put_args() {
+		return (struct __wt_page_log_put_args *)calloc(1, sizeof(struct __wt_page_log_put_args));
+	}
+	~__wt_page_log_put_args() {
+		free($self);
+	}
+}
+
+%extend __wt_page_log_get_args {
+	__wt_page_log_get_args() {
+		return (struct __wt_page_log_get_args *)calloc(1, sizeof(struct __wt_page_log_get_args));
+	}
+	~__wt_page_log_get_args() {
+		free($self);
+	}
+}
 
 /*
  * The original wiredtiger_calc_modify was ignored, now we define our own.

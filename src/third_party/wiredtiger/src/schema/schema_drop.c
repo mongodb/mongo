@@ -60,6 +60,9 @@ __drop_file(
          */
         WT_TRET(__wt_meta_track_drop(session, filename));
 
+    __wti_debug_crash_if_flag_set(
+      session, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE, "after dropping file entry", uri);
+
     /*
      * Truncate history store for the dropped file if we can find its id from the metadata, this is
      * a best-effort operation, as we don't fail drop if truncate returns an error. There is no
@@ -294,6 +297,9 @@ __drop_table(
         WT_ERR(__wt_schema_drop(session, colgroup->source, cfg, check_visibility));
         WT_ERR(__wt_metadata_remove(session, colgroup->name));
     }
+
+    __wti_debug_crash_if_flag_set(session, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP,
+      "after dropping a colgroup entry from table", uri);
 
     /* Drop the indices. */
     WT_ERR(__wt_schema_open_indices(session, table));

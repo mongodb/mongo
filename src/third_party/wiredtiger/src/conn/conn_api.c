@@ -605,7 +605,7 @@ __conn_get_page_log(WT_CONNECTION *wt_conn, const char *name, WT_PAGE_LOG **page
 
 /*
  * __wti_conn_remove_page_log --
- *     Remove page_log added by WT_CONNECTION->add_page_log, only used internally.
+ *     Remove all page_log instances added by WT_CONNECTION->add_page_log, only used internally.
  */
 int
 __wti_conn_remove_page_log(WT_SESSION_IMPL *session)
@@ -2219,11 +2219,29 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
 
-    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point_colgroup", &cval));
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.before_insert_colgroup", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_COLGROUP);
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.before_insert_file", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.after_drop_colgroup", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
+
+    WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.after_drop_file", &cval));
+    if (cval.val)
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
+    else
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_copy", &cval));
     if (cval.val)

@@ -73,6 +73,7 @@ class test_metadata_cursor02(wttest.WiredTigerTestCase):
                 self.ignoreStdoutPatternIfExists('removing incomplete table')
             else:
                 self.session.drop('file:' + name[-2:] + '.wt')
+                self.ignoreStdoutPatternIfExists('removing incomplete table')
 
             cursor = self.session.open_cursor(self.metauri)
             is_create_cursor = self.metauri.endswith('create')

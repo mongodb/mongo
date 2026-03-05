@@ -2204,13 +2204,26 @@ struct __wt_connection {
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;
      * corruption_abort, if true and built in diagnostic mode\, dump core in the case of data
      * corruption., a boolean flag; default \c true.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;crash_point =
+     * (, control the settings of crash points used for debugging., a set of related configuration
+     * options defined as follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+     * after_drop_colgroup, if true\, force crash in table drop after dropping the table metadata
+     * entry.  This is intended for testing purposes only., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;after_drop_file, if true\, force
+     * crash in table drop after dropping the colgroup metadata entry.  This is intended for testing
+     * purposes only., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;before_insert_colgroup, if true\,
+     * force crash in table creation before inserting the colgroup metadata entry.  This is intended
+     * for testing purposes only., a boolean flag; default \c false.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;before_insert_file, if true\, force
+     * crash in table creation before inserting the file metadata entry.  This is intended for
+     * testing purposes only., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-     * crash_point_colgroup, if true\, force crash in table creation while creating colgroup
-     * metadata entry.  This is intended for testing purposes only., a boolean flag; default \c
-     * false.}
-     * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to
-     * make a copy of any data returned by a cursor operation and return the copy instead.  The copy
-     * is freed on the next cursor operation.  This allows memory sanitizers to detect inappropriate
+     * ),,}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to make
+     * a copy of any data returned by a cursor operation and return the copy instead.  The copy is
+     * freed on the next cursor operation.  This allows memory sanitizers to detect inappropriate
      * references to memory owned by cursors., a boolean flag; default \c false.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_reposition, if true\, for operations with snapshot
      * isolation the cursor temporarily releases any page that requires force eviction\, then
@@ -3129,37 +3142,49 @@ struct __wt_connection {
  * display invalid cache configuration warnings., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true and built in diagnostic mode\, dump
  * core in the case of data corruption., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;crash_point_colgroup, if true\, force crash in table creation
- * while creating colgroup metadata entry.  This is intended for testing purposes only., a boolean
- * flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system
- * allocator to make a copy of any data returned by a cursor operation and return the copy instead.
- * The copy is freed on the next cursor operation.  This allows memory sanitizers to detect
- * inappropriate references to memory owned by cursors., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_reposition, if true\, for operations with snapshot
- * isolation the cursor temporarily releases any page that requires force eviction\, then
- * repositions back to the page for further operations.  A page release encourages eviction of hot
- * or large pages\, which is more likely to succeed without a cursor keeping the page pinned., a
- * boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify
- * internal algorithms to change skew to force history store eviction to happen more aggressively.
- * This includes but is not limited to not skewing newest\, not favoring leaf pages\, and modifying
- * the eviction score mechanism., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction_checkpoint_ts_ordering, if true\, act as if eviction is
- * being run in parallel to checkpoint.  We should return EBUSY in eviction if we detect any
- * timestamp ordering issue., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;crash_point = (, control the settings of crash points used for
+ * debugging., a set of related configuration options defined as follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;after_drop_colgroup, if true\, force
+ * crash in table drop after dropping the table metadata entry.  This is intended for testing
+ * purposes only., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;after_drop_file, if true\, force crash in
+ * table drop after dropping the colgroup metadata entry.  This is intended for testing purposes
+ * only., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;before_insert_colgroup, if true\, force
+ * crash in table creation before inserting the colgroup metadata entry.  This is intended for
+ * testing purposes only., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;before_insert_file, if true\, force crash
+ * in table creation before inserting the file metadata entry.  This is intended for testing
+ * purposes only., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp; ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to make a copy of
+ * any data returned by a cursor operation and return the copy instead.  The copy is freed on the
+ * next cursor operation.  This allows memory sanitizers to detect inappropriate references to
+ * memory owned by cursors., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * log_retention, adjust log removal to retain at least this number of log files.  (Warning: this
- * option can remove log files required for recovery if no checkpoints have yet been done and the
- * number of log files exceeds the configured value.  As WiredTiger cannot detect the difference
- * between a system that has not yet checkpointed and one that will never checkpoint\, it might
- * discard log files before any checkpoint is done.) Ignored if set to 0., an integer between \c 0
- * and \c 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation
- * of memory will only provide the exact amount requested.  This will help with spotting memory
- * allocation issues more easily., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\, every realloc call will force a new
- * memory allocation by using malloc., a boolean flag; default \c false.}
+ * cursor_reposition, if true\, for operations with snapshot isolation the cursor temporarily
+ * releases any page that requires force eviction\, then repositions back to the page for further
+ * operations.  A page release encourages eviction of hot or large pages\, which is more likely to
+ * succeed without a cursor keeping the page pinned., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction, if true\, modify internal algorithms to change skew to
+ * force history store eviction to happen more aggressively.  This includes but is not limited to
+ * not skewing newest\, not favoring leaf pages\, and modifying the eviction score mechanism., a
+ * boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;eviction_checkpoint_ts_ordering,
+ * if true\, act as if eviction is being run in parallel to checkpoint.  We should return EBUSY in
+ * eviction if we detect any timestamp ordering issue., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
+ * of log files.  (Warning: this option can remove log files required for recovery if no checkpoints
+ * have yet been done and the number of log files exceeds the configured value.  As WiredTiger
+ * cannot detect the difference between a system that has not yet checkpointed and one that will
+ * never checkpoint\, it might discard log files before any checkpoint is done.) Ignored if set to
+ * 0., an integer between \c 0 and \c 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * realloc_exact, if true\, reallocation of memory will only provide the exact amount requested.
+ * This will help with spotting memory allocation issues more easily., a boolean flag; default \c
+ * false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_malloc, if true\, every realloc call will force a
+ * new memory allocation by using malloc., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
  * operation about every Nth operation to simulate a collision., an integer between \c 0 and \c 10M;
  * default \c 0.}

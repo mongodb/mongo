@@ -49,32 +49,14 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
     def conn_extensions(self, extlist):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
-    def breakpoint(self):
-        import pdb, sys
-        sys.stdin = open('/dev/tty', 'r')
-        sys.stdout = open('/dev/tty', 'w')
-        sys.stderr = open('/dev/tty', 'w')
-        pdb.set_trace()
-
-    def check_package(self, page_log, package, values):
-        i = 0
-        while True:
-            returns = page_log.pl_get_package_part(self.session, package, i)
-            if len(returns) == 0:
-                break
-            self.assertEquals(returns, values[i])
-            i += 1
-        self.assertEquals(len(values), i)
-
     def test_disagg_basic(self):
         # Test some basic functionality of the page log API, calling
         # each supported method in the API at least once.
-        self.skipTest('Disagg test is broken until PageLogPutArgs, PageLogGetArgs work')
         session = self.session
         page_log = self.conn.get_page_log('palite')
 
         page_log.pl_begin_checkpoint(session, 1)
-        page_log.pl_complete_checkpoint(session, 1)
+        page_log.pl_complete_checkpoint_ext(session, 1, 0, 'Checkpoint')
 
         page_log.pl_begin_checkpoint(session, 2)
         handle = page_log.pl_open_handle(session, 1)
@@ -94,17 +76,41 @@ class test_disagg01(wttest.WiredTigerTestCase, DisaggConfigMixin):
         put_args_delta.flags = flags_delta
 
         handle.plh_put(session, 20, 2, put_args_main, page20_full)
+        page20_full_lsn = put_args_main.lsn
+        put_args_delta.base_lsn = page20_full_lsn
+        put_args_delta.backlink_lsn = page20_full_lsn
         handle.plh_put(session, 20, 2, put_args_delta, page20_delta1)
+        page20_delta1_lsn = put_args_delta.lsn
+
+        put_args_main.backlink_lsn = 0
+        put_args_main.base_lsn = 0
         handle.plh_put(session, 21, 2, put_args_main, page21_full)
+        page21_full_lsn = put_args_main.lsn
+        put_args_delta.base_lsn = page21_full_lsn
+        put_args_delta.backlink_lsn = page21_full_lsn
         handle.plh_put(session, 21, 2, put_args_delta, page21_delta1)
+        page21_delta1_lsn = put_args_delta.lsn
+
+        put_args_delta.base_lsn = page20_full_lsn
+        put_args_delta.backlink_lsn = page20_delta1_lsn
         handle.plh_put(session, 20, 2, put_args_delta, page20_delta2)
 
         get_args = wiredtiger.PageLogGetArgs()
-
+        get_args.lsn = put_args_delta.lsn
         page20_results = handle.plh_get(session, 20, 2, get_args)
+
+        get_args.lsn = page21_delta1_lsn
         page21_results = handle.plh_get(session, 21, 2, get_args)
 
-        self.assertEquals(page20_results, [page20_full, page20_delta1, page20_delta2])
-        self.assertEquals(page21_results, [page21_full, page21_delta1])
+        self.assertEqual(page20_results, [page20_full, page20_delta1, page20_delta2])
+        self.assertEqual(page21_results, [page21_full, page21_delta1])
+
+        discard_args = wiredtiger.PageLogDiscardArgs()
+        discard_args.flags = 0
+        discard_args.base_lsn = page20_full_lsn
+        discard_args.backlink_lsn = put_args_delta.lsn
+        handle.plh_discard(session, 20, 2, discard_args)
+
+        self.assertGreater(discard_args.lsn, put_args_delta.lsn)
 
         page_log.terminate(session) # dereference
