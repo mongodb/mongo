@@ -571,6 +571,22 @@ TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
     ASSERT_EQ(originalEpoch + 1, incrementedEpoch);
 }
 
+TEST_F(CollectionCatalogTest, StatsCalculation) {
+    auto stats = catalog.getStats();
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("dbFoo", "collFoo");
+    std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
+    catalog.registerCollection(opCtx.get(), newColl, boost::none);
+
+    catalog.deregisterCollection(opCtx.get(), newColl->uuid(), boost::none);
+
+    ASSERT_EQ(catalog.getStats(), stats);
+
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
+    auto emptyStats = CollectionCatalog::Stats{};
+    ASSERT_EQ(catalog.getStats(), emptyStats);
+}
+
 TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     NamespaceString aColl = NamespaceString::createNamespaceString_forTest("dbA", "collA");
     NamespaceString b1Coll = NamespaceString::createNamespaceString_forTest("dbB", "collB1");

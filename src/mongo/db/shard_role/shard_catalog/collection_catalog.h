@@ -553,6 +553,10 @@ public:
      * Total collections = 'internal' + 'userCollections' + 'userTimeseries'
      */
     struct Stats {
+        enum Operation { kRegister, kDeregister };
+        void adjustOnCollectionRegistration(const Collection& coll,
+                                            size_t registeredCollectionsSize,
+                                            Operation op);
         // Non-system collections on non-internal databases
         // Note timeseries collections are not accounted here.
         int userCollections = 0;
@@ -571,6 +575,7 @@ public:
         int queryableEncryption = 0;
         // <>.system.profile collections on non-internal databases. Counted as `internal`.
         int systemProfile = 0;
+        friend bool operator==(const Stats&, const Stats&) = default;
     };
 
     /**

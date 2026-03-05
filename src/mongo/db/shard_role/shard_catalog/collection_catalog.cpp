@@ -2340,39 +2340,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     // We still need to register the nss and UUID with the catalog.
     _catalogIdTracker.create(nss, uuid, coll->getCatalogId(), commitTime, allowMixedModeWrites);
 
-
-    if (!nss.isOnInternalDb()) {
-        if (nss.isSystem()) {
-            _stats.internal += 1;
-        } else if (coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
-            _stats.userTimeseries += 1;
-        } else {
-            _stats.userCollections += 1;
-            if (coll->isCapped()) {
-                _stats.userCapped += 1;
-            }
-            if (coll->isClustered()) {
-                _stats.userClustered += 1;
-            }
-            if (coll->getCollectionOptions().encryptedFieldConfig) {
-                _stats.queryableEncryption += 1;
-                FLEStatusSection::get().updateIndexTypeStatsOnRegisterCollection(
-                    coll->getCollectionOptions().encryptedFieldConfig.value());
-            }
-            if (isCSFLE1Validator(coll->getValidatorDoc())) {
-                _stats.csfle += 1;
-            }
-        }
-
-        if (nss.isSystemDotProfile()) {
-            _stats.systemProfile += 1;
-        }
-    } else {
-        _stats.internal += 1;
-    }
-
-    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections +
-                                  _stats.userTimeseries) == _collections.size());
+    _stats.adjustOnCollectionRegistration(*coll, _collections.size(), Stats::Operation::kRegister);
 
     auto& resourceCatalog = ResourceCatalog::get();
     resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
@@ -2401,38 +2369,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 
     _catalogIdTracker.drop(ns, uuid, commitTime);
 
-    if (!ns.isOnInternalDb()) {
-        if (ns.isSystem()) {
-            _stats.internal -= 1;
-        } else if (coll->isTimeseriesCollection() && coll->isNewTimeseriesWithoutView()) {
-            _stats.userTimeseries -= 1;
-        } else {
-            _stats.userCollections -= 1;
-            if (coll->isCapped()) {
-                _stats.userCapped -= 1;
-            }
-            if (coll->isClustered()) {
-                _stats.userClustered -= 1;
-            }
-            if (coll->getCollectionOptions().encryptedFieldConfig) {
-                _stats.queryableEncryption -= 1;
-                FLEStatusSection::get().updateIndexTypeStatsOnDeregisterCollection(
-                    coll->getCollectionOptions().encryptedFieldConfig.value());
-            }
-            if (isCSFLE1Validator(coll->getValidatorDoc())) {
-                _stats.csfle -= 1;
-            }
-        }
-
-        if (ns.isSystemDotProfile()) {
-            _stats.systemProfile -= 1;
-        }
-    } else {
-        _stats.internal -= 1;
-    }
-
-    invariant(static_cast<size_t>(_stats.internal + _stats.userCollections +
-                                  _stats.userTimeseries) == _collections.size());
+    _stats.adjustOnCollectionRegistration(
+        *coll, _collections.size(), Stats::Operation::kDeregister);
 
     coll->onDeregisterFromCatalog(opCtx->getServiceContext());
 
@@ -2443,6 +2381,52 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     }
 
     return coll;
+}
+
+void CollectionCatalog::Stats::adjustOnCollectionRegistration(const Collection& coll,
+                                                              size_t registeredCollectionsSize,
+                                                              Stats::Operation op) {
+    const int delta = (op == Stats::kRegister ? 1 : -1);
+    const auto& nss = coll.ns();
+    if (!nss.isOnInternalDb()) {
+        if (nss.isSystem()) {
+            internal += delta;
+        } else if (coll.isTimeseriesCollection() && coll.isNewTimeseriesWithoutView()) {
+            userTimeseries += delta;
+        } else {
+            userCollections += delta;
+            if (coll.isCapped()) {
+                userCapped += delta;
+            }
+            if (coll.isClustered()) {
+                userClustered += delta;
+            }
+            if (coll.getCollectionOptions().encryptedFieldConfig) {
+                queryableEncryption += delta;
+                auto encryptedFieldConfig =
+                    coll.getCollectionOptions().encryptedFieldConfig.value();
+                if (op == Stats::kRegister) {
+                    FLEStatusSection::get().updateIndexTypeStatsOnRegisterCollection(
+                        encryptedFieldConfig);
+                } else {
+                    FLEStatusSection::get().updateIndexTypeStatsOnDeregisterCollection(
+                        encryptedFieldConfig);
+                }
+            }
+            if (isCSFLE1Validator(coll.getValidatorDoc())) {
+                csfle += delta;
+            }
+        }
+
+        if (nss.isSystemDotProfile()) {
+            systemProfile += delta;
+        }
+    } else {
+        internal += delta;
+    }
+
+    invariant(static_cast<size_t>(internal + userCollections + userTimeseries) ==
+              registeredCollectionsSize);
 }
 
 void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
