@@ -27,3 +27,9 @@ py_binary(
     srcs = ["sbom_files_pr.py"],
     visibility = ["//visibility:public"],
 )
+
+py_library(
+    name = "sbom_utils",
+    srcs = ["sbom_utils.py"],
+    visibility = ["//visibility:public"],
+)

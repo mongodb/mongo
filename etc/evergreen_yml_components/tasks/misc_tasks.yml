@@ -2029,6 +2029,7 @@ tasks:
             - "buildscripts/sbom/generate_sbom.py"
             - "--project=https://github.com/10gen/mongo.git"
             - "--target=branch"
+            - "--branch-filter=${BRANCH_FILTER}"
             - "--branch=${branch_name}"
             - "--endorctl-path=${workdir}/endorctl"
             - "--config-path=${workdir}/.endorctl"
@@ -2053,6 +2054,7 @@ tasks:
             - "buildscripts/sbom/sbom_files_pr.py"
             - "--github-owner=${github_org}"
             - "--github-repo=${github_repo}"
+            - "--branch-filter=${BRANCH_FILTER}"
             - "--base-branch=${branch_name}"
             - "--new-branch=SERVER-111072/sbom_update_${branch_name}"
             - "--pr-title=SERVER-111072 Auto-generated SBOM files [${branch_name}]"
@@ -2103,6 +2105,7 @@ tasks:
             - "--run"
           env:
             REQUESTER: ${requester}
+            BRANCH_FILTER: ${BRANCH_FILTER}
             BRANCH_NAME: ${branch_name}
             GITHUB_ORG: ${github_org}
             GITHUB_REPO: ${github_repo}
@@ -2110,7 +2113,7 @@ tasks:
             CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
             CONTAINER_ENV_FILES: ${workdir}/silkbomb.env
             WORKING_DIR: ${workdir}
-            SBOM_REPO_PATH: sbom.json
+            SBOM_REPO_PATH: ${SBOM_REPO_PATH}
             LOCAL_REPO_PATH: src
 
   - name: check_for_noexcept

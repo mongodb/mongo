@@ -1,4 +1,5 @@
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -50,7 +51,7 @@ def upload_sbom_via_silkbomb(
     container_options = ["--pull=always", "--platform=linux/amd64", "--rm"]
     container_env_files = ["--env-file", str(creds_file_path.resolve())]
     container_volumes = ["-v", f"{workdir}:/workdir"]
-    silkbomb_command = "augment"  # it augment first and uses upload command
+    silkbomb_command = "upload"
     silkbomb_args = [
         "--sbom-in",
         f"/workdir/{local_repo_path}/{sbom_repo_path}",
@@ -105,7 +106,7 @@ def upload_sbom_via_silkbomb(
     try:
         print(f"Running command: {' '.join(command)}")
         subprocess.run(command, check=True, text=True, capture_output=True, timeout=timeout_seconds)
-        print("Updated sbom.json file upload via Silkbomb successful!")
+        print("Updated SBOM file upload via Silkbomb successful!")
     except FileNotFoundError as e:
         print(f"Error: '{container_command}' command not found.")
         raise e
@@ -135,6 +136,14 @@ def run(
         str,
         typer.Option(..., envvar="LOCAL_REPO_PATH", help="Path to the local git repository."),
     ],
+    branch_filter: Annotated[
+        str,
+        typer.Option(
+            ...,
+            envvar="BRANCH_FILTER",
+            help=r"Upload SBOM only if branch_name matches regex. (e.g., 'master|v[0-9]+\.[0-9]+-staging').",
+        ),
+    ],
     branch_name: Annotated[
         str,
         typer.Option(..., envvar="BRANCH_NAME", help="The head branch (e.g., the PR branch name)."),
@@ -147,7 +156,7 @@ def run(
             envvar="SBOM_REPO_PATH",
             help="Path to the SBOM file to check and upload.",
         ),
-    ] = "sbom.json",
+    ] = "sbom.private.json",
     requester: Annotated[
         str,
         typer.Option(
@@ -181,13 +190,11 @@ def run(
         bool, typer.Option("--check-sbom-file-change", help="Check for changes to the SBOM file.")
     ] = False,
 ):
-    if requester != "commit" and not dry_run:
-        print(f"Skipping: Run can only be triggered for 'commit', but requester was '{requester}'.")
-        sys.exit(0)
-
-    major_branches = ["v7.0", "v8.0", "v8.1", "master"]  # Only major branches that MongoDB supports
-    if False and branch_name not in major_branches:
-        print(f"Skipping: Branch '{branch_name}' is not a major branch. Exiting.")
+    # Check if branch name matches the branch filter regex
+    if not re.fullmatch(branch_filter, branch_name):
+        print(
+            f"Branch '{branch_name}' does not match branch filter '{branch_filter}'. Terminating as successful."
+        )
         sys.exit(0)
 
     repo_path = pathlib.Path(f"{workdir}/{local_repo_path}")

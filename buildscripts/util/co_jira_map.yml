@@ -8,6 +8,8 @@
   - Services & Integrations
 10gen/performance:
   - Product Performance
+10gen/platsec-server:
+  - Product Security
 10gen/query:
   - Query Execution
   - Query Integration
@@ -31,6 +33,8 @@
 10gen/query-optimization-cost-based-ranker:
   - Query Optimization
 10gen/server-catalog-and-routing:
+  - Catalog And Routing
+10gen/server-catalog-and-routing-shard-catalog:
   - Catalog And Routing
 10gen/server-cluster-scalability:
   - Cluster Scalability
@@ -60,5 +64,7 @@
   - Storage Execution
 10gen/server-workload-resilience:
   - Workload Execution
+10gen/storage-engines:
+  - Storage Engines
 10gen/streams-engine:
   - Atlas Streams

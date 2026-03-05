@@ -38,8 +38,10 @@ for component in components_remove:
 
 # List of folders in src/third_party to exclude from SBOM generation warnings
 third_party_folders_remove = [
-    "scripts",
-    "boringssl_replacement",  # this is an alias folder
+    "src/third_party/scripts",  # this folder contains scripts related to the import process, but does not contain SBOM components itself
+    "src/third_party/private",  # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
+    "src/third_party/boringssl_replacement",  # this is an alias folder
+    "src/third_party/wasmtime",  # currently no targets depend on this
 ]
 
 # ################ Component Renaming ################
@@ -49,14 +51,13 @@ third_party_folders_remove = [
 # Valid: pkg:github/abseil/abseil-cpp@20250512.1
 # Run string replacements to correct for this:
 endor_components_rename = [
-    ["pkg:c/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/zlib", "pkg:github/madler/zlib"],
     ["pkg:generic/libstemmer", "pkg:github/snowballstem/snowball"],
     ["pkg:generic/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
-    ["pkg:generic/github.com/", "pkg:github/"],
-    ["pkg:c/github.com/", "pkg:github/"],
+    ["pkg:generic/gitlab.gnome.org/gnome/libxml2", "pkg:generic/gnome/libxml2"],
+    ["pkg:generic/gitlab.com/bzip2/bzip2", "pkg:github/libarchive/bzip2"],
 ]
 
 # ################ Version Transformation ################

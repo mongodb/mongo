@@ -6,11 +6,19 @@ Script that opens a PR using a bot to update SBOM-related files.
 import argparse
 import os
 import re
+import sys
 import time
 
-from github import Commit, GithubException, GithubIntegration, GitRef, PullRequest, Repository
+from github import (
+    GithubException,
+    GithubIntegration,
+    GitRef,
+    InputGitTreeElement,
+    PullRequest,
+    Repository,
+)
 
-SBOM_FILES = ["sbom.json", "README.third_party.md"]
+SBOM_FILES = ["sbom.json", "sbom.private.json", "README.third_party.md"]
 
 
 def get_repository(github_owner, github_repo, app_id, _private_key) -> Repository.Repository:
@@ -39,16 +47,16 @@ def get_pull_request(branch_gitref: GitRef.GitRef) -> PullRequest.PullRequest | 
         return None
 
 
-def create_branch(base_branch, new_branch) -> None:
+def create_branch(repository, base_branch, new_branch) -> None:
     """
     Create a new branch or get existing branch.
     """
     try:
         print(f"Attempting to create branch '{new_branch}' with base branch '{base_branch}'.")
         ref = f"refs/heads/{new_branch}"
-        base_repo_branch = repo.get_branch(base_branch)
+        base_repo_branch = repository.get_branch(base_branch)
         sha = base_repo_branch.commit.sha
-        repo.create_git_ref(ref=ref, sha=sha)
+        repository.create_git_ref(ref=ref, sha=sha)
         print(f"Created branch '{new_branch}', ref: {ref}, sha: {sha}")
     except GithubException as e:
         if e.status == 422:
@@ -57,25 +65,36 @@ def create_branch(base_branch, new_branch) -> None:
             raise
 
 
-def read_text_file(file_path: str) -> str:
+def read_text_file(path: str) -> str:
     """Read a text file and return as string"""
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
+        with open(path, "r", encoding="utf-8") as file:
             content = file.read()
         return content
     except FileNotFoundError:
-        print(f"ERROR: The file '{file_path}' was not found.")
-        return f"ERROR: The file '{file_path}' was not found."
-    except Exception as e:
+        print(f"ERROR: The file '{path}' was not found.")
+        return f"ERROR: The file '{path}' was not found."
+    except (OSError, UnicodeDecodeError) as e:
         print(f"An error occurred: {e}")
+        return f"ERROR: An error occurred while reading '{path}': {e}"
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="This script checks for changes to SBOM and related files and creats a PR if files have been updated.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description=(
+            "This script checks for changes to SBOM and related files and creates a PR if "
+            "files have been updated."
+        ),
     )
     parser.add_argument("--github-owner", help="GitHub org/owner (e.g., 10gen).", type=str)
     parser.add_argument("--github-repo", help="GitHub repository name (e.g., mongo).", type=str)
+    parser.add_argument(
+        "--branch-filter",
+        help="Create a PR only if base branch matches regex.",
+        type=str,
+        default=".*",
+    )
     parser.add_argument("--base-branch", help="base branch to merge into.", type=str)
     parser.add_argument("--new-branch", help="New branch for the PR.", type=str)
     parser.add_argument("--pr-title", help="Title for the PR.", type=str)
@@ -98,8 +117,16 @@ if __name__ == "__main__":
 
     if not args.app_id or not args.private_key:
         parser.error(
-            "Must define --app-id or env MONGO_PR_BOT_APP_ID and --private-key or env MONGO_PR_BOT_PRIVATE_KEY."
+            "Must define --app-id or env MONGO_PR_BOT_APP_ID and --private-key or env "
+            "MONGO_PR_BOT_PRIVATE_KEY."
         )
+
+    # Check if base branch matches the branch filter regex
+    if not re.fullmatch(args.branch_filter, args.base_branch):
+        print(
+            f"Base branch '{args.base_branch}' does not match branch filter '{args.branch_filter}'. Terminating as successful."
+        )
+        sys.exit(0)
 
     # Replace spaces with newline, if applicable
     private_key = (
@@ -109,17 +136,29 @@ if __name__ == "__main__":
     repo = get_repository(args.github_owner, args.github_repo, args.app_id, private_key)
     print("repo: ", repo)
 
-    HAS_UPDATE = False
+    # Collect all changed files first so we can commit them in a single commit
+    changed_files: list[tuple[str, str]] = []
 
     for file_path in SBOM_FILES:
-        original_file = repo.get_contents(file_path, ref=f"refs/heads/{args.base_branch}")
-        print("original_file: ", original_file)
-        original_content = original_file.decoded_content.decode()
+        print(f"Checking file '{file_path}' on '{args.base_branch}' for changes...")
+        # Try to get the existing file from the base branch; 404 means "new file"
+        try:
+            original_file = repo.get_contents(file_path, ref=f"refs/heads/{args.base_branch}")
+            print("original_file: ", original_file)
+            original_content = original_file.decoded_content.decode()
+        except GithubException as e:
+            if e.status in [403, 404]:
+                print(f"'{file_path}' does not exist on {args.base_branch}; treating as new file")
+                original_content = ""
+            else:
+                raise
+
         try:
             with open(file_path, "r", encoding="utf-8") as file:
                 new_content = file.read()
         except FileNotFoundError:
             print("Error: file '%s' not found.", file_path)
+            continue
 
         # Compare content with removed Endor Labs version to avoid triggering a new SBOM on only that change
         PATTERN = r'{"name":"EndorLabsInc","version":".*"}'
@@ -128,37 +167,47 @@ if __name__ == "__main__":
         new_content_compare = re.sub(PATTERN, REPL, "".join(new_content.split()))
 
         if original_content_compare != new_content_compare:
-            create_branch(args.base_branch, args.new_branch)
-            original_file_new_branch = repo.get_contents(
-                file_path, ref=f"refs/heads/{args.new_branch}"
+            print(f"Detected change in '{file_path}'")
+            changed_files.append((file_path, new_content))
+
+    if changed_files:
+        # Ensure the branch exists (create if needed)
+        create_branch(repo, args.base_branch, args.new_branch)
+
+        # Small delay to reduce chance of 409s immediately after branch creation
+        time.sleep(5)
+
+        # Base commit/tree on the current head of the PR branch
+        branch_ref = repo.get_branch(args.new_branch)
+        base_commit_sha = branch_ref.commit.sha
+        base_commit = repo.get_git_commit(base_commit_sha)
+        base_tree = repo.get_git_tree(base_commit_sha)
+
+        # Build tree elements for all changed files in one go
+        elements = [
+            InputGitTreeElement(
+                path=path,
+                mode="100644",
+                type="blob",
+                content=content,
             )
-            print("original_file_new_branch: ", original_file_new_branch)
+            for path, content in changed_files
+        ]
 
-            print("New file is different from original file.")
-            print("repo.update_file:")
-            print(f"  message: Updating '{file_path}'")
-            print("  path: ", file_path)
-            print("  sha: ", original_file_new_branch.sha)
-            print("  content:")
-            print(new_content[:128])
-            print("...[truncated]...")
-            print(new_content[-128:])
-            print("  branch: ", args.new_branch)
-            time.sleep(10)  # Wait to reduce chance of 409 errors
-            update_file_result = repo.update_file(
-                message=f"Updating '{file_path}'",
-                path=file_path,
-                sha=original_file_new_branch.sha,
-                content=new_content,
-                branch=args.new_branch,
-            )
-            print("update_file_result: ", update_file_result)
-            commit: Commit = update_file_result.get("commit")
-            print("commit: ", commit)
+        new_tree = repo.create_git_tree(elements, base_tree)
 
-            HAS_UPDATE = True
+        commit_message = "Update SBOM-related files: " + ", ".join(
+            path for path, _ in changed_files
+        )
+        print("Creating single commit with message:", commit_message)
 
-    if HAS_UPDATE:
+        new_commit = repo.create_git_commit(commit_message, new_tree, [base_commit])
+
+        # Move branch ref to new commit (single commit containing all file updates)
+        ref = repo.get_git_ref(f"heads/{args.new_branch}")
+        ref.edit(new_commit.sha)
+
+    if changed_files:
         # Get open PR or create new PR
         pull_requests = repo.get_pulls(
             state="open", head=f"{args.github_owner}:{args.new_branch}", base=args.base_branch
@@ -173,7 +222,6 @@ if __name__ == "__main__":
             print(f" head={args.new_branch}")
             print(f" base={args.base_branch}")
             print(f" body={pr_body}")
-
             pull_request = repo.create_pull(
                 title=args.pr_title,
                 head=args.new_branch,

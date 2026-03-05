@@ -19,7 +19,9 @@ def process_owners(cur_dir: str) -> tuple[dict[re.Pattern, list[str]], bool]:
         contents = yaml.safe_load(f)
 
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert contents["version"] == "1.0.0", f"Invalid version in {owners_file_path}"
+        assert (
+            contents["version"] == "1.0.0" or contents["version"] == "2.0.0"
+        ), f"Invalid version in {owners_file_path}"
         assert "filters" in contents
 
         no_parent_owners = False

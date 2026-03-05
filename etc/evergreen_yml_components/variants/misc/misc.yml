@@ -119,6 +119,22 @@ buildvariants:
     run_on: rhel92-small
     expansions:
       ENDOR_NAMESPACE: mongodb.10gen
+      BRANCH_FILTER: master|v[0-9]+\.[0-9]+-staging
     stepback: false
     tasks:
       - name: update_sbom
+
+  - name: upload-sbom-if-changed
+    display_name: "Upload SBOM if changed"
+    allowed_requesters: ["commit"]
+    expansions:
+      BRANCH_FILTER: master|v[0-9]+\.[0-9]+-staging
+      SBOM_REPO_PATH: &sbom_file sbom.private.json
+    paths:
+      - *sbom_file
+    tags: ["assigned_to_jira_team_platsec_ssdlc"]
+    run_on:
+      - rhel8.8-small
+    stepback: false
+    tasks:
+      - name: upload_sbom_via_silkbomb_if_changed

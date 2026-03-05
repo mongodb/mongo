@@ -92,7 +92,7 @@ filters:
   - "README.third_party.md":
     approvers:
       - 10gen/code-review-team-ssdlc
-  - "sbom.json":
+  - "sbom.*":
     approvers:
       - 10gen/code-review-team-ssdlc
   - "MODULE.bazel*":

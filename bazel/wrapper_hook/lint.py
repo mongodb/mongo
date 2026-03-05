@@ -434,7 +434,7 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
                 if file.endswith((SUPPORTED_EXTENSIONS))
             ]
 
-    if lint_all or "sbom.json" in files_to_lint:
+    if lint_all or "sbom.private.json" in files_to_lint:
         lr.run_bazel("//buildscripts:sbom_linter")
 
     if lint_all or any(file.endswith((".h", ".cpp")) for file in files_to_lint):

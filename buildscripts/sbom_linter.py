@@ -290,11 +290,13 @@ def main() -> int:
         help="Whether to apply formatting to the output file.",
     )
     parser.add_argument(
-        "--input-file", default="sbom.json", help="The input CycloneDX file to format and lint."
+        "--input-file",
+        default="sbom.private.json",
+        help="The input CycloneDX file to format and lint.",
     )
     parser.add_argument(
         "--output-file",
-        default="sbom.json",
+        default="sbom.private.json",
         help="The file to output to when formatting is specified.",
     )
     args = parser.parse_args()
