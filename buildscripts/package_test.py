@@ -1,5 +1,6 @@
 import argparse
 import dataclasses
+import fnmatch
 import json
 import logging
 import os
@@ -313,9 +314,7 @@ OS_DOCKER_LOOKUP = {
 }
 
 # These versions are marked "current" but in fact are EOL
-VERSIONS_TO_SKIP: set[str] = set(
-    ["3.0.15", "3.2.22", "3.4.24", "3.6.23", "4.0.28", "4.2.24", "4.2.25", "4.4.29", "6.3.2"]
-)
+VERSIONS_TO_SKIP: set[str] = set(["3.*", "4.*", "5.*", "6.*"])
 DISABLED_TESTS: set[tuple[str, str]] = set()
 
 VALID_TAR_DIRECTORY_ARCHITECTURES = [
@@ -559,10 +558,15 @@ def iterate_over_downloads() -> Generator[dict[str, Any], None, None]:
         for download in version["downloads"]:
             if download["edition"] == "source":
                 continue
-            if version["version"] in VERSIONS_TO_SKIP:
+            if should_skip_version(version["version"]):
                 continue
             download["version"] = version["version"]
             yield download
+
+
+def should_skip_version(version: str) -> bool:
+    """Return True when version matches a skip entry (supports wildcards such as '4.*')."""
+    return any(fnmatch.fnmatchcase(version, pattern) for pattern in VERSIONS_TO_SKIP)
 
 
 def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
