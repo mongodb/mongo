@@ -52,6 +52,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 #include "mongo/db/s/resharding/resharding_clone_fetcher.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -262,9 +263,14 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
             readConcern.setWaitLastStableRecoveryTimestamp(true);
             request.setReadConcern(readConcern);
 
+            // TODO SERVER-120915: Remove the PrimaryOnly readPref once SERVER-120915 is unblokced.
+            auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
+            auto mustUsePrimaryDrivenIndexBuilds =
+                rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
+            auto rp = mustUsePrimaryDrivenIndexBuilds ? ReadPreference::PrimaryOnly
+                                                      : ReadPreference::Nearest;
             auto readPref = ReadPreferenceSetting{
-                ReadPreference::Nearest,
-                Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
+                rp, Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
             // The read preference on the request is merely informational (e.g. for profiler
             // entries) -- the pipeline's opCtx setting is actually used when sending the request.
             request.setUnwrappedReadPref(readPref.toContainingBSON());
