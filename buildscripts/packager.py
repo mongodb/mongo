@@ -48,7 +48,7 @@ ARCH_CHOICES = ["x86_64", "arm64", "aarch64", "s390x"]
 # Made up names for the flavors of distribution we package for.
 DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2", "amazon2023"]
 
-unexpected_lts_release_series = ("8.2",)
+unexpected_lts_release_series = ("8.2", "8.3")
 
 
 def get_suffix(version, stable_name: str, unstable_name: str) -> str:
