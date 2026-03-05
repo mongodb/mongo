@@ -241,6 +241,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
         &userLiteParsedPipeline,
         resolvedView,
         originalNs,
+        subPipelineExpCtx->getResolvedNamespaces(),
         LiteParserOptions{.ifrContext = subPipelineExpCtx->getIfrContext()});
 
     // Parse from the modified LiteParsedPipeline. Skip desugar since we already did it above.

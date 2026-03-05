@@ -221,12 +221,13 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
                    "$vectorSearch-as-an-extension is not allowed against views."));
     }
 
-    return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
-                          _astNode->getFirstStageViewApplicationPolicy()),
-                      .callback = [this](const ViewInfo& viewInfo, StringData stageName) {
-                          _astNode->bindViewInfo(
-                              toStdStringViewForInterop(viewInfo.viewName.coll()));
-                      }};
+    return ViewPolicy{
+        .policy = view_util::toFirstStageApplicationPolicy(
+            _astNode->getFirstStageViewApplicationPolicy()),
+        .callback =
+            [this](const ViewInfo& viewInfo, StringData stageName, const ResolvedNamespaceMap&) {
+                _astNode->bindViewInfo(toStdStringViewForInterop(viewInfo.viewName.coll()));
+            }};
 }
 
 // static

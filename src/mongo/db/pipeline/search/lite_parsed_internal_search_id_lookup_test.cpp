@@ -73,7 +73,8 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackStoresViewPipelin
 
     // Invoke the callback.
     auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(viewInfo, LiteParsedInternalSearchIdLookUp::kStageName);
+    viewPolicy.callback(
+        viewInfo, LiteParsedInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
 
     // Now getStageParams should return params with the view pipeline BSON.
     auto stageParams = liteParsed->getStageParams();
@@ -125,7 +126,8 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackWithEmptyViewPipe
     ViewInfo viewInfo(kViewNss, kResolvedNss, {});
 
     auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(viewInfo, LiteParsedInternalSearchIdLookUp::kStageName);
+    viewPolicy.callback(
+        viewInfo, LiteParsedInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
 
     auto stageParams = liteParsed->getStageParams();
     auto* typedParams = dynamic_cast<InternalSearchIdLookupStageParams*>(stageParams.get());
@@ -202,7 +204,8 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest,
     const ResolvedView resolvedView{kResolvedNss, viewPipeline, BSONObj()};
 
     // Call applyViewToLiteParsed() which desugars the view pipeline and invokes handleView().
-    PipelineResolver::applyViewToLiteParsed(&pipeline, resolvedView, kViewNss);
+    PipelineResolver::applyViewToLiteParsed(
+        &pipeline, resolvedView, kViewNss, ResolvedNamespaceMap{});
 
     // IdLookup has a kDoNothing policy so the view pipeline should NOT be prepended.
     const auto& stages = pipeline.getStages();

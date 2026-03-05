@@ -107,8 +107,13 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     // Desugar and call handleView() to invoke ViewPolicy callbacks for extension stages.
     LiteParsedDesugarer::desugar(&lpp);
 
-    PipelineResolver::applyViewToLiteParsed(
-        &lpp, resolvedView, requestedNss, LiteParserOptions{.ifrContext = ifrContext});
+    auto resolvedNamespaces = helpers.resolveInvolvedNamespaces(lpp.getInvolvedNamespaces());
+
+    PipelineResolver::applyViewToLiteParsed(&lpp,
+                                            resolvedView,
+                                            requestedNss,
+                                            resolvedNamespaces,
+                                            LiteParserOptions{.ifrContext = ifrContext});
 
     // Parse the modified LiteParsedPipeline to a full Pipeline and serialize the Pipeline back
     // to BSON. This ensures that any view info bound to LiteParsedDocumentSources is included
@@ -186,11 +191,12 @@ AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
 void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
                                              const ResolvedView& resolvedView,
                                              const NamespaceString& viewNss,
+                                             const ResolvedNamespaceMap& resolvedNamespaces,
                                              const LiteParserOptions& options) {
     // Desugar the viewPipeline and apply it to the user pipeline.
     auto viewInfo = resolvedView.toViewInfo(viewNss, options);
     LiteParsedDesugarer::desugar(viewInfo.viewPipeline.get());
-    userLPP->handleView(viewInfo);
+    userLPP->handleView(viewInfo, resolvedNamespaces);
 }
 
 PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosViewRequest(

@@ -240,11 +240,12 @@ void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
     resetDeferredCaches();
 }
 
-void LiteParsedPipeline::handleView(const ViewInfo& viewInfo) {
+void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
+                                    const ResolvedNamespaceMap& resolvedNamespaces) {
     for (const auto& stage : _stageSpecs) {
         // Let each stage bind to the view info.
         auto thisPolicy = stage->getViewPolicy();
-        thisPolicy.callback(viewInfo, stage->getParseTimeName());
+        thisPolicy.callback(viewInfo, stage->getParseTimeName(), resolvedNamespaces);
     }
 
     // Determine whether the pipeline should automatically prepend the view pipeline. This decision

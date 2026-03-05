@@ -993,7 +993,10 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
 
     // Desugar the viewPipeline and apply it to the desugared user pipeline.
     PipelineResolver::applyViewToLiteParsed(
-        desugaredLPP, aggExState.getResolvedView(), aggExState.getOriginalNss());
+        desugaredLPP,
+        aggExState.getResolvedView(),
+        aggExState.getOriginalNss(),
+        uassertStatusOK(aggExState.resolveInvolvedNamespaces()));
     return SecondParseRequirement::kReparseFromLPP;
 }
 

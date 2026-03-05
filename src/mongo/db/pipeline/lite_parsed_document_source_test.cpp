@@ -347,7 +347,7 @@ TEST(ViewPolicy, CanSpecifyViewPolicyWithCustomReadFunction) {
     // Make a custom view function that just sets a bool flag indicating that the function has been
     // called successfully.
     bool fired = false;
-    auto viewFunc = [&fired](const ViewInfo&, StringData stageName) {
+    auto viewFunc = [&fired](const ViewInfo&, StringData stageName, const ResolvedNamespaceMap&) {
         ASSERT_FALSE(fired);
         fired = true;
     };
@@ -362,7 +362,7 @@ TEST(ViewPolicy, CanSpecifyViewPolicyWithCustomReadFunction) {
     ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
 
     // Make sure that we can actually call the custom view function.
-    viewPolicy.callback({}, "");
+    viewPolicy.callback({}, "", ResolvedNamespaceMap{});
     ASSERT_TRUE(fired);
 }
 
@@ -373,7 +373,7 @@ TEST(ViewPolicy, CanSpecifyDisallowViewPolicyDefaultValues) {
     auto viewPolicy = lp.getViewPolicy();
     ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
 
-    ASSERT_THROWS_CODE_AND_WHAT(viewPolicy.callback({}, "$test"),
+    ASSERT_THROWS_CODE_AND_WHAT(viewPolicy.callback({}, "$test", ResolvedNamespaceMap{}),
                                 DBException,
                                 ErrorCodes::CommandNotSupportedOnView,
                                 "$test is not supported on views.");
@@ -384,15 +384,18 @@ TEST(ViewPolicy, CanSpecifyDisallowViewPolicyCustomValues) {
 
     const int kCustomErrorCode = 11505700;
     const std::string kCustomErrorMsg = "test error message";
-    auto lp = TestLiteParsed(spec.firstElement(), DisallowViewsPolicy{[&](const auto&, auto) {
+    auto lp = TestLiteParsed(spec.firstElement(),
+                             DisallowViewsPolicy{[&](const auto&, auto, const auto&) {
                                  uasserted(kCustomErrorCode, kCustomErrorMsg);
                              }});
 
     auto viewPolicy = lp.getViewPolicy();
     ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
 
-    ASSERT_THROWS_CODE_AND_WHAT(
-        viewPolicy.callback({}, "$test"), DBException, kCustomErrorCode, kCustomErrorMsg);
+    ASSERT_THROWS_CODE_AND_WHAT(viewPolicy.callback({}, "$test", ResolvedNamespaceMap{}),
+                                DBException,
+                                kCustomErrorCode,
+                                kCustomErrorMsg);
 }
 
 TEST(LiteParsedPipelineClone, CloneCreatesDeepCopy) {

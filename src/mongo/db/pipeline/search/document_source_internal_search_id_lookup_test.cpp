@@ -592,7 +592,8 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
 
     auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(viewInfo, DocumentSourceInternalSearchIdLookUp::kStageName);
+    viewPolicy.callback(
+        viewInfo, DocumentSourceInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
 
     // Now use the registry to build the DocumentSource from the LiteParsed.
     auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
@@ -683,7 +684,7 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
 
     // Call handleView() on the full pipeline, simulating what runAggregate() does.
-    liteParsedPipeline.handleView(viewInfo);
+    liteParsedPipeline.handleView(viewInfo, ResolvedNamespaceMap{});
 
     // Since $_internalSearchIdLookup has kDoNothing policy, the view pipeline should NOT be
     // prepended. The LiteParsedPipeline should still have 2 stages, not 4.
@@ -733,7 +734,7 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
 
     // Call handleView().
-    liteParsedPipeline.handleView(viewInfo);
+    liteParsedPipeline.handleView(viewInfo, ResolvedNamespaceMap{});
 
     // Since the first stage is $match (which has kDefaultPrepend policy), the view pipeline should
     // be prepended. The LiteParsedPipeline should now have 3 stages.

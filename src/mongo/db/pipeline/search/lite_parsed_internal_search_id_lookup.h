@@ -87,10 +87,11 @@ public:
     }
 
     ViewPolicy getViewPolicy() const final {
-        return ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
-                          .callback = [this](const ViewInfo& viewInfo, StringData) {
-                              _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
-                          }};
+        return ViewPolicy{
+            .policy = ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
+            .callback = [this](const ViewInfo& viewInfo, StringData, const ResolvedNamespaceMap&) {
+                _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
+            }};
     }
 
     LiteParsedInternalSearchIdLookUp(DocumentSourceIdLookupSpec spec)

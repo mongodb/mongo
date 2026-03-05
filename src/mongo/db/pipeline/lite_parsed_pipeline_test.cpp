@@ -32,9 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -60,7 +62,7 @@ TEST(LiteParsedPipelineTest, HandleViewStitchesViewBeforeUserPipe) {
     std::vector<BSONObj> viewStages = {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 10)};
     const auto viewInfo = createTestViewInfo(std::move(viewStages));
 
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     // Verify the pipeline now contains the view stages in the correct order.
     const auto& stages = pipeline.getStages();
@@ -80,7 +82,7 @@ TEST(LiteParsedPipelineTest, HandleViewEmptyUserPipelineBecomesViewPipeline) {
                                        BSON("$project" << BSON("y" << 1))};
     const auto viewInfo = createTestViewInfo(std::move(viewStages));
 
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     // Final pipeline should be view pipeline.
     const auto& stages = pipeline.getStages();
@@ -97,7 +99,7 @@ TEST(LiteParsedPipelineTest, HandleViewEmptyViewPipelineIsNoop) {
     // Create an empty view pipeline.
     const auto viewInfo = createTestViewInfo({});
 
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     // User pipeline should be the same.
     const auto& stages = pipeline.getStages();
@@ -115,7 +117,7 @@ TEST(LiteParsedPipelineTest, HandleViewDoesNotConsumeOrMutateViewInfo) {
     const auto before = viewInfo.getOriginalBson();
     ASSERT_EQ(before.size(), 1U);
 
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     ASSERT_TRUE(viewInfo.viewPipeline);
     const auto after = viewInfo.getOriginalBson();
@@ -130,7 +132,7 @@ TEST(LiteParsedPipelineTest, HandleViewStitchedPipelineSurvivesViewInfoLifetime)
         // ViewInfo lives only in this scope.
         std::vector<BSONObj> viewStages = {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 5)};
         auto viewInfo = createTestViewInfo(std::move(viewStages));
-        pipeline.handleView(viewInfo);
+        pipeline.handleView(viewInfo, {});
     }
     // View pipeline stages own their backing BSON, so they remain valid after ViewInfo is
     // destroyed. Verify the pipeline now contains the view stages in the correct order.
@@ -152,7 +154,7 @@ TEST(LiteParsedPipelineTest, ViewInfoCloneIsIndependentOfOriginalLifetime) {
     ASSERT_TRUE(cloned.viewPipeline);
     LiteParsedPipeline userPipe(kTestNss, std::vector<BSONObj>{BSON("$sort" << BSON("y" << 1))});
 
-    userPipe.handleView(cloned);
+    userPipe.handleView(cloned, {});
 
     const auto& stages = userPipe.getStages();
     ASSERT_EQ(stages.size(), 3U);
@@ -216,7 +218,7 @@ TEST(LiteParsedPipelineTest, ClonedPipelineWithViewStagesPreservesOwnership) {
     {
         std::vector<BSONObj> viewStages = {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 5)};
         auto viewInfo = createTestViewInfo(std::move(viewStages));
-        original.handleView(viewInfo);
+        original.handleView(viewInfo, {});
     }
 
     // Clone the pipeline after ViewInfo is destroyed. The cloned stages should also own their BSON.
@@ -274,6 +276,11 @@ protected:
         LiteParsedDocumentSource::unregisterParser_forTest(_doNothingStageName);
     }
 
+    /** Unregisters a parser by name. Used by tests that register additional parsers. */
+    static void unregisterParserByName(const std::string& name) {
+        LiteParsedDocumentSource::unregisterParser_forTest(name);
+    }
+
     BSONObj defaultStageSpec() const {
         return BSON(_defaultStageName << BSONObj());
     }
@@ -295,7 +302,7 @@ TEST_F(LiteParsedPipelineViewPolicyTest, FirstDoNothingSuppressesPrepend) {
     LiteParsedPipeline pipeline(kTestNss, userStages);
 
     auto viewInfo = makeViewInfo();
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     const auto& out = pipeline.getStages();
     ASSERT_EQ(out.size(), 2U);
@@ -309,7 +316,7 @@ TEST_F(LiteParsedPipelineViewPolicyTest,
     LiteParsedPipeline pipeline(kTestNss, userStages);
 
     auto viewInfo = makeViewInfo();
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     const auto& out = pipeline.getStages();
     ASSERT_EQ(out.size(), 3U);
@@ -323,13 +330,80 @@ TEST_F(LiteParsedPipelineViewPolicyTest, PrependWhenDefaultPrependIsTrueForAllSt
     LiteParsedPipeline pipeline(kTestNss, userStages);
 
     auto viewInfo = makeViewInfo();
-    pipeline.handleView(viewInfo);
+    pipeline.handleView(viewInfo, {});
 
     const auto& out = pipeline.getStages();
     ASSERT_EQ(out.size(), 3U);
     ASSERT_EQ(out[0]->getParseTimeName(), "$match");
     ASSERT_EQ(out[1]->getParseTimeName(), _defaultStageName);
     ASSERT_EQ(out[2]->getParseTimeName(), _defaultStageName);
+}
+
+/**
+ * Test that handleView passes resolvedNamespaces to stage ViewPolicy callbacks when the pipeline
+ * has involved namespaces (e.g., from $lookup, $graphLookup).
+ */
+TEST_F(LiteParsedPipelineViewPolicyTest, HandleViewPassesResolvedNamespacesToStageCallbacks) {
+    const std::string kResolveNsCheckStage = "$resolveNsCheck";
+    ResolvedNamespaceMap receivedResolvedNamespaces;
+
+    auto createResolveNsCheckParser =
+        [&receivedResolvedNamespaces](
+            const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
+            return std::make_unique<TestLiteParsed>(
+                spec,
+                ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
+                           .callback = [&receivedResolvedNamespaces](
+                                           const ViewInfo&,
+                                           StringData,
+                                           const ResolvedNamespaceMap& resolvedNs) {
+                               receivedResolvedNamespaces = resolvedNs;
+                           }});
+        };
+
+    LiteParsedDocumentSource::registerParser(
+        kResolveNsCheckStage,
+        {.parser = createResolveNsCheckParser,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
+
+    auto guard = ScopeGuard([name = kResolveNsCheckStage] {
+        LiteParsedPipelineViewPolicyTest::unregisterParserByName(name);
+    });
+
+    // Build a ResolvedNamespaceMap simulating resolution of involved namespaces (e.g., a $lookup
+    // foreign collection "test.foreign" resolved to a view "test.otherView" with its pipeline).
+    const auto kForeignNss = NamespaceString::createNamespaceString_forTest("test.foreign"_sd);
+    const auto kUnderlyingNss =
+        NamespaceString::createNamespaceString_forTest("test.underlyingColl"_sd);
+
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces[kForeignNss] =
+        ResolvedNamespace(kUnderlyingNss, {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 10)});
+    resolvedNamespaces[kResolvedNss] = ResolvedNamespace(kResolvedNss, {});
+
+    std::vector<BSONObj> userStages = {BSON(kResolveNsCheckStage << BSONObj())};
+    LiteParsedPipeline pipeline(kTestNss, userStages);
+
+    std::vector<BSONObj> viewStages = {BSON("$match" << BSON("a" << 1))};
+    const auto viewInfo = createTestViewInfo(std::move(viewStages));
+
+    pipeline.handleView(viewInfo, resolvedNamespaces);
+
+    // Verify the stage's ViewPolicy callback received the resolved namespaces.
+    ASSERT_EQ(receivedResolvedNamespaces.size(), 2U);
+    ASSERT_TRUE(receivedResolvedNamespaces.contains(kForeignNss));
+    ASSERT_TRUE(receivedResolvedNamespaces.contains(kResolvedNss));
+    ASSERT_EQ(receivedResolvedNamespaces.at(kForeignNss).ns, kUnderlyingNss);
+    ASSERT_EQ(receivedResolvedNamespaces.at(kForeignNss).pipeline.size(), 2U);
+    ASSERT_EQ(receivedResolvedNamespaces.at(kResolvedNss).ns, kResolvedNss);
+    ASSERT_TRUE(receivedResolvedNamespaces.at(kResolvedNss).pipeline.empty());
+
+    // Also verify view pipeline was prepended as usual.
+    const auto& stages = pipeline.getStages();
+    ASSERT_EQ(stages.size(), 2U);
+    ASSERT_EQ(stages[0]->getParseTimeName(), "$match");
+    ASSERT_EQ(stages[1]->getParseTimeName(), kResolveNsCheckStage);
 }
 
 }  // namespace mongo

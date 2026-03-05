@@ -2471,7 +2471,8 @@ void testViewPolicyHelper(const NamespaceString& nss,
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("x" << 1))};
     ViewInfo viewInfo(viewNss, resolvedNss, std::move(viewPipeline));
 
-    viewPolicy.callback(viewInfo, ConfigurableViewPolicyTestAstNode::kStageName);
+    viewPolicy.callback(
+        viewInfo, ConfigurableViewPolicyTestAstNode::kStageName, ResolvedNamespaceMap{});
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), expectedViewName);
 }
 }  // namespace

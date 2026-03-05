@@ -67,6 +67,7 @@ public:
     static void applyViewToLiteParsed(LiteParsedPipeline* userLPP,
                                       const ResolvedView& resolvedView,
                                       const NamespaceString& viewNss,
+                                      const ResolvedNamespaceMap& resolvedNamespaces,
                                       const LiteParserOptions& options = LiteParserOptions{});
 
     using MakeExpressionContextFn = std::function<boost::intrusive_ptr<ExpressionContext>(

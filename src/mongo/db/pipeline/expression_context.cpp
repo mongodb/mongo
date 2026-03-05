@@ -49,15 +49,6 @@
 
 namespace mongo {
 
-ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
-                                     std::vector<BSONObj> pipeline,
-                                     boost::optional<UUID> collUUID,
-                                     bool involvedNamespaceIsAView)
-    : ns(std::move(ns)),
-      pipeline(std::move(pipeline)),
-      uuid(collUUID),
-      involvedNamespaceIsAView(involvedNamespaceIsAView) {}
-
 ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
     : variablesParseState(variables.useIdGenerator()),
       _params(std::move(params)),

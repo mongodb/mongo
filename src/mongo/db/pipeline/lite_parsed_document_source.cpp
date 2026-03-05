@@ -284,11 +284,12 @@ ViewInfo ViewInfo::clone() const {
 }
 
 DisallowViewsPolicy::DisallowViewsPolicy()
-    : ViewPolicy(
-          kFirstStageApplicationPolicy::kDoNothing, [](const ViewInfo&, StringData stageName) {
-              uasserted(ErrorCodes::CommandNotSupportedOnView,
-                        std::string(str::stream() << stageName << " is not supported on views."));
-          }) {}
+    : ViewPolicy(kFirstStageApplicationPolicy::kDoNothing,
+                 [](const ViewInfo&, StringData stageName, const ResolvedNamespaceMap&) {
+                     uasserted(
+                         ErrorCodes::CommandNotSupportedOnView,
+                         std::string(str::stream() << stageName << " is not supported on views."));
+                 }) {}
 
 DisallowViewsPolicy::DisallowViewsPolicy(ViewPolicyCallbackFn&& fn)
     : ViewPolicy(kFirstStageApplicationPolicy::kDoNothing, std::move(fn)) {}

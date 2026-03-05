@@ -39,6 +39,7 @@
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/read_concern_support_result.h"
@@ -55,6 +56,7 @@
 #include <utility>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -165,7 +167,8 @@ public:
     std::unique_ptr<LiteParsedPipeline> viewPipeline;
 };
 
-using ViewPolicyCallbackFn = std::function<void(const ViewInfo&, StringData)>;
+using ViewPolicyCallbackFn =
+    std::function<void(const ViewInfo&, StringData, const ResolvedNamespaceMap&)>;
 
 /**
  * Indicates how this stage will interact with a view. LiteParsedDocumentSources that
@@ -184,8 +187,9 @@ struct ViewPolicy {
     } policy = kFirstStageApplicationPolicy::kDefaultPrepend;
 
     // Offers a stage the chance to receive/bind to a view definition on the command's resolved view
-    // definitions. Receives resolved view information and the stage name.
-    ViewPolicyCallbackFn callback = [](const ViewInfo&, StringData) {
+    // definitions. Receives resolved view information, the stage name, and the resolved namespaces
+    // map.
+    ViewPolicyCallbackFn callback = [](const ViewInfo&, StringData, const ResolvedNamespaceMap&) {
         // Default callback is a no-op.
     };
 };

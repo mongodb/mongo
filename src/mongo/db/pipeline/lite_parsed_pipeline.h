@@ -403,9 +403,11 @@ public:
      * solely by the first stage: if its policy is kDefaultPrepend (or the pipeline is empty), the
      * desugared view pipeline is cloned and prepended; otherwise it is not.
      *
-     * The provided ViewInfo is not mutated.
-     */
-    void handleView(const ViewInfo& viewInfo);
+     * The provided ViewInfo is not mutated. The resolvedNamespaces map is passed to each stage's
+     * ViewPolicy callback to provide access to all resolved namespaces in the aggregation. This
+     * will be used for view resolution in secondary namespaces (e.g. `from` field in $unionWith or
+     * $lookup).     */
+    void handleView(const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces);
 
 private:
     friend struct ViewInfo;
