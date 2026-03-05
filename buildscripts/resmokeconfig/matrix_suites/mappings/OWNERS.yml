@@ -68,6 +68,9 @@ filters:
   - "*ingress_request_rate_limiter*":
     approvers:
       - 10gen/server-workload-resilience
+  - "fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
     approvers:
       - 10gen/server-replication-reviewers

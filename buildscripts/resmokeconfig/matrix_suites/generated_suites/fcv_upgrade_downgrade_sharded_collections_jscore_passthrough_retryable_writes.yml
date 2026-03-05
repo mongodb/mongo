@@ -1,0 +1,262 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+      - FCVUpgradeDowngradeInBackground
+  config:
+    shell_options:
+      eval:
+        await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_fcv_upgrade_downgrade.js");;
+        await import("jstests/libs/override_methods/enable_sessions.js"); await import("jstests/libs/override_methods/retry_writes_at_least_once.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          isRunningFCVUpgradeDowngradeSuite: true
+          sessionOptions:
+            retryWrites: true
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_mongos: 3
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
+  hooks:
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            isRunningFCVUpgradeDowngradeSuite: true
+    - class: FCVUpgradeDowngradeInBackground
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/awaitdata_getmore_cmd.js
+    - jstests/core/**/bypass_doc_validation.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/tailable_cursor_invalidation.js
+    - jstests/core/**/tailable_getmore_batch_size.js
+    - jstests/core/**/tailable_skip_limit.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/distinct_index1.js
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+    - jstests/core/query/api/api_version_unstable_indexes.js
+    - jstests/aggregation/sources/densify/internal_parse.js
+    - jstests/aggregation/parsing/api_version_stage_allowance_checks.js
+    - jstests/core/diagnostics/operation_latency_histogram.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/facet/facet_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
+    - jstests/core/query/command_let_variables_expressions.js
+    - jstests/core/index/hashed/hashed_index_with_arrays.js
+    - jstests/core/query/update/update_multi5.js
+    - jstests/core/query/find_and_modify/find_and_modify_last_error_object.js
+    - jstests/core/query/update/update_with_pipeline.js
+    - jstests/core/query/update/update_nested_arr_idx.js
+    - jstests/core/index/fts/fts_index3.js
+    - jstests/core/index/geo/geo_update.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/index/index_type_change.js
+    - jstests/core/query/and/and2.js
+    - jstests/core/query/cursor/getmore_invalidated_documents.js
+    - jstests/core/query/explain/explain_multi_plan.js
+    - jstests/core/query/inc/inc_negative_overflow.js
+    - jstests/core/query/inc/inc3.js
+    - jstests/core/query/pull/pull.js
+    - jstests/core/query/pull/pull2.js
+    - jstests/core/query/pull/pull_or.js
+    - jstests/core/query/pull/pull_remove1.js
+    - jstests/core/query/pull/pullall.js
+    - jstests/core/query/pull/pullall2.js
+    - jstests/core/query/set/set3.js
+    - jstests/core/query/set/set4.js
+    - jstests/core/query/set/set5.js
+    - jstests/core/query/set/set6.js
+    - jstests/core/query/set/set7.js
+    - jstests/core/query/set/set_type_change.js
+    - jstests/core/query/sort/sort_with_update_between_getmores.js
+    - jstests/core/query/unset/unset2.js
+    - jstests/core/query/dbref_upsert.js
+    - jstests/core/shell/shell_writeconcern.js
+    - jstests/core/write/autoid.js
+    - jstests/core/query/batch_write/batch_write_collation_estsize.js
+    - jstests/core/query/batch_write/batch_write_command_w0.js
+    - jstests/core/query/bulk/bulk_api_ordered.js
+    - jstests/core/query/bulk/bulk_api_unordered.js
+    - jstests/core/query/crud_api.js
+    - jstests/core/query/batch_write/batch_write_command_delete.js
+    - jstests/core/query/delete/remove_justone.js
+    - jstests/core/query/find_and_modify/find_and_modify.js
+    - jstests/core/query/find_and_modify/find_and_modify_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert.js
+    - jstests/core/query/find_and_modify/find_and_modify_concurrent_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_coll.js
+    - jstests/core/query/find_and_modify/find_and_modify_empty_update.js
+    - jstests/core/query/find_and_modify/find_and_modify_new.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional2.js
+    - jstests/core/query/find_and_modify/find_and_modify_upsert_non_existent.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional_new_remove.js
+    - jstests/core/query/find_and_modify/find_and_modify_dotted_fields.js
+    - jstests/core/query/find_and_modify/find_and_modify_positional3.js
+    - jstests/core/query/find_and_modify/find_and_modify_new_upsert_sort.js
+    - jstests/core/query/find_and_modify/find_and_modify_where.js
+    - jstests/core/query/batch_write/batch_write_command_update.js
+    - jstests/core/query/update/update_index.js
+    - jstests/core/query/update/update_mod_dotted.js
+    - jstests/core/query/update/update_inc_create_embedded_field.js
+    - jstests/core/query/update/update_multi7.js
+    - jstests/core/query/update/update_addToSet.js
+    - jstests/core/query/update/update_arraymatch1.js
+    - jstests/core/query/update/update_positional_inc.js
+    - jstests/core/query/update/update_arraymatch6.js
+    - jstests/core/query/update/update_arraymatch7.js
+    - jstests/core/query/update/update_arraymatch8.js
+    - jstests/core/query/update/update_bit_examples.js
+    - jstests/core/query/update/update_blank1.js
+    - jstests/core/query/update/update_currentdate_examples.js
+    - jstests/core/query/update/update_dbref.js
+    - jstests/core/query/update/update_mul_examples.js
+    - jstests/core/query/update/update_set_unset.js
+    - jstests/core/query/update/update_upsert_add_filter.js
+    - jstests/core/query/update/update_set_large_numeric_field.js
+    - jstests/core/query/update/update_inc_implicit_subfield.js
+    - jstests/core/query/update/update_dollar_fields.js
+    - jstests/core/query/update/update_options_object.js
+    - jstests/core/query/update/update_numeric_eq_strings.js
+    - jstests/core/query/update/update_guarantee_id.js
+    - jstests/core/query/update/upsert_and.js
+    - jstests/core/query/update/upsert_fields.js
+    - jstests/core/query/update/upsert_fields_duplicate_or.js
+    - jstests/core/query/update/upsert_shell.js
+    - jstests/core/query/update/update_inc.js
+    - jstests/core/write/write_result.js
+    - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+    - jstests/core/shell/role_management_helpers.js
+    - jstests/core/administrative/roles_info.js
+    - jstests/core/catalog/views/views_all_commands.js
+    - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
+    - jstests/aggregation/sources/unionWith/unionWith_explain.js
+    - jstests/aggregation/expressions/internal_js_emit_with_scope.js
+    - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
+    - jstests/aggregation/sources/lookup/lookup_non_correlated.js
+    - jstests/core/ddl/collection_uuid_index_commands.js
+    - jstests/core/query/queryable_encryption/*.js
+    - jstests/aggregation/exec/spill_to_disk.js
+    - jstests/aggregation/optimization/match_swapping_renamed_fields.js
+    - jstests/aggregation/optimization/use_query_project_and_sort.js
+    - jstests/aggregation/optimization/use_query_projection.js
+    - jstests/aggregation/optimization/use_query_sort.js
+    - jstests/aggregation/sources/group/groupMissing.js
+    - jstests/aggregation/sources/graphLookup/variables.js
+    - jstests/core/query/push/push2.js
+    - jstests/core/query/update/update_addToSet2.js
+    - jstests/core/shell/bench_test1.js
+    - jstests/core/catalog/list_catalog_stage_consistency.js
+    - jstests/core/query/query_settings/query_settings_size_limits.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/profile2.js
+    - jstests/core/**/profile3.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/profile_update.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/query/bulk/bulk_write_profile.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
+    - jstests/core/**/crud_api.js
+    - jstests/core/**/find_and_modify.js
+    - jstests/core/**/find_and_modify_fields.js
+    - jstests/core/**/find_and_modify_pipeline_update.js
+    - jstests/core/**/find_and_modify_positional_new_remove.js
+    - jstests/core/**/fts_find_and_modify.js
+    - jstests/core/**/fts_score_metadata.js
+    - jstests/core/**/project_with_collation.js
+    - jstests/core/**/find_and_modify_metrics.js
+    - jstests/core/**/update_metrics.js
+    - jstests/core/**/failcommand_failpoint.js
+    - jstests/core/**/batch_write_command_w0.js
+    - jstests/core/timeseries/ddl/rename_timeseries.js
+    - jstests/core/timeseries/query/timeseries_graph_lookup.js
+    - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
+    - jstests/core/timeseries/query/timeseries_lookup.js
+    - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/ddl/timeseries_index_partial.js
+    - jstests/core/timeseries/query/timeseries_partial_index_opt.js
+    - jstests/core/timeseries/query/timeseries_find.js
+    - jstests/core/timeseries/query/timeseries_view_aggregate.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    - requires_profiling
+    - featureFlagFLE2CleanupCommand
+    - featureFlagTimeseriesUpdatesSupport
+    - featureFlagRecordIdsReplicated
+    - featureFlagRankFusionBasic
+    - featureFlagRankFusionFull
+    - featureFlagSearchHybridScoringFull
+    - featureFlagCreateViewlessTimeseriesCollections
+    - uses_transactions
+    - requires_fcv_80
+    - requires_fcv_81
+    - requires_fcv_82
+    - requires_fcv_83
+    - cannot_run_during_upgrade_downgrade
+    - does_not_support_causal_consistency
+    - does_not_support_retryable_writes
+    - requires_getmore
+    - requires_non_retryable_writes
+    - requires_multi_updates
+    - requires_collstats
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - jstests/aggregation/**/*.js
+test_kind: js_test

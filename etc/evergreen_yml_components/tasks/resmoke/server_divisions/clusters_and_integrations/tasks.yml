@@ -2712,6 +2712,21 @@ tasks:
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
 
   - <<: *gen_task_template
+    name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+        "jscore",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
     tags:
       [
