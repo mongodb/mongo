@@ -422,29 +422,43 @@ void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
                               gConcurrentWriteTransactions.load());
 }
 
-bool TicketingSystem::_wasOperationDowngradedToLowPriority(
-    OperationContext* opCtx, ExecutionAdmissionContext* admCtx) const {
+bool TicketingSystem::_shouldDeprioritize(OperationContext* opCtx,
+                                          ExecutionAdmissionContext* admCtx) const {
     if (isClientDeprioritizationExempted(opCtx->getClient())) {
         return false;
     }
 
     const auto priority = admCtx->getPriority();
+    const auto taskType = admCtx->getTaskType();
+
+    // Exempt priority is never deprioritized.
+    if (priority == AdmissionContext::Priority::kExempt) {
+        return false;
+    }
+
+    // NonDeprioritizable tasks are never deprioritized.
+    if (taskType == ExecutionAdmissionContext::TaskType::NonDeprioritizable) {
+        return false;
+    }
+
+    // We don't deprioritize operations within a multi-document transaction.
+    if (opCtx->inMultiDocumentTransaction()) {
+        return false;
+    }
+
+    // The operation is already low-priority (no-op).
+    if (priority == AdmissionContext::Priority::kLow) {
+        return false;
+    }
 
     // Background tasks are always downgraded to low priority, if its deprioritization is enabled.
     // Otherwise, they are treated as normal priority bypassing the heuristic deprioritization.
-    if (admCtx->isBackgroundTask() && priority != AdmissionContext::Priority::kExempt) {
+    if (taskType == ExecutionAdmissionContext::TaskType::Background) {
         return _state.loadRelaxed().deprioritization.backgroundTasks;
     }
 
-    // Check for all conditions that prevent a downgrade:
-    //      1. The heuristic must be enabled via its server parameter.
-    //      2. We don't deprioritize operations within a multi-document transaction.
-    //      3. It is illegal to demote a high-priority (exempt) operation.
-    //      4. The operation is already low-priority (no-op).
-    //      5. The operation is immune to heuristic deprioritization.
-    if (!_state.loadRelaxed().deprioritization.heuristic || opCtx->inMultiDocumentTransaction() ||
-        priority == AdmissionContext::Priority::kExempt ||
-        priority == AdmissionContext::Priority::kLow) {
+    // The heuristic must be enabled via its server parameter.
+    if (!_state.loadRelaxed().deprioritization.heuristic) {
         return false;
     }
 
@@ -693,7 +707,7 @@ boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* op
 
     auto effectivePriority = admCtx->getPriority();
     if (usesPrioritization()) {
-        if (_wasOperationDowngradedToLowPriority(opCtx, admCtx)) {
+        if (_shouldDeprioritize(opCtx, admCtx)) {
             executionPriority.emplace(opCtx, AdmissionContext::Priority::kLow);
             effectivePriority = AdmissionContext::Priority::kLow;
             admCtx->priorityLowered();

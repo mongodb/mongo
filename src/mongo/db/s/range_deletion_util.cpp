@@ -337,7 +337,7 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const UUID& collectionUuid,
                                                      const BSONObj& keyPattern,
                                                      const ChunkRange& range) {
-    admission::execution_control::ScopedLowPriorityBackgroundTask backgroundTask(opCtx);
+    admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
 
     suspendRangeDeletion.pauseWhileSet(opCtx);
 

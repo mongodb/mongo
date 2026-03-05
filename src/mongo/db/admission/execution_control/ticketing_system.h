@@ -325,8 +325,7 @@ private:
     /**
      * Returns true if the operation should be downgraded to low priority.
      */
-    bool _wasOperationDowngradedToLowPriority(OperationContext* opCtx,
-                                              ExecutionAdmissionContext* admCtx) const;
+    bool _shouldDeprioritize(OperationContext* opCtx, ExecutionAdmissionContext* admCtx) const;
 
     /**
      * Helper method to set a deprioritization flag with proper state transition checking.

@@ -2980,7 +2980,7 @@ void IndexBuildsCoordinator::_runIndexBuild(OperationContext* opCtx,
                                             const UUID& buildUUID,
                                             const IndexBuildOptions& indexBuildOptions,
                                             const boost::optional<ResumeIndexInfo>& resumeInfo) {
-    admission::execution_control::ScopedLowPriorityBackgroundTask backgroundTask(opCtx);
+    admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
 
     activeIndexBuilds.sleepIfNecessary_forTestOnly();
 

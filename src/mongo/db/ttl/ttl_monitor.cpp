@@ -374,7 +374,7 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
-    admission::execution_control::ScopedLowPriorityBackgroundTask backgroundTask(opCtx);
+    admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
 
     // Don't do work if we are a secondary (TTL will be handled by primary)
     auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);

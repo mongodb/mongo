@@ -40,7 +40,7 @@ class OperationContext;
 
 namespace admission::execution_control {
 enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite };
-class ScopedLowPriorityBackgroundTask;
+class ScopedTaskTypeModifierBase;
 };  // namespace admission::execution_control
 
 namespace ec = admission::execution_control;
@@ -50,6 +50,18 @@ namespace ec = admission::execution_control;
  */
 class MONGO_MOD_PUBLIC ExecutionAdmissionContext : public AdmissionContext {
 public:
+    /**
+     * Task type to fine tune the deprioritization
+     */
+    enum class TaskType {
+        Default,             // The task can be deprioritized (if not exempt) based on the
+                             // deprioritization heuristics
+        NonDeprioritizable,  // The task should never be deprioritized (though it's not exempt, so
+                             // waits for a ticket)
+        Background,          // The task is considered as a background task, e.g. index builds,
+                             // range deletions, and TTL deletions.
+    };
+
     ExecutionAdmissionContext() = default;
     ExecutionAdmissionContext(const ExecutionAdmissionContext& other);
     ExecutionAdmissionContext& operator=(const ExecutionAdmissionContext& other);
@@ -118,10 +130,10 @@ public:
     }
 
     /**
-     * Returns whether this operation is considered as background task.
+     * Returns the task type
      */
-    bool isBackgroundTask() const {
-        return _isBackgroundTask.loadRelaxed();
+    TaskType getTaskType() const {
+        return _taskType.loadRelaxed();
     }
 
     /**
@@ -199,7 +211,7 @@ public:
     }
 
 private:
-    friend class ec::ScopedLowPriorityBackgroundTask;
+    friend class ec::ScopedTaskTypeModifierBase;
 
     /**
      * Returns true if this operation should be classified as "long running" based on admission
@@ -248,9 +260,8 @@ private:
     // True if this operation was ever heuristically deprioritized.
     Atomic<bool> _priorityLowered{false};
 
-    // True if this operation is considered as background task, e.g. index builds, range deletions,
-    // and TTL deletions.
-    Atomic<bool> _isBackgroundTask{false};
+    // Task type
+    Atomic<TaskType> _taskType{TaskType::Default};
 
     // Current operation type (read or write).
     ec::OperationType _opType{ec::OperationType::kRead};
@@ -266,27 +277,54 @@ private:
     Atomic<bool> _wasInMultiDocTxn{false};
 };
 
+inline std::string to_string(ExecutionAdmissionContext::TaskType tt) {
+    switch (tt) {
+        case ExecutionAdmissionContext::TaskType::Default:
+            return "Normal";
+        case ExecutionAdmissionContext::TaskType::NonDeprioritizable:
+            return "NonDeprioritizable";
+        case ExecutionAdmissionContext::TaskType::Background:
+            return "Background";
+    }
+    MONGO_UNREACHABLE_TASSERT(12043500);
+}
+
 namespace admission::execution_control {
 
 /**
- * RAII object to set the background task flag on the ExecutionAdmissionContext decoration and
- * restore it to its original value upon destruction.
+ * RAII-like object base to temporarily change the task type of the ExecutionAdmissionContext
+ * attached to the operation context. Being a RAII-like, on the destructor it sets back the Normal
+ * task mode.
  */
-class MONGO_MOD_PUBLIC ScopedLowPriorityBackgroundTask {
+class MONGO_MOD_PRIVATE ScopedTaskTypeModifierBase {
 public:
-    ScopedLowPriorityBackgroundTask(OperationContext* opCtx) : _opCtx(opCtx) {
-        ExecutionAdmissionContext::get(_opCtx)._isBackgroundTask.store(true);
-    }
+    ~ScopedTaskTypeModifierBase();
 
-    ~ScopedLowPriorityBackgroundTask() {
-        ExecutionAdmissionContext::get(_opCtx)._isBackgroundTask.store(false);
-    }
+    ScopedTaskTypeModifierBase(const ScopedTaskTypeModifierBase&) = delete;
+    ScopedTaskTypeModifierBase& operator=(const ScopedTaskTypeModifierBase&) = delete;
 
-    ScopedLowPriorityBackgroundTask(const ScopedLowPriorityBackgroundTask&) = delete;
-    ScopedLowPriorityBackgroundTask& operator=(const ScopedLowPriorityBackgroundTask&) = delete;
+protected:
+    ScopedTaskTypeModifierBase(OperationContext* opCtx,
+                               ExecutionAdmissionContext::TaskType newValue);
 
 private:
     OperationContext* _opCtx;
+};
+
+/**
+ * RAII-like object to set the task type to 'Background'
+ */
+class MONGO_MOD_PUBLIC ScopedTaskTypeBackground : private ScopedTaskTypeModifierBase {
+public:
+    ScopedTaskTypeBackground(OperationContext* opCtx);
+};
+
+/**
+ * RAII-like object to set the task type to 'NonDeprioritizable'
+ */
+class MONGO_MOD_PUBLIC ScopedTaskTypeNonDeprioritizable : private ScopedTaskTypeModifierBase {
+public:
+    ScopedTaskTypeNonDeprioritizable(OperationContext* opCtx);
 };
 
 };  // namespace admission::execution_control
