@@ -41,16 +41,19 @@ export function makeInsertCommandArb(
     metaValue = undefined,
     minFields = 1,
     maxFields = 5,
-    ranges = {},
+    options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
     const measurementRanges = {
-        intRange: ranges.intRange,
-        dateRange: ranges.dateRange,
+        intRange: options.ranges?.intRange,
+        dateRange: options.ranges?.dateRange,
         fieldNameArb,
     };
 
-    const docArb = makeMeasurementDocArb(timeField, metaField, metaValue, minFields, maxFields, measurementRanges);
+    const docArb = makeMeasurementDocArb(timeField, metaField, metaValue, minFields, maxFields, {
+        ...options,
+        ...measurementRanges,
+    });
 
     return docArb.map((doc) => new InsertCommand(doc));
 }
@@ -71,7 +74,9 @@ export function makeInsertCommandArb(
  * @param {number} [maxFields=5]                 // max extra metric fields per doc
  * @param {number} [minDocs=1]                   // min docs in the batch
  * @param {number} [maxDocs=500]                 // max docs in the batch
- * @param {{intRange?: Range, dateRange?: Range}} [ranges]
+ * @param {Object} [options]
+ * @param {Object} [options.explicitArbitraries] Object mapping field names to specific arbitrary factories to inject into the test suite
+ * @param {{intRange?: Range, dateRange?: Range}} [options.ranges]
  * @param {fc.Arbitrary<string>} [fieldNameArb=fc.string({minLength:1,maxLength:8})]
  *
  * @returns {fc.Arbitrary<BatchInsertCommand>}
@@ -84,12 +89,12 @@ export function makeBatchInsertCommandArb(
     maxFields = 5,
     minDocs = 1,
     maxDocs = 500,
-    ranges = {},
+    options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
     const measurementRanges = {
-        intRange: ranges.intRange,
-        dateRange: ranges.dateRange,
+        intRange: options.ranges?.intRange,
+        dateRange: options.ranges?.dateRange,
         minFields,
         maxFields,
         minDocs,
@@ -97,7 +102,10 @@ export function makeBatchInsertCommandArb(
         fieldNameArb,
     };
 
-    const docsArb = makeMeasurementDocStreamArb(timeField, metaField, metaValue, measurementRanges);
+    const docsArb = makeMeasurementDocStreamArb(timeField, metaField, metaValue, {
+        ...options,
+        ...measurementRanges,
+    });
 
     return docsArb.map((docs) => new BatchInsertCommand(docs));
 }
@@ -232,7 +240,9 @@ export function makeUpdateByFilterCommandArb(timeFieldname, metaFieldname, filte
  * @param {number} [maxFields=5]
  * @param {number} [minDocs=1]
  * @param {number} [maxDocs=500]
- * @param {{intRange?: Range, dateRange?: Range}} [ranges]
+ * @param {Object} [options]
+ * @param {Object} [options.explicitArbitraries] Object mapping field names to specific arbitrary factories to inject into the test suite
+ * @param {{intRange?: Range, dateRange?: Range}} [options.ranges]
  * @param {fc.Arbitrary<string>} [fieldNameArb=fc.string({minLength:1,maxLength:8})]
  *
  * @returns {fc.Arbitrary<InsertCommand|BatchInsertCommand|DeleteByFilterCommand|UpdateByFilterCommand>}
@@ -245,10 +255,18 @@ export function makeTimeseriesCommandArb(
     maxFields = 5,
     minDocs = 1,
     maxDocs = 500,
-    ranges = {},
+    options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
-    const insertArb = makeInsertCommandArb(timeField, metaField, metaValue, minFields, maxFields, ranges, fieldNameArb);
+    const insertArb = makeInsertCommandArb(
+        timeField,
+        metaField,
+        metaValue,
+        minFields,
+        maxFields,
+        options,
+        fieldNameArb,
+    );
 
     const batchInsertArb = makeBatchInsertCommandArb(
         timeField,
@@ -258,7 +276,7 @@ export function makeTimeseriesCommandArb(
         maxFields,
         minDocs,
         maxDocs,
-        ranges,
+        options,
         fieldNameArb,
     );
 
@@ -281,7 +299,9 @@ export function makeTimeseriesCommandArb(
  * @param {number} [maxFields=5]
  * @param {number} [minDocs=1]
  * @param {number} [maxDocs=500]
- * @param {{intRange?: Range, dateRange?: Range}} [ranges]
+ * @param {Object} [options]
+ * @param {Object} [options.explicitArbitraries] Object mapping field names to specific arbitrary factories to inject into the test suite
+ * @param {{intRange?: Range, dateRange?: Range}} [options.ranges]
  * @param {fc.Arbitrary<string>} [fieldNameArb=fc.string({minLength:1,maxLength:8})]
  *
  * @returns {fc.Arbitrary<Array<InsertCommand|BatchInsertCommand|DeleteByRandomIdCommand>>}
@@ -296,10 +316,18 @@ export function makeTimeseriesCommandSequenceArb(
     maxFields = 5,
     minDocs = 1,
     maxDocs = 500,
-    ranges = {},
+    options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
-    const insertArb = makeInsertCommandArb(timeField, metaField, metaValue, minFields, maxFields, ranges, fieldNameArb);
+    const insertArb = makeInsertCommandArb(
+        timeField,
+        metaField,
+        metaValue,
+        minFields,
+        maxFields,
+        options,
+        fieldNameArb,
+    );
 
     const batchInsertArb = makeBatchInsertCommandArb(
         timeField,
@@ -309,7 +337,7 @@ export function makeTimeseriesCommandSequenceArb(
         maxFields,
         minDocs,
         maxDocs,
-        ranges,
+        options,
         fieldNameArb,
     );
 

@@ -31,10 +31,12 @@ import {
  * @param {*} [metaValue]         // optional
  * @param {number} [minFields=1]  // min # of extra metric fields
  * @param {number} [maxFields=5]  // max # of extra metric fields
- * @param {Object} [ranges]
- * @param {Range} [ranges.intRange]
- * @param {Range} [ranges.dateRange]
- * @param {fc.Arbitrary<string>} [ranges.fieldNameArb]
+ * @param {Object} [options]
+ * @param {Object} [options.explicitArbitraries]
+ * @param {Object} [options.ranges]
+ * @param {Range} [options.ranges.intRange]
+ * @param {Range} [options.ranges.dateRange]
+ * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
  *
  * @returns {fc.Arbitrary<Object>}
  */
@@ -44,7 +46,7 @@ export function makeMeasurementDocArb(
     metaValue,
     minFields = 1,
     maxFields = 5,
-    ranges = {},
+    options = {},
 ) {
     if (typeof timeFieldname !== "string" || timeFieldname.length === 0) {
         throw new Error("makeMeasurementDocArb: timeFieldname must be a non-empty string");
@@ -60,7 +62,8 @@ export function makeMeasurementDocArb(
         decimalRange,
         dateRange,
         fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
-    } = ranges;
+    } = options.ranges ?? {};
+    const explicitArbitraries = options.explicitArbitraries ?? {};
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
     const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
@@ -86,7 +89,7 @@ export function makeMeasurementDocArb(
 
     // Field names for extra fields must not collide with reserved ones
     const baseFieldNameArb = fieldNameArb.filter(
-        (name) => name !== "_id" && name !== timeFieldname && name !== metaFieldname,
+        (name) => !["_id", timeFieldname, metaFieldname, ...Object.keys(explicitArbitraries)].includes(name),
     );
 
     const fieldNamesArb = fc.array(baseFieldNameArb, {
@@ -98,6 +101,9 @@ export function makeMeasurementDocArb(
         const recordSpec = {
             _id: idArb,
         };
+        for (const [fieldName, factory] of Object.entries(explicitArbitraries)) {
+            recordSpec[fieldName] = factory();
+        }
 
         recordSpec[timeFieldname] = timeArb;
         recordSpec[metaFieldname] = metaArb;
@@ -137,18 +143,20 @@ export function makeMeasurementDocArb(
  * @param {string} timeFieldname
  * @param {string} metaFieldname
  * @param {*} [metaValue]   // optional
- * @param {Object} [ranges]
- * @param {Range} [ranges.intRange]
- * @param {Range} [ranges.dateRange]
- * @param {number} [ranges.minFields=1]   // number of extra metric fields
- * @param {number} [ranges.maxFields=5]
- * @param {number} [ranges.minDocs=0]
- * @param {number} [ranges.maxDocs=20]
- * @param {fc.Arbitrary<string>} [ranges.fieldNameArb]
+ * @param {Object} [options]
+ * @param {Object} [options.explicitArbitraries]
+ * @param {Object} [options.ranges]
+ * @param {Range} [options.ranges.intRange]
+ * @param {Range} [options.ranges.dateRange]
+ * @param {number} [options.ranges.minFields=1]   // number of extra metric fields
+ * @param {number} [options.ranges.maxFields=5]
+ * @param {number} [options.ranges.minDocs=0]
+ * @param {number} [options.ranges.maxDocs=20]
+ * @param {fc.Arbitrary<string>} [options.ranges.fieldNameArb]
  *
  * @returns {fc.Arbitrary<Object[]>}
  */
-export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaValue, ranges = {}) {
+export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaValue, options = {}) {
     if (typeof timeFieldname !== "string" || timeFieldname.length === 0) {
         throw new Error("makeMeasurementDocStreamArb: timeFieldname must be a non-empty string");
     }
@@ -168,7 +176,8 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
         maxDocs = 20,
         fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
         timeBucketing = "hours",
-    } = ranges;
+    } = options.ranges ?? {};
+    const explicitArbitraries = options.explicitArbitraries ?? {};
 
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
     const defaultDateMax = new Date("2038-01-19T03:14:07.000Z");
@@ -177,7 +186,7 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
     const dateMax = dateRange?.max ?? defaultDateMax;
 
     const baseFieldNameArb = fieldNameArb.filter(
-        (name) => name !== "_id" && name !== timeFieldname && name !== metaFieldname,
+        (name) => !["_id", timeFieldname, metaFieldname, ...Object.keys(explicitArbitraries)].includes(name),
     );
 
     const fieldNamesArb = fc.array(baseFieldNameArb, {
@@ -222,7 +231,7 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
 
         // Extra fields: each gets a metric stream built via makeMetricStreamArb
         // with minLength = maxLength = docCount, so every stream[i] is defined.
-        const extraFieldStreamArbs = fieldNames.map(() =>
+        let extraFieldStreamArbs = fieldNames.map(() =>
             makeMetricStreamArb(docCount, docCount, {
                 intRange,
                 doubleRange,
@@ -231,6 +240,11 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
                 dateRange: {min: dateMin, max: dateMax},
             }),
         );
+
+        for (const [fieldName, factory] of Object.entries(explicitArbitraries)) {
+            fieldNames.push(fieldName);
+            extraFieldStreamArbs.push(fc.array(factory(), {minLength: docCount, maxLength: docCount}));
+        }
 
         return fc
             .tuple(idStreamArb, timeStreamArb, metaStreamArb, ...extraFieldStreamArbs)

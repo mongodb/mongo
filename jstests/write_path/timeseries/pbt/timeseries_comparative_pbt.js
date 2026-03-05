@@ -22,7 +22,8 @@ import {assertCollectionsMatch} from "jstests/write_path/timeseries/pbt/lib/asse
 const ctrlCollName = jsTestName() + "_control";
 const tsCollName = jsTestName() + "_timeseries";
 const tsBucketCollName = "system.buckets." + tsCollName;
-const dbName = "test";
+const timeField = "ts";
+const metaField = "meta";
 
 describe("Basic comparative PBT for timeseries inserts", () => {
     let tsColl;
@@ -34,7 +35,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         db[tsCollName].drop();
 
         db.createCollection(ctrlCollName);
-        db.createCollection(tsCollName, {timeseries: {timeField: "ts", metaField: "meta"}});
+        db.createCollection(tsCollName, {timeseries: {timeField: timeField, metaField: metaField}});
 
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
@@ -59,7 +60,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
             /* maxFields     */ 3,
             /* minDocs       */ 0,
             /* maxDocs       */ 10,
-            /* ranges        */ {}, // {intRange, dateRange} if you want to override
+            /* options       */ {}, // {intRange, dateRange} if you want to override
             /* fieldNameArb  */ undefined, // use default short-string field names
         );
 
