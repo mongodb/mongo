@@ -47,10 +47,10 @@ public:
     DisallowViewAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
 
-    void bindViewInfo(std::string_view viewName) const override {
-        std::string message = str::stream()
-            << "Stage " << std::string(getName())
-            << " does not support views. Attempted to use in view: " << std::string(viewName);
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+        std::string message = str::stream() << "Stage " << std::string(getName())
+                                            << " does not support views. Attempted to use in view: "
+                                            << std::string(viewInfo.viewName());
         sdk_uasserted(11507700, message);
     }
 

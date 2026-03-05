@@ -53,6 +53,7 @@ extensions_with_config(
         ":other_metrics_mongo_extension_signed_lib",
         ":sleep_mongo_extension_signed_lib",
         ":vector_search_optimization_mongo_extension_signed_lib",
+        ":view_pipeline_validator_mongo_extension_signed_lib",
         ":disallow_view_mongo_extension_signed_lib",
         ":desugar_add_view_name_mongo_extension_signed_lib",
         ":add_fields_match_mongo_extension_signed_lib",
@@ -111,7 +112,7 @@ pkg_name = "//" + package_name() + "/"
 ############################## EXTENSIONS FOR PASSTHROUGH TESTS ##############################
 ### Any extension name suffix'ed with "_mongo_extension" with be automatically picked up by
 ### the extension passthroughs and loaded on all nodes, if it is also added to
-### "dist_test_extensions" in mongo/BUILD.bazel.
+### "dist_test_extensions".
 
 # Extensions under test_examples/
 [
@@ -127,6 +128,7 @@ pkg_name = "//" + package_name() + "/"
         "read_n_documents",
         "disallow_view",
         "desugar_add_view_name",
+        "view_pipeline_validator",
     ]
 ]
 
@@ -243,7 +245,7 @@ filegroup(
 
 ######################### EXTENSIONS FOR NO PASSTHROUGH OR UNIT TESTS #########################
 ### To be manually loaded in a no-passthrough e2e test, the extension must also be added to
-### "dist_test_extensions" in mongo/BUILD.bazel.
+### "dist_test_extensions".
 ### To be manually loaded in a unit test, the extension must also be added to the list of "data"
 ### for that test's Bazel target.
 

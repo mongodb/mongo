@@ -164,8 +164,8 @@ public:
         }
     }
 
-    void bindViewInfo(std::string_view viewName) const override {
-        _viewName = std::string(viewName);
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+        _viewName = std::string(viewInfo.viewName());
     }
 
     MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()

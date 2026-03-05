@@ -260,8 +260,13 @@ DEATH_TEST(HostAstNodeViewInfoTest, HostAstNodeCannotBindViewInfo, "11507501") {
         NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
     auto handle = AggStageAstNodeHandle{astNode};
 
+    std::string dbName = "testDbName";
     std::string viewName = "testViewName";
-    handle->bindViewInfo(viewName);
+    ::MongoExtensionNamespaceString nss{stringViewAsByteView(dbName.c_str()),
+                                        stringViewAsByteView(viewName.c_str())};
+    ::MongoExtensionViewInfo viewInfo{nss, 0, nullptr};
+
+    handle->bindViewInfo(viewInfo);
 }
 
 }  // namespace

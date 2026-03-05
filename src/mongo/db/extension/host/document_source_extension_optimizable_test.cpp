@@ -2433,8 +2433,8 @@ public:
         return _viewPolicy;
     }
 
-    void bindViewInfo(std::string_view viewName) const override {
-        _boundViewName = std::string(viewName);
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+        _boundViewName = std::string(viewInfo.viewName());
     }
 
     std::string getBoundViewName() const {
@@ -2475,7 +2475,58 @@ void testViewPolicyHelper(const NamespaceString& nss,
         viewInfo, ConfigurableViewPolicyTestAstNode::kStageName, ResolvedNamespaceMap{});
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), expectedViewName);
 }
-}  // namespace
+
+// AstNode that validates view pipeline allows only $match, $addFields, $set (mirrors
+// view_pipeline_validator test_example extension).
+class ViewPipelineValidatorTestAstNode : public sdk::AggStageAstNode {
+public:
+    static inline const std::string kStageName = "$validateViewPipeline";
+
+    ViewPipelineValidatorTestAstNode() : sdk::AggStageAstNode(kStageName) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<ViewPipelineValidatorTestAstNode>();
+    }
+
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+        for (const auto& stage : viewInfo.viewPipeline()) {
+            if (stage.isEmpty()) {
+                continue;
+            }
+            StringData stageName = stage.firstElement().fieldNameStringData();
+            if (stageName != "$match" && stageName != "$addFields" && stageName != "$set") {
+                uasserted(
+                    ErrorCodes::BadValue,
+                    str::stream()
+                        << "View pipeline stage '" << stageName
+                        << "' is not allowed. Only $match, $addFields, and $set are permitted.");
+            }
+        }
+    }
+};
+
+void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) {
+    auto astNodeImpl = std::make_unique<ViewPipelineValidatorTestAstNode>();
+    auto handle =
+        AggStageAstNodeHandle{new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNodeImpl))};
+
+    host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
+        ViewPipelineValidatorTestAstNode::kStageName, std::move(handle), nss);
+
+    auto viewPolicy = liteParsed.getViewPolicy();
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"_sd);
+    std::vector<BSONObj> pipelineCopy = viewPipeline;
+    ViewInfo viewInfo(viewNss, resolvedNss, std::move(pipelineCopy));
+
+    viewPolicy.callback(
+        viewInfo, ViewPipelineValidatorTestAstNode::kStageName, ResolvedNamespaceMap{});
+}
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
@@ -2499,6 +2550,38 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
                          viewNss.coll().data());
 }
 
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ViewPipelineValidatorAcceptsOnlyMatchAddFieldsSetStages) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+
+    // Valid: $match and $addFields (and $set) are allowed.
+    runViewPipelineValidatorCallback({BSON("$match" << BSON("x" << 1))});
+    runViewPipelineValidatorCallback({BSON("$addFields" << BSON("y" << 1))});
+    runViewPipelineValidatorCallback({BSON("$set" << BSON("z" << 1))});
+    runViewPipelineValidatorCallback(
+        {BSON("$match" << BSON("x" << 1)), BSON("$addFields" << BSON("y" << 1))});
+
+    // Valid: empty pipeline.
+    runViewPipelineValidatorCallback({});
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ViewPipelineValidatorRejectsDisallowedStages) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+
+    ASSERT_THROWS(runViewPipelineValidatorCallback({BSON("$project" << BSON("x" << 1))}),
+                  AssertionException);
+
+    ASSERT_THROWS(runViewPipelineValidatorCallback({BSON("$match" << BSON("x" << 1)),
+                                                    BSON("$lookup" << BSON("from" << "other"
+                                                                                  << "localField"
+                                                                                  << "id"
+                                                                                  << "foreignField"
+                                                                                  << "id"
+                                                                                  << "as"
+                                                                                  << "joined"))}),
+                  AssertionException);
+}
+
 TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsReturnsUnknown) {
     auto astNode = std::make_unique<sdk::shared_test_stages::TransformAggStageAstNode>();
     AggStageAstNodeHandle handle{new sdk::ExtensionAggStageAstNodeAdapter(std::move(astNode))};
@@ -2512,4 +2595,5 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsRet
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
 }
 
+}  // namespace
 }  // namespace mongo::extension

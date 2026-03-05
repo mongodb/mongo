@@ -35,7 +35,7 @@
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/extension/sdk/query_shape_opts_handle.h"
-#include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
+#include "mongo/db/extension/sdk/view_info.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -269,10 +269,10 @@ public:
         return MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
     }
 
-    // Note that bindViewInfo receives a std::string_view. If an extension wants to access a view
-    // name outside of the call to bindViewInfo, it must make its own copy of it. There are no
-    // guarantees on the lifetime of the string outside of the scope of this function.
-    virtual void bindViewInfo(std::string_view viewName) const {
+    // Note that viewInfo is non-owning, meaning if an extension wants to access the metadata
+    // outside of the call to bindViewInfo, it must make its own copy of it. There are no guarantees
+    // on the lifetime outside of the scope of this function.
+    virtual void bindViewInfo(const ViewInfo& viewInfo) const {
         // Default implementation is a no-op.
     }
 
@@ -382,11 +382,25 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _extBindViewInfo(const ::MongoExtensionAggStageAstNode* astNode,
-                                                    ::MongoExtensionByteView viewName) noexcept {
+    static ::MongoExtensionStatus* _extBindViewInfo(
+        const ::MongoExtensionAggStageAstNode* astNode,
+        const ::MongoExtensionViewInfo* viewInfo) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
+            sdk_tassert(11905600, "Provided view info was invalid", viewInfo != nullptr);
+            sdk_tassert(11905604,
+                        "If viewPipelineLen is non-zero, viewPipeline must be provided",
+                        viewInfo->viewPipelineLen == 0 || viewInfo->viewPipeline != nullptr);
+            std::vector<mongo::BSONObj> stages;
+            for (size_t i = 0; i < viewInfo->viewPipelineLen; ++i) {
+                stages.emplace_back(bsonObjFromByteView(viewInfo->viewPipeline[i]));
+            }
+            ViewInfo viewInfoWrapper =
+                ViewInfo(byteViewAsStringView(viewInfo->viewNamespace.databaseName),
+                         byteViewAsStringView(viewInfo->viewNamespace.collectionName),
+                         std::move(stages));
+
             static_cast<const ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bindViewInfo(
-                byteViewAsStringView(viewName));
+                viewInfoWrapper);
         });
     }
 

@@ -28,7 +28,6 @@
  */
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 
-#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 
@@ -78,8 +77,8 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
     return policy;
 }
 
-void AggStageAstNodeAPI::bindViewInfo(std::string_view viewName) const {
+void AggStageAstNodeAPI::bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) const {
     invokeCAndConvertStatusToException(
-        [&]() { return _vtable().bind_view_info(get(), stringViewAsByteView(viewName)); });
+        [&]() { return _vtable().bind_view_info(get(), &viewInfo); });
 }
 }  // namespace mongo::extension

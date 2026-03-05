@@ -17,6 +17,7 @@ mongo_cc_library(
         "host_portal_adapter.cpp",
         "query_execution_context_adapter.cpp",
         "query_shape_opts_adapter.cpp",
+        "view_info_adapter.cpp",
     ],
     deps = [
         "//src/mongo/db/extension/host/aggregation_stage",

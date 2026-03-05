@@ -422,6 +422,20 @@ typedef struct MongoExtensionNamespaceString {
 } MongoExtensionNamespaceString;
 
 /**
+ * MongoExtensionViewInfo includes view metadata for the aggregation, if any.
+ *
+ * viewNamespace is the view's namespace (database + view name), and viewPipeline is the view's
+ * effective pipeline as a BSON array of aggregation stage objects (e.g.
+ * {"$match": {...}}, {"$set": {...}}], of size viewPipelineLen. An empty viewPipeline (len == 0)
+ * denotes an identity view.
+ */
+typedef struct MongoExtensionViewInfo {
+    const ::MongoExtensionNamespaceString viewNamespace;
+    const size_t viewPipelineLen;
+    const MongoExtensionByteView* viewPipeline;  // array of BSON pipeline stages
+} MongoExtensionViewInfo;
+
+/**
  * MongoExtensionCatalogContext contains a collection's catalog context information (i.e
  * MongoExtensionNamespaceString, uuidString), which is generally available when an AstNode binds
  * into a LogicalStage. Note that the members of this struct are provided as views, meaning the
@@ -675,11 +689,15 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
         MongoExtensionFirstStageViewApplicationPolicy* viewPolicyOutput);
 
     /**
-     * Passes viewInfo over to the extension. For now we just send the view name.
-     * Ownership of the view name is not transferred over the API boundary.
+     * Passes view metadata to the AST node. Called when the pipeline is running against
+     * a view, so the stage can perform any view validation and/or bind view namespace and pipeline
+     * for use at execution time.
+     *
+     * Ownership of the BSON members is not transferred over the API boundary, so the extension must
+     * copy if they need to persist beyond the scope of bind_view_info().
      */
     MongoExtensionStatus* (*bind_view_info)(const MongoExtensionAggStageAstNode* astNode,
-                                            MongoExtensionByteView viewName);
+                                            const MongoExtensionViewInfo* viewInfo);
 } MongoExtensionAggStageAstNodeVTable;
 
 /**

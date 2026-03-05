@@ -203,8 +203,9 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostBindViewInfo(const ::MongoExtensionAggStageAstNode* astNode,
-                                                     ::MongoExtensionByteView viewName) noexcept {
+    static ::MongoExtensionStatus* _hostBindViewInfo(
+        const ::MongoExtensionAggStageAstNode* astNode,
+        const ::MongoExtensionViewInfo* viewInfo) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             tasserted(11507501,
                       "_hostBindViewInfo should not be called. Ensure that astNode is "

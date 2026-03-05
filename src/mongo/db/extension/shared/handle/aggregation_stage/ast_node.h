@@ -93,10 +93,9 @@ public:
     MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const;
 
     /**
-     * Binds view information to this AST node. The view name is passed to allow the stage to
-     * perform custom handling when a view is encountered.
+     * Binds view information to this AST node.
      */
-    void bindViewInfo(std::string_view viewName) const;
+    void bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) const;
 
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);

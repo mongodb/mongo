@@ -32,6 +32,8 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/extension/host_connector/adapter/view_info_adapter.h"
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -221,13 +223,15 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
                    "$vectorSearch-as-an-extension is not allowed against views."));
     }
 
-    return ViewPolicy{
-        .policy = view_util::toFirstStageApplicationPolicy(
-            _astNode->getFirstStageViewApplicationPolicy()),
-        .callback =
-            [this](const ViewInfo& viewInfo, StringData stageName, const ResolvedNamespaceMap&) {
-                _astNode->bindViewInfo(toStdStringViewForInterop(viewInfo.viewName.coll()));
-            }};
+    return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
+                          _astNode->getFirstStageViewApplicationPolicy()),
+                      .callback = [this](const ViewInfo& viewInfo,
+                                         StringData stageName,
+                                         const ResolvedNamespaceMap&) {
+                          host_connector::ViewInfoAdapter viewInfoAdapter =
+                              host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);
+                          _astNode->bindViewInfo(viewInfoAdapter.getAsBoundaryType());
+                      }};
 }
 
 // static
