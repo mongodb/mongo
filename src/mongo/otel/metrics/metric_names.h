@@ -85,6 +85,12 @@ private:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kPrometheusFileExporterWrites = {
+        "metrics.prometheus_file_exporter.writes"};
+    static constexpr MetricName kPrometheusFileExporterWritesFailed = {
+        "metrics.prometheus_file_exporter.failed_writes"};
+    static constexpr MetricName kPrometheusFileExporterWritesSkipped = {
+        "metrics.prometheus_file_exporter.skipped_writes"};
     static constexpr MetricName kConnectionsProcessed = {"network.connections_processed"};
     static constexpr MetricName kIngressTLSHandshakeLatency = {
         "network.ingress_tls_handshake_latency"};

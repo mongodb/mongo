@@ -197,6 +197,37 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "metrics_prometheus_file_exporter",
+    srcs = [
+        "metrics_prometheus_file_exporter.cpp",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":otel_metrics_service",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:clock_sources",
+        "//src/third_party/opentelemetry-cpp/exporters/prometheus:prometheus_exporter_utils",
+        "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
+        "@com_github_jupp0r_prometheus_cpp//core",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_prometheus_file_exporter_test",
+    srcs = [
+        "metrics_prometheus_file_exporter_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":metrics_prometheus_file_exporter",
+        ":metrics_test_util",
+        "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
+        "//src/third_party/opentelemetry-cpp/sdk/src/resource",
+    ],
+)
+
+mongo_cc_library(
     name = "in_memory_metrics_exporter",
     testonly = True,
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
@@ -248,6 +279,7 @@ test_suite(
         ":metrics_gauge_test",
         ":metrics_histogram_test",
         ":metrics_initialization_test",
+        ":metrics_prometheus_file_exporter_test",
         ":metrics_service_test",
         ":metrics_test_util_test",
     ],

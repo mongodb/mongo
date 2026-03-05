@@ -38,6 +38,9 @@ namespace mongo::otel::metrics {
 
 // Used to denote the unit of measurement in a metric.
 enum class MetricUnit {
+    // Generic
+    kEvents,
+
     // Time
     kMicroseconds,
     kMilliseconds,

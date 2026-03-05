@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/metric_unit.h"
+#pragma once
 
-#include "mongo/logv2/log.h"
+#include "mongo/base/status_with.h"
+#include "mongo/util/functional.h"
+
+#include <memory>
+#include <string>
+
+#include <opentelemetry/sdk/metrics/push_metric_exporter.h>
 
 namespace mongo::otel::metrics {
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+struct PrometheusFileExporterOptions {
+    /**
+     * The maximum number of export failures allowed before we consider the situation unrecoverable
+     * and terminate the process. This could be triggered by things like the output file becoming
+     * unwritable or writes suddenly becoming extremely slow.
+     */
+    int maxConsecutiveFailures = 10;
 
-StringData toString(MetricUnit unit) {
-    switch (unit) {
-        // Generic
-        case MetricUnit::kEvents:
-            return "events";
+    /**
+     * Used for testing delays and slowness in the file writer thread. This code will be executed
+     * when the failpoint is active.
+     */
+    unique_function<void()> testOnlyFailpointCallback;
+};
 
-        // Time
-        case MetricUnit::kMicroseconds:
-            return "microseconds";
-        case MetricUnit::kMilliseconds:
-            return "milliseconds";
-        case MetricUnit::kSeconds:
-            return "seconds";
-
-        // Space
-        case MetricUnit::kBytes:
-            return "bytes";
-
-        // Database
-        case MetricUnit::kOperations:
-            return "operations";
-        case MetricUnit::kQueries:
-            return "queries";
-
-        // Networking
-        case MetricUnit::kConnections:
-            return "connections";
-    }
-    LOGV2_FATAL(11494600, "Unknown MetricUnit value", "value"_attr = static_cast<int>(unit));
-}
+/**
+ * Exports files to the provided `filepath`. Note that the exporter will sometimes create a file
+ * with the same name as `filepath` but ".tmp" extension to facilitate the process. These files are
+ * cleaned up by the exporter.
+ */
+StatusWith<std::unique_ptr<opentelemetry::sdk::metrics::PushMetricExporter>>
+createPrometheusFileExporter(const std::string& filepath,
+                             PrometheusFileExporterOptions options = {});
 }  // namespace mongo::otel::metrics
