@@ -72,19 +72,11 @@ public:
 
     /**
      * Schedule the timeout to occur at "when", regardless of if or when it is already scheduled.
-     * If it is already scheduled to occur after "when", it is canceled and rescheduled
+     * If it is already scheduled to occur after "when", it is canceled and rescheduled.
      *
      * Returns status of the attempt to schedule on the executor.
      */
     Status scheduleAt(Date_t when);
-
-    /**
-     * Schedule the timeout to occur at "when" if it is not scheduled or scheduled to occur before
-     * "when".  If it is already scheduled to occur before "when", this call has no effect.
-     *
-     * Returns status of the attempt to schedule on the executor.
-     */
-    Status delayUntil(Date_t when);
 
     /**
      * Returns whether the callback is scheduled at all.
@@ -134,9 +126,9 @@ private:
  *
  * Synchronization of the randomSource is up to the caller; it is provided externally to
  * avoid having a separate random number generator per timer.  The randomSource function will
- * be called with the maximum jitter value passed to delayUntilWithJitter; it should return
- * a value in the range [0, maxJitter) or [0, maxJitter] depending on what you want the
- * actual jitter range to be.
+ * be called with the maximum jitter value passed to scheduleAtWithJitter; it should return a value
+ * in the range [0, maxJitter) or [0, maxJitter] depending on what you want the actual jitter range
+ * to be.
  */
 class DelayableTimeoutCallbackWithJitter : public DelayableTimeoutCallback {
 public:
@@ -149,12 +141,11 @@ public:
         : DelayableTimeoutCallback(executor, std::move(callback), timerName),
           _randomSource(std::move(randomSource)) {}
 
-    Status scheduleAt(Date_t when);
-    Status delayUntil(Date_t when);
-    Status delayUntilWithJitter(WithLock, Date_t when, Milliseconds maxJitter);
+    Status scheduleAtWithJitter(WithLock, Date_t when, Milliseconds maxJitter);
 
 private:
     void _resetRandomization(WithLock);
+    void _updateJitter(WithLock, Milliseconds jitterUpperBound);
 
     RandomSource _randomSource;
     Date_t _lastRandomizationTime;

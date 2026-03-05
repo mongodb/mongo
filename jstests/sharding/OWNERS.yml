@@ -76,3 +76,6 @@ filters:
   - "shard_drain_chunk_size_behavior.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "heal_config_shards_on_fcv_upgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

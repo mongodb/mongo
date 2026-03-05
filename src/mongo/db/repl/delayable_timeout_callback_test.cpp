@@ -127,23 +127,6 @@ TEST_F(DelayableTimeoutCallbackTest, ScheduleAtSchedulesFirstCallback) {
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 }
 
-TEST_F(DelayableTimeoutCallbackTest, DelayUntilSchedulesFirstCallback) {
-    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() + Seconds(2)));
-
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_EQ(1, callbackRan);
-    ASSERT_EQ(0, callbackRanWithError);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-}
-
 TEST_F(DelayableTimeoutCallbackTest, ScheduleAtMovesCallbackLater) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
@@ -157,29 +140,6 @@ TEST_F(DelayableTimeoutCallbackTest, ScheduleAtMovesCallbackLater) {
     ASSERT_EQ(0, callbackRan);
 
     ASSERT_OK(_delayableTimeoutCallback->scheduleAt(_net->now() + Seconds(2)));
-
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_EQ(1, callbackRan);
-    ASSERT_EQ(0, callbackRanWithError);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-}
-
-TEST_F(DelayableTimeoutCallbackTest, DelayUntilMovesCallbackLater) {
-    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() + Seconds(2)));
-
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() + Seconds(2)));
 
     _net->runUntil(_net->now() + Seconds(1));
     ASSERT_TRUE(_delayableTimeoutCallback->isActive());
@@ -210,29 +170,6 @@ TEST_F(DelayableTimeoutCallbackTest, ScheduleAtMovesCallbackEarlier) {
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 }
 
-TEST_F(DelayableTimeoutCallbackTest, DelayUntilDoesNotMoveCallbackEarlier) {
-    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() + Seconds(3)));
-
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() + Seconds(1)));
-
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    ASSERT_EQ(0, callbackRan);
-    _net->runUntil(_net->now() + Seconds(1));
-    ASSERT_EQ(1, callbackRan);
-    ASSERT_EQ(0, callbackRanWithError);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-}
-
 TEST_F(DelayableTimeoutCallbackTest, ScheduleAtInPastRunsImmediately) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     // Make sure there's a past to schedule in.
@@ -240,22 +177,6 @@ TEST_F(DelayableTimeoutCallbackTest, ScheduleAtInPastRunsImmediately) {
 
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
     ASSERT_OK(_delayableTimeoutCallback->scheduleAt(_net->now() - Seconds(1)));
-
-    // Needed to trigger anything scheduled.
-    _net->runReadyNetworkOperations();
-
-    ASSERT_EQ(1, callbackRan);
-    ASSERT_EQ(0, callbackRanWithError);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-}
-
-TEST_F(DelayableTimeoutCallbackTest, DelayUntilInPastRunsImmediately) {
-    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
-    // Make sure there's a past to schedule in.
-    _net->runUntil(_net->now() + Days(1));
-
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-    ASSERT_OK(_delayableTimeoutCallback->delayUntil(_net->now() - Seconds(1)));
 
     // Needed to trigger anything scheduled.
     _net->runReadyNetworkOperations();
@@ -305,68 +226,95 @@ TEST_F(DelayableTimeoutCallbackTest, Shutdown) {
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 }
 
-TEST_F(DelayableTimeoutCallbackWithJitterTest, DelayUntilWithJitter) {
+TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithZeroJitter) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());
 
     stdx::lock_guard lk(_mutex);
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
-        lk, _net->now() + Seconds(10), Milliseconds(100)));
-
-    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
-    // Our "random" generator is just 10,20,30,...
-    ASSERT_EQ(_net->now() + Milliseconds(10010), _delayableTimeoutCallback->getNextCall());
-    ASSERT_EQ(0, callbackRan);
-
-    // Setting it again in the same time shouldn't change jitter.
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
-        lk, _net->now() + Seconds(10), Milliseconds(100)));
-    ASSERT_EQ(_net->now() + Milliseconds(10010), _delayableTimeoutCallback->getNextCall());
-    ASSERT_EQ(0, callbackRan);
-
-    // Move forward less than the max jitter shouldn't change jitter.
-    for (int i = 0; i < 3; i++) {
-        _net->runUntil(_net->now() + Milliseconds(25));
-        ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
-            lk, _net->now() + Seconds(10), Milliseconds(100)));
-        ASSERT_EQ(_net->now() + Milliseconds(10010), _delayableTimeoutCallback->getNextCall());
-        ASSERT_EQ(0, callbackRan);
-    }
-
-    // Move forward to the max jitter should recalculate jitter.
-    _net->runUntil(_net->now() + Milliseconds(25));
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
-        lk, _net->now() + Seconds(10), Milliseconds(100)));
-    ASSERT_EQ(_net->now() + Milliseconds(10020), _delayableTimeoutCallback->getNextCall());
-    ASSERT_EQ(0, callbackRan);
-
-    // Setting max jitter to less than actual jitter should recalculate jitter.
-    ASSERT_OK(_delayableTimeoutCallback->delayUntilWithJitter(
-        lk, _net->now() + Seconds(10), Milliseconds(19)));
-    // Jitter value will be 30 % 19 = 11
-    ASSERT_EQ(_net->now() + Milliseconds(10011), _delayableTimeoutCallback->getNextCall());
-    ASSERT_EQ(0, callbackRan);
-
-    _net->runUntil(_net->now() + Milliseconds(10011));
-    ASSERT_EQ(1, callbackRan);
-    ASSERT_EQ(0, callbackRanWithError);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-}
-
-TEST_F(DelayableTimeoutCallbackWithJitterTest, DelayUntilWithZeroJitter) {
-    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
-    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
-
-    stdx::lock_guard lk(_mutex);
-
     ASSERT_OK(
-        _delayableTimeoutCallback->delayUntilWithJitter(lk, _net->now() + Seconds(10), Seconds(0)));
-
+        _delayableTimeoutCallback->scheduleAtWithJitter(lk, _net->now() + Seconds(10), Seconds(0)));
     ASSERT_TRUE(_delayableTimeoutCallback->isActive());
     ASSERT_EQ(_net->now() + Milliseconds(10000), _delayableTimeoutCallback->getNextCall());
     ASSERT_EQ(0, callbackRan);
 
     _net->runUntil(_net->now() + Milliseconds(10000));
+    ASSERT_EQ(1, callbackRan);
+    ASSERT_EQ(0, callbackRanWithError);
+    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
+}
+
+TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithJitterMovesCallbackEarlier) {
+    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
+    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
+
+    stdx::lock_guard lk(_mutex);
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(3), Milliseconds(100)));
+
+    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
+    ASSERT_EQ(0, callbackRan);
+    _net->runUntil(_net->now() + Seconds(1));
+    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
+    ASSERT_EQ(0, callbackRan);
+
+    // Schedule at an earlier time (move backward); should cancel and reschedule like scheduleAt().
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(1), Milliseconds(100)));
+    // Jitter refreshed (elapsed >= 100ms); next call is at base time + jitter in [0, 100)ms.
+    const auto expectedWhen = _delayableTimeoutCallback->getNextCall();
+    ASSERT_GTE(expectedWhen, _net->now() + Seconds(1));
+    ASSERT_LT(expectedWhen, _net->now() + Seconds(1) + Milliseconds(100));
+
+    _net->runUntil(expectedWhen);
+    ASSERT_EQ(1, callbackRan);
+    ASSERT_EQ(0, callbackRanWithError);
+    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
+}
+
+TEST_F(DelayableTimeoutCallbackWithJitterTest, ScheduleAtWithJitter) {
+    executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
+    ASSERT_FALSE(_delayableTimeoutCallback->isActive());
+
+    stdx::lock_guard lk(_mutex);
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
+
+    ASSERT_TRUE(_delayableTimeoutCallback->isActive());
+    // Our "random" generator is 10,20,30,...; after ScheduleAtWithJitterMovesCallbackEarlier used
+    // 10 and 20, first value here is 30.
+    ASSERT_EQ(_net->now() + Milliseconds(10030), _delayableTimeoutCallback->getNextCall());
+    ASSERT_EQ(0, callbackRan);
+
+    // Setting it again in the same time shouldn't change jitter.
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
+    ASSERT_EQ(_net->now() + Milliseconds(10030), _delayableTimeoutCallback->getNextCall());
+    ASSERT_EQ(0, callbackRan);
+
+    // Move forward less than the max jitter shouldn't change jitter.
+    for (int i = 0; i < 3; i++) {
+        _net->runUntil(_net->now() + Milliseconds(25));
+        ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+            lk, _net->now() + Seconds(10), Milliseconds(100)));
+        ASSERT_EQ(_net->now() + Milliseconds(10030), _delayableTimeoutCallback->getNextCall());
+        ASSERT_EQ(0, callbackRan);
+    }
+
+    // Move forward to the max jitter should recalculate jitter.
+    _net->runUntil(_net->now() + Milliseconds(25));
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(100)));
+    ASSERT_EQ(_net->now() + Milliseconds(10040), _delayableTimeoutCallback->getNextCall());
+    ASSERT_EQ(0, callbackRan);
+
+    // Setting max jitter to less than actual jitter should recalculate jitter.
+    ASSERT_OK(_delayableTimeoutCallback->scheduleAtWithJitter(
+        lk, _net->now() + Seconds(10), Milliseconds(19)));
+    // Jitter value will be 50 % 19 = 12 (next in sequence after 40)
+    ASSERT_EQ(_net->now() + Milliseconds(10012), _delayableTimeoutCallback->getNextCall());
+    ASSERT_EQ(0, callbackRan);
+
+    _net->runUntil(_net->now() + Milliseconds(10012));
     ASSERT_EQ(1, callbackRan);
     ASSERT_EQ(0, callbackRanWithError);
     ASSERT_FALSE(_delayableTimeoutCallback->isActive());

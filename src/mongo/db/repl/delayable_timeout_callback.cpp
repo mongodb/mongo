@@ -74,19 +74,15 @@ Status DelayableTimeoutCallback::scheduleAt(Date_t when) {
 
 Status DelayableTimeoutCallback::_scheduleAt(WithLock lk, Date_t when) {
     if (_cbHandle && when < _nextCall) {
-        LOGV2_DEBUG(6602300,
-                    3,
-                    "Moving a delayable timeout call backwards, which is inefficient",
-                    "timerName"_attr = _timerName,
-                    "when"_attr = when,
-                    "nextCall"_attr = _nextCall);
+        LOGV2_DEBUG(
+            6602300,
+            3,
+            "Moving a delayable timeout call backwards, which requires canceling and rescheduling.",
+            "timerName"_attr = _timerName,
+            "when"_attr = when,
+            "nextCall"_attr = _nextCall);
         _cancel(lk);
     }
-    return _delayUntil(lk, when);
-}
-
-Status DelayableTimeoutCallback::delayUntil(Date_t when) {
-    stdx::lock_guard lk(_mutex);
     return _delayUntil(lk, when);
 }
 
@@ -166,24 +162,7 @@ void DelayableTimeoutCallbackWithJitter::_resetRandomization(WithLock) {
     _currentJitter = Milliseconds(0);
 }
 
-Status DelayableTimeoutCallbackWithJitter::scheduleAt(Date_t when) {
-    stdx::lock_guard lk(_mutex);
-    _resetRandomization(lk);
-    return _scheduleAt(lk, when);
-}
-
-Status DelayableTimeoutCallbackWithJitter::delayUntil(Date_t when) {
-    stdx::lock_guard lk(_mutex);
-    _resetRandomization(lk);
-    return _delayUntil(lk, when);
-}
-
-Status DelayableTimeoutCallbackWithJitter::delayUntilWithJitter(WithLock,
-                                                                Date_t when,
-                                                                Milliseconds jitterUpperBound) {
-    if (jitterUpperBound == Milliseconds::zero())
-        return delayUntil(when);
-    stdx::lock_guard lk(_mutex);
+void DelayableTimeoutCallbackWithJitter::_updateJitter(WithLock lk, Milliseconds jitterUpperBound) {
     Date_t now = _getExecutor()->now();
     Milliseconds elapsed = now - _lastRandomizationTime;
     if (_lastRandomizationTime == Date_t() || elapsed < Milliseconds::zero() ||
@@ -192,7 +171,20 @@ Status DelayableTimeoutCallbackWithJitter::delayUntilWithJitter(WithLock,
         _currentJitter =
             Milliseconds(_randomSource(lk, durationCount<Milliseconds>(jitterUpperBound)));
     }
-    return _delayUntil(lk, when + _currentJitter);
+}
+
+Status DelayableTimeoutCallbackWithJitter::scheduleAtWithJitter(WithLock,
+                                                                Date_t when,
+                                                                Milliseconds jitterUpperBound) {
+    if (jitterUpperBound == Milliseconds::zero()) {
+        stdx::lock_guard lk(_mutex);
+        _resetRandomization(lk);
+        return _scheduleAt(lk, when);
+    }
+
+    stdx::lock_guard lk(_mutex);
+    _updateJitter(lk, jitterUpperBound);
+    return _scheduleAt(lk, when + _currentJitter);
 }
 
 }  // namespace repl
