@@ -1376,7 +1376,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
         "dropIdent",
         {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
              -> Status {
-             // TODO: SERVER-118737 implement.
+             const auto& ident = op->getObject().firstElement().valueStringData();
+             const Timestamp& dropIdentTs = op->getTimestamp();
+
+             opCtx->getServiceContext()->getStorageEngine()->dropIdentTimestamped(
+                 opCtx, ident, dropIdentTs);
              return Status::OK();
          },
          {}},

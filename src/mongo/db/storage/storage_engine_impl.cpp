@@ -973,6 +973,13 @@ void StorageEngineImpl::dropUnknownIdent(RecoveryUnit& ru,
     _dropPendingIdentReaper.dropUnknownIdent(stableTimestamp, ident);
 }
 
+void StorageEngineImpl::dropIdentTimestamped(OperationContext* opCtx,
+                                             StringData ident,
+                                             Timestamp timestamp) {
+    uassertStatusOK(
+        _dropPendingIdentReaper.immediatelyCompletePendingDropAtTimestamp(opCtx, ident, timestamp));
+}
+
 std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(StringData ident) {
     return _dropPendingIdentReaper.markIdentInUse(ident);
 }

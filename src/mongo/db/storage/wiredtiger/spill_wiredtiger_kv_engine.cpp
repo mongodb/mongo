@@ -190,7 +190,8 @@ std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru)
 Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           bool identHasSizeInfo,
-                                          const StorageEngine::DropIdentCallback& onDrop) {
+                                          const StorageEngine::DropIdentCallback& onDrop,
+                                          boost::optional<Timestamp> _) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);

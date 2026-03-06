@@ -617,6 +617,16 @@ public:
      */
     virtual void dropIdent(RecoveryUnit& ru, StringData ident) = 0;
 
+    /**
+     * Performs a timestamped ident drop.
+     *
+     * The ident will remain visible in checkpoints taken before 'timestamp' and will be
+     * dropped in checkpoints taken at or after 'timestamp'.
+     */
+    virtual void dropIdentTimestamped(OperationContext* opCtx,
+                                      StringData ident,
+                                      Timestamp timestamp) = 0;
+
     BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
 
     /**

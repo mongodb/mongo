@@ -2053,7 +2053,8 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                      StringData ident,
                                      bool identHasSizeInfo,
-                                     const StorageEngine::DropIdentCallback& onDrop) {
+                                     const StorageEngine::DropIdentCallback& onDrop,
+                                     boost::optional<Timestamp> timestamp) {
     string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);

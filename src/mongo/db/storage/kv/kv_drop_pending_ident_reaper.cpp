@@ -258,7 +258,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx,
             uassertStatusOK(interruptStatus);
         }
 
-        auto status = _tryToDrop(lock, opCtx, *identInfo);
+        auto status = _tryToDrop(lock, opCtx, *identInfo, boost::none);
         if (status == ErrorCodes::ObjectIsBusy) {
             LOGV2_PROD_ONLY(6936300,
                             "Drop-pending ident is still in use",
@@ -300,7 +300,7 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     }
 
     for (size_t retries = 1;; ++retries) {
-        auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident);
+        auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, boost::none);
         if (status != ErrorCodes::ObjectIsBusy) {
             return status;
         }
@@ -322,8 +322,51 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDrop(OperationContext
     }
 }
 
-Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(OperationContext* opCtx,
-                                                                          StringData ident) {
+Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(OperationContext* opCtx,
+                                                                           StringData ident,
+                                                                           Timestamp timestamp) {
+    {
+        stdx::lock_guard lock(_mutex);
+        auto it = _dropPendingIdents.find(ident);
+        if (it == _dropPendingIdents.end()) {
+            LOGV2_WARNING(12079400,
+                          "Ident not found in drop-pending registry during replicated drop; "
+                          "assuming already dropped",
+                          "ident"_attr = ident,
+                          "timestamp"_attr = timestamp);
+            return Status::OK();
+        }
+
+        const auto& info = *it->second;
+        const auto readiness = std::visit(
+            OverloadedVisitor{
+                [&](Timestamp dropTs) -> Status {
+                    if (timestamp <= dropTs) {
+                        return Status(ErrorCodes::ObjectIsBusy,
+                                      "Pending drop is not ready at the requested timestamp");
+                    }
+
+                    return Status::OK();
+                },
+                [&](StorageEngine::CheckpointIteration) -> Status {
+                    return Status(ErrorCodes::BadValue,
+                                  "immediatelyCompletePendingDropAtTimestamp() cannot be used with "
+                                  "a checkpoint-iteration pending drop");
+                }},
+            info.dropTime);
+
+        if (!readiness.isOK()) {
+            return readiness;
+        }
+    }
+
+    return _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
+}
+
+Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
+    OperationContext* opCtx,
+    StringData ident,
+    boost::optional<Timestamp> replicatedIdentDropTimestamp) {
     stdx::lock_guard dropLock(_dropMutex);
     auto info = [&]() -> DropPendingIdents::value_type {
         stdx::lock_guard stateLock(_mutex);
@@ -342,12 +385,14 @@ Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(Operat
         // While we held no mutexes another thread completed the drop on this ident
         return Status::OK();
     }
-    return _tryToDrop(dropLock, opCtx, *info);
+    return _tryToDrop(dropLock, opCtx, *info, replicatedIdentDropTimestamp);
 }
 
-Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
-                                            OperationContext* opCtx,
-                                            IdentInfo& identInfo) {
+Status KVDropPendingIdentReaper::_tryToDrop(
+    WithLock,
+    OperationContext* opCtx,
+    IdentInfo& identInfo,
+    boost::optional<Timestamp> replicatedIdentDropTimestamp) {
     LOGV2_PROD_ONLY(22237,
                     "Completing drop for ident",
                     "ident"_attr = identInfo.identName,
@@ -358,7 +403,8 @@ Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
     auto status = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                      identInfo.identName,
                                      ident::isCollectionIdent(identInfo.identName),
-                                     identInfo.onDrop);
+                                     identInfo.onDrop,
+                                     replicatedIdentDropTimestamp);
     if (!status.isOK()) {
         stdx::lock_guard lock(_mutex);
         identInfo.dropInProgress = false;

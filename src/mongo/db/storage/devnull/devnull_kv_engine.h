@@ -119,7 +119,8 @@ public:
     Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
-                     const StorageEngine::DropIdentCallback& onDrop) override {
+                     const StorageEngine::DropIdentCallback& onDrop,
+                     boost::optional<Timestamp> _) override {
         return Status::OK();
     }
 

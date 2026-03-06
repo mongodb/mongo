@@ -155,6 +155,17 @@ public:
     Status immediatelyCompletePendingDrop(OperationContext* opCtx, StringData ident);
 
     /**
+     * If the given ident has been registered with the reaper, attempts to immediately drop it
+     * using the provided replicated drop timestamp. Returns ObjectIsBusy if 'timestamp' is earlier
+     * than the pending drop timestamp or if the ident is still in use. Returns BadValue for
+     * checkpoint-iteration drops. Returns Status::OK() if the ident was not tracked, as the reaper
+     * cannot distinguish "ident has already been dropped" from "ident was never drop pending".
+     */
+    Status immediatelyCompletePendingDropAtTimestamp(OperationContext* opCtx,
+                                                     StringData ident,
+                                                     Timestamp timestamp);
+
+    /**
      * Wait some fixed amount of additional time before dropping an ident. This gets added to the
      * timestamp of each ident getting dropped. Has no effect on checkpoint-style drops.
      */
@@ -193,9 +204,13 @@ private:
 
     Status _tryToDrop(WithLock,  // Must hold _dropMutex but *not* _mutex
                       OperationContext* opCtx,
-                      IdentInfo& identInfo);
+                      IdentInfo& identInfo,
+                      boost::optional<Timestamp> replicatedIdentDropTimestamp);
 
-    Status _immediatelyAttemptToCompletePendingDrop(OperationContext* opCtx, StringData ident);
+    Status _immediatelyAttemptToCompletePendingDrop(
+        OperationContext* opCtx,
+        StringData ident,
+        boost::optional<Timestamp> replicatedIdentDropTimestamp);
 
     Timestamp _applyDelay(const Timestamp& ts) const;
 

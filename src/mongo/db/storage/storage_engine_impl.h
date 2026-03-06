@@ -218,6 +218,10 @@ public:
                           const Timestamp& stableTimestamp,
                           StringData ident) override;
 
+    void dropIdentTimestamped(OperationContext* opCtx,
+                              StringData ident,
+                              Timestamp timestamp) override;
+
     std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
 
     void startTimestampMonitor(

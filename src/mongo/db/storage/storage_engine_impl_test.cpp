@@ -31,7 +31,9 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
@@ -225,6 +227,94 @@ TEST_F(TimestampKVEngineTest, TimestampAdvancesOnNotification) {
     }
 
     _storageEngine->getTimestampMonitor()->removeListener(&listener);
+}
+
+namespace {
+class MockKVEngine : public DevNullKVEngine {
+public:
+    MOCK_METHOD(Status,
+                dropIdent,
+                (RecoveryUnit & ru,
+                 StringData ident,
+                 bool identHasSizeInfo,
+                 const StorageEngine::DropIdentCallback& onDrop,
+                 boost::optional<Timestamp> timestamp),
+                (override));
+};
+
+class StorageEngineImplTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        auto opCtx = makeOperationContext();
+
+        auto runner = makePeriodicRunner(getServiceContext());
+        getServiceContext()->setPeriodicRunner(std::move(runner));
+
+        StorageEngineOptions options{/*directoryPerDB=*/false,
+                                     /*directoryForIndexes=*/false,
+                                     /*forRepair=*/false,
+                                     /*lockFileCreatedByUncleanShutdown=*/false};
+        _storageEngine = std::make_unique<StorageEngineImpl>(
+            opCtx.get(), std::make_unique<MockKVEngine>(), std::unique_ptr<KVEngine>(), options);
+        _mockKVEngine = static_cast<MockKVEngine*>(_storageEngine->getEngine());
+    }
+
+    void tearDown() override {
+        ServiceContextTest::tearDown();
+    }
+
+    std::unique_ptr<StorageEngine> _storageEngine;
+    MockKVEngine* _mockKVEngine;
+};
+}  // namespace
+
+TEST_F(StorageEngineImplTest, DropIdentTimestampedPassesTimestampToKVEngine) {
+    auto uniqueOpCtx = makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
+    std::string ident{"my-ident"};
+    Timestamp dropIdentTs(10, 20);
+    Timestamp dropCollectionTs(5, 0);
+
+    // Assert that the replicated ident drop timestamp is passed to the KVEngine.
+    _storageEngine->addDropPendingIdent(dropCollectionTs, std::make_shared<Ident>(ident));
+
+    EXPECT_CALL(*_mockKVEngine, dropIdent)
+        .WillOnce([&](RecoveryUnit& calledRu,
+                      StringData calledIdent,
+                      bool identHasSizeInfo,
+                      const StorageEngine::DropIdentCallback& onDrop,
+                      boost::optional<Timestamp> timestamp) {
+            ASSERT_EQ(calledIdent, StringData{ident});
+            ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
+            ASSERT_FALSE(static_cast<bool>(onDrop));
+            ASSERT(timestamp);
+            ASSERT_EQ(*timestamp, dropIdentTs);
+            return Status::OK();
+        });
+
+    ASSERT_DOES_NOT_THROW(_storageEngine->dropIdentTimestamped(opCtx, ident, dropIdentTs));
+
+    // Assert that if dropIdentTimestamped returns a failure, it is propagated.
+    _storageEngine->addDropPendingIdent(dropCollectionTs, std::make_shared<Ident>(ident));
+    EXPECT_CALL(*_mockKVEngine, dropIdent)
+        .WillOnce([&](RecoveryUnit& calledRu,
+                      StringData calledIdent,
+                      bool identHasSizeInfo,
+                      const StorageEngine::DropIdentCallback& onDrop,
+                      boost::optional<Timestamp> timestamp) {
+            ASSERT_EQ(calledIdent, StringData{ident});
+            ASSERT_EQ(identHasSizeInfo, ident::isCollectionIdent(calledIdent));
+            ASSERT_FALSE(static_cast<bool>(onDrop));
+            ASSERT(timestamp);
+            ASSERT_EQ(*timestamp, dropIdentTs);
+            return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIdent failed.");
+        });
+
+    ASSERT_THROWS_CODE(_storageEngine->dropIdentTimestamped(opCtx, ident, dropIdentTs),
+                       DBException,
+                       ErrorCodes::OperationFailed);
 }
 
 }  // namespace mongo

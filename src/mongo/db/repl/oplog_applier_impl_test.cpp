@@ -74,6 +74,7 @@
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -91,6 +92,7 @@
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -4871,6 +4873,41 @@ TEST_F(OplogApplierImplTest, DropDatabaseSucceedsInRecovering) {
 
     auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
     ASSERT_OK(runOpSteadyState(op));
+}
+
+TEST_F(OplogApplierImplTest, DropIdentCommandDropsPendingIdentAtOpTimestamp) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto storageEngine = serviceContext->getStorageEngine();
+    const std::string ident = storageEngine->generateNewInternalIdent();
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        StorageWriteTransaction swt(*ru);
+        auto& provider =
+            rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
+        ASSERT_OK(storageEngine->getEngine()->createRecordStore(provider, *ru, nss, ident, {}));
+        swt.commit();
+    }
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, ident));
+    }
+
+    const Timestamp pendingDropTs(20, 0);
+    {
+        auto identRef = std::make_shared<Ident>(ident);
+        storageEngine->addDropPendingIdent(pendingDropTs, identRef);
+    }
+
+    auto op = makeCommandOplogEntry(OpTime(Timestamp(21, 0), 1),
+                                    NamespaceString::makeCommandNamespace(DatabaseName::kAdmin),
+                                    BSON("dropIdent" << ident));
+    ASSERT_OK(runOpSteadyState(op));
+
+    {
+        auto ru = storageEngine->newRecoveryUnit();
+        ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, ident));
+    }
 }
 
 TEST_F(OplogApplierImplWithFastAutoAdvancingClockTest, LogSlowOpApplicationWhenSuccessful) {
