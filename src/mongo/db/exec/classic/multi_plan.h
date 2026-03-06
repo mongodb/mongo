@@ -194,7 +194,7 @@ public:
      * - its productivity
      * - the number of retrieved documents
      */
-    EstimationResult estimateAllPlans() const;
+    StatusWith<EstimationResult> estimateAllPlans() const;
 
     /**
      * Returns true if a backup plan was picked.

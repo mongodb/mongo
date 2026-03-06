@@ -1,4 +1,4 @@
-import {getWinningPlanFromExplain, getExecutionStats} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, getExecutionStats, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {
     assertPlanCosted,
     assertPlanNotCosted,
@@ -45,6 +45,8 @@ function populateCollection(collSufix, cardinality, numFields, compoundIndexes) 
         // control of predicate selectivity and productivity
         doc["x1"] = i % 100;
         doc["x2"] = i % 1000;
+        doc["s1"] = "txt_" + doc["f1"];
+        doc["s2"] = "txt_" + doc["f2"];
         ops.push({
             insertOne: {document: doc},
         });
@@ -72,11 +74,13 @@ const compoundIndexes = [
     {f1: 1, f2: 1, f3: 1},
     {f4: 1, f5: 1, f3: 1},
     {f5: 1, f4: 1, f3: 1, f2: 1, f1: 1},
+    {s1: "text"},
+    {s2: 1},
 ];
 
 const nFields = Math.max(...compoundIndexes.map((obj) => Object.keys(obj).length));
 const batchSize = getMultiplanningBatchSize();
-const mpEndConditions = {kEOF: "EOF", kFullBatch: "FullBatch", kMaxWorks: "MaxWorks"};
+const mpEndConditions = {kEOF: "EOF", kFullBatch: "FullBatch", kMaxWorks: "MaxWorks", kSinglePlan: "SinglePlan"};
 const rankerStrategies = {kCBR: "CBR", kMP: "MP"};
 
 function checkRanker({qID = "", cName = "", query = {}, order = {}, limit = 0, mpEndCond = "", ranker = ""}) {
@@ -99,6 +103,12 @@ function checkRanker({qID = "", cName = "", query = {}, order = {}, limit = 0, m
             break;
         }
         case mpEndConditions.kMaxWorks: {
+            break;
+        }
+        case mpEndConditions.kSinglePlan: {
+            // There is one rejected plan which equivalent to the winning plan because
+            // AutomaticCE/CBR couldn't estimate the text node, and switched to MP.
+            assert.eq(getRejectedPlans(explain).length, 1);
             break;
         }
         default: {
@@ -135,7 +145,10 @@ assert.commandWorked(
 );
 try {
     // The implementation of AutomaticCE with a cost-based choice of the plan ranker
-    // considers 4 different cases. Each of these cases is listed below and tested.
+    // considers 5 different cases. Each of these cases is listed below and tested.
+
+    // PLEASE MAKE SURE TO TEST ALL CASES, AND TO MATCH THE NUMBERS HERE WITH THE
+    // ENUMERATION OF CASES IN THE CODE.
 
     // (1) AutomaticCE chooses MP because of EOF or full batch
     // 1.1 EOF small collection
@@ -203,16 +216,26 @@ try {
         ranker: rankerStrategies.kMP,
     });
 
-    // (2) AutomaticCE chooses CBR because of very low productivity
+    // (2) "AutomaticCE chooses MP because plan contains inestimable node(s)"
     checkRanker({
         qID: "2.1",
+        cName: "20k",
+        query: {"$or": [{"f1": {"$ne": 72}}, {"s2": {"$regex": "text_"}}, {"$text": {"$search": "text_77"}}]},
+        order: {"_id": 1},
+        mpEndCond: mpEndConditions.kSinglePlan,
+        ranker: rankerStrategies.kMP,
+    });
+
+    // (3) AutomaticCE chooses CBR because of very low productivity
+    checkRanker({
+        qID: "3.1",
         cName: "20k",
         query: {f1: {$gte: 0}, x2: {$gte: 998}},
         mpEndCond: mpEndConditions.kMaxWorks,
         ranker: rankerStrategies.kCBR,
     });
     checkRanker({
-        qID: "2.2",
+        qID: "3.2",
         cName: "20k",
         query: {f1: {$lt: 505}, f2: {$gt: 100}},
         order: {x1: 1},
@@ -222,7 +245,7 @@ try {
     });
     // This is an interesting case with productivity = 0.0052 which is < 0.0101
     checkRanker({
-        qID: "2.3",
+        qID: "3.3",
         cName: "20k",
         query: {
             $expr: {
@@ -238,14 +261,14 @@ try {
         ranker: rankerStrategies.kCBR,
     });
 
-    // (3) AutomaticCE chooses MP because the required improvement is not achievable
+    // (4) AutomaticCE chooses MP because the required improvement is not achievable
     // Make this test more stable by increasing the required ratio - it works with the default but
     // sometimes the ratio may occasionally get better.
     const prevRatio = assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: 3.0}),
     ).was;
     checkRanker({
-        qID: "3.1",
+        qID: "4.1",
         cName: "20k",
         query: {f1: {$gte: 0}, x2: {$gte: 900}},
         mpEndCond: mpEndConditions.kMaxWorks,
@@ -255,16 +278,16 @@ try {
         db.adminCommand({setParameter: 1, internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice: prevRatio}),
     );
 
-    // (4) AutomaticCE chooses CBR because it is cheaper than MP
+    // (5) AutomaticCE chooses CBR because it is cheaper than MP
     checkRanker({
-        qID: "4.1",
+        qID: "5.1",
         cName: "20k",
         query: {f1: {$gte: 0}, x2: {$gte: 940}},
         mpEndCond: mpEndConditions.kMaxWorks,
         ranker: rankerStrategies.kCBR,
     });
     checkRanker({
-        qID: "4.2",
+        qID: "5.2",
         cName: "20k",
         query: {f1: {$lt: 505}, f2: {$gt: 100}},
         order: {f3: 1},

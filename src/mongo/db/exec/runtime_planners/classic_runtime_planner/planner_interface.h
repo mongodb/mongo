@@ -241,7 +241,7 @@ public:
         return _multiplanStage->getTrialPhaseConfig();
     }
 
-    MultiPlanStage::EstimationResult estimateAllPlans() const {
+    StatusWith<MultiPlanStage::EstimationResult> estimateAllPlans() const {
         return _multiplanStage->estimateAllPlans();
     }
 

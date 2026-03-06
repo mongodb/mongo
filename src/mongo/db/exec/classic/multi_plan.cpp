@@ -632,7 +632,7 @@ bool MultiPlanStage::bestSolutionEof() const {
     return bestPlan.root->isEOF();
 }
 
-MultiPlanStage::EstimationResult MultiPlanStage::estimateAllPlans() const {
+StatusWith<MultiPlanStage::EstimationResult> MultiPlanStage::estimateAllPlans() const {
     EstimateMap ceMap;
     CostEstimator costEstimator(ceMap);
     CostEstimate totalCost = zeroCost;
@@ -646,7 +646,10 @@ MultiPlanStage::EstimationResult MultiPlanStage::estimateAllPlans() const {
         const PlanStage* execPlan = candidate.root;
 
         const auto res = ce::ExactCardinalityImpl::calculateExactCardinality(plan, execPlan, ceMap);
-        uassertStatusOK(res);  // TODO: handle error
+        if (!res.isOK()) {
+            return res.getStatus();
+        }
+
         const auto planCost = costEstimator.estimatePlan(*plan);
         totalCost += planCost;
 
@@ -669,7 +672,7 @@ MultiPlanStage::EstimationResult MultiPlanStage::estimateAllPlans() const {
         }
     }
     tassert(11306809, "Total MP cost must be > 0", totalCost > zeroCost);
-    return {totalCost, bestProductivity, bestPlanNumResults};
+    return StatusWith<EstimationResult>({totalCost, bestProductivity, bestPlanNumResults});
 }
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {

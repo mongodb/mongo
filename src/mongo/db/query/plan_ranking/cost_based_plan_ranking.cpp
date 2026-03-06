@@ -197,7 +197,14 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
             stats->totalWorks / numSolutions == numWorksPerPlanEst);
 
     // Estimate the cost of MP based on the "estimation" trial.
-    auto estRes = mp.estimateAllPlans();
+    auto estResWithStatus = mp.estimateAllPlans();
+    if (!estResWithStatus.isOK()) {
+        LOGV2_INFO(12023300,
+                   "AutomaticCE chooses MP (2)",
+                   "Reason"_attr = " because plan contains inestimable node(s)");
+        return getBestMPPlan(mp);
+    }
+    auto estRes = estResWithStatus.getValue();
     tassert(11306805,
             "The MP estimation phase should not have filled a full batch",
             numResultsMP > estRes.bestPlanNumResults);
@@ -217,7 +224,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     const double minProductivityForMP = static_cast<double>(numResultsMP) / numWorksPerPlanMP;
     if (estRes.bestPlanProductivity <= minProductivityForMP) {
         LOGV2_INFO(11306804,
-                   "AutomaticCE chooses CBR (2)",
+                   "AutomaticCE chooses CBR (3)",
                    "Reason"_attr = "very low productivity",
                    "Condition"_attr = "estRes.bestPlanProductivity < minProductivityForMP",
                    "minProductivityForMPAdjusted"_attr = minProductivityForMP,
@@ -260,7 +267,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         }
         stats = mp.getSpecificStats();
         LOGV2_INFO(11306802,
-                   "AutomaticCE chooses MP (3)",
+                   "AutomaticCE chooses MP (4)",
                    "Reason"_attr = "the required improvement is not achievable",
                    "Condition"_attr =
                        "maxAchievableImprovementRatio < minRequiredImprovementRatio");
@@ -273,7 +280,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     }
 
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
-    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (4)", "Reason"_attr = "it is cheaper than MP");
+    LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
     return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
 }
 
