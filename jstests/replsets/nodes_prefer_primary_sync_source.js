@@ -12,6 +12,8 @@
  * @tags: [
  *  multiversion_incompatible,
  *  requires_mongobridge,
+ *  # Slow Windows machines cause this test to be flaky, and provide little additional signal.
+ *  incompatible_with_windows_tls,
  * ]
  */
 
@@ -84,6 +86,17 @@ const eastDC = new DataCenter("east", [testNode]);
 // are further apart, we delay messages between them by 300 ms.
 // Mimic secondary and primary being in the same data center by making the delay between eastCentral
 // data center and central data center very minimal.
+//
+//        50 ms              5 ms                  45 ms
+//  west ──────────▶ central ────────▶ eastCentral ───────────▶ east
+//  (farSecondary)  (primary)          (secondary)           (testNode)
+//    │                 │                   ▲                    ▲
+//    │                 │                   │                    │
+//    ├──── 55 ms ──────┼───────────────────┘                    │
+//    │                 │                                        │
+//    │                 └──────────── 50 ms ─────────────────────┤
+//    │                                                          │
+//    └──────────────────────── 300 ms ──────────────────────────┘
 delayMessagesBetweenDataCenters(westDC, centralDC, 50 /* delayMillis */);
 delayMessagesBetweenDataCenters(centralDC, eastDC, 50 /* delayMillis */);
 delayMessagesBetweenDataCenters(westDC, eastCentralDC, 55 /* delayMillis */);
