@@ -2477,24 +2477,22 @@ tasks:
           # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
           resmoke_args: --storageEngineCacheSizeGB=5
 
-  # TODO (SERVER-120829) Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_repl_jscore_passthrough_secondary_reads_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_repl",
-  #       "default",
-  #       "large",
-  #       "requires_extra_system_deps",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_repl_jscore_passthrough_secondary_reads
-  #         use_large_distro: "true"
-  #         # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
-  #         resmoke_args: --storageEngineCacheSizeGB=5
+  - <<: *gen_task_template
+    name: disagg_repl_jscore_passthrough_secondary_reads_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_repl_jscore_passthrough_secondary_reads
+          use_large_distro: "true"
+          # Secondaries need extra WT cache on disagg to avoid filling up the cache in between checkpoints.
+          resmoke_args: --storageEngineCacheSizeGB=5
 
   - <<: *gen_task_template
     name: disagg_repl_force_checkpoint_gen
