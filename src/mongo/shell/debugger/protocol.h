@@ -156,7 +156,7 @@ class StackTraceRequest : public VisitableRequest<StackTraceRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "stackTrace";
     StackTraceRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
-    Response response(std::string script, int line);
+    Response response(std::string name, std::string path, int line);
 };
 
 // https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Scope

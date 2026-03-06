@@ -169,13 +169,6 @@ class MongoShellDebugSession extends DebugSession {
      * @overload
      */
     setBreakPointsRequest(response, args) {
-        let filePath = args.source.path;
-        const mongoRepo = process.env["MONGO_REPO"];
-        if (mongoRepo && filePath.startsWith(mongoRepo)) {
-            // Trim the MONGO_REPO prefix and any leading slash
-            filePath = filePath.substring(mongoRepo.length).replace(/^\/+/, "");
-        }
-
         const lines = (args.breakpoints || []).map((bp) => ({
             line: bp.line,
             condition: bp.condition,
@@ -200,7 +193,7 @@ class MongoShellDebugSession extends DebugSession {
                 return breakpoint;
             });
 
-            this.breakpoints.set(filePath, {lines, unverified: bps});
+            this.breakpoints.set(args.source.path, {lines, unverified: bps});
             response.body = {breakpoints: bps};
             this.sendResponse(response);
             return;
@@ -362,19 +355,6 @@ class MongoShellDebugSession extends DebugSession {
     stackTraceRequest(response) {
         this.sendCommand("stackTrace", {})
             .then((result) => {
-                // Convert relative paths back to absolute paths so VSCode can open it
-                if (result.stackFrames) {
-                    const mongoRepo = process.env["MONGO_REPO"];
-                    result.stackFrames = result.stackFrames.map((frame) => {
-                        if (frame.source?.path && mongoRepo) {
-                            // If path is relative, make it absolute
-                            if (!frame.source.path.startsWith("/")) {
-                                frame.source.path = mongoRepo + "/" + frame.source.path;
-                            }
-                        }
-                        return frame;
-                    });
-                }
                 response.body = result;
                 this.sendResponse(response);
             })

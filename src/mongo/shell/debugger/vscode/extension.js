@@ -48,7 +48,7 @@ function checkIfNewerVersionAvailable(context) {
     const extensionSrcPath = "src/mongo/shell/debugger/vscode";
 
     try {
-        const mongoRepo = process.env["MONGO_REPO"];
+        const mongoRepo = findMongoRepo();
         if (!mongoRepo) {
             return;
         }
@@ -84,6 +84,25 @@ function checkIfNewerVersionAvailable(context) {
         // Silently fail - don't disrupt extension activation
         console.error("Version check failed:", error);
     }
+}
+
+function findMongoRepo() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders?.length > 0) {
+        // Check if any workspace folder looks like the mongo repo
+        for (const folder of workspaceFolders) {
+            const repoPath = folder.uri.fsPath;
+            // Verify it's the mongo repo by checking for a marker file
+            const fs = require("fs");
+            const markerPath = path.join(repoPath, "src/mongo/shell/debugger/vscode/package.json");
+            if (fs.existsSync(markerPath)) {
+                return repoPath;
+            }
+        }
+        // No workspace folders had the marker file, so just take the first one to hopefully be more relevant than nothing (null).
+        return workspaceFolders[0].uri.fsPath;
+    }
+    return null;
 }
 
 module.exports = {activate, deactivate};

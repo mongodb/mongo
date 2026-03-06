@@ -150,7 +150,7 @@ Response ContinueRequest::response() {
  * StackTraceRequest
  */
 
-Response StackTraceRequest::response(std::string script, int line) {
+Response StackTraceRequest::response(std::string name, std::string path, int line) {
     BSONObjBuilder responseBuilder;
     responseBuilder.append("type", "response");
     responseBuilder.append("seq", seq);
@@ -160,10 +160,10 @@ Response StackTraceRequest::response(std::string script, int line) {
 
     BSONObjBuilder frameBuilder;
     frameBuilder.append("id", 1);
-    frameBuilder.append("name", script);
+    frameBuilder.append("name", name);
 
     BSONObjBuilder sourceBuilder;
-    sourceBuilder.append("path", script);
+    sourceBuilder.append("path", path);
     frameBuilder.append("source", sourceBuilder.obj());
 
     frameBuilder.append("line", line);

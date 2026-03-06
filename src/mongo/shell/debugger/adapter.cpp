@@ -36,6 +36,8 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
+#include <boost/filesystem.hpp>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -44,7 +46,6 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #endif
-
 
 namespace mongo {
 namespace mozjs {
@@ -64,6 +65,27 @@ static AtomicWord<bool> _configured{false};
 
 
 /**
+ * Path helpers
+ *
+ * VSCode uses absolute path.
+ * The shell uses relative path.
+ */
+
+// Assume that the user is working from their mongo repo root.
+// It would be more elegant to use something like ModuleLoader::resolveBaseUrl in the future.
+const boost::filesystem::path MONGO_ROOT = boost::filesystem::current_path();
+
+std::string abs2rel(std::string absPath) {
+    boost::filesystem::path absolute(absPath);
+    return boost::filesystem::relative(absolute, MONGO_ROOT).string();
+}
+
+std::string rel2abs(std::string relPath) {
+    boost::filesystem::path relative(relPath);
+    return boost::filesystem::absolute(relative, MONGO_ROOT).string();
+}
+
+/**
  * DebugAdapter
  */
 
@@ -76,6 +98,7 @@ void DebugAdapter::handleRequest(ConfigurationDoneRequest& request) {
 }
 
 void DebugAdapter::handleRequest(SetBreakpointsRequest& request) {
+    request.source = abs2rel(request.source);
     DebuggerGlobal::setBreakpoints(request);
     sendMessage(request.response());
 }
@@ -88,7 +111,9 @@ void DebugAdapter::handleRequest(ContinueRequest& request) {
 void DebugAdapter::handleRequest(StackTraceRequest& request) {
     auto script = DebuggerGlobal::getPausedScript();
     auto line = DebuggerGlobal::getPausedLine();
-    auto response = request.response(script, line);
+
+    auto path = rel2abs(script);
+    auto response = request.response(script, path, line);
     sendMessage(response);
 }
 
