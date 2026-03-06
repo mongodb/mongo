@@ -2,7 +2,7 @@
 //
 // This test is to ensure that localhost authentication works correctly against a standalone
 // mongod whether it is hosted with "localhost" or a hostname.
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 
 let baseName = "auth_server-6591";
 let dbpath = MongoRunner.dataPath + baseName;

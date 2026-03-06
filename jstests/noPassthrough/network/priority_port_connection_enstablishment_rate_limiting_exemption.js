@@ -14,7 +14,7 @@
 import {before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 
 describe("Tests for priority port exemption from connection (session) establishment rate limiter within JS test replica set and sharded cluster helpers", function () {
     this.nonExemptIP = get_ipaddr();

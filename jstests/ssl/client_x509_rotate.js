@@ -4,7 +4,7 @@ import {
     assertHasConnPoolStats,
     checkHostHasNoOpenConnections,
     checkHostHasOpenConnections,
-} from "jstests/libs/conn_pool_helpers.js";
+} from "jstests/libs/network/conn_pool_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 

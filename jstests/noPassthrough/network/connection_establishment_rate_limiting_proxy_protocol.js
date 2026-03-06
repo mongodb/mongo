@@ -12,7 +12,7 @@ if (_isWindows()) {
     quit();
 }
 
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 

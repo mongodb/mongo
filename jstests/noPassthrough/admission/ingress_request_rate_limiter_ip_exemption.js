@@ -3,7 +3,7 @@
  * @tags: [requires_fcv_80]
  */
 
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {
     authenticateConnection,
     getRateLimiterStats,

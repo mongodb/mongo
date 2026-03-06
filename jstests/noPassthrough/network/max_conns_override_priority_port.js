@@ -10,7 +10,7 @@
  * ]
  */
 import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kConfiguredMaxConns = 5;

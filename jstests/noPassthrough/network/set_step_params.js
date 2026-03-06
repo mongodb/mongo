@@ -2,7 +2,7 @@
  * @tags: [requires_replication, requires_sharding, sets_replica_set_matching_strategy]
  */
 
-import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
+import {assertHasConnPoolStats, launchFinds} from "jstests/libs/network/conn_pool_helpers.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

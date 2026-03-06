@@ -4,7 +4,7 @@
  * ]
  */
 
-import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
+import {assertHasConnPoolStats, launchFinds} from "jstests/libs/network/conn_pool_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = "test";

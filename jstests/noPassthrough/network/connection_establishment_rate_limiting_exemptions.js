@@ -8,7 +8,7 @@
  * ]
  */
 
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {
     getConnectionStats,
     runTestReplSet,

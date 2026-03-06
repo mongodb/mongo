@@ -8,7 +8,7 @@
  *   requires_fcv_83,
  * ]
  */
-import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
+import {assertHasConnPoolStats, launchFinds} from "jstests/libs/network/conn_pool_helpers.js";
 import {configureFailPoint, configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -6,7 +6,7 @@
  * ]
  */
 
-import {assertHasConnPoolStats} from "jstests/libs/conn_pool_helpers.js";
+import {assertHasConnPoolStats} from "jstests/libs/network/conn_pool_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {

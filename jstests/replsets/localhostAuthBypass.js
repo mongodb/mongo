@@ -8,7 +8,7 @@ let keyfile = "jstests/libs/key1";
 let username = "foo";
 let password = "bar";
 
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let createUser = function (mongo) {

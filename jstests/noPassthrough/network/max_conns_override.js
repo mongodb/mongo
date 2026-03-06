@@ -8,7 +8,7 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";

@@ -66,12 +66,6 @@ filters:
   - "mochalite.js":
     approvers:
       - 10gen/devprod-correctness
-  - "mirror_reads_helpers.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "conn_pool_helpers.js":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "pause_after_populate.js":
     approvers:
       - 10gen/query-optimization
@@ -96,9 +90,6 @@ filters:
   - "replicated_record_ids_utils.js":
     approvers:
       - 10gen/server-storage-engine-integration
-  - "host_ipaddr.js":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "feature_compatibility_version.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

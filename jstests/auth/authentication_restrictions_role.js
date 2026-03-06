@@ -2,7 +2,7 @@
  * This test checks that authentication restrictions can be set on roles and respected.
  * @tags: [requires_replication, requires_sharding]
  */
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -1,7 +1,7 @@
 // Test that authentication restrictions can be applied on origin clients or direct peers using
 // the clientSourceAuthenticationRestrictionMode server parameter.
 
-import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";

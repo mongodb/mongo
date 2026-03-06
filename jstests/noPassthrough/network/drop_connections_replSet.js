@@ -9,7 +9,7 @@ import {
     assertHasConnPoolStats,
     checkHostHasNoOpenConnections,
     checkHostHasOpenConnections,
-} from "jstests/libs/conn_pool_helpers.js";
+} from "jstests/libs/network/conn_pool_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});

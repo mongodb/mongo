@@ -9,7 +9,7 @@
  * ]
  */
 
-import {MirrorReadsHelpers} from "jstests/libs/mirror_reads_helpers.js";
+import {MirrorReadsHelpers} from "jstests/libs/network/mirror_reads_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 

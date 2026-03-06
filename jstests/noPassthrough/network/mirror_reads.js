@@ -8,7 +8,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {MirrorReadsHelpers} from "jstests/libs/mirror_reads_helpers.js";
+import {MirrorReadsHelpers} from "jstests/libs/network/mirror_reads_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = "mirrored_reads_test";
