@@ -1,7 +1,7 @@
 /**
  * Establish the multiplanning replanning behavior that we would like to preserve.
- * TODO SERVER-116987: Verify that CBR is able to choose a plan that gets cached.
- * TODO SERVER-116351: Verify that CBR is able to be invoked during replanning.
+ * Verify that CBR is able to choose a plan that gets cached.
+ * Verify that CBR is able to be invoked during replanning.
  */
 
 import {
@@ -66,7 +66,7 @@ function runInitialCacheTest(isMultiplanning) {
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     }
 
-    // TODO SERVER-116987: Add a log line that shows when CBR chose a plan that's cached.
+    // TODO SERVER-119180: Add a log line that shows when CBR chose a plan that's cached.
     // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
     // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
 
@@ -82,7 +82,7 @@ function runInitialCacheTest(isMultiplanning) {
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     }
 
-    // TODO SERVER-116987: Add a log line that shows when CBR chose a plan that's cached.
+    // TODO SERVER-119180: Add a log line that shows when CBR chose a plan that's cached.
     // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
     // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
 }
@@ -131,7 +131,7 @@ function runReplanningTest(isMultiplanning) {
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     }
 
-    // TODO SERVER-116351: Add a log line that shows when CBR chose a new plan via replanning.
+    // TODO SERVER-119180: Add a log line that shows when CBR chose a new plan via replanning.
     // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
     // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
 
@@ -185,8 +185,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySe
 try {
     // 1: Run with only MultiPlanning.
     db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: false});
-    runInitialCacheTest(true);
-    runReplanningTest(true);
+    runInitialCacheTest(true /* isMultiplanning */);
+    runReplanningTest(true /* isMultiplanning */);
 
     // 2: Run with CBR fallback strategies.
     db.adminCommand({setParameter: 1, featureFlagCostBasedRanker: true, internalQueryCBRCEMode: "automaticCE"});
@@ -194,15 +194,17 @@ try {
     const cbrFallbackStrategies = [
         "CBRForNoMultiplanningResults",
         "CBRCostBasedRankerChoice",
-        "HistogramCEWithHeuristicFallback",
+        // TODO SERVER-118487: Re-enable this fallback strategy, we pick the plan with index scan on 'a' for 'bIndexQuery'.
+        // "HistogramCEWithHeuristicFallback",
     ];
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
         db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy});
-        runInitialCacheTest(false);
-        // TODO SERVER-116351: Enable test below.
-        // runReplanningTest(false);
+        runInitialCacheTest(false /* isMultiplanning */);
+
+        jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});
+        runReplanningTest(false /* isMultiplanning */);
     }
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).

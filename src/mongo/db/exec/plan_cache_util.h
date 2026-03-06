@@ -35,7 +35,6 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
@@ -150,6 +149,21 @@ protected:
     CollectionAcquisition _collection;
 };
 
+enum class CacheMode {
+    // Always write a cache entry for the winning plan to the plan cache, overwriting any
+    // previously existing cache entry for the query shape.
+    AlwaysCache,
+
+    // Write a cache entry for the query shape *unless* we encounter one of the following edge
+    // cases:
+    //  - Two or more plans tied for the win.
+    //  - The winning plan returned zero query results during the plan ranking trial period.
+    SometimesCache,
+
+    // Do not write to the plan cache.
+    NeverCache,
+};
+
 /**
  * A function object which when invoked might update the classic plan cache. Whether the classic
  * plan cache entry is written to depends on the following:
@@ -160,26 +174,11 @@ protected:
  */
 class ConditionalClassicPlanCacheWriter : public ClassicPlanCacheWriter {
 public:
-    enum class Mode {
-        // Always write a cache entry for the winning plan to the plan cache, overwriting any
-        // previously existing cache entry for the query shape.
-        AlwaysCache,
-
-        // Write a cache entry for the query shape *unless* we encounter one of the following edge
-        // cases:
-        //  - Two or more plans tied for the win.
-        //  - The winning plan returned zero query results during the plan ranking trial period.
-        SometimesCache,
-
-        // Do not write to the plan cache.
-        NeverCache,
-    };
-
-    static Mode alwaysOrNeverCacheMode(bool shouldCache) {
-        return shouldCache ? Mode::AlwaysCache : Mode::NeverCache;
+    static CacheMode alwaysOrNeverCacheMode(bool shouldCache) {
+        return shouldCache ? CacheMode::AlwaysCache : CacheMode::NeverCache;
     }
 
-    ConditionalClassicPlanCacheWriter(Mode planCachingMode,
+    ConditionalClassicPlanCacheWriter(CacheMode planCachingMode,
                                       OperationContext* opCtx,
                                       const CollectionAcquisition& collection)
         : ClassicPlanCacheWriter(opCtx, collection), _planCachingMode{planCachingMode} {}
@@ -195,7 +194,7 @@ protected:
         const plan_ranker::PlanRankingDecision& ranking,
         const std::vector<plan_ranker::CandidatePlan>& candidates) const;
 
-    const Mode _planCachingMode;
+    const CacheMode _planCachingMode;
 };
 
 // This functions compute the values of the "reads" and "works" metric for the winning plan using

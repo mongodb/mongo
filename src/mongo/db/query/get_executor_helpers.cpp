@@ -44,12 +44,14 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/sort_key_generator.h"
 #include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_utils.h"
@@ -59,6 +61,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/update_driver.h"
@@ -69,6 +72,54 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+namespace {
+void inspectPlannerResult(
+    const std::unique_ptr<PlannerInterface>& result,
+    const boost::optional<QueryPlannerParams::ReplanningData>& replanningData) {
+    if (!replanningData.has_value()) {
+        return;
+    }
+
+    // Only planning for classic plans can throw the ReplanningRequired exception. Thus when
+    // we call makePlanner again, we should still end up with a ClassicRuntimePlannerResult
+    // since the query hasn't changed.
+    // TODO SERVER-120501: Throw/catch this exception for SBE plans too.
+    auto planner = dynamic_cast<classic_runtime_planner::ClassicPlannerInterface*>(result.get());
+    tassert(8746607,
+            "Replanning should have resulted in a ClassicPlannerInterface, but it didn't",
+            planner);
+
+    // We do not consult the plan cache upon replanning so we should never enounter a
+    // CachedPlanner here.
+    tassert(8746608,
+            "Replanning should not have resulted in a CachedPlanner, but it did",
+            !dynamic_cast<classic_runtime_planner::CachedPlanner*>(planner));
+
+    // TODO SERVER-120492: Investigate if we can remove this tassert.
+    tassert(8746609,
+            "Replanning should not have resulted in a SubPlanner, but it did",
+            !dynamic_cast<classic_runtime_planner::SubPlanner*>(planner));
+
+    const auto isSameAsCachedPlan =
+        planner->querySolution() && replanningData->oldPlanHash == planner->querySolution()->hash();
+
+    LOGV2_DEBUG(
+        20582,
+        1,
+        "Query plan after replanning and its cache status",
+        "query"_attr = redact(planner->cq()->toStringShort()),
+        "planSummary"_attr = plan_explainer_factory::make(planner->getRoot())->getPlanSummary(),
+        "shouldCache"_attr =
+            ((replanningData->shouldCache == plan_cache_util::CacheMode::AlwaysCache) ? "yes"
+                                                                                      : "no"),
+        "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
+
+    if (isSameAsCachedPlan) {
+        planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
+    }
+}
+}  // namespace
 
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo) {
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
@@ -87,12 +138,18 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     CanonicalQuery* canonicalQuery,
     std::size_t plannerOptions,
     Pipeline* pipeline) {
+    // We create this once on replanning and then make a copy for each QueryPlannerParams to own for
+    // subsequent calls.
+    boost::optional<QueryPlannerParams::ReplanningData> replanningData = boost::none;
+
     static constexpr size_t kMaxIterations = 5;
     for (size_t iter = 0; iter < kMaxIterations; ++iter) {
         try {
             // First try the single collection query parameters, as these would have been
             // generated with query settings if present.
-            return makePlanner(std::move(plannerParams));
+            auto result = makePlanner(std::move(plannerParams));
+            inspectPlannerResult(result, replanningData);
+            return result;
         } catch (const ExceptionFor<ErrorCodes::NoDistinctScansForDistinctEligibleQuery>&) {
             // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Remove
             // the distinct property and replan using SBE or subplanning as applicable.
@@ -101,7 +158,8 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
                 // Stages still need to be finalized for SBE since classic was used previously.
                 finalizePipelineStages(pipeline, canonicalQuery);
             }
-            return makePlanner(makeQueryPlannerParams(*canonicalQuery, plannerOptions));
+            return makePlanner(
+                makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData));
         } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
             // The planner failed to generate a viable plan. Remove the query settings and
             // retry if any are present. Otherwise just propagate the exception.
@@ -124,11 +182,19 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
 
             plannerOptions |= QueryPlannerParams::IGNORE_QUERY_SETTINGS;
             // Propagate the params to the next iteration.
-            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions);
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
         } catch (const ExceptionFor<ErrorCodes::RetryMultiPlanning>&) {
             // Propagate the params to the next iteration.
-            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions);
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
             canonicalQuery->getExpCtx()->setWasRateLimited(true);
+        } catch (const ExceptionFor<ErrorCodes::ReplanningRequired>& exception) {
+            // Propagate the params and replanning information to the next iteration.
+            auto replanningInfo = exception.extraInfo<ReplanningRequiredInfo>();
+            replanningData = boost::make_optional<QueryPlannerParams::ReplanningData>(
+                {.replanReason = std::move(exception.reason()),
+                 .shouldCache = replanningInfo->getCacheMode(),
+                 .oldPlanHash = replanningInfo->getOldPlanHash()});
+            plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
         }
     }
     tasserted(8712800, "Exceeded retry iterations for making a planner");

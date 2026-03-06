@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -414,11 +415,11 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
 
     struct ReplanningData {
         std::string replanReason;
-        bool shouldCache = false;
-        size_t oldPlanHash = 0;
+        plan_cache_util::CacheMode shouldCache;
+        size_t oldPlanHash;
     };
     // Populated if we are replanning.
-    boost::optional<ReplanningData> replanningData;
+    boost::optional<ReplanningData> replanningData = boost::none;
 
 private:
     bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,

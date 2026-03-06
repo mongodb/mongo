@@ -899,6 +899,8 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScans = 0;
     statsOut->collectionScansNonTailable = 0;
 
+    statsOut->replanReason = _replanReason;
+
     PlanSummaryStatsVisitor visitor(*statsOut);
 
     for (const auto* stage : stages) {
@@ -960,10 +962,6 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                 break;
             }
             case STAGE_MULTI_PLAN: {
-                const MultiPlanStage* multiPlan = static_cast<const MultiPlanStage*>(stage);
-                const MultiPlanStats* multiPlanStats =
-                    static_cast<const MultiPlanStats*>(multiPlan->getSpecificStats());
-                statsOut->replanReason = multiPlanStats->replanReason;
                 statsOut->fromMultiPlanner = true;
                 break;
             }

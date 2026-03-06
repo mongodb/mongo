@@ -33,6 +33,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -49,17 +50,17 @@ public:
     // Required member of every ErrorExtraInfo.
     static constexpr auto code = ErrorCodes::ReplanningRequired;
 
-    ReplanningRequiredInfo(bool shouldCache, size_t oldPlanHash);
+    ReplanningRequiredInfo(plan_cache_util::CacheMode cacheMode, size_t oldPlanHash);
 
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
-    bool getShouldCache() const;
+    plan_cache_util::CacheMode getCacheMode() const;
 
     size_t getOldPlanHash() const;
 
 private:
-    bool _shouldCache;
+    plan_cache_util::CacheMode _cacheMode;
     size_t _oldPlanHash;
 };
 

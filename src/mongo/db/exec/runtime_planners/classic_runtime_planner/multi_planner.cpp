@@ -39,12 +39,15 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions,
                            PlanExplainerData maybeExplainData)
     : ClassicPlannerInterface(std::move(plannerData), std::move(maybeExplainData)) {
+    plan_cache_util::CacheMode shouldCache = plannerParams().replanningData.has_value()
+        ? plannerParams().replanningData->shouldCache
+        : plan_cache_util::CacheMode::AlwaysCache;
     auto stage = std::make_unique<MultiPlanStage>(
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
         cq(),
-        plan_cache_util::ClassicPlanCacheWriter{opCtx(),
-                                                collections().getMainCollectionPtrOrAcquisition()});
+        plan_cache_util::ConditionalClassicPlanCacheWriter{
+            shouldCache, opCtx(), collections().getMainCollectionPtrOrAcquisition()});
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;
         auto executableTree = buildExecutableTree(*solution);

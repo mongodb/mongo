@@ -282,8 +282,6 @@ struct CachedPlanStats : public SpecificStats {
     void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
         visitor->visit(this);
     }
-
-    boost::optional<std::string> replanReason;
 };
 
 struct CollectionScanStats : public SpecificStats {
@@ -759,7 +757,6 @@ struct MultiPlanStats : public SpecificStats {
         visitor->visit(this);
     }
 
-    boost::optional<std::string> replanReason;
     // Total number of works across all candidate plans.
     int totalWorks = 0;
     // Total number of documents returned across all candidate plans.

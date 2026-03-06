@@ -165,9 +165,7 @@ MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
       _query(cq),
       _onPickBestPlan(std::move(onPickBestPlan)),
       _bestPlanIdx(kNoSuchPlan),
-      _backupPlanIdx(kNoSuchPlan) {
-    _specificStats.replanReason = replanReason;
-}
+      _backupPlanIdx(kNoSuchPlan) {}
 
 void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
                              std::unique_ptr<PlanStage> root,

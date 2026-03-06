@@ -95,7 +95,7 @@ SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
         //
         // TODO SERVER-18777: Support replanning for rooted $or queries.
         plan_cache_util::ConditionalClassicPlanCacheWriter perBranchWriter{
-            plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+            plan_cache_util::CacheMode::SometimesCache,
             opCtx(),
             collections().getMainCollectionPtrOrAcquisition()};
 

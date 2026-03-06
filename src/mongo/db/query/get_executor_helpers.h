@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/classic/delete_stage.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -66,6 +68,23 @@ struct PlanCacheInfo {
     boost::optional<uint32_t> planCacheShapeHash;
 };
 
+class ClassicRuntimePlannerResult {
+public:
+    PlanCacheInfo& planCacheInfo() {
+        return _cacheInfo;
+    }
+
+    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
+        // SbeWithClassicRuntimePlanningPrepareExecutionHelper passes cached plan hash to the
+        // runtime planner.
+    }
+
+    std::unique_ptr<classic_runtime_planner::ClassicPlannerInterface> runtimePlanner;
+
+private:
+    PlanCacheInfo _cacheInfo;
+};
+
 /**
  * Fills in the given information on the CurOp::OpDebug object, if it has not already been filled in
  * by an outer pipeline.
@@ -73,11 +92,10 @@ struct PlanCacheInfo {
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo);
 
 
-using MakePlannerParamsFn =
-    std::function<std::unique_ptr<QueryPlannerParams>(const CanonicalQuery&, size_t)>;
+using MakePlannerParamsFn = std::function<std::unique_ptr<QueryPlannerParams>(
+    const CanonicalQuery&, size_t, boost::optional<QueryPlannerParams::ReplanningData>)>;
 using MakePlannerFn =
     std::function<std::unique_ptr<PlannerInterface>(std::unique_ptr<QueryPlannerParams>)>;
-
 /*
  * Calls `makePlanner` with five retries in case exceptions are thrown. Uses the given plannerParams
  * at first to avoid additional calls to `makeQueryPlannerParams`.

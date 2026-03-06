@@ -88,6 +88,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -97,6 +98,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_params_diagnostic_printer.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/replanning_required_info.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -262,23 +264,6 @@ private:
 namespace crp_classic = classic_runtime_planner;
 namespace crp_sbe = classic_runtime_planner_for_sbe;
 
-class ClassicRuntimePlannerResult {
-public:
-    PlanCacheInfo& planCacheInfo() {
-        return _cacheInfo;
-    }
-
-    void setCachedPlanHash(boost::optional<size_t> cachedPlanHash) {
-        // SbeWithClassicRuntimePlanningPrepareExecutionHelper passes cached plan hash to the
-        // runtime planner.
-    }
-
-    std::unique_ptr<crp_classic::ClassicPlannerInterface> runtimePlanner;
-
-private:
-    PlanCacheInfo _cacheInfo;
-};
-
 /**
  * A class to hold the result of preparation of the query to be executed using SBE engine with
  * Classic runtime planning. This result stores and provides the following information:
@@ -409,7 +394,9 @@ public:
         // Delay the call to the subplanner in some plan ranking modes until we know the number of
         // plans.
         auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
-        if (needsSubplanning &&
+        // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
+        // subplanning. If not, add a descriptive comment here about why.
+        if (!isReplanning() && needsSubplanning &&
             !plan_ranking::delayOrSkipSubplanner(*_cq, *_plannerParams, usingClassic())) {
             LOGV2_DEBUG(20924,
                         2,
@@ -556,6 +543,11 @@ protected:
      */
     virtual bool usingClassic() = 0;
 
+    /*
+     * Returns true if we have decided to replan for the query.
+     */
+    virtual bool isReplanning() = 0;
+
     /**
      * Attempts to build a special cased fast-path query plan for a find-by-_id query. Returns
      * nullptr if this optimization does not apply.
@@ -676,6 +668,8 @@ private:
     virtual PlannerDataType makePlannerData() = 0;
 };
 
+using AddNewStageFn = std::function<void(classic_runtime_planner::ClassicPlannerInterface*)>;
+
 class ClassicPrepareExecutionHelper final
     : public PrepareExecutionHelper<PlanCacheKey, ClassicRuntimePlannerResult, PlannerData> {
 public:
@@ -685,6 +679,9 @@ public:
                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
                                   std::unique_ptr<QueryPlannerParams> plannerParams)
         : PrepareExecutionHelper{opCtx, collections, yieldPolicy, cq, std::move(plannerParams)} {}
+    void disableConsultingCache() {
+        _shouldConsultCache = false;
+    }
 
 private:
     using CachedSolutionPair =
@@ -702,6 +699,10 @@ private:
 
     bool usingClassic() final {
         return true;
+    }
+
+    bool isReplanning() final {
+        return _plannerParams->replanningData.has_value();
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> maybePlannerFromRankerResult(
@@ -778,6 +779,10 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildCachedPlan(
         const PlanCacheKey& planCacheKey) final {
+        if (!_shouldConsultCache) {
+            return nullptr;
+        }
+
         if (!shouldCacheQuery(*_cq)) {
             planCacheCounters.incrementClassicSkippedCounter();
             return nullptr;
@@ -843,6 +848,10 @@ private:
     }
 
     boost::optional<size_t> _cachedPlanHash;
+
+    // When replanning we should not consult the cache for the new best plan, so in the event that
+    // we do replan this should be set to false.
+    bool _shouldConsultCache = true;
 };
 
 /**
@@ -893,6 +902,11 @@ protected:
     }
 
     bool usingClassic() final {
+        return false;
+    }
+
+    bool isReplanning() final {
+        // TODO SERVER-120501: have this return something sensical.
         return false;
     }
 
@@ -1104,7 +1118,8 @@ std::unique_ptr<PlannerInterface> getClassicPlanner(
     const MultipleCollectionAccessor& collections,
     CanonicalQuery* canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    std::unique_ptr<QueryPlannerParams> plannerParams) {
+    std::unique_ptr<QueryPlannerParams> plannerParams,
+    boost::optional<AddNewStageFn> addStageFn = boost::none) {
     ClassicPrepareExecutionHelper helper{
         opCtx,
         collections,
@@ -1116,7 +1131,22 @@ std::unique_ptr<PlannerInterface> getClassicPlanner(
     ScopedDebugInfo queryPlannerParams(
         "queryPlannerParams",
         diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
+
+    if (helper.getPlannerParams().replanningData.has_value()) {
+        // If we did consult the cache on replanning, there is a potential for a "replanning
+        // storm" - a concurrent query could activate the deactivated cache entry (we may have
+        // deactivated the entry when we decided to replan), which means that consulting the
+        // plan cache would lead us to use that activated entry again. We would again
+        // decide to replan, and thus we would find ourselves in a loop.
+        helper.disableConsultingCache();
+    }
+
     auto planningResult = uassertStatusOK(helper.prepare());
+
+    if (addStageFn) {
+        addStageFn.value()(planningResult->runtimePlanner.get());
+    }
+
     setOpDebugPlanCacheInfo(opCtx, planningResult->planCacheInfo());
     uassertStatusOK(planningResult->runtimePlanner->plan());
     return std::move(planningResult->runtimePlanner);
@@ -1186,9 +1216,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     // application of the settings lead to a failure in generating the plan.
     auto makeQueryPlannerParams =
         [&opCtx, &collections, traversalPreference = std::move(traversalPreference)](
-            const CanonicalQuery& cq, size_t options) -> std::unique_ptr<QueryPlannerParams> {
-        return std::make_unique<QueryPlannerParams>(
-            QueryPlannerParams::ArgsForSingleCollectionQuery{
+            const CanonicalQuery& cq,
+            size_t options,
+            boost::optional<QueryPlannerParams::ReplanningData> replanningData)
+        -> std::unique_ptr<QueryPlannerParams> {
+        auto result =
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
                 .opCtx = opCtx,
                 .canonicalQuery = cq,
                 .collections = collections,
@@ -1198,6 +1231,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                     feature_flags::gFeatureFlagCostBasedRanker),
                 .planRankerMode = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
             });
+        result->replanningData = std::move(replanningData);
+        return result;
     };
 
     ON_BLOCK_EXIT([&] {
@@ -1303,8 +1338,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         canonicalQuery->setUsingSbePlanCache(false);
 
         // Default to using the classic executor with the classic runtime planner.
-        return getClassicPlanner(
-            opCtx, collections, canonicalQuery.get(), yieldPolicy, std::move(plannerParams));
+        return getClassicPlanner(opCtx,
+                                 collections,
+                                 canonicalQuery.get(),
+                                 yieldPolicy,
+                                 std::move(plannerParams),
+                                 boost::none /* addStageFn */);
     };
 
     auto planner = retryMakePlanner(std::move(paramsForSingleCollectionQuery),
@@ -1388,6 +1427,52 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
     }
 
     return std::make_unique<projection_ast::Projection>(proj);
+}
+
+}  // namespace
+
+
+namespace {
+/**
+ * Returns a MakePlannerParamsFn to pass into 'retryMakePlanner'.
+ */
+auto makeQueryPlannerParamsFactory(OperationContext* opCtx,
+                                   MultipleCollectionAccessor& collections,
+                                   size_t plannerOptions = QueryPlannerParams::DEFAULT) {
+    return [opCtx, &collections, plannerOptions](
+               const CanonicalQuery& cq,
+               size_t options,
+               boost::optional<QueryPlannerParams::ReplanningData> replanningData)
+               -> std::unique_ptr<QueryPlannerParams> {
+        auto result =
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
+                .opCtx = opCtx,
+                .canonicalQuery = cq,
+                .collections = collections,
+                .plannerOptions = plannerOptions,
+                .cbrEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagCostBasedRanker),
+                .planRankerMode = cq.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
+            });
+        result->replanningData = std::move(replanningData);
+        return result;
+    };
+}
+
+/**
+ * Returns a MakePlannerFn to pass into 'retryMakePlanner'.
+ */
+auto makePlannerFactory(OperationContext* opCtx,
+                        MultipleCollectionAccessor& collections,
+                        CanonicalQuery* cq,
+                        const PlanYieldPolicy::YieldPolicy& policy,
+                        boost::optional<AddNewStageFn> addStageFn) {
+    return [opCtx, cq, &collections, policy, addStageFn](
+               std::unique_ptr<QueryPlannerParams> plannerParams)
+               -> std::unique_ptr<PlannerInterface> {
+        return getClassicPlanner(
+            opCtx, collections, cq, policy, std::move(plannerParams), addStageFn);
+    };
 }
 
 }  // namespace
@@ -1543,28 +1628,26 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams.canonicalQuery = cq.get();
 
     MultipleCollectionAccessor collections{coll};
-    auto plannerParams =
-        std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
-            .opCtx = opCtx,
-            .canonicalQuery = *cq,
-            .collections = collections,
-            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagCostBasedRanker),
-            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
-        });
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collections, cq.get(), policy, std::move(plannerParams)};
+    auto addDeleteStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
+        runtimePlanner->addDeleteStage(parsedDelete, projection.get(), deleteStageParams);
+    };
 
-    ScopedDebugInfo queryPlannerParams(
-        "queryPlannerParams",
-        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
-    auto result = uassertStatusOK(helper.prepare());
-    setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
-    result->runtimePlanner->addDeleteStage(parsedDelete, projection.get(), deleteStageParams);
-    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
-        return status;
-    }
-    return result->runtimePlanner->makeExecutor(std::move(cq));
+    // Invoke the lambda returned from the factory for the initial planner params.
+    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
+        *cq.get(), QueryPlannerParams::DEFAULT, boost::none /* replanningData */);
+    auto planner =
+        retryMakePlanner(std::move(plannerParams),
+                         makeQueryPlannerParamsFactory(opCtx, collections),
+                         makePlannerFactory(opCtx,
+                                            collections,
+                                            cq.get(),
+                                            policy,
+                                            boost::make_optional<AddNewStageFn>(addDeleteStageFn)),
+                         cq.get(),
+                         QueryPlannerParams::DEFAULT,
+                         nullptr /* pipeline */);
+
+    return planner->makeExecutor(std::move(cq));
 }
 
 //
@@ -1716,31 +1799,26 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     updateStageParams.canonicalQuery = cq.get();
 
     MultipleCollectionAccessor collections{coll};
-    ClassicPrepareExecutionHelper helper{
-        opCtx,
-        collections,
-        cq.get(),
-        policy,
-        std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
-            .opCtx = opCtx,
-            .canonicalQuery = *cq,
-            .collections = collections,
-            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagCostBasedRanker),
-            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
-        })};
+    auto addUpdateStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
+        runtimePlanner->addUpdateStage(canonicalUpdate, projection.get(), updateStageParams);
+    };
 
-    ScopedDebugInfo queryPlannerParams(
-        "queryPlannerParams",
-        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
-    auto result = uassertStatusOK(helper.prepare());
-    setOpDebugPlanCacheInfo(opCtx, result->planCacheInfo());
-    result->runtimePlanner->addUpdateStage(
-        canonicalUpdate, projection.get(), std::move(updateStageParams));
-    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
-        return status;
-    }
-    return result->runtimePlanner->makeExecutor(std::move(cq));
+    // Invoke the lambda returned from the factory for the initial planner params.
+    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
+        *cq, QueryPlannerParams::DEFAULT, boost::none /* replanningData */);
+    auto planner =
+        retryMakePlanner(std::move(plannerParams),
+                         makeQueryPlannerParamsFactory(opCtx, collections),
+                         makePlannerFactory(opCtx,
+                                            collections,
+                                            cq.get(),
+                                            policy,
+                                            boost::make_optional<AddNewStageFn>(addUpdateStageFn)),
+                         cq.get(),
+                         QueryPlannerParams::DEFAULT,
+                         nullptr /* pipeline */);
+
+    return planner->makeExecutor(std::move(cq));
 }
 
 //
@@ -1828,28 +1906,26 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     }
 
     MultipleCollectionAccessor collections{coll};
-    auto plannerParams =
-        std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForSingleCollectionQuery{
-            .opCtx = opCtx,
-            .canonicalQuery = *cq,
-            .collections = collections,
-            .plannerOptions = plannerOptions,
-            .cbrEnabled = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagCostBasedRanker),
-            .planRankerMode = cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode(),
-        });
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collections, cq.get(), yieldPolicy, std::move(plannerParams)};
+    auto addCountStageFn = [&](classic_runtime_planner::ClassicPlannerInterface* runtimePlanner) {
+        runtimePlanner->addCountStage(limit, skip);
+    };
 
-    ScopedDebugInfo queryPlannerParams(
-        "queryPlannerParams",
-        diagnostic_printers::QueryPlannerParamsPrinter{helper.getPlannerParams()});
-    auto result = uassertStatusOK(helper.prepare());
-    result->runtimePlanner->addCountStage(limit, skip);
-    if (auto status = result->runtimePlanner->plan(); !status.isOK()) {
-        return status;
-    }
-    return result->runtimePlanner->makeExecutor(std::move(cq));
+    // Invoke the lambda returned from the factory for the initial planner params.
+    auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions)(
+        *cq, plannerOptions, boost::none /* replanningData */);
+    auto planner =
+        retryMakePlanner(std::move(plannerParams),
+                         makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions),
+                         makePlannerFactory(opCtx,
+                                            collections,
+                                            cq.get(),
+                                            yieldPolicy,
+                                            boost::make_optional<AddNewStageFn>(addCountStageFn)),
+                         cq.get(),
+                         plannerOptions,
+                         nullptr /* pipeline */);
+
+    return planner->makeExecutor(std::move(cq));
 }
 
 StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(

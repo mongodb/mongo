@@ -59,7 +59,10 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     // TODO: SERVER-115496: move the check below to wherever we enumerate plans.
     // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
     // subplanner.
-    if (SubplanStage::needsSubplanning(query) && solutions.size() > maxNumberOfOrPlans()) {
+    // TODO SERVER-120492: Investigate if we can remove the replanning restriction on subplanning.
+    // If not, add a descriptive comment here about why.
+    if (!plannerData.plannerParams->replanningData.has_value() &&
+        SubplanStage::needsSubplanning(query) && solutions.size() > maxNumberOfOrPlans()) {
         return Status(ErrorCodes::MaxNumberOfOrPlansExceeded,
                       str::stream()
                           << "exceeded " << maxNumberOfOrPlans() << " plans. Switch to subplanner");

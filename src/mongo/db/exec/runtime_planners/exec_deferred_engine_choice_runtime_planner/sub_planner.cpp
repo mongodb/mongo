@@ -44,7 +44,7 @@ SubPlanner::SubPlanner(PlannerData plannerData)
         // TODO SERVER-18777: Support replanning for rooted $or queries.
         .onPickPlanForBranch =
             plan_cache_util::ConditionalClassicPlanCacheWriter{
-                plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+                plan_cache_util::CacheMode::SometimesCache,
                 opCtx(),
                 collections().getMainCollectionPtrOrAcquisition()},
 

@@ -42,7 +42,7 @@ SubPlanner::SubPlanner(PlannerData plannerData) : ClassicPlannerInterface(std::m
         // TODO SERVER-18777: Support replanning for rooted $or queries.
         .onPickPlanForBranch =
             plan_cache_util::ConditionalClassicPlanCacheWriter{
-                plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
+                plan_cache_util::CacheMode::SometimesCache,
                 opCtx(),
                 collections().getMainCollectionPtrOrAcquisition()},
 
@@ -69,6 +69,11 @@ std::unique_ptr<QuerySolution> SubPlanner::extractQuerySolution() {
 }
 
 const QuerySolution* SubPlanner::querySolution() const {
-    return nullptr;
+    // Currently this function is only called during replanning to check if the new plan's solution
+    // hash is the same as the cached plan's hash. However, subplanning during replanning is
+    // currently blocked (SERVER-120492), so this function should never be reached.
+    // TODO SERVER-120492: If we can do subplanning within replanning, we should instead return the
+    // whole-query QSN (if there is one) from the SubplanStage.
+    MONGO_UNREACHABLE_TASSERT(8746606);
 }
 }  // namespace mongo::classic_runtime_planner

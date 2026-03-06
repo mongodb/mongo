@@ -33,18 +33,19 @@
 
 namespace mongo {
 namespace {
-constexpr StringData kShouldCacheFieldName = "shouldCache";
+constexpr StringData kCacheModeFieldName = "cacheMode";
 constexpr StringData kOldPlanHashFieldName = "oldPlanHash";
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ReplanningRequiredInfo);
 
 }  // namespace
 
-ReplanningRequiredInfo::ReplanningRequiredInfo(bool shouldCache, size_t oldPlanHash)
-    : _shouldCache(shouldCache), _oldPlanHash(oldPlanHash) {}
+ReplanningRequiredInfo::ReplanningRequiredInfo(plan_cache_util::CacheMode cacheMode,
+                                               size_t oldPlanHash)
+    : _cacheMode(cacheMode), _oldPlanHash(oldPlanHash) {}
 
 void ReplanningRequiredInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kShouldCacheFieldName, _shouldCache);
+    bob->append(kCacheModeFieldName, _cacheMode == plan_cache_util::CacheMode::AlwaysCache);
 
     // The hash is of type size_t, which is unsigned and BSON cannot store unsigned values. Storing
     // it as a string in the BSON allows us to convert it back to a size_t during parsing without
@@ -53,10 +54,10 @@ void ReplanningRequiredInfo::serialize(BSONObjBuilder* bob) const {
 }
 
 std::shared_ptr<const ErrorExtraInfo> ReplanningRequiredInfo::parse(const BSONObj& obj) {
-    const auto& shouldCacheElem = obj.getField(kShouldCacheFieldName);
+    const auto& cacheModeElem = obj.getField(kCacheModeFieldName);
     uassert(8746600,
-            fmt::format("ReplanningRequiredInfo was missing '{}' field", kShouldCacheFieldName),
-            !shouldCacheElem.eoo());
+            fmt::format("ReplanningRequiredInfo was missing '{}' field", kCacheModeFieldName),
+            !cacheModeElem.eoo());
 
     const auto& oldPlanHashElem = obj.getField(kOldPlanHashFieldName);
     uassert(8746602,
@@ -71,11 +72,14 @@ std::shared_ptr<const ErrorExtraInfo> ReplanningRequiredInfo::parse(const BSONOb
             fmt::format("Failed to parse ReplanningRequiredInfo '{}' field", kOldPlanHashFieldName),
             fromCharsRes.ec == std::errc{});
 
-    return std::make_shared<ReplanningRequiredInfo>(shouldCacheElem.Bool(), oldPlanHash);
+    return std::make_shared<ReplanningRequiredInfo>(
+        plan_cache_util::ConditionalClassicPlanCacheWriter::alwaysOrNeverCacheMode(
+            cacheModeElem.Bool()),
+        oldPlanHash);
 }
 
-bool ReplanningRequiredInfo::getShouldCache() const {
-    return _shouldCache;
+plan_cache_util::CacheMode ReplanningRequiredInfo::getCacheMode() const {
+    return _cacheMode;
 }
 
 size_t ReplanningRequiredInfo::getOldPlanHash() const {

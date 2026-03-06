@@ -124,9 +124,7 @@ public:
         auto callbacks = SubplanStage::PlanSelectionCallbacks{
             .onPickPlanForBranch =
                 plan_cache_util::ConditionalClassicPlanCacheWriter{
-                    plan_cache_util::ConditionalClassicPlanCacheWriter::Mode::SometimesCache,
-                    opCtx(),
-                    coll},
+                    plan_cache_util::CacheMode::SometimesCache, opCtx(), coll},
             .onPickPlanWholeQuery = plan_cache_util::ClassicPlanCacheWriter{opCtx(), coll},
         };
 

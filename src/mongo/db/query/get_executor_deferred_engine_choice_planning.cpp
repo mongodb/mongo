@@ -156,7 +156,9 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     tassert(11974306, "Expected planner params to be initialized.", expressResult.plannerParams);
     auto paramsForSingleCollectionQuery = std::move(expressResult.plannerParams);
 
-    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams) {
+    auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams,
+                                 boost::optional<std::string> replanReason = boost::none,
+                                 boost::optional<bool> shouldCache = boost::none) {
         return uassertStatusOK(preparePlanner(opCtx,
                                               canonicalQuery.get(),
                                               std::move(plannerParams),

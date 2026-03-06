@@ -134,7 +134,8 @@ ExpressResult tryExpress(OperationContext* opCtx,
     // However, that requires the full set of planner parameters for the main collection to be
     // available and creating those now allows them to be reused for subsequent strategies if
     // the express index equality one fails.
-    auto paramsForSingleCollectionQuery = makePlannerParams(*canonicalQuery, plannerOptions);
+    auto paramsForSingleCollectionQuery =
+        makePlannerParams(*canonicalQuery, plannerOptions, boost::none /* replanningData */);
     if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
         if (auto indexEntry =
                 getIndexForExpressEquality(*canonicalQuery, *paramsForSingleCollectionQuery)) {

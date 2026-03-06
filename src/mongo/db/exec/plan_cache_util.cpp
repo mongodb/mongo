@@ -38,6 +38,7 @@
 #include "mongo/db/exec/plan_cache_callbacks_impl.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/find_command.h"
@@ -410,13 +411,13 @@ bool ConditionalClassicPlanCacheWriter::shouldCacheBasedOnCachingMode(
     const plan_ranker::PlanRankingDecision& ranking,
     const std::vector<plan_ranker::CandidatePlan>& candidates) const {
     switch (_planCachingMode) {
-        case Mode::AlwaysCache: {
+        case CacheMode::AlwaysCache: {
             return true;
         }
-        case Mode::NeverCache: {
+        case CacheMode::NeverCache: {
             return false;
         }
-        case Mode::SometimesCache: {
+        case CacheMode::SometimesCache: {
             auto winnerIdx = ranking.candidateOrder[0];
             invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
             auto& winningPlan = candidates[winnerIdx];
