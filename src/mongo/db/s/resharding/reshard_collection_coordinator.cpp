@@ -149,21 +149,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx,
                                                                                         nss()));
 
-            // For unshardCollection on untracked collections that exist locally, return
-            // NamespaceNotSharded. Non-existent collections fall through to NamespaceNotFound
-            // below. Tracked-unsplittable collections are handled downstream for idempotency.
-            if (resharding::isUnshardCollection(_doc.getProvenance()) && !cmOld.hasRoutingTable()) {
-                auto coll = acquireCollectionMaybeLockFree(
-                    opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx, nss(), AcquisitionPrerequisites::kRead));
-                if (coll.exists()) {
-                    uasserted(ErrorCodes::NamespaceNotSharded,
-                              str::stream() << "Collection '" << nss().toStringForErrorMsg()
-                                            << "' is not sharded.");
-                }
-            }
-
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Collection '" << nss().toStringForErrorMsg()
                                   << "' not found in cluster catalog",
