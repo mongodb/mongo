@@ -103,49 +103,5 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
     auto swRankingResult = strategy->rankPlans(plannerData);
     return swRankingResult;
 }
-
-size_t maxNumberOfOrPlans() {
-    // Use as an upper bound the value of internalQueryEnumerationMaxOrSolutions reduced by 1. If
-    // the enumerator produces exactly maxOrSolutions, the total number of possible plans is likely
-    // higher, which means that some plans are cut out.
-    auto maxOrSolutions = static_cast<size_t>(internalQueryEnumerationMaxOrSolutions.load());
-    return maxOrSolutions > 0 ? std::min(maxOrSolutions - 1, kMaxNumberOfOrPlans) : 0;
-}
-
-bool delayOrSkipSubplanner(const CanonicalQuery& query,
-                           const QueryPlannerParams& params,
-                           bool isClassic) {
-    // With CBR enabled there should be no changes to the SBE planning path.
-    // TODO SERVER-117707: Decide what to do with this restriction.
-    if (!isClassic) {
-        return false;
-    }
-
-    if (!params.cbrEnabled || params.planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
-        return false;
-    }
-
-    // Always use the subplanner for clustered collections to enable clustered index scans for $or
-    // branches.
-    // TODO SERVER-117766: Avoid subplanner for $or queries over clustered collections.
-    if (params.clusteredInfo) {
-        return false;
-    }
-
-    auto autoPlanRankingStrategy = query.getExpCtx()
-                                       ->getQueryKnobConfiguration()
-                                       .getPlanRankingStrategyForAutomaticQueryPlanRankerMode();
-    switch (autoPlanRankingStrategy) {
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-            kCBRForNoMultiplanningResults:
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRCostBasedRankerChoice:
-            return true;
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-            kHistogramCEWithHeuristicFallback:
-            return false;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
 }  // namespace plan_ranking
 }  // namespace mongo

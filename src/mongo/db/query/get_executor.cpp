@@ -391,13 +391,7 @@ public:
     }
 
     StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
-        // Delay the call to the subplanner in some plan ranking modes until we know the number of
-        // plans.
-        auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
-        // TODO SERVER-120492: Investigate if we can remove the replanning restriction on
-        // subplanning. If not, add a descriptive comment here about why.
-        if (!isReplanning() && needsSubplanning &&
-            !plan_ranking::delayOrSkipSubplanner(*_cq, *_plannerParams, usingClassic())) {
+        if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
@@ -436,24 +430,7 @@ public:
         }
 
         if (!rankerResult.isOK()) {
-            // In case the plan ranker failed to return a result, distinguish two cases:
-            // - a rooted $or query exceeded kMaxNumberOfOrPlans plans, in which case we need to
-            // call the subplanner;
-            // - other error, in which case we return the status to the caller.
-            if (rankerResult.getStatus().code() != ErrorCodes::MaxNumberOfOrPlansExceeded) {
-                return rankerResult.getStatus();
-            }
-            // We can reach this point only for rooted $or queries in automaticCE mode. The
-            // automaticCE mode ignores the server parameter
-            // 'internalQueryPlanOrChildrenIndependently' and hence we check here only the query
-            // properties.
-            tassert(11260301,
-                    "The subplanner can be called only for rooted $or queries",
-                    SubplanStage::canUseSubplanning(*_cq));
-            uassert(ErrorCodes::IllegalOperation,
-                    "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
-                    !_cq->getForcedPlanSolutionHash());
-            return buildSubPlan();
+            return rankerResult.getStatus();
         }
 
         std::vector<std::unique_ptr<QuerySolution>> solutions =

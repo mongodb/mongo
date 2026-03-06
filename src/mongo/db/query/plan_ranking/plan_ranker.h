@@ -52,30 +52,6 @@ std::unique_ptr<PlanRankingStrategy> makeStrategy(
     QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum autoStrategy);
 
 /**
- * Maximum number of plans of $or queries for which the automatic ranking strategy uses whole query
- * planning. For a larger number of plans switch to the subplanner to plan $or branches
- * individually.
- */
-static constexpr size_t kMaxNumberOfOrPlans = 16;
-
-/**
- * Computes the maximum number of plans of $or queries for which the automatic ranking strategy uses
- * whole query planning. The number has an upper bound - the value of the knob
- * `internalQueryEnumerationMaxOrSolutions` to ensure that all possible query plans are ranked and
- * the strategy does not miss potentially better plans.
- */
-size_t maxNumberOfOrPlans();
-
-/**
- * Check if the optimizer should delay calling of the Subplanner for rooted $or queries until we
- * know the number of plans. The subplanner can be completely skipped if the number of plans is
- * smaller than the kMaxNumberOrPlans.
- */
-bool delayOrSkipSubplanner(const CanonicalQuery& query,
-                           const QueryPlannerParams& params,
-                           bool isClassicEngine);
-
-/**
  * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
  * to be executed.
  *

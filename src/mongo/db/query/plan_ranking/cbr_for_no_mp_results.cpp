@@ -29,12 +29,10 @@
 
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
-#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -56,17 +54,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
-    // TODO: SERVER-115496: move the check below to wherever we enumerate plans.
-    // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
-    // subplanner.
-    // TODO SERVER-120492: Investigate if we can remove the replanning restriction on subplanning.
-    // If not, add a descriptive comment here about why.
-    if (!plannerData.plannerParams->replanningData.has_value() &&
-        SubplanStage::needsSubplanning(query) && solutions.size() > maxNumberOfOrPlans()) {
-        return Status(ErrorCodes::MaxNumberOfOrPlansExceeded,
-                      str::stream()
-                          << "exceeded " << maxNumberOfOrPlans() << " plans. Switch to subplanner");
-    }
     if (solutions.size() == 1) {
         // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.

@@ -27,7 +27,6 @@ import {
     getRejectedPlan,
     getRejectedPlans,
     getWinningPlanFromExplain,
-    isSubplannerCompositePlan,
 } from "jstests/libs/query/analyze_plan.js";
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
@@ -117,21 +116,9 @@ function predicateTest(explainMode) {
     }
 
     // When the query uses sub-planning the top-level query doesn't hit the plan cache.
-    // This is not the case when the SBE plan cache is enabled, or if CBR is used to plan the query,
-    // except when the collection is clustered. If the SBE engine is enabled but not the SBE plan cache,
-    // we do not cache the plan regardless of whether CBR is enabled or not.
+    // This is not the case when the SBE plan cache is enabled.
     const explain = coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode);
-    const cbrEnabled = getPlanRankerMode(db) === "automaticCE";
-    // In case of large number of plans, the automaticCE may fall back to multiplanner subplanner,
-    // in which case the top-level query does not get cached.
-    const isCompositePlan = isSubplannerCompositePlan(explain);
-    const usingSbeEngine = getEngine(explain) != "classic";
-    const canPlanBeCached =
-        (isUsingSbePlanCache ||
-            (cbrEnabled && !isCompositePlan && !ClusteredCollectionUtil.isCollectionClustered(coll))) &&
-        !(usingSbeEngine && !isUsingSbePlanCache);
-
-    assertWinningPlanCacheStatus(explain, canPlanBeCached);
+    assertWinningPlanCacheStatus(explain, isUsingSbePlanCache);
 
     // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the
     // cache.

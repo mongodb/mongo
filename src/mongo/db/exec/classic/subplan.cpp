@@ -256,7 +256,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
 
     // If the plan ranking is a CBR strategy, plan each branch of the $or using the respective
-    // cost-based ranking. Multiplanning and automaticCE startegy (>16 plans) plan each branch
+    // cost-based ranking. Multiplanning and automaticCE strategy plan each branch
     // of the $or using multiplanning as defined in the multiplanCallback below.
     bool useMultiplanner = !cbrEnabled || rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
     if (!useMultiplanner && subplanningStatus.isOK()) {
