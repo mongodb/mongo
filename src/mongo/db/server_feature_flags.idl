@@ -65,6 +65,13 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions
         default: false
         fcv_gated: true
+    featureFlagSizeBasedOplogTruncationForDisagg:
+        description: >-
+            Feature flag to enable oplog truncation based on size and time for disagg,
+            instead of oplog truncation only based on time.
+        cpp_varname: feature_flags::gFeatureFlagSizeBasedOplogTruncationForDisagg
+        default: false
+        fcv_gated: true
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
