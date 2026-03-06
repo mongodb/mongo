@@ -5,7 +5,7 @@
  *   uses_atclustertime,
  * ]
  */
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";

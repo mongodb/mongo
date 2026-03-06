@@ -6,7 +6,7 @@
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {assertChangeStreamEventEq, canonicalizeEventForTesting} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 function runTest(collName, shardKey) {
     const st = new ShardingTest({

@@ -12,7 +12,7 @@
 //  # TODO(SERVER-113808): Check txn errors on replicaset running as --shardsvr
 //  transitioning_replicaset_incompatible,
 // ]
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const collName = "banned_txn_dbs";

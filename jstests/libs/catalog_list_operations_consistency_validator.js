@@ -27,7 +27,7 @@ import {
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const isMultiversion =
     Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);

@@ -2,7 +2,7 @@
 //   requires_persistence,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const dbName = "test";
 const collName = "query_yields_catch_index_corruption";

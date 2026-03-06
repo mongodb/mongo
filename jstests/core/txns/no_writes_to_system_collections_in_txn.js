@@ -6,7 +6,7 @@
 //   # we have to make sure it wont be moved anywhere by the balancer
 //   assumes_balancer_off
 // ]
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const session = db.getMongo().startSession();
 

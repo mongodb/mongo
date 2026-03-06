@@ -3,7 +3,7 @@
 //   uses_transactions,
 //   disables_test_commands,
 // ]
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.enableTestCommands = false;

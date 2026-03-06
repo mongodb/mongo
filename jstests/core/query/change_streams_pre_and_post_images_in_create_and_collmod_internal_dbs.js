@@ -12,7 +12,7 @@
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const collName = "changeStreamPreAndPostImages";
 

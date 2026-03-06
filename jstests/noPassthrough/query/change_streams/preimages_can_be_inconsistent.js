@@ -15,7 +15,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {describe, it, beforeEach, afterEach} from "jstests/libs/mochalite.js";
 
 describe("change streams preimages consistency checks", function () {

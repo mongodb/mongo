@@ -5,7 +5,7 @@
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const runTest = (db, coll) => {
     // Test that explain is legal with all readConcern levels.

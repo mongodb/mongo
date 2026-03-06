@@ -8,7 +8,7 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {PersistenceProviderUtil} from "jstests/libs/persistence_provider_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const session = db.getMongo().startSession();
 
