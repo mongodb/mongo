@@ -58,6 +58,7 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
 
     // Indicates that there is no timeout for the request to complete
     static constexpr Milliseconds kNoTimeout{-1};
+    static constexpr Date_t kNoDeadline{Date_t::max()};
 
     // Type to represent the internal id of this request
     typedef uint64_t RequestId;
@@ -145,6 +146,7 @@ struct MONGO_MOD_PUBLIC RemoteCommandRequest {
     OperationContext* opCtx{nullptr};
 
     Milliseconds timeout = kNoTimeout;
+    Date_t deadline = kNoDeadline;
     boost::optional<ErrorCodes::Error> timeoutCode;
 
     bool fireAndForget = false;

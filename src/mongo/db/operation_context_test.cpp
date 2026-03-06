@@ -1415,5 +1415,190 @@ TEST_F(OverdueInterruptTestWithInterruptibleWait, KillDuringInterruptibleSleepNo
         ASSERT_EQ(stats->overdueMaxTime.loadRelaxed(), Milliseconds{0});
     }
 }
+
+using RemoteOperationDeadlineExtensionTests = OperationDeadlineTests;
+
+// The deadline extension RAII adds a buffer to the effective deadline used for enforcement
+// (checkForInterruptNoAssert, waitForConditionOrInterrupt) without changing the value returned
+// by getDeadline(). This tests that a single RAII instance extends the effective deadline by the
+// requested amount, and that destroying it removes the extension.
+TEST_F(RemoteOperationDeadlineExtensionTests, SingleInstance) {
+    auto opCtx = client->makeOperationContext();
+
+    const auto originalDeadline = mockClock->now() + Seconds{10};
+    opCtx->setDeadlineByDate(originalDeadline, ErrorCodes::MaxTimeMSExpired);
+
+    constexpr auto extension = Seconds{1};
+
+    {
+        OperationContext::OverrideDeadlineGuard deadlineOverride(opCtx.get(), extension);
+
+        // getDeadline() is NOT affected by deadlineOverride.
+        ASSERT_EQ(opCtx->getDeadline(), originalDeadline);
+
+        // Advance clock to just past the original deadline but within the extension.
+        mockClock->advance(Seconds{10} + Milliseconds{500});
+        // The effective deadline is originalDeadline + 1s, so the op should NOT be expired.
+        ASSERT_OK(opCtx->checkForInterruptNoAssert());
+    }
+
+    // After the RAII is destroyed, the extension is removed. The effective deadline reverts to
+    // originalDeadline, which the clock has already passed.
+    ASSERT_NOT_OK(opCtx->checkForInterruptNoAssert());
+    // getDeadline() is still the original value.
+    ASSERT_EQ(opCtx->getDeadline(), originalDeadline);
+}
+
+// When there is no deadline set on the opCtx, the extension has no effect —
+// _getExtendedDeadline() returns Date_t::max() regardless.
+TEST_F(RemoteOperationDeadlineExtensionTests, NoEffectWithoutDeadline) {
+    auto opCtx = client->makeOperationContext();
+
+    ASSERT_FALSE(opCtx->hasDeadline());
+    ASSERT_EQ(opCtx->getDeadline(), Date_t::max());
+
+    {
+        OperationContext::OverrideDeadlineGuard deadlineOverride(opCtx.get(), Seconds{5});
+
+        // No deadline set, so getDeadline() and hasDeadline() are unchanged.
+        ASSERT_FALSE(opCtx->hasDeadline());
+        ASSERT_EQ(opCtx->getDeadline(), Date_t::max());
+        ASSERT_OK(opCtx->checkForInterruptNoAssert());
+    }
+
+    // Still no deadline after the RAII is destroyed.
+    ASSERT_FALSE(opCtx->hasDeadline());
+    ASSERT_EQ(opCtx->getDeadline(), Date_t::max());
+}
+
+// Simulates the core scenario that motivated ref-counting: multiple egress requests for a single
+// opCtx create one OverrideDeadlineGuard each. When the fast requests's RAII is destroyed, the
+// effective deadline must remain extended for the still-in-flight slow request. Only when ALL RAIIs
+// are destroyed should the extension be removed.
+TEST_F(RemoteOperationDeadlineExtensionTests, ConcurrentInstancesKeepExtensionUntilLastDestroyed) {
+    auto opCtx = client->makeOperationContext();
+
+    const auto originalDeadline = mockClock->now() + Seconds{10};
+    opCtx->setDeadlineByDate(originalDeadline, ErrorCodes::MaxTimeMSExpired);
+    constexpr auto extension = Seconds{1};
+
+    // Two shard requests create overlapping overrides on the same opCtx.
+    auto shard0Override =
+        std::make_unique<OperationContext::OverrideDeadlineGuard>(opCtx.get(), extension);
+    auto shard1Override =
+        std::make_unique<OperationContext::OverrideDeadlineGuard>(opCtx.get(), extension);
+
+    // Advance clock past the original deadline but within the extension.
+    mockClock->advance(Seconds{10} + Milliseconds{500});
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    // Fast shard completes first — destroy its override.
+    shard0Override.reset();
+
+    // Effective deadline must NOT revert while shard1's override is alive.
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    // Slow shard completes — destroy its override.
+    shard1Override.reset();
+
+    // All overrides gone — extension removed, effective deadline reverts to originalDeadline.
+    ASSERT_NOT_OK(opCtx->checkForInterruptNoAssert());
+}
+
+// The first registered extension is respected.
+TEST_F(RemoteOperationDeadlineExtensionTests, OnlyUseFirstExtension) {
+    auto opCtx = client->makeOperationContext();
+
+    const auto originalDeadline = mockClock->now() + Seconds{10};
+    opCtx->setDeadlineByDate(originalDeadline, ErrorCodes::MaxTimeMSExpired);
+
+    auto override1 =
+        std::make_unique<OperationContext::OverrideDeadlineGuard>(opCtx.get(), Seconds{2});
+    auto override2 =
+        std::make_unique<OperationContext::OverrideDeadlineGuard>(opCtx.get(), Seconds{1});
+
+    ASSERT_EQ(opCtx->getDeadline(), originalDeadline);
+
+    // Advance clock to originalDeadline + 1.5s. With the 2s extension, should not be expired.
+    mockClock->advance(Seconds{11} + Milliseconds{500});
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    override1.reset();
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    override2.reset();
+    ASSERT_NOT_OK(opCtx->checkForInterruptNoAssert());
+}
+
+// Verify that the RAII can be created, destroyed, and re-created on the same opCtx. This tests
+// that the ref-count is properly reset after the last override is destroyed, allowing a fresh
+// batch to re-establish the extension.
+TEST_F(RemoteOperationDeadlineExtensionTests, ExtensionReusableAcrossRequestBatches) {
+    auto opCtx = client->makeOperationContext();
+
+    const auto originalDeadline = mockClock->now() + Seconds{10};
+    opCtx->setDeadlineByDate(originalDeadline, ErrorCodes::MaxTimeMSExpired);
+    constexpr auto extension = Seconds{1};
+
+    // First batch of shard requests.
+    {
+        OperationContext::OverrideDeadlineGuard override1(opCtx.get(), extension);
+        OperationContext::OverrideDeadlineGuard override2(opCtx.get(), extension);
+        ASSERT_EQ(opCtx->getDeadline(), originalDeadline);  // getDeadline() unchanged
+    }
+    // All destroyed — extension removed, should not be expired (clock hasn't advanced).
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    // Second batch (e.g., a retry or scatter-gather to different shards).
+    {
+        OperationContext::OverrideDeadlineGuard override1(opCtx.get(), extension);
+        ASSERT_EQ(opCtx->getDeadline(), originalDeadline);  // getDeadline() still unchanged
+    }
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+}
+
+// The extension is orthogonal to artificial deadlines (runWithDeadline). Verify that pushing and
+// popping an artificial deadline does not interfere with the extension, and vice versa.
+TEST_F(RemoteOperationDeadlineExtensionTests, OrthogonalToArtificialDeadline) {
+    auto opCtx = client->makeOperationContext();
+
+    const auto realDeadline = mockClock->now() + Seconds{10};
+    opCtx->setDeadlineByDate(realDeadline, ErrorCodes::MaxTimeMSExpired);
+    constexpr auto extension = Seconds{1};
+
+    const auto artificialDeadline = mockClock->now() + Seconds{8};
+
+    auto raii = std::make_unique<OperationContext::OverrideDeadlineGuard>(opCtx.get(), extension);
+
+    // runWithDeadline pushes an artificial deadline.
+    opCtx->runWithDeadline(artificialDeadline, ErrorCodes::MaxTimeMSExpired, [&]() {
+        // Inside the deadline scope, getDeadline() reflects the artificial deadline.
+        ASSERT_EQ(opCtx->getDeadline(), artificialDeadline);
+
+        // Advance to just past the artificial deadline but within the extension.
+        mockClock->advance(Seconds{8} + Milliseconds{500});
+        // The extension applies to all deadlines, including artificial ones.
+        // Effective deadline = artificialDeadline + 1s = now+9s. Clock is at now+8.5s. NOT expired.
+        ASSERT_OK(opCtx->checkForInterruptNoAssert());
+    });
+
+    // After runWithDeadline, the real deadline is restored.
+    ASSERT_EQ(opCtx->getDeadline(), realDeadline);
+
+    // RAII is still alive — extension is still active.
+    // Effective deadline = realDeadline + 1s = now+11s. Clock is at now+8.5s. Not expired.
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    // Destroy the RAII — extension removed.
+    raii.reset();
+
+    // Effective deadline = realDeadline = now+10s. Clock is at now+8.5s. Still not expired.
+    ASSERT_OK(opCtx->checkForInterruptNoAssert());
+
+    // Advance past the real deadline.
+    mockClock->advance(Seconds{2});
+    ASSERT_NOT_OK(opCtx->checkForInterruptNoAssert());
+}
+
 }  // namespace
 }  // namespace mongo

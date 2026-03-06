@@ -1618,6 +1618,7 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
     // was killed due to a maxTimeMs timeout, the remaining time will be 0, and the remote request
     // will not be sent. To avoid this, we remove the timeout for the remote 'killCursor' command.
     request.timeout = executor::RemoteCommandRequest::kNoTimeout;
+    request.deadline = executor::RemoteCommandRequest::kNoDeadline;
 
     LOGV2_DEBUG(8456102,
                 2,

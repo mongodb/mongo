@@ -42,9 +42,11 @@
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/executor_integration_test_connection_stats.h"
@@ -57,6 +59,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_argument_gen.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
@@ -192,6 +195,18 @@ std::ostream& operator<<(std::ostream& out, const ExpectedCounters& expected) {
     out << "}";
     return out;
 #undef PRINT
+}
+
+/**
+ * Reads a process-global metric from the global metric tree. The metric is registered by
+ * network_interface_tl.cpp via MetricBuilder<Counter64> and lives in the MetricTree under the
+ * implicit "metrics" prefix.
+ */
+long long getMetric(std::string name) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    auto obj = bob.obj();
+    return obj["metrics"]["operation"][name].numberLong();
 }
 
 class NetworkInterfaceTest : public NetworkInterfaceIntegrationFixture {
@@ -336,9 +351,13 @@ public:
     void testCustomCodeRequestTimeoutHit();
     void testCustomCodeTimeoutWaitingToAcquireConnection();
     void testNoCustomCodeRequestTimeoutHit();
+    void testNoCustomCodeRequestTimeoutHitInConnectionPool();
     void testAsyncOpTimeout();
     void testAsyncOpTimeoutWithOpCtxDeadlineSooner();
     void testAsyncOpTimeoutWithOpCtxDeadlineLater();
+    void testAsyncOpTimeoutLocalBufferExtendsDeadline();
+    void testNumRequestsTimedOutBeforeConnAcquisitionIncrementedOnExpiredDeadline();
+    void testNumRequestsTimedOutBeforeSendingIncrementedWithCustomTimeoutCode();
     void testStartCommand();
     void testFireAndForget();
     void testUseOperationKeyWhenProvided();
@@ -717,15 +736,37 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, CustomCodeRequestTimeoutHit)
 
 /**
  * Test that if no custom timeout code is passed into the request, then timeouts errors will
- * expect default error codes depending on location.
+ * expect default error codes depending on location. With deadline-based timeout handling, a
+ * Milliseconds(0) timeout results in an already-expired deadline, which is caught early in
+ * getClient() before reaching the connection pool.
  */
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHit) {
-    // Covered in MockGRPCAsyncClientFactoryTest::TimeoutStreamEstablishment.
-    SKIP_ON_GRPC("ConnectionPool-specific error code");
-
     auto cb = makeCallbackHandle();
-    // Force timeout by setting timeout to 0.
+    // Force timeout by setting timeout to 0 — deadline will already be expired.
     auto request = makeTestCommand(Milliseconds(0), makeFindCmdObj());
+    auto deferred = runCommand(cb, request);
+    auto res = deferred.get(interruptible());
+
+    ASSERT(!res.isOK());
+    // The deadline is already expired before connection acquisition, so the error comes from the
+    // NITL's deadline check rather than from the connection pool.
+    ASSERT_EQ(res.status.code(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
+}
+
+/**
+ * Test that if no custom timeout code is passed into the request, then timeouts that occur during
+ * connection pool acquisition return PooledConnectionAcquisitionExceededTimeLimit. We use the
+ * connectionPoolDoesNotFulfillRequests failpoint to guarantee the timeout fires inside the pool
+ * rather than racing on whether the deadline expires before or after entering the pool.
+ */
+TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHitInConnectionPool) {
+    SKIP_ON_GRPC("ConnectionPool-specific failpoint");
+
+    FailPointEnableBlock fpb("connectionPoolDoesNotFulfillRequests");
+    auto cb = makeCallbackHandle();
+    // Use a timeout long enough to always reach the connection pool before expiring,
+    // but short enough to keep the test fast.
+    auto request = makeTestCommand(Milliseconds(500), makeFindCmdObj());
     auto deferred = runCommand(cb, request);
     auto res = deferred.get(interruptible());
 
@@ -752,6 +793,10 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
+    // Disable the local buffer time addition for straightforward assertions in this test.
+    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
+        "maxTimeMsLocalBufferTimeMillis", 0};
+
     // Kick off operation
     auto cb = makeCallbackHandle();
 
@@ -796,6 +841,10 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
+    // Disable the local buffer time addition for straightforward assertions in this test.
+    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
+        "maxTimeMsLocalBufferTimeMillis", 0};
+
     // Kick off operation
     auto cb = makeCallbackHandle();
 
@@ -811,6 +860,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     auto request = makeTestCommand(
         requestTimeout, makeSleepCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
+    auto createRequestDelay = stopWatch.elapsed();
 
     auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
@@ -831,13 +881,141 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(duration_cast<Milliseconds>(result.elapsed.value()), requestTimeout);
+    ASSERT_GTE(duration_cast<Milliseconds>(result.elapsed.value()) + createRequestDelay,
+               requestTimeout);
     ASSERT_LT(duration_cast<Milliseconds>(result.elapsed.value() + networkStartCommandDelay),
               opCtxDeadline);
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
     assertNumOps({.canceled = 0u, .timedOut = 1u, .failed = 0u, .succeeded = 0u});
+}
+
+// Test that the local timeout buffer (maxTimeMsLocalBufferTimeMillis) causes the local timer
+// to fire later than the nominal deadline.
+TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutLocalBufferExtendsDeadline) {
+    constexpr auto bufferMs = Milliseconds{500};
+    const RAIIServerParameterControllerForTest bufferServerParameterRAII{
+        "maxTimeMsLocalBufferTimeMillis", bufferMs.count()};
+
+    // Block the remote handling of "ping" for much longer than our timeout, so the local timer
+    // is the one that fires.
+    Milliseconds failCommandBlockTime(10'000);
+    auto fpGuard = configureFailCommand("ping", {}, failCommandBlockTime);
+
+    auto cb = makeCallbackHandle();
+    constexpr auto requestTimeout = Milliseconds{100};
+    auto request = makeTestCommand(
+        requestTimeout, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired);
+    auto deferred = runCommand(cb, request);
+
+    auto result = deferred.get(interruptible());
+    ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
+    ASSERT(result.elapsed);
+
+    // The elapsed time should be at least requestTimeout + buffer, minus a small buffer to account
+    // for the time that may pass between calculating the timeout in RCR and starting the timer in
+    // the NITL.
+    ASSERT_GTE(result.elapsed.value(), (requestTimeout + bufferMs) - Milliseconds(10));
+    // And it should not have waited the full failCommand blockTime.
+    ASSERT_LT(result.elapsed.value(), failCommandBlockTime);
+}
+
+// Test that the "numRequestsTimedOutBeforeSentToRemote" serverStatus metric is incremented when
+// a request's deadline has already passed before connection acquisition in getClient().
+TEST_WITH_AND_WITHOUT_BATON_F(
+    NetworkInterfaceTest, NumRequestsTimedOutBeforeConnAcquisitionIncrementedOnExpiredDeadline) {
+    auto metricBefore = getMetric("numRequestsTimedOutBeforeConnectionAcquisitionAttempt");
+
+    auto cb = makeCallbackHandle();
+    // Force timeout by setting timeout to 0 — the deadline will already be expired by the time
+    // getClient() checks it, triggering the early return path that increments the metric.
+    auto request = makeTestCommand(Milliseconds(0), makeFindCmdObj());
+    auto deferred = runCommand(cb, request);
+    auto res = deferred.get(interruptible());
+
+    ASSERT(!res.isOK());
+    ASSERT_EQ(res.status.code(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
+
+    auto metricAfter = getMetric("numRequestsTimedOutBeforeConnectionAcquisitionAttempt");
+    ASSERT_GT(metricAfter, metricBefore);
+}
+
+// Same as above but with a custom timeout code. Verifies the metric is incremented even when
+// the error code is overridden via timeoutCode.
+TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest,
+                              NumRequestsTimedOutBeforeSendingIncrementedWithCustomTimeoutCode) {
+    auto metricBefore = getMetric("numRequestsTimedOutBeforeConnectionAcquisitionAttempt");
+
+    auto cb = makeCallbackHandle();
+    // Force timeout by setting timeout to 0, using a custom error code. The metric should still
+    // be incremented even though the error code is MaxTimeMSExpired instead of the default
+    // NetworkInterfaceExceededTimeLimit.
+    auto request = makeTestCommand(
+        Milliseconds(0), makeFindCmdObj(), nullptr, false, ErrorCodes::MaxTimeMSExpired);
+    auto deferred = runCommand(cb, request);
+    auto res = deferred.get(interruptible());
+
+    ASSERT(!res.isOK());
+    ASSERT_EQ(res.status.code(), ErrorCodes::MaxTimeMSExpired);
+
+    auto metricAfter = getMetric("numRequestsTimedOutBeforeConnectionAcquisitionAttempt");
+    ASSERT_GT(metricAfter, metricBefore);
+}
+
+// Tests that the numRequestsTimedOutBeforeSentToRemote metric is incremented when a
+// request's deadline expires between connection acquisition (getClient) and command
+// sending (sendRequest).
+TEST_F(NetworkInterfaceTest, NumRequestsTimedOutBeforeSentToRemoteMetric) {
+    SKIP_ON_GRPC("ConnectionPool-specific failpoint");
+
+    resetIsInternalClient(true);
+    ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
+
+    // Pre-warm the pool with 2 connection.
+    {
+        auto fpGuard = configureFailCommand("echo", {}, Milliseconds(500));
+        auto f1 = runCommand(makeCallbackHandle(), makeTestCommand(Seconds(5), makeEchoCmdObj()));
+        auto f2 = runCommand(makeCallbackHandle(), makeTestCommand(Seconds(5), makeEchoCmdObj()));
+        f1.get(interruptible());
+        f2.get(interruptible());
+    }
+
+    auto metricBefore = getMetric("numRequestsTimedOutBeforeSentToRemote");
+
+    boost::optional<FailPointEnableBlock> fpb("networkInterfaceHangCommandsAfterAcquireConn");
+
+    auto cbA = makeCallbackHandle();
+    auto futA = runCommand(cbA, makeTestCommand(kMaxWait, BSON("ping" << 1)));
+
+    // Wait for A to reach the failpoint, confirming the reactor thread is blocked.
+    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+
+    auto cbB = makeCallbackHandle();
+    auto futB = runCommand(
+        cbB,
+        makeTestCommand(
+            Milliseconds(100), BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired));
+
+    // Wait for B's deadline to expire while its sendRequest is blocked behind A.
+    sleepmillis(500);
+
+    // Release the failpoint. A's sendRequest continues (sends ping), then the reactor picks
+    // up B's queued sendRequest, which finds its deadline expired and increments the metric.
+    fpb.reset();
+
+    // B should have timed out before sending.
+    auto resultB = futB.get(interruptible());
+    ASSERT(!resultB.isOK());
+    ASSERT_EQ(resultB.status.code(), ErrorCodes::MaxTimeMSExpired);
+
+    // A should succeed normally.
+    auto resultA = futA.get(interruptible());
+    ASSERT(resultA.isOK());
+
+    // Verify the metric was incremented.
+    auto metricAfter = getMetric("numRequestsTimedOutBeforeSentToRemote");
+    ASSERT_GT(metricAfter, metricBefore);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, StartCommand) {

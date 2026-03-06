@@ -549,8 +549,14 @@ function executeTest(db, isMongos) {
         try {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"});
 
+            // Use a timeout large enough that the request deadline will not expire before
+            // the request reaches the shard. The maxTimeNeverTimeOut failpoint prevents the
+            // actual timeout from firing on the server, so the value just needs to survive
+            // the network layer's early deadline checks on mongos (SERVER-107401).
             assert.doesNotThrow(function () {
-                t.find({}).maxTimeMS(1).count();
+                t.find({})
+                    .maxTimeMS(60 * 1000)
+                    .count();
             });
         } finally {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"});

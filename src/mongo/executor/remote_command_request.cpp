@@ -98,6 +98,10 @@ RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
         if (auto maxTimeMSOpOnly = Milliseconds(maxTimeField);
             timeout == executor::RemoteCommandRequest::kNoTimeout || maxTimeMSOpOnly < timeout) {
             timeout = maxTimeMSOpOnly;
+            auto now = MONGO_likely(hasGlobalServiceContext())
+                ? getGlobalServiceContext()->getFastClockSource()->now()
+                : Date_t::now();
+            deadline = now + maxTimeMSOpOnly;
         }
     }
 
@@ -113,6 +117,15 @@ RemoteCommandRequest::RemoteCommandRequest(RequestId requestId_,
     }
 
     _updateTimeoutFromOpCtxDeadline(opCtx);
+
+    // If we have a timeout but _updateTimeoutFromOpCtxDeadline didn't set a deadline,
+    // derive one from the timeout duration.
+    if (timeout != kNoTimeout && deadline == kNoDeadline) {
+        auto now = MONGO_likely(hasGlobalServiceContext())
+            ? getGlobalServiceContext()->getFastClockSource()->now()
+            : Date_t::now();
+        deadline = now + timeout;
+    }
 }
 
 RemoteCommandRequest::RemoteCommandRequest(const HostAndPort& target_,
@@ -151,6 +164,7 @@ void RemoteCommandRequest::_updateTimeoutFromOpCtxDeadline(const OperationContex
     const auto opCtxTimeout = opCtx->getRemainingMaxTimeMillis();
     if (timeout == kNoTimeout || opCtxTimeout <= timeout) {
         timeout = opCtxTimeout;
+        deadline = opCtx->getDeadline();
         timeoutCode = opCtx->getTimeoutError();
 
         if (MONGO_unlikely(maxTimeNeverTimeOut.shouldFail())) {

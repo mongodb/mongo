@@ -45,7 +45,19 @@ server_parameters:
         description: >-
             Log egress connections that take longer than this threshold, in milliseconds, to establish.
         set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
+        cpp_vartype: Atomic<long long>
         cpp_varname: gSlowConnectionThresholdMillis
         default: 100
+        redact: false
+
+    maxTimeMsLocalBufferTimeMillis:
+        description: >-
+            The buffer (in milliseconds) to add to the local timeouts when forwarding requests to
+            remote nodes. This ensures that remote nodes have a chance to respond with MaxTimeMSExpired
+            errors, rather than letting the timeout expire locally and churning the associated connection
+            to cancel the request.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<int>
+        cpp_varname: gMaxTimeMsLocalBufferTimeMillis
+        default: 50
         redact: false

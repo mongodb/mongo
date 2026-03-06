@@ -153,7 +153,7 @@ bool OperationContext::_hasDeadlineExpired(Date_t now) const {
         return true;
     }
 
-    return now >= getDeadline();
+    return now >= _getExtendedDeadline();
 }
 
 bool OperationContext::hasDeadlineExpired() const {
@@ -369,7 +369,7 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
     bool opHasDeadline = (hasDeadline() && !MONGO_unlikely(maxTimeNeverTimeOut.shouldFail()));
 
     if (opHasDeadline) {
-        deadline = std::min(deadline, getDeadline());
+        deadline = std::min(deadline, _getExtendedDeadline());
     }
 
     try {
@@ -382,7 +382,8 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
                 cv, m, deadline, _baton.get());
         }();
 
-        if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
+        if (opHasDeadline && waitStatus == stdx::cv_status::timeout &&
+            deadline == _getExtendedDeadline()) {
             // It's possible that the system clock used in stdx::condition_variable::wait_until
             // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
             // we treat the operation as though it has exceeded its time limit, just as if the
@@ -578,5 +579,18 @@ Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) 
 
 bool OperationContext::isIgnoringInterrupts() const {
     return _ignoreInterrupts;
+}
+
+OperationContext::OverrideDeadlineGuard::OverrideDeadlineGuard(OperationContext* opCtx,
+                                                               Milliseconds ext)
+    : _state(opCtx->_deadlineExtensionState) {
+    if (_state->count.fetchAndAdd(1) == 0) {
+        _state->extension.store(ext);
+    }
+}
+OperationContext::OverrideDeadlineGuard::~OverrideDeadlineGuard() {
+    if (_state->count.subtractAndFetch(1) == 0) {
+        _state->extension.store(Milliseconds(0));
+    }
 }
 }  // namespace mongo

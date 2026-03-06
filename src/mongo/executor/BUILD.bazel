@@ -162,6 +162,7 @@ mongo_cc_library(
     ],
     deps = [
         ":async_client_factory",
+        ":egress_networking_parameters",
         ":network_interface",
         "//src/mongo/client:async_client",
         "//src/mongo/db:server_feature_flags",
@@ -454,6 +455,7 @@ mongo_cc_unit_test(
         "network_interface_mock_test.cpp",
         "network_interface_mock_test_fixture.cpp",
         "pinned_connection_task_executor_test.cpp",
+        "remote_command_request_test.cpp",
     ],
     tags = [
         "mongo_unittest_fifth_group",
@@ -522,6 +524,7 @@ mongo_cc_integration_test(
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:wire_version",
         "//src/mongo/db/commands:kill_operations_idl",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/executor:network_interface_factory",

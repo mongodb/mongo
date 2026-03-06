@@ -212,11 +212,13 @@ private:
 
         // Original request as received from the caller.
         const RemoteCommandRequest request;
+        std::unique_ptr<OperationContext::OverrideDeadlineGuard> opCtxDeadlineOverride;
 
         TaskExecutor::CallbackHandle cbHandle;
 
         ClockSource::StopWatch stopwatch;
         Date_t deadline = kNoExpirationDate;
+        Milliseconds poolTimeout = RemoteCommandRequest::kNoTimeout;
 
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
@@ -228,6 +230,10 @@ private:
         stdx::mutex cancelMutex;
         // Overwrites the generic cancellation status when the operation is cancelled.
         Status cancelStatus = Status::OK();
+
+        // Indicates whether or not this command has been sent to the remote, so that we know what
+        // cleanup is required on failure.
+        bool isSentToRemote = false;
     };
 
     struct CommandState final : public CommandStateBase {

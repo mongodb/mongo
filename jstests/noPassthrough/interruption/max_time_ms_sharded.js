@@ -13,7 +13,8 @@ let st = new ShardingTest({
     rs: {nodes: 1},
     // The maxTimeAlwaysTimeOut failpoint interferes with the maxAwaitTimeMS parameter sent by the
     // streamable RSM so we have mongos use the non-streamable version here.
-    mongosOptions: {setParameter: {replicaSetMonitorProtocol: "sdam"}},
+    // Turn off maxTimeMsLocalBufferTimeMillis, as it isn't relevant when the shards are configured to never timeout and interferes with the test timing.
+    mongosOptions: {setParameter: {replicaSetMonitorProtocol: "sdam", maxTimeMsLocalBufferTimeMillis: 0}},
 });
 
 let mongos = st.s0;

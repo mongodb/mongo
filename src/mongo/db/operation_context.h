@@ -884,6 +884,39 @@ public:
         return *_tickSource;
     }
 
+    /**
+     * This class allows temporary extensions of the operation context deadline. It should be used
+     * sparingly, as it could prevent operations from properly respecting the user-provided
+     * MaxTimeMs value, but is required in specific cases on mongos to allow the baton to outlive
+     * remote requests.
+     *
+     * Once a single caller has extended the deadline, additional callers may indicate intent to use
+     * that extended deadline by making their own RAII instance, though only the first extension
+     * value that is provided will be used.
+     */
+    class OverrideDeadlineGuard {
+    public:
+        OverrideDeadlineGuard(OperationContext* opCtx, Milliseconds ext);
+        ~OverrideDeadlineGuard();
+
+    protected:
+        friend OperationContext;
+
+        struct State {
+            Atomic<int> count{0};
+            Atomic<Milliseconds> extension{Milliseconds(0)};
+        };
+
+    private:
+        std::shared_ptr<State> _state;
+    };
+
+protected:
+    // We use a shared pointer here because remote requests frequently outlive the opCtx, and so the
+    // pointer to the extension must remain valid past opCtx destruction.
+    std::shared_ptr<OverrideDeadlineGuard::State> _deadlineExtensionState =
+        std::make_shared<OverrideDeadlineGuard::State>();
+
 private:
     /**
      * Helper that marks the operation as killed (if not an artificial deadline) and returns an
@@ -914,6 +947,21 @@ private:
             !isKillPending()) {
             markKilled(_timeoutError);
         }
+    }
+
+    /**
+     * _getExtendedDeadline returns the deadline that has been potentially extended by the
+     * OverrideDeadlineGuard. This is used internally when checking for interrupt, but the
+     * non-modified deadline is still reported when callers request the maxTimeMs info from the
+     * opCtx. This is required in order to prevent egress connection churn due to baton
+     * interruptions when maxTimeMs expires, by providing a short windows of time for the shard to
+     * return its own MaxTimeMsExpired response instead.
+     */
+    Date_t _getExtendedDeadline() const {
+        auto deadline = _deadline;
+        if (deadline == Date_t::max())
+            return deadline;  // no deadline set
+        return deadline + _deadlineExtensionState->extension.load();
     }
 
     /**
