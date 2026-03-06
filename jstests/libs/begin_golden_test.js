@@ -53,10 +53,10 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
 
-    if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
-        relativePathToExpectedOutput += "/sbeIndividualFeatures";
-    } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
+    if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
+    } else if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
+        relativePathToExpectedOutput += "/sbeIndividualFeatures";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.
         assert.fail(

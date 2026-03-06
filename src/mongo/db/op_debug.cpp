@@ -140,6 +140,14 @@ void addSingleSpillingStats(PlanSummaryStats::SpillingStage stage,
             appendCallback("hashLookupSpilledDataStorageSize",
                            static_cast<long long>(stats.getSpilledDataStorageSize()));
             return;
+        case PlanSummaryStats::SpillingStage::HASH_JOIN:
+            appendCallback("hashJoinSpills", static_cast<long long>(stats.getSpills()));
+            appendCallback("hashJoinSpilledBytes", static_cast<long long>(stats.getSpilledBytes()));
+            appendCallback("hashJoinSpilledRecords",
+                           static_cast<long long>(stats.getSpilledRecords()));
+            appendCallback("hashJoinSpilledDataStorageSize",
+                           static_cast<long long>(stats.getSpilledDataStorageSize()));
+            return;
     }
     MONGO_UNREACHABLE_TASSERT(9851000);
 }

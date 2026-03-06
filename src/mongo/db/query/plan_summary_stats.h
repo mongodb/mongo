@@ -102,6 +102,7 @@ struct MONGO_MOD_PUBLIC PlanSummaryStats {
         GRAPH_LOOKUP,
         GROUP,
         HASH_LOOKUP,
+        HASH_JOIN,
         SET_WINDOW_FIELDS,
         SORT,
         TEXT_OR,

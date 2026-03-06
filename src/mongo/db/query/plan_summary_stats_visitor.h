@@ -108,6 +108,13 @@ public:
                 hashLookupSpillingStatsTotal);
         }
     }
+    void visit(tree_walker::MaybeConstPtr<true, sbe::HashJoinStats> stats) final {
+        if (stats->spillingStats.getSpills() > 0) {
+            _summary.usedDisk = true;
+            _summary.spillingStatsPerStage[PlanSummaryStats::SpillingStage::HASH_JOIN].accumulate(
+                stats->spillingStats);
+        }
+    }
     void visit(tree_walker::MaybeConstPtr<true, DocumentSourceCursorStats> stats) final {
         accumulate(stats->planSummaryStats);
     }
