@@ -704,6 +704,7 @@ mongo_cc_library(
     ],
     deps = [
         ":forwardable_operation_metadata",
+        ":range_deletion_task",
         ":remove_shard_exception",
         ":resharding_server_parameters_idl",
         ":sharding_logging",
@@ -985,6 +986,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "range_deletion_task",
+    srcs = ["range_deletion_task_gen"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
     name = "sharding_runtime_d",
     srcs = [
         "active_migrations_registry.cpp",
@@ -1023,7 +1034,6 @@ mongo_cc_library(
         "random_migration_testing_utils.cpp",
         "range_deleter_service.cpp",
         "range_deleter_service_op_observer.cpp",
-        "range_deletion_task_gen",
         "range_deletion_util.cpp",
         "read_only_catalog_cache_loader.cpp",
         "session_catalog_migration.cpp",
@@ -1217,6 +1227,7 @@ mongo_cc_library(
         ":balancer_stats_registry",
         ":forwardable_operation_metadata",
         ":query_analysis_writer",
+        ":range_deletion_task",
         ":resharding_server_parameters_idl",
         ":sharding_catalog_manager",
         ":sharding_coord_d",
@@ -1801,6 +1812,8 @@ mongo_cc_unit_test(
         "sharding_util_refresh_test.cpp",
         "topology_time_ticker_test.cpp",
         "vector_clock_config_server_test.cpp",
+        "//src/mongo/db/s:remove_shard_commit_coordinator_test.cpp",
+        "//src/mongo/db/s:topology_change_helpers_test.cpp",
         "//src/mongo/db/s/balancer:auto_merger_policy_test.cpp",
         "//src/mongo/db/s/balancer:balancer_chunk_selection_policy_test.cpp",
         "//src/mongo/db/s/balancer:balancer_commands_scheduler_test.cpp",

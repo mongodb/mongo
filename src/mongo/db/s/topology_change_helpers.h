@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/remove_shard_draining_progress_gen.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_parameter.h"
@@ -73,6 +74,19 @@ namespace topology_change_helpers {
 
 // Returns the count of range deletion tasks locally on the config server.
 long long getRangeDeletionCount(OperationContext* opCtx);
+
+/**
+ * Gets the latest non processing range deletion task scheduled for
+ * future deletion. Used during transitionToDedicatedConfigServer to check for any pending delayed
+ * range deletion tasks.
+ */
+boost::optional<RangeDeletionTask> getLatestNonProcessingRangeDeletionTask(OperationContext* opCtx);
+
+/**
+ * Checks if the orphan cleanup delay has elapsed. If not, throws a RemoveShardDrainingInfo
+ * exception.
+ */
+void checkOrphanCleanupDelayElapsed(OperationContext* opCtx, const RangeDeletionTask& task);
 
 // Calls ShardsvrJoinMigrations locally on the config server.
 void joinMigrations(OperationContext* opCtx);

@@ -18,21 +18,30 @@ export const ShardTransitionUtil = (function() {
 
         // TODO (SERVER-97816): remove multiversion check and assume removeShard is idempotent.
         const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-        assert.soon(function() {
-            const res = st.s.adminCommand({transitionToDedicatedConfigServer: 1});
-            if (isMultiversion && !res.ok && res.code === ErrorCodes.ShardNotFound) {
-                // If the config server primary steps down right after removing the config.shards
-                // doc for the shard but before responding with "state": "completed", the mongos
-                // would retry the _configsvrTransitionToDedicatedConfigServer command against the
-                // new config server primary, which would not find the removed shard in its
-                // ShardRegistry if it has done a ShardRegistry reload after the config.shards doc
-                // for the shard was removed. This would cause the command to fail with
-                // ShardNotFound.
-                return true;
-            }
-            assert.commandWorked(res);
-            return res.state == 'completed';
-        }, "failed to transition to dedicated config server within " + timeout + "ms", timeout);
+        assert.soon(
+            function() {
+                const res = st.s.adminCommand({transitionToDedicatedConfigServer: 1});
+                if (isMultiversion && !res.ok && res.code === ErrorCodes.ShardNotFound) {
+                    // If the config server primary steps down right after removing the
+                    // config.shards doc for the shard but before responding with "state":
+                    // "completed", the mongos would retry the
+                    // _configsvrTransitionToDedicatedConfigServer command against the new config
+                    // server primary, which would not find the removed shard in its ShardRegistry
+                    // if it has done a ShardRegistry reload after the config.shards doc for the
+                    // shard was removed. This would cause the command to fail with ShardNotFound.
+                    return true;
+                }
+                if (!res.ok && res.code === ErrorCodes.RemoveShardDrainingInProgress) {
+                    // If orphanCleanupDelaySecs hasn't elapsed yet, the command will fail with
+                    // RemoveShardDrainingInProgress. Keep retrying until the delay elapses.
+                    return false;
+                }
+                assert.commandWorked(res);
+                return res.state == "completed";
+            },
+            "failed to transition to dedicated config server within " + timeout + "ms",
+            timeout,
+        );
     }
 
     function waitForRangeDeletions(conn) {
