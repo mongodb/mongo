@@ -36,10 +36,13 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
 #include "mongo/util/modules.h"
+
+namespace mongo {
+struct JSRegEx;
+}
 
 #include <cstdint>
 #include <functional>

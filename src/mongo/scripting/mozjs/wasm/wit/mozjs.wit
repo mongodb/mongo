@@ -1,0 +1,90 @@
+package mongo:mozjs;
+
+interface mozjs {
+  /// Error codes mirrored from `err_code_t`.
+  enum err-code {
+    ok,
+    e-invalid-arg,
+    e-bad-state,
+    e-nomem,
+    e-io,
+    e-timeout,
+    e-not-supported,
+    e-internal,
+
+    e-jsapi-fail,
+    e-pending-exception,
+    e-no-exception,
+    e-terminated,
+    e-oom,
+
+    e-compile,
+    e-runtime,
+    e-module,
+    e-promise-rejection,
+    e-stack-overflow,
+
+    e-type,
+    e-encoding,
+  }
+
+  /// Mirrors `wasm_mozjs_error_t` (but as owned values).
+  record wasm-mozjs-error {
+    code: err-code,
+
+    msg: option<string>,
+    filename: option<string>,
+    stack: option<string>,
+
+    line: u32,
+    column: u32,
+  }
+
+  type ok = u16;
+
+  /// Opaque function handle.
+  type function-handle = u64;
+
+  /// Initialize/shutdown/interrupt
+  initialize-engine: func() -> result<ok, wasm-mozjs-error>;
+  shutdown-engine: func() -> result<ok, wasm-mozjs-error>;
+  interrupt-current-op: func() -> result<ok, wasm-mozjs-error>;
+
+  /// Create a JS function from source.
+  create-function: func(source: list<u8>) -> result<function-handle, wasm-mozjs-error>;
+
+  /// Invoke a function with BSON args (no `this.` binding).
+  /// Used by $function, $accumulator, mapReduce.reduce, mapReduce.finalize.
+  invoke-function: func(handle: function-handle, bson: list<u8>) -> result<ok, wasm-mozjs-error>;
+
+  /// Invoke a predicate with the document as `this`, returns bool directly.
+  /// Used by $where: function() { return this.age > 18; }
+  invoke-predicate: func(handle: function-handle, document: list<u8>) -> result<bool, wasm-mozjs-error>;
+
+  /// Invoke a map function with the document as `this`; emits buffered internally.
+  /// Used by mapReduce.map: function() { emit(this.key, this.value); }
+  invoke-map: func(handle: function-handle, document: list<u8>) -> result<ok, wasm-mozjs-error>;
+
+  /// Get last return value as BSON bytes.
+  get-return-value-bson: func() -> result<list<u8>, wasm-mozjs-error>;
+
+  /// Set a named global variable from a BSON-encoded value.
+  set-global: func(name: string, bson-value: list<u8>) -> result<ok, wasm-mozjs-error>;
+
+  /// Get a named global variable as BSON-encoded bytes.
+  get-global: func(name: string) -> result<list<u8>, wasm-mozjs-error>;
+
+  /// Set a named global to a single BSON element's JS value directly.
+  set-global-value: func(name: string, bson-element: list<u8>) -> result<ok, wasm-mozjs-error>;
+
+  /// Set up the emit() built-in for mapReduce. Resets the emit buffer.
+  /// Optional byte-limit caps total emitted bytes (default 16 MiB).
+  setup-emit: func(byte-limit: option<s64>) -> result<ok, wasm-mozjs-error>;
+
+  /// Drain the emit buffer: returns accumulated {k,v} pairs as BSON, then clears.
+  drain-emit-buffer: func() -> result<list<u8>, wasm-mozjs-error>;
+}
+
+world api {
+  export mozjs;
+}

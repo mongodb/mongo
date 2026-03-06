@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include "mongo/scripting/mozjs/common/types/bson.h"
 
 #include "mongo/base/error_codes.h"
@@ -34,13 +35,15 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
+#ifndef MONGO_MOZJS_WASI_BUILD
 #include "mongo/db/pipeline/resume_token.h"
+#endif
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/idwrapper.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/util/assert_util.h"
@@ -49,7 +52,9 @@
 #include <cstddef>
 
 #include <jsapi.h>
+#if !defined(MONGO_MOZJS_WASI_BUILD)
 #include <jscustomallocator.h>
+#endif
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -96,17 +101,21 @@ BSONObj getBSONFromArg(JSContext* cx, JS::HandleValue arg, bool isBSON) {
  * the appearance of mutable state on the read/write versions.
  */
 struct BSONHolder {
-    BSONHolder(const BSONObj& obj, const BSONObj* parent, const MozJSScopeBase* scope, bool ro)
+    BSONHolder(const BSONObj& obj,
+               const BSONObj* parent,
+               const MozJSCommonRuntimeInterface* runtime,
+               bool ro)
         : _obj(obj),
-          _generation(scope->getGeneration()),
+          _generation(runtime->getGeneration()),
           _isOwned(obj.isOwned() || (parent && parent->isOwned())),
           _resolved(false),
           _readOnly(ro),
           _altered(false) {
+        bool requiresOwned = runtime->requiresOwnedObjects();
         uassert(
             ErrorCodes::BadValue,
             "Attempt to bind an unowned BSON Object to a JS scope marked as requiring ownership",
-            _isOwned || (!scope->requiresOwnedObjects()));
+            _isOwned || (!requiresOwned));
         if (parent) {
             _parent.emplace(*parent);
         }
@@ -117,7 +126,7 @@ struct BSONHolder {
     }
 
     void uassertValid(JSContext* cx) const {
-        if (!_isOwned && getMozJSScope(cx)->getGeneration() != _generation)
+        if (!_isOwned && getCommonRuntime(cx)->getGeneration() != _generation)
             uasserted(ErrorCodes::BadValue,
                       "Attempt to access an invalidated BSON Object in JS scope");
     }
@@ -162,12 +171,13 @@ void definePropertyFromBSONElement(JSContext* cx,
 
 void BSONInfo::make(
     JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, const BSONObj* parent, bool ro) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
-    getProto<BSONInfo>(scope).newObject(obj);
-    JS::SetReservedSlot(obj,
-                        BSONHolderSlot,
-                        JS::PrivateValue(trackedNew<BSONHolder>(scope, bson, parent, scope, ro)));
+    getProto<BSONInfo>(runtime).newObject(obj);
+    JS::SetReservedSlot(
+        obj,
+        BSONHolderSlot,
+        JS::PrivateValue(trackedNew<BSONHolder>(runtime, bson, parent, runtime, ro)));
 }
 
 void BSONInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
@@ -176,7 +186,7 @@ void BSONInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     if (!holder)
         return;
 
-    trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), holder);
+    trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), holder);
 }
 
 /*
@@ -342,9 +352,9 @@ void bsonCompareCommon(JSContext* cx,
         uasserted(ErrorCodes::BadValue, fmt::format("{} needs 2 arguments", funcName));
 
     // If either argument is not proper BSON, then we wrap both objects.
-    auto* scope = getMozJSScope(cx);
-    bool isBSON = getProto<BSONInfo>(scope).instanceOf(args.get(0)) &&
-        getProto<BSONInfo>(scope).instanceOf(args.get(1));
+    auto* runtime = getCommonRuntime(cx);
+    bool isBSON = getProto<BSONInfo>(runtime).instanceOf(args.get(0)) &&
+        getProto<BSONInfo>(runtime).instanceOf(args.get(1));
 
     BSONObj bsonObject1 = getBSONFromArg(cx, args.get(0), isBSON);
     BSONObj bsonObject2 = getBSONFromArg(cx, args.get(1), isBSON);
@@ -370,9 +380,9 @@ void BSONInfo::Functions::bsonBinaryEqual::call(JSContext* cx, JS::CallArgs args
         uasserted(ErrorCodes::BadValue, "bsonBinaryEqual needs 2 arguments");
 
     // If either argument is not a proper BSON, then we wrap both objects.
-    auto* scope = getMozJSScope(cx);
-    bool isBSON = getProto<BSONInfo>(scope).instanceOf(args.get(0)) &&
-        getProto<BSONInfo>(scope).instanceOf(args.get(1));
+    auto* runtime = getCommonRuntime(cx);
+    bool isBSON = getProto<BSONInfo>(runtime).instanceOf(args.get(0)) &&
+        getProto<BSONInfo>(runtime).instanceOf(args.get(1));
 
     BSONObj bsonObject1 = getBSONFromArg(cx, args.get(0), isBSON);
     BSONObj bsonObject2 = getBSONFromArg(cx, args.get(1), isBSON);

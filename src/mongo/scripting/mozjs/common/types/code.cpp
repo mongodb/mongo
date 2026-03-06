@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
@@ -70,11 +70,11 @@ void CodeInfo::construct(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::BadValue,
             "Code needs 0, 1 or 2 arguments",
             args.length() == 0 || args.length() == 1 || args.length() == 2);
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedObject thisv(cx);
 
-    getProto<CodeInfo>(scope).newObject(&thisv);
+    getProto<CodeInfo>(runtime).newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     if (args.length() == 0) {

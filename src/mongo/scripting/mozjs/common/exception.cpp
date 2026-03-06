@@ -32,7 +32,7 @@
 #include "mongo/scripting/mozjs/common/error.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/status.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wraptype.h"
@@ -45,7 +45,11 @@
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
 #include <js/friend/ErrorMessages.h>
+#ifdef MONGO_MOZJS_WASI_BUILD
+#include "mongo/scripting/mozjs/wasm/engine/error.h"
+#else
 #include <mongo/scripting/mozjs/mongoErrorReportToString.h>
+#endif
 
 namespace mongo {
 namespace mozjs {
@@ -64,16 +68,16 @@ void mongoToJSException(JSContext* cx) {
         JS::ReportUncatchableException(cx);
         // If a JSAPI callback returns false without setting a pending exception, SpiderMonkey will
         // treat it as an uncatchable error.
-        auto* scope = getMozJSScope(cx);
-        scope->setStatus(std::move(status));
+        auto* runtime = getCommonRuntime(cx);
+        runtime->setStatus(std::move(status));
     }
 }
 
 std::string currentJSStackToString(JSContext* cx) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedValue error(cx);
-    getProto<ErrorInfo>(scope).newInstance(&error);
+    getProto<ErrorInfo>(runtime).newInstance(&error);
 
     return ObjectWrapper(cx, error).getString("stack");
 }
@@ -127,21 +131,26 @@ Status jsExceptionToStatus(JSContext* cx,
                            JS::HandleValue excn,
                            ErrorCodes::Error altCode,
                            StringData altReason) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     // It's possible that we have an uncaught exception for OOM, which is reported on the
     // exception status of the JSContext. We must check for this OOM exception first to ensure
     // we return the correct error code and message (i.e JSInterpreterFailure). This is consistent
     // with MozJSImplScope::_checkForPendingException().
+    // JS_IsThrowingOutOfMemoryException is a MongoDB-specific modification to
+    // SpiderMonkey (see src/third_party/mozjs). The WASI build uses upstream
+    // Firefox SpiderMonkey which doesn't have this.
+#ifndef MONGO_MOZJS_WASI_BUILD
     if (JS_IsThrowingOutOfMemoryException(cx, excn)) {
         return Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
     }
+#endif
 
     if (!excn.isObject()) {
         return Status(altCode, ValueWriter(cx, excn).toString());
     }
 
-    if (getProto<MongoStatusInfo>(scope).instanceOf(excn)) {
+    if (getProto<MongoStatusInfo>(runtime).instanceOf(excn)) {
         return MongoStatusInfo::toStatus(cx, excn);
     }
 

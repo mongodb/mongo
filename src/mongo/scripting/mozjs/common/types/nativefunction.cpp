@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
@@ -103,7 +103,7 @@ void NativeFunctionInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto holder = JS::GetMaybePtrFromReservedSlot<NativeHolder>(obj, NativeHolderSlot);
 
     if (holder)
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), holder);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), holder);
 }
 
 void NativeFunctionInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
@@ -120,10 +120,10 @@ void NativeFunctionInfo::make(JSContext* cx,
                               JS::MutableHandleObject obj,
                               NativeFunction function,
                               void* data) {
-    auto scope = getMozJSScope(cx);
-    getProto<NativeFunctionInfo>(scope).newObject(obj);
+    auto runtime = getCommonRuntime(cx);
+    getProto<NativeFunctionInfo>(runtime).newObject(obj);
     JS::SetReservedSlot(
-        obj, NativeHolderSlot, JS::PrivateValue(trackedNew<NativeHolder>(scope, function, data)));
+        obj, NativeHolderSlot, JS::PrivateValue(trackedNew<NativeHolder>(runtime, function, data)));
 }
 
 }  // namespace mozjs

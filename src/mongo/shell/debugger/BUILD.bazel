@@ -71,6 +71,7 @@ mongo_cc_library(
     private_hdrs = [
         "//src/mongo/base:string_data.h",
         "//src/mongo/scripting:engine.h",
+        "//src/mongo/scripting:js_regex.h",
     ],
     deps = [
         "//src/mongo:base",

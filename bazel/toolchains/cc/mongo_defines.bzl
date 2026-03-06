@@ -18,7 +18,6 @@ BOOST_DEFINES = [
     # our current Xcode 12 doesn't offer std::atomic_ref, so we cannot.
     "BOOST_FILESYSTEM_NO_CXX20_ATOMIC_REF",
     "BOOST_LOG_NO_SHORTHAND_NAMES",
-    "BOOST_LOG_USE_NATIVE_SYSLOG",
     "BOOST_LOG_WITHOUT_THREAD_ATTR",
     "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
     "BOOST_SYSTEM_NO_DEPRECATED",
@@ -27,6 +26,10 @@ BOOST_DEFINES = [
 ] + select({
     "@//bazel/config:linkdynamic_not_shared_archive": ["BOOST_LOG_DYN_LINK"],
     "@//conditions:default": [],
+}) + select({
+    "@platforms//os:windows": ["BOOST_LOG_WITHOUT_SYSLOG"],
+    "@platforms//os:wasi": ["BOOST_LOG_WITHOUT_SYSLOG"],
+    "@//conditions:default": ["BOOST_LOG_USE_NATIVE_SYSLOG"],
 })
 
 ENTERPRISE_DEFINES = select({

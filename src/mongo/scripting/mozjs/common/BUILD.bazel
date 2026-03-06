@@ -10,26 +10,40 @@ exports_files(
     ]),
 )
 
+# Type sources shared between WASI and non-WASI builds.
+# status.cpp is excluded because WASI and non-WASI builds use different
+# implementations (wasm stub vs common/types).
+TYPES_SRCS = [
+    "//src/mongo/scripting/mozjs/common/types:bindata.cpp",
+    "//src/mongo/scripting/mozjs/common/types:bson.cpp",
+    "//src/mongo/scripting/mozjs/common/types:code.cpp",
+    "//src/mongo/scripting/mozjs/common/types:dbpointer.cpp",
+    "//src/mongo/scripting/mozjs/common/types:dbref.cpp",
+    "//src/mongo/scripting/mozjs/common/types:maxkey.cpp",
+    "//src/mongo/scripting/mozjs/common/types:minkey.cpp",
+    "//src/mongo/scripting/mozjs/common/types:nativefunction.cpp",
+    "//src/mongo/scripting/mozjs/common/types:numberdecimal.cpp",
+    "//src/mongo/scripting/mozjs/common/types:numberint.cpp",
+    "//src/mongo/scripting/mozjs/common/types:numberlong.cpp",
+    "//src/mongo/scripting/mozjs/common/types:object.cpp",
+    "//src/mongo/scripting/mozjs/common/types:oid.cpp",
+    "//src/mongo/scripting/mozjs/common/types:regexp.cpp",
+    "//src/mongo/scripting/mozjs/common/types:timestamp.cpp",
+]
+
+# Filegroup for WASI builds - exports source files for compilation in genrules.
+# WASI builds use a stub status.cpp from the wasm package.
+filegroup(
+    name = "wasi_sources",
+    srcs = glob(["*.cpp"]) + TYPES_SRCS + [
+        "//src/mongo/scripting/mozjs/wasm:status.cpp",
+    ],
+    visibility = ["//src/mongo/scripting/mozjs/wasm:__pkg__"],
+)
+
 mongo_cc_library(
     name = "mozjs_common",
-    srcs = glob(["*.cpp"]) + [
-        "//src/mongo/scripting/mozjs/common/types:bindata.cpp",
-        "//src/mongo/scripting/mozjs/common/types:bson.cpp",
-        "//src/mongo/scripting/mozjs/common/types:code.cpp",
-        "//src/mongo/scripting/mozjs/common/types:dbpointer.cpp",
-        "//src/mongo/scripting/mozjs/common/types:dbref.cpp",
-        "//src/mongo/scripting/mozjs/common/types:maxkey.cpp",
-        "//src/mongo/scripting/mozjs/common/types:minkey.cpp",
-        "//src/mongo/scripting/mozjs/common/types:nativefunction.cpp",
-        "//src/mongo/scripting/mozjs/common/types:numberdecimal.cpp",
-        "//src/mongo/scripting/mozjs/common/types:numberint.cpp",
-        "//src/mongo/scripting/mozjs/common/types:numberlong.cpp",
-        "//src/mongo/scripting/mozjs/common/types:object.cpp",
-        "//src/mongo/scripting/mozjs/common/types:oid.cpp",
-        "//src/mongo/scripting/mozjs/common/types:regexp.cpp",
-        "//src/mongo/scripting/mozjs/common/types:status.cpp",
-        "//src/mongo/scripting/mozjs/common/types:timestamp.cpp",
-    ],
+    srcs = glob(["*.cpp"]) + TYPES_SRCS,
     copts = select({
         "@platforms//os:windows": [
             # The default MSVC preprocessor elides commas in some cases as a
@@ -41,10 +55,23 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    textual_hdrs = glob(["*.defs"]),
-    deps = [
-        "//src/mongo/scripting:scripting_common",
-        "//src/mongo/util:buildinfo",
-        "//src/third_party/mozjs",
+    srcs_select = [
+        {
+            "//bazel/config:wasi": ["//src/mongo/scripting/mozjs/wasm:status.cpp"],
+            "//conditions:default": ["//src/mongo/scripting/mozjs/common/types:status.cpp"],
+        },
     ],
+    textual_hdrs = glob(["*.defs"]),
+    deps = select({
+        "//bazel/config:wasi": [
+            # WASI builds don't need scripting_common (avoids networking/SSL dependencies)
+            # and use SpiderMonkey headers from @spidermonkey, not //src/third_party/mozjs
+            "//src/mongo/util:buildinfo",
+        ],
+        "//conditions:default": [
+            "//src/mongo/scripting:scripting_common",
+            "//src/mongo/util:buildinfo",
+            "//src/third_party/mozjs",
+        ],
+    }),
 )

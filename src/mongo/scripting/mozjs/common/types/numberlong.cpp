@@ -38,7 +38,7 @@
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
@@ -80,7 +80,7 @@ void NumberLongInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto numLong = JS::GetMaybePtrFromReservedSlot<int64_t>(obj, Int64Slot);
 
     if (numLong)
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), numLong);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), numLong);
 }
 
 int64_t NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
@@ -129,7 +129,7 @@ void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) 
     uassert(ErrorCodes::BadValue, "NumberLong.compare() needs 1 argument", args.length() == 1);
     uassert(ErrorCodes::BadValue,
             "NumberLong.compare() argument must be a NumberLong",
-            getProto<NumberLongInfo>(getMozJSScope(cx)).instanceOf(args.get(0)));
+            getCommonRuntime(cx)->numberLongProto().instanceOf(args.get(0)));
 
     int64_t thisVal = NumberLongInfo::ToNumberLong(cx, args.thisv());
     int64_t otherVal = NumberLongInfo::ToNumberLong(cx, args.get(0));
@@ -171,11 +171,11 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
             "NumberLong needs 0, 1 or 3 arguments",
             args.length() == 0 || args.length() == 1 || args.length() == 3);
 
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedObject thisv(cx);
 
-    getProto<NumberLongInfo>(scope).newObject(&thisv);
+    getProto<NumberLongInfo>(runtime).newObject(&thisv);
 
     int64_t numLong;
 
@@ -221,7 +221,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
         numLong = (top << 32) + bot;
     }
     JS::SetReservedSlot(
-        thisv, Int64Slot, JS::PrivateValue(getMozJSScope(cx)->trackedNewInt64(numLong)));
+        thisv, Int64Slot, JS::PrivateValue(getCommonRuntime(cx)->trackedNewInt64(numLong)));
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -234,7 +234,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
     if (!JS_DefinePropertyById(
             cx,
             proto,
-            getMozJSScope(cx)->getInternedStringId(InternedString::floatApprox),
+            getCommonRuntime(cx)->getInternedStringId(InternedString::floatApprox),
             smUtils::wrapConstrainedMethod<Functions::floatApprox, false, NumberLongInfo>,
             nullptr,
             JSPROP_ENUMERATE)) {
@@ -245,7 +245,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
     if (!JS_DefinePropertyById(
             cx,
             proto,
-            getMozJSScope(cx)->getInternedStringId(InternedString::top),
+            getCommonRuntime(cx)->getInternedStringId(InternedString::top),
             smUtils::wrapConstrainedMethod<Functions::top, false, NumberLongInfo>,
             nullptr,
             JSPROP_ENUMERATE)) {
@@ -256,7 +256,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
     if (!JS_DefinePropertyById(
             cx,
             proto,
-            getMozJSScope(cx)->getInternedStringId(InternedString::bottom),
+            getCommonRuntime(cx)->getInternedStringId(InternedString::bottom),
             smUtils::wrapConstrainedMethod<Functions::bottom, false, NumberLongInfo>,
             nullptr,
             JSPROP_ENUMERATE)) {
@@ -267,7 +267,7 @@ void NumberLongInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::Han
     if (!JS_DefinePropertyById(
             cx,
             proto,
-            getMozJSScope(cx)->getInternedStringId(InternedString::exactValueString),
+            getCommonRuntime(cx)->getInternedStringId(InternedString::exactValueString),
             smUtils::wrapConstrainedMethod<Functions::exactValueString, false, NumberLongInfo>,
             nullptr,
             JSPROP_ENUMERATE)) {

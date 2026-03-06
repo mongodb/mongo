@@ -33,13 +33,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/scripting/oid_validation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -70,7 +70,7 @@ void OIDInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto oid = JS::GetMaybePtrFromReservedSlot<OID>(obj, OIDSlot);
 
     if (oid) {
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), oid);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), oid);
     }
 }
 
@@ -101,7 +101,7 @@ void OIDInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         auto str = ValueWriter(cx, args.get(0)).toString();
 
-        Scope::validateObjectIdString(str);
+        validateObjectIdString(str);
         oid.init(str);
     }
 
@@ -109,11 +109,11 @@ void OIDInfo::construct(JSContext* cx, JS::CallArgs args) {
 }
 
 void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedObject thisv(cx);
-    getProto<OIDInfo>(scope).newObject(&thisv);
-    JS::SetReservedSlot(thisv, OIDSlot, JS::PrivateValue(trackedNew<OID>(scope, oid)));
+    getProto<OIDInfo>(runtime).newObject(&thisv);
+    JS::SetReservedSlot(thisv, OIDSlot, JS::PrivateValue(trackedNew<OID>(runtime, oid)));
 
     out.setObjectOrNull(thisv);
 }
@@ -139,7 +139,7 @@ void OIDInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObje
 
     if (!JS_DefinePropertyById(cx,
                                proto,
-                               getMozJSScope(cx)->getInternedStringId(InternedString::str),
+                               getCommonRuntime(cx)->getInternedStringId(InternedString::str),
                                smUtils::wrapConstrainedMethod<Functions::getter, true, OIDInfo>,
                                nullptr,
                                JSPROP_ENUMERATE)) {

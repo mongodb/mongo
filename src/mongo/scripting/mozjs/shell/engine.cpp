@@ -68,7 +68,7 @@ bool isExternalScriptingEnabled() {
 }
 
 namespace {
-auto operationMozJSScopeBaseDecoration =
+auto operationMozJSShellRuntimeInterfaceDecoration =
     OperationContext::declareDecoration<mozjs::MozJSImplScope*>();
 }
 
@@ -117,8 +117,8 @@ mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread(boost::optional<int
 }
 
 void MozJSScriptEngine::interrupt(ClientLock&, OperationContext* opCtx) {
-    if (opCtx && (*opCtx)[operationMozJSScopeBaseDecoration]) {
-        (*opCtx)[operationMozJSScopeBaseDecoration]->kill();
+    if (opCtx && (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]) {
+        (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]->kill();
         LOGV2_DEBUG(22808, 2, "Interrupting op", "opId"_attr = opCtx->getOpID());
     } else if (opCtx) {
         LOGV2_DEBUG(
@@ -133,8 +133,8 @@ void MozJSScriptEngine::interruptAll(ServiceContextLock& svcCtxLock) {
     while (auto client = cursor.next()) {
         stdx::lock_guard lk(*client);
         if (auto opCtx = client->getOperationContext();
-            opCtx && (*opCtx)[operationMozJSScopeBaseDecoration]) {
-            (*opCtx)[operationMozJSScopeBaseDecoration]->kill();
+            opCtx && (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]) {
+            (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration]->kill();
         }
     }
 }
@@ -183,7 +183,7 @@ void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScop
                 "opId"_attr = opCtx->getOpID());
 
     stdx::lock_guard lk(*opCtx->getClient());
-    (*opCtx)[operationMozJSScopeBaseDecoration] = scope;
+    (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration] = scope;
 
     if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
         scope->kill();
@@ -198,7 +198,7 @@ void MozJSScriptEngine::unregisterOperation(OperationContext* opCtx) {
                 "opId"_attr = opCtx->getOpID());
 
     stdx::lock_guard lk(*opCtx->getClient());
-    (*opCtx)[operationMozJSScopeBaseDecoration] = nullptr;
+    (*opCtx)[operationMozJSShellRuntimeInterfaceDecoration] = nullptr;
 }
 
 }  // namespace mozjs

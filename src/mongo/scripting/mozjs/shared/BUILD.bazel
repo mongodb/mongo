@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "mozjs_error_types.h",
+    "mozjs_wasm_startup_options.h",
+])
+
+# Shared types and definitions for MozJS that can be used by both
+# the WASM engine and the mongod host side.
+mongo_cc_library(
+    name = "mozjs_shared_types",
+    hdrs = [
+        "mozjs_error_types.h",
+        "mozjs_wasm_startup_options.h",
+    ],
+    deps = [],
+)

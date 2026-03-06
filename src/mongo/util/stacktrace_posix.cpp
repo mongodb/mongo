@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#ifndef __wasi__
 #include <dlfcn.h>
+#endif
 
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
@@ -241,6 +243,7 @@ void printMetadata(StackTraceSink& sink, const StackTraceAddressMetadata& meta) 
 }
 
 void mergeDlInfo(StackTraceAddressMetadata& f) {
+#ifndef __wasi__
     if (f.file() && f.symbol())
         return;
     Dl_info dli;
@@ -258,6 +261,10 @@ void mergeDlInfo(StackTraceAddressMetadata& f) {
     if (!f.symbol() && dli.dli_saddr) {
         f.symbol().assign(reinterpret_cast<uintptr_t>(dli.dli_saddr), dli.dli_sname);
     }
+#else
+    // WASI doesn't support dynamic linking, so we can't get symbol info
+    (void)f;
+#endif
 }
 
 #if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND

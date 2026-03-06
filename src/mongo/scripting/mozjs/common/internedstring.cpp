@@ -29,7 +29,7 @@
 
 #include "mongo/scripting/mozjs/common/internedstring.h"
 
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/util/assert_util.h"
 
 #include <js/Id.h>
@@ -63,7 +63,7 @@ InternedStringTable::~InternedStringTable() {
 }
 
 InternedStringId::InternedStringId(JSContext* cx, InternedString id)
-    : _id(cx, getMozJSScope(cx)->getInternedStringId(id)) {}
+    : _id(cx, getCommonRuntime(cx)->getInternedStringId(id)) {}
 
 }  // namespace mozjs
 }  // namespace mongo

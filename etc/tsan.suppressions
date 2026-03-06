@@ -65,3 +65,14 @@ deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 race:S2Loop::FindVertex
 race:S2EdgeIndex::IncrementQueryCount
 race:S2RegionCoverer::NewCandidate
+
+# SERVER-115422: wasmtime's parallel compilation (via rayon) triggers TSan false positives.
+# TSan cannot unwind Rust stacks fully, so reported frames vary across runs: sometimes
+# wasmtime/rayon/cranelift-specific, sometimes bare Rust stdlib functions (core::ptr,
+# core::mem, alloc::, __rustc allocator). These patterns cover all observed variants.
+race:rayon_core
+race:wasmtime
+race:cranelift
+race:__rustc
+race:core::ptr
+race:core::mem

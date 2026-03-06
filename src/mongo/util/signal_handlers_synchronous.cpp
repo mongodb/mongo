@@ -285,7 +285,7 @@ void myPureCallHandler() {
     abruptQuit(SIGABRT);
 }
 
-#else
+#elif !defined(__wasi__)
 
 extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
     if (gSynchronousSignalHandlerCb) {
@@ -361,6 +361,37 @@ void setupSignalTestingHandler() {
 #endif
 }
 
+#else
+// WASI doesn't support signals currently. The effort tracking the support
+// for signals is https://github.com/WebAssembly/WASI/issues/414,
+// See https://github.com/WebAssembly/WASI/issues/166
+extern "C" void abruptQuitAction(int signalNum, void*, void*) {
+    abruptQuit(signalNum);
+};
+
+void printSigInfo(const void* siginfo) {
+    (void)siginfo;
+}
+
+extern "C" void abruptQuitWithAddrSignal(int signalNum, void* siginfo, void* ucontext_erased) {
+    (void)siginfo;
+    (void)ucontext_erased;
+    abruptQuit(signalNum);
+}
+
+extern "C" void noopSignalHandler(int signalNum, void*, void*) {
+    (void)signalNum;
+}
+
+extern "C" typedef void(sigAction_t)(int signum, void* info, void* context);
+
+void installSignalHandler(int signal, sigAction_t handler) {
+    (void)signal;
+    (void)handler;
+}
+
+void setupSignalTestingHandler() {}
+
 #endif
 
 }  // namespace
@@ -382,7 +413,7 @@ void endProcessWithSignal(int signalNum) {
         // The exception filter exits the process
         quickExit(ExitCode::abrupt);
     }
-#else
+#elif !defined(__wasi__)
     // This works by restoring the system-default handler for the given signal, unblocking the
     // signal, and re-raising it, in order to get the system default termination behavior (i.e.,
     // dumping core, or just exiting).
@@ -398,6 +429,10 @@ void endProcessWithSignal(int signalNum) {
     invariant(sigprocmask(SIG_UNBLOCK, &unblockSignalMask, nullptr) == 0);
 
     raise(signalNum);
+#else
+    // WASI doesn't support signals, just exit with the appropriate code
+    (void)signalNum;
+    quickExit(ExitCode::abrupt);
 #endif
 }
 
@@ -410,7 +445,7 @@ void setupSynchronousSignalHandlers() {
     _set_purecall_handler(myPureCallHandler);
     _set_invalid_parameter_handler(myInvalidParameterHandler);
     setWindowsUnhandledExceptionFilter();
-#else
+#elif !defined(__wasi__)
     static constexpr struct {
         int signal;
         sigAction_t* function;  // signal ignored if nullptr
@@ -435,6 +470,8 @@ void setupSynchronousSignalHandlers() {
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
     setupStackTraceSignalAction(stackTraceSignal());
 #endif
+#else
+    // WASI doesn't support signals, so signal setup is a no-op
 #endif
 }
 
@@ -451,7 +488,7 @@ void reportOutOfMemoryErrorAndExit() {
 }
 
 void clearSignalMask() {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__wasi__)
     // We need to make sure that all signals are unmasked so signals are handled correctly
     sigset_t unblockSignalMask;
     invariant(sigemptyset(&unblockSignalMask) == 0);

@@ -57,7 +57,8 @@
 
 #ifdef _WIN32
 #define SECURE_RANDOM_BCRYPT
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || \
+    defined(__EMSCRIPTEN__) || defined(__wasi__)
 #define SECURE_RANDOM_URANDOM
 #elif defined(__OpenBSD__)
 #define SECURE_RANDOM_ARCFOUR

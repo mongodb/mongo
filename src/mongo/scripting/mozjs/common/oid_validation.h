@@ -27,14 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#pragma once
 
-#include <jsapi.h>
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
-namespace mongo::mozjs {
+namespace mongo {
+namespace mozjs {
 
-MozJSScopeBase* getMozJSScope(JSContext* cx) {
-    return static_cast<MozJSScopeBase*>(JS_GetContextPrivate(cx));
+/**
+ * Validates that a string is a valid ObjectId string (24 hex characters).
+ * Extracted from Scope::validateObjectIdString for WASI builds.
+ */
+inline void validateObjectIdString(StringData str) {
+    uassert(11542200, "invalid object id: length", str.size() == 24);
+    auto isAllHex = [](StringData s) {
+        return std::all_of(s.begin(), s.end(), [](char c) {
+            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        });
+    };
+    uassert(11542201, "invalid object id: not hex", isAllHex(str));
 }
 
-}  // namespace mongo::mozjs
+}  // namespace mozjs
+}  // namespace mongo

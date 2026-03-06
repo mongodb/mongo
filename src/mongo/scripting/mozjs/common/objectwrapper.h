@@ -38,12 +38,15 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/common/exception.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/common/lifetimestack.h"
 #include "mongo/util/modules.h"
+
+namespace mongo {
+struct JSRegEx;
+}
 
 #include <cstddef>
 #include <cstdint>

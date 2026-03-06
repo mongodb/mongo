@@ -83,13 +83,21 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
                 # can be used to find it if we use a different repository rule later.
                 "--sysroot={}".format("external/_main~_repo_rules~wasi_sdk/share/wasi-sysroot"),
                 "-fno-common",
-                "-fno-omit-frame-pointer",
+                "-Oz",
+                "-ffunction-sections",
+                "-fdata-sections",
+                "-fvisibility=hidden",
                 "-U_FORTIFY_SOURCE",
                 "-D_FORTIFY_SOURCE=0",
+
+                # WASI emulation shims - enable syscall emulation for POSIX APIs
                 "-D_WASI_EMULATED_SIGNAL",
                 "-D_WASI_EMULATED_MMAN",
                 "-D_WASI_EMULATED_PROCESS_CLOCKS",
                 "-D_WASI_EMULATED_GETPID",
+
+                # WASI platform lacks syslog support
+                "-DBOOST_LOG_WITHOUT_SYSLOG",
             ])],
         )],
     )
@@ -103,6 +111,12 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             flag_groups = [flag_group(flags = [
                 "-std=c++20",
                 "-fexceptions",
+
+                # Include headers for declarations needed by third-party code
+                "-include",
+                "wasm32-wasip2/assert.h",  # assert() for Abseil
+                "-include",
+                "stdlib.h",  # malloc/free for fmt
             ])],
         )],
     )
@@ -115,16 +129,77 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
             actions = all_link_actions,
             flag_groups = [flag_group(flags = [
                 "-Wl,--gc-sections",
+                "-Wl,--strip-all",
                 "-lc++",
                 "-lc++abi",
+                "-lwasi-emulated-signal",
+                "-lwasi-emulated-mman",
+                "-lwasi-emulated-process-clocks",
+                "-lwasi-emulated-getpid",
             ])],
         )],
     )
+
+    # Include path features (mirrors the Linux toolchain).
+    # Without these, external-repo headers (like Abseil) are only added via
+    # -iquote (quoted includes) and <angled> includes fail.
+    all_compile = [
+        ACTION_NAMES.preprocess_assemble,
+        ACTION_NAMES.linkstamp_compile,
+        ACTION_NAMES.c_compile,
+        ACTION_NAMES.cpp_compile,
+        ACTION_NAMES.cpp_header_parsing,
+        ACTION_NAMES.cpp_module_compile,
+        ACTION_NAMES.clif_match,
+        ACTION_NAMES.objc_compile,
+        ACTION_NAMES.objcpp_compile,
+    ]
+
+    include_paths_feature = feature(
+        name = "include_paths",
+        enabled = True,
+        flag_sets = [flag_set(
+            actions = all_compile,
+            flag_groups = [
+                flag_group(
+                    flags = ["-iquote", "%{quote_include_paths}"],
+                    iterate_over = "quote_include_paths",
+                ),
+                flag_group(
+                    flags = ["-I%{include_paths}"],
+                    iterate_over = "include_paths",
+                ),
+                flag_group(
+                    flags = ["-isystem", "%{system_include_paths}"],
+                    iterate_over = "system_include_paths",
+                ),
+            ],
+        )],
+    )
+
+    external_include_paths_feature = feature(
+        name = "external_include_paths",
+        enabled = True,
+        flag_sets = [flag_set(
+            actions = all_compile,
+            flag_groups = [
+                flag_group(
+                    flags = ["-isystem", "%{external_include_paths}"],
+                    iterate_over = "external_include_paths",
+                    expand_if_available = "external_include_paths",
+                ),
+            ],
+        )],
+    )
+
+    # WASI SDK sysroot path (relative to execroot)
+    wasi_sysroot = "external/_main~_repo_rules~wasi_sdk/share/wasi-sysroot"
 
     # Construct the toolchain.
     return [cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         action_configs = action_configs,
+        tool_paths = tool_paths,
         toolchain_identifier = "wasi_sdk_cc_wasip2",
         host_system_name = "local",
         target_system_name = "wasi",
@@ -133,11 +208,18 @@ def _wasi_cc_toolchain_config_wasip2_impl(ctx):
         compiler = "clang",
         abi_version = "none",
         abi_libc_version = "wasi",
+        builtin_sysroot = wasi_sysroot,
+        cxx_builtin_include_directories = [
+            wasi_sysroot + "/include",
+            wasi_sysroot + "/include/wasm32-wasip2",
+        ],
         features = [
             compile_flags,
             cxx20_flags,
             link_flags,
-            feature(name = "supports_dynamic_linker", enabled = True),
+            include_paths_feature,
+            external_include_paths_feature,
+            feature(name = "supports_dynamic_linker", enabled = False),
         ],
     )]
 

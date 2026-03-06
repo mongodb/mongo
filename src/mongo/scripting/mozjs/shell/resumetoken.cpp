@@ -30,9 +30,9 @@
 #include "mongo/scripting/mozjs/shell/resumetoken.h"
 
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/scripting/mozjs/shell/runtime.h"
 
 #include <string>
 
@@ -60,8 +60,8 @@ void ResumeTokenDataUtility::Functions::decodeResumeToken::call(JSContext* cx, J
     const auto resumeTokenDataBson = ResumeToken::parse(encodedResumeTokenBson).getData().toBSON();
 
     JS::RootedObject thisValue(cx);
-    auto* scope = getMozJSScope(cx);
-    getProto<BSONInfo>(scope).newObject(&thisValue);
+    auto* runtime = getCommonRuntime(cx);
+    getProto<BSONInfo>(runtime).newObject(&thisValue);
     BSONInfo::make(cx, &thisValue, std::move(resumeTokenDataBson), nullptr, true);
 
     args.rval().setObjectOrNull(thisValue);

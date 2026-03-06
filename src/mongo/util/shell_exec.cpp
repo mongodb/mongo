@@ -228,7 +228,7 @@ private:
     PROCESS_INFORMATION _process;
     DWORD _exitcode = STILL_ACTIVE;
 };
-#else
+#elif !defined(__wasi__)
 class ProcessStream {
 public:
     ProcessStream(const std::string& cmd) {
@@ -290,6 +290,41 @@ private:
     FILE* _fp;
     int _fd;
     int _exitcode = 1;
+};
+#else
+// WASI doesn't support process execution
+// See: https://github.com/WebAssembly/WASI/issues/414
+class ProcessStream {
+public:
+    ProcessStream(const std::string& cmd) {
+        uasserted(ErrorCodes::OperationFailed,
+                  str::stream() << "Shell execution not supported in WASI environment: " << cmd);
+    }
+
+    int close() {
+        return 1;
+    }
+
+    bool eof() {
+        return true;
+    }
+
+    Status wait(Milliseconds duration) {
+        (void)duration;
+        return {ErrorCodes::OperationFailed, "Shell execution not supported in WASI"};
+    }
+
+    void read(StringBuilder& sb, size_t len) {
+        (void)sb;
+        (void)len;
+    }
+
+    ~ProcessStream() = default;
+
+private:
+    ProcessStream() = delete;
+    ProcessStream(const ProcessStream&) = delete;
+    ProcessStream& operator=(const ProcessStream&) = delete;
 };
 #endif
 }  // namespace

@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/js_regex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -65,15 +66,6 @@ class OperationContext;
 struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
     const char* name;
     const StringData source;
-};
-
-struct MONGO_MOD_PUBLIC JSRegEx {
-    std::string pattern;
-    std::string flags;
-
-    JSRegEx() = default;
-    JSRegEx(std::string pattern, std::string flags)
-        : pattern(std::move(pattern)), flags(std::move(flags)) {}
 };
 
 class MONGO_MOD_OPEN Scope {
@@ -208,8 +200,6 @@ public:
      * right now its just global - slightly inefficient, but a lot simpler
      */
     static void storedFuncMod(OperationContext* opCtx);
-
-    static void validateObjectIdString(const std::string& str);
 
     /** gets the time at which the scope was created */
     Date_t getCreateTime() const {

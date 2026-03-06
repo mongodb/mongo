@@ -637,7 +637,8 @@ private:
 // Find minimum timer resolution of OS
 Nanoseconds getMinimumTimerResolution() {
     Nanoseconds minTimerResolution;
-#if defined(__linux__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__) || defined(__wasi__) || \
+    defined(__wasm__) || defined(__wasm32__) || defined(__wasm64__)
     struct timespec tp;
     int ret = clock_getres(CLOCK_REALTIME, &tp);
     if (ret == -1) {

@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wraptype.h"
 #include "mongo/util/assert_util.h"
@@ -52,8 +52,8 @@ namespace smUtils {
  * void as the last type in wrapConstrainedMethod.
  */
 template <typename T, typename... Args>
-bool instanceOf(MozJSScopeBase* scope, bool* isProto, JS::HandleValue value) {
-    auto& proto = getProto<T>(scope);
+bool instanceOf(MozJSCommonRuntimeInterface* runtime, bool* isProto, JS::HandleValue value) {
+    auto& proto = getProto<T>(runtime);
 
     if (proto.instanceOf(value)) {
         if (value.toObjectOrNull() == proto.getProto()) {
@@ -63,7 +63,7 @@ bool instanceOf(MozJSScopeBase* scope, bool* isProto, JS::HandleValue value) {
         return true;
     }
 
-    return instanceOf<Args...>(scope, isProto, value);
+    return instanceOf<Args...>(runtime, isProto, value);
 }
 
 /**
@@ -72,7 +72,9 @@ bool instanceOf(MozJSScopeBase* scope, bool* isProto, JS::HandleValue value) {
  * We use this to identify the end of the template list in the general case.
  */
 template <>
-inline bool instanceOf<void>(MozJSScopeBase* scope, bool* isProto, JS::HandleValue value) {
+inline bool instanceOf<void>(MozJSCommonRuntimeInterface* runtime,
+                             bool* isProto,
+                             JS::HandleValue value) {
     return false;
 }
 
@@ -85,7 +87,7 @@ inline bool instanceOf<void>(MozJSScopeBase* scope, bool* isProto, JS::HandleVal
  *       ::call - a static function of type void (JSContext* cx, JS::CallArgs args)
  *       ::name - a static function which returns a const char* with the type name
  *   noProto - whether the method can be invoked on the prototype
- *   Args - The list of types to check against scope->getProto<T>().instanceOf
+ *   Args - The list of types to check against runtime->getProto<T>().instanceOf
  *          for the thisv the method has been invoked against
  */
 template <typename T, bool noProto, typename... Args>
@@ -101,7 +103,7 @@ bool wrapConstrainedMethod(JSContext* cx, unsigned argc, JS::Value* vp) {
                           << ValueWriter(cx, args.thisv()).typeAsString() << "\"");
         }
 
-        if (!instanceOf<Args..., void>(getMozJSScope(cx), &isProto, args.thisv())) {
+        if (!instanceOf<Args..., void>(getCommonRuntime(cx), &isProto, args.thisv())) {
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "Cannot call \"" << T::name() << "\" on object of type \""
                                     << ObjectWrapper(cx, args.thisv()).getClassName() << "\"");

@@ -43,6 +43,32 @@
 #include <unistd.h>
 #endif
 
+// If building for WASI/wasm, noop all debugger functionality to avoid POSIX/signal/fork issues.
+// See https://github.com/WebAssembly/WASI/issues/166
+#if defined(__wasi__) || defined(__WASI__) || defined(__wasm__) || defined(__wasm32__)
+
+namespace mongo {
+
+void breakpoint() {
+    // no-op under WASI
+}
+
+void setupSIGTRAPforDebugger() {
+    // no-op under WASI
+}
+
+void waitForDebugger() {
+    // no-op under WASI
+}
+
+bool isDebuggerActive() {
+    return false;
+}
+
+}  // namespace mongo
+
+#else  // non-WASI builds
+
 #ifndef _WIN32
 namespace {
 std::once_flag breakpointOnceFlag;
@@ -199,3 +225,5 @@ bool isDebuggerActive() {
 }
 
 }  // namespace mongo
+#endif
+

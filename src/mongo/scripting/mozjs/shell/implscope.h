@@ -44,7 +44,6 @@
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/global.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/types/code.h"
@@ -74,6 +73,7 @@
 #include "mongo/scripting/mozjs/shell/mongo.h"
 #include "mongo/scripting/mozjs/shell/mongohelpers.h"
 #include "mongo/scripting/mozjs/shell/resumetoken.h"
+#include "mongo/scripting/mozjs/shell/runtime.h"
 #include "mongo/scripting/mozjs/shell/session.h"
 #include "mongo/scripting/mozjs/shell/uri.h"
 #include "mongo/stdx/condition_variable.h"
@@ -131,15 +131,20 @@ const StringData kUnknownError = "Unknown Failure from JSInterpreter";
  *
  * For more information about overriden fields, see mongo::Scope
  */
-class MONGO_MOD_PUB MozJSImplScope final : public MozJSScopeBase {
+class MONGO_MOD_PUB MozJSImplScope final : public Scope,
+                                           public MozJSShellRuntimeInterface,
+                                           public MozJSCommonRuntimeInterface {
     MozJSImplScope(const MozJSImplScope&) = delete;
     MozJSImplScope& operator=(const MozJSImplScope&) = delete;
+
+    template <typename T>
+    friend WrapType<T>& getProto(MozJSCommonRuntimeInterface*);
 
 public:
     explicit MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB);
     ~MozJSImplScope() override;
 
-    // ---- MozJSScopeBase (common) surface ----
+    // ---- Proto accessors ----
     WrapType<BinDataInfo>& binDataProto() override {
         return _binDataProto;
     }
@@ -668,13 +673,37 @@ private:
 };
 
 MONGO_MOD_PUB inline MozJSImplScope* getScope(JSContext* cx) {
-    return static_cast<MozJSImplScope*>(JS_GetContextPrivate(cx));
+    return static_cast<MozJSImplScope*>(getCommonRuntime(cx));
 }
 
 inline MozJSImplScope* getScope(class JS::GCContext* gcCtx) {
     return getScope(freeOpToJSContext(gcCtx));
 }
 
+template <>
+inline WrapType<CursorHandleInfo>& getProto(MozJSCommonRuntimeInterface* runtime) {
+    return static_cast<MozJSImplScope*>(runtime)->cursorHandleProto();
+}
+
+template <>
+inline WrapType<CursorInfo>& getProto(MozJSCommonRuntimeInterface* runtime) {
+    return static_cast<MozJSImplScope*>(runtime)->cursorProto();
+}
+
+template <>
+inline WrapType<MongoExternalInfo>& getProto(MozJSCommonRuntimeInterface* runtime) {
+    return static_cast<MozJSImplScope*>(runtime)->mongoExternalProto();
+}
+
+template <>
+inline WrapType<SessionInfo>& getProto(MozJSCommonRuntimeInterface* runtime) {
+    return static_cast<MozJSImplScope*>(runtime)->sessionProto();
+}
+
+template <>
+inline WrapType<URIInfo>& getProto(MozJSCommonRuntimeInterface* runtime) {
+    return static_cast<MozJSImplScope*>(runtime)->uriProto();
+}
 
 }  // namespace mozjs
 }  // namespace mongo

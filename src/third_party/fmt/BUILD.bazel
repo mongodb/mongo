@@ -6,8 +6,11 @@ mongo_cc_library(
     name = "fmt",
     srcs = [
         "dist/src/format.cc",
-        "dist/src/os.cc",
-    ],
+    ] + select({
+        # os.cc uses POSIX I/O (dup, dup2, pipe) not available in WASI
+        "@platforms//os:wasi": [],
+        "//conditions:default": ["dist/src/os.cc"],
+    }),
     hdrs = glob([
         "dist/include/fmt/*.h",
     ]),
@@ -21,4 +24,9 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     includes = ["dist/include"],
+    local_defines = select({
+        # Disable POSIX file operations for WASI
+        "@platforms//os:wasi": ["FMT_USE_FCNTL=0"],
+        "//conditions:default": [],
+    }),
 )

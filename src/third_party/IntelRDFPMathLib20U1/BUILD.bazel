@@ -22,20 +22,30 @@ INTEL_RDFP_MATHLIB_DEFINES = [
     "DECIMAL_CALL_BY_REFERENCE=0",
     "DECIMAL_GLOBAL_ROUNDING=0",
     "DECIMAL_GLOBAL_EXCEPTION_FLAGS=0",
-    "UNCHANGED_BINARY_STATUS_FLAGS=0",
     "USE_COMPILER_F128_TYPE=0",
     "USE_COMPILER_F80_TYPE=0",
     "USE_NATIVE_QUAD_TYPE=0",
 ] + select({
+    # WASI/WASM: treat as Linux-like.
+    # Do NOT define UNCHANGED_BINARY_STATUS_FLAGS so that
+    # BID_OPT_RESTORE_BINARY_FLAGS() becomes a no-op (WASI has no fenv.h).
+    "@platforms//os:wasi": [
+        "LINUX=1",
+        "linux=1",
+    ],
     "@platforms//os:linux": [
         "LINUX=1",
         "linux=1",
+        "UNCHANGED_BINARY_STATUS_FLAGS=0",
     ],
     "@platforms//os:macos": [
         "LINUX=1",
         "mach=1",
+        "UNCHANGED_BINARY_STATUS_FLAGS=0",
     ],
-    "//conditions:default": [],
+    "//conditions:default": [
+        "UNCHANGED_BINARY_STATUS_FLAGS=0",
+    ],
 }) + select({
     "@platforms//cpu:s390x": [
         "s390x=1",

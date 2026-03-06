@@ -31,7 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
@@ -64,7 +64,7 @@ void NumberIntInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto x = JS::GetMaybePtrFromReservedSlot<int>(obj, IntSlot);
 
     if (x)
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), x);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), x);
 }
 
 int NumberIntInfo::ToNumberInt(JSContext* cx, JS::HandleValue thisv) {
@@ -107,7 +107,7 @@ void NumberIntInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
 void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS::RootedObject thisv(cx);
 
-    getProto<NumberIntInfo>(getMozJSScope(cx)).newObject(&thisv);
+    getCommonRuntime(cx)->numberIntProto().newObject(&thisv);
 
     int32_t x = 0;
 
@@ -118,7 +118,7 @@ void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         uasserted(ErrorCodes::BadValue, "NumberInt takes 0 or 1 arguments");
     }
-    JS::SetReservedSlot(thisv, IntSlot, JS::PrivateValue(trackedNew<int>(getMozJSScope(cx), x)));
+    JS::SetReservedSlot(thisv, IntSlot, JS::PrivateValue(trackedNew<int>(getCommonRuntime(cx), x)));
 
     args.rval().setObjectOrNull(thisv);
 }

@@ -32,7 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/wraptype.h"
 #include "mongo/util/assert_util.h"
@@ -115,9 +115,9 @@ void DBRefInfo::make(
     JS::RootedObject local(cx);
     BSONInfo::make(cx, &local, std::move(bson), parent, ro);
 
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
-    getProto<DBRefInfo>(scope).newObject(obj);
+    getProto<DBRefInfo>(runtime).newObject(obj);
 
     JS::SetReservedSlot(
         obj,

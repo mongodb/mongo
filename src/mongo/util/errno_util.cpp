@@ -38,7 +38,7 @@
 #include <winsock2.h>
 #endif
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__wasi__)
 #include <netdb.h>
 #endif
 
@@ -64,6 +64,8 @@ public:
     std::string message(int e) const override {
 #ifdef _WIN32
         return systemError(e).message();
+#elif defined(__wasi__)
+        return "getaddrinfo error " + std::to_string(e) + " (networking not supported in WASI)";
 #else
         return gai_strerror(e);
 #endif

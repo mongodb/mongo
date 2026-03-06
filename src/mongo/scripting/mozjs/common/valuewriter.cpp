@@ -33,11 +33,12 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/js_regex.h"
 #include "mongo/scripting/mozjs/common/exception.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/code.h"
 #include "mongo/scripting/mozjs/common/types/dbpointer.h"
@@ -137,22 +138,22 @@ int ValueWriter::type() {
         }
 
         if (auto jsClass = JS::GetClass(obj)) {
-            auto scope = getMozJSScope(_context);
-            if (scope->numberIntProto().getJSClass() == jsClass) {
+            auto runtime = getCommonRuntime(_context);
+            if (runtime->numberIntProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::numberInt);
-            } else if (scope->numberLongProto().getJSClass() == jsClass) {
+            } else if (runtime->numberLongProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::numberLong);
-            } else if (scope->numberDecimalProto().getJSClass() == jsClass) {
+            } else if (runtime->numberDecimalProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::numberDecimal);
-            } else if (scope->oidProto().getJSClass() == jsClass) {
+            } else if (runtime->oidProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::oid);
-            } else if (scope->binDataProto().getJSClass() == jsClass) {
+            } else if (runtime->binDataProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::binData);
-            } else if (scope->timestampProto().getJSClass() == jsClass) {
+            } else if (runtime->timestampProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::timestamp);
-            } else if (scope->minKeyProto().getJSClass() == jsClass) {
+            } else if (runtime->minKeyProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::minKey);
-            } else if (scope->maxKeyProto().getJSClass() == jsClass) {
+            } else if (runtime->maxKeyProto().getJSClass() == jsClass) {
                 return stdx::to_underlying(BSONType::maxKey);
             }
         }
@@ -251,7 +252,7 @@ int32_t ValueWriter::toInt32() {
 
 int64_t ValueWriter::toInt64() {
     int64_t out;
-    if (getMozJSScope(_context)->numberLongProto().instanceOf(_value))
+    if (getCommonRuntime(_context)->numberLongProto().instanceOf(_value))
         return NumberLongInfo::ToNumberLong(_context, _value);
 
     if (JS::ToInt64(_context, _value, &out))
@@ -265,13 +266,13 @@ Decimal128 ValueWriter::toDecimal128() {
     if (_value.isNumber()) {
         return Decimal128(toNumber(), Decimal128::kRoundTo15Digits);
     }
-    if (getMozJSScope(_context)->numberIntProto().instanceOf(_value))
+    if (getCommonRuntime(_context)->numberIntProto().instanceOf(_value))
         return Decimal128(NumberIntInfo::ToNumberInt(_context, _value));
 
-    if (getMozJSScope(_context)->numberLongProto().instanceOf(_value))
+    if (getCommonRuntime(_context)->numberLongProto().instanceOf(_value))
         return Decimal128(static_cast<int64_t>(NumberLongInfo::ToNumberLong(_context, _value)));
 
-    if (getMozJSScope(_context)->numberDecimalProto().instanceOf(_value))
+    if (getCommonRuntime(_context)->numberDecimalProto().instanceOf(_value))
         return NumberDecimalInfo::ToNumberDecimal(_context, _value);
 
     if (_value.isString()) {
@@ -296,7 +297,7 @@ Decimal128 ValueWriter::toDecimal128() {
 }
 
 OID ValueWriter::toOID() {
-    if (getMozJSScope(_context)->oidProto().instanceOf(_value)) {
+    if (getCommonRuntime(_context)->oidProto().instanceOf(_value)) {
         return OIDInfo::getOID(_context, _value);
     }
 
@@ -304,7 +305,7 @@ OID ValueWriter::toOID() {
 }
 
 void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData) {
-    if (!getMozJSScope(_context)->binDataProto().instanceOf(_value)) {
+    if (!getCommonRuntime(_context)->binDataProto().instanceOf(_value)) {
         throwCurrentJSException(_context, ErrorCodes::BadValue, "Unable to write BinData value.");
     }
 
@@ -318,9 +319,8 @@ void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData)
     uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", binDataStr);
 
     auto binData = base64::decode(*binDataStr);
-    withBinData(BSONBinData(binData.c_str(),
-                            binData.size(),
-                            static_cast<mongo::BinDataType>(static_cast<int>(subType))));
+    withBinData(BSONBinData(
+        binData.c_str(), binData.size(), static_cast<BinDataType>(static_cast<int>(subType))));
 }
 
 Timestamp ValueWriter::toTimestamp() {
@@ -328,7 +328,7 @@ Timestamp ValueWriter::toTimestamp() {
 
     uassert(ErrorCodes::BadValue,
             "Unable to write Timestamp value.",
-            getMozJSScope(_context)->timestampProto().getJSClass() == JS::GetClass(obj));
+            getCommonRuntime(_context)->timestampProto().getJSClass() == JS::GetClass(obj));
 
     return TimestampInfo::getValidatedValue(_context, obj);
 }
@@ -393,7 +393,7 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
 void ValueWriter::_writeObject(BSONObjBuilder* b,
                                StringData sd,
                                ObjectWrapper::WriteFieldRecursionFrames* frames) {
-    auto scope = getMozJSScope(_context);
+    auto runtime = getCommonRuntime(_context);
 
     // We open a block here because it's important that the two rooting types
     // we need (obj and o) go out of scope before we actually open a
@@ -407,26 +407,26 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
         auto jsclass = JS::GetClass(obj);
 
         if (jsclass) {
-            if (scope->oidProto().getJSClass() == jsclass) {
+            if (runtime->oidProto().getJSClass() == jsclass) {
                 b->append(sd, OIDInfo::getOID(_context, obj));
 
                 return;
             }
 
-            if (scope->numberLongProto().getJSClass() == jsclass) {
+            if (runtime->numberLongProto().getJSClass() == jsclass) {
                 long long out = NumberLongInfo::ToNumberLong(_context, obj);
                 b->append(sd, out);
 
                 return;
             }
 
-            if (scope->numberIntProto().getJSClass() == jsclass) {
+            if (runtime->numberIntProto().getJSClass() == jsclass) {
                 b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
 
                 return;
             }
 
-            if (scope->codeProto().getJSClass() == jsclass) {
+            if (runtime->codeProto().getJSClass() == jsclass) {
                 if (o.hasOwnField(InternedString::scope)  // CodeWScope
                     && o.type(InternedString::scope) == stdx::to_underlying(BSONType::object)) {
                     if (o.type(InternedString::code) != stdx::to_underlying(BSONType::string)) {
@@ -445,16 +445,16 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 return;
             }
 
-            if (scope->numberDecimalProto().getJSClass() == jsclass) {
+            if (runtime->numberDecimalProto().getJSClass() == jsclass) {
                 b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
 
                 return;
             }
 
-            if (scope->dbPointerProto().getJSClass() == jsclass) {
+            if (runtime->dbPointerProto().getJSClass() == jsclass) {
                 uassert(ErrorCodes::BadValue,
                         "can't serialize DBPointer prototype",
-                        scope->dbPointerProto().getProto() != obj);
+                        runtime->dbPointerProto().getProto() != obj);
 
                 JS::RootedValue id(_context);
                 o.getValue("id", &id);
@@ -464,7 +464,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
                 return;
             }
 
-            if (scope->binDataProto().getJSClass() == jsclass) {
+            if (runtime->binDataProto().getJSClass() == jsclass) {
                 auto str = JS::GetMaybePtrFromReservedSlot<std::string>(
                     obj, BinDataInfo::BinDataStringSlot);
 
@@ -479,26 +479,26 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
                 b->appendBinData(sd,
                                  binData.size(),
-                                 static_cast<mongo::BinDataType>(static_cast<int>(subType)),
+                                 static_cast<BinDataType>(static_cast<int>(subType)),
                                  binData.c_str());
 
                 return;
             }
 
-            if (scope->timestampProto().getJSClass() == jsclass) {
+            if (runtime->timestampProto().getJSClass() == jsclass) {
                 Timestamp ot = TimestampInfo::getValidatedValue(_context, obj);
                 b->append(sd, ot);
 
                 return;
             }
 
-            if (scope->minKeyProto().getJSClass() == jsclass) {
+            if (runtime->minKeyProto().getJSClass() == jsclass) {
                 b->appendMinKey(sd);
 
                 return;
             }
 
-            if (scope->maxKeyProto().getJSClass() == jsclass) {
+            if (runtime->maxKeyProto().getJSClass() == jsclass) {
                 b->appendMaxKey(sd);
 
                 return;
@@ -511,7 +511,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             case JSProto_Function: {
                 uassert(16716,
                         "cannot convert native function to BSON",
-                        !scope->nativeFunctionProto().instanceOf(obj));
+                        !runtime->nativeFunctionProto().instanceOf(obj));
                 JSStringWrapper jsstr;
                 b->appendCode(sd, ValueWriter(_context, _value).toStringData(&jsstr));
                 return;

@@ -232,6 +232,7 @@ class Linter:
             files_to_ignore = set(
                 [
                     "src/mongo/scripting/mozjs/shell/PosixNSPR.cpp",
+                    "src/mongo/scripting/mozjs/wasm/wit_gen/generated/",
                     "src/mongo/shell/linenoise.cpp",
                     "src/mongo/shell/linenoise.h",
                     "src/mongo/shell/mk_wcwidth.cpp",

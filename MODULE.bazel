@@ -57,6 +57,28 @@ filegroup(
     ] * 5,
 )
 
+http_file(
+    name = "mozjs_wasm",
+    downloaded_file_path = "mozjs_wasm_api.wasm",
+    sha256 = "3d5a780b657fdfe66cc2f45f141e9e89e9bcb5ab7a1c90f0fb4778b5c0080b15",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/wasm_scratch/mozjs_wasm_api.wasm",
+    ] * 5,
+)
+
+http_file(
+    name = "spidermonkey_wasip2_dist",
+    downloaded_file_path = "spidermonkey-wasip2-release.tar.gz",
+    sha256 = "f528e5730721559781aef47d355079da63185588bb14ebb6bf5266d4aa5e3eb0",
+    urls = [
+        # Implements retry by relisting each url multiple times to be used as a failover.
+        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
+        "https://mdb-build-public.s3.us-east-1.amazonaws.com/wasm_scratch/spidermonkey-wasip2-release.tar.gz",
+    ] * 5,
+)
+
 # SourceGraph indexer
 http_file(
     name = "scip-clang",
@@ -362,3 +384,14 @@ wasi_deps = use_repo_rule(
 )
 
 wasi_deps(name = "wasi_sdk")
+
+spidermonkey_repo = use_repo_rule(
+    "//src/mongo/scripting/mozjs/wasm:spidermonkey_repo.bzl",
+    "spidermonkey_repository",
+)
+
+spidermonkey_repo(
+    name = "spidermonkey",
+    repository_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-repository",
+    version_file = "//src/mongo/scripting/mozjs/wasm/spider-monkey:spider-monkey-version",
+)

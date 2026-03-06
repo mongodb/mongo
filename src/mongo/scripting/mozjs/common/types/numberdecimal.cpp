@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
@@ -66,7 +66,7 @@ void NumberDecimalInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto x = JS::GetMaybePtrFromReservedSlot<Decimal128>(obj, Decimal128Slot);
 
     if (x)
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), x);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), x);
 }
 
 Decimal128 NumberDecimalInfo::ToNumberDecimal(JSContext* cx, JS::HandleValue thisv) {
@@ -97,11 +97,11 @@ void NumberDecimalInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args
 }
 
 void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedObject thisv(cx);
 
-    getProto<NumberDecimalInfo>(scope).newObject(&thisv);
+    getProto<NumberDecimalInfo>(runtime).newObject(&thisv);
 
     Decimal128 x(0);
 
@@ -112,18 +112,19 @@ void NumberDecimalInfo::construct(JSContext* cx, JS::CallArgs args) {
     } else {
         uasserted(ErrorCodes::BadValue, "NumberDecimal takes 0 or 1 arguments");
     }
-    JS::SetReservedSlot(thisv, Decimal128Slot, JS::PrivateValue(trackedNew<Decimal128>(scope, x)));
+    JS::SetReservedSlot(
+        thisv, Decimal128Slot, JS::PrivateValue(trackedNew<Decimal128>(runtime, x)));
 
     args.rval().setObjectOrNull(thisv);
 }
 
 void NumberDecimalInfo::make(JSContext* cx, JS::MutableHandleValue thisv, Decimal128 decimal) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
-    getProto<NumberDecimalInfo>(scope).newObject(thisv);
+    getProto<NumberDecimalInfo>(runtime).newObject(thisv);
     JS::SetReservedSlot(thisv.toObjectOrNull(),
                         Decimal128Slot,
-                        JS::PrivateValue(trackedNew<Decimal128>(scope, decimal)));
+                        JS::PrivateValue(trackedNew<Decimal128>(runtime, decimal)));
 }
 
 }  // namespace mozjs

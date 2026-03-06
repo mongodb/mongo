@@ -217,6 +217,10 @@ mongo_cc_library(
             "libs/thread/src/pthread/once.cpp",
             "libs/thread/src/pthread/thread.cpp",
         ],
+        "@platforms//os:wasi": [
+            "libs/thread/src/pthread/once.cpp",
+            "libs/thread/src/pthread/thread.cpp",
+        ],
         "@platforms//os:windows": [
             "libs/thread/src/win32/thread.cpp",
             "libs/thread/src/win32/thread_primitives.cpp",
@@ -231,6 +235,9 @@ mongo_cc_library(
         "@platforms//os:macos": [
             "libs/thread/src/pthread/once_atomic.cpp",
         ],
+        "@platforms//os:wasi": [
+            "libs/thread/src/pthread/once_atomic.cpp",
+        ],
         "//conditions:default": [],
     }),
     copts = BOOST_COPTS,
@@ -240,6 +247,9 @@ mongo_cc_library(
             "BOOST_THREAD_PTHREAD",
         ],
         "@platforms//os:macos": [
+            "BOOST_THREAD_PTHREAD",
+        ],
+        "@platforms//os:wasi": [
             "BOOST_THREAD_PTHREAD",
         ],
         "@platforms//os:windows": [
@@ -287,9 +297,7 @@ mongo_cc_library(
         "libs/log/src/trivial.cpp",
     ] + select({
         "@platforms//os:windows": [],
-        "//conditions:default": [
-            "libs/log/src/syslog_backend.cpp",
-        ],
+        "//conditions:default": ["libs/log/src/syslog_backend.cpp"],
     }),
     hdrs = BOOST_LIB_HEADERS,
     copts = BOOST_COPTS + select({

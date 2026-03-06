@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/logv2/log_domain_global.h"
 
 #include <cstdint>
@@ -92,7 +91,14 @@ struct LogDomainGlobal::Impl {
                              RamLogSink,
                              UserAssertSink>
         ConsoleBackend;
-#ifndef _WIN32
+// Syslog support is conditionally compiled using Boost's BOOST_LOG_USE_NATIVE_SYSLOG macro.
+// This macro is defined by Boost.Log only when the platform provides a native syslog
+// implementation (via <syslog.h>). Platforms that lack syslog, notably WASI and Windows
+// will not have this macro defined, causing all syslog-related
+// types, members, and logic to be excluded from compilation. This avoids link errors and
+// unavailable-API references on those platforms without requiring us to maintain our own
+// platform-detection logic.
+#ifdef BOOST_LOG_USE_NATIVE_SYSLOG
     typedef CompositeBackend<boost::log::sinks::syslog_backend,
                              RamLogSink,
                              RamLogSink,
@@ -118,7 +124,7 @@ struct LogDomainGlobal::Impl {
     boost::shared_ptr<boost::log::sinks::unlocked_sink<ConsoleBackend>> _consoleSink;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<RotatableFileBackend>> _rotatableFileSink;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<BacktraceBackend>> _backtraceSink;
-#ifndef _WIN32
+#ifdef BOOST_LOG_USE_NATIVE_SYSLOG
     boost::shared_ptr<boost::log::sinks::unlocked_sink<SyslogBackend>> _syslogSink;
 #endif
     AtomicWord<int32_t> activeSourceThreadLocals{0};
@@ -152,7 +158,7 @@ LogDomainGlobal::Impl::Impl(LogDomainGlobal& parent) : _parent(parent) {
 }
 
 Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions const& options) {
-#ifndef _WIN32
+#ifdef BOOST_LOG_USE_NATIVE_SYSLOG
     if (options.syslogEnabled) {
         // Create a backend
         auto backend = boost::make_shared<SyslogBackend>(
@@ -244,7 +250,7 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         _consoleSink->set_formatter(mkFmt());
         if (_rotatableFileSink)
             _rotatableFileSink->set_formatter(mkFmt());
-#ifndef _WIN32
+#ifdef BOOST_LOG_USE_NATIVE_SYSLOG
         if (_syslogSink)
             _syslogSink->set_formatter(mkFmt());
 #endif

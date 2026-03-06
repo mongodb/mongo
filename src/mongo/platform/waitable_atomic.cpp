@@ -235,6 +235,39 @@ bool waitUntil(const void* uaddr,
     return timeoutOverflow || errno != ETIMEDOUT;
 }
 
+#elif defined(__wasi__)
+
+// WASI is single-threaded and has no futex or atomic-wait primitives.
+// notify* are no-ops; waitUntil returns false (timeout) when the value
+// hasn't changed because a single-threaded environment can never receive
+// an external wake-up. Returning true would cause an infinite busy-spin.
+
+void notifyOne(const void* uaddr) {
+    (void)uaddr;
+}
+
+void notifyMany(const void* uaddr, int nToWake) {
+    (void)uaddr;
+    (void)nToWake;
+}
+
+void notifyAll(const void* uaddr) {
+    (void)uaddr;
+}
+
+bool waitUntil(const void* uaddr,
+               uint32_t old,
+               boost::optional<system_clock::time_point> deadline) {
+    // Value already changed before we started waiting.
+    if (*static_cast<const uint32_t*>(uaddr) != old) {
+        return true;
+    }
+
+    // Single-threaded: the value cannot change during this call.
+    // Return false (timeout) to avoid infinite busy-spin.
+    return false;
+}
+
 #else
 #error "Need an implementation of waitUntil(), notifyOne(), notifyMany(), notifyAll() for this OS"
 #endif

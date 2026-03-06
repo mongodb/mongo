@@ -1,0 +1,11 @@
+[package]
+name = "mongo_wasip2_rust_shims"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+encoding_c = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/encoding_c" }
+encoding_c_mem = { path = "{{SPIDERMONKEY_ROOT}}/third_party/rust/encoding_c_mem" }

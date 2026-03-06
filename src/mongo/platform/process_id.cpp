@@ -80,6 +80,13 @@ inline NativeProcessId getCurrentNativeThreadId() {
 inline NativeProcessId getCurrentNativeThreadId() {
     return pthread_getthreadid_np();
 }
+#elif defined(__wasi__)
+inline NativeProcessId getCurrentNativeThreadId() {
+    // WASI doesn't support threads or thread IDs, so return a constant value
+    // Using the SERVER-115422 ticket number as a return number for better debugging
+    // and searchability in logs.
+    return 115422;
+}
 #else
 inline NativeProcessId getCurrentNativeThreadId() {
     return ::syscall(SYS_gettid);

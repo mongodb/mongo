@@ -35,7 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/types/code.h"
@@ -58,7 +58,9 @@
 #include <cstdio>
 #include <iosfwd>
 
+#if !defined(MONGO_MOZJS_WASI_BUILD)
 #include <jscustomallocator.h>
+#endif
 
 #include <js/Array.h>
 #include <js/CharacterEncoding.h>
@@ -83,36 +85,34 @@ ValueReader::ValueReader(JSContext* cx, JS::MutableHandleValue value)
     : _context(cx), _value(value) {}
 
 void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly) {
-    auto scope = getMozJSScope(_context);
+    auto runtime = getCommonRuntime(_context);
 
     switch (elem.type()) {
         case BSONType::code:
             // javascriptProtection prevents Code and CodeWScope BSON types from
             // being automatically marshalled into executable functions.
-            if (scope->isJavaScriptProtectionEnabled()) {
+            if (runtime->isJavaScriptProtectionEnabled()) {
                 JS::RootedValueArray<1> args(_context);
                 ValueReader(_context, args[0]).fromStringData(elem.valueStringData());
-
-                JS::RootedObject obj(_context);
-                getProto<CodeInfo>(scope).newInstance(args, _value);
+                getProto<CodeInfo>(runtime).newInstance(args, _value);
             } else {
-                scope->newFunction(elem.valueStringData(), _value);
+                runtime->newFunction(elem.valueStringData(), _value);
             }
             return;
         case BSONType::codeWScope:
-            if (scope->isJavaScriptProtectionEnabled()) {
+            if (runtime->isJavaScriptProtectionEnabled()) {
                 JS::RootedValueArray<2> args(_context);
-
                 ValueReader(_context, args[0]).fromStringData(elem.codeWScopeCode());
                 ValueReader(_context, args[1])
                     .fromBSON(elem.codeWScopeObject().getOwned(), nullptr, readOnly);
-
-                getProto<CodeInfo>(scope).newInstance(args, _value);
+                getProto<CodeInfo>(runtime).newInstance(args, _value);
             } else {
+#ifndef MONGO_MOZJS_WASI_BUILD
                 if (!elem.codeWScopeObject().isEmpty())
                     LOGV2_WARNING(23826, "CodeWScope doesn't transfer to db.eval");
-                scope->newFunction(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
-                                   _value);
+#endif
+                runtime->newFunction(
+                    StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1), _value);
             }
             return;
         case BSONType::symbol:
@@ -157,7 +157,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             ValueReader(_context, args[1]).fromStringData(elem.regexFlags());
 
             JS::RootedObject obj(_context);
-            getProto<RegExpInfo>(scope).newInstance(args, &obj);
+            getProto<RegExpInfo>(runtime).newInstance(args, &obj);
 
             _value.setObjectOrNull(obj);
 
@@ -175,7 +175,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             ValueReader(_context, args[1]).fromStringData(ss.str());
 
-            getProto<BinDataInfo>(scope).newInstance(args, _value);
+            getProto<BinDataInfo>(runtime).newInstance(args, _value);
             return;
         }
         case BSONType::timestamp: {
@@ -185,16 +185,16 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 .fromDouble(static_cast<double>(elem.timestampTime().toMillisSinceEpoch()) / 1000);
             ValueReader(_context, args[1]).fromDouble(elem.timestampInc());
 
-            getProto<TimestampInfo>(scope).newInstance(args, _value);
+            getProto<TimestampInfo>(runtime).newInstance(args, _value);
 
             return;
         }
         case BSONType::numberLong: {
             JS::RootedObject thisv(_context);
-            getProto<NumberLongInfo>(scope).newObject(&thisv);
+            getProto<NumberLongInfo>(runtime).newObject(&thisv);
             JS::SetReservedSlot(thisv,
                                 NumberLongInfo::Int64Slot,
-                                JS::PrivateValue(scope->trackedNewInt64(elem.numberLong())));
+                                JS::PrivateValue(runtime->trackedNewInt64(elem.numberLong())));
             _value.setObjectOrNull(thisv);
             return;
         }
@@ -204,16 +204,16 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             ValueReader(_context, args[0]).fromDecimal128(decimal);
             JS::RootedObject obj(_context);
 
-            getProto<NumberDecimalInfo>(scope).newInstance(args, &obj);
+            getProto<NumberDecimalInfo>(runtime).newInstance(args, &obj);
             _value.setObjectOrNull(obj);
 
             return;
         }
         case BSONType::minKey:
-            getProto<MinKeyInfo>(scope).newInstance(_value);
+            getProto<MinKeyInfo>(runtime).newInstance(_value);
             return;
         case BSONType::maxKey:
-            getProto<MaxKeyInfo>(scope).newInstance(_value);
+            getProto<MaxKeyInfo>(runtime).newInstance(_value);
             return;
         case BSONType::dbRef: {
             JS::RootedValueArray<1> oidArgs(_context);
@@ -221,9 +221,9 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             JS::RootedValueArray<2> dbPointerArgs(_context);
             ValueReader(_context, dbPointerArgs[0]).fromStringData(elem.dbrefNS());
-            getProto<OIDInfo>(scope).newInstance(oidArgs, dbPointerArgs[1]);
+            getProto<OIDInfo>(runtime).newInstance(oidArgs, dbPointerArgs[1]);
 
-            getProto<DBPointerInfo>(scope).newInstance(dbPointerArgs, _value);
+            getProto<DBPointerInfo>(runtime).newInstance(dbPointerArgs, _value);
             return;
         }
         default:
@@ -337,11 +337,11 @@ void ValueReader::fromDouble(double d) {
 }
 
 void ValueReader::fromInt64(int64_t i) {
-    auto scope = getMozJSScope(_context);
+    auto runtime = getCommonRuntime(_context);
     JS::RootedObject num(_context);
-    getProto<NumberLongInfo>(scope).newObject(&num);
+    getProto<NumberLongInfo>(runtime).newObject(&num);
     JS::SetReservedSlot(
-        num, NumberLongInfo::Int64Slot, JS::PrivateValue(scope->trackedNewInt64(i)));
+        num, NumberLongInfo::Int64Slot, JS::PrivateValue(runtime->trackedNewInt64(i)));
     _value.setObjectOrNull(num);
 }
 

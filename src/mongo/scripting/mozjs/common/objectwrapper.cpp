@@ -33,8 +33,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/js_regex.h"
 #include "mongo/scripting/mozjs/common/idwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/types/dbref.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
@@ -599,9 +600,9 @@ void ObjectWrapper::callMethod(JS::HandleValue fun, JS::MutableHandleValue out) 
 }
 
 BSONObj ObjectWrapper::toBSON() {
-    auto* scope = getMozJSScope(_context);
-    if (getProto<BSONInfo>(scope).instanceOf(_object) ||
-        getProto<DBRefInfo>(scope).instanceOf(_object)) {
+    auto* runtime = getCommonRuntime(_context);
+    if (getProto<BSONInfo>(runtime).instanceOf(_object) ||
+        getProto<DBRefInfo>(runtime).instanceOf(_object)) {
         BSONObj* originalBSON = nullptr;
         bool altered;
 
@@ -734,9 +735,9 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
         }
     }
 
-    auto* scope = getMozJSScope(cx);
-    if (getProto<BSONInfo>(scope).instanceOf(thisv) ||
-        getProto<DBRefInfo>(scope).instanceOf(thisv)) {
+    auto* runtime = getCommonRuntime(cx);
+    if (getProto<BSONInfo>(runtime).instanceOf(thisv) ||
+        getProto<DBRefInfo>(runtime).instanceOf(thisv)) {
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(cx, thisv);
     }
 }

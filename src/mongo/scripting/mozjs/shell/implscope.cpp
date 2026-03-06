@@ -582,7 +582,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
     {
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
-        JS_SetContextPrivate(_context, this);
+        JS_SetContextPrivate(_context, static_cast<MozJSCommonRuntimeInterface*>(this));
 
         JSAutoRealm ac(_context, _global);
         _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
@@ -629,6 +629,10 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 
 #endif
     currentJSScope = this;
+}
+
+MozJSShellRuntimeInterface* getShellRuntime(JSContext* cx) {
+    return static_cast<MozJSImplScope*>(getCommonRuntime(cx));
 }
 
 MozJSImplScope::~MozJSImplScope() {

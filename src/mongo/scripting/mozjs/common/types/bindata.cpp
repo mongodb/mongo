@@ -38,7 +38,7 @@
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
@@ -97,7 +97,7 @@ void hexToBinData(JSContext* cx,
                   int type,
                   const JS::Handle<JS::Value> hexdata,
                   JS::MutableHandleValue out) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
     uassert(ErrorCodes::BadValue, "BinData data must be a String", hexdata.isString());
 
     auto hexstr = ValueWriter(cx, hexdata).toString();
@@ -110,7 +110,7 @@ void hexToBinData(JSContext* cx,
 
     args[0].setInt32(type);
     ValueReader(cx, args[1]).fromStringData(encoded);
-    return getProto<BinDataInfo>(scope).newInstance(args, out);
+    return getProto<BinDataInfo>(runtime).newInstance(args, out);
 }
 
 std::string* getEncoded(JS::HandleValue thisv) {
@@ -128,7 +128,7 @@ void BinDataInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto str = getEncoded(obj);
 
     if (str) {
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), str);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), str);
     }
 }
 
@@ -156,7 +156,7 @@ void BinDataInfo::Functions::UUID::call(JSContext* cx, JS::CallArgs args) {
     JS::RootedValueArray<2> newArgs(cx);
     newArgs[0].setInt32(newUUID);
     ValueReader(cx, newArgs[1]).fromStringData(encoded);
-    getProto<BinDataInfo>(getMozJSScope(cx)).newInstance(newArgs, args.rval());
+    getCommonRuntime(cx)->binDataProto().newInstance(newArgs, args.rval());
 }
 
 void BinDataInfo::Functions::MD5::call(JSContext* cx, JS::CallArgs args) {
@@ -247,7 +247,7 @@ void BinDataInfo::Functions::hex::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     if (args.length() != 2) {
         uasserted(ErrorCodes::BadValue, "BinData takes 2 arguments -- BinData(subtype,data)");
@@ -271,7 +271,7 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto tmpBase64 = mongo::base64::decode(str);
 
     JS::RootedObject thisv(cx);
-    getProto<BinDataInfo>(scope).newObject(&thisv);
+    getProto<BinDataInfo>(runtime).newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS::RootedValue len(cx);
@@ -280,8 +280,9 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.defineProperty(InternedString::len, len, JSPROP_READONLY);
     o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
-    JS::SetReservedSlot(
-        thisv, BinDataStringSlot, JS::PrivateValue(trackedNew<std::string>(scope, std::move(str))));
+    JS::SetReservedSlot(thisv,
+                        BinDataStringSlot,
+                        JS::PrivateValue(trackedNew<std::string>(runtime, std::move(str))));
 
     args.rval().setObjectOrNull(thisv);
 }

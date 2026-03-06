@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/valuewriter.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
@@ -79,10 +79,10 @@ double getTimestampComponent(JSContext* cx, JS::HandleValue component, std::stri
 }  // namespace
 
 void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto* scope = getMozJSScope(cx);
+    auto* runtime = getCommonRuntime(cx);
 
     JS::RootedObject thisv(cx);
-    getProto<TimestampInfo>(scope).newObject(&thisv);
+    getProto<TimestampInfo>(runtime).newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     if (args.length() == 0) {

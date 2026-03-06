@@ -1306,7 +1306,7 @@
         "usagesDigest": "9e6XGcxkYrSsu0+gftPsVGZrX02VFK68P4HmulrwVAE=",
         "recordedFileInputs": {
           "@@//src/third_party/wasmtime/BUILD.bazel.wasmtime": "f8f59cc6f0f55ead667c8b438e3d056250807cbb565b0cfe1c4b7bce196ca22f",
-          "@@//MODULE.bazel": "8fc6eef7f959c870cba70c101a56f6e7148dfde24ce476d7f02f0e4002c929ea",
+          "@@//MODULE.bazel": "dc17238883ec055ae6309e1489ddfec05de2c74dd5fd3671ce4153b9316d4a46",
           "@@rules_rust~~rust_host_tools~rust_host_tools//rust_host_tools": "ENOENT"
         },
         "recordedDirentsInputs": {},

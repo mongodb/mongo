@@ -35,7 +35,7 @@
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
 #include "mongo/scripting/mozjs/common/objectwrapper.h"
-#include "mongo/scripting/mozjs/common/scope_base.h"
+#include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/valuereader.h"
 #include "mongo/scripting/mozjs/common/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
@@ -70,7 +70,7 @@ Status MongoStatusInfo::toStatus(JSContext* cx, JS::HandleValue value) {
 
 void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandleValue value) {
     invariant(status != Status::OK());
-    auto scope = getMozJSScope(cx);
+    auto runtime = getCommonRuntime(cx);
 
     JS::RootedValue undef(cx);
     undef.setUndefined();
@@ -78,10 +78,10 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
     JS::RootedValueArray<1> args(cx);
     ValueReader(cx, args[0]).fromStringData(status.reason());
     JS::RootedObject error(cx);
-    getProto<ErrorInfo>(scope).newInstance(args, &error);
+    getProto<ErrorInfo>(runtime).newInstance(args, &error);
 
     JS::RootedObject thisv(cx);
-    getProto<MongoStatusInfo>(scope).newObjectWithProto(&thisv, error);
+    getProto<MongoStatusInfo>(runtime).newObjectWithProto(&thisv, error);
     ObjectWrapper thisvObj(cx, thisv);
     thisvObj.defineProperty(InternedString::code,
                             JSPROP_ENUMERATE,
@@ -103,7 +103,7 @@ void MongoStatusInfo::fromStatus(JSContext* cx, Status status, JS::MutableHandle
         nullptr);
 
     JS::SetReservedSlot(
-        thisv, StatusSlot, JS::PrivateValue(trackedNew<Status>(scope, std::move(status))));
+        thisv, StatusSlot, JS::PrivateValue(trackedNew<Status>(runtime, std::move(status))));
 
     value.setObjectOrNull(thisv);
 }
@@ -112,7 +112,7 @@ void MongoStatusInfo::finalize(JS::GCContext* gcCtx, JSObject* obj) {
     auto status = JS::GetMaybePtrFromReservedSlot<Status>(obj, StatusSlot);
 
     if (status)
-        trackedDelete(getMozJSScope(freeOpToJSContext(gcCtx)), status);
+        trackedDelete(getCommonRuntime(freeOpToJSContext(gcCtx)), status);
 }
 
 void MongoStatusInfo::Functions::code::call(JSContext* cx, JS::CallArgs args) {
@@ -160,11 +160,11 @@ void MongoStatusInfo::Functions::stack::call(JSContext* cx, JS::CallArgs args) {
 }
 
 void MongoStatusInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
-    auto scope = getMozJSScope(cx);
+    auto runtime = getCommonRuntime(cx);
     JS::SetReservedSlot(proto,
                         StatusSlot,
                         JS::PrivateValue(trackedNew<Status>(
-                            scope, Status(ErrorCodes::UnknownError, "Mongo Status Prototype"))));
+                            runtime, Status(ErrorCodes::UnknownError, "Mongo Status Prototype"))));
 }
 
 }  // namespace mozjs

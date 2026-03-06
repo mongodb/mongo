@@ -261,14 +261,6 @@ void Scope::storedFuncMod(OperationContext* opCtx) {
         [](OperationContext*, boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
 }
 
-void Scope::validateObjectIdString(const string& str) {
-    uassert(10448, "invalid object id: length", str.size() == 24);
-    auto isAllHex = [](StringData s) {
-        return std::all_of(s.begin(), s.end(), [](char c) { return ctype::isXdigit(c); });
-    };
-    uassert(10430, "invalid object id: not hex", isAllHex(str));
-}
-
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
     if (_localDBName.isEmpty()) {
         if (ignoreNotConnected)
