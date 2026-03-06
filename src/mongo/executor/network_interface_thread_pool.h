@@ -33,6 +33,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <cstdint>
@@ -65,14 +66,14 @@ public:
     void schedule(Task task) override;
 
 private:
-    void _consumeTasks(stdx::unique_lock<stdx::mutex> lk);
-    void _consumeTasksInline(stdx::unique_lock<stdx::mutex> lk);
+    void _consumeTasks(stdx::unique_lock<ObservableMutex<stdx::mutex>> lk);
+    void _consumeTasksInline(stdx::unique_lock<ObservableMutex<stdx::mutex>> lk);
     void _dtorImpl();
 
     NetworkInterface* const _net;
 
     // Protects all of the pool state below
-    stdx::mutex _mutex;
+    ObservableMutex<stdx::mutex> _mutex;
     stdx::condition_variable _joiningCondition;
     std::vector<Task> _tasks;
     bool _started = false;

@@ -43,6 +43,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/lru_cache.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 
@@ -184,6 +185,10 @@ std::string ConnectionPool::PoolMetrics::toString() const {
  */
 class ConnectionPool::LimitController final : public ConnectionPool::ControllerInterface {
 public:
+    LimitController() {
+        ObservableMutexRegistry::get().add("LimitController::_mutex", _mutex);
+    }
+
     void addHost(PoolId id, const HostAndPort& host) override {
         stdx::lock_guard lk(_mutex);
         PoolData poolData;
@@ -259,7 +264,7 @@ protected:
         size_t target = 0;
     };
 
-    stdx::mutex _mutex;
+    ObservableMutex<stdx::mutex> _mutex;
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 

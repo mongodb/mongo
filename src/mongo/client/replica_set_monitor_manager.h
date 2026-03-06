@@ -51,6 +51,8 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
@@ -116,7 +118,9 @@ class ReplicaSetMonitorManager {
     ReplicaSetMonitorManager& operator=(const ReplicaSetMonitorManager&) = delete;
 
 public:
-    ReplicaSetMonitorManager() = default;
+    ReplicaSetMonitorManager() {
+        ObservableMutexRegistry::get().add("ReplicaSetMonitorManager::_mutex", _mutex);
+    }
     ~ReplicaSetMonitorManager();
 
     static ReplicaSetMonitorManager* get();
@@ -201,7 +205,7 @@ private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors and several fields.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // Fields guarded by _mutex:
 

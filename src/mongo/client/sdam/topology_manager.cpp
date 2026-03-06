@@ -36,6 +36,7 @@
 #include "mongo/client/sdam/topology_state_machine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #include <memory>
 #include <mutex>
@@ -80,10 +81,12 @@ TopologyManagerImpl::TopologyManagerImpl(SdamConfiguration config,
       _clockSource(clockSource),
       _topologyDescription(TopologyDescription::create(_config)),
       _topologyStateMachine(std::make_unique<TopologyStateMachine>(_config)),
-      _topologyEventsPublisher(eventsPublisher) {}
+      _topologyEventsPublisher(eventsPublisher) {
+    ObservableMutexRegistry::get().add("TopologyManagerImpl::_mutex", _mutex);
+}
 
 bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
 
     boost::optional<HelloRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
@@ -126,13 +129,13 @@ bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 TopologyDescriptionPtr TopologyManagerImpl::getTopologyDescription() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
     return _getTopologyDescriptionWithLock(lock);
 }
 
 void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
 
         auto oldServerDescription = _topologyDescription->findServerByAddress(hostAndPort);
         if (oldServerDescription) {

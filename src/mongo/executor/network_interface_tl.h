@@ -57,6 +57,7 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
 #include <array>
@@ -330,7 +331,7 @@ private:
     }
 
     // Guards _svcCtx, _state, _inProgress, and _inProgressAlarms.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     ServiceContext* _svcCtx = nullptr;
 

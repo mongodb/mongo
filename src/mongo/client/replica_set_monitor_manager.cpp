@@ -138,7 +138,7 @@ ReplicaSetMonitorManager* ReplicaSetMonitorManager::get() {
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     _doGarbageCollectionLocked(lk);
 
     if (auto monitor = _monitors[setName].lock()) {
@@ -182,7 +182,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     const MongoURI& uri, std::function<void()> cleanupCallback) {
     invariant(uri.type() == ConnectionString::ConnectionType::kReplicaSet);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     uassert(ErrorCodes::ShutdownInProgress,
             str::stream() << "Unable to get monitor for '" << uri << "' due to shutdown",
             !_isShutdown);
@@ -217,7 +217,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
     // the mutex.
     vector<shared_ptr<ReplicaSetMonitor>> rsmPtrs;
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
 
     for (const auto& entry : _monitors) {
         auto monitor = entry.second.lock();
@@ -232,7 +232,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
     vector<string> allNames;
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
 
     for (const auto& entry : _monitors) {
         if (entry.second.lock()) {
@@ -244,12 +244,12 @@ vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
 }
 
 size_t ReplicaSetMonitorManager::getNumMonitors() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     return _monitors.size();
 }
 
 void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
         if (auto monitor = it->second.lock()) {
@@ -287,7 +287,7 @@ void ReplicaSetMonitorManager::shutdown() {
     decltype(_taskExecutor) taskExecutor;
     decltype(_connectionManager) connectionManager;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
             return;
         }
@@ -316,7 +316,7 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
     shutdown();
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
         _isShutdown = false;
     }
 }
@@ -365,7 +365,7 @@ ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
 }
 
 bool ReplicaSetMonitorManager::isShutdown() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     return _isShutdown;
 }
 
@@ -375,7 +375,7 @@ void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& targ
 }
 
 void ReplicaSetMonitorManager::installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     _monitors[monitor->getName()] = monitor;
 }
 

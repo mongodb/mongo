@@ -43,6 +43,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <cstddef>
@@ -151,7 +153,10 @@ public:
     static Status onUpdateMatchingStrategy(const std::string& str);
 
     explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
-        : _shardRegistry(std::move(shardRegistry)) {}
+        : _shardRegistry(std::move(shardRegistry)) {
+        ObservableMutexRegistry::get().add("ShardingTaskExecutorPoolController::_mutex", _mutex);
+    }
+
     ShardingTaskExecutorPoolController& operator=(ShardingTaskExecutorPoolController&&) = delete;
 
     void init(ConnectionPool* parent) override;
@@ -250,7 +255,7 @@ private:
 
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 
-    stdx::mutex _mutex;
+    ObservableMutex<stdx::mutex> _mutex;
 
     // Entires to _poolDatas are added by addHost() and removed by removeHost()
     stdx::unordered_map<PoolId, PoolData> _poolDatas;

@@ -46,6 +46,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -214,6 +215,8 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     _sdamConfig =
         SdamConfiguration(seedsNoDups, TopologyType::kReplicaSetNoPrimary, _uri.getSetName());
     _serverSelector = std::make_unique<ServerSelector>(_sdamConfig);
+
+    ObservableMutexRegistry::get().add("StreamableReplicaSetMonitor::_mutex", _mutex);
 }
 
 StreamableReplicaSetMonitor::~StreamableReplicaSetMonitor() {
@@ -672,7 +675,7 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    stdx::unique_lock<ObservableMutex<stdx::mutex>> lock(_mutex);
     if (_isDropped.load())
         return;
 

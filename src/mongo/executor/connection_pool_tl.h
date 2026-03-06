@@ -45,6 +45,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -76,7 +78,9 @@ public:
           _onConnectHook(std::move(onConnectHook)),
           _connPoolOptions(connPoolOptions),
           _transientSSLContext(transientSSLContext),
-          _instanceName(instanceName) {}
+          _instanceName(instanceName) {
+        ObservableMutexRegistry::get().add("TLTypeFactory::_mutex", _mutex);
+    }
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort,
@@ -115,7 +119,7 @@ private:
     std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
     std::string _instanceName;
 
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };

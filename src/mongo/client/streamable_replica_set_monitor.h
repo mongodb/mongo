@@ -60,6 +60,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -342,7 +343,7 @@ private:
 
     AtomicWord<bool> _isDropped{true};
 
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
     std::shared_ptr<ReplicaSetMonitorStats> _stats;

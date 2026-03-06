@@ -66,6 +66,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -163,7 +164,9 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
     : _instanceName(std::move(instanceName)),
       _clientFactory(std::move(factory)),
       _metadataHook(std::move(metadataHook)),
-      _state(kDefault) {}
+      _state(kDefault) {
+    ObservableMutexRegistry::get().add("NetworkInterfaceTL::_mutex", _mutex);
+}
 
 NetworkInterfaceTL::~NetworkInterfaceTL() {
     shutdown();
@@ -633,7 +636,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                                        const BatonHandle&) {
     std::shared_ptr<NetworkInterfaceTL::CommandStateBase> cmdStateToCancel;
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
         auto it = _inProgress.find(cbHandle);
         if (it == _inProgress.end()) {
             return;
@@ -716,7 +719,7 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
     auto alarmState = std::make_shared<AlarmState>(this, id, _reactor->makeTimer(), token);
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
 
         if (_inShutdown_inlock(lk)) {
             // Check that we've won any possible race with _shutdownAllAlarms();
@@ -757,7 +760,7 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
 
 void NetworkInterfaceTL::_shutdownAllAlarms() {
     auto alarms = [&] {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
         invariant(_state == kStopping);
         return _inProgressAlarms;
     }();
@@ -771,13 +774,13 @@ void NetworkInterfaceTL::_shutdownAllAlarms() {
     }
 
     {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<ObservableMutex<stdx::mutex>> lk(_mutex);
         _stoppedCV.wait(lk, [&] { return _inProgressAlarms.empty(); });
     }
 }
 
 void NetworkInterfaceTL::_removeAlarm(std::uint64_t id) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lk(_mutex);
     auto it = _inProgressAlarms.find(id);
     invariant(it != _inProgressAlarms.end());
     _inProgressAlarms.erase(it);

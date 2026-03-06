@@ -37,6 +37,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <concepts>
 #include <functional>
@@ -64,7 +65,7 @@ public:
     }
 
 protected:
-    mutable mongo::stdx::mutex _mutex;
+    mutable mongo::ObservableMutex<mongo::stdx::mutex> _mutex;
     virtual std::shared_ptr<TopologyDescription> _getTopologyDescriptionWithLock(
         WithLock) const = 0;
 };

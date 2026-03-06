@@ -32,6 +32,7 @@
 
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <memory>
 #include <mutex>
@@ -49,14 +50,14 @@ bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
     return _getTopologyDescriptionWithLock(lock);
 }
 
 void MockTopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {}
 
 void MockTopologyManager::setTopologyDescription(TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard<ObservableMutex<stdx::mutex>> lock(_mutex);
     _topologyDescription = newDescription;
 }
 
