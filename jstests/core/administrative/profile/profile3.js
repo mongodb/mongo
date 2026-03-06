@@ -41,6 +41,11 @@ try {
         db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
     );
 
+    // Increase this deadline in order to prevent flakiness in this test.
+    assert.commandWorked(
+        db.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+    );
+
     db.createCollection(t.getName());
     t.insert({x: 1});
     t.findOne({x: 1});

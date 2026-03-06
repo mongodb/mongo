@@ -18,6 +18,11 @@ assert.commandWorked(
     coll.getDB().setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
 );
 
+// Increase this deadline in order to prevent flakiness in this test.
+assert.commandWorked(
+    coll.getDB().getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+);
+
 /**
  * Asserts that array 'results' contains a profiler generated document that corresponds to a
  * truncated command that matches a regular expression 'truncatedCommandRegexp'. Outputs a message

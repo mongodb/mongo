@@ -35,6 +35,11 @@ assert.commandWorked(
     testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
 );
 
+// Increase this deadline in order to prevent flakiness in this test.
+assert.commandWorked(
+    testDB.getSiblingDB("admin").runCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+);
+
 // Executes query0 and gets the corresponding system.profile entry.
 assert.eq(
     1,
