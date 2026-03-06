@@ -34,10 +34,12 @@
 
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_prometheus_file_exporter.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/stdx/chrono.h"
 
+#include <absl/algorithm/container.h>
 #include <google/protobuf/message.h>
 #ifdef MONGO_CONFIG_GRPC
 #include <grpcpp/ext/otel_plugin.h>
@@ -66,6 +68,21 @@ namespace otlp = opentelemetry::exporter::otlp;
 namespace metrics_api = opentelemetry::metrics;
 namespace metrics_sdk = opentelemetry::sdk::metrics;
 
+/**
+ * Returns the current singleton metricReader.
+ */
+std::shared_ptr<metrics_sdk::MetricReader>& metricReader() {
+    static std::shared_ptr<metrics_sdk::MetricReader> reader;
+    return reader;
+}
+
+/**
+ * Returns whether metrics has been initialized.
+ */
+bool isInitialized() {
+    return metricReader() != nullptr;
+}
+
 Status initializeHttp(const std::string& endpoint, const std::string& compression) {
     LOGV2(10500901,
           "Initializing OpenTelemetry metrics using HTTP exporter",
@@ -88,7 +105,8 @@ Status initializeHttp(const std::string& endpoint, const std::string& compressio
     std::shared_ptr<metrics_sdk::MeterProvider> provider =
         metrics_sdk::MeterProviderFactory::Create();
 
-    provider->AddMetricReader(std::move(reader));
+    metricReader() = std::move(reader);
+    provider->AddMetricReader(metricReader());
     metrics_api::Provider::SetMeterProvider(std::move(provider));
 
     return Status::OK();
@@ -136,23 +154,61 @@ Status initializeFile(const std::string& directory) {
     std::shared_ptr<metrics_sdk::MeterProvider> provider =
         metrics_sdk::MeterProviderFactory::Create();
 
-    provider->AddMetricReader(std::move(reader));
+    metricReader() = std::move(reader);
+    provider->AddMetricReader(metricReader());
+    metrics_api::Provider::SetMeterProvider(std::move(provider));
+
+    return Status::OK();
+}
+
+Status initializePrometheusFileExporter(const std::string& directory,
+                                        const int maxConsecutiveFailures) {
+    LOGV2(11730000,
+          "Initializing OpenTelemetry metrics using Prometheus file exporter",
+          "directory"_attr = directory,
+          "maxConsecutiveFailures"_attr = maxConsecutiveFailures);
+
+    auto pid = ProcessId::getCurrent().toString();
+    StatusWith<std::unique_ptr<metrics_sdk::PushMetricExporter>> prometheusFileExporter =
+        createPrometheusFileExporter(
+            /*filename=*/fmt::format("{}/mongodb-{}-prometheus-metrics.txt", directory, pid),
+            {.maxConsecutiveFailures = maxConsecutiveFailures});
+    if (!prometheusFileExporter.isOK()) {
+        return prometheusFileExporter.getStatus();
+    }
+
+    metrics_sdk::PeriodicExportingMetricReaderOptions pemOpts;
+    pemOpts.export_interval_millis = stdx::chrono::milliseconds(gOpenTelemetryExportIntervalMillis);
+    pemOpts.export_timeout_millis = stdx::chrono::milliseconds(gOpenTelemetryExportTimeoutMillis);
+    auto reader = metrics_sdk::PeriodicExportingMetricReaderFactory::Create(
+        std::move(prometheusFileExporter.getValue()), pemOpts);
+
+    // Initialize and set the global MeterProvider
+    std::shared_ptr<metrics_sdk::MeterProvider> provider =
+        metrics_sdk::MeterProviderFactory::Create();
+
+    metricReader() = std::move(reader);
+    provider->AddMetricReader(metricReader());
     metrics_api::Provider::SetMeterProvider(std::move(provider));
 
     return Status::OK();
 }
 
 void validateOptions() {
-    uassert(
-        ErrorCodes::InvalidOptions,
-        "featureFlagOtelMetrics must be enabled in order to export OpenTelemetry metrics",
-        gFeatureFlagOtelMetrics.isEnabled() ||
-            (gOpenTelemetryMetricsHttpEndpoint.empty() && gOpenTelemetryMetricsDirectory.empty()));
+    uassert(ErrorCodes::InvalidOptions,
+            "featureFlagOtelMetrics must be enabled in order to export OpenTelemetry metrics",
+            gFeatureFlagOtelMetrics.isEnabled() ||
+                (gOpenTelemetryMetricsHttpEndpoint.empty() &&
+                 gOpenTelemetryMetricsDirectory.empty() &&
+                 gOpenTelemetryPrometheusMetricsDirectory.empty()));
 
     uassert(ErrorCodes::InvalidOptions,
-            "openTelemetryMetricsHttpEndpoint and openTelemetryMetricsDirectory cannot be set "
-            "simultaneously",
-            gOpenTelemetryMetricsHttpEndpoint.empty() || gOpenTelemetryMetricsDirectory.empty());
+            "At most one of openTelemetryMetricsHttpEndpoint, openTelemetryMetricsDirectory, and "
+            "gOpenTelemetryPrometheusMetricsDirectory may be set",
+            absl::c_count(std::vector<bool>{!gOpenTelemetryMetricsHttpEndpoint.empty(),
+                                            !gOpenTelemetryMetricsDirectory.empty(),
+                                            !gOpenTelemetryPrometheusMetricsDirectory.empty()},
+                          true) <= 1);
 
     uassert(ErrorCodes::InvalidOptions,
             "openTelemetryMetricsCompression must be either `none` or `gzip`",
@@ -160,8 +216,10 @@ void validateOptions() {
                 gOpenTelemetryMetricsCompression == "gzip");
 
     uassert(ErrorCodes::InvalidOptions,
-            "openTelemetryMetricsCompression must be `none` for metrics file exporter",
-            gOpenTelemetryMetricsDirectory.empty() || gOpenTelemetryMetricsCompression == "none");
+            "openTelemetryMetricsCompression must be `none` unless "
+            "openTelemetryMetricsHttpEndpoint is set",
+            !gOpenTelemetryMetricsHttpEndpoint.empty() ||
+                gOpenTelemetryMetricsCompression == "none");
 
     uassert(ErrorCodes::InvalidOptions,
             "openTelemetryExportTimeoutMillis must be less than openTelemetryExportIntervalMillis",
@@ -171,12 +229,20 @@ void validateOptions() {
 
 Status initialize() {
     try {
+        uassert(ErrorCodes::IllegalOperation,
+                "Metrics initialization attempted after a previous initialization without "
+                "calling shutdown.",
+                !isInitialized());
+
         validateOptions();
 
         const bool httpEndpointParameterSet = !gOpenTelemetryMetricsHttpEndpoint.empty();
         const bool directoryParameterSet = !gOpenTelemetryMetricsDirectory.empty();
+        const bool prometheusExporterParamaterSet =
+            !gOpenTelemetryPrometheusMetricsDirectory.empty();
 
-        if (!httpEndpointParameterSet && !directoryParameterSet) {
+        if (!httpEndpointParameterSet && !directoryParameterSet &&
+            !prometheusExporterParamaterSet) {
             LOGV2(10500903, "Not initializing OpenTelemetry metrics");
             return Status::OK();
         }
@@ -185,6 +251,10 @@ Status initialize() {
             if (httpEndpointParameterSet) {
                 return initializeHttp(gOpenTelemetryMetricsHttpEndpoint,
                                       gOpenTelemetryMetricsCompression);
+            } else if (prometheusExporterParamaterSet) {
+                return initializePrometheusFileExporter(
+                    gOpenTelemetryPrometheusMetricsDirectory,
+                    gOpenTelemetryPrometheusFileExportMaxConsecutiveFailures);
             }
             return initializeFile(gOpenTelemetryMetricsDirectory);
         }();
@@ -216,11 +286,15 @@ Status initialize() {
 
 void shutdown() {
     LOGV2(10500904, "Shutting down OpenTelemetry metrics");
-    if (!gOpenTelemetryMetricsHttpEndpoint.empty() || !gOpenTelemetryMetricsDirectory.empty()) {
+    if (isInitialized()) {
+        // Explicitly shutdown the metricReader since the Otel implementation may hold on to the
+        // shared_ptr even after the current provider is replaced.
+        invariant(metricReader() != nullptr);
+        metricReader()->Shutdown();
+        metricReader() = nullptr;
         metrics_api::Provider::SetMeterProvider({});
     }
 }
-
 }  // namespace mongo::otel::metrics
 #else
 namespace mongo::otel::metrics {

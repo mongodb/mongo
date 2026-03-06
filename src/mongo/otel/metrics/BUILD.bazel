@@ -30,6 +30,7 @@ mongo_cc_library(
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
+                ":metrics_prometheus_file_exporter",
                 "//src/mongo/base:system_error",
                 "//src/mongo/db:server_feature_flags",
                 "//src/third_party/opentelemetry-cpp/api",

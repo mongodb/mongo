@@ -44,6 +44,9 @@
 namespace mongo::otel::metrics {
 namespace {
 
+using testing::HasSubstr;
+using unittest::match::StatusIs;
+
 class OtelMetricsInitializationTest : public unittest::Test {
 public:
     void setUp() override {
@@ -52,7 +55,7 @@ public:
     }
 
     void tearDown() override {
-        opentelemetry::metrics::Provider::SetMeterProvider({});
+        shutdown();
     }
 
     const std::string& getMetricsPath() {
@@ -69,6 +72,15 @@ TEST_F(OtelMetricsInitializationTest, NoMeterProvider) {
     auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_TRUE(isNoopMeterProvider(provider.get()));
 }
+
+TEST_F(OtelMetricsInitializationTest, MultipleInitializationIsError) {
+    RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsPath()};
+    ASSERT_OK(initialize());
+    EXPECT_THAT(initialize(),
+                StatusIs(ErrorCodes::IllegalOperation,
+                         HasSubstr("initialization attempted after a previous initialization")));
+}
+
 
 TEST_F(OtelMetricsInitializationTest, Shutdown) {
     RAIIServerParameterControllerForTest param{"openTelemetryMetricsDirectory", getMetricsPath()};
@@ -102,6 +114,28 @@ TEST_F(OtelMetricsInitializationTest, HttpMeterProvider) {
 TEST_F(OtelMetricsInitializationTest, HttpAndDirectory) {
     RAIIServerParameterControllerForTest httpParam{"openTelemetryMetricsHttpEndpoint",
                                                    "http://localhost:4318/v1/traces"};
+    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
+                                                        getMetricsPath()};
+    auto status = initialize();
+    ASSERT_FALSE(status.isOK());
+    ASSERT_EQ(status.codeString(), "InvalidOptions");
+
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
+}
+
+TEST_F(OtelMetricsInitializationTest, PrometheusExporterMeterProvider) {
+    RAIIServerParameterControllerForTest param{"openTelemetryPrometheusMetricsDirectory",
+                                               getMetricsPath()};
+    ASSERT_OK(initialize());
+
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_FALSE(isNoopMeterProvider(provider.get()));
+}
+
+TEST_F(OtelMetricsInitializationTest, PrometheusDirectoryAndOtelDirectory) {
+    RAIIServerParameterControllerForTest prometheusParam{"openTelemetryPrometheusMetricsDirectory",
+                                                         getMetricsPath()};
     RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
                                                         getMetricsPath()};
     auto status = initialize();
@@ -148,14 +182,28 @@ TEST_F(OtelMetricsInitializationTest, InvalidCompressionParam) {
         ASSERT_TRUE(isNoopMeterProvider(provider.get()));
     }
 
-    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
-                                                        getMetricsPath()};
-    for (const auto& value : {"gzip", "foo"}) {
-        RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
-                                                              value};
-        ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
-        auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-        ASSERT_TRUE(isNoopMeterProvider(provider.get()));
+    {
+        RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
+                                                            getMetricsPath()};
+        for (const auto& value : {"gzip", "foo"}) {
+            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                                  value};
+            ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            ASSERT_TRUE(isNoopMeterProvider(provider.get()));
+        }
+    }
+
+    {
+        RAIIServerParameterControllerForTest directoryParam{
+            "openTelemetryPrometheusMetricsDirectory", getMetricsPath()};
+        for (const auto& value : {"gzip", "foo"}) {
+            RAIIServerParameterControllerForTest compressionParam{"openTelemetryMetricsCompression",
+                                                                  value};
+            ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
+            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+            ASSERT_TRUE(isNoopMeterProvider(provider.get()));
+        }
     }
 }
 
