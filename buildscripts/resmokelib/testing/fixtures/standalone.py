@@ -44,6 +44,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         load_extensions=None,
         skip_extensions_signature_verification=False,
         use_priority_port: bool = False,
+        uds_path_prefix: Optional[str] = None,
     ):
         """Initialize MongoDFixture with different options for the mongod process.
 
@@ -63,6 +64,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 Use specific names (e.g. ["add_fields_match"]) to load individual extensions.
                 Defaults to None (no extensions loaded).
             use_priority_port (bool, optional): Whether to open a priority port on this node at startup. Defaults to False.
+            uds_path_prefix (Optional[str], optional): Directory prefix for Unix domain socket. Defaults to None.
 
         Raises
             ValueError: _description_
@@ -140,6 +142,14 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
 
+        # Unix domain socket support
+        self.uds_path_prefix = uds_path_prefix
+        self.uds_path = None
+        if self.uds_path_prefix:
+            # MongoDB creates socket at {unixSocketPrefix}/mongodb-{port}.sock
+            self.uds_path = os.path.join(self.uds_path_prefix, f"mongodb-{self.port}.sock")
+            self.mongod_options["unixSocketPrefix"] = self.uds_path_prefix
+
         self.use_priority_port = use_priority_port
         if self.use_priority_port:
             self.priority_port = fixturelib.get_next_port(job_num)
@@ -203,6 +213,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         os.makedirs(self._dbpath, exist_ok=True)
 
+        # Create UDS directory if needed
+        if self.uds_path_prefix:
+            os.makedirs(self.uds_path_prefix, exist_ok=True)
+
         launcher = MongodLauncher(self.fixturelib)
 
         mongod_options = self.mongod_options.copy()
@@ -220,9 +234,13 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         try:
             msg = f"Starting mongod on port { self.port }...\n{ mongod.as_command() }"
+            if self.uds_path:
+                msg += f"\nUnix domain socket: { self.uds_path }"
             self.logger.info(msg)
             mongod.start()
             msg = f"mongod started on port { self.port } with pid { mongod.pid }"
+            if self.uds_path:
+                msg += f" (UDS: { self.uds_path })"
             self.logger.info(msg)
         except Exception as err:
             msg = "Failed to start mongod on port {:d}: {}".format(self.port, err)
@@ -415,6 +433,31 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string() + "/?directConnection=true"
+
+    def get_uds_path(self):
+        """Return the Unix domain socket path for this mongod."""
+        return self.uds_path
+
+    def get_uds_connection_string(self):
+        """Return connection string using Unix domain socket."""
+        return self.uds_path if self.uds_path else None
+
+    def get_environment_variables(self):
+        """Return environment variables for standalone mongod fixture."""
+        env_vars = {}
+
+        # Provide fixture type
+        env_vars["MONGODB_FIXTURE_TYPE"] = "MongoDFixture"
+
+        # Provide UDS path if available (single and list forms for consistency)
+        if self.uds_path:
+            env_vars["MONGODB_UDS_PATH"] = self.uds_path
+            env_vars["MONGODB_UDS_PATHS"] = self.uds_path  # Single item, but consistent naming
+
+        # Provide connection string
+        env_vars["MONGODB_CONNECTION_STRING"] = self.get_internal_connection_string()
+
+        return env_vars
 
 
 # The below parameters define the default 'logComponentVerbosity' object passed to mongod processes

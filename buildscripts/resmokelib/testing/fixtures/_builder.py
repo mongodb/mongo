@@ -386,6 +386,7 @@ class ReplSetBuilder(FixtureBuilder):
                 # requested extensions.
                 load_extensions=[],
                 use_priority_port=use_priority_port,
+                uds_path_prefix=replset.uds_path_prefix,
             )
 
             # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
@@ -405,6 +406,7 @@ class ReplSetBuilder(FixtureBuilder):
             launch_mongot=launch_mongot,
             load_extensions=[],
             use_priority_port=use_priority_port,
+            uds_path_prefix=replset.uds_path_prefix,
         )
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)

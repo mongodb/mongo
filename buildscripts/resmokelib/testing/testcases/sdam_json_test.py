@@ -47,4 +47,7 @@ class SDAMJsonTestCase(interface.ProcessTestCase):
         command_line = [self.program_executable]
         command_line += ["--source-dir", self.TEST_DIR]
         command_line += ["-f", self.json_test_file]
-        return core.programs.make_process(self.logger, command_line, **self.program_options)
+        # Merge fixture environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_fixture_environment_variables(program_options)
+        return core.programs.make_process(self.logger, command_line, **program_options)

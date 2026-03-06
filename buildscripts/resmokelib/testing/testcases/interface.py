@@ -220,6 +220,46 @@ class ProcessTestCase(TestCase):
         """Return a new Process instance that could be used to run the test or log the command."""
         raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
 
+    def _get_fixture_environment_variables(self):
+        """
+        Get environment variables from the fixture.
+
+        Returns:
+            dict: Environment variables provided by the fixture, or empty dict if no fixture.
+        """
+        if self.fixture is None:
+            return {}
+        return self.fixture.get_environment_variables()
+
+    def _merge_fixture_environment_variables(self, process_kwargs):
+        """
+        Merge fixture environment variables into process_kwargs.
+
+        This method updates process_kwargs in-place by merging fixture environment
+        variables with any existing env_vars. Fixture environment variables will not
+        override existing values in env_vars.
+
+        Args:
+            process_kwargs (dict): Process kwargs dictionary that may contain 'env_vars'.
+
+        Returns:
+            dict: The updated process_kwargs dictionary (same object, modified in-place).
+        """
+        fixture_env_vars = self._get_fixture_environment_variables()
+        if not fixture_env_vars:
+            return process_kwargs
+
+        # Get or create env_vars in process_kwargs
+        if "env_vars" not in process_kwargs:
+            process_kwargs["env_vars"] = {}
+
+        # Merge fixture env vars, but don't override existing values
+        for key, value in fixture_env_vars.items():
+            if key not in process_kwargs["env_vars"]:
+                process_kwargs["env_vars"][key] = value
+
+        return process_kwargs
+
     def _get_all_processes(self):
         """
         A best effort collection of all processes involved in the current test:

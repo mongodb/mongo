@@ -73,5 +73,7 @@ class QueryTesterServerTestCase(interface.ProcessTestCase):
 
         program_options = {}
         interface.append_process_tracking_options(program_options, self._id)
+        # Merge fixture environment variables into program_options
+        self._merge_fixture_environment_variables(program_options)
 
         return core.programs.generic_program(self.logger, command, program_options)

@@ -1,5 +1,6 @@
 """Sharded cluster fixture for executing JSTests against."""
 
+import os
 import os.path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -60,6 +61,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         shard_replset_name_prefix="shard-rs",
         configsvr_replset_name="config-rs",
         use_priority_ports=False,
+        uds_path_prefix=None,
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -153,6 +155,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.configsvr_replset_name = configsvr_replset_name
         self.shard_replset_name_prefix = shard_replset_name_prefix
         self.use_priority_ports = use_priority_ports
+        self.uds_path_prefix = uds_path_prefix
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -565,6 +568,85 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             output += mongos.get_node_info()
         return output + self.configsvr.get_node_info()
 
+    def get_all_uds_paths(self):
+        """Return dict of all UDS paths in the cluster."""
+        paths = {
+            "configsvr": (
+                self.configsvr.get_uds_paths() if hasattr(self.configsvr, "get_uds_paths") else []
+            ),
+            "shards": [],
+            "mongos": [],
+        }
+        # Add shard paths
+        for shard in self.shards:
+            if shard is self.configsvr:
+                continue
+            if hasattr(shard, "get_uds_paths"):
+                paths["shards"].append(shard.get_uds_paths())
+            else:
+                paths["shards"].append([])
+        # Add mongos paths if _MongoSFixture has UDS support
+        for mongos in self.mongos:
+            if hasattr(mongos, "get_uds_path"):
+                paths["mongos"].append(mongos.get_uds_path())
+        return paths
+
+    def get_environment_variables(self):
+        """Return environment variables for sharded cluster fixture."""
+        env_vars = {}
+
+        # Provide fixture type
+        env_vars["MONGODB_FIXTURE_TYPE"] = "ShardedClusterFixture"
+
+        # Provide mongos connection strings (comma-separated)
+        mongos_conn_strs = [mongos.get_internal_connection_string() for mongos in self.mongos]
+        if mongos_conn_strs:
+            env_vars["MONGODB_MONGOS_HOSTS"] = ",".join(mongos_conn_strs)
+            # Provide primary mongos connection
+            env_vars["MONGODB_CONNECTION_STRING"] = mongos_conn_strs[0]
+
+        # Provide UDS paths for all components (standardized singular and plural forms)
+        uds_paths = self.get_all_uds_paths()
+
+        # Collect all UDS paths from all components
+        all_uds_paths = []
+
+        # Add configsvr UDS paths
+        if uds_paths.get("configsvr"):
+            all_uds_paths.extend([path for path in uds_paths["configsvr"] if path])
+
+        # Add shard UDS paths (flatten list of lists)
+        if uds_paths.get("shards"):
+            for shard_paths in uds_paths["shards"]:
+                all_uds_paths.extend([path for path in shard_paths if path])
+
+        # Add mongos UDS paths
+        mongos_uds = []
+        if uds_paths.get("mongos"):
+            mongos_uds = [path for path in uds_paths["mongos"] if path]
+            all_uds_paths.extend(mongos_uds)
+
+        # Set mongos-specific UDS environment variables if we have any mongos paths
+        if mongos_uds:
+            env_vars["MONGODB_MONGOS_UDS_PATHS"] = ",".join(
+                mongos_uds
+            )  # Keep mongos-specific for backward compatibility
+            # Provide primary mongos UDS path (standardized singular form)
+            env_vars["MONGODB_UDS_PATH"] = mongos_uds[0]
+
+        # Set environment variables if we have any UDS paths
+        if all_uds_paths:
+            env_vars["MONGODB_UDS_PATHS"] = ",".join(all_uds_paths)  # All paths from all components
+
+        # Provide number of shards
+        env_vars["MONGODB_NUM_SHARDS"] = str(len(self.shards))
+
+        # Provide config server connection string
+        if self.configsvr:
+            env_vars["MONGODB_CONFIG_SERVER"] = self.configsvr.get_internal_connection_string()
+
+        return env_vars
+
     def get_configsvr_logger(self):
         """Return a new logging.Logger instance used for a config server shard."""
         return self.fixturelib.new_fixture_node_logger(
@@ -599,6 +681,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "auth_options": auth_options,
             "replset_config_options": replset_config_options,
             "shard_logging_prefix": self.configsvr_shard_logging_prefix,
+            "uds_path_prefix": self.uds_path_prefix,
             **configsvr_options,
         }
 
@@ -677,6 +760,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             "replset_config_options": replset_config_options,
             "shard_logging_prefix": shard_logging_prefix,
             "use_auto_bootstrap_procedure": use_auto_bootstrap_procedure,
+            "uds_path_prefix": self.uds_path_prefix,
             **shard_options,
         }
 
@@ -710,7 +794,11 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         mongos_options["set_parameters"] = mongos_options.get(
             "set_parameters", self.fixturelib.make_historic({})
         ).copy()
-        return {"dbpath_prefix": self._dbpath_prefix, "mongos_options": mongos_options}
+        return {
+            "dbpath_prefix": self._dbpath_prefix,
+            "mongos_options": mongos_options,
+            "uds_path_prefix": self.uds_path_prefix,
+        }
 
     def install_mongos(self, mongos):
         """Install a mongos. Called by a builder."""
@@ -818,6 +906,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         mongos_options=None,
         add_feature_flags=False,
         use_priority_port=False,
+        uds_path_prefix=None,
     ):
         """Initialize _MongoSFixture."""
 
@@ -852,6 +941,14 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             self.priority_port = fixturelib.get_next_port(job_num)
             self.mongos_options["priorityPort"] = self.priority_port
 
+        # Unix domain socket support
+        self.uds_path_prefix = uds_path_prefix
+        self.uds_path = None
+        if self.uds_path_prefix:
+            # MongoDB creates socket at {unixSocketPrefix}/mongodb-{port}.sock
+            self.uds_path = os.path.join(self.uds_path_prefix, f"mongodb-{self.port}.sock")
+            self.mongos_options["unixSocketPrefix"] = self.uds_path_prefix
+
         self._dbpath_prefix = dbpath_prefix
 
     def setup(self):
@@ -862,6 +959,10 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
                 name=self.logger.name
             )
             self.mongos_options["logappend"] = ""
+
+        # Create UDS directory if needed
+        if self.uds_path_prefix:
+            os.makedirs(self.uds_path_prefix, exist_ok=True)
 
         launcher = MongosLauncher(self.fixturelib)
         mongos, _ = launcher.launch_mongos_program(
@@ -1020,6 +1121,26 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             pid=self.mongos.pid,
         )
         return [info]
+
+    def get_uds_path(self):
+        """Return the Unix domain socket path if configured."""
+        return self.uds_path
+
+    def get_environment_variables(self):
+        """Return environment variables for mongos fixture."""
+        env_vars = {}
+
+        # Provide UDS path if available
+        if self.uds_path:
+            env_vars["MONGODB_MONGOS_UDS_PATH"] = self.uds_path
+
+        # Provide port
+        env_vars["MONGODB_MONGOS_PORT"] = str(self.port)
+
+        # Provide connection string
+        env_vars["MONGODB_MONGOS_CONNECTION_STRING"] = self.get_internal_connection_string()
+
+        return env_vars
 
 
 # Default shutdown quiesce mode duration for mongos

@@ -54,6 +54,8 @@ class TLAPlusTestCase(interface.ProcessTestCase):
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
         interface.append_process_tracking_options(process_kwargs, self._id)
+        # Merge fixture environment variables into process_kwargs
+        self._merge_fixture_environment_variables(process_kwargs)
 
         return core.programs.generic_program(
             self.logger,

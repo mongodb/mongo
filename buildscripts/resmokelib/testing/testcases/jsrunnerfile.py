@@ -47,6 +47,8 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
+        # Merge fixture environment variables into process_kwargs
+        self._merge_fixture_environment_variables(process_kwargs)
         self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):

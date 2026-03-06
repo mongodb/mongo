@@ -83,6 +83,15 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
 
         process_kwargs = copy.deepcopy(self.shell_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self.test_id)
+        # Merge fixture environment variables into process_kwargs
+        fixture_env_vars = self.fixture.get_environment_variables()
+        if fixture_env_vars:
+            if "env_vars" not in process_kwargs:
+                process_kwargs["env_vars"] = {}
+            # Merge fixture env vars, but don't override existing values
+            for key, value in fixture_env_vars.items():
+                if key not in process_kwargs["env_vars"]:
+                    process_kwargs["env_vars"][key] = value
         self.shell_options["process_kwargs"] = process_kwargs
 
     def _populate_test_data(self, test_data):

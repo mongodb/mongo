@@ -59,4 +59,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"--corpus_database={self.corpus_directory}",
             f"--llvm_fuzzer_wrapper_corpus_dir={self.seed_directory}",
         ]
-        return core.programs.make_process(self.logger, default_args, **self.program_options)
+        # Merge fixture environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_fixture_environment_variables(program_options)
+
+        return core.programs.make_process(self.logger, default_args, **program_options)

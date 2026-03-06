@@ -28,8 +28,12 @@ class CPPUnitTestCase(interface.ProcessTestCase):
         interface.append_process_tracking_options(self.program_options, self._id)
 
     def _make_process(self):
+        # Merge fixture environment variables into program_options
+        program_options = self.program_options.copy()
+        self._merge_fixture_environment_variables(program_options)
+
         return core.programs.make_process(
             self.logger,
             [self.program_executable, "--enhancedReporter=false"],
-            **self.program_options,
+            **program_options,
         )

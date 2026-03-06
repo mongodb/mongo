@@ -124,6 +124,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
         interface.append_process_tracking_options(process_kwargs, self._id)
 
+        # Add fixture environment variables to process_kwargs
+        self._merge_fixture_environment_variables(process_kwargs)
+
         self.shell_options["process_kwargs"] = process_kwargs
         self.shell_options = certs.expand_x509_paths(self.shell_options)
 

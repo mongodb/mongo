@@ -165,6 +165,16 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
         """Return a list of NodeInfo objects."""
         return []
 
+    def get_environment_variables(self):
+        """
+        Return a dictionary of environment variables to provide to test cases.
+
+        Returns:
+            dict: A dictionary mapping environment variable names to their values.
+                  All values should be strings.
+        """
+        return {}
+
     def get_dbpath_prefix(self):
         """Return dbpath prefix."""
         return self._dbpath_prefix

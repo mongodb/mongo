@@ -39,6 +39,8 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
 
         process_kwargs = copy.deepcopy(self.program_options.get("process_kwargs", {}))
         interface.append_process_tracking_options(process_kwargs, self._id)
+        # Merge fixture environment variables into process_kwargs
+        self._merge_fixture_environment_variables(process_kwargs)
         self.program_options["process_kwargs"] = process_kwargs
         self.program_options = certs.expand_x509_paths(self.program_options)
 

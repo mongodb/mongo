@@ -32,6 +32,8 @@ class MongosTestCase(interface.ProcessTestCase):
             self.options["test"] = ""
 
         interface.append_process_tracking_options(self.process_kwargs, self._id)
+        # Merge fixture environment variables into process_kwargs
+        self._merge_fixture_environment_variables(self.process_kwargs)
 
     def _make_process(self):
         return core.programs.mongos_program(
