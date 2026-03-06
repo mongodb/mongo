@@ -31,6 +31,8 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_instruction.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -66,4 +68,15 @@ TEST(CodeFragmentTest, TestPushOwnedAccessorVal) {
     ASSERT(res.tag() == testTag);
     ASSERT(res.value() == testValue);
 }
+
+DEATH_TEST(SBEVMBytecodeValidationDeathTest,
+           InvalidOpcodeTriggersUnreachable,
+           "SBE lastInstruction VM opcode") {
+    constexpr uint8_t kInvalidOpcode = static_cast<uint8_t>(sbe::vm::Instruction::lastInstruction);
+    sbe::vm::CodeFragment code;
+    code.instrs().resize(1, kInvalidOpcode);
+    sbe::vm::ByteCode interpreter;
+    interpreter.run(&code);
+}
+
 }  // namespace mongo

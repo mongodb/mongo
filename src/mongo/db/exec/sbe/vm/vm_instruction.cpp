@@ -36,6 +36,8 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 
+#include <algorithm>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #if defined(_MSC_VER)
@@ -255,110 +257,127 @@ void ByteCode::runLambdaInternal(const CodeFragment* code, int64_t position) {
     popAndReleaseStack();
 }
 
+namespace {
+using DispatchTable = std::array<void*, std::numeric_limits<decltype(Instruction::tag)>::max() + 1>;
+
+constexpr DispatchTable defaultInitializeDispatchTable(void* lastInstructionAddr,
+                                                       DispatchTable initial) {
+    DispatchTable ret{};
+    std::fill(ret.begin() + Instruction::lastInstruction, ret.end(), lastInstructionAddr);
+    for (auto i = 0; i < Instruction::lastInstruction; i++) {
+        ret[i] = initial[i];
+    }
+    return ret;
+};
+}  // namespace
+
 void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 #if USE_THREADED_INTERPRETER
     // Very important this in sync with Instruction::Tags.
-    static constexpr void* dispatchTable[std::numeric_limits<decltype(Instruction::tag)>::max() +
-                                         1] = {&&do_pushConstVal,
-                                               &&do_pushAccessVal,
-                                               &&do_pushOwnedAccessorVal,
-                                               &&do_pushEnvAccessorVal,
-                                               &&do_pushMoveVal,
-                                               &&do_pushLocalVal,
-                                               &&do_pushMoveLocalVal,
-                                               &&do_pushOneArgLambda,
-                                               &&do_pushTwoArgLambda,
-                                               &&do_pop,
-                                               &&do_swap,
-                                               &&do_makeOwn,
+    constexpr DispatchTable dispatchTable =
+        defaultInitializeDispatchTable(&&do_lastInstruction,
+                                       {&&do_pushConstVal,
+                                        &&do_pushAccessVal,
+                                        &&do_pushOwnedAccessorVal,
+                                        &&do_pushEnvAccessorVal,
+                                        &&do_pushMoveVal,
+                                        &&do_pushLocalVal,
+                                        &&do_pushMoveLocalVal,
+                                        &&do_pushOneArgLambda,
+                                        &&do_pushTwoArgLambda,
+                                        &&do_pop,
+                                        &&do_swap,
+                                        &&do_makeOwn,
 
-                                               &&do_add,
-                                               &&do_sub,
-                                               &&do_mul,
-                                               &&do_div,
-                                               &&do_idiv,
-                                               &&do_mod,
-                                               &&do_negate,
-                                               &&do_numConvert,
+                                        &&do_add,
+                                        &&do_sub,
+                                        &&do_mul,
+                                        &&do_div,
+                                        &&do_idiv,
+                                        &&do_mod,
+                                        &&do_negate,
+                                        &&do_numConvert,
 
-                                               &&do_logicNot,
+                                        &&do_logicNot,
 
-                                               &&do_less,
-                                               &&do_lessEq,
-                                               &&do_greater,
-                                               &&do_greaterEq,
-                                               &&do_eq,
-                                               &&do_neq,
+                                        &&do_less,
+                                        &&do_lessEq,
+                                        &&do_greater,
+                                        &&do_greaterEq,
+                                        &&do_eq,
+                                        &&do_neq,
 
-                                               &&do_cmp3w,
+                                        &&do_cmp3w,
 
-                                               &&do_collLess,
-                                               &&do_collLessEq,
-                                               &&do_collGreater,
-                                               &&do_collGreaterEq,
-                                               &&do_collEq,
-                                               &&do_collNeq,
-                                               &&do_collCmp3w,
+                                        &&do_collLess,
+                                        &&do_collLessEq,
+                                        &&do_collGreater,
+                                        &&do_collGreaterEq,
+                                        &&do_collEq,
+                                        &&do_collNeq,
+                                        &&do_collCmp3w,
 
-                                               &&do_fillEmpty,
-                                               &&do_fillEmptyImm,
-                                               &&do_getField,
-                                               &&do_getFieldImm,
-                                               &&do_getElement,
-                                               &&do_collComparisonKey,
-                                               &&do_getFieldOrElement,
-                                               &&do_traverseP,
-                                               &&do_traversePImm,
-                                               &&do_traverseF,
-                                               &&do_traverseFImm,
-                                               &&do_magicTraverseF,
-                                               &&do_setField,
-                                               &&do_getArraySize,
+                                        &&do_fillEmpty,
+                                        &&do_fillEmptyImm,
+                                        &&do_getField,
+                                        &&do_getFieldImm,
+                                        &&do_getElement,
+                                        &&do_collComparisonKey,
+                                        &&do_getFieldOrElement,
+                                        &&do_traverseP,
+                                        &&do_traversePImm,
+                                        &&do_traverseF,
+                                        &&do_traverseFImm,
+                                        &&do_magicTraverseF,
+                                        &&do_setField,
+                                        &&do_getArraySize,
 
-                                               &&do_aggSum,
-                                               &&do_aggCount,
-                                               &&do_aggMin,
-                                               &&do_aggMax,
-                                               &&do_aggFirst,
-                                               &&do_aggLast,
+                                        &&do_aggSum,
+                                        &&do_aggCount,
+                                        &&do_aggMin,
+                                        &&do_aggMax,
+                                        &&do_aggFirst,
+                                        &&do_aggLast,
 
-                                               &&do_aggCollMin,
-                                               &&do_aggCollMax,
+                                        &&do_aggCollMin,
+                                        &&do_aggCollMax,
 
-                                               &&do_exists,
-                                               &&do_isNull,
-                                               &&do_isObject,
-                                               &&do_isArray,
-                                               &&do_isInList,
-                                               &&do_isString,
-                                               &&do_isNumber,
-                                               &&do_isBinData,
-                                               &&do_isDate,
-                                               &&do_isNaN,
-                                               &&do_isInfinity,
-                                               &&do_isRecordId,
-                                               &&do_isMinKey,
-                                               &&do_isMaxKey,
-                                               &&do_isTimestamp,
-                                               &&do_isKeyString,
-                                               &&do_typeMatchImm,
+                                        &&do_exists,
+                                        &&do_isNull,
+                                        &&do_isObject,
+                                        &&do_isArray,
+                                        &&do_isInList,
+                                        &&do_isString,
+                                        &&do_isNumber,
+                                        &&do_isBinData,
+                                        &&do_isDate,
+                                        &&do_isNaN,
+                                        &&do_isInfinity,
+                                        &&do_isRecordId,
+                                        &&do_isMinKey,
+                                        &&do_isMaxKey,
+                                        &&do_isTimestamp,
+                                        &&do_isKeyString,
+                                        &&do_typeMatchImm,
 
-                                               &&do_function,
-                                               &&do_functionSmall,
+                                        &&do_function,
+                                        &&do_functionSmall,
 
-                                               &&do_jmp,
-                                               &&do_jmpTrue,
-                                               &&do_jmpFalse,
-                                               &&do_jmpNothing,
-                                               &&do_jmpNotNothing,
-                                               &&do_ret,
-                                               &&do_allocStack,
+                                        &&do_jmp,
+                                        &&do_jmpTrue,
+                                        &&do_jmpFalse,
+                                        &&do_jmpNothing,
+                                        &&do_jmpNotNothing,
+                                        &&do_ret,
+                                        &&do_allocStack,
 
-                                               &&do_fail,
+                                        &&do_fail,
 
-                                               &&do_dateTruncImm,
+                                        &&do_dateTruncImm,
 
-                                               &&do_valueBlockApplyLambda};
+                                        &&do_valueBlockApplyLambda});
+    static_assert(std::none_of(
+        dispatchTable.begin(), dispatchTable.end(), [](void* p) { return p == nullptr; }));
 #endif
 
     auto pcPointer = code->instrs().data() + position;
@@ -1470,6 +1489,15 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
     DISPATCH();
     INSTRUCTION(valueBlockApplyLambda) {
         valueBlockApplyLambda(code);
+    }
+    DISPATCH();
+    INSTRUCTION(lastInstruction) {
+        // Invalid opcode; log and kill the process. Field names are PII, so only log opcode tags.
+        LOGV2_ERROR(11919400,
+                    "Invalid SBE VM bytecode",
+                    "bytecode in hexadecimal"_attr = hexblob::encode(
+                        code->instrs().data(), code->instrs().size() * sizeof(uint8_t)));
+        tasserted(11919401, "SBE lastInstruction VM opcode");
     }
     DISPATCH();
 #if USE_THREADED_INTERPRETER
