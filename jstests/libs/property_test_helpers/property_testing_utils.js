@@ -38,31 +38,46 @@ function createColl(db, coll, isTS = false) {
     const args = isTS ? {timeseries: {timeField: "t", metaField: "m"}} : {};
     assert.commandWorked(db.createCollection(coll.getName(), args));
 }
-/*
- * Acceptable error codes from creating an index. We could change our model or add filters
- * to the model to remove these cases, but that would cause them to become overcomplicated.
- * In pbt_self_test.js, we assert that the number of indexes created is high enough, to avoid our
- * tests silently erroring too much on index creation.
- */
-const okIndexCreationErrorCodes = [
-    // Index already exists.
-    ErrorCodes.IndexOptionsConflict,
-    // Overlapping fields and path collisions in wildcard projection.
-    31249,
-    31250,
-    7246200,
-    7246204,
-    7246208,
-    7246209,
-    7246210,
-    // For partial index filters, we can sometimes go over the depth limit of the filter. It's
-    // difficult to control the exact depth of the filters generated without sacrificing lots of
-    // interesting cases, so instead we allow this error.
-    ErrorCodes.CannotCreateIndex,
-    // Error code when creating specific partial indexes on time-series, for example when the
-    // predicate is `{a: {$in: [null]}}`
-    5916301,
-];
+
+export function createIndexesForPBT(collection, indexSpecs) {
+    /*
+     * Acceptable error codes from creating an index. We could change our model or add filters
+     * to the model to remove these cases, but that would cause them to become overcomplicated.
+     * In pbt_self_test.js, we assert that the number of indexes created is high enough, to avoid our
+     * tests silently erroring too much on index creation.
+     */
+    const okIndexCreationErrorCodes = [
+        // Index already exists.
+        ErrorCodes.IndexOptionsConflict,
+        // Overlapping fields and path collisions in wildcard projection.
+        31249,
+        31250,
+        7246200,
+        7246204,
+        7246208,
+        7246209,
+        7246210,
+        // For partial index filters, we can sometimes go over the depth limit of the filter. It's
+        // difficult to control the exact depth of the filters generated without sacrificing lots of
+        // interesting cases, so instead we allow this error.
+        ErrorCodes.CannotCreateIndex,
+        // Error code when creating specific partial indexes on time-series, for example when the
+        // predicate is `{a: {$in: [null]}}`
+        5916301,
+    ];
+
+    const indexNames = [];
+    for (let i = 0; i < indexSpecs.length; ++i) {
+        const indexSpec = indexSpecs[i];
+        const indexName = `index_${i}`;
+        const res = collection.createIndex(indexSpec.def, {name: indexName, ...indexSpec.options});
+        if (res.ok) {
+            indexNames.push(indexName);
+        }
+        assert.commandWorkedOrFailedWithCode(res, okIndexCreationErrorCodes);
+    }
+    return indexNames;
+}
 
 /*
  * Clear any state in the collection (other than data, which doesn't change). Create indexes the
@@ -91,12 +106,7 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
         assertDropCollection(collection.getDB(), collection.getName());
         createColl(collection.getDB(), collection, isTS);
         assert.commandWorked(collection.insert(docs));
-        const createIndex = (indexSpec, num) =>
-            assert.commandWorkedOrFailedWithCode(
-                collection.createIndex(indexSpec.def, {name: `index_${num}`, ...indexSpec.options}),
-                okIndexCreationErrorCodes,
-            );
-        indexes.forEach(createIndex);
+        createIndexesForPBT(collection, indexes);
     }
 
     // Setup the control/experiment collections, define the helper functions, then run the property.

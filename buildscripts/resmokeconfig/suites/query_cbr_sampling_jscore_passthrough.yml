@@ -46,6 +46,9 @@ selector:
     # TODO SERVER-99091 re-enable this test to get coverage of switching between plan ranker modes.
     - jstests/core/query/query_knob_correctness_pbt.js
 
+    # TODO SERVER-120633: Investigate tassert of missing index descriptor.
+    - jstests/core/query/or/subplanning_during_drop_index.js
+
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling

@@ -14,13 +14,11 @@
  * ]
  */
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
+import {topLevelOrAggModel} from "jstests/libs/property_test_helpers/common_models.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getMatchPredicateSpec} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
@@ -42,32 +40,7 @@ const experimentColl = db.subplanning_pbt_experiment;
 // cache.
 const correctnessProperty = createCacheCorrectnessProperty(controlColl, experimentColl);
 
-// {$match: {$or: ...}}
-const matchWithTopLevelOrArb = getMatchPredicateSpec()
-    .singleCompoundPredicate.filter((pred) => {
-        // This filter will pass 1/3rd of the time. Since generating
-        // queries is quick, this isn't a concern.
-        return Object.keys(pred).includes("$or");
-    })
-    // Older versions suffer from SERVER-101007
-    .filter((pred) => is83orAbove || !JSON.stringify(pred).includes('"$elemMatch"'))
-    .map((pred) => {
-        return {$match: pred};
-    });
-const aggModel = fc
-    .record({
-        orMatch: matchWithTopLevelOrArb,
-        query: getQueryAndOptionsModel().filter(
-            // Older versions suffer from SERVER-101007
-            ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
-        ),
-    })
-    .map(({orMatch, query}) => {
-        return {
-            "pipeline": [orMatch, ...query.pipeline],
-            "options": query.options,
-        };
-    });
+const aggModel = topLevelOrAggModel({is83orAbove: is83orAbove});
 
 // Test with a regular collection.
 testProperty(

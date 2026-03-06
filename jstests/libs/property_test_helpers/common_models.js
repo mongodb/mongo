@@ -11,7 +11,7 @@ import {
     getTrySbeEnginePushdownEligibleAggPipelineArb,
     getSbeFullPushdownEligibleAggPipelineArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
-import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
+import {getMatchArb, getMatchPredicateSpec} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -157,4 +157,36 @@ export function projectFirstStageAggModel({isTS = false, is83orAbove = true} = {
     return aggArb.map(({projectStage, restOfPipeline}) => {
         return {"pipeline": [projectStage, ...restOfPipeline], "options": {}};
     });
+}
+
+// Creates a model for {$match: {$or: ...}} expressions.
+export function topLevelOrAggModel({is83orAbove = true} = {}) {
+    const matchWithTopLevelOrArb = getMatchPredicateSpec()
+        .singleCompoundPredicate.filter((pred) => {
+            // This filter will pass 1/3rd of the time. Since generating
+            // queries is quick, this isn't a concern.
+            return Object.keys(pred).includes("$or");
+        })
+        // Older versions suffer from SERVER-101007
+        .filter((pred) => is83orAbove || !JSON.stringify(pred).includes('"$elemMatch"'))
+        .map((pred) => {
+            return {$match: pred};
+        });
+
+    const aggModel = fc
+        .record({
+            orMatch: matchWithTopLevelOrArb,
+            query: getQueryAndOptionsModel().filter(
+                // Older versions suffer from SERVER-101007
+                ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
+            ),
+        })
+        .map(({orMatch, query}) => {
+            return {
+                "pipeline": [orMatch, ...query.pipeline],
+                "options": query.options,
+            };
+        });
+
+    return aggModel;
 }
