@@ -65,13 +65,15 @@ struct ClientSummary {
           remote(c->session()->remote()),
           sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
-          isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()) {}
+          isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()),
+          isProxyUnixSock(c->session()->isConnectedToProxyUnixSocket()) {}
 
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;
         attrs.add("remote", m.remote);
         attrs.add("isLoadBalanced", m.isLoadBalanced);
-        if (m.isLoadBalanced) {
+        attrs.add("isProxyUnixSock", m.isProxyUnixSock);
+        if (m.isLoadBalanced || m.isProxyUnixSock) {
             attrs.add("sourceClient", m.sourceClient);
         }
         attrs.add("uuid", m.uuid);
@@ -85,6 +87,7 @@ struct ClientSummary {
     HostAndPort sourceClient;
     SessionId id;
     bool isLoadBalanced;
+    bool isProxyUnixSock;
 };
 
 bool quiet() {

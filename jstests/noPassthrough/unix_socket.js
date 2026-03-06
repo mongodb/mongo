@@ -11,9 +11,11 @@
  *    {prefix}/unix-mongodb-{port}.sock and removed on shutdown (connect/ping use the
  *    regular unix socket; proxy sockets require PROXY protocol so we only verify creation/cleanup).
  */
+
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+
 // @tags: [
 //   requires_sharding,
-//   grpc_incompatible,
 // ]
 // This test will only work on POSIX machines.
 if (_isWindows()) {
@@ -45,11 +47,52 @@ var doesLogMatchRegex = function(logArray, regex) {
     return false;
 };
 
-var checkSocket = function(path) {
+// The server expects a port to be after the last hyphen and before .sock.
+let pathHasPort = function(path) {
+    const suffixIndex = path.lastIndexOf("-");
+    if (suffixIndex === -1 || !path.endsWith(".sock")) {
+        return false;
+    }
+
+    const port = path.substring(suffixIndex + 1, path.length - ".sock".length);
+    return /^[0-9]+$/.test(port);
+};
+
+let checkClientMetadataLog = function(serverHandle, path, isProxy) {
+    // The remote attribute of the client metadata log behaves differently when the client connects
+    // over gRPC.
+    if (jsTestOptions().shellGRPC) {
+        return;
+    }
+
+    let hasPort = pathHasPort(path);
+    checkLog.containsRelaxedJson(
+        serverHandle,
+        51800,
+        {
+            "remote": `${isProxy && hasPort ? "proxy" : "anonymous"} unix socket:${
+                hasPort ? serverHandle.port : 27017}`,
+        },
+        1,
+        30 * 1000,
+        (actual, expected) => actual >= expected,
+    );
+};
+
+let checkSocket = function(serverHandle, path) {
     assert.eq(fileExists(path), true);
+
     var conn = new Mongo(path);
     assert.commandWorked(conn.getDB("admin").runCommand("ping"),
                          `Expected ping command to succeed for ${path}`);
+    checkClientMetadataLog(serverHandle, path, false);
+
+    const fp = configureFailPoint(serverHandle, "isConnectedToProxyUnixSocketOverride");
+    conn = new Mongo(path);
+    assert.commandWorked(conn.getDB("admin").runCommand("ping"),
+                         `Expected ping command to succeed for ${path}`);
+    checkClientMetadataLog(serverHandle, path, true);
+    fp.off();
 };
 
 var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',', optMongos) {
@@ -79,7 +122,7 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
     // makeProxyUnixSockPath) and has permissions 0600. We do not connect over it; proxy listeners
     // require PROXY protocol.
     let proxyPath = null;
-    if (optDict.proxyUnixSocketPrefix) {
+    if (!jsTestOptions().shellGRPC && optDict.proxyUnixSocketPrefix) {
         proxyPath = `${optDict.proxyUnixSocketPrefix}/unix-mongodb-${conn.port}.sock`;
         assert(fileExists(proxyPath), `Proxy socket should exist: ${proxyPath}`);
         const proxyMode = new Number(getFileMode(proxyPath));
@@ -90,7 +133,7 @@ var testSockOptions = function(bindPath, expectSockPath, optDict, bindSep = ',',
         );
     }
 
-    checkSocket(checkPath);
+    checkSocket(conn, checkPath);
 
     // Test the naming of the unix socket
     var log = conn.adminCommand({getLog: 'global'});
