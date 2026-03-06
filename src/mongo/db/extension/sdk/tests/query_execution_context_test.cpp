@@ -29,10 +29,12 @@
 
 #include "mongo/db/extension/host/query_execution_context.h"
 
+#include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -89,6 +91,57 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptCustomKillCode) {
     ASSERT_EQ(handle->checkForInterrupt(),
               ExtensionGenericStatus(customKillCode, "operation was interrupted"));
 }
+
+TEST_F(QueryExecutionContextTestFixture, CheckForDeadline) {
+    _opCtx->setDeadlineAfterNowBy(Seconds{5}, ErrorCodes::ExceededTimeLimit);
+    const auto deadlineTimestampMs = _opCtx->getDeadline().asInt64();
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_EQ(handle->getDeadlineTimestampMs(), deadlineTimestampMs);
+}
+
+TEST_F(QueryExecutionContextTestFixture, GetDeadlineTimestampMsWhenNoDeadline) {
+    // Do not set a deadline; OperationContext defaults to Date_t::max() (no deadline).
+    const auto deadlineTimestampMs = _opCtx->getDeadline().asInt64();
+    std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
+        std::make_unique<host::QueryExecutionContext>(_expCtx.get());
+    host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
+    sdk::QueryExecutionContextHandle handle(&adapter);
+
+    ASSERT_EQ(handle->getDeadlineTimestampMs(), deadlineTimestampMs);
+    ASSERT_EQ(handle->getDeadlineTimestampMs(), std::numeric_limits<int64_t>::max());
+}
+
+class QueryExecutionContextVTableDeathTest : public unittest::Test {
+public:
+    void setUp() override {
+        // Initialize HostServices so that aggregation stages will be able to access member
+        // functions, e.g. to run assertions.
+        extension::sdk::HostServicesAPI::setHostServices(
+            &extension::host_connector::HostServicesAdapter::get());
+    }
+};
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidCheckForInterrupt, "11098300") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.check_for_interrupt = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetMetrics, "11213507") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.get_metrics = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetDeadlineTimestampMs, "11646100") {
+    auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
+    vtable.get_deadline_timestamp_ms = nullptr;
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+};
 
 }  // namespace
 }  // namespace mongo::extension

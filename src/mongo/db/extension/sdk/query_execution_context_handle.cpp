@@ -50,4 +50,10 @@ UnownedOperationMetricsHandle QueryExecutionContextAPI::getMetrics(
     return UnownedOperationMetricsHandle(metrics);
 }
 
+int64_t QueryExecutionContextAPI::getDeadlineTimestampMs() const {
+    int64_t deadlineTimestampMs{0};
+    invokeCAndConvertStatusToException(
+        [&]() { return _vtable().get_deadline_timestamp_ms(get(), &deadlineTimestampMs); });
+    return deadlineTimestampMs;
+}
 }  // namespace mongo::extension::sdk

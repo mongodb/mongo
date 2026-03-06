@@ -66,6 +66,7 @@ extensions_with_config(
         ":duplicate_stage_descriptor_bad_extension_signed_lib",
         ":foo_extension_v2_signed_lib",
         ":vector_search_extension_signed_lib",
+        ":assert_deadline_increased_after_batch_extension_signed_lib",
     ],
 )
 
@@ -287,6 +288,13 @@ signed_mongo_cc_extension_shared_library(
 signed_mongo_cc_extension_shared_library(
     name = "vector_search_extension",
     srcs = ["vector_search.cpp"],
+)
+
+# "assert_deadline_increased_after_batch" is used to test that the operation deadline
+# is correctly refreshed when issuing a getMore command.
+signed_mongo_cc_extension_shared_library(
+    name = "assert_deadline_increased_after_batch_extension",
+    srcs = ["assert_deadline_increased_after_batch.cpp"],
 )
 
 signed_mongo_cc_extension_shared_library(

@@ -60,4 +60,11 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
     });
 }
 
+MongoExtensionStatus* QueryExecutionContextAdapter::_extGetDeadlineTimestampMs(
+    const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
+        *deadlineTimestampMs = execCtx.getDeadlineTimestampMs();
+    });
+}
 }  // namespace mongo::extension::host_connector

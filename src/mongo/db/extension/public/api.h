@@ -942,6 +942,13 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
     MongoExtensionStatus* (*get_metrics)(const MongoExtensionQueryExecutionContext* ctx,
                                          MongoExtensionExecAggStage* execAggStage,
                                          MongoExtensionOperationMetrics** metrics);
+
+    /**
+     * Returns the deadline UNIX timestamp expressed in milliseconds. If the operation has no
+     * deadline, returns the maximum representable int64_t value.
+     */
+    MongoExtensionStatus* (*get_deadline_timestamp_ms)(
+        const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs);
 } MongoExtensionQueryExecutionContextVTable;
 
 ////////////////////////////////////////////////////////////////

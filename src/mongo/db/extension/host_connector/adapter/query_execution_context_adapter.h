@@ -57,6 +57,7 @@ public:
     virtual Status checkForInterrupt() const = 0;
     virtual UnownedOperationMetricsHandle getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const = 0;
+    virtual int64_t getDeadlineTimestampMs() const = 0;
 };
 
 /**
@@ -79,6 +80,10 @@ public:
         return *_ctx;
     }
 
+    static ::MongoExtensionQueryExecutionContextVTable getVTable() {
+        return VTABLE;
+    }
+
 private:
     static MongoExtensionStatus* _extCheckForInterrupt(
         const MongoExtensionQueryExecutionContext* ctx, MongoExtensionStatus* queryStatus) noexcept;
@@ -87,8 +92,13 @@ private:
                                                 MongoExtensionExecAggStage* execAggStage,
                                                 MongoExtensionOperationMetrics** metrics) noexcept;
 
+    static MongoExtensionStatus* _extGetDeadlineTimestampMs(
+        const MongoExtensionQueryExecutionContext* ctx, int64_t* deadlineTimestampMs) noexcept;
+
     static constexpr ::MongoExtensionQueryExecutionContextVTable VTABLE = {
-        .check_for_interrupt = &_extCheckForInterrupt, .get_metrics = &_extGetMetrics};
+        .check_for_interrupt = &_extCheckForInterrupt,
+        .get_metrics = &_extGetMetrics,
+        .get_deadline_timestamp_ms = &_extGetDeadlineTimestampMs};
 
     std::unique_ptr<QueryExecutionContextBase> _ctx;
 };

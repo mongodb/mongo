@@ -60,6 +60,8 @@ public:
 
     UnownedOperationMetricsHandle getMetrics(MongoExtensionExecAggStage* execStage) const;
 
+    int64_t getDeadlineTimestampMs() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         sdk_tassert(11098300,
                     "QueryExecutionContext' 'check_for_interrupt' is null",
@@ -67,6 +69,9 @@ public:
         sdk_tassert(11213507,
                     "QueryExecutionContext' 'get_metrics' is null",
                     vtable.get_metrics != nullptr);
+        sdk_tassert(11646100,
+                    "QueryExecutionContext' 'get_deadline_timestamp_ms' is null",
+                    vtable.get_deadline_timestamp_ms != nullptr);
     };
 };
 

@@ -952,6 +952,10 @@ public:
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
         return UnownedOperationMetricsHandle{nullptr};
     }
+
+    int64_t getDeadlineTimestampMs() const override {
+        return std::numeric_limits<int64_t>::max();
+    }
 };
 
 static constexpr std::string_view kMergeOnlyDPLStageName = "$mergeOnlyDPL";

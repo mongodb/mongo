@@ -62,6 +62,10 @@ public:
         return opDebugMetrics.getOrCreateMetrics(stageName, execStage);
     }
 
+    int64_t getDeadlineTimestampMs() const override {
+        return _ctx->getOperationContext()->getDeadline().asInt64();
+    }
+
 private:
     const ExpressionContext* _ctx;
 };
