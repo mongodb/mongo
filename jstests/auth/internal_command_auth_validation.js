@@ -741,6 +741,20 @@ const internalCommandsMap = {
             _shardsvrReshardingOperationTime: "test.x",
         },
     },
+    _shardsvrReshardDonorInitialize: {
+        testname: "_shardsvrReshardDonorInitialize",
+        command: {
+            _shardsvrReshardDonorInitialize: UUID(),
+            commonReshardingMetadata: {
+                _id: UUID(),
+                ns: "test.x",
+                ui: UUID(),
+                tempNs: "test.resharding.x",
+                reshardingKey: {x: 1},
+            },
+            recipientShards: [],
+        },
+    },
     _shardsvrReshardRecipientClone: {
         testname: "_shardsvrReshardRecipientClone",
         command: {

@@ -318,6 +318,26 @@ commands:
                 type: uuid
                 description: "The UUID for the resharding operation."
 
+    _shardsvrReshardDonorInitialize:
+        description:
+            "The internal command sent by the coordinator to donor shards to
+            initialize the resharding donor state machine."
+        command_name: _shardsvrReshardDonorInitialize
+        cpp_name: ShardsvrReshardDonorInitialize
+        type: uuid
+        strict: false
+        namespace: type
+        reply_type: OkReply
+        api_version: ""
+        fields:
+            commonReshardingMetadata: CommonReshardingMetadata
+            recipientShards:
+                type: array<shard_id>
+                description: "The list of recipient shards participating in the resharding operation."
+            telemetryContext:
+                type: object_owned
+                optional: true
+
     _shardsvrReshardRecipientClone:
         description: "The internal recipient clone command."
         command_name: _shardsvrReshardRecipientClone

@@ -3507,6 +3507,31 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "_shardsvrReshardDonorInitialize",
+            command: {
+                _shardsvrReshardDonorInitialize: UUID(),
+                commonReshardingMetadata: {
+                    _id: UUID(),
+                    ns: "test.x",
+                    ui: UUID(),
+                    tempNs: "test.resharding.x",
+                    reshardingKey: {x: 1},
+                },
+                recipientShards: [],
+            },
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {__system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    expectFail: true,
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
             testname: "_shardsvrReshardRecipientClone",
             command: {
                 _shardsvrReshardRecipientClone: UUID(),
