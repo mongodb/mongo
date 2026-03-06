@@ -73,9 +73,10 @@ std::string _evalResult;
 AtomicWord<bool> _hasEvalRequest{false};
 AtomicWord<bool> _evalComplete{false};
 
-// Scope and variable data captured when paused
+// Data captured when paused
 static std::vector<Scope> _capturedScopes;
 static std::map<int, std::vector<Variable>> _capturedVariables;
+std::vector<protocol::StackFrame> _capturedStackFrames;
 
 // Debugger state
 static std::unique_ptr<DebuggerObject> _debuggerObject;
@@ -318,6 +319,69 @@ bool DebuggerObject::storeScopesCallback(JSContext* cx, unsigned argc, JS::Value
 }
 
 /**
+ * Store stack frame information.
+ * Expects an array of objects with {url, line} properties.
+ */
+bool DebuggerObject::storeStackFramesCallback(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    if (argc < 1 || !args[0].isObject()) {
+        args.rval().setUndefined();
+        return true;
+    }
+
+    JS::RootedObject framesArray(cx, &args[0].toObject());
+    bool isArray;
+    if (!JS::IsArrayObject(cx, framesArray, &isArray) || !isArray) {
+        args.rval().setUndefined();
+        return true;
+    }
+
+    uint32_t length;
+    if (!JS::GetArrayLength(cx, framesArray, &length)) {
+        args.rval().setUndefined();
+        return true;
+    }
+
+    _capturedStackFrames.clear();
+
+    for (uint32_t i = 0; i < length; i++) {
+        JS::RootedValue frameVal(cx);
+        if (!JS_GetElement(cx, framesArray, i, &frameVal) || !frameVal.isObject()) {
+            continue;
+        }
+
+        JS::RootedObject frameObj(cx, &frameVal.toObject());
+
+        // Extract url
+        JS::RootedValue urlVal(cx);
+        std::string url;
+        if (JS_GetProperty(cx, frameObj, "url", &urlVal) && urlVal.isString()) {
+            JS::RootedString urlStr(cx, urlVal.toString());
+            JS::UniqueChars urlChars = JS_EncodeStringToUTF8(cx, urlStr);
+            url = urlChars ? std::string(urlChars.get()) : "unknown";
+        }
+
+        // Extract line number
+        JS::RootedValue lineVal(cx);
+        int line = 0;
+        if (JS_GetProperty(cx, frameObj, "line", &lineVal)) {
+            int32_t lineNum;
+            if (JS::ToInt32(cx, lineVal, &lineNum)) {
+                line = lineNum;
+            }
+        }
+
+        // Set both the "name" and the "source" to the url, the adapter will modify each
+        // appropriately.
+        _capturedStackFrames.emplace_back(url, url, line);
+    }
+
+    args.rval().setUndefined();
+    return true;
+}
+
+/**
  * Store variable information for a given scope.
  * Expects variablesReference (int) and an array of {name, value, type, variablesReference}
  * objects.
@@ -452,6 +516,12 @@ Status DebuggerObject::setOnDebuggerStatementCallback(JS::RootedObject const& gl
 
     status = registerNativeFunction(
         _cx, global, "__storeVariables", DebuggerObject::storeVariablesCallback, 2);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = registerNativeFunction(
+        _cx, global, "__storeStackFrames", DebuggerObject::storeStackFramesCallback, 1);
     if (!status.isOK()) {
         return status;
     }
@@ -653,6 +723,10 @@ std::vector<Variable> DebuggerGlobal::getVariables(int variablesReference) {
         return it->second;
     }
     return std::vector<Variable>();
+}
+
+std::vector<protocol::StackFrame> DebuggerGlobal::getStackFrames() {
+    return _capturedStackFrames;
 }
 
 void DebuggerGlobal::unpause() {

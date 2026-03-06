@@ -109,11 +109,15 @@ void DebugAdapter::handleRequest(ContinueRequest& request) {
 }
 
 void DebugAdapter::handleRequest(StackTraceRequest& request) {
-    auto script = DebuggerGlobal::getPausedScript();
-    auto line = DebuggerGlobal::getPausedLine();
+    auto frames = DebuggerGlobal::getStackFrames();
 
-    auto path = rel2abs(script);
-    auto response = request.response(script, path, line);
+    for (auto& frame : frames) {
+        frame.source = rel2abs(frame.source);
+        // some built-in scripts have absolute paths as their "name", so convert them to relative
+        // for the client
+        frame.name = abs2rel(frame.name);
+    }
+    auto response = request.response(frames);
     sendMessage(response);
 }
 

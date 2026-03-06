@@ -151,12 +151,23 @@ public:
     Response response();
 };
 
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_StackFrame
+class StackFrame {
+public:
+    std::string name;
+    std::string source;
+    int line;
+
+    StackFrame(std::string name, std::string source, int line)
+        : name(name), source(source), line(line) {};
+};
+
 // https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace
 class StackTraceRequest : public VisitableRequest<StackTraceRequest> {
 public:
     inline static constexpr std::string_view COMMAND = "stackTrace";
     StackTraceRequest(const PartialRequest& partial) : VisitableRequest(partial) {};
-    Response response(std::string name, std::string path, int line);
+    Response response(std::vector<StackFrame> frames);
 };
 
 // https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Scope

@@ -39,6 +39,7 @@
                         line: frame.script?.getOffsetLocation(frame.offset)?.lineNumber ?? 0,
                     };
 
+                    storeFrames(frame);
                     processScopes(frame);
 
                     // Invoke the C++ callback
@@ -55,6 +56,24 @@
     }
 
     // HELPER FUNCTIONS to parse variable/scope labeling
+
+    function storeFrames(frame) {
+        // Build the full call stack by walking frame.older
+        const stackFrames = [];
+        let currentFrame = frame;
+        let id = 1;
+        while (currentFrame && id <= 50) {
+            // Limit to 50 frames to avoid infinite loops
+            const url = currentFrame.script?.url ?? "unknown";
+            const line = currentFrame.script?.getOffsetLocation(currentFrame.offset)?.lineNumber ?? 0;
+
+            stackFrames.push({url, line});
+
+            currentFrame = currentFrame.older;
+            id++;
+        }
+        globalThis.__storeStackFrames(stackFrames);
+    }
 
     // Extract scope and variable information
     function processScopes(frame) {
@@ -105,7 +124,7 @@
     function getScopeName(env, level) {
         switch (env.type) {
             case "declarative":
-                return ["Local", "Closure", "Script"][level - 1];
+                return ["Local", "Closure", "Script"][level - 1] ?? "Module";
             case "object":
                 return "Global";
             default:

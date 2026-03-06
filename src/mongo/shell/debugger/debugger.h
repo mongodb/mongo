@@ -58,6 +58,7 @@ public:
 
     static std::vector<Scope> getScopes(int frameId);
     static std::vector<Variable> getVariables(int variablesReference);
+    static std::vector<protocol::StackFrame> getStackFrames();
 
     static void unpause();
 };
@@ -79,6 +80,7 @@ private:
     static bool storeEvalResult(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeScopesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool storeVariablesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool storeStackFramesCallback(JSContext* cx, unsigned argc, JS::Value* vp);
     static bool getPendingBreakpointsCallback(JSContext* cx, unsigned argc, JS::Value* vp);
 
     static bool hasEvalRequest(JSContext* cx, unsigned argc, JS::Value* vp);

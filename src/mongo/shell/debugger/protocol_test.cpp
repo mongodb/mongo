@@ -76,9 +76,11 @@ TEST(StackTraceRequest, parseRequestAndResponse) {
     auto request = std::static_pointer_cast<StackTraceRequest>(Request::fromJSON(json));
     ASSERT_EQ(request->seq, 17);
 
-    auto response = request->response("my name", "my/path/to/file.js", 32);
+    std::vector<StackFrame> frames = {StackFrame("name_A", "source_A", 7),
+                                      StackFrame("name_B", "source_B", 99)};
+    auto response = request->response(frames);
     std::string expectedResponse =
-        R"({ "type" : "response", "seq" : 17, "body" : { "stackFrames" : [ { "id" : 1, "name" : "my name", "source" : { "path" : "my/path/to/file.js" }, "line" : 32, "column" : 0 } ] } })";
+        R"({ "type" : "response", "seq" : 17, "body" : { "stackFrames" : [ { "id" : 1, "name" : "name_A", "source" : { "path" : "source_A" }, "line" : 7, "column" : 0 }, { "id" : 2, "name" : "name_B", "source" : { "path" : "source_B" }, "line" : 99, "column" : 0 } ] } })";
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 

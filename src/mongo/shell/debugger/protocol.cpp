@@ -150,7 +150,7 @@ Response ContinueRequest::response() {
  * StackTraceRequest
  */
 
-Response StackTraceRequest::response(std::string name, std::string path, int line) {
+Response StackTraceRequest::response(std::vector<StackFrame> frames) {
     BSONObjBuilder responseBuilder;
     responseBuilder.append("type", "response");
     responseBuilder.append("seq", seq);
@@ -158,18 +158,23 @@ Response StackTraceRequest::response(std::string name, std::string path, int lin
     BSONObjBuilder bodyBuilder;
     BSONArrayBuilder stackFramesArr;
 
-    BSONObjBuilder frameBuilder;
-    frameBuilder.append("id", 1);
-    frameBuilder.append("name", name);
+    int frameId = 1;
+    for (const auto& frame : frames) {
+        BSONObjBuilder frameBuilder;
+        frameBuilder.append("id", frameId);
+        frameBuilder.append("name", frame.name);
 
-    BSONObjBuilder sourceBuilder;
-    sourceBuilder.append("path", path);
-    frameBuilder.append("source", sourceBuilder.obj());
+        BSONObjBuilder sourceBuilder;
+        sourceBuilder.append("path", frame.source);
+        frameBuilder.append("source", sourceBuilder.obj());
 
-    frameBuilder.append("line", line);
-    frameBuilder.append("column", 0);
+        frameBuilder.append("line", frame.line);
+        frameBuilder.append("column", 0);
 
-    stackFramesArr.append(frameBuilder.obj());
+        stackFramesArr.append(frameBuilder.obj());
+        frameId++;
+    }
+
     bodyBuilder.append("stackFrames", stackFramesArr.arr());
 
     responseBuilder.append("body", bodyBuilder.obj());
