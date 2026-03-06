@@ -1759,6 +1759,8 @@ tasks:
 
   - <<: *task_template
     name: concurrency_with_mongot_extension_single_node
+    # TODO SERVER-120396: Re-enable vector_search_extension suites
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1780,6 +1782,8 @@ tasks:
 
   - <<: *task_template
     name: concurrency_with_mongot_extension_mongos
+    # TODO SERVER-120396: Re-enable vector_search_extension suites
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
@@ -1802,6 +1806,8 @@ tasks:
 
   - <<: *task_template
     name: concurrency_with_mongot_extension_sharded_collections
+    # TODO SERVER-120396: Re-enable vector_search_extension suites
+    disable: true
     tags:
       [
         "assigned_to_jira_team_server_query_integration",
