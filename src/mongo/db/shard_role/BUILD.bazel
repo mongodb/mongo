@@ -92,6 +92,7 @@ mongo_cc_unit_test(
         "shard_role_loop_test.cpp",
         "shard_role_test.cpp",
         "//src/mongo/db:database_name_test.cpp",
+        "//src/mongo/db/shard_role/ddl:ddl_lock_manager_test.cpp",
         "//src/mongo/db/shard_role/lock_manager:d_concurrency_test.cpp",
         "//src/mongo/db/shard_role/shard_catalog:catalog_raii_test.cpp",
     ],

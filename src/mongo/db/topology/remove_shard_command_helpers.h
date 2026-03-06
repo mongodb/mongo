@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/remove_shard_draining_progress_gen.h"
 #include "mongo/util/modules.h"

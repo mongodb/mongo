@@ -57,7 +57,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DDLLockManager {
     /**
      * ScopedBaseDDLLock will hold a DDL lock for the given resource without performing any check.
      */
-    class ScopedBaseDDLLock {
+    class MONGO_MOD_PARENT_PRIVATE ScopedBaseDDLLock {
     public:
         ScopedBaseDDLLock(OperationContext* opCtx,
                           Locker* locker,
@@ -118,7 +118,7 @@ public:
      * If you try to lock with `waitForRecovery == true` the base lock will call the
      * `waitForRecovery` funciton on this interface
      */
-    class Recoverable {
+    class MONGO_MOD_OPEN Recoverable {
     public:
         virtual ~Recoverable() = default;
 

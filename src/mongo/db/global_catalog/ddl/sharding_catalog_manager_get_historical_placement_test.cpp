@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
@@ -36,6 +35,7 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"

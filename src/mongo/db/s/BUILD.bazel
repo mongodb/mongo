@@ -879,7 +879,6 @@ mongo_cc_unit_test(
         "range_deletion_util_test.cpp",
         "session_catalog_migration_destination_test.cpp",
         "session_catalog_migration_source_test.cpp",
-        "//src/mongo/db/global_catalog/ddl:ddl_lock_manager_test.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_key_index_util_test.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_key_util_test.cpp",
         "//src/mongo/db/global_catalog/ddl:shard_metadata_util_test.cpp",

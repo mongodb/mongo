@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_catalog/ddl/ddl_lock_manager.h"
+#include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"

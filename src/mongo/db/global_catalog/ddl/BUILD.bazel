@@ -469,7 +469,6 @@ mongo_cc_library(
     name = "sharding_catalog_manager",
     srcs = [
         "create_database_util.cpp",
-        "ddl_lock_manager.cpp",
         "placement_history_cleaner.cpp",
         "sharding_catalog_manager.cpp",
         "sharding_catalog_manager_chunk_operations.cpp",

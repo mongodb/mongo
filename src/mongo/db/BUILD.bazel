@@ -544,6 +544,7 @@ mongo_cc_library(
         "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.cpp",
         "//src/mongo/db/shard_role:direct_shard_client_tracker.cpp",
         "//src/mongo/db/shard_role:transaction_resources.cpp",
+        "//src/mongo/db/shard_role/ddl:ddl_lock_manager.cpp",
         "//src/mongo/db/shard_role/ddl:replica_set_ddl_tracker.cpp",
         "//src/mongo/db/shard_role/lock_manager:dump_lock_manager_impl.cpp",
         "//src/mongo/db/shard_role/shard_catalog:collection_metadata.cpp",
