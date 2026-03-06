@@ -63,6 +63,10 @@
                 skipEnforceFastCountOnValidate: true
         - class: CheckOrphansDeleted
         - class: FCVUpgradeDowngradeInBackground
+          shell_options:
+            global_vars:
+              TestData:
+                runningWithConfigStepdowns: true
         - class: CleanEveryN
           n: 20
 

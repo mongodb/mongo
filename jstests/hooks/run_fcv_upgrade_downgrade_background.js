@@ -34,6 +34,12 @@ const sendFCVUpDown = function (ver) {
             jsTest.log.info("setFCV: Temporarily unavailable", {e});
             return;
         }
+        if (e.code === ErrorCodes.HostUnreachable && TestData.runningWithConfigStepdowns) {
+            // The mongos may exhaust its retries due to having consecutive config stepdowns.
+            // In this case, the mongos will return a HostUnreachable error.
+            jsTest.log.info("setFCV: Host unreachable", {e});
+            return;
+        }
         if (e.code === ErrorCodes.CannotUpgrade) {
             jsTest.log.info("setFCV: Can not upgrade", {e});
             return;
