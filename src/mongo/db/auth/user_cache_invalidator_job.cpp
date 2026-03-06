@@ -65,8 +65,7 @@ namespace {
 
 using OIDorTimestamp = UserCacheInvalidator::OIDorTimestamp;
 
-const auto getUserCacheInvalidator =
-    ServiceContext::declareDecoration<std::unique_ptr<UserCacheInvalidator>>();
+const auto getUserCacheInvalidator = ServiceContext::declareDecoration<UserCacheInvalidator>();
 
 Seconds loadInterval() {
     return Seconds(userCacheInvalidationIntervalSecs.load());
@@ -114,20 +113,17 @@ std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
 Status userCacheInvalidationIntervalSecsNotify(const int& value) {
     LOGV2_DEBUG(20259, 5, "setInterval", "newInterval"_attr = loadInterval());
     if (hasGlobalServiceContext()) {
-        auto service = getGlobalServiceContext();
-        if (getUserCacheInvalidator(service)) {
-            getUserCacheInvalidator(service)->setPeriod(loadInterval());
-        }
+        getUserCacheInvalidator(getGlobalServiceContext()).setPeriod(loadInterval());
     }
     return Status::OK();
 }
 
 void UserCacheInvalidator::setPeriod(Milliseconds period) {
-    _job->setPeriod(period);
+    stdx::lock_guard lg(_jobMutex);
+    if (_job) {
+        _job.setPeriod(period);
+    }
 }
-
-UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
-    : _authzManager(authzManager) {}
 
 void UserCacheInvalidator::initialize(OperationContext* opCtx) {
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx);
@@ -147,9 +143,9 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     // UserCacheInvalidator should only run on a router.
     invariant(opCtx->getService()->role().has(ClusterRole::RouterServer));
 
-    auto invalidator =
-        std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(opCtx->getService()));
-    invalidator->initialize(opCtx);
+    auto& invalidator = getUserCacheInvalidator(serviceCtx);
+
+    invalidator.initialize(opCtx);
 
     auto periodicRunner = serviceCtx->getPeriodicRunner();
     invariant(periodicRunner);
@@ -158,25 +154,26 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
     // interval.
     PeriodicRunner::PeriodicJob job(
         "UserCacheInvalidator",
-        [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx)->run(); },
+        [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx).run(); },
         loadInterval(),
         true /*isKillableByStepdown*/);
 
-    invalidator->_job =
-        std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
-
-    // Make sure the invalidator is moved to the service context by the time we call start()
-    getUserCacheInvalidator(serviceCtx) = std::move(invalidator);
-    getUserCacheInvalidator(serviceCtx)->_job->start();
+    stdx::lock_guard lg(invalidator._jobMutex);
+    // UserCacheInvalidator job must not already be present
+    invariant(!invalidator._job);
+    invalidator._job = periodicRunner->makeJob(std::move(job));
+    invalidator._job.start();
 }
 
 void UserCacheInvalidator::stop(ServiceContext* serviceCtx) {
-    const auto& invalidator = getUserCacheInvalidator(serviceCtx);
-    if (invalidator == nullptr) {
-        return;
-    }
+    auto& invalidator = getUserCacheInvalidator(serviceCtx);
 
-    invalidator->_job->stop();
+    // Guard changes to _job with a mutex because this can run concurrently with start()
+    stdx::lock_guard lg(invalidator._jobMutex);
+    if (invalidator._job) {
+        invalidator._job.stop();
+        invalidator._job.detach();
+    }
 }
 
 void UserCacheInvalidator::run() try {
@@ -216,7 +213,8 @@ void UserCacheInvalidator::run() try {
         // If LDAP authorization is enabled and the authz cache generation has not changed, the
         // external users should be refreshed to ensure that any cached users evicted on the config
         // server are appropriately refreshed here.
-        auto refreshStatus = _authzManager->refreshExternalUsers(opCtx.get());
+        auto refreshStatus =
+            AuthorizationManager::get(opCtx->getService())->refreshExternalUsers(opCtx.get());
         if (!refreshStatus.isOK()) {
             LOGV2_WARNING(5914803,
                           "Error refreshing external users in user cache, so invalidating external "

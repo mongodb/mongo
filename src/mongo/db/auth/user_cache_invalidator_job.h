@@ -54,8 +54,6 @@ class MONGO_MOD_PUBLIC UserCacheInvalidator {
 public:
     using OIDorTimestamp = std::variant<OID, Timestamp>;
 
-    UserCacheInvalidator(AuthorizationManager* authzManager);
-
     /**
      * Create a new UserCacheInvalidator as a decorator on the service context
      * and start the background job.
@@ -77,10 +75,12 @@ private:
     void initialize(OperationContext* opCtx);
     void run();
 
-    std::unique_ptr<PeriodicJobAnchor> _job;
+    PeriodicJobAnchor _job;
 
-    AuthorizationManager* const _authzManager;
     OIDorTimestamp _previousGeneration;
+
+    // this mutex serializes start and stop+detach on the periodic job
+    stdx::mutex _jobMutex;
 };
 
 Status userCacheInvalidationIntervalSecsNotify(const int& newValue);
