@@ -20,6 +20,7 @@ export var CLIENT_CERT = getX509Path("client.pem");
 export var TRUSTED_CLIENT_CERT = getX509Path("trusted-client.pem");
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 export var CLUSTER_CERT = getX509Path("cluster_cert.pem");
+export var TRUSTED_CLUSTER_CERT = getX509Path("trusted-cluster-server.pem");
 
 // Note: "tlsAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
@@ -409,4 +410,96 @@ export function clientSupportsTLS1_3() {
     }
     const opensslVersion = opensslVersionAsInt();
     return opensslVersion === undefined ? true : opensslVersion >= 0x1010100; // 1.1.1
+}
+
+export function runTLSModeTest(conn, mode, clientCert, clientCA, unixDomainSocketPrefix) {
+    const tcpIpUri = `mongodb://localhost:${conn.port}/admin`;
+    switch (mode) {
+        case "disabled": {
+            // Ingress TLS is forbidden on the TCP/IP socket.
+            let exitCode = runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.eq(exitCode, 0, `Was not able to connect to ${tcpIpUri} without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.neq(exitCode, 0, `Was able to connect to ${tcpIpUri} with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        case "allowTLS":
+        case "preferTLS": {
+            // Both TLS and plaintext are permitted on the TCP/IP socket.
+            let exitCode = runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.eq(exitCode, 0, `Was not able to connect to ${tcpIpUri} without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.eq(exitCode, 0, `Could not connect to ${tcpIpUri} with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        case "requireTLS": {
+            // Ingress plaintext is forbidden on the TCP/IP socket.
+            let exitCode = runMongoProgram("mongo", tcpIpUri, "--eval", "assert.commandWorked(db.hello())");
+            assert.neq(exitCode, 0, `Was able to connect without TLS when TLSMode was ${mode}`);
+            exitCode = runMongoProgram(
+                "mongo",
+                tcpIpUri,
+                "--tls",
+                "--tlsCertificateKeyFile",
+                clientCert,
+                "--tlsCAFile",
+                clientCA,
+                "--eval",
+                "assert.commandWorked(db.hello())",
+            );
+            assert.eq(exitCode, 0, `Could not connect with TLS when TLSMode was ${mode}`);
+
+            break;
+        }
+        default:
+            assert(false, "Unrecognized tlsMode option testcase");
+    }
+
+    // Clients always uses plaintext when connecting to the server's unix domain socket regardless
+    // of whether they were configured with TLS or not. Similarly, the server accepts these plaintext connections
+    // over the unix domain sockets regardless of its configured tlsMode.
+    if (!_isWindows()) {
+        const unixPort = `${unixDomainSocketPrefix}/mongodb-${conn.port}.sock`;
+        const unixDomainUri = `mongodb://${encodeURIComponent(unixPort)}`;
+        let exitCode = runMongoProgram("mongo", unixDomainUri, "--eval", "assert.commandWorked(db.hello())");
+        assert.eq(exitCode, 0, `Was not able to connect to ${unixDomainUri} without TLS when TLSMode was ${mode}`);
+        exitCode = runMongoProgram(
+            "mongo",
+            unixDomainUri,
+            "--tls",
+            "--tlsCertificateKeyFile",
+            clientCert,
+            "--tlsCAFile",
+            clientCA,
+            "--eval",
+            "assert.commandWorked(db.hello())",
+        );
+        assert.eq(
+            exitCode,
+            0,
+            `Was not able to connect to ${unixDomainUri} with client TLS params when server TLSMode was ${mode}`,
+        );
+    }
 }
