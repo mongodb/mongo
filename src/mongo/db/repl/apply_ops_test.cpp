@@ -632,7 +632,6 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsReplicatedRridDisabled) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "test.ApplyOpsCreateWithRecordIdsReplicatedRridDisabled");
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
 
     auto createOpWithRecordIdsReplicated =
         BSON("op" << "c"
@@ -645,6 +644,92 @@ TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsReplicatedRridDisabled) {
         "featureFlagRecordIdsReplicated", false};
     ASSERT_EQ(ErrorCodes::CommandNotSupported,
               applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsCreateWithoutRecordIdsReplicatedRridEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "test.ApplyOpsCreateWithoutRecordIdsReplicatedRridEnabled");
+
+    auto createOpWithoutRecordIdsReplicated = BSON("op" << "c"
+                                                        << "ns" << nss.getCommandNS().ns_forTest()
+                                                        << "o" << BSON("create" << nss.coll()));
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithoutRecordIdsReplicated));
+    BSONObjBuilder resultBuilder;
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
+    ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+
+    // validating that the collection has recordIdsReplicated even when it was not present.
+    auto coll = acquireCollection(
+        opCtx.get(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_TRUE(coll.getCollectionPtr()->areRecordIdsReplicated());
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsTrueReplicatedRridEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "test.ApplyOpsCreateWithRecordIdsTrueReplicatedRridEnabled");
+
+    auto createOpWithRecordIdsReplicatedTrue =
+        BSON("op" << "c"
+                  << "ns" << nss.getCommandNS().ns_forTest() << "o"
+                  << BSON("create" << nss.coll() << "recordIdsReplicated" << true));
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithRecordIdsReplicatedTrue));
+    BSONObjBuilder resultBuilder;
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
+    ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+
+    // validating that the collection has recordIdsReplicated.
+    auto coll = acquireCollection(
+        opCtx.get(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_TRUE(coll.getCollectionPtr()->areRecordIdsReplicated());
+}
+
+TEST_F(ApplyOpsTest, ApplyOpsCreateWithRecordIdsFalseReplicatedRridEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "test.ApplyOpsCreateWithRecordIdsFalseReplicatedRridEnabled");
+
+    auto createOpWithRecordIdsReplicatedFalse =
+        BSON("op" << "c"
+                  << "ns" << nss.getCommandNS().ns_forTest() << "o"
+                  << BSON("create" << nss.coll() << "recordIdsReplicated" << false));
+
+    auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(createOpWithRecordIdsReplicatedFalse));
+    BSONObjBuilder resultBuilder;
+    RAIIServerParameterControllerForTest _featureFlagReplRidController{
+        "featureFlagRecordIdsReplicated", true};
+    ASSERT_OK(applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
+
+    // validating that the collection does not have recordIdsReplicated.
+    auto coll = acquireCollection(
+        opCtx.get(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_FALSE(coll.getCollectionPtr()->areRecordIdsReplicated());
 }
 
 using ApplyOpsDeathTest = ApplyOpsTest;
