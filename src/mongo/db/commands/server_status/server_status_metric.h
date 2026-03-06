@@ -312,11 +312,15 @@ template <typename T>
 using ServerStatusMetricPolicySelectionT = typename ServerStatusMetricPolicySelection<T>::type;
 
 /**
- * A CustomMetricBuilder, using a policy chosen by the ServerStatusMetricValuePolicy trait,
+ * A CustomMetricBuilder, using a policy chosen by the ServerStatusMetricValuePolicy trait.
  *
  * Example (note the auto& reference):
  *   auto& myMetric = *MetricBuilder<Counter64>("network.myMetric")
  *                         .setPredicate(someNullaryPredicate);
+ *
+ * NOTE: By default, MetricBuilder is NOT thread-safe. You must either use an atomic type (e.g.
+ * Counter64, Atomic64Metric, etc.) or use MetricBuilder<synchronized_value<T>> instead to guarantee
+ * thread-safety.
  */
 template <typename T>
 using MetricBuilder MONGO_MOD_PUBLIC = CustomMetricBuilder<ServerStatusMetricPolicySelectionT<T>>;
