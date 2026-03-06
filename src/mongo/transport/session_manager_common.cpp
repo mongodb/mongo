@@ -74,13 +74,15 @@ struct ClientSummary {
           sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
           isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()),
-          isPriority(c->session()->isConnectedToPriorityPort()) {}
+          isPriority(c->session()->isConnectedToPriorityPort()),
+          isProxyUnixSock(c->session()->isConnectedToProxyUnixSocket()) {}
 
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;
         attrs.add("remote", m.remote);
         attrs.add("isLoadBalanced", m.isLoadBalanced);
-        if (m.isLoadBalanced) {
+        attrs.add("isProxyUnixSock", m.isProxyUnixSock);
+        if (m.isLoadBalanced || m.isProxyUnixSock) {
             attrs.add("sourceClient", m.sourceClient);
         }
         if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
@@ -98,6 +100,7 @@ struct ClientSummary {
     SessionId id;
     bool isLoadBalanced;
     bool isPriority;
+    bool isProxyUnixSock;
 };
 
 bool quiet() {

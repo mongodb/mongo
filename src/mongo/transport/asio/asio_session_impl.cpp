@@ -234,7 +234,21 @@ CommonAsioSession::CommonAsioSession(
     }
 
     try {
-        _remote = HostAndPort(_remoteAddr.toString(true));
+        auto makeUnixRemote = [&] {
+#ifndef _WIN32
+            const int unixSockPort = parsePortFromUnixSockPath(_localAddr.toString(true));
+            if (unixSockPort == -1) {
+                return HostAndPort(_remoteAddr.toString(true));
+            }
+            return HostAndPort(fmt::format("{} unix socket:{}",
+                                           isConnectedToProxyUnixSocket() ? "proxy" : "anonymous",
+                                           unixSockPort));
+#else
+            return HostAndPort(_remoteAddr.toString(true));
+#endif
+        };
+
+        _remote = _remoteAddr.isIP() ? HostAndPort(_remoteAddr.toString(true)) : makeUnixRemote();
         _restrictionEnvironment = RestrictionEnvironment(_remoteAddr, _localAddr);
     } catch (...) {
         LOGV2_DEBUG(9079003,
