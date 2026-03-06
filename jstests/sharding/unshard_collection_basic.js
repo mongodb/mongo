@@ -49,7 +49,7 @@ const unshardedCollName = "foo_unsharded";
 const unshardedCollNS = dbName + "." + unshardedCollName;
 assert.commandWorked(st.s.getDB(dbName).runCommand({create: unshardedCollName}));
 let res = mongos.adminCommand({unshardCollection: unshardedCollNS});
-assert.commandFailedWithCode(res, [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
+assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotSharded);
 
 jsTest.log("Verify unshardCollection succeeds with explicit toShard option");
 let coll = mongos.getDB(dbName)[collName];
