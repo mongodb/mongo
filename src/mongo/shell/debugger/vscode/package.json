@@ -81,7 +81,11 @@
       }
     ]
   },
+  "scripts": {
+    "package": "vsce package --skip-license"
+  },
   "devDependencies": {
-    "@types/vscode": "^1.75.0"
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.7.1"
   }
 }

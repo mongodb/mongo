@@ -9,11 +9,8 @@ npm install
 VERSION=$(node -p "require('./package.json').version")
 EXT_NAME=$(node -p "require('./package.json').name")
 
-# Install vsce to package extensions
-npm install -g @vscode/vsce
-
 # Package extension
-vsce package --skip-license
+npm run package
 
 # Install via VSCode
 code --install-extension $EXT_NAME-$VERSION.vsix
