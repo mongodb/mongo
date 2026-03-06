@@ -1,4 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@rules_python//python:defs.bzl", "py_binary")
 load(
     "@bazel_skylib//rules:common_settings.bzl",
     "bool_flag",
@@ -82,10 +83,11 @@ config_setting(
     ],
 )
 
-# Expose script for external usage through bazel.
-exports_files([
-    "generate_config_header.py",
-])
+py_binary(
+    name = "generate_config_header",
+    srcs = ["generate_config_header.py"],
+    main = "generate_config_header.py",
+)
 
 # --------------------------------------
 # Compiler types

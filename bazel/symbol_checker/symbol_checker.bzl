@@ -65,7 +65,7 @@ def symbol_checker_aspect_impl(target, ctx):
             OutputGroupInfo(symbol_checker = depset()),
         ]
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     cc_toolchain = find_cpp_toolchain(ctx)
     nm_bin = cc_toolchain.nm_executable
 
@@ -154,7 +154,7 @@ symbol_checker_aspect = aspect(
         ),
     },
     toolchains = [
-        "@bazel_tools//tools/python:toolchain_type",
+        "@rules_python//python:toolchain_type",
         "@bazel_tools//tools/cpp:toolchain_type",
     ],
     attr_aspects = ["deps", "binary_with_debug"],

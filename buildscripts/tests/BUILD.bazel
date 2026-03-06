@@ -1,5 +1,6 @@
 load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
+load("@rules_python//python:defs.bzl", "py_library")
 
 mongo_toolchain_py_cxx_test(
     name = "test_clang_tidy",

@@ -966,7 +966,7 @@ def idl_generator_impl(ctx):
     gen_source = ctx.actions.declare_file(base + "_gen.cpp")
     gen_header = ctx.actions.declare_file(base + "_gen.h")
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     dep_depsets = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]
 
     # Transitive headers from deps + explicit hdrs attr
@@ -1084,7 +1084,7 @@ idl_generator_rule = rule(
         "gen_src": "%{name}.cpp",
     },
     doc = "Generates header/source files from IDL files.",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     fragments = ["py"],
 )
 

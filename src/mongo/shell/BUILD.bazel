@@ -235,15 +235,14 @@ render_template(
     srcs = [
         "error_codes.tpl.js",
         "//src/mongo/base:error_codes.yml",
-        "//src/mongo/base:generate_error_codes.py",
     ],
     cmd = [
-        "$(location //src/mongo/base:generate_error_codes.py)",
         "$(location //src/mongo/base:error_codes.yml)",
         "$(location error_codes.tpl.js)",
         "$(location error_codes.js)",
     ],
     output = "error_codes.js",
+    python_file = "//src/mongo/base:generate_error_codes.py",
     python_libs = [
         dependency(
             "ct3",
@@ -294,17 +293,15 @@ MONGOJS_CPP_JSFILES = [
 # into the native binary via bytecode upon startup.
 render_template(
     name = "mongojs_cpp",
-    srcs = [
-        "//buildscripts:jstoh.py",
-    ] + MONGOJS_CPP_JSFILES,
+    srcs = MONGOJS_CPP_JSFILES,
     cmd = [
-        "$(location //buildscripts:jstoh.py)",
         "$(location mongojs.cpp)",
     ] + [
         "$(location {})".format(file)
         for file in MONGOJS_CPP_JSFILES
     ],
     output = "mongojs.cpp",
+    python_file = "//buildscripts:jstoh.py",
 )
 
 MONGO_SERVER_CPP_JS_FILES = [
@@ -323,17 +320,15 @@ MONGO_SERVER_CPP_JS_FILES = [
 
 render_template(
     name = "mongo_server_cpp",
-    srcs = [
-        "//buildscripts:jstoh.py",
-    ] + MONGO_SERVER_CPP_JS_FILES,
+    srcs = MONGO_SERVER_CPP_JS_FILES,
     cmd = [
-        "$(location //buildscripts:jstoh.py)",
         "$(location mongo-server.cpp)",
     ] + [
         "$(location {})".format(file)
         for file in MONGO_SERVER_CPP_JS_FILES
     ],
     output = "mongo-server.cpp",
+    python_file = "//buildscripts:jstoh.py",
 )
 
 mongo_cc_library(

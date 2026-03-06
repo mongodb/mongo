@@ -5,6 +5,7 @@ load("@npm//:eslint/package_json.bzl", eslint_bin = "bin")
 load("@npm//:prettier/package_json.bzl", prettier = "bin")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/install_rules:bolt.bzl", "bolt_instrument", "bolt_optimize")
@@ -100,29 +101,27 @@ render_template(
     name = "clang_tidy_config",
     srcs = [
         ".clang-tidy.in",
-        "//buildscripts:clang_tidy_config_gen.py",
     ],
     cmd = [
-        "$(location //buildscripts:clang_tidy_config_gen.py)",
         "--input=$(location .clang-tidy.in)",
         "--output=$(location .clang-tidy)",
     ],
     output = ".clang-tidy",
+    python_file = "//buildscripts:clang_tidy_config_gen.py",
 )
 
 render_template(
     name = "clang_tidy_config_strict",
     srcs = [
         ".clang-tidy.in",
-        "//buildscripts:clang_tidy_config_gen.py",
     ],
     cmd = [
-        "$(location //buildscripts:clang_tidy_config_gen.py)",
         "--input=$(location .clang-tidy.in)",
         "--output=$(location .clang-tidy.strict)",
         "--warnings-as-errors",
     ],
     output = ".clang-tidy.strict",
+    python_file = "//buildscripts:clang_tidy_config_gen.py",
 )
 
 genrule(

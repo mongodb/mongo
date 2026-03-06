@@ -158,6 +158,8 @@ platform(
     ],
 )
 
+load("@rules_python//python:defs.bzl", "py_binary")
+
 py_binary(
     name = "remote_execution_containers_generator",
     srcs = ["remote_execution_containers_generator.py"],

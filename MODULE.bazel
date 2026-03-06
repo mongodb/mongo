@@ -126,12 +126,7 @@ git_override(
 #
 ## We need skylib to be able to use config_setting_group in rule_poetry below
 ## https://github.com/bazelbuild/bazel-skylib/blob/main/docs/selects_doc.md#selectsconfig_setting_group
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
-single_version_override(
-    module_name = "bazel_skylib",
-    version = "1.7.1",
-)
-
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
@@ -189,9 +184,7 @@ local_path_override(
     path = "src/third_party/fuzztest/dist",
 )
 
-# This is just here because 1.5.1 has a bug in it and our current version of re2 will pull in 1.5.1
-# If re2 is ever upgraded past 2025-08-12 this can be unpinned
-bazel_dep(name = "rules_python", version = "1.5.2")
+bazel_dep(name = "rules_python", version = "1.8.5")
 
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
 single_version_override(

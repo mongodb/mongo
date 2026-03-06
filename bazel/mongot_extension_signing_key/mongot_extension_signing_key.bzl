@@ -19,7 +19,7 @@ def mongot_extension_signing_key():
     mongot_extension_signing_key_repo(name = "mongot_extension_signing_key")
 
 def _gpg_export_armored_key_impl(ctx):
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     key = ctx.file.key
     armored_key_output_file = ctx.outputs.armored_key_output_file
@@ -91,12 +91,12 @@ gpg_export_armored_key = rule(
             default = Label("@gpg//:gpg_libs"),
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     fragments = ["py"],
 )
 
 def _generate_embedded_public_key_header_impl(ctx):
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     script = ctx.file.script
     public_key_path = ctx.file.public_key_path
@@ -130,6 +130,6 @@ generate_embedded_public_key_header = rule(
             allow_single_file = True,
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     fragments = ["py"],
 )

@@ -8,10 +8,8 @@ render_template(
     srcs = [
         "releases.tpl.h",
         "releases.yml",
-        "//buildscripts:cheetah_source_generator.py",
     ],
     cmd = [
-        "$(location //buildscripts:cheetah_source_generator.py)",
         "-o",
         "$(location releases.h)",
         "$(location releases.tpl.h)",
@@ -19,6 +17,7 @@ render_template(
         "$(MONGO_VERSION)",
     ],
     output = "releases.h",
+    python_file = "//buildscripts:cheetah_source_generator.py",
     python_libs = [
         dependency(
             "ct3",

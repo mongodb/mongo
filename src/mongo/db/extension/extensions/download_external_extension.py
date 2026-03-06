@@ -7,8 +7,8 @@ import sys
 import tarfile
 
 import requests
-from retry import retry
 import yaml
+from retry import retry
 
 
 def get_extension_conf(file_path, extension_name):

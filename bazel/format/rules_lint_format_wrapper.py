@@ -158,6 +158,10 @@ def main() -> int:
         print("python buildscripts/install_bazel.py")
         return 1
 
+    # aspect_rules_js js_binary launcher expects RUNFILES and Bazel on Linux sets RUNFILES_DIR.
+    if "RUNFILES_DIR" in os.environ and "RUNFILES" not in os.environ:
+        os.environ["RUNFILES"] = os.environ["RUNFILES_DIR"]
+
     parser = argparse.ArgumentParser(
         prog="Format", description="This script formats code in mongodb"
     )

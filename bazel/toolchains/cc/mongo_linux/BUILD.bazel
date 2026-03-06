@@ -1,3 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+
 py_binary(
     name = "mongo_toolchain_version_generator",
     srcs = ["mongo_toolchain_version_generator.py"],

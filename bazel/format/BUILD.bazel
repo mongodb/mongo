@@ -1,5 +1,6 @@
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun", "format_test")
 load("@poetry//:dependencies.bzl", "dependency")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 py_binary(
     name = "rules_lint_format_wrapper",

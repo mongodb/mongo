@@ -211,7 +211,7 @@ def mongo_install_rule_impl(ctx):
         DefaultInfo: with dep files and output file
         PackageFilesInfo: with a mapping for creating the archive
     """
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     file_map = {
         "binaries": {},
@@ -432,7 +432,7 @@ mongo_install_rule = rule(
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
     },
     doc = "Install targets",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
 )
 
 def mongo_install(

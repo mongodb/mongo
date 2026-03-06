@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "TCMALLOC_DEPS", "idl_generator", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("//bazel/config:generate_config_header.bzl", "generate_config_header")
 load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel/toolchains/cc:mongo_compiler_flags.bzl", "MONGO_GLOBAL_COPTS", "MONGO_GLOBAL_LINKFLAGS")
@@ -206,14 +207,11 @@ mongo_cc_library(
 
 render_template(
     name = "icu_init_cpp",
-    srcs = [
-        "generate_icu_init_cpp.py",
-    ] + select({
+    srcs = select({
         "@platforms//cpu:s390x": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat"],
         "//conditions:default": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat"],
     }),
     cmd = [
-        "$(location generate_icu_init_cpp.py)",
         "-o",
         "$(location icu_init.cpp)",
         "-i",
@@ -222,6 +220,7 @@ render_template(
         "//conditions:default": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat)"],
     }),
     output = "icu_init.cpp",
+    python_file = "generate_icu_init_cpp.py",
 )
 
 # When using ICU from third_party, icu_init.cpp will load a subset of

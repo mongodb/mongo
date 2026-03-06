@@ -23,7 +23,7 @@ def mongo_pretty_printer_test_impl(ctx):
     script_output = ctx.actions.declare_file(pretty_printer_directory + short_name + ".py")
     launcher_output = ctx.actions.declare_file(pretty_printer_directory + "pretty_printer_test_launcher_" + short_name + ".py")
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     inputs = depset(transitive = [
         ctx.attr._pretty_printer_creation_script.files,
@@ -71,7 +71,7 @@ mongo_pretty_printer_test = rule(
         "_pretty_printer_launcher_infile": attr.label(allow_single_file = True, default = "//src/mongo/util:pretty_printer_test_launcher.py.in"),
     },
     doc = "Create pretty printer tests",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     executable = True,
     test = True,
 )

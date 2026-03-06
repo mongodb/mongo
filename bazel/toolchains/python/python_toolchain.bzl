@@ -90,7 +90,7 @@ def _py_download(ctx):
 
         ctx.file("BUILD.bazel", """
 # Stub toolchain - platform doesn't match host, not downloaded
-load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
+load("@rules_python//python:defs.bzl", "py_runtime_pair")
 
 py_runtime_pair(
     name = "runtime_pair",
@@ -100,7 +100,7 @@ py_runtime_pair(
 
 toolchain(
     name = "python_toolchain",
-    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
+    toolchain_type = "@rules_python//python:toolchain_type",
     toolchain = ":runtime_pair",
     exec_compatible_with = [
         {constraints}

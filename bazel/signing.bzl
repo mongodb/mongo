@@ -5,7 +5,7 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
 def _gpg_sign_impl(ctx):
     outs = []
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     for src in ctx.files.srcs:
         out = ctx.actions.declare_file(src.basename + ".sig")
@@ -84,7 +84,7 @@ gpg_sign = rule(
             default = Label("//bazel:gpg_signer.py"),
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
     fragments = ["py"],
 )
 

@@ -1,3 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+
 py_binary(
     name = "test_sbom",
     srcs = ["test_sbom.py"],

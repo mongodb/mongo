@@ -590,6 +590,11 @@ common:public-release --stamp
 common --@rules_rust//rust/toolchain/channel=nightly
 common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true
 
+common --@rules_python//python/config_settings:bootstrap_impl=script
+# https://github.com/bazel-contrib/rules_python/issues/2864
+common --@rules_python//python/config_settings:venvs_site_packages=no
+common --@rules_python//python/config_settings:venvs_use_declare_symlink=no
+
 # Experimental flag to collect system network usage metrics during build
 common --experimental_collect_system_network_usage
 

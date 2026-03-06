@@ -2,6 +2,7 @@
 
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_binary", "mongo_cc_unit_test")
 load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 

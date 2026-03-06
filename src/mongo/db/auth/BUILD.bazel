@@ -361,15 +361,14 @@ render_template(
     srcs = [
         "builtin_roles.tpl.cpp",
         "builtin_roles.yml",
-        "builtin_roles_gen.py",
     ],
     cmd = [
-        "$(location builtin_roles_gen.py)",
         "$(location builtin_roles.yml)",
         "$(location builtin_roles.tpl.cpp)",
         "$(location builtin_roles.cpp)",
     ],
     output = "builtin_roles.cpp",
+    python_file = "builtin_roles_gen.py",
     python_libs = [
         dependency(
             "ct3",

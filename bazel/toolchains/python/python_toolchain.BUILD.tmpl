@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
+load("@rules_python//python:defs.bzl", "py_runtime", "py_runtime_pair")
 
 filegroup(
     name = "files",
@@ -37,5 +37,5 @@ toolchain(
     exec_compatible_with = [{constraints}],
     target_compatible_with = [{constraints}],
     toolchain = ":py_runtime_pair",
-    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
+    toolchain_type = "@rules_python//python:toolchain_type",
 )

@@ -10,11 +10,9 @@ package(default_visibility = ["//visibility:public"])
     python_genrule(
         name = "download_" + extension_name + "_" + variant,
         srcs = [
-            ":download_external_extension.py",
             "//etc:extensions.yml",
         ],
         cmd = [
-            "$(location :download_external_extension.py)",
             "--extension-name",
             extension_name,
             "--conf-file",
@@ -32,6 +30,7 @@ package(default_visibility = ["//visibility:public"])
             extension_name + "_" + variant + ".so",
             extension_name + "_" + variant + ".so.sig",
         ],
+        python_file = "download_external_extension.py",
         python_libs = [
             dependency(
                 "pyyaml",

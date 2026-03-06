@@ -2,6 +2,7 @@
 """YAML linters wrapper script for Bazel."""
 
 import os
+import runpy
 import subprocess
 import sys
 
@@ -13,6 +14,20 @@ def run_command(cmd, **kwargs):
         sys.exit(result.returncode)
 
 
+def run_module(module_name, args):
+    old_argv = sys.argv
+    old_cwd = os.getcwd()
+    try:
+        sys.argv = [module_name] + args
+        runpy.run_module(module_name, run_name="__main__")
+    except SystemExit as e:
+        if e.code not in (None, 0):
+            sys.exit(e.code)
+    finally:
+        sys.argv = old_argv
+        os.chdir(old_cwd)
+
+
 def main():
     # Change to workspace root if running under Bazel
     if "BUILD_WORKING_DIRECTORY" in os.environ:
@@ -22,19 +37,9 @@ def main():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         os.chdir(os.path.join(script_dir, ".."))
 
-    # Run yamllint as a Python module
-    run_command(
-        [
-            sys.executable,
-            "-m",
-            "yamllint",
-            "-c",
-            "etc/yamllint_config.yml",
-            "buildscripts",
-            "etc",
-            "jstests",
-        ],
-        shell=False,
+    run_module(
+        "yamllint",
+        ["-c", "etc/yamllint_config.yml", "buildscripts", "etc", "jstests"],
     )
 
     # Evaluate evergreen configs
@@ -81,10 +86,7 @@ def main():
     )
 
     # Run evergreen-lint using module invocation
-    run_command(
-        [sys.executable, "-m", "evergreen_lint", "-c", "./etc/evergreen_lint.yml", "lint"],
-        shell=False,
-    )
+    run_module("evergreen_lint", ["-c", "./etc/evergreen_lint.yml", "lint"])
 
     print("YAML linting completed successfully!")
 

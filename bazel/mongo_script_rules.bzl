@@ -14,7 +14,7 @@ def _py_cxx_wrapper(*, python_path, toolchain_path, python_interpreter, main_py)
     ])
 
 def _py_cxx_test_impl(ctx):
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
 
     python_path = []
     for dep in ctx.attr.deps:
@@ -73,7 +73,7 @@ py_cxx_test = rule(
         "data": attr.label_list(),
         "toolchain_path": attr.string(mandatory = True),
     },
-    toolchains = ["@bazel_tools//tools/cpp:toolchain_type", "@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type", "@rules_python//python:toolchain_type"],
     executable = True,
     test = True,
 )

@@ -75,7 +75,7 @@ def mongo_msi_impl(ctx):
     candle_arguments.append("-out")
     candle_arguments.append(output_directory + "/")
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     ctx.actions.run(
         outputs = candle_out,
         inputs = depset(transitive = [depset(candle_in), ctx.attr._candle_wrapper_script.files, python.files, ctx.attr._candle.files]),
@@ -165,5 +165,5 @@ mongo_msi = rule(
         ),
     },
     doc = "Create a msi using wix toolset",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
 )

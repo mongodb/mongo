@@ -50,17 +50,15 @@ JSFILES_TO_PRECOMPILE = [
 
 render_template(
     name = "render_js_compiled_code",
-    srcs = [
-        "//buildscripts:jstoh.py",
-    ] + JSFILES_TO_PRECOMPILE,
+    srcs = JSFILES_TO_PRECOMPILE,
     cmd = [
         "$(location {})".format(file)
         for file in [
-            "//buildscripts:jstoh.py",
             "js_compiled_code.cpp",
         ] + JSFILES_TO_PRECOMPILE
     ],
     output = "js_compiled_code.cpp",
+    python_file = "//buildscripts:jstoh.py",
 )
 
 mongo_cc_library(

@@ -1,4 +1,5 @@
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
+load("@rules_python//python:defs.bzl", "py_test")
 
 def resmoke_config_impl(ctx):
     base_name = ctx.label.name.removesuffix("_config")
@@ -6,7 +7,7 @@ def resmoke_config_impl(ctx):
     generated_config_file = ctx.actions.declare_file(base_name + ".yml")
     base_config_file = ctx.files.base_config[0]
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     python_path = []
     for path in ctx.attr.generator[PyInfo].imports.to_list():
         if path not in python_path:
@@ -68,7 +69,7 @@ resmoke_config = rule(
         ),
     },
     doc = "Generates a resmoke config YAML",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
 )
 
 def resmoke_suite_test(
@@ -123,7 +124,7 @@ def resmoke_suite_test(
 
     deps_path = ":".join(["$(location %s)" % dep for dep in deps])
 
-    native.py_test(
+    py_test(
         name = name,
         # To a user of resmoke_suite_test, the `srcs` is the list of tests to select. However, to the py_test rule,
         # the `srcs` are expected to be Python files only.

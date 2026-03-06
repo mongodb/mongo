@@ -41,18 +41,15 @@ render_template(
     srcs = [
         "stop_words_{}.txt".format(lang)
         for lang in STOP_WORD_LANGUAGES
-    ] + [
-        "generate_stop_words.py",
     ],
     cmd = [
-        "$(location generate_stop_words.py)",
-    ] + [
         "$(location stop_words_{}.txt)".format(lang)
         for lang in STOP_WORD_LANGUAGES
     ] + [
         "$(location stop_words_list.cpp)",
     ],
     output = "stop_words_list.cpp",
+    python_file = "generate_stop_words.py",
 )
 
 mongo_cc_library(

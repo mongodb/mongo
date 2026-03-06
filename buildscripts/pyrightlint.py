@@ -4,6 +4,7 @@
 import argparse
 import logging
 import os
+import runpy
 import subprocess
 import sys
 
@@ -29,12 +30,18 @@ def is_interesting_file(filename: str) -> bool:
 def lint(paths: list[str]):
     """Lint specified paths (files or directories) using Pyright."""
     if "BUILD_WORKSPACE_DIRECTORY" in os.environ:
-        subprocess.run(
-            ["python", "-m", "pyright", "-p", "pyproject.toml"] + paths,
-            env=os.environ,
-            check=True,
-            cwd=REPO_ROOT,
-        )
+        old_argv = sys.argv
+        old_cwd = os.getcwd()
+        try:
+            sys.argv = ["pyright", "-p", "pyproject.toml"] + paths
+            os.chdir(REPO_ROOT)
+            runpy.run_module("pyright", run_name="__main__")
+        except SystemExit as e:
+            if e.code not in (None, 0):
+                raise
+        finally:
+            sys.argv = old_argv
+            os.chdir(old_cwd)
         return
 
     lint_runner = runner.LintRunner()

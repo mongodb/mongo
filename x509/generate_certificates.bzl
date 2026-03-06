@@ -2,7 +2,7 @@ load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel/config:render_template.bzl", "render_template")
 
 def _generate_certificates(ctx):
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     python_libs = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.py_libs]
 
     python_path = []
@@ -107,5 +107,5 @@ generate_certificates = rule(
             ],
         ),
     },
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    toolchains = ["@rules_python//python:toolchain_type"],
 )
