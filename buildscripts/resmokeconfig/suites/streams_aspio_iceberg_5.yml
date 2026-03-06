@@ -4,6 +4,7 @@ selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_dlq_schema.js
     - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_partitioning.js
+    - src/mongo/db/modules/*/jstests/streams/aspio/iceberg/iceberg_partitioning_2.js
 
 executor:
   fixture:
