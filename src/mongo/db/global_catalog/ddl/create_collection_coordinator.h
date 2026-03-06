@@ -200,7 +200,9 @@ private:
 
     // Broadcast create collection to the other shards.
     void _createCollectionOnParticipants(
-        OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     // Commits the create collection operation to the global catalog within a transaction.
     void _commitOnShardingCatalog(OperationContext* opCtx,
@@ -209,7 +211,8 @@ private:
 
     // Ensure that the change stream event gets emitted and install the new filtering metadata.
     void _setPostCommitMetadata(OperationContext* opCtx,
-                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                const CancellationToken& token);
 
     // Exit from the critical section on all the shards, unblocking reads and writes. On the
     // participant shards, it is set to clear the filtering metadata after exiting the critical

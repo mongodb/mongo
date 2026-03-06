@@ -338,6 +338,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             nss,
             shards,
             **executor,
+            token,
             getNewSession(opCtx),
             fromMigrate,
             false /* dropSystemCollections */);
@@ -410,7 +411,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                        opCtx, getNewSession(opCtx), **executor, token);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", dbNss);

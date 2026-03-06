@@ -595,7 +595,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
 void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
     OperationContext* opCtx,
     const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CancellationToken& token) {
     const auto shardsAndConfigsvr = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto participants = shardRegistry->getAllShardIds(opCtx);
@@ -607,7 +608,8 @@ void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
         return participants;
     }();
 
-    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shardsAndConfigsvr, osi, executor);
+    sharding_ddl_util::performNoopRetryableWriteOnShards(
+        opCtx, shardsAndConfigsvr, osi, executor, token);
 }
 
 bool ShardingDDLCoordinator::_isRetriableErrorForDDLCoordinator(const Status& status) {

@@ -250,7 +250,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void performNoopRetryableWriteOnShards(
     OperationContext* opCtx,
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CancellationToken& token);
 
 
 /*
@@ -266,6 +267,7 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
     const NamespaceString& nss,
     const std::vector<ShardId>& shardIds,
     std::shared_ptr<executor::TaskExecutor> executor,
+    const CancellationToken& token,
     const OperationSessionInfo& osi,
     bool fromMigrate,
     bool dropSystemCollections,

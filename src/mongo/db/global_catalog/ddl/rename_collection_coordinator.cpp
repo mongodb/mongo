@@ -168,13 +168,14 @@ void checkCollectionUUIDConsistencyAcrossShards(
     const NamespaceString& nss,
     const UUID& collectionUuid,
     const std::vector<mongo::ShardId>& shardIds,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     const BSONObj filterObj = BSON("name" << nss.coll());
     ListCollections command;
     command.setFilter(filterObj);
     command.setDbName(nss.dbName());
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
-        **executor, CancellationToken::uncancelable(), command);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(**executor, token, command);
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     struct MismatchedShard {
@@ -221,13 +222,14 @@ void checkTargetCollectionDoesNotExistInCluster(
     OperationContext* opCtx,
     const NamespaceString& toNss,
     const std::vector<mongo::ShardId>& shardIds,
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     const BSONObj filterObj = BSON("name" << toNss.coll());
     ListCollections command;
     command.setFilter(filterObj);
     command.setDbName(toNss.dbName());
-    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(
-        **executor, CancellationToken::uncancelable(), command);
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<ListCollections>>(**executor, token, command);
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 
     std::vector<std::string> shardsContainingTargetCollection;
@@ -262,16 +264,17 @@ void checkCatalogConsistencyAcrossShards(OperationContext* opCtx,
                                          const boost::optional<CollectionType>& fromCollType,
                                          const NamespaceString& toNss,
                                          const bool dropTarget,
-                                         std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+                                         std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token) {
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     auto sourceCollUuid = *getCollectionUUID(opCtx, fromNss, fromCollType);
     checkCollectionUUIDConsistencyAcrossShards(
-        opCtx, fromNss, sourceCollUuid, participants, executor);
+        opCtx, fromNss, sourceCollUuid, participants, executor, token);
 
     if (!dropTarget) {
-        checkTargetCollectionDoesNotExistInCluster(opCtx, toNss, participants, executor);
+        checkTargetCollectionDoesNotExistInCluster(opCtx, toNss, participants, executor, token);
     }
 }
 
@@ -569,7 +572,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
-            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();
 
@@ -687,8 +690,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     checkDatabaseRestrictions(opCtx, fromNss, optSourceCollType, toNss);
 
-                    checkCatalogConsistencyAcrossShards(
-                        opCtx, fromNss, optSourceCollType, toNss, _doc.getDropTarget(), executor);
+                    checkCatalogConsistencyAcrossShards(opCtx,
+                                                        fromNss,
+                                                        optSourceCollType,
+                                                        toNss,
+                                                        _doc.getDropTarget(),
+                                                        executor,
+                                                        token);
 
                     // Check that the target collection is not sharded, if requested.
                     if (_doc.getRenameCollectionRequest().getTargetMustNotBeSharded().get_value_or(
@@ -894,7 +902,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, session, **executor);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, session, **executor, token);
                 }
 
                 const auto& fromNss = nss();
@@ -980,7 +989,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // Use the session ID + txnNumber to ensure no stale requests get through.
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                        opCtx, getNewSession(opCtx), **executor, token);
                 }
 
                 // Commit the collection and chunks metadata on the global catalog.
@@ -1047,7 +1056,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                        opCtx, getNewSession(opCtx), **executor, token);
                 }
 
                 const auto& fromNss = nss();

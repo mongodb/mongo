@@ -294,7 +294,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                     // session. This prevents requests with older txnNumbers
                     // from being processed.
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                        opCtx, getNewSession(opCtx), **executor, token);
                 }
 
 
@@ -349,7 +349,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                          // session. This prevents requests with older txnNumbers
                                          // from being processed.
                                          _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                                             opCtx, getNewSession(opCtx), **executor);
+                                             opCtx, getNewSession(opCtx), **executor, token);
                                      }
 
                                      unblockReadsAndWrites(opCtx);
@@ -404,7 +404,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                opCtx, getNewSession(opCtx), **executor);
+                opCtx, getNewSession(opCtx), **executor, token);
 
             const auto& failedPhase = _doc.getPhase();
             const auto& toShardId = _doc.getToShardId();
@@ -428,7 +428,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                 try {
                     // Even if the error is `ShardNotFound`, the recipient may still be in draining
                     // mode, so try to drop any orphaned data anyway.
-                    dropOrphanedDataOnRecipient(opCtx, executor);
+                    dropOrphanedDataOnRecipient(opCtx, executor, token);
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                     LOGV2_INFO(7392901,
                                "Failed to remove orphaned data on recipient as it has been removed",
@@ -756,7 +756,9 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
 }
 
 void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
-    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     if (!_doc.getCollectionsToClone()) {
         // A retryable error occurred before to persist the collections to clone, consequently no
         // data has been cloned yet.
@@ -772,6 +774,7 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             nss,
             {_doc.getToShardId()},
             **executor,
+            token,
             session,
             true /* fromMigrate */,
             true /* dropSystemCollections */);

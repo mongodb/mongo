@@ -160,10 +160,11 @@ void RefineCollectionShardKeyCoordinator::_performNoopWriteOnDataShardsAndConfig
     OperationContext* opCtx,
     const NamespaceString& nss,
     const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CancellationToken& token) {
     auto shards = getShardsWithDataForCollection(opCtx, nss);
     shards.push_back(Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId());
-    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shards, osi, executor);
+    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shards, osi, executor, token);
 }
 
 ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
@@ -241,7 +242,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
+                    _performNoopWriteOnDataShardsAndConfigServer(
+                        opCtx, nss(), session, **executor, token);
                 }
 
                 // Stop migrations during most of the execution of the coordinator to guarantee a
@@ -276,7 +278,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
+                    _performNoopWriteOnDataShardsAndConfigServer(
+                        opCtx, nss(), session, **executor, token);
                 }
 
                 ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
@@ -314,7 +317,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
+                    _performNoopWriteOnDataShardsAndConfigServer(
+                        opCtx, nss(), session, **executor, token);
                 }
 
                 ConfigsvrCommitRefineCollectionShardKey commitRequest(nss());
@@ -347,7 +351,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 if (!_firstExecution) {
                     const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
+                    _performNoopWriteOnDataShardsAndConfigServer(
+                        opCtx, nss(), session, **executor, token);
                 }
 
                 ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());

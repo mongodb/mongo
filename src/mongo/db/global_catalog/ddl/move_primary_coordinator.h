@@ -172,7 +172,8 @@ private:
      * Drops possible orphaned collections on the recipient.
      */
     void dropOrphanedDataOnRecipient(OperationContext* opCtx,
-                                     std::shared_ptr<executor::ScopedTaskExecutor> executor);
+                                     std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                     const CancellationToken& token);
 
     /**
      * Fetches database metadata from the global catalog and installs it in the shard catalog. This

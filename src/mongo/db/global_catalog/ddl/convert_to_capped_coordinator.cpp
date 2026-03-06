@@ -285,6 +285,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         nss(),
                         participantsNotOwningData,
                         **executor,
+                        token,
                         session,
                         true /* fromMigrate */,
                         false /* dropSystemCollections */,
@@ -431,57 +432,59 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     ShardingRecoveryService::FilteringMetadataClearer(),
                     true /* throwIfReasonDiffers */);
             }))
-        .onError([this, executor = executor, anchor = shared_from_this()](const Status& status) {
-            const auto opCtxHolder = makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
+        .onError(
+            [this, token, executor = executor, anchor = shared_from_this()](const Status& status) {
+                const auto opCtxHolder = makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
 
-            // If the convertToCapped command fails on the dataShard, not retry the operation if
-            // we can ensure the collection hasn't been capped.
-            if (_doc.getPhase() == Phase::kConvertCollectionToCappedOnDataShard) {
-                try {
-                    // Perform a noop write on the participant in order to advance the txnNumber
-                    // for this coordinator's lsid so that requests with older txnNumbers can no
-                    // longer execute.
-                    //
-                    // Additionally we want to wait for the completion of any ongoing command to
-                    // ensure that the subsequent check will see the correct status of the
-                    // collection.
-                    _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                // If the convertToCapped command fails on the dataShard, not retry the operation if
+                // we can ensure the collection hasn't been capped.
+                if (_doc.getPhase() == Phase::kConvertCollectionToCappedOnDataShard) {
+                    try {
+                        // Perform a noop write on the participant in order to advance the txnNumber
+                        // for this coordinator's lsid so that requests with older txnNumbers can no
+                        // longer execute.
+                        //
+                        // Additionally we want to wait for the completion of any ongoing command to
+                        // ensure that the subsequent check will see the correct status of the
+                        // collection.
+                        _performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
+                            opCtx, getNewSession(opCtx), **executor, token);
 
-                    if (!isCollectionCappedWithRequestedSize(opCtx,
-                                                             nss(),
-                                                             _doc.getSize(),
-                                                             *_doc.getDataShard(),
-                                                             *_doc.getTargetUUID())) {
-                        // The conversion to capped failed so there was no catalog change, it is
-                        // then safe to simply return the error to the router that will retry
-                        triggerCleanup(opCtx, status);
-                        MONGO_UNREACHABLE_TASSERT(10083518);
+                        if (!isCollectionCappedWithRequestedSize(opCtx,
+                                                                 nss(),
+                                                                 _doc.getSize(),
+                                                                 *_doc.getDataShard(),
+                                                                 *_doc.getTargetUUID())) {
+                            // The conversion to capped failed so there was no catalog change, it is
+                            // then safe to simply return the error to the router that will retry
+                            triggerCleanup(opCtx, status);
+                            MONGO_UNREACHABLE_TASSERT(10083518);
+                        }
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(8577202,
+                                      "Failed to check if the collection has been capped.",
+                                      logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                               "error"_attr = redact(e)});
                     }
-                } catch (const DBException& e) {
-                    LOGV2_WARNING(8577202,
-                                  "Failed to check if the collection has been capped.",
-                                  logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                                           "error"_attr = redact(e)});
                 }
-            }
 
-            // If the coordinator succeeded to convert the collection to capped and the collection
-            // is tracked, the sharding catalog must be updated. Thus throw the error and retry
-            // relying on _mustAlwaysMakeProgress that will always be true reached this phase.
-            if (_mustAlwaysMakeProgress() || _isRetriableErrorForDDLCoordinator(status)) {
-                // Retry the operation.
+                // If the coordinator succeeded to convert the collection to capped and the
+                // collection is tracked, the sharding catalog must be updated. Thus throw the error
+                // and retry relying on _mustAlwaysMakeProgress that will always be true reached
+                // this phase.
+                if (_mustAlwaysMakeProgress() || _isRetriableErrorForDDLCoordinator(status)) {
+                    // Retry the operation.
+                    return status;
+                }
+
+                if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
+                    triggerCleanup(opCtx, status);
+                    MONGO_UNREACHABLE_TASSERT(10083519);
+                }
+
                 return status;
-            }
-
-            if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
-                triggerCleanup(opCtx, status);
-                MONGO_UNREACHABLE_TASSERT(10083519);
-            }
-
-            return status;
-        });
+            });
 }
 
 bool ConvertToCappedCoordinator::_mustAlwaysMakeProgress() {
@@ -561,7 +564,8 @@ logv2::DynamicAttributes ConvertToCappedCoordinator::getCoordinatorLogAttrs() co
 void ConvertToCappedCoordinator::_performNoopRetryableWriteOnParticipantShardsAndConfigsvr(
     OperationContext* opCtx,
     const OperationSessionInfo& osi,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CancellationToken& token) {
     const ShardId configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
     const ShardId coordShardId = ShardingState::get(opCtx)->shardId();
 
@@ -577,7 +581,7 @@ void ConvertToCappedCoordinator::_performNoopRetryableWriteOnParticipantShardsAn
     if (dataShard != coordShardId && dataShard != configShard) {
         participants.emplace_back(dataShard);
     }
-    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, participants, osi, executor);
+    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, participants, osi, executor, token);
 }
 
 

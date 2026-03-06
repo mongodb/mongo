@@ -116,7 +116,9 @@ private:
                                   const CancellationToken& token) noexcept override;
 
     void _performNoopRetryableWriteOnParticipants(
-        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        const CancellationToken& token);
 
     void _saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx);
 

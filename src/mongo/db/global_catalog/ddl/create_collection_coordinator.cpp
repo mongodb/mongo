@@ -539,6 +539,7 @@ void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<ShardId>& excludedDataShard,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
+                             const CancellationToken& token,
                              const OperationSessionInfo& osi,
                              const boost::optional<UUID>& expectedUUID = boost::none) {
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
@@ -557,6 +558,7 @@ void broadcastDropCollection(OperationContext* opCtx,
         nss,
         participants,
         executor,
+        token,
         osi,
         true /* fromMigrate */,
         false /* dropSystemCollections */,
@@ -1571,17 +1573,19 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                    auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
         .then(_buildPhaseHandler(
             Phase::kCreateCollectionOnParticipants,
-            [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                _createCollectionOnParticipants(opCtx, executor);
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _createCollectionOnParticipants(opCtx, executor, token);
             }))
         .then(_buildPhaseHandler(
             Phase::kCommitOnShardingCatalog,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _commitOnShardingCatalog(opCtx, executor, token);
             }))
-        .then(_buildPhaseHandler(Phase::kSetPostCommitMetadata,
-                                 [this, executor = executor, anchor = shared_from_this()](
-                                     auto* opCtx) { _setPostCommitMetadata(opCtx, executor); }))
+        .then(_buildPhaseHandler(
+            Phase::kSetPostCommitMetadata,
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                _setPostCommitMetadata(opCtx, executor, token);
+            }))
         .then(
             _buildPhaseHandler(Phase::kExitCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()](
@@ -1846,7 +1850,8 @@ void CreateCollectionCoordinator::_enterWriteCriticalSectionOnDataShardAndCheckC
 
     // TODO (SERVER-87265) Remove this call if possible.
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
     }
 
     _enterCriticalSectionOnShards(opCtx,
@@ -1903,7 +1908,8 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
 
     // TODO (SERVER-87265) Remove this call if possible.
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
     }
 
     auto optUuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -2029,7 +2035,8 @@ void CreateCollectionCoordinator::_enterCriticalSection(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
     }
 
     // Block reads and writes on all shards other than the dbPrimary.
@@ -2107,9 +2114,12 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
 }
 
 void CreateCollectionCoordinator::_createCollectionOnParticipants(
-    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
 
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     }
@@ -2206,7 +2216,8 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
     }
 
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
 
         // Check if a previous request already created and committed the collection.
         const auto shardKeyPattern =
@@ -2301,9 +2312,12 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
 }
 
 void CreateCollectionCoordinator::_setPostCommitMetadata(
-    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
 
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
@@ -2336,6 +2350,7 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                 nss(),
                 nonInvolvedShardIds,
                 **executor,
+                token,
                 session,
                 true /* fromMigrate */,
                 false /* dropSystemCollections */,
@@ -2355,7 +2370,15 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                 "Expected collectionIsEmpty to be set on the coordinator document",
                 *_doc.getCollectionIsEmpty());
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-            opCtx, nss(), {*_doc.getOriginalDataShard()}, **executor, session, true, false, _uuid);
+            opCtx,
+            nss(),
+            {*_doc.getOriginalDataShard()},
+            **executor,
+            token,
+            session,
+            true,
+            false,
+            _uuid);
     }
 }
 
@@ -2364,7 +2387,8 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
     }
 
     // Exit critical section on all shards other than the coordinator.
@@ -2400,7 +2424,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                opCtx, getNewSession(opCtx), **executor);
+                opCtx, getNewSession(opCtx), **executor, token);
 
             if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
                 _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -2412,6 +2436,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                                         nss(),
                                         *_doc.getOriginalDataShard() /* excludedDataShard */,
                                         **executor,
+                                        token,
                                         session,
                                         _uuid);
             }

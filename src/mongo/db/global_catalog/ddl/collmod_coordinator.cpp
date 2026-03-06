@@ -143,7 +143,9 @@ void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const
 };
 
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
-    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CancellationToken& token) {
     auto shardsAndConfigsvr = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto participants = shardRegistry->getAllShardIds(opCtx);
@@ -156,7 +158,7 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     }();
 
     sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getNewSession(opCtx), executor);
+        opCtx, shardsAndConfigsvr, getNewSession(opCtx), executor, token);
 }
 
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
@@ -292,12 +294,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 staticValidateCollMod(opCtx, originalNss(), _request);
             }
         })
-        .then([this, executor = executor, anchor = shared_from_this()] {
+        .then([this, token, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
             if (_doc.getPhase() > Phase::kUnset) {
-                _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                _performNoopRetryableWriteOnParticipants(opCtx, **executor, token);
             }
 
             {

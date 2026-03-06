@@ -380,7 +380,7 @@ void DropCollectionCoordinator::_commitDropCollection(
                                             bool fromMigrate) {
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-            opCtx, nss(), recipients, **executor, session, fromMigrate, false);
+            opCtx, nss(), recipients, **executor, token, session, fromMigrate, false);
     };
 
     auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

@@ -559,12 +559,13 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
 void performNoopRetryableWriteOnShards(OperationContext* opCtx,
                                        const std::vector<ShardId>& shardIds,
                                        const OperationSessionInfo& osi,
-                                       const std::shared_ptr<executor::TaskExecutor>& executor) {
+                                       const std::shared_ptr<executor::TaskExecutor>& executor,
+                                       const CancellationToken& token) {
     auto updateOp = buildNoopWriteRequestCommand();
     generic_argument_util::setOperationSessionInfo(updateOp, osi);
     generic_argument_util::setMajorityWriteConcern(updateOp);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<write_ops::UpdateCommandRequest>>(
-        executor, CancellationToken::uncancelable(), updateOp);
+        executor, token, updateOp);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
@@ -588,6 +589,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const std::vector<ShardId>& shardIds,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
+                                                  const CancellationToken& token,
                                                   const OperationSessionInfo& osi,
                                                   bool fromMigrate,
                                                   bool dropSystemCollections,
@@ -601,7 +603,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     generic_argument_util::setOperationSessionInfo(dropCollectionParticipant, osi);
     generic_argument_util::setMajorityWriteConcern(dropCollectionParticipant);
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropCollectionParticipant>>(
-        executor, CancellationToken::uncancelable(), dropCollectionParticipant);
+        executor, token, dropCollectionParticipant);
     sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 

@@ -115,11 +115,14 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
 }
 
 void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
-    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token) {
     tassert(8631102, "There must be a collection stored in the document", _doc.getOptCollType());
 
     if (!_firstExecution) {
-        _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
+        _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+            opCtx, getNewSession(opCtx), **executor, token);
     }
 
     {
@@ -154,6 +157,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             nss(),
             participants,
             **executor,
+            token,
             session,
             true /* fromMigrate */,
             false /* dropSystemCollections */,
@@ -200,9 +204,11 @@ ExecutorFuture<void> UntrackUnsplittableCollectionCoordinator::_runImpl(
             _buildPhaseHandler(Phase::kEnterCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()](
                                    auto* opCtx) { _enterCriticalSection(opCtx, executor, token); }))
-        .then(_buildPhaseHandler(Phase::kCommit,
-                                 [this, executor = executor, token, anchor = shared_from_this()](
-                                     auto* opCtx) { _commitUntrackCollection(opCtx, executor); }))
+        .then(_buildPhaseHandler(
+            Phase::kCommit,
+            [this, executor = executor, token, anchor = shared_from_this()](auto* opCtx) {
+                _commitUntrackCollection(opCtx, executor, token);
+            }))
         .then(
             _buildPhaseHandler(Phase::kReleaseCriticalSection,
                                [this, token, executor = executor, anchor = shared_from_this()](
