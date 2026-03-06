@@ -6,6 +6,9 @@ filters:
   - "catalog_and_routing":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "replication":
+    approvers:
+      - 10gen/server-replication
   - "server_integration":
     approvers:
       - 10gen/server-storage-engine-integration
@@ -24,3 +27,6 @@ filters:
   - "server_ttl":
     approvers:
       - 10gen/server-ttl
+  - "streams":
+    approvers:
+      - 10gen/streams-engine

@@ -145,3 +145,17 @@ The unit and integration tests for the server-ttl component can be run with the 
 ```
 bazel test --test_output=summary --test_tag_filters=-intermediate_debug,server-ttl //...
 ```
+
+### Streams
+
+The tests for the streams component can be run with the following:
+
+```
+bazel test --test_output=summary --test_tag_filters=-intermediate_debug,streams-smoke --streams_release_build=True //...
+```
+
+When running smoke_tests.py, also include `--streams_release_build=True`:
+
+```
+python buildscripts/smoke_tests/smoke_tests.py streams --//bazel/config:streams_release_build=True
+```

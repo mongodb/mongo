@@ -303,6 +303,7 @@ component_name_to_formal_name = {
     "server-storage-engine-integration": "Server Storage Engine Integration",
     "server-timeseries-bucket-catalog": "Server Timeseries Bucket Catalog",
     "server-ttl": "Server TTL",
+    "streams": "Atlas Stream Processing",
 }
 
 component_name_to_test_tag = {
@@ -320,6 +321,7 @@ component_name_to_test_tag = {
     "server-timeseries-bucket-catalog": "server-timeseries-bucket-catalog",
     "server-tracking-allocators": "server-tracking-allocators",
     "server-ttl": "server-ttl",
+    "streams": "streams-smoke",
 }
 
 
