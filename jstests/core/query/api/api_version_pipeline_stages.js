@@ -73,16 +73,6 @@ const unstablePipelines = [
     ],
 ];
 
-function is81orAbove(db) {
-    const res = db.getSiblingDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
-    return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.1") >= 0;
-}
-
-// TODO (SERVER-98651) listClusterCatalog can always be included once backported.
-if (is81orAbove(db)) {
-    unstablePipelines.push([{$listClusterCatalog: {}}]);
-}
-
 function assertAggregateFailsWithAPIStrict(pipeline) {
     // The error code may also be an unrecognized pipeline stage, QueryFeatureNotAllowed, or parsing error, if the test is running in a
     // multiversioned scenario where the stage does not exist or is not enabled on the older version.

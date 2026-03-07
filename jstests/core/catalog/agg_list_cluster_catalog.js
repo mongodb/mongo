@@ -2,8 +2,6 @@
  * Test the $listClusterCatalog stage.
  *
  * @tags: [
- *    # TODO (SERVER-98651) remove the tag as part of this ticket.
- *    requires_fcv_81,
  *    # There is no need to support multitenancy, as it has been canceled and was never in
  *    # production (see SERVER-97215 for more information)
  *    command_not_supported_in_serverless,
@@ -24,6 +22,9 @@ const kSpecsList = ["shards", "tracked", "balancingConfiguration"];
 const adminDB = db.getSiblingDB("admin");
 const configDB = db.getSiblingDB("config");
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+
 // Test all the combination of specs. Every spec can be true or false. The total number of
 // combinations will be 2^n where n is number of specs.
 function generateSpecCombinations(specs) {
@@ -41,56 +42,81 @@ function generateSpecCombinations(specs) {
     return combinations;
 }
 
-function verify(expectedResult, result, specs) {
-    // A resharding in background might change the uuid. Enforce equality.
-    if (TestData.runningWithBalancer) {
-        expectedResult.info.uuid = undefined;
-        result.info.uuid = undefined;
+// Verifies that the $listClusterCatalog entry (called 'stageEntry') is valid according to the given
+// listCollections entry.
+function verify(listCollectionEntry, stageEntry, specs) {
+    // Polish both entries before comparing them.
+    {
+        // A resharding in background might change the uuid. Enforce equality.
+        if (TestData.runningWithBalancer) {
+            delete listCollectionEntry.info.uuid;
+            delete stageEntry.info.uuid;
+        }
+
+        // TODO (SERVER-95599): Stop ignoring the 'info.configDebugDump' field once 9.0 becomes last LTS.
+        if (isMultiversion || TestData.isRunningFCVUpgradeDowngradeSuite) {
+            delete listCollectionEntry.info.configDebugDump;
+            delete stageEntry.info.configDebugDump;
+        }
     }
-    // Ensure the result fields matches the expected once.
-    assert.eq(expectedResult.options, result.options, "options field mismatch:" + tojson(result));
-    assert.eq(expectedResult.info, result.info, "info field mismatch:" + tojson(result));
-    assert.eq(expectedResult.idIndex, result.idIndex, "idIndex field mismatch:" + tojson(result));
-    assert.eq(expectedResult.type, result.type, "type field mismatch:" + tojson(result));
-    assert.eq(expectedResult.db, result.db, "db field mismatch:" + tojson(result));
-    assert.eq(expectedResult.ns, result.ns, "ns field mismatch:" + tojson(result));
-    // Ensure this field is no longer present.
-    assert.eq(undefined, result.name, "name field mismatch:" + tojson(result));
+
+    function errMsgWithListCollectionEntry(reason) {
+        return (
+            reason +
+            ". $listClusterCatalog entry: " +
+            tojson(stageEntry) +
+            ", listCollections entry: " +
+            tojson(listCollectionEntry)
+        );
+    }
+
+    function errMsg(reason) {
+        return reason + ". $listClusterCatalog entry: " + tojson(stageEntry);
+    }
+
+    // Ensure the stageEntry fields matches the expected ones.
+    assert.eq(listCollectionEntry.options, stageEntry.options, errMsgWithListCollectionEntry("options field mismatch"));
+    assert.eq(listCollectionEntry.info, stageEntry.info, errMsgWithListCollectionEntry("info field mismatch"));
+    assert.eq(listCollectionEntry.idIndex, stageEntry.idIndex, errMsgWithListCollectionEntry("idIndex field mismatch"));
+    assert.eq(listCollectionEntry.type, stageEntry.type, errMsgWithListCollectionEntry("type field mismatch"));
+    assert.eq(listCollectionEntry.db, stageEntry.db, errMsgWithListCollectionEntry("db field mismatch"));
+    assert.eq(
+        listCollectionEntry.db + "." + listCollectionEntry.name,
+        stageEntry.ns,
+        errMsgWithListCollectionEntry("ns field mismatch"),
+    );
+
+    // Ensure the field 'name' is not present.
+    assert.eq(undefined, stageEntry.name, errMsg("name field should not be present"));
     // Ensure 'sharded' field is always present.
-    assert.neq(undefined, result.sharded, "sharded field mismatch:" + tojson(result));
+    assert.neq(undefined, stageEntry.sharded, errMsg("sharded field should always be present"));
 
     // Verifying the output is never undefined if the information is requested.
-    // The values of the following checks might change at runtime according to the suite. The result
+    // The values of the following checks might change at runtime according to the suite. The stageEntry
     // could change in between aggregation and the check (which would require querying the config
     // database).
     if (specs.tracked) {
-        assert.neq(undefined, result.tracked, "tracked field mismatch:" + tojson(result));
+        assert.neq(undefined, stageEntry.tracked, errMsg("tracked field should be present"));
     } else {
-        assert.eq(undefined, result.tracked, "tracked field mismatch:" + tojson(result));
+        assert.eq(undefined, stageEntry.tracked, errMsg("tracked field should not be present"));
     }
     if (specs.shards) {
-        assert.neq(undefined, result.shards, "shards field mismatch:" + tojson(result));
+        assert.neq(undefined, stageEntry.shards, errMsg("shards field should be present"));
     } else {
-        assert.eq(undefined, result.shards, "shards field mismatch:" + tojson(result));
+        assert.eq(undefined, stageEntry.shards, errMsg("shards field should not be present"));
     }
-    if (result.sharded && specs.balancingConfiguration) {
-        assert.neq(undefined, result.balancingEnabled, "balancingEnabled field mismatch:" + tojson(result));
-        assert.neq(undefined, result.autoMergingEnabled, "autoMergingEnabled field mismatch:" + tojson(result));
-        assert.neq(undefined, result.chunkSize, "chunkSize field mismatch:" + tojson(result));
+    if (stageEntry.sharded && specs.balancingConfiguration) {
+        assert.neq(undefined, stageEntry.balancingEnabled, errMsg("balancingEnabled field should be present"));
+        assert.neq(undefined, stageEntry.autoMergingEnabled, errMsg("autoMergingEnabled field should be present"));
+        assert.neq(undefined, stageEntry.chunkSize, errMsg("chunkSize field should be present"));
     } else {
-        assert.eq(undefined, result.balancingEnabled, "balancingEnabled field mismatch:" + tojson(result));
-        assert.eq(undefined, result.autoMergingEnabled, "autoMergingEnabled field mismatch:" + tojson(result));
-        assert.eq(undefined, result.chunkSize, "chunkSize field mismatch:" + tojson(result));
+        assert.eq(undefined, stageEntry.balancingEnabled, errMsg("balancingEnabled field should not be present"));
+        assert.eq(undefined, stageEntry.autoMergingEnabled, errMsg("autoMergingEnabled field should not be present"));
+        assert.eq(undefined, stageEntry.chunkSize, errMsg("chunkSize field should not be present"));
     }
 }
 
-function getStageResultForNss(stageResult, nss) {
-    return stageResult.find((obj) => {
-        return obj.ns === nss;
-    });
-}
-
-function isTempNss(collectionName) {
+function isTempCollection(collectionName) {
     if (collectionName.startsWith("system.resharding") || collectionName.startsWith("tmp.agg_out")) {
         return true;
     }
@@ -105,26 +131,27 @@ function isTempNss(collectionName) {
     return false;
 }
 
+// Verifies that for every collection in the list collection result, there is a corresponding entry
+// in the stage result.
 function verifyAgainstListCollections(listCollectionResult, stageResult, specs) {
-    listCollectionResult.forEach((expectedResult) => {
-        let nss = expectedResult.db + "." + expectedResult.name;
-        let nssStageResult = getStageResultForNss(stageResult, nss);
+    listCollectionResult.forEach((listCollectionEntry) => {
+        let nss = listCollectionEntry.db + "." + listCollectionEntry.name;
+        let stageEntry = stageResult.find((entry) => entry.ns === nss);
         // Temporary namespaces might disappear between the list collection request and the
         // aggregation request. Ignore this case.
-        if (isTempNss(expectedResult.name) && nssStageResult == undefined) {
+        if (isTempCollection(listCollectionEntry.name) && stageEntry == undefined) {
             return;
         }
-        // The result must be present.
+        // The $listClusterCatalog entry must be present.
         assert.neq(
-            nssStageResult,
+            stageEntry,
             undefined,
             `The namespace ${nss} was found in listCollections but not in the $listClusterCatalog. Result ${tojson(
                 stageResult,
             )}`,
         );
-        // The result must match the entire list collection result + some few extra fields.
-        expectedResult.ns = nss;
-        verify(expectedResult, nssStageResult, specs);
+        // The $listClusterCatalog entry must match the entire list collection result + some few extra fields.
+        verify(listCollectionEntry, stageEntry, specs);
     });
 }
 
@@ -230,7 +257,7 @@ jsTest.log("The stage must work under any combination of specs.");
     });
 }
 
-jsTest.log("The stage must return the admin collections.");
+jsTest.log("The stage must return the collections from the 'admin' database.");
 {
     let listCollectionResult = runListCollectionsOnDbs(db, ["admin"]);
     let stageResult = adminDB.aggregate([{$listClusterCatalog: {}}]).toArray();
@@ -238,7 +265,7 @@ jsTest.log("The stage must return the admin collections.");
     verifyAgainstListCollections(listCollectionResult, stageResult, {});
 }
 
-jsTest.log("The stage must return the same config collections from admin and config databases.");
+jsTest.log("The stage must return the collections from the 'config' database.");
 {
     assert.soon(() => {
         let listCollectionResult = runListCollectionsOnDbs(db, ["config"]);

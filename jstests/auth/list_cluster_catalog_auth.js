@@ -1,10 +1,5 @@
 /*
  * Test to validate the privileges of using $listClusterCatalog stage.
- *
- * @tags: [
- *   # TODO (SERVER-98651) remove the tag
- *   requires_fcv_81,
- * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

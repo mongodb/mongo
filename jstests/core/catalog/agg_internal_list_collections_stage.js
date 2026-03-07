@@ -3,8 +3,6 @@
  * response.
  *
  * @tags: [
- *    # TODO (SERVER-98651) remove the tag as part of this ticket.
- *    requires_fcv_81,
  *    # $_internalListCollections only supports local read concern
  *    # TODO (SERVER-98658) Reconsider this tag after resolving this ticket.
  *    assumes_read_concern_unchanged,
