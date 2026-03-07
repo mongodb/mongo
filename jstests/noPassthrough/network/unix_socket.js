@@ -70,7 +70,7 @@ let checkClientMetadataLog = function (serverHandle, path, isProxy) {
         serverHandle,
         51800,
         {
-            "remote": `${isProxy && hasPort ? "proxy" : "anonymous"} unix socket:${hasPort ? serverHandle.port : 27017}`,
+            "remote": `anonymous unix socket:${hasPort ? serverHandle.port : 27017}`,
         },
         1,
         30 * 1000,
@@ -86,11 +86,18 @@ let checkSocket = function (serverHandle, path) {
     assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
     checkClientMetadataLog(serverHandle, path, false);
 
-    const fp = configureFailPoint(serverHandle, "isConnectedToProxyUnixSocketOverride");
+    // TODO(SERVER-121137): Since the python proxy server can't make a connection to the unix domain
+    // socket, we have no way of connecting to the proxy unix socket with a proxy protocol header.
+    // Therefore, these failpoints were added to trick the server into thinking that it's connected
+    // to the proxy unix socket. Once the python proxy server can make connections to unix domain
+    // sockets, we can remove these failpoints and start up the proxy server instead.
+    const proxySockFp = configureFailPoint(serverHandle, "isConnectedToProxyUnixSocketOverride");
+    const noProxyProtocolFp = configureFailPoint(serverHandle, "skipProxyProtocolParsing");
     conn = new Mongo(path);
     assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
     checkClientMetadataLog(serverHandle, path, true);
-    fp.off();
+    proxySockFp.off();
+    noProxyProtocolFp.off();
 };
 
 let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ",", optMongos) {

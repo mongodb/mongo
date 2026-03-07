@@ -65,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
 MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 MONGO_FAIL_POINT_DEFINE(isConnectedToProxyUnixSocketOverride);
+MONGO_FAIL_POINT_DEFINE(skipProxyProtocolParsing);
 
 namespace {
 
@@ -240,9 +241,9 @@ CommonAsioSession::CommonAsioSession(
             if (unixSockPort == -1) {
                 return HostAndPort(_remoteAddr.toString(true));
             }
-            return HostAndPort(fmt::format("{} unix socket:{}",
-                                           isConnectedToProxyUnixSocket() ? "proxy" : "anonymous",
-                                           unixSockPort));
+            // Unix socket paths are not in host:port format, so the HostAndPort ctor can't parse
+            // the port. Explicitly specify the port instead.
+            return HostAndPort(_remoteAddr.toString(false), unixSockPort);
 #else
             return HostAndPort(_remoteAddr.toString(true));
 #endif
@@ -545,6 +546,10 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
 }
 
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
+    if (MONGO_unlikely(skipProxyProtocolParsing.shouldFail())) {
+        return ExecutorFuture<void>(reactor);
+    }
+
     invariant(_isIngressSession);
     invariant(reactor);
     const Backoff kExponentialBackoff(Milliseconds(gProxyProtocolMaximumWaitBackoffMillis.load()),
