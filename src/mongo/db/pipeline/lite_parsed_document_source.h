@@ -167,61 +167,17 @@ public:
     std::unique_ptr<LiteParsedPipeline> viewPipeline;
 };
 
-using ViewPolicyCallbackFn =
-    std::function<void(const ViewInfo&, StringData, const ResolvedNamespaceMap&)>;
-
 /**
- * Indicates how this stage will interact with a view. LiteParsedDocumentSources that
- * wish to perform custom behavior for views should override the callback function.
+ * Describes what the pipeline as a whole should do with a view on the main aggregate
+ * collection, if this stage is at the front of the pipeline.
  */
-struct ViewPolicy {
-    // Describes what the pipeline as a whole should do with a view on the main aggregate
-    // collection, if this stage is at the front of the pipeline.
-    enum class kFirstStageApplicationPolicy {
-        // If this stage is at the front of the pipeline, the pipeline should
-        // prepend the view.
-        kDefaultPrepend,
-        // If this stage is at the front of the pipeline, the pipeline should not
-        // prepend the view. The stage will apply the view pipeline itself internally.
-        kDoNothing,
-    } policy = kFirstStageApplicationPolicy::kDefaultPrepend;
-
-    // Offers a stage the chance to receive/bind to a view definition on the command's resolved view
-    // definitions. Receives resolved view information, the stage name, and the resolved namespaces
-    // map.
-    ViewPolicyCallbackFn callback = [](const ViewInfo&, StringData, const ResolvedNamespaceMap&) {
-        // Default callback is a no-op.
-    };
-};
-
-/**
- * Default view policy for aggregation stages. This policy allows views to be used with the stage
- * by prepending the view pipeline when the stage is at the front of the pipeline.
- *
- * When a stage uses DefaultViewPolicy:
- * - If the stage is at the front of the pipeline and the main collection is a view, the view
- *   pipeline will be prepended to the aggregation pipeline.
- * - The callback is a no-op, meaning the stage does not need to perform any special handling
- *   when a view is encountered.
- *
- * This is the default behavior for most aggregation stages that support views.
- */
-struct DefaultViewPolicy : ViewPolicy {};
-
-/**
- * View policy that disallows views for aggregation stages. This policy prevents views from being
- * used with the stage by throwing an error when a view is encountered.
- *
- * When a stage uses DisallowViewsPolicy:
- * - The policy is set to kDoNothing, meaning the view pipeline will not be automatically prepended.
- * - The callback throws a CommandNotSupportedOnView error (or a custom error if a custom callback
- *   is provided) when a view is detected.
- *
- * Use this policy for stages that cannot operate on views.
- */
-struct DisallowViewsPolicy : public ViewPolicy {
-    DisallowViewsPolicy();
-    DisallowViewsPolicy(ViewPolicyCallbackFn&&);
+enum class FirstStageViewApplicationPolicy {
+    // If this stage is at the front of the pipeline, the pipeline should
+    // prepend the view.
+    kDefaultPrepend,
+    // If this stage is at the front of the pipeline, the pipeline should not
+    // prepend the view. The stage will apply the view pipeline itself internally.
+    kDoNothing,
 };
 
 /**
@@ -443,11 +399,16 @@ public:
 
     virtual std::unique_ptr<StageParams> getStageParams() const = 0;
 
+    virtual FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const {
+        return FirstStageViewApplicationPolicy::kDefaultPrepend;
+    }
+
     /**
-     * Retrieve the ViewPolicy for this stage.
+     * Bind view information to this stage. Called by handleView() when running against a view.
      */
-    virtual ViewPolicy getViewPolicy() const {
-        return DefaultViewPolicy{};
+    virtual void bindViewInfo(const ViewInfo& viewInfo,
+                              const ResolvedNamespaceMap& resolvedNamespaces) {
+        // Default implementation is a no-op.
     }
 
     /**
@@ -517,7 +478,8 @@ public:
 
     /**
      * Returns true if this is a vector search stage ($vectorSearch) or has a nested $vectorSearch.
-     * TODO SERVER-116021 Remove this override when extensions can handle views through ViewPolicy.
+     * TODO SERVER-116021 Remove this override when extensions can handle views through
+     * bindViewInfo().
      */
     virtual bool hasExtensionVectorSearchStage() const {
         return false;

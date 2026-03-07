@@ -77,7 +77,7 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
     return policy;
 }
 
-void AggStageAstNodeAPI::bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) const {
+void AggStageAstNodeAPI::bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) {
     invokeCAndConvertStatusToException(
         [&]() { return _vtable().bind_view_info(get(), &viewInfo); });
 }

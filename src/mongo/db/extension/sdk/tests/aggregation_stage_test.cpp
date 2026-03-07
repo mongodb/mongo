@@ -1714,7 +1714,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    void bindViewInfo(const ViewInfo& viewInfo) const override {
+    void bindViewInfo(const ViewInfo& viewInfo) override {
         _boundDbName = std::string(viewInfo.dbName());
         _boundViewName = std::string(viewInfo.viewName());
         _boundPipeline = viewInfo.viewPipeline();
@@ -1737,9 +1737,9 @@ public:
     }
 
 private:
-    mutable std::string _boundDbName;
-    mutable std::string _boundViewName;
-    mutable std::vector<BSONObj> _boundPipeline;
+    std::string _boundDbName;
+    std::string _boundViewName;
+    std::vector<BSONObj> _boundPipeline;
 };
 
 TEST_F(AggStageTest, ExtensionAstNodeCanReturnDefaultViewPolicy) {

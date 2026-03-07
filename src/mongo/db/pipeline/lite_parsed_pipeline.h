@@ -398,15 +398,16 @@ public:
     /**
      * Applies view semantics to this pipeline.
      *
-     * Each stage is given a chance to validate the view or modify itself with the view via its
-     * ViewPolicy callback. Whether the view pipeline is automatically prepended is determined
-     * solely by the first stage: if its policy is kDefaultPrepend (or the pipeline is empty), the
-     * desugared view pipeline is cloned and prepended; otherwise it is not.
+     * Each stage is given a chance to validate the view or modify itself via its bindViewInfo()
+     * override. Whether the view pipeline is automatically prepended is determined solely by the
+     * first stage's FirstStageViewApplicationPolicy: if it is kDefaultPrepend (or the
+     * pipeline is empty), the desugared view pipeline is cloned and prepended; otherwise it is not.
      *
      * The provided ViewInfo is not mutated. The resolvedNamespaces map is passed to each stage's
-     * ViewPolicy callback to provide access to all resolved namespaces in the aggregation. This
+     * bindViewInfo() to provide access to all resolved namespaces in the aggregation. This
      * will be used for view resolution in secondary namespaces (e.g. `from` field in $unionWith or
-     * $lookup).     */
+     * $lookup).
+     */
     void handleView(const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces);
 
 private:

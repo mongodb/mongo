@@ -95,7 +95,7 @@ public:
     /**
      * Binds view information to this AST node.
      */
-    void bindViewInfo(const ::MongoExtensionViewInfo& viewInfo) const;
+    void bindViewInfo(const ::MongoExtensionViewInfo& viewInfo);
 
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);

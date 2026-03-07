@@ -104,7 +104,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     auto lpp = LiteParsedPipeline(request, true, LiteParserOptions{.ifrContext = ifrContext});
     lpp.makeOwned();
 
-    // Desugar and call handleView() to invoke ViewPolicy callbacks for extension stages.
+    // Desugar and call handleView() to invoke bindViewInfo() for extension stages.
     LiteParsedDesugarer::desugar(&lpp);
 
     auto resolvedNamespaces = helpers.resolveInvolvedNamespaces(lpp.getInvolvedNamespaces());

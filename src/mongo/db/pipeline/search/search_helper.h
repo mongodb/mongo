@@ -114,7 +114,7 @@ bool isMongotPipeline(const Pipeline* pipeline);
  * stage that will rely on calls to mongot.
  *
  * TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and handle
- * the view through a custom ViewPolicy.
+ * the view through a bindViewInfo() override.
  */
 bool isMongotLiteParsedPipeline(const LiteParsedPipeline& lpp);
 
@@ -135,7 +135,7 @@ bool isMongotStage(DocumentSource* stage);
 
 /**
  * Check if this is a $vectorSearch-as-an-extension stage.
- * TODO SERVER-116021 Remove this function when the extension can do this through ViewPolicy.
+ * TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
  */
 bool isExtensionVectorSearchStage(std::string stageName);
 

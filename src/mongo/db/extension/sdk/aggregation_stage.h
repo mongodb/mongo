@@ -272,7 +272,7 @@ public:
     // Note that viewInfo is non-owning, meaning if an extension wants to access the metadata
     // outside of the call to bindViewInfo, it must make its own copy of it. There are no guarantees
     // on the lifetime outside of the scope of this function.
-    virtual void bindViewInfo(const ViewInfo& viewInfo) const {
+    virtual void bindViewInfo(const ViewInfo& viewInfo) {
         // Default implementation is a no-op.
     }
 
@@ -383,7 +383,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _extBindViewInfo(
-        const ::MongoExtensionAggStageAstNode* astNode,
+        ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionViewInfo* viewInfo) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             sdk_tassert(11905600, "Provided view info was invalid", viewInfo != nullptr);
@@ -399,7 +399,7 @@ private:
                          byteViewAsStringView(viewInfo->viewNamespace.collectionName),
                          std::move(stages));
 
-            static_cast<const ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bindViewInfo(
+            static_cast<ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bindViewInfo(
                 viewInfoWrapper);
         });
     }

@@ -696,7 +696,7 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
      * Ownership of the BSON members is not transferred over the API boundary, so the extension must
      * copy if they need to persist beyond the scope of bind_view_info().
      */
-    MongoExtensionStatus* (*bind_view_info)(const MongoExtensionAggStageAstNode* astNode,
+    MongoExtensionStatus* (*bind_view_info)(MongoExtensionAggStageAstNode* astNode,
                                             const MongoExtensionViewInfo* viewInfo);
 } MongoExtensionAggStageAstNodeVTable;
 

@@ -242,20 +242,14 @@ void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
 
 void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
                                     const ResolvedNamespaceMap& resolvedNamespaces) {
-    for (const auto& stage : _stageSpecs) {
-        // Let each stage bind to the view info.
-        auto thisPolicy = stage->getViewPolicy();
-        thisPolicy.callback(viewInfo, stage->getParseTimeName(), resolvedNamespaces);
+    for (auto& stage : _stageSpecs) {
+        stage->bindViewInfo(viewInfo, resolvedNamespaces);
     }
 
-    // Determine whether the pipeline should automatically prepend the view pipeline. This decision
-    // is made solely by the first stage, if any. Other stages' first-stage policies are not
-    // consulted here.
     const auto firstStagePolicy = _stageSpecs.empty()
-        ? ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend
-        : _stageSpecs.front()->getViewPolicy().policy;
-
-    if (firstStagePolicy == ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend) {
+        ? FirstStageViewApplicationPolicy::kDefaultPrepend
+        : _stageSpecs.front()->getFirstStageViewApplicationPolicy();
+    if (firstStagePolicy == FirstStageViewApplicationPolicy::kDefaultPrepend) {
         // If the first stage doesn't explicitly disallow it, clone and prepend the desugared view
         // pipeline to the current pipeline.
         auto clonedViewPipe = viewInfo.getViewPipeline();

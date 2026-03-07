@@ -2433,7 +2433,7 @@ public:
         return _viewPolicy;
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
         _boundViewName = std::string(viewInfo.viewName());
     }
 
@@ -2448,12 +2448,12 @@ public:
 
 private:
     MongoExtensionFirstStageViewApplicationPolicy _viewPolicy;
-    mutable std::string _boundViewName;
+    std::string _boundViewName;
 };
 
 void testViewPolicyHelper(const NamespaceString& nss,
                           MongoExtensionFirstStageViewApplicationPolicy extensionPolicy,
-                          ViewPolicy::kFirstStageApplicationPolicy expectedPolicy,
+                          FirstStageViewApplicationPolicy expectedPolicy,
                           const std::string& expectedViewName) {
     auto astNodeImpl = ConfigurableViewPolicyTestAstNode::make(extensionPolicy);
     auto* astNodeImplPtr = static_cast<ConfigurableViewPolicyTestAstNode*>(astNodeImpl.get());
@@ -2463,16 +2463,13 @@ void testViewPolicyHelper(const NamespaceString& nss,
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
         ConfigurableViewPolicyTestAstNode::kStageName, std::move(handle), nss);
 
-    auto viewPolicy = liteParsed.getViewPolicy();
-    ASSERT_EQ(viewPolicy.policy, expectedPolicy);
-
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("x" << 1))};
     ViewInfo viewInfo(viewNss, resolvedNss, std::move(viewPipeline));
 
-    viewPolicy.callback(
-        viewInfo, ConfigurableViewPolicyTestAstNode::kStageName, ResolvedNamespaceMap{});
+    ASSERT_EQ(liteParsed.getFirstStageViewApplicationPolicy(), expectedPolicy);
+    liteParsed.bindViewInfo(viewInfo, {});
     ASSERT_EQ(astNodeImplPtr->getBoundViewName(), expectedViewName);
 }
 
@@ -2493,7 +2490,7 @@ public:
         return std::make_unique<ViewPipelineValidatorTestAstNode>();
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
         for (const auto& stage : viewInfo.viewPipeline()) {
             if (stage.isEmpty()) {
                 continue;
@@ -2518,14 +2515,12 @@ void runViewPipelineValidatorCallback(const std::vector<BSONObj>& viewPipeline) 
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
         ViewPipelineValidatorTestAstNode::kStageName, std::move(handle), nss);
 
-    auto viewPolicy = liteParsed.getViewPolicy();
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.coll"_sd);
     std::vector<BSONObj> pipelineCopy = viewPipeline;
     ViewInfo viewInfo(viewNss, resolvedNss, std::move(pipelineCopy));
 
-    viewPolicy.callback(
-        viewInfo, ViewPipelineValidatorTestAstNode::kStageName, ResolvedNamespaceMap{});
+    liteParsed.bindViewInfo(viewInfo, {});
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
@@ -2535,7 +2530,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
                          MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend,
-                         ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
+                         FirstStageViewApplicationPolicy::kDefaultPrepend,
                          viewNss.coll().data());
 }
 
@@ -2546,7 +2541,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(_nss,
                          MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
-                         ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
+                         FirstStageViewApplicationPolicy::kDoNothing,
                          viewNss.coll().data());
 }
 

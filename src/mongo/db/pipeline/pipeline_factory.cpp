@@ -227,8 +227,7 @@ std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
         subPipelineExpCtx->addResolvedNamespaces(viewLiteParsedPipeline.getInvolvedNamespaces());
     }
 
-    // Create a LiteParsedPipeline for the user pipeline and apply view handling with ViewPolicy
-    // callbacks.
+    // Create a LiteParsedPipeline for the user pipeline and apply view handling via bindViewInfo().
     LiteParsedPipeline userLiteParsedPipeline(
         makeLiteParsedPipeline(subPipelineExpCtx, currentPipeline));
     if (opts.desugar) {

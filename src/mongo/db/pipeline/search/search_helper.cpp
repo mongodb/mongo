@@ -319,7 +319,7 @@ bool isMongotStage(DocumentSource* stage) {
          dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage));
 }
 
-// TODO SERVER-116021 Remove this function when the extension can do this through ViewPolicy.
+// TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
 bool isExtensionVectorSearchStage(std::string stageName) {
     return stageName == kExtensionVectorSearchStageName ||
         stageName == DocumentSourceVectorSearch::kStageName;

@@ -1,7 +1,8 @@
 /**
- * This test verifies that the $addViewName extension stage correctly passes the view name
- * through the extension boundary (AstNode -> LogicalStage -> ExecAggStage) and adds
- * it as a field in output documents. It also verifies that the view pipeline is correctly appended when the first stage's ViewPolicy is kDefaultPrepend, and not prepended if it's kDoNothing.
+ * This test verifies that the $addViewName extension stage correctly passes the view name through
+ * the extension boundary (AstNode -> LogicalStage -> ExecAggStage) and adds it as a field in output
+ * documents. It also verifies that the view pipeline is correctly appended when the first stage's
+ * FirstStageViewApplicationPolicy is kDefaultPrepend, and not prepended if it's kDoNothing.
  *
  * This test also verifies that the $disallowViews extension stage correctly uasserts when
  * used in a view context.
@@ -98,7 +99,7 @@ function testNestedViewsWithViewNameStage(suffix, userPipeStage) {
     const outerViewNss = `${db.getName()}.${outerViewName}`;
 
     const userPipe = [userPipeStage];
-    const shouldPrepend = false; // ViewPolicy is kDoNothing
+    const shouldPrepend = false; // FirstStageViewApplicationPolicy is kDoNothing
 
     const outerView = {view: db[outerViewName], viewName: outerViewName, viewNss: outerViewNss};
     // Verify outer view name is present when running on outerView
@@ -213,7 +214,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$addViewName: {}}];
             const viewName = "test_view";
-            const shouldPrepend = false; // ViewPolicy is kDoNothing
+            const shouldPrepend = false; // FirstStageViewApplicationPolicy is kDoNothing
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
@@ -221,7 +222,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$testFoo: {}}];
             const userPipe = [{$addViewName: {}}];
             const viewName = "foo_view";
-            const shouldPrepend = false; // ViewPolicy is kDoNothing
+            const shouldPrepend = false; // FirstStageViewApplicationPolicy is kDoNothing
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
@@ -229,7 +230,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$testFoo: {}}, {$addViewName: {}}];
             const viewName = "test_view_later";
-            const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+            const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
@@ -237,7 +238,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$addFields: {a: 1}}];
             const userPipe = [{$testFoo: {}}, {$desugarAddViewName: {}}];
             const viewName = "test_view_desugar";
-            const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+            const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
@@ -277,14 +278,14 @@ describe("View policy extension stages", function () {
         it("should not add view name when $addViewName is in view definition", function () {
             const viewPipe = [{$addViewName: {}}];
             const userPipe = [{$testFoo: {}}];
-            const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+            const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
             testViewNameAbsentInView("add_viewname_in_view", viewPipe, userPipe, shouldPrepend);
         });
 
         it("should not add view name when view has $desugarAddViewName in definition and desugaring should work in view def", function () {
             const viewPipe = [{$desugarAddViewName: {}}];
             const userPipe = [{$addFields: {a: 1}}];
-            const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+            const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
             testViewNameAbsentInView("desugar_add_viewname_in_view", viewPipe, userPipe, shouldPrepend);
         });
 
@@ -292,21 +293,21 @@ describe("View policy extension stages", function () {
             it("should not add view name when $addViewName is at first position in view definition", function () {
                 const viewPipe = [{$addViewName: {}}, {$addFields: {a: 1}}];
                 const userPipe = [{$addFields: {a: 1}}];
-                const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+                const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
                 testViewNameAbsentInView("add_viewname_first", viewPipe, userPipe, shouldPrepend);
             });
 
             it("should not add view name when $addViewName is at middle position in view definition", function () {
                 const viewPipe = [{$addFields: {a: 1}}, {$addViewName: {}}, {$addFields: {a: 1}}];
                 const userPipe = [{$addFields: {a: 1}}];
-                const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+                const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
                 testViewNameAbsentInView("add_viewname_middle", viewPipe, userPipe, shouldPrepend);
             });
 
             it("should not add view name when $addViewName is at last position in view definition", function () {
                 const viewPipe = [{$addFields: {a: 1}}, {$addViewName: {}}];
                 const userPipe = [{$addFields: {a: 1}}];
-                const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+                const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
                 testViewNameAbsentInView("add_viewname_last", viewPipe, userPipe, shouldPrepend);
             });
         });
@@ -314,7 +315,7 @@ describe("View policy extension stages", function () {
         it("should not add view name when view has multiple extension stages in definition", function () {
             const viewPipe = [{$desugarAddViewName: {}}, {$testFoo: {}}, {$addViewName: {}}];
             const userPipe = [{$addFields: {a: 1}}];
-            const shouldPrepend = true; // ViewPolicy is kDefaultPrepend
+            const shouldPrepend = true; // FirstStageViewApplicationPolicy is kDefaultPrepend
             testViewNameAbsentInView("multi_extension_view", viewPipe, userPipe, shouldPrepend);
         });
     });
@@ -440,7 +441,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$addViewName: {}}, {$addFields: {a: 1}}];
             const userPipe = [{$addViewName: {}}];
             const viewName = "view_with_add_viewname";
-            const shouldPrepend = false; // ViewPolicy is kDoNothing
+            const shouldPrepend = false; // FirstStageViewApplicationPolicy is kDoNothing
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
 
@@ -448,7 +449,7 @@ describe("View policy extension stages", function () {
             const viewPipe = [{$desugarAddViewName: {}}, {$addFields: {a: 1}}];
             const userPipe = [{$desugarAddViewName: {}}];
             const viewName = "view_with_desugar";
-            const shouldPrepend = false; // ViewPolicy is kDoNothing
+            const shouldPrepend = false; // FirstStageViewApplicationPolicy is kDoNothing
             testViewNameWithTemporaryView(viewName, viewPipe, userPipe, shouldPrepend);
         });
     });

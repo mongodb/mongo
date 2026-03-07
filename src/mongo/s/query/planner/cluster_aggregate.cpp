@@ -1165,7 +1165,7 @@ PipelineResolver::MongosViewRequestResult buildResolvedViewAggregateRequest(
 
     // We populated a view through the kickback retry logic. Build a new resolved request
     // from this view, handling special cases for
-    // mongot pipelines, timeseries views, and invoking ViewPolicy callbacks for
+    // mongot pipelines, timeseries views, and invoking bindViewInfo() for
     // extension stages.
     PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
                                                     resolveInvolvedNamespaces};

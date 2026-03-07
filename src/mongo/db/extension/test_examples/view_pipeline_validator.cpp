@@ -147,7 +147,7 @@ public:
           _arguments(arguments.getOwned()),
           _storedViewPipeline(std::move(storedViewPipeline)) {}
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
         _storedViewPipeline.clear();
         for (const auto& stage : viewInfo.viewPipeline()) {
             if (stage.isEmpty()) {
@@ -187,7 +187,7 @@ private:
     }
 
     const BSONObj _arguments;
-    mutable std::vector<BSONObj> _storedViewPipeline;
+    std::vector<BSONObj> _storedViewPipeline;
 };
 
 DEFAULT_PARSE_NODE(ValidateViewPipeline)

@@ -191,7 +191,7 @@ public:
         }
 
         // TODO SERVER-116021 Remove this override when extensions can handle views through
-        // ViewPolicy.
+        // bindViewInfo().
         bool hasExtensionVectorSearchStage() const override;
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
@@ -317,7 +317,10 @@ public:
 
         bool hasExtensionVectorSearchStage() const override;
 
-        ViewPolicy getViewPolicy() const override;
+        FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override;
+
+        void bindViewInfo(const ViewInfo& viewInfo,
+                          const ResolvedNamespaceMap& resolvedNamespaces) override;
 
         ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
                                                      bool isImplicitDefault) const override {
@@ -330,7 +333,7 @@ public:
         }
 
     private:
-        const AggStageAstNodeHandle _astNode;
+        AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;
     };

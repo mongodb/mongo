@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -239,17 +238,14 @@ TEST(LiteParsedPipelineTest, ClonedPipelineWithViewStagesPreservesOwnership) {
 
 }  // namespace
 
-// Parses { <stageName>: {} } into a TestLiteParsed whose ViewPolicy is fixed.
 std::unique_ptr<LiteParsedDocumentSource> createViewPolicyDefaultParser(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    return std::make_unique<TestLiteParsed>(
-        spec, ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend});
+    return std::make_unique<TestLiteParsed>(spec, FirstStageViewApplicationPolicy::kDefaultPrepend);
 }
 
 std::unique_ptr<LiteParsedDocumentSource> createViewPolicyDoNothingParser(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    return std::make_unique<TestLiteParsed>(
-        spec, ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDoNothing});
+    return std::make_unique<TestLiteParsed>(spec, FirstStageViewApplicationPolicy::kDoNothing);
 }
 
 class LiteParsedPipelineViewPolicyTest : public unittest::Test {
@@ -337,73 +333,6 @@ TEST_F(LiteParsedPipelineViewPolicyTest, PrependWhenDefaultPrependIsTrueForAllSt
     ASSERT_EQ(out[0]->getParseTimeName(), "$match");
     ASSERT_EQ(out[1]->getParseTimeName(), _defaultStageName);
     ASSERT_EQ(out[2]->getParseTimeName(), _defaultStageName);
-}
-
-/**
- * Test that handleView passes resolvedNamespaces to stage ViewPolicy callbacks when the pipeline
- * has involved namespaces (e.g., from $lookup, $graphLookup).
- */
-TEST_F(LiteParsedPipelineViewPolicyTest, HandleViewPassesResolvedNamespacesToStageCallbacks) {
-    const std::string kResolveNsCheckStage = "$resolveNsCheck";
-    ResolvedNamespaceMap receivedResolvedNamespaces;
-
-    auto createResolveNsCheckParser =
-        [&receivedResolvedNamespaces](
-            const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-            return std::make_unique<TestLiteParsed>(
-                spec,
-                ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
-                           .callback = [&receivedResolvedNamespaces](
-                                           const ViewInfo&,
-                                           StringData,
-                                           const ResolvedNamespaceMap& resolvedNs) {
-                               receivedResolvedNamespaces = resolvedNs;
-                           }});
-        };
-
-    LiteParsedDocumentSource::registerParser(
-        kResolveNsCheckStage,
-        {.parser = createResolveNsCheckParser,
-         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
-         .allowedWithClientType = AllowedWithClientType::kAny});
-
-    auto guard = ScopeGuard([name = kResolveNsCheckStage] {
-        LiteParsedPipelineViewPolicyTest::unregisterParserByName(name);
-    });
-
-    // Build a ResolvedNamespaceMap simulating resolution of involved namespaces (e.g., a $lookup
-    // foreign collection "test.foreign" resolved to a view "test.otherView" with its pipeline).
-    const auto kForeignNss = NamespaceString::createNamespaceString_forTest("test.foreign"_sd);
-    const auto kUnderlyingNss =
-        NamespaceString::createNamespaceString_forTest("test.underlyingColl"_sd);
-
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[kForeignNss] =
-        ResolvedNamespace(kUnderlyingNss, {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 10)});
-    resolvedNamespaces[kResolvedNss] = ResolvedNamespace(kResolvedNss, {});
-
-    std::vector<BSONObj> userStages = {BSON(kResolveNsCheckStage << BSONObj())};
-    LiteParsedPipeline pipeline(kTestNss, userStages);
-
-    std::vector<BSONObj> viewStages = {BSON("$match" << BSON("a" << 1))};
-    const auto viewInfo = createTestViewInfo(std::move(viewStages));
-
-    pipeline.handleView(viewInfo, resolvedNamespaces);
-
-    // Verify the stage's ViewPolicy callback received the resolved namespaces.
-    ASSERT_EQ(receivedResolvedNamespaces.size(), 2U);
-    ASSERT_TRUE(receivedResolvedNamespaces.contains(kForeignNss));
-    ASSERT_TRUE(receivedResolvedNamespaces.contains(kResolvedNss));
-    ASSERT_EQ(receivedResolvedNamespaces.at(kForeignNss).ns, kUnderlyingNss);
-    ASSERT_EQ(receivedResolvedNamespaces.at(kForeignNss).pipeline.size(), 2U);
-    ASSERT_EQ(receivedResolvedNamespaces.at(kResolvedNss).ns, kResolvedNss);
-    ASSERT_TRUE(receivedResolvedNamespaces.at(kResolvedNss).pipeline.empty());
-
-    // Also verify view pipeline was prepended as usual.
-    const auto& stages = pipeline.getStages();
-    ASSERT_EQ(stages.size(), 2U);
-    ASSERT_EQ(stages[0]->getParseTimeName(), "$match");
-    ASSERT_EQ(stages[1]->getParseTimeName(), kResolveNsCheckStage);
 }
 
 }  // namespace mongo

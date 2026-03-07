@@ -336,66 +336,19 @@ TEST(StageParams, CanGetStageParamsFromLiteParsed) {
     ASSERT_NE(baseParams->getId(), 0);
 }
 
-TEST(ViewPolicy, CanSpecifyDefaultViewPolicyWithNoCustomReadFunction) {
+TEST(ViewPolicy, DefaultPolicyReturnsDefaultPrepend) {
     BSONObj spec = BSON("$testStage" << BSONObj());
     auto lp = TestLiteParsed(spec.firstElement());
 
-    ASSERT_EQ(lp.getViewPolicy().policy, ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend);
+    ASSERT_EQ(lp.getFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDefaultPrepend);
 }
 
-TEST(ViewPolicy, CanSpecifyViewPolicyWithCustomReadFunction) {
-    // Make a custom view function that just sets a bool flag indicating that the function has been
-    // called successfully.
-    bool fired = false;
-    auto viewFunc = [&fired](const ViewInfo&, StringData stageName, const ResolvedNamespaceMap&) {
-        ASSERT_FALSE(fired);
-        fired = true;
-    };
-
+TEST(ViewPolicy, CanSpecifyDoNothingPolicy) {
     BSONObj spec = BSON("$testStage" << BSONObj());
-    auto lp =
-        TestLiteParsed(spec.firstElement(),
-                       ViewPolicy{.policy = ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
-                                  .callback = viewFunc});
+    auto lp = TestLiteParsed(spec.firstElement(), FirstStageViewApplicationPolicy::kDoNothing);
 
-    auto viewPolicy = lp.getViewPolicy();
-    ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
-
-    // Make sure that we can actually call the custom view function.
-    viewPolicy.callback({}, "", ResolvedNamespaceMap{});
-    ASSERT_TRUE(fired);
-}
-
-TEST(ViewPolicy, CanSpecifyDisallowViewPolicyDefaultValues) {
-    BSONObj spec = BSON("$testStage" << BSONObj());
-    auto lp = TestLiteParsed(spec.firstElement(), DisallowViewsPolicy{});
-
-    auto viewPolicy = lp.getViewPolicy();
-    ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
-
-    ASSERT_THROWS_CODE_AND_WHAT(viewPolicy.callback({}, "$test", ResolvedNamespaceMap{}),
-                                DBException,
-                                ErrorCodes::CommandNotSupportedOnView,
-                                "$test is not supported on views.");
-}
-
-TEST(ViewPolicy, CanSpecifyDisallowViewPolicyCustomValues) {
-    BSONObj spec = BSON("$testStage" << BSONObj());
-
-    const int kCustomErrorCode = 11505700;
-    const std::string kCustomErrorMsg = "test error message";
-    auto lp = TestLiteParsed(spec.firstElement(),
-                             DisallowViewsPolicy{[&](const auto&, auto, const auto&) {
-                                 uasserted(kCustomErrorCode, kCustomErrorMsg);
-                             }});
-
-    auto viewPolicy = lp.getViewPolicy();
-    ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
-
-    ASSERT_THROWS_CODE_AND_WHAT(viewPolicy.callback({}, "$test", ResolvedNamespaceMap{}),
-                                DBException,
-                                kCustomErrorCode,
-                                kCustomErrorMsg);
+    ASSERT_EQ(lp.getFirstStageViewApplicationPolicy(), FirstStageViewApplicationPolicy::kDoNothing);
 }
 
 TEST(LiteParsedPipelineClone, CloneCreatesDeepCopy) {

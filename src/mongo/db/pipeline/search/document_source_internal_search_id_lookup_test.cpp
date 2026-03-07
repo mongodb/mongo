@@ -586,14 +586,12 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
-    // Simulate what handleView() does: invoke the ViewPolicy callback with a view pipeline.
+    // Simulate what handleView() does: invoke bindViewInfo with a view pipeline.
     std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("active" << true)),
                                          BSON("$sort" << BSON("createdAt" << -1))};
     ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
 
-    auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(
-        viewInfo, DocumentSourceInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
+    liteParsed->bindViewInfo(viewInfo, {});
 
     // Now use the registry to build the DocumentSource from the LiteParsed.
     auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
@@ -641,7 +639,7 @@ TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
-    // Don't invoke the ViewPolicy callback.
+    // Don't invoke bindViewInfo.
 
     auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
 

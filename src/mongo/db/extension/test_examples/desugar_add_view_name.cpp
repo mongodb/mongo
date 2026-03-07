@@ -164,7 +164,7 @@ public:
         }
     }
 
-    void bindViewInfo(const sdk::ViewInfo& viewInfo) const override {
+    void bindViewInfo(const sdk::ViewInfo& viewInfo) override {
         _viewName = std::string(viewInfo.viewName());
     }
 
@@ -186,7 +186,7 @@ public:
 
 private:
     const mongo::BSONObj _arguments;
-    mutable std::string _viewName;
+    std::string _viewName;
 };
 
 DEFAULT_PARSE_NODE(AddViewName)

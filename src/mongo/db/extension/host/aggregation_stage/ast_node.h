@@ -204,7 +204,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _hostBindViewInfo(
-        const ::MongoExtensionAggStageAstNode* astNode,
+        ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionViewInfo* viewInfo) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             tasserted(11507501,

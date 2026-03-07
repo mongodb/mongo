@@ -45,8 +45,10 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Test);
  */
 class TestLiteParsed final : public LiteParsedDocumentSourceDefault<TestLiteParsed> {
 public:
-    TestLiteParsed(const BSONElement& originalBson, ViewPolicy viewPolicy = DefaultViewPolicy{})
-        : LiteParsedDocumentSourceDefault(originalBson), _viewPolicy(viewPolicy) {}
+    TestLiteParsed(
+        const BSONElement& originalBson,
+        FirstStageViewApplicationPolicy policy = FirstStageViewApplicationPolicy::kDefaultPrepend)
+        : LiteParsedDocumentSourceDefault(originalBson), _policy(policy) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -60,11 +62,11 @@ public:
         return std::make_unique<TestStageParams>(_originalBson);
     }
 
-    ViewPolicy getViewPolicy() const final {
-        return _viewPolicy;
+    FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
+        return _policy;
     }
 
-    ViewPolicy _viewPolicy;
+    FirstStageViewApplicationPolicy _policy;
 };
 
 }  // namespace mongo

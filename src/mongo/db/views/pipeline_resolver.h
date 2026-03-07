@@ -105,7 +105,7 @@ public:
 
     /**
      * Builds a resolved aggregation request from a view for mongos, handling special cases for
-     * mongot pipelines, timeseries views, and invoking ViewPolicy callbacks for extension stages.
+     * mongot pipelines, timeseries views, and invoking bindViewInfo() for extension stages.
      *
      * This is the single entrypoint for mongos view resolution. It returns a fully resolved
      * request with the pipeline set, and optionally a LiteParsedPipeline that was created during

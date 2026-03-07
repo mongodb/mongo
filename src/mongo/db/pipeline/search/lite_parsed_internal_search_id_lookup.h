@@ -86,12 +86,12 @@ public:
         return _ownedSpec;
     }
 
-    ViewPolicy getViewPolicy() const final {
-        return ViewPolicy{
-            .policy = ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
-            .callback = [this](const ViewInfo& viewInfo, StringData, const ResolvedNamespaceMap&) {
-                _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
-            }};
+    FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
+        return FirstStageViewApplicationPolicy::kDoNothing;
+    }
+
+    void bindViewInfo(const ViewInfo& viewInfo, const ResolvedNamespaceMap&) override {
+        _ownedSpec.setViewPipeline(viewInfo.getSerializedViewPipeline());
     }
 
     LiteParsedInternalSearchIdLookUp(DocumentSourceIdLookupSpec spec)
@@ -99,7 +99,7 @@ public:
           _ownedSpec(std::move(spec)) {}
 
 private:
-    mutable DocumentSourceIdLookupSpec _ownedSpec;
+    DocumentSourceIdLookupSpec _ownedSpec;
 };
 
 }  // namespace mongo

@@ -45,23 +45,22 @@ const NamespaceString kResolvedNss =
     NamespaceString::createNamespaceString_forTest("unittests.resolved_coll");
 
 /**
- * Tests for LiteParsed::getViewPolicy() and LiteParsed::getStageParams() to verify the
- * ViewPolicy callback correctly stores view pipeline BSON for use in desugaring.
+ * Tests for LiteParsed::bindViewInfo() and LiteParsed::getStageParams() to verify that
+ * bindViewInfo correctly stores view pipeline BSON for use in desugaring.
  */
 class LiteParsedInternalSearchIdLookUpTest : public unittest::Test {};
 
-TEST_F(LiteParsedInternalSearchIdLookUpTest, GetViewPolicyReturnsDoNothingPolicy) {
+TEST_F(LiteParsedInternalSearchIdLookUpTest, GetFirstStageViewApplicationPolicyReturnsDoNothing) {
     BSONObj spec = BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 100LL));
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
 
-    auto viewPolicy = liteParsed->getViewPolicy();
-
     // The policy should be kDoNothing since IdLookup handles view resolution itself.
-    ASSERT_EQ(viewPolicy.policy, ViewPolicy::kFirstStageApplicationPolicy::kDoNothing);
+    ASSERT_EQ(liteParsed->getFirstStageViewApplicationPolicy(),
+              FirstStageViewApplicationPolicy::kDoNothing);
 }
 
-TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackStoresViewPipelineBson) {
+TEST_F(LiteParsedInternalSearchIdLookUpTest, BindViewInfoStoresViewPipelineBson) {
     BSONObj spec = BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 100LL));
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
@@ -71,10 +70,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackStoresViewPipelin
                                          BSON("$project" << BSON("name" << 1 << "status" << 1))};
     ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
 
-    // Invoke the callback.
-    auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(
-        viewInfo, LiteParsedInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
+    liteParsed->bindViewInfo(viewInfo, {});
 
     // Now getStageParams should return params with the view pipeline BSON.
     auto stageParams = liteParsed->getStageParams();
@@ -100,7 +96,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetStageParamsReturnsLimitFromSpec)
     // Verify the limit was extracted correctly from the spec.
     ASSERT(typedParams->ownedSpec.getLimit());
     ASSERT_EQ(typedParams->ownedSpec.getLimit().get(), 42);
-    // Without view callback, the view pipeline should be empty.
+    // Without bindViewInfo call, the view pipeline should be empty.
     ASSERT_FALSE(typedParams->ownedSpec.getViewPipeline());
 }
 
@@ -117,7 +113,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, GetStageParamsReturnsNothingWhenNot
     ASSERT_FALSE(typedParams->ownedSpec.getViewPipeline());
 }
 
-TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackWithEmptyViewPipeline) {
+TEST_F(LiteParsedInternalSearchIdLookUpTest, BindViewInfoWithEmptyViewPipeline) {
     BSONObj spec = BSON(LiteParsedInternalSearchIdLookUp::kStageName << BSON("limit" << 10LL));
     auto liteParsed =
         LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
@@ -125,9 +121,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest, ViewPolicyCallbackWithEmptyViewPipe
     // Create an empty view pipeline.
     ViewInfo viewInfo(kViewNss, kResolvedNss, {});
 
-    auto viewPolicy = liteParsed->getViewPolicy();
-    viewPolicy.callback(
-        viewInfo, LiteParsedInternalSearchIdLookUp::kStageName, ResolvedNamespaceMap{});
+    liteParsed->bindViewInfo(viewInfo, {});
 
     auto stageParams = liteParsed->getStageParams();
     auto* typedParams = dynamic_cast<InternalSearchIdLookupStageParams*>(stageParams.get());
@@ -212,7 +206,7 @@ TEST_F(LiteParsedInternalSearchIdLookUpTest,
     ASSERT_EQ(stages.size(), 1U);
     ASSERT_EQ(stages[0]->getParseTimeName(), LiteParsedInternalSearchIdLookUp::kStageName);
 
-    // The IdLookup stage should now carry the desugared view pipeline via its ViewPolicy callback.
+    // The IdLookup stage should now carry the desugared view pipeline via bindViewInfo().
     auto* idLookup = dynamic_cast<LiteParsedInternalSearchIdLookUp*>(stages[0].get());
     ASSERT_TRUE(idLookup != nullptr);
 

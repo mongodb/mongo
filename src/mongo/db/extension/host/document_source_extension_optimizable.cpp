@@ -196,18 +196,24 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtension
         DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::hasExtensionVectorSearchStage()
     const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+// TODO SERVER-116021 Remove this check when the extension can do this through bindViewInfo().
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::hasExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
-ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy() const {
+FirstStageViewApplicationPolicy
+DocumentSourceExtensionOptimizable::LiteParsedExpanded::getFirstStageViewApplicationPolicy() const {
+    return view_util::toFirstStageApplicationPolicy(_astNode->getFirstStageViewApplicationPolicy());
+}
+
+void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
+    const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces) {
     if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
         // If this is not a $vectorSearch stage, views are banned entirely with the feature flag
         // disabled.
@@ -223,15 +229,8 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
                    "$vectorSearch-as-an-extension is not allowed against views."));
     }
 
-    return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
-                          _astNode->getFirstStageViewApplicationPolicy()),
-                      .callback = [this](const ViewInfo& viewInfo,
-                                         StringData stageName,
-                                         const ResolvedNamespaceMap&) {
-                          host_connector::ViewInfoAdapter viewInfoAdapter =
-                              host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);
-                          _astNode->bindViewInfo(viewInfoAdapter.getAsBoundaryType());
-                      }};
+    auto viewInfoAdapter = host_connector::ViewInfoAdapter::fromViewInfo(viewInfo);
+    _astNode->bindViewInfo(viewInfoAdapter.getAsBoundaryType());
 }
 
 // static

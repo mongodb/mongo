@@ -103,13 +103,13 @@ inline boost::optional<StageConstraints::HostTypeRequirement> toHostTypeRequirem
 }  // namespace static_properties_util
 
 namespace view_util {
-inline ViewPolicy::kFirstStageApplicationPolicy toFirstStageApplicationPolicy(
+inline FirstStageViewApplicationPolicy toFirstStageApplicationPolicy(
     MongoExtensionFirstStageViewApplicationPolicy policy) {
     switch (policy) {
         case MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend:
-            return ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend;
+            return FirstStageViewApplicationPolicy::kDefaultPrepend;
         case MongoExtensionFirstStageViewApplicationPolicy::kDoNothing:
-            return ViewPolicy::kFirstStageApplicationPolicy::kDoNothing;
+            return FirstStageViewApplicationPolicy::kDoNothing;
     }
     MONGO_UNREACHABLE_TASSERT(11507600);
 }
