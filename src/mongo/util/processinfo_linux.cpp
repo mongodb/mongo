@@ -496,6 +496,8 @@ public:
         if (f != nullptr) {
             if (fgets(fstr, 1023, f) != nullptr)
                 fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
+            else
+                fstr[0] = '\0';
             fclose(f);
         }
         return fstr;
