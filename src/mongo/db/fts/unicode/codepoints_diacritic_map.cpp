@@ -5506,6 +5506,10 @@ char32_t codepointRemoveDiacritics(char32_t codepoint) {
             return 0x9f3b;
         case 0x2fa1d:
             return 0x2a600;
+        case 0x110:
+            return 0x44;
+        case 0x111:
+            return 0x64;
         default:
             return codepoint;
     }
