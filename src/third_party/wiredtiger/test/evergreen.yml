@@ -6116,7 +6116,7 @@ buildvariants:
 - name: amazon2023-armv9-release-nonstandalone
   display_name: (ARMV9) Amazon 2023 (ARM64, Release Build, Non-standalone)
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   expansions:
     ENABLE_TCMALLOC: 1
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -6125,21 +6125,21 @@ buildvariants:
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
     - name: ".stress-test-1"
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: ".stress-test-2"
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: format-abort-recovery-stress-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: compile
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
 
 - name: amazon2023-armv9-nonstandalone
   display_name: (ARMV9) Amazon Linux 2023 (ARM64, Non-standalone)
   run_on:
-  - amazon2023-arm64-latest-large-m8g
+  - amazon2023.3-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -6165,7 +6165,7 @@ buildvariants:
 - name: amazon2023-release-armv9
   display_name: "(ARMV9) Amazon 2023 (ARM64, Release Build)"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   batchtime: 720 # 12 hours
   expansions:
     ENABLE_TCMALLOC: 1
@@ -6181,16 +6181,16 @@ buildvariants:
     - name: unit-test-zstd
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: long-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: format-smoke-test
     - name: s3-tiered-storage-extensions-test
 
 - name: amazon2023-armv9
   display_name: "(ARMV9) Amazon Linux 2023 ARM64"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   batchtime: 1440 # 24 hours
   expansions:
     ENABLE_TCMALLOC: 1
@@ -6204,11 +6204,11 @@ buildvariants:
     - name: compile
     - name: fops
     - name: format-failure-configs-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: format-smoke-test
     - name: format-stress-pull-request-test
     - name: long-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: make-check-test
     - name: model-test-failure-workloads
       batchtime: 1440 # 24 hours
@@ -6222,23 +6222,23 @@ buildvariants:
     - name: s3-tiered-storage-extensions-test
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: unit-test
     - name: unit-test-extra-long
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: unit-test-zstd
     - name: wtperf-test
     - name: checkpoint-filetypes-test
     - name: compile
     - name: fops
     - name: format-failure-configs-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
 
 - name: cppsuite-stress-tests-armv9
   display_name: "(ARMV9) Cppsuite Stress Tests ARM64"
   batchtime: 720 # twice a day
   run_on:
-  - amazon2023-arm64-latest-large-m8g
+  - amazon2023.3-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -6249,7 +6249,7 @@ buildvariants:
 - name: amazon2023-stress-tests-armv9
   display_name: (ARMV9) Amazon2023 Stress tests ARM64
   run_on:
-  - amazon2023-arm64-latest-large-m8g
+  - amazon2023.3-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -6267,7 +6267,7 @@ buildvariants:
 - name: amazon2023-armv9-asan
   display_name: "(ARMV9) Amazon Linux 2023 ASAN"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
@@ -6291,7 +6291,7 @@ buildvariants:
 - name: amazon2023-armv9-tsan
   display_name: "(ARMV9) Amazon Linux 2023 TSAN"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
@@ -6305,7 +6305,7 @@ buildvariants:
 - name: amazon2023-armv9-msan
   display_name: "(ARMV9) Amazon Linux 2023 MSAN"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
@@ -6328,16 +6328,16 @@ buildvariants:
     - name: examples-c-production-disable-static-test
     - name: format-msan-test
     - name: make-check-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: csuite-long-running
       # Some of the long-running tests require a large instance to run successfully.
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
       batchtime: 1440 # once a day
 
 - name: amazon2023-armv9-ubsan
   display_name: "(ARMV9) Amazon Linux 2023 UBSAN"
   run_on:
-  - amazon2023-arm64-latest-small-m8g
+  - amazon2023.3-arm64-small
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
@@ -6354,13 +6354,13 @@ buildvariants:
     - name: examples-c-production-disable-static-test
     - name: format-stress-pull-request-test
     - name: make-check-test
-      distros: amazon2023-arm64-latest-large-m8g
+      distros: amazon2023.3-arm64-large
     - name: cppsuite-default-all
 
 - name: amazon2023-stress-nonstandalone
   display_name: "(ARMV9) Amazon Linux 2023 Stress tests (Non-standalone)"
   run_on:
-  - amazon2023-arm64-latest-large-m8g
+  - amazon2023.3-arm64-large
   expansions:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
