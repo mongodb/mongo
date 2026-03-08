@@ -113,6 +113,9 @@ __page_find_min_delta_leaf(WT_SESSION_IMPL *session, WT_ITEM *deltas,
             WT_CELL_DELTA_LEAF_UNPACK(
               session, (WT_PAGE_HEADER *)deltas[i].data, s[i].unpack, s[i].cell);
 
+            WT_ASSERT(
+              session, s[i].unpack->delta_key.data != NULL || s[i].unpack->delta_key.size == 0);
+
             WT_RET(__wt_cell_decompress_prefix_key(session, s[i].current_key,
               s[i].unpack->delta_key.data, s[i].unpack->delta_key.size,
               s[i].unpack->delta_key.prefix));

@@ -190,6 +190,12 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
         is_delta = (result != 0);
         block_size_sum += size;
 
+        if (is_delta)
+            __wt_verbose(session, WT_VERB_READ,
+              "Reading delta page at position #%" PRId32 " for page_id %" PRIu64, result, page_id);
+        else
+            __wt_verbose(session, WT_VERB_READ, "Reading base page for page_id %" PRIu64, page_id);
+
         /*
          * Do little- to big-endian handling early on.
          */

@@ -717,6 +717,8 @@ ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
 ANY_OK(__wt_page_log_discard_args::__wt_page_log_discard_args)
 ANY_OK(__wt_page_log_discard_args::~__wt_page_log_discard_args)
+ANY_OK(__wt_page_log_complete_checkpoint_args::__wt_page_log_complete_checkpoint_args)
+ANY_OK(__wt_page_log_complete_checkpoint_args::~__wt_page_log_complete_checkpoint_args)
 ANY_OK(__wt_page_log_put_args::__wt_page_log_put_args)
 ANY_OK(__wt_page_log_put_args::~__wt_page_log_put_args)
 ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
@@ -762,6 +764,13 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 %ignore __wt_page_log::get_complete_checkpoint(WT_PAGE_LOG *, int *);
 %ignore __wt_page_log::get_open_checkpoint(WT_PAGE_LOG *, int *);
+
+/* TODO: workaround for issues getting a Python version of structs working. */
+%ignore __wt_page_log_complete_checkpoint_args::checkpoint_id;
+%ignore __wt_page_log_complete_checkpoint_args::checkpoint_timestamp;
+%ignore __wt_page_log_complete_checkpoint_args::checkpoint_metadata;
+%ignore __wt_page_log_complete_checkpoint_args::checkpoint_oldest_timestamp;
+%ignore __wt_page_log_complete_checkpoint_args::lsn;
 
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, compare, (self, other))
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, equals, (self, other))
@@ -1206,9 +1215,10 @@ SIDESTEP_METHOD(__wt_page_log, pl_begin_checkpoint,
   (self, session, checkpoint_id))
 
 SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint,
-  (WT_SESSION *session, int checkpoint_id),
-  (self, session, checkpoint_id))
+  (WT_SESSION *session, WT_PAGE_LOG_COMPLETE_CHECKPOINT_ARGS *args),
+  (self, session, args))
 
+/* FIXME-WT-16821: Remember to remove ext. */
 SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint_ext,
   (WT_SESSION *session, int checkpoint_id, uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata, uint64_t *lsnp),
   (self, session, checkpoint_id, checkpoint_timestamp, checkpoint_metadata, lsnp))

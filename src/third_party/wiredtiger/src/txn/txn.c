@@ -1092,9 +1092,9 @@ __txn_resolve_prepared_update_chain(
     /* Resolve the prepared update to be a committed update. */
     __txn_apply_prepare_state_update(session, upd, true);
 
-    /* Sleep for 100ms in the prepared resolution path if configured. */
+    /* Sleep for 1 second in the prepared resolution path if configured. */
     if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
-        __wt_sleep(0, 100 * WT_THOUSAND);
+        __wt_sleep(0, 1000 * WT_THOUSAND);
     WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
 }
 
@@ -2382,7 +2382,7 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_CONN_SET(session, txn_global_stable_timestamp,
       __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp));
 
-    if (conn->version_cursor_count == 0)
+    if (__wt_atomic_load_uint32_relaxed(&conn->version_cursor_count) == 0)
         WT_STAT_CONN_SET(session, txn_global_version_cursor_timestamp, WT_TS_NONE);
     else
         WT_STAT_CONN_SET(session, txn_global_version_cursor_timestamp,

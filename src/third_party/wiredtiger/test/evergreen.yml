@@ -1795,8 +1795,7 @@ variables:
       - func: "fetch artifacts"
       - func: "format test disagg"
         vars:
-          # FIXME-WT-16695 Enable truncate on mode = switch when test failure is resolved.
-          format_args: disagg.mode=switch ops.truncate=0 runs.timer=10:15
+          format_args: disagg.mode=switch runs.timer=10:15
           times: 5
 
   # FIXME-WT-16113: Consolidate this logic in test/format itself.
@@ -1808,8 +1807,7 @@ variables:
       - func: "format test disagg"
         vars:
           # Validate data with a non-layered table.
-          # FIXME-WT-16695 Enable truncate on mode = switch when test failure is resolved.
-          format_args: disagg.mode=switch ops.truncate=0 ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
+          format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
           times: 5
 
   - &format-stress-test-disagg-multi

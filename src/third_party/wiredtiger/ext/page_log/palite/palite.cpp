@@ -2554,6 +2554,9 @@ Palite::initialize_interface()
     pl_abandon_checkpoint = palite_abandon_checkpoint;
     pl_begin_checkpoint = palite_begin_checkpoint;
     pl_complete_checkpoint_ext = palite_complete_checkpoint_ext;
+    /*
+     * FIXME-WT-16821: palite_get_complete_checkpoint_ext will be deprecated.
+     */
     pl_get_complete_checkpoint_ext = palite_get_complete_checkpoint_ext;
     pl_get_last_lsn = palite_get_last_lsn;
     pl_open_handle = palite_open_handle;

@@ -648,6 +648,14 @@ __clayered_get_current(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, bo
     if (clayered->ingest_cursor != NULL && F_ISSET(clayered->ingest_cursor, WT_CURSTD_KEY_INT))
         ingest_positioned = true;
 
+    /*
+     * FIXME-WT-16810: In leader mode, skip searching ingest as it should be empty. This will need
+     * revisiting when asynchronous step-up is supported, because ingest may legitimately contain
+     * data for some time after promotion.
+     */
+    if (clayered->leader)
+        ingest_positioned = false;
+
     if (clayered->stable_cursor != NULL && F_ISSET(clayered->stable_cursor, WT_CURSTD_KEY_INT))
         stable_positioned = true;
 
@@ -792,6 +800,14 @@ __clayered_iterate_constituents(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag,
     bool forward = (iter_flag == WT_CLAYERED_ITERATE_NEXT);
     WT_CURSOR *c_ingest = clayered->ingest_cursor;
     WT_CURSOR *c_stable = clayered->stable_cursor;
+
+    /*
+     * FIXME-WT-16810: In leader mode, skip iterating through ingest as it should be empty. This
+     * will need revisiting when asynchronous step-up is supported, because ingest may legitimately
+     * contain data for some time after promotion.
+     */
+    if (clayered->leader)
+        c_ingest = NULL;
 
     /*
      * FIXME-WT-15058: Both cursors are expected to be initialized, but we currently have an issue
@@ -1398,11 +1414,18 @@ __clayered_search_near(WT_CURSOR *cursor, int *exactp)
      * * Otherwise a larger key is preferred if one exists.
      * * Otherwise a smaller key should be returned.
      * If both constituents have a larger key available, return the one closes to the search term.
+     *
+     * FIXME-WT-16810: In leader mode, skip searching ingest as it should be empty.
+     * This will need revisiting when asynchronous step-up is supported, because ingest may
+     * legitimately contain data for some time after promotion.
      */
-    clayered->ingest_cursor->set_key(clayered->ingest_cursor, &cursor->key);
-    WT_ERR_NOTFOUND_OK(
-      clayered->ingest_cursor->search_near(clayered->ingest_cursor, &ingest_cmp), true);
-    ingest_found = ret != WT_NOTFOUND;
+    ingest_found = false;
+    if (!clayered->leader) {
+        clayered->ingest_cursor->set_key(clayered->ingest_cursor, &cursor->key);
+        WT_ERR_NOTFOUND_OK(
+          clayered->ingest_cursor->search_near(clayered->ingest_cursor, &ingest_cmp), true);
+        ingest_found = ret != WT_NOTFOUND;
+    }
 
     /* If there wasn't an exact match, check the stable table as well */
     if ((!ingest_found || ingest_cmp != 0) && clayered->stable_cursor != NULL) {

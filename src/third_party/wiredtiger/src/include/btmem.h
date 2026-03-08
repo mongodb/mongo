@@ -370,11 +370,17 @@ struct __wt_page_modify {
     wt_timestamp_t rec_max_timestamp;
 
     /*
-     * Track the timestamp used for the most recent reconciliation. It's useful to avoid duplicating
-     * work when precise checkpoints are enabled, so we don't re-reconcile pages when no new content
-     * could be written.
+     * Track the pinned stable timestamp used for the most recent reconciliation. It's useful to
+     * avoid duplicating work when precise checkpoints are enabled, so we don't re-reconcile pages
+     * when no new content could be written.
      */
     wt_timestamp_t rec_pinned_stable_timestamp;
+
+    /*
+     * Track the prune timestamp used for the most recent reconciliation. It's useful to avoid
+     * duplicating work when doing garbage collection on the ingest btree.
+     */
+    wt_timestamp_t rec_prune_timestamp;
 
     /* An approximate timestamp of the newest update */
     wt_shared wt_timestamp_t newest_commit_timestamp;
