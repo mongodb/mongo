@@ -322,7 +322,7 @@ TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
     ASSERT_EQUALS(
         "Expected \"v\" field in response to replSetHeartbeat to "
-        "have type NumberInt, but found string",
+        "have type NumberInt/NumberLong, but found string",
         result.reason());
 }
 

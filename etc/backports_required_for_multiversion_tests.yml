@@ -524,6 +524,8 @@ last-continuous:
       ticket: SERVER-117009
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
+    - test_file: jstests/replsets/election_term_over_int_max.js
+      ticket: SERVER-119413
   suites: null
 last-lts:
   all:
@@ -1105,4 +1107,6 @@ last-lts:
       ticket: SERVER-117009
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
+    - test_file: jstests/replsets/election_term_over_int_max.js
+      ticket: SERVER-119413
   suites: null
