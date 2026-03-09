@@ -228,23 +228,50 @@ bool ExecutionAdmissionContext::_shouldRecordStats() {
 }
 
 admission::execution_control::ScopedTaskTypeModifierBase::ScopedTaskTypeModifierBase(
-    OperationContext* opCtx, ExecutionAdmissionContext::TaskType newValue)
+    OperationContext* opCtx, ExecutionAdmissionContext::TaskType newType)
     : _opCtx(opCtx) {
-    dassert(ExecutionAdmissionContext::get(_opCtx).getTaskType() ==
-            ExecutionAdmissionContext::TaskType::Default);
-    dassert(ExecutionAdmissionContext::get(_opCtx).getPriority() ==
-            AdmissionContext::Priority::kNormal);
+    const auto currentType = ExecutionAdmissionContext::get(_opCtx).getTaskType();
+    const auto currentPrio = ExecutionAdmissionContext::get(_opCtx).getPriority();
+
+    dassert(currentType == newType || currentType == ExecutionAdmissionContext::TaskType::Default);
+    dassert(currentPrio == AdmissionContext::Priority::kExempt ||
+            currentPrio == AdmissionContext::Priority::kNormal);
     dassert(!_opCtx->inMultiDocumentTransaction());
-    ExecutionAdmissionContext::get(_opCtx)._taskType.store(newValue);
+
+    ExecutionAdmissionContext::get(_opCtx)._taskType.store(newType);
+
+    // There is no need for mutex here, because the thread <-> operation context (and
+    // ExecutionAdmissionContext) is a 1 to 1 relation.
+    // Nobody should update the ExecutionAdmissionContext's counter from a different thread (sharing
+    // opCtx is prohibited).
+    const auto recursionCount =
+        ++ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion;
+    if (recursionCount < 1) {
+        LOGV2_WARNING(12096800,
+                      "Inconsistency in _scopedTaskTypeModifierRecursion count. Resetting it to 1.",
+                      "recursionCount"_attr = recursionCount);
+        dassert(false);
+        ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion = 1;
+    }
+
     LOGV2_DEBUG(12043501,
                 1,
                 "Changing task type on ExecutionAdmissionContext",
-                "newValue"_attr = to_string(newValue));
+                "newValue"_attr = to_string(newType));
 }
 
 admission::execution_control::ScopedTaskTypeModifierBase::~ScopedTaskTypeModifierBase() {
-    ExecutionAdmissionContext::get(_opCtx)._taskType.store(
-        ExecutionAdmissionContext::TaskType::Default);
+    // There is no need for mutex here, because the thread <-> operation context (and
+    // ExecutionAdmissionContext) is a 1 to 1 relation.
+    // Nobody should update the ExecutionAdmissionContext's counter from a different thread (sharing
+    // opCtx is prohibited).
+    const auto recursionCount =
+        --ExecutionAdmissionContext::get(_opCtx)._scopedTaskTypeModifierRecursion;
+    dassert(recursionCount >= 0);
+    if (recursionCount == 0) {
+        ExecutionAdmissionContext::get(_opCtx)._taskType.store(
+            ExecutionAdmissionContext::TaskType::Default);
+    }
 }
 
 admission::execution_control::ScopedTaskTypeBackground::ScopedTaskTypeBackground(

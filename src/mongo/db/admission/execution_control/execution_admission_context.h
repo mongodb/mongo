@@ -275,6 +275,10 @@ private:
 
     // True if the operation was ever in a multi-document transaction. Once set to true, stays true.
     Atomic<bool> _wasInMultiDocTxn{false};
+
+    // ScopedTaskTypeModifier recursion counter to handle interleaving task type modifier
+    // destructions.
+    int _scopedTaskTypeModifierRecursion{0};
 };
 
 inline std::string to_string(ExecutionAdmissionContext::TaskType tt) {
@@ -305,7 +309,7 @@ public:
 
 protected:
     ScopedTaskTypeModifierBase(OperationContext* opCtx,
-                               ExecutionAdmissionContext::TaskType newValue);
+                               ExecutionAdmissionContext::TaskType newType);
 
 private:
     OperationContext* _opCtx;

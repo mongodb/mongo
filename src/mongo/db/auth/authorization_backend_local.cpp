@@ -304,6 +304,8 @@ AuthorizationBackendLocal::RolesSnapshot AuthorizationBackendLocal::_snapshotRol
 
 Status AuthorizationBackendLocal::rolesExist(OperationContext* opCtx,
                                              const std::vector<RoleName>& roleNames) {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     // Perform DB queries for user-defined roles (skipping builtin roles).
     stdx::unordered_set<RoleName> unknownRoles;
     for (const auto& roleName : roleNames) {
@@ -323,6 +325,8 @@ Status AuthorizationBackendLocal::rolesExist(OperationContext* opCtx,
 
 StatusWith<ResolvedRoleData> AuthorizationBackendLocal::resolveRoles(
     OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) try {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     using RoleNameSet = typename decltype(ResolvedRoleData::roles)::value_type;
     const bool processRoles = option.shouldMineRoles();
     const bool processPrivs = option.shouldMinePrivileges();
@@ -462,6 +466,8 @@ StatusWith<User> AuthorizationBackendLocal::getUserObject(
     OperationContext* opCtx,
     const UserRequest& userReq,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     std::vector<RoleName> directRoles;
 
     User user(userReq.clone());
@@ -537,6 +543,8 @@ Status AuthorizationBackendLocal::getUserDescription(
     const UserRequest& userReq,
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     const UserName& userName = userReq.getUserName();
     std::vector<RoleName> directRoles;
     BSONObjBuilder resultBuilder;
@@ -635,6 +643,7 @@ Status AuthorizationBackendLocal::getRolesDescription(
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     std::vector<BSONObj>* result) {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
 
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
         // Shouldn't be called this way, but cope if we are.
@@ -704,6 +713,8 @@ Status AuthorizationBackendLocal::getRoleDescriptionsForDB(
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,
     std::vector<BSONObj>* result) {
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(opCtx);
+
     auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
 
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
