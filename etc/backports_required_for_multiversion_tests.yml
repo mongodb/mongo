@@ -1842,8 +1842,6 @@ last-lts:
     ticket: SERVER-103932
   - test_file: jstests/sharding/txn_lookup_hits_migration_conflict_all_colls_local.js
     ticket: SERVER-107535
-  - test_file: jstests/sharding/timeseries_user_system_buckets_sharding.js
-    ticket: SERVER-113933
   - test_file: jstests/replsets/insert_documents_close_to_size_limit.js
     ticket: SERVER-113532
   - test_file: jstests/concurrency/fsm_workloads/update_and_batched_delete.js

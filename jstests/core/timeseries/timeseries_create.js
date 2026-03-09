@@ -9,6 +9,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
@@ -79,7 +80,12 @@ const testOptions = function({
              Object.entries(timeseriesOptions).length > 1)) {
             assert.commandWorked(testDB.createCollection(
                 collName, {timeseries: {timeField: timeseriesOptions["timeField"]}}));
-            assert.commandFailedWithCode(create(), ErrorCodes.NamespaceExists);
+            const expectedErrors = [ErrorCodes.NamespaceExists];
+            if (TestData.mixedBinVersions && FixtureHelpers.isMongos(testDB)) {
+                // Tolerate this error since SERVER-80776 is not fixed in v7.0
+                expectedErrors.push(ErrorCodes.StaleConfig);
+            }
+            assert.commandFailedWithCode(create(), expectedErrors);
 
             assert.commandWorked(testDB.runCommand({drop: collName}));
         }

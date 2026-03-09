@@ -226,7 +226,13 @@ function runTest(testCase, minRequiredVersion = null) {
     jsTest.log("Case collection: sharded timeseries / collection: timeseries with different opts.");
     runTest(() => {
         shardCollectionWorked(kColl, tsOptions);
-        createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
+        const expectedErrors = [ErrorCodes.NamespaceExists];
+        if (jsTest.options().shardMixedBinVersions ||
+            jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+            // Tolerate this error since SERVER-80776 is not fixed in v7.0
+            expectedErrors.push(ErrorCodes.StaleConfig);
+        }
+        createFailed(kColl, tsOptions2, expectedErrors);
     });
 
     jsTest.log("Case collection: sharded timeseries / collection: bucket timeseries.");
