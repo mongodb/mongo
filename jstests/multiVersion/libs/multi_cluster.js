@@ -4,7 +4,7 @@
 
 import "jstests/multiVersion/libs/multi_rs.js";
 
-import {copyJSON} from "jstests/libs/json_utils.js";
+import {copyJSON} from "jstests/libs/query-integration-features/json_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 

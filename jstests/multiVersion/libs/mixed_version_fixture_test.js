@@ -1,6 +1,6 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
-import {copyJSON} from "jstests/libs/json_utils.js";
+import {copyJSON} from "jstests/libs/query-integration-features/json_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const latestVersion = {
