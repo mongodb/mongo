@@ -287,6 +287,19 @@ export const workerThread = (function () {
                 };
             }
         } finally {
+            // Kill this worker thread's session to ensure any possible idle cursors left open by
+            // the workload are closed.
+            // TODO:SERVER-120162 Reenable CheckIdleCursors hook.
+            try {
+                const session = myDB.getSession();
+                if (session) {
+                    myDB.runCommand({killSessions: [session.getSessionId()]});
+                }
+            } catch (e) {
+                // Ignore errors from killSessions.
+                jsTest.log.info("Error running killSessions: " + e);
+            }
+
             // Avoid retention of connection object
             configs = null;
             myDB = null;
