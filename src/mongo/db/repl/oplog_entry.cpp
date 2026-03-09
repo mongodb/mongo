@@ -180,14 +180,9 @@ void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
                                                      UUID uuid,
                                                      const BSONObj& docToInsert,
-                                                     const BSONObj& docKey,
-                                                     boost::optional<bool> isTimeseries) {
+                                                     const BSONObj& docKey) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
-
-    if (isTimeseries && *isTimeseries) {
-        op.setIsTimeseries(true);
-    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
@@ -199,14 +194,9 @@ ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
 ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
                                                      UUID uuid,
                                                      const BSONObj& update,
-                                                     const BSONObj& criteria,
-                                                     boost::optional<bool> isTimeseries) {
+                                                     const BSONObj& criteria) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kUpdate);
-
-    if (isTimeseries && *isTimeseries) {
-        op.setIsTimeseries(true);
-    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);
@@ -217,14 +207,9 @@ ReplOperation MutableOplogEntry::makeUpdateOperation(const NamespaceString nss,
 
 ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                                      UUID uuid,
-                                                     const BSONObj& docToDelete,
-                                                     boost::optional<bool> isTimeseries) {
+                                                     const BSONObj& docToDelete) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kDelete);
-
-    if (isTimeseries && *isTimeseries) {
-        op.setIsTimeseries(true);
-    }
     op.setTid(nss.tenantId());
     op.setNss(nss);
     op.setUuid(uuid);

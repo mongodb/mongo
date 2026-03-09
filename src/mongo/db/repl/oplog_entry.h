@@ -304,17 +304,14 @@ public:
     static ReplOperation makeInsertOperation(const NamespaceString& nss,
                                              UUID uuid,
                                              const BSONObj& docToInsert,
-                                             const BSONObj& docKey,
-                                             boost::optional<bool> isTimeseries = false);
+                                             const BSONObj& docKey);
     static ReplOperation makeUpdateOperation(NamespaceString nss,
                                              UUID uuid,
                                              const BSONObj& update,
-                                             const BSONObj& criteria,
-                                             boost::optional<bool> isTimeseries = false);
+                                             const BSONObj& criteria);
     static ReplOperation makeDeleteOperation(const NamespaceString& nss,
                                              UUID uuid,
-                                             const BSONObj& docToDelete,
-                                             boost::optional<bool> isTimeseries = false);
+                                             const BSONObj& docToDelete);
 
     /**
      * Generates the 'o' field of a 'create' OplogEntry.

@@ -741,12 +741,12 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
-            repl::ReplOperation operation = MutableOplogEntry::makeInsertOperation(
-                nss,
-                uuid,
-                iter->doc,
-                docKey,
-                /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
+            repl::ReplOperation operation =
+                MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
+            if (coll->isNewTimeseriesWithoutView()) {
+                operation.setIsTimeseries(true);
+            }
+
             // versionContext is set in the batched write oplog entry, but not each individual op.
             operation.setVersionContext(boost::none);
             operation.setDestinedRecipient(
@@ -887,11 +887,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         repl::ReplOperation operation = MutableOplogEntry::makeUpdateOperation(
-            nss,
-            args.coll->uuid(),
-            args.updateArgs->update,
-            args.updateArgs->criteria,
-            /*isTimeseries=*/args.coll->isNewTimeseriesWithoutView());
+            nss, args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
         // versionContext is set in the batched write oplog entry, but not each individual op.
         operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(
@@ -902,6 +898,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         }
         if (!args.updateArgs->replicatedRecordId.isNull()) {
             operation.setRecordId(args.updateArgs->replicatedRecordId);
+        }
+        if (args.coll->isNewTimeseriesWithoutView()) {
+            operation.setIsTimeseries(true);
         }
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
             invariant(!args.updateArgs->preImageDoc.isEmpty(),
@@ -1069,17 +1068,17 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        repl::ReplOperation operation = MutableOplogEntry::makeDeleteOperation(
-            nss,
-            uuid,
-            documentKey.getShardKeyAndId(),
-            /*isTimeseries=*/coll->isNewTimeseriesWithoutView());
+        repl::ReplOperation operation =
+            MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
         // versionContext is set in the batched write oplog entry, but not each individual op.
         operation.setVersionContext(boost::none);
         operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
+        }
+        if (coll->isNewTimeseriesWithoutView()) {
+            operation.setIsTimeseries(true);
         }
         if (args.changeStreamPreAndPostImagesEnabledForCollection) {
             invariant(!doc.isEmpty(),
