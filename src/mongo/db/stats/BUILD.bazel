@@ -87,7 +87,6 @@ mongo_cc_library(
     ],
 )
 
-# TODO SERVER-120237: remove this once 9.0 becomes last LTS.
 mongo_cc_library(
     name = "direct_system_buckets_access",
     srcs = [

@@ -84,7 +84,21 @@ assert.eq(true, isViewlessTimeseriesFormat(validCollName));
 jsTest.log.info("Verifying inconsistent collection was skipped (still in legacy format)");
 assert.eq(true, isLegacyTimeseriesFormat(inconsistentCollName));
 
-// Disable failpoint
+jsTest.log.info("Verifying bypass parameter allowDirectSystemBucketsAccess works");
+const bucketCollName = "system.buckets." + inconsistentCollName;
+const shardPrimary = st.rs0.getPrimary();
+
+assert.commandFailedWithCode(
+    db.runCommand({count: bucketCollName}),
+    ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+);
+
+assert.commandWorked(shardPrimary.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: true}));
+assert.commandWorked(db.runCommand({count: bucketCollName}));
+
+// cleanup
+assert.commandWorked(shardPrimary.adminCommand({setParameter: 1, allowDirectSystemBucketsAccess: false}));
 failpoint.off();
+assert.commandWorked(db.dropDatabase());
 
 st.stop();

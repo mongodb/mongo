@@ -108,7 +108,7 @@ function testUpgradeErrors() {
                 upgradeDowngradeViewlessTimeseries: bucketsCollName,
                 mode: "upgradeToViewless",
             }),
-            ErrorCodes.InvalidNamespace,
+            ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
         );
         assert(db.getCollection(tsCollName).drop());
     }

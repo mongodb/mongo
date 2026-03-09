@@ -83,7 +83,10 @@ jsTest.log("normal timeseries, drop by the buckets NS");
     assertExistsAndTypeIs(coll, "timeseries");
     assertDoesntExist(bucketsColl);
 
-    assert.commandWorked(db.runCommand({drop: bucketsColl.getName()}));
+    assert.commandFailedWithCode(
+        db.runCommand({drop: bucketsColl.getName()}),
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+    );
 
     assertExistsAndTypeIs(coll, "timeseries");
     assertDoesntExist(bucketsColl);
@@ -117,7 +120,10 @@ jsTest.log("view on buckets, buckets doesn't exist, drop by the buckets NS");
     // Reported as "timeseries", even though the buckets collection doesn't exist.
     assertExistsAndTypeIs(coll, "timeseries");
 
-    assert.commandWorked(db.runCommand({drop: bucketsColl.getName()}));
+    assert.commandFailedWithCode(
+        db.runCommand({drop: bucketsColl.getName()}),
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+    );
 
     // The view still exists, since it's not technically a timeseries.
     assertExistsAndTypeIs(coll, "timeseries");
@@ -150,7 +156,10 @@ jsTest.log("view on another collection, buckets doesn't exist, drop by the bucke
     assertExistsAndTypeIs(coll, "view");
     assertDoesntExist(bucketsColl);
 
-    assert.commandWorked(db.runCommand({drop: bucketsColl.getName()}));
+    assert.commandFailedWithCode(
+        db.runCommand({drop: bucketsColl.getName()}),
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+    );
 
     assertExistsAndTypeIs(coll, "view");
     assertDoesntExist(bucketsColl);
@@ -166,7 +175,10 @@ jsTest.log("normal collection, buckets doesn't exist, drop by the buckets NS");
     assertExistsAndTypeIs(coll, "collection");
     assertDoesntExist(bucketsColl);
 
-    assert.commandWorked(db.runCommand({drop: bucketsColl.getName()}));
+    assert.commandFailedWithCode(
+        db.runCommand({drop: bucketsColl.getName()}),
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+    );
 
     assertExistsAndTypeIs(coll, "collection");
     assertDoesntExist(bucketsColl);

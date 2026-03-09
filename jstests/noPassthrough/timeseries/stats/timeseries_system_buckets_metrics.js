@@ -2,6 +2,7 @@
  * Validates metrics.numCommandsTargetingSystemBuckets when issuing commands that
  * target timeseries collections vs directly targeting system.buckets collections.
  *
+ * // TODO SERVER-121176: remove this test once 9.0 becomes last LTS.
  * @tags: [
  *   requires_timeseries,
  * ]
@@ -77,10 +78,19 @@ function testDirectBucketTargeting({name, primaryConn, otherConns}) {
     assertSystemBucketsMetrics(primaryConn, otherConns, 0, `[after regular timeseries ops] (${name})`);
 
     // 2) Directly targeting system.buckets should be counted.
+    // When featureFlagBlockDirectSystemBucketsAccess is enabled, commands are rejected after the metric
+    // is incremented, so the count remains the same regardless of whether the commands succeed.
     coll = testDB.getCollection(getTimeseriesBucketsColl("coll"));
-    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField, metaField}}));
-    assert.commandWorked(coll.insertOne(timeseriesRawDoc));
-    assert(coll.drop());
+    const kBlockedErrorCode = ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace;
+    assert.commandWorkedOrFailedWithCode(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField, metaField}}),
+        kBlockedErrorCode,
+    );
+    assert.commandWorkedOrFailedWithCode(
+        testDB.runCommand({insert: coll.getName(), documents: [timeseriesRawDoc]}),
+        kBlockedErrorCode,
+    );
+    assert.commandWorkedOrFailedWithCode(testDB.runCommand({drop: coll.getName()}), kBlockedErrorCode);
 
     const EXPECTED_DIRECT_BUCKET_COMMANDS = 3; // createCollection + insert + drop
     assertSystemBucketsMetrics(

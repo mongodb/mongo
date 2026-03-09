@@ -1188,5 +1188,7 @@ error_codes:
   # Error code to indicate that replanning the query is required
   - {code: 490, name: ReplanningRequired, extra: ReplanningRequiredInfo}
 
+  - {code: 491, name: CommandNotSupportedOnLegacyTimeseriesBucketsNamespace}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

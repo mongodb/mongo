@@ -299,6 +299,7 @@ tasks:
           resmoke_args: >-
             --runAllFeatureFlagTests
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *antithesis_task_template
     name: antithesis_jstestfuzz_sharded

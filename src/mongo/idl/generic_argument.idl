@@ -396,7 +396,6 @@ structs:
             # This flag must be propagated to shards because mongos lacks FCV awareness,
             # it cannot reliably evaluate whether BlockDirectSystemBucketsAccess is enabled
             # for the current cluster version. Enforcement is therefore delegated to the shards.
-            # TODO SERVER-120237: remove this once 9.0 becomes last LTS.
             isDirectSystemBucketsAccess:
                 type: optionalBool
                 # Even though this field is forwarded to shards, forward_to_shards is set to

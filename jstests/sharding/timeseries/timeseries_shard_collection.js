@@ -431,7 +431,7 @@ assert.commandFailedWithCode(
         shardCollection: `${dbName}.${getTimeseriesBucketsColl(collName)}`,
         key: {time: 1},
     }),
-    5731501,
+    [5731501, ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace],
 );
 
 st.stop();

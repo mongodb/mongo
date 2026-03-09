@@ -65,7 +65,6 @@ structs:
                     collection type that stores its data in a different format from that
                     in which users interact with, this means that the command will operate
                     directly on the format in which it is stored."
-            # TODO SERVER-120237 remove this once 9.0 becomes last LTS.
             isDirectSystemBucketsAccess:
                 type: optionalBool
                 description:

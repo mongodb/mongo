@@ -1927,6 +1927,7 @@ tasks:
           # TODO(SERVER-119866): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard_gen
@@ -2423,6 +2424,7 @@ tasks:
           # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough_gen
@@ -2448,6 +2450,7 @@ tasks:
           # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
@@ -2473,6 +2476,7 @@ tasks:
           # Requires legacy timeseries (system.buckets) even in all feature flags variants
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: sharding_jscore_passthrough_with_dynamic_execution_control_gen
@@ -2679,6 +2683,7 @@ tasks:
           # Requires legacy timeseries (system.buckets) even in all feature flags variants
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   # TODO(SERVER-108818): Remove this temporary suite.
   - <<: *gen_task_template
@@ -2710,6 +2715,7 @@ tasks:
           # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_retryable_writes_gen
@@ -2740,6 +2746,7 @@ tasks:
           # TODO(SERVER-109882): Enable viewless timeseries in upgrade/downgrade suites
           resmoke_args: >-
             --disableFeatureFlags=featureFlagCreateViewlessTimeseriesCollections
+            --disableFeatureFlags=featureFlagBlockDirectSystemBucketsAccess
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes_gen

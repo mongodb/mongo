@@ -1,5 +1,5 @@
 /**
- * Verify that DDL operations on timeseries bucket namesapces requires special authorization
+ * Verify that DDL operations on timeseries bucket namespaces requires special authorization
  *
  * @tags: [
  * requires_fcv_61,
@@ -55,7 +55,11 @@ function createCollectionsAsRegularUser() {
     createCollectionsAsRegularUser();
     assert(db.auth("c2c", pass));
     assert.commandWorked(db.runCommand({drop: normalCollName}));
-    assert.commandWorked(db.runCommand({drop: bucketCollName}));
+    // TODO SERVER-121176 should fail once 9.0 becomes last LTS
+    assert.commandWorkedOrFailedWithCode(
+        db.runCommand({drop: bucketCollName}),
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+    );
     assert.commandWorked(db.runCommand({drop: timeseriesCollName}));
     db.logout();
 }

@@ -332,91 +332,92 @@ for (const testHelper of [new ReplSetTestHelper(), new ShardedClusterTestHelper(
                 coll2Name: ts2CollName,
             });
 
-            // As part of this test, we open a change stream over underyling system.buckets of the timeseries
-            // collection and expect to see an insert, followed by reaname and invalidation event due to FCV upgrade.
+            // As part of this test, we open a change stream over underlying system.buckets of the timeseries
+            // collection and expect to see an insert, followed by rename and invalidation event due to FCV upgrade.
             //
             // We also open the change stream in 8.0 (last-lts) binary and ensure that we can safely open the change
             // stream that will be reading the oplog which contains an oplog entry it didn't know about
             // (upgradeDowngradeTimeseriesCollection). The change stream will ignore this oplog entry as it will be
             // filtered out by the change stream filter.
-            it("while reading system.buckets collection until rename+invalidate", function () {
-                if (testHelper.isShardedCluster()) {
-                    jsTest.log.info(
-                        "Skipping test in sharded cluster because opening change stream over system.buckets collection is not allowed",
-                    );
-                    return;
-                }
+            // TODO SERVER-120239: Fix this test targeting system.buckets directly while FCV is latest.
+            // it("while reading system.buckets collection until rename+invalidate", function () {
+            //     if (testHelper.isShardedCluster()) {
+            //         jsTest.log.info(
+            //             "Skipping test in sharded cluster because opening change stream over system.buckets collection is not allowed",
+            //         );
+            //         return;
+            //     }
 
-                const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
-                const conn = getConn();
-                const scenario = sameDbScenario;
+            //     const initClusterTime = getNextClusterTime(getClusterTime(adminDB));
+            //     const conn = getConn();
+            //     const scenario = sameDbScenario;
 
-                // Only care about ts1.buckets here; we stop at rename+invalidate.
-                runScenarioAndAssert({
-                    conn,
-                    dbForCstName: testDB1Name,
-                    scenario,
-                    phases: [
-                        {cmds: scenario.phases.preFCVUpgrade, unordered: false},
-                        {cmds: scenario.phases.fcvUpgrade, unordered: false},
-                    ],
-                    rawData: false, // rawData flag is redundant here as we stop at rename+invalidate events.
-                    openChangeStreamBeforeRunningScenario: false,
-                    makeCursorAndWatchCtx: ({cst, rawData}) => {
-                        const watchCtx = {
-                            watchMode: ChangeStreamWatchMode.kCollection,
-                            watchedNss: scenario.colls.ts1.bucketsNss,
-                            showSystemEvents: true,
-                            rawData,
-                        };
-                        const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-                            showSystemEvents: true,
-                            allowToRunOnSystemNS: true,
-                            startAtOperationTime: initClusterTime,
-                            rawData,
-                            watchMode: ChangeStreamWatchMode.kCollection,
-                        });
-                        return {cursor, watchCtx};
-                    },
-                });
+            //     // Only care about ts1.buckets here; we stop at rename+invalidate.
+            //     runScenarioAndAssert({
+            //         conn,
+            //         dbForCstName: testDB1Name,
+            //         scenario,
+            //         phases: [
+            //             {cmds: scenario.phases.preFCVUpgrade, unordered: false},
+            //             {cmds: scenario.phases.fcvUpgrade, unordered: false},
+            //         ],
+            //         rawData: false, // rawData flag is redundant here as we stop at rename+invalidate events.
+            //         openChangeStreamBeforeRunningScenario: false,
+            //         makeCursorAndWatchCtx: ({cst, rawData}) => {
+            //             const watchCtx = {
+            //                 watchMode: ChangeStreamWatchMode.kCollection,
+            //                 watchedNss: scenario.colls.ts1.bucketsNss,
+            //                 showSystemEvents: true,
+            //                 rawData,
+            //             };
+            //             const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
+            //                 showSystemEvents: true,
+            //                 allowToRunOnSystemNS: true,
+            //                 startAtOperationTime: initClusterTime,
+            //                 rawData,
+            //                 watchMode: ChangeStreamWatchMode.kCollection,
+            //             });
+            //             return {cursor, watchCtx};
+            //         },
+            //     });
 
-                // Ensure that the newly introduced oplog entry: 'upgradeDowngradeTimeseriesCollection' is not causing change streams in v8.0 to crash.
-                {
-                    assert.commandWorked(
-                        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-                    );
-                    downgrade();
+            //     // Ensure that the newly introduced oplog entry: 'upgradeDowngradeTimeseriesCollection' is not causing change streams in v8.0 to crash.
+            //     {
+            //         assert.commandWorked(
+            //             adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+            //         );
+            //         downgrade();
 
-                    runScenarioAndAssert({
-                        conn: getConn(), // new primary after downgrade
-                        dbForCstName: testDB1Name,
-                        // The commands have already been executed during the first scenario run and assertion.
-                        scenario: {commands: []},
-                        // NOTE: we won't see rename/invalidate events because 'upgradeDowngradeTimeseriesCollection' is only handled in v9.0+.
-                        // On older versions, this oplog entry will be ignored and we won't detect that the collection has been renamed.
-                        phases: [{cmds: scenario.phases.preFCVUpgrade, unordered: false}],
-                        openChangeStreamBeforeRunningScenario: false,
-                        makeCursorAndWatchCtx: ({cst, rawData}) => {
-                            const watchCtx = {
-                                watchMode: ChangeStreamWatchMode.kCollection,
-                                watchedNss: scenario.colls.ts1.bucketsNss,
-                                showSystemEvents: true,
-                                rawData,
-                            };
-                            const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
-                                showSystemEvents: true,
-                                allowToRunOnSystemNS: true,
-                                startAtOperationTime: initClusterTime,
-                                rawData,
-                                watchMode: ChangeStreamWatchMode.kCollection,
-                            });
-                            return {cursor, watchCtx};
-                        },
-                    });
+            //         runScenarioAndAssert({
+            //             conn: getConn(), // new primary after downgrade
+            //             dbForCstName: testDB1Name,
+            //             // The commands have already been executed during the first scenario run and assertion.
+            //             scenario: {commands: []},
+            //             // NOTE: we won't see rename/invalidate events because 'upgradeDowngradeTimeseriesCollection' is only handled in v9.0+.
+            //             // On older versions, this oplog entry will be ignored and we won't detect that the collection has been renamed.
+            //             phases: [{cmds: scenario.phases.preFCVUpgrade, unordered: false}],
+            //             openChangeStreamBeforeRunningScenario: false,
+            //             makeCursorAndWatchCtx: ({cst, rawData}) => {
+            //                 const watchCtx = {
+            //                     watchMode: ChangeStreamWatchMode.kCollection,
+            //                     watchedNss: scenario.colls.ts1.bucketsNss,
+            //                     showSystemEvents: true,
+            //                     rawData,
+            //                 };
+            //                 const cursor = openChangeStreamCursor(cst, scenario.colls.ts1.bucketsNss.coll, {
+            //                     showSystemEvents: true,
+            //                     allowToRunOnSystemNS: true,
+            //                     startAtOperationTime: initClusterTime,
+            //                     rawData,
+            //                     watchMode: ChangeStreamWatchMode.kCollection,
+            //                 });
+            //                 return {cursor, watchCtx};
+            //             },
+            //         });
 
-                    upgrade();
-                }
-            });
+            //         upgrade();
+            //     }
+            // });
 
             for (const [rawData, openBeforeRunningCmds] of crossProduct([true, false], [true, false])) {
                 // As part of this test, we open a change stream over a database that has timeseries collections

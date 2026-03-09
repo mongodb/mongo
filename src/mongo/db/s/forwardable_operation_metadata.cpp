@@ -90,7 +90,6 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
 
     setRawData(isRawDataOperation(opCtx));
 
-    // TODO: SERVER-120237 Remove this once 9.0 becomes last LTS.
     setIsDirectSystemBucketsAccess(isDirectSystemBucketsAccess(opCtx));
 
     if (auto telemetryCtx =
@@ -124,7 +123,6 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     isRawDataOperation(opCtx) = getRawData();
 
-    // TODO: SERVER-120237 Remove this once 9.0 becomes last LTS.
     isDirectSystemBucketsAccess(opCtx) = getIsDirectSystemBucketsAccess();
 
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;

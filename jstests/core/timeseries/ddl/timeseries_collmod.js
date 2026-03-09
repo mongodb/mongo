@@ -129,10 +129,12 @@ assert.commandFailedWithCode(
     db.runCommand({"collMod": getTimeseriesBucketsColl(collName), "timeseries": {"granularity": "hours"}}),
     [
         ErrorCodes.InvalidNamespace,
+        // When viewless timeseries are enabled, any request targeting system.buckets directly is rejected.
+        ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
         // Error code thrown by collmod coordinator.
         //
         // TODO SERVER-105548 remove the following error code once 9.0 becomes last LTS
-        // Currently needded for multiversion compability. Since 8.2 we throw InvalidNamespace also
+        // Currently needed for multiversion compatibility. Since 8.2 we throw InvalidNamespace also
         // on sharded clusters.
         6201808,
     ],

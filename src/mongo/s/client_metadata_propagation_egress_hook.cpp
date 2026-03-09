@@ -67,7 +67,6 @@ Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContex
             metadataBob->append(kRawDataFieldName, true);
         }
 
-        // TODO: SERVER-120237 remove this once 9.0 becomes last LTS.
         if (isDirectSystemBucketsAccess(opCtx)) {
             metadataBob->append(kIsDirectSystemBucketsAccessFieldName, true);
         }

@@ -46,7 +46,6 @@ constexpr inline auto kIsDirectSystemBucketsAccessFieldName = "isDirectSystemBuc
  * actual FCV, so it cannot reliably determine whether BlockDirectSystemBucketsAccess is enabled
  * for the current cluster version.
  *
- * TODO SERVER-120237: Remove this file once 9.0 becomes last LTS.
  */
 bool& isDirectSystemBucketsAccess(OperationContext*);
 

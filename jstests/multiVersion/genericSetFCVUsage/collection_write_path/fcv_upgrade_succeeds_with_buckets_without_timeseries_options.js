@@ -38,8 +38,10 @@ function testUpgradeFromFCV(conn, fromFCV) {
     // Upgrade succeeds even though we have an invalid bucket collection
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
-    assert.eq(1, db[bucketCollName].countDocuments({}));
-    db[bucketCollName].drop();
+    // verify collection still exists after upgrade
+    assert.eq(1, db.getCollectionInfos({name: bucketCollName}).length);
+
+    db.dropDatabase();
 }
 
 function testAllTopologies(fromFCV) {

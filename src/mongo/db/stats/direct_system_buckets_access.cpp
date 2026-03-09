@@ -29,8 +29,6 @@
 
 #include "mongo/db/stats/direct_system_buckets_access.h"
 
-// TODO SERVER-120237 : Remove this file once 9.0 becomes last LTS.
-
 namespace mongo {
 namespace {
 const auto directSystemBucketsAccess = OperationContext::declareDecoration<bool>();

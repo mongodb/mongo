@@ -153,6 +153,13 @@ feature_flags:
         cpp_varname: gFeatureFlagViewlessTimeseriesUpgradeDowngradeRetriableError
         default: false
         fcv_gated: false
+    featureFlagBlockDirectSystemBucketsAccess:
+        description: >-
+            When enabled, external operations directly targeting legacy timeseries
+            system.buckets collections will fail with an error.
+        cpp_varname: gFeatureFlagBlockDirectSystemBucketsAccess
+        default: false
+        fcv_gated: true
     featureFlagCreateViewlessTimeseriesCollections:
         description: >-
             Enables the creation of viewless timeseries collections.
@@ -280,3 +287,16 @@ feature_flags:
         cpp_varname: gFeatureFlagESEKeystoreV2
         default: false
         fcv_gated: true
+
+server_parameters:
+    allowDirectSystemBucketsAccess:
+        description: >-
+            When set to true, bypasses the featureFlagBlockDirectSystemBucketsAccess check,
+            allowing direct operations on legacy timeseries system.buckets namespaces
+            even when the feature flag is enabled. This parameter is intended as an
+            emergency escape hatch.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: allowDirectSystemBucketsAccess
+        default: false
+        redact: false
