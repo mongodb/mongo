@@ -249,7 +249,7 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
                     Object.fromEntries([
                         ["setParameter", 1],
                         ...Object.entries(paramsToRestore)
-                            .filter(([k, _]) => k != "ok")
+                            .filter(([k, _]) => !["ok", "operationTime"].includes(k))
                             .map(([param, value]) => [param, typeof value === "string" ? value : value["value"]]),
                     ]),
                 ),

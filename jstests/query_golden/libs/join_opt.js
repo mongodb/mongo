@@ -69,6 +69,7 @@ export function joinTestWrapper(testFun) {
         }),
     );
     delete params.ok;
+    delete params.operationTime;
 
     try {
         testFun();

@@ -192,6 +192,8 @@ buildvariants:
       - name: .requires_extra_system_deps .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - amazon2023-arm64-latest-m8g-4xlarge
+      - name: query_golden_disagg_gen
+      - name: query_golden_sharding_disagg_gen
       - name: streams_build_only_gen
       # TODO (SERVER-120830): Reenable suite with only passing tests.
       # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
