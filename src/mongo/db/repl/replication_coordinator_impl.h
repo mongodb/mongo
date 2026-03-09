@@ -475,7 +475,7 @@ public:
 
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
-    Status stepUpIfEligible(bool skipDryRun) override;
+    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) override;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) override;
 

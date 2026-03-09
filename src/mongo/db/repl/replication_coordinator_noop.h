@@ -334,7 +334,7 @@ public:
 
     Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const final;
 
-    Status stepUpIfEligible(bool skipDryRun) final;
+    Status stepUpIfEligible(OperationContext* opCtx, bool skipDryRun) final;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) final;
 

@@ -791,7 +791,7 @@ public:
         LOGV2(21581, "Received replSetStepUp request");
 
         const bool skipDryRun = cmdObj["skipDryRun"].trueValue();
-        status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible(skipDryRun);
+        status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible(opCtx, skipDryRun);
 
         if (!status.isOK()) {
             LOGV2(21582, "replSetStepUp request failed", "error"_attr = causedBy(status));
