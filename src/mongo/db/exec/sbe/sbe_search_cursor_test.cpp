@@ -117,9 +117,11 @@ std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(OperationCo
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load(),
                                              /*batchSize*/ boost::none,
                                              /*preFetchNextBatch*/ false);
+    // When pinning is enabled, TaskExecutorCursor requires both executor and underlying executor;
+    // tests use the same executor for both since there is no real connection to pin.
     return std::make_unique<executor::TaskExecutorCursor>(
         testExecutor,
-        nullptr /* underlyingExec */,
+        testExecutor /* underlyingExec: same as executor in tests */,
         CursorResponse{NamespaceString::kEmpty, cursorId, batchVec},
         req,
         std::move(opts));

@@ -31,13 +31,11 @@
 #include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/executor/pinned_connection_task_executor_registry.h"
 #include "mongo/executor/task_executor_cursor_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -771,6 +769,143 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, MultipleCursorsCancellati
     // For good measure, run this test in non-pinned mode as well. This test was motivated by
     // SERVER-93583, which exposed a bug in pinning mode, but should pass in both modes.
     CancelTECWhileSharedPCTEInUse();
+}
+
+/**
+ * Tests that we make sure to destroy the PinnedConnectionTaskExecutor (PCTE) before shutting down
+ * the underlying executor, avoiding invariants from shutting down an executor with in-flight work.
+ */
+TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture,
+       PinnedCursorDrainedBeforeUnderlyingShutdownSucceeds) {
+    const auto aggCmd =
+        BSON("aggregate" << "test"
+                         << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << false)));
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             aggCmd,
+                             opCtx.get());
+    TaskExecutorCursorOptions options(
+        /*pinConnection=*/true, /*batchSize=*/boost::none, /*preFetchNextBatch=*/true);
+    auto tec = std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
+    // Do not schedule a response: leave the initial command in flight so a callback is pending.
+
+    executor::shutdownPinnedExecutors(opCtx->getServiceContext(), getExecutorPtr());
+    getExecutorPtr()->shutdown();
+    getExecutorPtr()->join();
+    // Cursor destroyed after PCTE was drained; no invariant.
+    ASSERT_NO_THROW(tec.reset());
+}
+
+/**
+ * Same as PinnedCursorDrainedBeforeUnderlyingShutdownSucceeds, but we keep an additional cursor
+ * (from the second TEC constructor) alive after destroying the parent. Verifies that the additional
+ * cursor's PCTE is drained before we shut down the underlying executor.
+ */
+TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture,
+       AdditionalPinnedCursorDrainedBeforeUnderlyingShutdownSucceeds) {
+    const auto aggCmd =
+        BSON("aggregate" << "test"
+                         << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+    std::vector<size_t> cursorIds{1, 2};
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             aggCmd,
+                             opCtx.get());
+    std::unique_ptr<TaskExecutorCursor> additionalCursor;
+    {
+        auto tec = makeTec(rcr, /*batchSize=*/boost::none, /*preFetchNextBatch=*/false);
+        ASSERT_BSONOBJ_EQ(aggCmd,
+                          scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, cursorIds));
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
+        ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
+        auto cursorVec = tec->releaseAdditionalCursors();
+        ASSERT_EQUALS(cursorVec.size(), 1u);
+        additionalCursor = std::move(cursorVec[0]);
+    }
+    // Additional cursor (from second constructor) prefetches with default options; satisfy that
+    // getMore(2) first, then the killCursors(1) from the parent destructor.
+    ASSERT_BSONOBJ_EQ(BSON("getMore" << 2LL << "collection"
+                                     << "test"),
+                      scheduleSuccessfulCursorResponse("nextBatch", 2, 4, cursorIds[1]));
+    ASSERT_BSONOBJ_EQ(BSON("killCursors" << "test"
+                                         << "cursors" << BSON_ARRAY((int)cursorIds[0])),
+                      scheduleSuccessfulKillCursorResponse(cursorIds[0]));
+    // Trigger another getMore on the additional cursor and leave it in flight (no response).
+    ServiceContext* svc = opCtx->getServiceContext();
+    TaskExecutorCursor* additionalCursorPtr = additionalCursor.get();
+    stdx::thread getNextThread([svc, additionalCursorPtr]() {
+        auto client = svc->getService()->makeClient("AdditionalCursorGetNextThread");
+        auto threadOpCtx = client->makeOperationContext();
+        try {
+            // Consume batch then schedule getMore and block; will complete when we drain the
+            // PCTE or underlying shuts down.
+            while (additionalCursorPtr->getNext(threadOpCtx.get())) {
+            }
+        } catch (...) {
+            // Expected when we shutdown (InterruptedAtShutdown, CallbackCanceled, etc.).
+        }
+    });
+    ASSERT_TRUE(tryWaitUntilReadyRequests()) << "getMore should be in flight";
+
+    executor::shutdownPinnedExecutors(svc, getExecutorPtr());
+    getExecutorPtr()->shutdown();
+    getExecutorPtr()->join();
+    getNextThread.join();
+    ASSERT_NO_THROW(additionalCursor.reset());
+}
+
+/**
+ * Tests that after moving a pinned cursor, the PCTE remains in the registry so we can drain it
+ * before shutting down the underlying executor.
+ */
+TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture,
+       MovePinnedCursorThenCorrectShutdownOrderSucceeds) {
+    const auto aggCmd =
+        BSON("aggregate" << "test"
+                         << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << false)));
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             aggCmd,
+                             opCtx.get());
+    TaskExecutorCursorOptions options(
+        /*pinConnection=*/true, /*batchSize=*/boost::none, /*preFetchNextBatch=*/true);
+    auto tec = std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
+    // Do not schedule a response: leave the initial command in flight so a callback is pending.
+
+    auto movedCursor = std::make_unique<TaskExecutorCursor>(std::move(*tec));
+    tec.reset();
+
+    executor::shutdownPinnedExecutors(opCtx->getServiceContext(), getExecutorPtr());
+    getExecutorPtr()->shutdown();
+    getExecutorPtr()->join();
+    ASSERT_NO_THROW(movedCursor.reset());
+}
+
+/**
+ * Same as MovePinnedCursorThenCorrectShutdownOrderSucceeds, but we complete the initial command
+ * first so there is no callback in flight. Verifies that move + correct shutdown order succeeds.
+ */
+TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture, MovePinnedCursorThenShutdownSucceeds) {
+    const auto aggCmd =
+        BSON("aggregate" << "test"
+                         << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << false)));
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                             aggCmd,
+                             opCtx.get());
+    TaskExecutorCursorOptions options(
+        /*pinConnection=*/true, /*batchSize=*/boost::none, /*preFetchNextBatch=*/true);
+    auto tec = std::make_unique<TaskExecutorCursor>(getExecutorPtr(), rcr, std::move(options));
+    ASSERT_BSONOBJ_EQ(aggCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 2, 0));
+    ASSERT_TRUE(tec->getNext(opCtx.get()));  // Consume so initial command is done.
+
+    auto movedCursor = std::make_unique<TaskExecutorCursor>(std::move(*tec));
+    tec.reset();
+
+    executor::shutdownPinnedExecutors(opCtx->getServiceContext(), getExecutorPtr());
+    getExecutorPtr()->shutdown();
+    getExecutorPtr()->join();
+    ASSERT_NO_THROW(movedCursor.reset());
 }
 
 }  // namespace

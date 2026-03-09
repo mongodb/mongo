@@ -94,6 +94,18 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
       _batchIter(_batch.end()) {
 
     tassert(6253101, "rcr must have an opCtx to use construct cursor from response", rcr.opCtx);
+    if (_options.pinConnection) {
+        tassert(
+            12080500,
+            "TaskExecutorCursor in pinning mode must have an executor and an underlying executor",
+            _executor != nullptr && _underlyingExecutor != nullptr);
+        // It's possible we're registering a new token for an already registered underlying
+        // executor. That's fine since shutdown() and join() are idempotent, so having the same PCTE
+        // (or underlying executor) drained multiple times is safe.
+        _pcteToken = std::make_unique<PinnedExecutorRegistryToken>(
+            rcr.opCtx->getServiceContext(), _executor, _underlyingExecutor);
+    }
+
     _lsid = rcr.opCtx->getLogicalSessionId();
     _processResponse(rcr.opCtx, std::move(response));
 }
@@ -101,6 +113,7 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
 TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other) noexcept
     : _executor(std::move(other._executor)),
       _underlyingExecutor(std::move(other._underlyingExecutor)),
+      _pcteToken(std::move(other._pcteToken)),
       _rcr(other._rcr),  // NOLINT
       _options(std::move(other._options)),
       _lsid(other._lsid),  // NOLINT
@@ -168,8 +181,9 @@ TaskExecutorCursor::~TaskExecutorCursor() {
         TaskExecutor::RemoteCommandCallbackFn callbackToRun = [](const auto&) {
         };
         if (_options.pinConnection) {
-            invariant(_underlyingExecutor,
-                      "TaskExecutorCursor in pinning mode must have an underlying executor");
+            tassert(12080501,
+                    "TaskExecutorCursor in pinning mode must have an underlying executor",
+                    _underlyingExecutor != nullptr);
             callbackToRun = [main = _executor, underlying = _underlyingExecutor](const auto&) {
                 underlying->schedule([main = std::move(main)](const auto&) {
                     if (MONGO_unlikely(
