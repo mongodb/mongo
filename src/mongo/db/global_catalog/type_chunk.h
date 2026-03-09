@@ -169,6 +169,17 @@ public:
                                                      const Timestamp& timestamp);
 
     /**
+     * A helper method for using this class with PersistentTaskStore that returns an otherwise
+     * invalid ChunkType object without the proper chunk version set. It is the caller's
+     * responsibility to ensure the ChunkVersion is fixed afterwards.
+     *
+     * TODO SERVER-121075: See if this can be removed.
+     */
+    MONGO_MOD_PRIVATE static ChunkType parse(const BSONObj& source, const IDLParserContext& ctxt) {
+        return uassertStatusOK(parseFromConfigBSON(source, OID(), Timestamp()));
+    }
+
+    /**
      * Constructs a new ChunkType object from BSON with the following format:
      * {_id: <>, max: <>, shard: <>, history: <>, lastmod: <>, onCurrentShardSince: <>}
      * Also does validation of the contents.

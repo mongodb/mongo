@@ -41,10 +41,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/waiter_list.h"
 #include "mongo/util/decorable.h"
@@ -189,6 +189,8 @@ public:
      */
     void setFilteringMetadata_nonAuthoritative(OperationContext* opCtx,
                                                CollectionMetadata newMetadata);
+    void setFilteringMetadata_authoritative(OperationContext* opCtx,
+                                            CollectionMetadata newMetadata);
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
@@ -200,11 +202,13 @@ public:
      * setFilteringMetadata which requires exclusive).
      */
     void clearFilteringMetadata_nonAuthoritative(OperationContext* opCtx);
+    void clearFilteringMetadata_authoritative(OperationContext* opCtx);
 
     /**
      * Calls to clearFilteringMetadata + clears the _metadataManager object.
      */
     void clearFilteringMetadataForDroppedCollection_nonAuthoritative(OperationContext* opCtx);
+    void clearFilteringMetadataForDroppedCollection_authoritative(OperationContext* opCtx);
 
     /**
      * Methods to control the collection's critical section. Methods listed below must be called
@@ -355,6 +359,11 @@ private:
      * Auxiliary function used to implement the different flavours of clearFilteringMetadata.
      */
     void _clearFilteringMetadata(OperationContext* opCtx, bool collIsDropped);
+
+    /**
+     * Auxiliary function used to implement the various setFilteringMetadata flavours.
+     */
+    void _setFilteringMetadata(OperationContext* opCtx, CollectionMetadata collMetatada);
 
     /**
      * This function cleans up some state associated with the current sharded metadata before it's

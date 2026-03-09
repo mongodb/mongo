@@ -30,14 +30,11 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -57,7 +54,6 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -379,8 +375,8 @@ boost::optional<CriticalSectionSignal> CollectionShardingRuntime::getCriticalSec
     return {};
 }
 
-void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
-    OperationContext* opCtx, CollectionMetadata newMetadata) {
+void CollectionShardingRuntime::_setFilteringMetadata(OperationContext* opCtx,
+                                                      CollectionMetadata newMetadata) {
     tassert(7032302,
             str::stream() << "Namespace " << _nss.toStringForErrorMsg()
                           << " must never have a routing table.",
@@ -426,21 +422,28 @@ void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
         auto result = waitingVersion <=> newChunkVersion;
         return result == std::partial_ordering::less;
     });
-    // We reset the state on whether we are authoritative or not and delegate it to the parent
-    // caller on whether the CSS is now authoritative.
+}
+
+void CollectionShardingRuntime::setFilteringMetadata_nonAuthoritative(
+    OperationContext* opCtx, CollectionMetadata newMetadata) {
+    _setFilteringMetadata(opCtx, std::move(newMetadata));
     _authoritativeState = AuthoritativeState::kNonAuthoritative;
+}
+
+void CollectionShardingRuntime::setFilteringMetadata_authoritative(OperationContext* opCtx,
+                                                                   CollectionMetadata newMetadata) {
+    _setFilteringMetadata(opCtx, std::move(newMetadata));
+    _authoritativeState = AuthoritativeState::kAuthoritative;
 }
 
 void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
                                                         bool collIsDropped) {
-    _authoritativeState = AuthoritativeState::kNonAuthoritative;
-
     if (_placementVersionInRecoverOrRefresh) {
         _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
 
     if (_nss.isNamespaceAlwaysUntracked()) {
-        // The namespace is always marked as untraked thus there is no need to clear anything.
+        // The namespace is always marked as untracked thus there is no need to clear anything.
         return;
     }
 
@@ -461,11 +464,24 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
 
 void CollectionShardingRuntime::clearFilteringMetadata_nonAuthoritative(OperationContext* opCtx) {
     _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
+    _authoritativeState = AuthoritativeState::kNonAuthoritative;
 }
 
 void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection_nonAuthoritative(
     OperationContext* opCtx) {
     _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
+    _authoritativeState = AuthoritativeState::kNonAuthoritative;
+}
+
+void CollectionShardingRuntime::clearFilteringMetadata_authoritative(OperationContext* opCtx) {
+    _clearFilteringMetadata(opCtx, /* collIsDropped */ false);
+    _authoritativeState = AuthoritativeState::kAuthoritative;
+}
+
+void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection_authoritative(
+    OperationContext* opCtx) {
+    _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
+    _authoritativeState = AuthoritativeState::kAuthoritative;
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
