@@ -960,14 +960,12 @@ Status validate(OperationContext* opCtx,
 
         const FastCountType fastCountType = validateState.getDetectedFastCountType(opCtx);
         results->setFastCountType({fastCountType});
-        if (validateState.enforceFastCountRequested() || validateState.enforceFastSizeRequested()) {
-            if (fastCountType == FastCountType::both) {
-                LOGV2_ERROR(ErrorCodes::InvalidOptions, "Both FastCount tables found");
-                results->addError("Both FastCount tables found", false);
-            } else if (fastCountType == FastCountType::neither) {
-                LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
-                results->addError("Neither FastCount table found", false);
-            }
+
+        const bool shouldEnforceFastCountOrSize =
+            validateState.enforceFastCountRequested() || validateState.enforceFastSizeRequested();
+        if (shouldEnforceFastCountOrSize && fastCountType == FastCountType::neither) {
+            LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
+            results->addError("Neither FastCount table found", false);
         }
 
         _validateCatalogEntry(opCtx, &validateState, results);

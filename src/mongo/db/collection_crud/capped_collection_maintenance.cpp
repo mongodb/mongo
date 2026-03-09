@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -206,9 +207,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         serviceOpCounters(opCtx).gotDelete();
     }
 
-    if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (isReplicatedFastCountEnabled(opCtx)) {
         UncommittedFastCountChange::getForWrite(opCtx).record(
             collection->uuid(), -docsRemoved, -sizeSaved);
     }

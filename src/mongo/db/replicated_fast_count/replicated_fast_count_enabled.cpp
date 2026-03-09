@@ -40,7 +40,7 @@ bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
     // TODO(SERVER-117326): Remove feature flag check.
     return gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
                VersionContext::getDecoration(opCtx),
-               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         rss::ReplicatedStorageService::get(opCtx)
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount();

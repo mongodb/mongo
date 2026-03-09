@@ -5,14 +5,12 @@
  * @tags: [
  *   requires_replication,
  *   requires_wiredtiger,
- *   # TODO SERVER-120515: Re-enable this test because the size storer can coexist with the
- *   # replicated fast count collection.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
 import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const replTest = new ReplSetTest({nodes: 1});
 replTest.startSet();
@@ -55,7 +53,11 @@ primary = replTest.getPrimary();
 const collIdent = getUriForColl(coll());
 const indexIdent = getUriForIndex(coll(), "_id_");
 
-assert.eq(coll().count(), 1);
+// TODO SERVER-120753: Re-enable this test when replicated fast count is correctly persisted on step
+// down.
+if (!FeatureFlagUtil.isPresentAndEnabled(primary, "featureFlagReplicatedFastCount")) {
+    assert.eq(coll().count(), 1);
+}
 assert(coll().drop());
 assert.commandWorked(primary.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
 assert.commandWorked(primary.adminCommand({fsync: 1}));

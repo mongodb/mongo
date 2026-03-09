@@ -4,8 +4,8 @@
  */
 
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const internalFastCountCollectionName = "fast_count_metadata_store";
 const collName = jsTestName() + "_coll";
 
 function initializeMongod(ctx) {
@@ -22,43 +22,20 @@ describe("FastCount validation", function () {
         initializeMongod(this);
     });
 
-    it("detects legacy WiredTiger size storer table", function () {
-        for (const flag of [
+    it("detects correct FastCountType", function () {
+        const enforceFlagCombinations = [
+            {enforceFastCount: false, enforceFastSize: false},
             {enforceFastCount: true},
             {enforceFastSize: true},
             {enforceFastCount: true, enforceFastSize: true},
-        ]) {
+        ];
+        const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(this.db, "featureFlagReplicatedFastCount");
+        const expectedFastCountType = featureFlagEnabled ? "both" : "legacySizeStorer";
+
+        for (const flag of enforceFlagCombinations) {
             const result = assert.commandWorked(this.db.runCommand(Object.assign({validate: collName}, flag)));
             assert(result.valid, result);
-            assert(result.fastCountType == "legacySizeStorer", result);
-        }
-    });
-
-    afterEach(function () {
-        MongoRunner.stopMongod(this.conn);
-    });
-});
-
-describe("FastCount validation without shutdown validation", function () {
-    beforeEach(function () {
-        initializeMongod(this);
-    });
-
-    it("detects both after creating replicated collection", function () {
-        assert.commandWorked(this.configDb.createCollection(internalFastCountCollectionName));
-
-        const resultWithoutEnforce = assert.commandWorked(this.db.runCommand({validate: collName}));
-        assert(resultWithoutEnforce.valid, resultWithoutEnforce);
-        assert(resultWithoutEnforce.fastCountType == "both", resultWithoutEnforce);
-
-        for (const flag of [
-            {enforceFastCount: true},
-            {enforceFastSize: true},
-            {enforceFastCount: true, enforceFastSize: true},
-        ]) {
-            const result = assert.commandWorked(this.db.runCommand(Object.assign({validate: collName}, flag)));
-            assert(!result.valid, result);
-            assert(result.fastCountType == "both", result);
+            assert.eq(result.fastCountType, expectedFastCountType, result);
 
             // The keysPerIndex values are populated by _validateIndexes(), which runs after traverseRecordStore(), so a
             // non-zero key count for the _id index confirms the fast count error did not stop validation early. The
@@ -80,8 +57,6 @@ describe("FastCount validation without shutdown validation", function () {
     // behavior is not tested here.
 
     afterEach(function () {
-        // We must skip validation during shutdown because creating the `fast_count_metadata_store`
-        // causes the shutdown validation result to be invalid.
-        MongoRunner.stopMongod(this.conn, null, {skipValidation: true});
+        MongoRunner.stopMongod(this.conn);
     });
 });

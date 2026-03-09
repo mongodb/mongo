@@ -4,9 +4,6 @@
  *
  * @tags: [
  *   requires_wiredtiger,
- *   # TODO SERVER-120515: Re-enable this test because the size storer can coexist with the
- *   # replicated fast count collection.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
@@ -17,6 +14,7 @@ import {
     getUriForIndex,
     startMongodOnExistingPath,
 } from "jstests/disk/libs/wt_file_helper.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const baseName = "wt_repair_missing_files";
 const collName = "test";
@@ -52,7 +50,10 @@ testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testCollUri, getUriForColl(testColl));
 assert.eq(testColl.find({}).itcount(), 0);
-assert.eq(testColl.count(), 0);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 0);
+}
 
 /**
  * Test 2. Delete an index file. Verify that repair rebuilds and allows MongoDB to start up
@@ -82,7 +83,10 @@ assert.neq(indexUri, getUriForIndex(testColl, indexName));
 
 assertQueryUsesIndex(testColl, doc, indexName);
 assert.eq(testColl.find(doc).itcount(), 1);
-assert.eq(testColl.count(), 1);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 1);
+}
 
 MongoRunner.stopMongod(mongod);
 
@@ -100,7 +104,10 @@ mongod = startMongodOnExistingPath(dbpath);
 testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testColl.find(doc).itcount(), 1);
-assert.eq(testColl.count(), 1);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 1);
+}
 MongoRunner.stopMongod(mongod);
 
 /**
@@ -119,7 +126,10 @@ testColl = mongod.getDB(baseName)[collName];
 assert.isnull(testColl.exists());
 
 assert.eq(testColl.find(doc).itcount(), 0);
-assert.eq(testColl.count(), 0);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 0);
+}
 
 /**
  * Test 5. Verify that using repair with --directoryperdb creates a missing directory and its
@@ -149,7 +159,10 @@ testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testCollUri, getUriForColl(testColl));
 assert.eq(testColl.find({}).itcount(), 0);
-assert.eq(testColl.count(), 0);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 0);
+}
 
 MongoRunner.stopMongod(mongod);
 resetDbpath(dbpath);
@@ -174,6 +187,9 @@ mongod = startMongodOnExistingPath(dbpath);
 testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testColl.find(doc).itcount(), 1);
-assert.eq(testColl.count(), 1);
+// TODO SERVER-117520: Check this is correct after implementing repair.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+    assert.eq(testColl.count(), 1);
+}
 
 MongoRunner.stopMongod(mongod);

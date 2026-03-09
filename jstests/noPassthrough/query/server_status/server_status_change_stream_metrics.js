@@ -57,7 +57,10 @@ function checkOplogMetrics(db, changeStream, previousMetrics, expectedDocsReturn
     assert.gte(newMetrics.document.returned, newMetrics.oplogStats.document.returned);
     assert.gte(newMetrics.queryExecutor.scannedObjects, newMetrics.oplogStats.queryExecutor.scannedObjects);
     assert.eq(expectedDocsReturned, oplogDocsReturned);
-    assert.eq(expectedDocsScanned, oplogDocsScanned);
+    // Since the oplog can be written to in the background (for example, for internal replicated
+    // collections), we can only guarantee that there are *at least* the expected number of
+    // documents scanned.
+    assert.lte(expectedDocsScanned, oplogDocsScanned);
     // Check oplog stats are added to total stats.
     assert.eq(oplogDocsReturned, newMetrics.document.returned - previousMetrics.document.returned);
     assert.eq(oplogDocsScanned, newMetrics.queryExecutor.scannedObjects - previousMetrics.queryExecutor.scannedObjects);

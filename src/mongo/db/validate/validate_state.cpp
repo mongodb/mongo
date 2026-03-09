@@ -35,6 +35,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_registry.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -182,10 +183,7 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx) const {
             // size storer counts for the 'config.image_collection' collection. We therefore do not
             // enforce fast count on it.
             return false;
-        } else if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-                       VersionContext::getDecoration(opCtx),
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                   _nss.isOnInternalDb()) {
+        } else if (isReplicatedFastCountEnabled(opCtx) && _nss.isOnInternalDb()) {
             // SERVER-119984 TODO: Revisit this, enforce if possible.
             return false;
         }

@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
@@ -134,9 +135,7 @@ void Checkpointer::run() {
 
         const Date_t startTime = Date_t::now();
         opCtx->getServiceContext()->getStorageEngine()->checkpoint();
-        if (gFeatureFlagReplicatedFastCount.isEnabledUseLatestFCVWhenUninitialized(
-                VersionContext::getDecoration(opCtx.get()),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (isReplicatedFastCountEnabled(opCtx.get())) {
             ReplicatedFastCountManager::get(opCtx->getServiceContext()).flushAsync();
         }
 

@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1154,9 +1155,7 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
     // Immediately flush the size storer information to disk. When the node is fsync locked for
     // operations such as backup, it's imperative that we copy the most up-to-date data files.
     if (!_sizeStorer) {
-        if (gFeatureFlagReplicatedFastCount.isEnabledUseLastLTSFCVWhenUninitialized(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (isReplicatedFastCountEnabled(opCtx)) {
             // TODO(SERVER-101413): Remove this once checkpointing and recovery is functional.
             ReplicatedFastCountManager::get(opCtx->getServiceContext()).flushAsync();
         }

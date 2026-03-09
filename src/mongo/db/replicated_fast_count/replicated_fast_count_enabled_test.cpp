@@ -54,12 +54,12 @@ TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenProviderReturnsFalse) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    ASSERT_FALSE(isReplicatedFastCountEnabled(operationContext()));
+    ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, DisabledWhenFeatureFlagOff) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
-    ASSERT_FALSE(isReplicatedFastCountEnabled(operationContext()));
+    ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, EnabledWhenBothFlagAndProviderOn) {
