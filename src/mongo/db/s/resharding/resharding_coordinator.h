@@ -469,26 +469,6 @@ private:
         OperationContext* opCtx, boost::optional<Status> abortReason = boost::none);
 
     /**
-     * Sends the command to the specified participants asynchronously.
-     */
-    template <typename CommandType>
-    void _sendCommandToAllParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
-    template <typename CommandType>
-    void _sendCommandToAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                 std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
-    template <typename CommandType>
-    void _sendCommandToAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
-
-    void _sendRecipientCloneCmdToShards(
-        OperationContext* opCtx,
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        ShardsvrReshardRecipientClone cmd,
-        std::set<ShardId> recipientShardIds);
-
-    /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
      * by the time the refresh completes.
      */
@@ -538,7 +518,7 @@ private:
      * Sends '_shardsvrCommitReshardCollection' to all participant shards.
      */
     void _tellAllParticipantsToCommit(
-        const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
      * Sends '_shardsvrAbortReshardCollection' to all participant shards.
