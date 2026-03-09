@@ -370,4 +370,42 @@ TEST_F(OrderedTicketSemaphoreTest, TryAcquireReturnsFalseWhenWaitersQueued) {
     future.get();
     ASSERT_EQ(sem->available(), 0);
 }
+
+/**
+ * Test that operations with lowAdmissions > 0 can bypass the max waiters limit.
+ */
+TEST_F(OrderedTicketSemaphoreTest, LowAdmissionsCanBypassMaxWaitersLimit) {
+    auto sem = makeSemaphore(0, 1);  // 0 tickets, max 1 waiter.
+
+    MockAdmissionContext admCtx1, admCtx2WithLowAdmissions, admCtx3NoLowAdmissions;
+
+    auto future1 = launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtx1, Date_t::max(), true));
+    });
+
+    waitForQueuedThreads(sem, 1);
+    ASSERT_EQ(sem->waiters(), 1);
+
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx3NoLowAdmissions, getDeadline(), true),
+                       DBException,
+                       ErrorCodes::AdmissionQueueOverflow);
+    ASSERT_EQ(sem->waiters(), 1);  // Queue unchanged.
+
+    // An operation with lowAdmissions > 0 should be able to bypass the limit.
+    admCtx2WithLowAdmissions.recordLowAdmission();
+    ASSERT_GT(admCtx2WithLowAdmissions.getLowAdmissions(), 0);
+
+    auto future2 = launchAsync([&]() {
+        auto [client, opCtx] = makeOpCtx();
+        ASSERT_TRUE(sem->acquire(opCtx.get(), &admCtx2WithLowAdmissions, Date_t::max(), true));
+    });
+
+    waitForQueuedThreads(sem, 2);
+    ASSERT_EQ(sem->waiters(), 2);
+
+    sem->resize(2);
+    future1.get();
+    future2.get();
+}
 }  // namespace mongo
