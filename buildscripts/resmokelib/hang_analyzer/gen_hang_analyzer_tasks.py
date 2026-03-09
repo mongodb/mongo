@@ -183,22 +183,7 @@ class CoreAnalysisTaskGenerator(ABC):
         # We hardcode some task names where the core analysis is extending the long pole
         # of required patch builds by 100 mins and the BFs are taking too long to fix.
         # This list is a quick fix to improve development velocity.
-        # TODO(SERVER-118661): Remove disagg suites from skip list.
-        skip_tasks = [
-            "disagg_repl_jscore_passthrough",
-            "disagg_repl_jscore_passthrough_secondary_reads",
-            "disagg_sharded_colls_jscore_passthrough_secondary_reads_with_balancer",
-            "disagg_two_nodes_repl_jscore_passthrough",
-            "no_passthrough_disagg_override",
-            "disagg_concurrency_replication",
-            "disagg_concurrency_replication_multi_stmt_txn",
-            "disagg_concurrency_sharded_replication",
-            "disagg_concurrency_sharded_replication_with_balancer",
-            "disagg_concurrency_sharded_causal_consistency",
-            "disagg_concurrency_sharded_causal_consistency_with_balancer",
-            "disagg_retryable_writes_jscore_passthrough",
-        ]
-
+        skip_tasks = []
         current_task_name = task.display_name
         if task.parent_task_id:
             parent_task = self.evg_api.task_by_id(task.parent_task_id)

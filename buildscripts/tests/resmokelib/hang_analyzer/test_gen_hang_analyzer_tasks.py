@@ -309,23 +309,6 @@ class TestCoreAnalysisTaskGenerator(unittest.TestCase):
             task = variant["tasks"][0]
             self.assertFalse(task["activate"])
 
-    def test_should_skip_task_for_hardcoded_task_names(self):
-        """Test that hardcoded task names are skipped."""
-        with patch(
-            "buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks.read_config_file"
-        ) as mock_read:
-            mock_read.return_value = self.mock_expansions
-            generator = ResmokeCoreAnalysisTaskGenerator(self.expansions_file, use_mock_tasks=True)
-
-            # Test skipped task names
-            for task_name in ["no_passthrough_disagg_override", "disagg_repl_jscore_passthrough"]:
-                mock_task = MagicMock()
-                mock_task.display_name = task_name
-                mock_task.parent_task_id = None
-                mock_task.build_variant = "ubuntu2204"
-
-                self.assertTrue(generator._should_skip_task(mock_task))
-
     def test_should_not_skip_normal_task(self):
         """Test that normal tasks are not skipped."""
         with patch(
