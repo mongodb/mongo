@@ -706,6 +706,103 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                 });
             }
         });
+
+        it("should have populated CBR metrics with automaticCE+fallback when we hit the CBR fallback during replanning", function () {
+            let prevCBRConfig;
+            try {
+                FixtureHelpers.mapOnEachShardNode({
+                    db: testDB.getSiblingDB("admin"),
+                    func: (db) => {
+                        prevCBRConfig = getCBRConfig(db);
+                        assert.commandWorked(
+                            db.adminCommand({
+                                setParameter: 1,
+                                featureFlagCostBasedRanker: true,
+                                internalQueryCBRCEMode: "automaticCE",
+                                automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults",
+                            }),
+                        );
+                    },
+                    primaryNodeOnly: true,
+                });
+
+                // Put a plan into the cache, we expect this query to use multiplanning.
+                const bIndexQuery = {a: {$gte: 1}, b: {$gte: 14500}, c: 1};
+                automaticCEColl.find(bIndexQuery).toArray(); // Insert inactive plan into cache
+                automaticCEColl.find(bIndexQuery).toArray(); // Activate plan
+
+                // Since we used multiplanning, no CBR metrics should be populated.
+                let stats = getQueryStats(conn, {collName: automaticCECollName});
+                assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
+
+                let queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
+                assert(
+                    queryPlannerSection.hasOwnProperty("costBasedRanker"),
+                    `costBasedRanker section should be present even if multiplanning was used ${tojson(queryPlannerSection)}`,
+                );
+                let cbrSection = queryPlannerSection.costBasedRanker;
+
+                assert.eq(cbrSection.cardinalityEstimationMethods, {
+                    Histogram: NumberLong(0),
+                    Sampling: NumberLong(0),
+                    Heuristics: NumberLong(0),
+                    Mixed: NumberLong(0),
+                    Metadata: NumberLong(0),
+                    Code: NumberLong(0),
+                });
+                assert.eq(cbrSection.nDocsSampled.sum, 0);
+
+                // We expect this query (same shape, different constants) to trigger replanning, and hit the CBR fallback.
+                const aIndexQuery = {a: {$gte: 1}, b: {$gte: 2}, c: 1};
+                automaticCEColl.find(aIndexQuery).toArray();
+
+                stats = getQueryStats(conn, {collName: automaticCECollName});
+                assert.eq(1, stats.length, `Expected 1 query stats entry: ${tojson(stats)}`);
+
+                queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
+                assert(
+                    queryPlannerSection.hasOwnProperty("costBasedRanker"),
+                    `costBasedRanker section should be present when CBR is used: ${tojson(queryPlannerSection)}`,
+                );
+                cbrSection = queryPlannerSection.costBasedRanker;
+
+                // TODO SERVER-117707 Remove branch.
+                if (isSbeEnabled) {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(0),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                    assert.eq(cbrSection.nDocsSampled.sum, 0);
+                } else {
+                    assert.eq(cbrSection.cardinalityEstimationMethods, {
+                        Histogram: NumberLong(0),
+                        Sampling: NumberLong(1),
+                        Heuristics: NumberLong(0),
+                        Mixed: NumberLong(0),
+                        Metadata: NumberLong(0),
+                        Code: NumberLong(0),
+                    });
+                    assert.gt(
+                        cbrSection.nDocsSampled.sum,
+                        0,
+                        `nDocsSampled should be positive when CBR is used: ${tojson(cbrSection)}`,
+                    );
+                }
+            } finally {
+                // Reset knobs to defaults on all nodes.
+                FixtureHelpers.mapOnEachShardNode({
+                    db: testDB.getSiblingDB("admin"),
+                    func: (db) => {
+                        restoreCBRConfig(db, prevCBRConfig);
+                    },
+                    primaryNodeOnly: true,
+                });
+            }
+        });
     });
 }
 
