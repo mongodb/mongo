@@ -16,20 +16,29 @@ function runTest(db) {
     const waitTimeMillis = 500;
     const testCases = setupCollectionAndGetExplainTestCases(db, collName, waitTimeMillis);
 
-    function collectOptimizationTimeMillis(explain) {
+    // Recursively search for any optimization time fields.  Because explain now
+    // reports the value in millis, micros and nanos we return an array of objects
+    //  containing both the value and its unit so the caller can compare it appropriately.
+    function collectOptimizationTimes(explain) {
         if (explain === null || typeof explain !== "object") {
             return [];
         }
 
         if (Array.isArray(explain)) {
-            return explain.flatMap(collectOptimizationTimeMillis);
+            return explain.flatMap(collectOptimizationTimes);
         } else {
             let ownResults = [];
             if (explain.hasOwnProperty("optimizationTimeMillis")) {
-                ownResults = [explain.optimizationTimeMillis];
+                ownResults.push({time: explain.optimizationTimeMillis, unit: "millis"});
+            }
+            if (explain.hasOwnProperty("optimizationTimeMicros")) {
+                ownResults.push({time: explain.optimizationTimeMicros, unit: "micros"});
+            }
+            if (explain.hasOwnProperty("optimizationTimeNanos")) {
+                ownResults.push({time: explain.optimizationTimeNanos, unit: "nanos"});
             }
             return Object.keys(explain)
-                .flatMap((key) => collectOptimizationTimeMillis(explain[key]))
+                .flatMap((key) => collectOptimizationTimes(explain[key]))
                 .concat(ownResults);
         }
     }
@@ -40,10 +49,19 @@ function runTest(db) {
         runWithFailpoint(db, testCase.failpointName, testCase.failpointOpts, () => {
             const explain = assert.commandWorked(db.runCommand(testCase.command));
 
-            // Assert the optimizationTimeMillis field is reported in explain as expected.
-            const optimizationTimeMillis = collectOptimizationTimeMillis(explain);
-            optimizationTimeMillis.forEach((time) => assert.gte(time, waitTimeMillis, explain));
-            assert.gt(optimizationTimeMillis.length, 0, explain);
+            // Assert that at least one optimization time field is reported and that it
+            // reflects the injected delay.  Convert the threshold based on the unit.
+            const optimizationTimes = collectOptimizationTimes(explain);
+            optimizationTimes.forEach(({time, unit}) => {
+                if (unit === "micros") {
+                    assert.gte(time, waitTimeMillis * 1000, explain);
+                } else if (unit === "nanos") {
+                    assert.gte(time, waitTimeMillis * 1000000, explain);
+                } else {
+                    assert.gte(time, waitTimeMillis, explain);
+                }
+            });
+            assert.gt(optimizationTimes.length, 0, explain);
         });
     }
 }

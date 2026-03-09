@@ -51,6 +51,7 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"
@@ -133,11 +134,37 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
 
     if (exec->getOpCtx() != nullptr) {
-        const auto planningTime =
+        const auto planningTimeOpt =
             CurOp::get(exec->getOpCtx())->debug().getAdditiveMetrics().planningTime;
-        plannerBob.appendNumber(
-            "optimizationTimeMillis",
-            durationCount<Milliseconds>(planningTime.value_or(Microseconds{0})));
+
+        // Determine the precision we should be reporting. Default to millis if we have no
+        // canonical query available.
+        QueryExecTimerPrecision precision = QueryExecTimerPrecision::kMillis;
+        if (auto query = exec->getCanonicalQuery()) {
+            precision = query->getExpCtx()
+                            ->getQueryKnobConfiguration()
+                            .getMeasureQueryExecutionTimeInNanoseconds()
+                ? QueryExecTimerPrecision::kNanos
+                : QueryExecTimerPrecision::kMillis;
+        }
+
+        // Convert to Nanoseconds first to support all precisions, defaulting to zero if
+        // unavailable.
+        const Nanoseconds planningTime =
+            planningTimeOpt ? duration_cast<Nanoseconds>(planningTimeOpt.value()) : Nanoseconds{0};
+
+        // Always provide the millisecond value.
+        plannerBob.appendNumber("optimizationTimeMillis",
+                                durationCount<Milliseconds>(planningTime));
+
+        if (precision == QueryExecTimerPrecision::kNanos) {
+            // When the precise timer is enabled, also expose micro- and nanosecond counts
+            // just like we do for execution stats.
+            plannerBob.appendNumber("optimizationTimeMicros",
+                                    durationCount<Microseconds>(planningTime));
+            plannerBob.appendNumber("optimizationTimeNanos",
+                                    durationCount<Nanoseconds>(planningTime));
+        }
     }
 
     if (!extraInfo.isEmpty()) {
