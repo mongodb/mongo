@@ -157,7 +157,12 @@ export function makeMetricArb(types, ranges = {}) {
         // Keep sizes small and hex-based.
         bsonPrimitiveMetricTypes.push(
             fc
-                .tuple(fc.integer({min: 0, max: 255}), fc.hexaString({minLength: 24, maxLength: 24}))
+                .tuple(
+                    // TODO: SERVER-121129 Remove filter for 7
+                    // Filter 7 as this is a special format and inserts will be rejected.
+                    fc.integer({min: 0, max: 255}).filter((x) => x != 7),
+                    fc.hexaString({minLength: 24, maxLength: 24}),
+                )
                 .map(([subtype, hex]) => HexData(subtype, hex)),
         );
     }

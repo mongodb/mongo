@@ -92,7 +92,7 @@ export function makeBatchInsertCommandArb(
     options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
 ) {
-    const measurementRanges = {
+    options.ranges = {
         intRange: options.ranges?.intRange,
         dateRange: options.ranges?.dateRange,
         minFields,
@@ -104,7 +104,6 @@ export function makeBatchInsertCommandArb(
 
     const docsArb = makeMeasurementDocStreamArb(timeField, metaField, metaValue, {
         ...options,
-        ...measurementRanges,
     });
 
     return docsArb.map((docs) => new BatchInsertCommand(docs));
@@ -318,6 +317,7 @@ export function makeTimeseriesCommandSequenceArb(
     maxDocs = 500,
     options = {},
     fieldNameArb = fc.string({minLength: 1, maxLength: 8}),
+    replayPath = undefined,
 ) {
     const insertArb = makeInsertCommandArb(
         timeField,
@@ -343,5 +343,9 @@ export function makeTimeseriesCommandSequenceArb(
 
     const deleteArb = makeDeleteByRandomIdCommandArb();
 
-    return fc.commands([insertArb, batchInsertArb, deleteArb], {minLength: minCommands, maxLength: maxCommands});
+    return fc.commands([insertArb, batchInsertArb, deleteArb], {
+        minLength: minCommands,
+        maxLength: maxCommands,
+        replayPath: replayPath,
+    });
 }

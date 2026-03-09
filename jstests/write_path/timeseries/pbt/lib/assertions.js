@@ -8,7 +8,7 @@
  * @param {DBCollection} tsColl timeseries collection representing "actual" state
  * @param {DBCollection} ctrlColl standard collection uses as control representing "expected" state
  * @param {DBCollection} bucketColl raw timeseries bucket collection
- * @param {Object} query query specification
+ * @param {Object} [query] query specification
  */
 export function assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query = {}) {
     const timeField = tsColl.getMetadata().options.timeseries.timeField;
@@ -30,15 +30,17 @@ export function assertCollectionsMatch(tsColl, ctrlColl, bucketColl, query = {})
     }
 
     for (let i = 0; i < Math.min(tsDocs.length, ctrlDocs.length); ++i) {
-        const bucket = bucketColl.findOne({
-            [metaField]: tsDocs[i][metaField],
-            [`control.min.${timeField}`]: {$lte: tsDocs[i][timeField]},
-            [`control.max.${timeField}`]: {$gte: tsDocs[i][timeField]},
-        });
-        assert.docEq(ctrlDocs[i], tsDocs[i], {
-            message: "tsColl and ctrlColl diverged, expected is ctrlDoc, actual is tsDoc",
-            documentIndex: i,
-            bucket: bucket,
+        assert.docEq(ctrlDocs[i], tsDocs[i], () => {
+            const bucket = bucketColl.findOne({
+                [metaField]: tsDocs[i][metaField],
+                [`control.min.${timeField}`]: {$lte: tsDocs[i][timeField]},
+                [`control.max.${timeField}`]: {$gte: tsDocs[i][timeField]},
+            });
+            return {
+                message: "tsColl and ctrlColl diverged, expected is ctrlDoc, actual is tsDoc",
+                documentIndex: i,
+                bucket: bucket,
+            };
         });
     }
 }

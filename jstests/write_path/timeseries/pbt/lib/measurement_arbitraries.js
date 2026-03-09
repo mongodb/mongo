@@ -72,7 +72,6 @@ export function makeMeasurementDocArb(
     const dateMax = dateRange?.max ?? defaultDateMax;
 
     // Special-field generators
-    const idArb = fc.uuid({version: 7}).noBias();
     const timeArb = fc.date({min: dateMin, max: dateMax});
 
     // Parent metric arb used for meta (when not fixed) and for extra fields
@@ -99,14 +98,12 @@ export function makeMeasurementDocArb(
 
     return fieldNamesArb.chain((fieldNames) => {
         const recordSpec = {
-            _id: idArb,
+            [timeFieldname]: timeArb,
+            [metaFieldname]: metaArb,
         };
         for (const [fieldName, factory] of Object.entries(explicitArbitraries)) {
             recordSpec[fieldName] = factory();
         }
-
-        recordSpec[timeFieldname] = timeArb;
-        recordSpec[metaFieldname] = metaArb;
 
         for (const name of fieldNames) {
             recordSpec[name] = parentMetricArb;
@@ -213,12 +210,6 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
             return fc.constant([]);
         }
 
-        // Streams for special fields (fixed length docCount)
-        const idStreamArb = fc.array(fc.uuid({version: 7}).noBias(), {
-            minLength: docCount,
-            maxLength: docCount,
-        });
-
         // Sensor-like increasing time stream to create meaningful bucket boundaries.
         const timeStreamArb = makeSensorDateMetricStreamArb(
             docCount,
@@ -231,39 +222,32 @@ export function makeMeasurementDocStreamArb(timeFieldname, metaFieldname, metaVa
 
         // Extra fields: each gets a metric stream built via makeMetricStreamArb
         // with minLength = maxLength = docCount, so every stream[i] is defined.
-        let extraFieldStreamArbs = fieldNames.map(() =>
-            makeMetricStreamArb(docCount, docCount, {
+        let extraFieldStreamArbs = {};
+        for (const fieldName of fieldNames) {
+            extraFieldStreamArbs[fieldName] = makeMetricStreamArb(docCount, docCount, {
                 intRange,
                 doubleRange,
                 longRange,
                 decimalRange,
                 dateRange: {min: dateMin, max: dateMax},
-            }),
-        );
+            });
+        }
 
         for (const [fieldName, factory] of Object.entries(explicitArbitraries)) {
-            fieldNames.push(fieldName);
-            extraFieldStreamArbs.push(fc.array(factory(), {minLength: docCount, maxLength: docCount}));
+            extraFieldStreamArbs[fieldName] = fc.array(factory(), {minLength: docCount, maxLength: docCount});
         }
 
         return fc
-            .tuple(idStreamArb, timeStreamArb, metaStreamArb, ...extraFieldStreamArbs)
-            .map(([idStream, timeStream, metaStream, ...metricStreamsPerField]) => {
+            .tuple(timeStreamArb, metaStreamArb, ...Object.values(extraFieldStreamArbs))
+            .map(([timeStream, metaStream, ...extraFieldStream]) => {
                 const docs = [];
 
                 for (let i = 0; i < docCount; ++i) {
-                    const doc = {
-                        _id: idStream[i],
-                    };
+                    const doc = {[timeFieldname]: timeStream[i], [metaFieldname]: metaStream[i]};
 
-                    doc[timeFieldname] = timeStream[i];
-                    doc[metaFieldname] = metaStream[i];
-
-                    for (let f = 0; f < fieldNames.length; ++f) {
-                        const fieldName = fieldNames[f];
-                        const streamForField = metricStreamsPerField[f];
-                        doc[fieldName] = streamForField[i];
-                    }
+                    Object.keys(extraFieldStreamArbs).forEach((name, idx) => {
+                        doc[name] = extraFieldStream[idx][i];
+                    });
 
                     docs.push(doc);
                 }

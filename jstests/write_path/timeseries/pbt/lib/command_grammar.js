@@ -66,10 +66,11 @@ function getAllIdsFromModel(model) {
 export class InsertCommand {
     constructor(doc) {
         this.doc = doc;
+        doc._id = new ObjectId();
     }
 
     toString() {
-        return `InsertCommand(_id=${this.doc._id})`;
+        return `InsertCommand(doc=${tojsononeline(this.doc)})`;
     }
 
     /**
@@ -105,11 +106,13 @@ export class InsertCommand {
 export class BatchInsertCommand {
     constructor(docs) {
         this.docs = docs;
+        for (let doc of docs) {
+            doc._id = new ObjectId();
+        }
     }
 
     toString() {
-        const ids = this.docs.map((d) => d._id).join(",");
-        return `BatchInsertCommand(count=${this.docs.length}, _ids=[${ids}])`;
+        return `BatchInsertCommand(count=${this.docs.length}, docs=${tojsononeline(this.docs)})`;
     }
 
     /**

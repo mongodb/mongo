@@ -12,7 +12,7 @@
  * ]
  */
 
-import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
@@ -30,7 +30,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
     let ctrlColl;
     let bucketColl;
 
-    beforeEach(() => {
+    const beforeHook = () => {
         db[ctrlCollName].drop();
         db[tsCollName].drop();
 
@@ -40,12 +40,7 @@ describe("Basic comparative PBT for timeseries inserts", () => {
         ctrlColl = db.getCollection(ctrlCollName);
         tsColl = db.getCollection(tsCollName);
         bucketColl = db.getCollection(tsBucketCollName);
-    });
-
-    afterEach(() => {
-        ctrlColl.drop();
-        tsColl.drop();
-    });
+    };
 
     it("keeps tsColl and ctrlColl in sync under insert/batch-insert/delete", () => {
         const metaValue = "metavalu";
@@ -62,14 +57,17 @@ describe("Basic comparative PBT for timeseries inserts", () => {
             /* maxDocs       */ 10,
             /* options       */ {}, // {intRange, dateRange} if you want to override
             /* fieldNameArb  */ undefined, // use default short-string field names
+            /* replayPath    */ undefined, // replace this value with the replay path to replicate a failure
         );
 
         fc.assert(
-            fc.property(programArb, (cmds) => {
-                const model = makeEmptyModel();
-                fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
-                assertCollectionsMatch(tsColl, ctrlColl, bucketColl);
-            }),
+            fc
+                .property(programArb, (cmds) => {
+                    const model = makeEmptyModel();
+                    fc.modelRun(() => ({model: model, real: {tsColl, ctrlColl}}), cmds);
+                    assertCollectionsMatch(tsColl, ctrlColl, bucketColl);
+                })
+                .beforeEach(beforeHook),
             {numRuns: 50},
         );
     });
