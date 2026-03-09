@@ -553,6 +553,19 @@ public:
         }
     }
 
+    // Gathers and returns a vector of all queryStatsMetrics for registered batch write operations.
+    MONGO_MOD_PRIVATE std::vector<write_ops::QueryStatsMetrics>
+    gatherQueryStatsMetricsForBatchWrites() const {
+        std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
+        if (_queryStatsInfoForBatchWrites) {
+            for (const auto& [opIndex, info] : *_queryStatsInfoForBatchWrites) {
+                queryStatsMetrics.emplace_back(write_ops::QueryStatsMetrics{
+                    static_cast<int32_t>(opIndex), getCursorMetrics(opIndex)});
+            }
+        }
+        return queryStatsMetrics;
+    }
+
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
 

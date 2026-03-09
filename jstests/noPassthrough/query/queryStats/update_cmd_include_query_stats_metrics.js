@@ -11,7 +11,6 @@ import {
     getQueryStatsUpdateCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const collName = jsTestName();
@@ -150,12 +149,6 @@ describe("Sharded", () => {
     before(() => {
         const st = new ShardingTest({shards: 2});
         testDB = st.s.getDB("test");
-        // TODO SERVER-120499 Remove skipping test due to legacy batch write exec.
-        if (!isUweEnabled(st.s)) {
-            st.stop();
-            jsTest.log.info("Skipping test: featureFlagUnifiedWriteExecutor is not enabled");
-            quit();
-        }
         st.shardColl(testDB[collName], {_id: 1}, {_id: 1});
         fixture = st;
         resetCollection(testDB[collName]);

@@ -36,6 +36,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
@@ -3119,5 +3120,112 @@ TEST_F(BatchWriteLargeTopLevelFieldTest, WriteWithStmtIds) {
     auto actual = builder.obj().objsize();
     ASSERT_GTE(estimate, actual);
 }
+
+TEST_F(BatchWriteOpTest, BuildClientResponseIncludesQueryStatsMetricsWhenForwardedFromRouter) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint(
+        ShardId("shard"), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setUpdates({buildUpdate(BSON("x" << 1), BSON("$set" << BSON("y" << 1)), false),
+                             buildUpdate(BSON("x" << 2), BSON("$set" << BSON("y" << 2)), false)});
+        return updateOp;
+    }());
+
+    _opCtx->setCommandForwardedFromRouter();
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+    opDebug.setQueryStatsInfoAtOpIndex(1, OpDebug::QueryStatsInfo{});
+
+    opDebug.getAdditiveMetrics(0).keysExamined = 10;
+    opDebug.getAdditiveMetrics(0).docsExamined = 5;
+    opDebug.getAdditiveMetrics(1).keysExamined = 20;
+    opDebug.getAdditiveMetrics(1).docsExamined = 15;
+
+    BatchWriteOp batchOp(_opCtx, request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+
+    BatchedCommandResponse response;
+    buildResponse(2, &response);
+    response.setNModified(2);
+
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
+    ASSERT(batchOp.isFinished());
+
+    BatchedCommandResponse clientResponse;
+    batchOp.buildClientResponse(&clientResponse);
+    ASSERT(clientResponse.getOk());
+    ASSERT_EQUALS(clientResponse.getN(), 2);
+
+    ASSERT_TRUE(clientResponse.areQueryStatsMetricsSet());
+    const auto& metrics = clientResponse.getQueryStatsMetrics();
+    ASSERT_EQUALS(metrics.size(), 2u);
+
+    bool found0 = false, found1 = false;
+    for (const auto& m : metrics) {
+        if (m.getOriginalOpIndex() == 0) {
+            ASSERT_EQ(m.getMetrics().getKeysExamined(), 10);
+            ASSERT_EQ(m.getMetrics().getDocsExamined(), 5);
+            found0 = true;
+        } else if (m.getOriginalOpIndex() == 1) {
+            ASSERT_EQ(m.getMetrics().getKeysExamined(), 20);
+            ASSERT_EQ(m.getMetrics().getDocsExamined(), 15);
+            found1 = true;
+        }
+    }
+    ASSERT(found0);
+    ASSERT(found1);
+}
+
+TEST_F(BatchWriteOpTest,
+       BuildClientResponseDoesNotIncludeQueryStatsMetricsWhenNotForwardedFromRouter) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint(
+        ShardId("shard"), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+
+    auto targeter = initTargeterFullRange(nss, endpoint);
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setUpdates({buildUpdate(BSON("x" << 1), BSON("$set" << BSON("y" << 1)), false),
+                             buildUpdate(BSON("x" << 2), BSON("$set" << BSON("y" << 2)), false)});
+        return updateOp;
+    }());
+
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
+    opDebug.setQueryStatsInfoAtOpIndex(1, OpDebug::QueryStatsInfo{});
+
+    opDebug.getAdditiveMetrics(0).keysExamined = 10;
+    opDebug.getAdditiveMetrics(0).docsExamined = 5;
+    opDebug.getAdditiveMetrics(1).keysExamined = 20;
+    opDebug.getAdditiveMetrics(1).docsExamined = 15;
+
+    BatchWriteOp batchOp(_opCtx, request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+
+    BatchedCommandResponse response;
+    buildResponse(2, &response);
+    response.setNModified(2);
+
+    batchOp.noteBatchResponse(*targeted.begin()->second, response, nullptr);
+    ASSERT(batchOp.isFinished());
+
+    BatchedCommandResponse clientResponse;
+    batchOp.buildClientResponse(&clientResponse);
+    ASSERT(clientResponse.getOk());
+    ASSERT_EQUALS(clientResponse.getN(), 2);
+
+    ASSERT_FALSE(clientResponse.areQueryStatsMetricsSet());
+}
+
 }  // namespace
 }  // namespace mongo

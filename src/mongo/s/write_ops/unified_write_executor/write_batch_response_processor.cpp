@@ -1447,14 +1447,8 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
     // primary shard) such that router can receive and aggregate the metrics there.
     // Otherwise, ignore if the current node is a router.
     if (opCtx->isCommandForwardedFromRouter()) {
-        std::vector<write_ops::QueryStatsMetrics> queryStatsMetrics;
         auto& opDebug = CurOp::get(opCtx)->debug();
-        opDebug.forEachQueryStatsInfoForBatchWrites(
-            [&queryStatsMetrics, &opDebug](size_t opIndex, const OpDebug::QueryStatsInfo&) {
-                queryStatsMetrics.emplace_back(write_ops::QueryStatsMetrics{
-                    static_cast<int32_t>(opIndex), opDebug.getCursorMetrics(opIndex)});
-            });
-        resp.setQueryStatsMetrics(std::move(queryStatsMetrics));
+        resp.setQueryStatsMetrics(opDebug.gatherQueryStatsMetricsForBatchWrites());
     }
     return resp;
 }

@@ -971,6 +971,14 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     if (!_retriedStmtIds.empty()) {
         batchResp->setRetriedStmtIds({_retriedStmtIds.begin(), _retriedStmtIds.end()});
     }
+
+    // Append query stats metrics if the command is forwarded from router (the current node is a
+    // primary shard) such that router can receive and aggregate the metrics there.
+    // Otherwise, ignore if the current node is a router.
+    if (_opCtx->isCommandForwardedFromRouter()) {
+        auto& opDebug = CurOp::get(_opCtx)->debug();
+        batchResp->setQueryStatsMetrics(opDebug.gatherQueryStatsMetricsForBatchWrites());
+    }
 }
 
 int BatchWriteOp::numWriteOpsIn(WriteOpState opState) const {

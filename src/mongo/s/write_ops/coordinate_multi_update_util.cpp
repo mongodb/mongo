@@ -33,6 +33,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
+#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
 
 namespace mongo {
 namespace coordinate_multi_update_util {
@@ -92,13 +93,21 @@ BulkWriteCRUDOp getWriteOpFromBulk(const BulkWriteCommandRequest& bulkOp,
     return BulkWriteCRUDOp{bulkOp.getOps()[getWriteOpIndex(childBatches)]};
 }
 
-BSONObj makeCommandForOp(BatchWriteOp& batchOp,
+BSONObj makeCommandForOp(OperationContext* opCtx,
+                         BatchWriteOp& batchOp,
                          const TargetedBatchMap& childBatches,
                          const BatchedCommandRequest& clientRequest) {
     auto op = getWriteOpFromBatch(batchOp, childBatches);
     BSONObjBuilder bob;
     clientRequest.getNS().serializeCollectionName(&bob, getCommandNameForOp(op));
-    bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(getOpAsBson(op)));
+    if (op.getOpType() == BatchedCommandRequest::BatchType_Update) {
+        auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
+        unified_write_executor::WriteBatchQueryStatsRegistrar{}
+            .setIncludeQueryStatsMetricsIfRequested(opCtx, op.getIndex(), updateOpEntry);
+        bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(updateOpEntry.toBSON()));
+    } else {
+        bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(getOpAsBson(op)));
+    }
     bob.appendElementsUnique(getRequestBson(clientRequest));
     return bob.obj();
 }
@@ -180,7 +189,9 @@ BatchedCommandResponse executeCoordinateMultiUpdate(OperationContext* opCtx,
                                                     const BatchedCommandRequest& clientRequest) {
     try {
         return parseBatchedResponse(executeCoordinateMultiUpdate(
-            opCtx, clientRequest.getNS(), makeCommandForOp(batchOp, childBatches, clientRequest)));
+            opCtx,
+            clientRequest.getNS(),
+            makeCommandForOp(opCtx, batchOp, childBatches, clientRequest)));
     } catch (const DBException& e) {
         BatchedCommandResponse result;
         result.setStatus(e.toStatus());
