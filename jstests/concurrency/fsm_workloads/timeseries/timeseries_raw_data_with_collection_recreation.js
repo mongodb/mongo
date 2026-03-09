@@ -43,6 +43,8 @@ export const $config = (function () {
         // Encountered if a collection did not exist at the beginning of an operation but was
         // created as a time-series collection by the time we go to acquire it.
         10685100,
+        // The collection has been dropped and re-created as a time-series collection during our insert.
+        10685101,
     ];
 
     const data = {
