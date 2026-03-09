@@ -97,4 +97,10 @@ Value DocumentSourceCollStats::serialize(const SerializationOptions& opts) const
     return Value(Document{{getSourceName(), _collStatsSpec.toBSON(opts)}});
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceCollStats::clone(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    tassert(121023, "expCtx passed to clone must not be null", expCtx);
+
+    return make_intrusive<DocumentSourceCollStats>(expCtx, _collStatsSpec);
+}
 }  // namespace mongo

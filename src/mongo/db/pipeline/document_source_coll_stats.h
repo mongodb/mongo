@@ -157,6 +157,9 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const override;
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
