@@ -227,11 +227,12 @@ function runTest(planRankerMode) {
         assert.lt(rootStageCost(coll.find({a: 1}).hint({a: 1})), 0.01);
 
         // FETCH cost should be somewhat roughly proportional to the number of input rows.
-        assert.between(
-            9,
+        assert.close(
             rootStageCost(coll.find({a: {$lt: coll.count() / 10}}).hint({a: 1})) /
                 rootStageCost(coll.find({a: {$lt: coll.count() / 100}}).hint({a: 1})),
             10,
+            "FETCH cost ratio for 10x input should be close to 10",
+            2 /* significant figures */,
         );
 
         // FETCH cost should be the approximately the same with or without a residual predicate.
