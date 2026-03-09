@@ -149,6 +149,8 @@ last-continuous:
       ticket: SERVER-112273
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
+    - test_file: jstests/aggregation/expressions/trim.js
+      ticket: SERVER-120668
   suites: null
 last-lts:
   all:
@@ -796,4 +798,6 @@ last-lts:
       ticket: SERVER-112273
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
+    - test_file: jstests/aggregation/expressions/trim.js
+      ticket: SERVER-120668
   suites: null
