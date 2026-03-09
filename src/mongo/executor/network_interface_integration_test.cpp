@@ -81,6 +81,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -90,7 +91,6 @@
 #include <memory>
 #include <mutex>
 #include <ostream>
-#include <sstream>  // TODO?
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -855,18 +855,19 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
     auto client = serviceContext->getService()->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
 
-    auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
-    opCtx->setDeadlineByDate(stopWatch.start() + opCtxDeadline, ErrorCodes::ExceededTimeLimit);
+    Timer timer{serviceContext->getTickSource()};
+    opCtx->setDeadlineByDate(serviceContext->getPreciseClockSource()->now() + opCtxDeadline,
+                             ErrorCodes::ExceededTimeLimit);
 
     auto request = makeTestCommand(
         requestTimeout, makeSleepCmdObj(), opCtx.get(), false, ErrorCodes::MaxTimeMSExpired);
-    auto createRequestDelay = stopWatch.elapsed();
+    auto createRequestDelay = timer.elapsed();
 
     auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
     // in runCommand. The delay between setting the deadline on opCtx and starting the command can
     // be long enough that the assertion about opCtxDeadline fails.
-    auto networkStartCommandDelay = stopWatch.elapsed();
+    auto networkStartCommandDelay = timer.elapsed();
 
     auto result = deferred.get(interruptible());
 
@@ -881,10 +882,8 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadl
 
     // check that the request timeout uses the smaller of the operation context deadline and
     // the timeout specified in the request constructor.
-    ASSERT_GTE(duration_cast<Milliseconds>(result.elapsed.value()) + createRequestDelay,
-               requestTimeout);
-    ASSERT_LT(duration_cast<Milliseconds>(result.elapsed.value() + networkStartCommandDelay),
-              opCtxDeadline);
+    ASSERT_GTE(result.elapsed.value() + createRequestDelay, requestTimeout);
+    ASSERT_LT(result.elapsed.value() + networkStartCommandDelay, opCtxDeadline);
 
     // Sleep has timed out but _killOperations may still be running. We can't use
     // waitForCommandToStop since there is no guarantee when _killOperations starts.
