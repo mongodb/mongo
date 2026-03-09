@@ -46,15 +46,18 @@ __wt_time_window_to_string(WT_TIME_WINDOW *tw, char *tw_string)
 {
     char ts_string[6][WT_TS_INT_STRING_SIZE];
 
-    WT_IGNORE_RET(__wt_snprintf(tw_string, WT_TIME_STRING_SIZE,
-      "start: %s/%s/%s/%" PRIu64 "/%" PRIu64 " | stop: %s/%s/%s/%" PRIu64 "/%" PRIu64 "%s",
-      __wt_timestamp_to_string(tw->durable_start_ts, ts_string[0]),
-      __wt_timestamp_to_string(tw->start_ts, ts_string[1]),
-      __wt_timestamp_to_string(tw->start_prepare_ts, ts_string[2]), tw->start_prepared_id,
-      tw->start_txn, __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[3]),
-      __wt_timestamp_to_string(tw->stop_ts, ts_string[4]),
-      __wt_timestamp_to_string(tw->stop_prepare_ts, ts_string[5]), tw->stop_prepared_id,
-      tw->stop_txn, WT_TIME_WINDOW_HAS_PREPARE(tw) ? ", prepared" : ""));
+    WT_IGNORE_RET(
+      __wt_snprintf(tw_string, WT_TIME_STRING_SIZE,
+        "start: durable_timestamp=%s timestamp=%s prepare_timestamp=%s prepared_id=%" PRIu64
+        " transaction=%" PRIu64 " | stop: durable_timestamp=%s timestamp=%s prepare_timestamp=%s "
+        "prepared_id=%" PRIu64 " transaction=%" PRIu64 "%s",
+        __wt_timestamp_to_string(tw->durable_start_ts, ts_string[0]),
+        __wt_timestamp_to_string(tw->start_ts, ts_string[1]),
+        __wt_timestamp_to_string(tw->start_prepare_ts, ts_string[2]), tw->start_prepared_id,
+        tw->start_txn, __wt_timestamp_to_string(tw->durable_stop_ts, ts_string[3]),
+        __wt_timestamp_to_string(tw->stop_ts, ts_string[4]),
+        __wt_timestamp_to_string(tw->stop_prepare_ts, ts_string[5]), tw->stop_prepared_id,
+        tw->stop_txn, WT_TIME_WINDOW_HAS_PREPARE(tw) ? ", prepared" : ""));
     return (tw_string);
 }
 

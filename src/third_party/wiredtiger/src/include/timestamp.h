@@ -20,11 +20,11 @@
 /*
  * We need an appropriately sized buffer for formatted time points, aggregates and windows. This is
  * for time windows with 6 timestamps, 2 transaction IDs, 2 prepared IDs, prepare state and
- * formatting. The formatting is currently about 64 characters - enough space that we don't need to
- * think about it. Time points have less information that time aggregate windows - cater for the
- * larger here.
+ * formatting. The formatting overhead is currently under 192 characters (field labels, etc.) -
+ * enough space that we don't need to think about it. Time points have less information that time
+ * aggregate windows - cater for the larger here.
  */
-#define WT_TIME_STRING_SIZE (WT_TS_INT_STRING_SIZE * 6 + 20 * 4 + 64)
+#define WT_TIME_STRING_SIZE (WT_TS_INT_STRING_SIZE * 6 + 20 * 4 + 192)
 
 /* The time points that define a value's time window and associated prepare information. */
 struct __wt_time_window {
