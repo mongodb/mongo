@@ -597,6 +597,12 @@ task_groups:
       - func: "configure evergreen api credentials"
       - func: "set up credentials"
       - func: "get engflow creds"
+    # Remove teardown_task_timeout_secs after SERVER-120810, restoring default teardown timeout. generate.tasks can
+    # stall as it waits for the Evergreen job to run the actual task generation. During this time, generate.tasks
+    # is sleeping/polling for completion. In unlucky cases where there are other task generation jobs on the
+    # same version, they run serially and can take a long time complete. A slow task here is better than the task not
+    # displaying all test results.
+    teardown_task_timeout_secs: 3600
     teardown_task:
       - command: s3.put
         params:
