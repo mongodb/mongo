@@ -29,13 +29,13 @@
 
 #include "mongo/db/s/ready_range_deletions_processor.h"
 
+#include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
-#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 
@@ -204,6 +204,9 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         _threadOpCtxHolder.reset();
     });
 
+    HierarchicalCancelableOperationContextFactory opCtxFactory(opCtx->getCancellationToken(),
+                                                               _executor);
+
     while (!_stopRequested()) {
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -262,16 +265,26 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                             (optKeyPattern ? (*optKeyPattern).toBSON()
                                            : getShardKeyPattern(opCtx, dbName, collectionUuid));
 
-                        auto numDocsAndBytesDeleted =
-                            uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
-                                opCtx, dbName, collectionUuid, shardKeyPattern, range));
-                        LOGV2_INFO(9239400,
-                                   "Finished deletion of documents in orphan range",
-                                   "namespace"_attr = nss,
-                                   "collectionUUID"_attr = collectionUuid.toString(),
-                                   "range"_attr = redact(range.toString()),
-                                   "docsDeleted"_attr = numDocsAndBytesDeleted.first,
-                                   "bytesDeleted"_attr = numDocsAndBytesDeleted.second);
+                        {
+                            // There can only be one operation context per client, and because we
+                            // don't want to miss the shutdown signal, let's create an alternate
+                            // client for the batch.
+                            auto newClient =
+                                _service->getService()->makeClient("range-deleter-batch");
+                            AlternativeClientRegion acr(newClient);
+                            auto batchOpCtxHolder = opCtxFactory.makeOperationContext(&cc());
+                            auto* batchOpCtx = batchOpCtxHolder.get();
+                            auto numDocsAndBytesDeleted =
+                                uassertStatusOK(rangedeletionutil::deleteRangeInBatches(
+                                    batchOpCtx, dbName, collectionUuid, shardKeyPattern, range));
+                            LOGV2_INFO(9239400,
+                                       "Finished deletion of documents in orphan range",
+                                       "namespace"_attr = nss,
+                                       "collectionUUID"_attr = collectionUuid.toString(),
+                                       "range"_attr = redact(range.toString()),
+                                       "docsDeleted"_attr = numDocsAndBytesDeleted.first,
+                                       "bytesDeleted"_attr = numDocsAndBytesDeleted.second);
+                        }
                         orphansRemovalCompleted = true;
                     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                         // No orphaned documents to remove from a dropped collection
