@@ -166,8 +166,6 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.works, isSbeEnabled ? 20000 : 10000);
 }
 
-// TODO SERVER-116353: Add additional tests.
-
 const prevCBRConfig = getCBRConfig(db);
 
 const prevQueryKnobs = assert.commandWorked(
