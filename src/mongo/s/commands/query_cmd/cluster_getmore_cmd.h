@@ -29,12 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/planner/cluster_find.h"
@@ -52,22 +48,38 @@ inline const ReadConcernSupportResult kSupportsReadConcernResult{
       "default read concern not permitted (getMore uses the cursor's read concern)"}}};
 
 /**
- * Implements the getMore command on mongos. Retrieves more from an existing mongos cursor
- * corresponding to the cursor id passed from the application. In order to generate these results,
- * may issue getMore commands to remote nodes in one or more shards.
+ * Implements the cluster getMore command on both mongos (router) and shard servers.
+ *
+ * Retrieves more from an existing mongos cursor corresponding to the cursor id passed from the
+ * application. In order to generate these results, may issue getMore commands to remote nodes in
+ * one or more shards.
+ *
+ * The 'Impl' template parameter is a small struct that provides the properties that differ between
+ * the 'ClusterGetMoreCmdD' and 'ClusterGetMoreCmdS' variants, such as:
+ *  - The command name.
+ *  - The stable API version of the command via 'getApiVersions()'.
+ *  - Whether the command can run via 'checkCanRunHere()'.
+ *
+ * The class uses CRTP with 'TypedCommand' where:
+ *  - The type ClusterGetMoreCmdBase<Impl> is passed as the concrete type for the template
+ * parameter.
+ *  - 'Impl' provides the command-specific behavior.
+ *
+ * This template class provides the shared functionality between the command variants such as the
+ * 'run()' function.
+ *
+ * See 'cluster_getmore_cmd_d.cpp' and 'cluster_getmore_cmd_s.cpp' for more details.
  */
 template <typename Impl>
-class ClusterGetMoreCmdBase final : public Command {
+class ClusterGetMoreCmdBase final : public TypedCommand<ClusterGetMoreCmdBase<Impl>> {
 public:
-    ClusterGetMoreCmdBase() : Command(Impl::kName) {}
+    using TC = TypedCommand<ClusterGetMoreCmdBase<Impl>>;
+    using Request = typename Impl::Request;
+    using Reply = typename Impl::Reply;
+    ClusterGetMoreCmdBase() : TC(Impl::kCommandName) {}
 
     const std::set<std::string>& apiVersions() const override {
         return Impl::getApiVersions();
-    }
-
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        return std::make_unique<Invocation>(this, opMsgRequest);
     }
 
     bool allowedInTransactions() const final {
@@ -78,19 +90,19 @@ public:
         return true;
     }
 
-    class Invocation final : public CommandInvocation {
+    class Invocation final : public TC::MinimalInvocationBase {
     public:
-        Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse(request.body, IDLParserContext{Impl::kName})) {}
+        using TC::MinimalInvocationBase::MinimalInvocationBase;
+        using TC::MinimalInvocationBase::request;
 
     private:
         NamespaceString ns() const override {
-            return NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection());
+            return NamespaceStringUtil::deserialize(request().getDbName(),
+                                                    request().getCollection());
         }
 
         const DatabaseName& db() const override {
-            return _cmd.getDbName();
+            return request().getDbName();
         }
 
         bool supportsWriteConcern() const override {
@@ -104,11 +116,11 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             Impl::doCheckAuthorization(
-                opCtx, ns(), _cmd.getCommandParameter(), _cmd.getTerm().is_initialized());
+                opCtx, ns(), request().getCommandParameter(), request().getTerm().is_initialized());
         }
 
         const GenericArguments& getGenericArguments() const override {
-            return _cmd.getGenericArguments();
+            return request().getGenericArguments();
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
@@ -118,7 +130,7 @@ public:
             Impl::checkCanRunHere(opCtx);
 
             auto bob = reply->getBodyBuilder();
-            auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, _cmd));
+            auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, request()));
             if (opCtx->isExhaust() && response.getCursorId() != 0) {
                 // Indicate that an exhaust message should be generated and the previous BSONObj
                 // command parameters should be reused as the next BSONObj command parameters.
@@ -131,16 +143,15 @@ public:
             }
         }
 
+        // TODO SERVER-121034: Remove validateResult() once CursorResponseBuilder is typed.
         void validateResult(const BSONObj& replyObj) {
             CursorGetMoreReply::parse(replyObj.removeField("ok"),
                                       IDLParserContext{"CursorGetMoreReply"});
         }
-
-        const GetMoreCommandRequest _cmd;
     };
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return TC::AllowedOnSecondary::kAlways;
     }
 
     bool maintenanceOk() const override {
@@ -158,8 +169,8 @@ public:
         return false;
     }
 
-    ReadWriteType getReadWriteType() const override {
-        return ReadWriteType::kRead;
+    typename TC::ReadWriteType getReadWriteType() const override {
+        return TC::ReadWriteType::kRead;
     }
 
     std::string help() const override {

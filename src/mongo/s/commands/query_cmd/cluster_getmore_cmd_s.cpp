@@ -46,7 +46,9 @@ namespace {
  * Implements the cluster getMore command on mongos.
  */
 struct ClusterGetMoreCmdS {
-    static constexpr StringData kName = "getMore"_sd;
+    using Request = GetMoreCommandRequest;
+    using Reply = GetMoreCommandRequest::Reply;
+    static constexpr StringData kCommandName = "getMore"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;

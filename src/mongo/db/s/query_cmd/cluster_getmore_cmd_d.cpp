@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/commands/query_cmd/cluster_getmore_cmd.h"
@@ -50,7 +51,9 @@ namespace {
  * Implements the cluster getMore command on mongod.
  */
 struct ClusterGetMoreCmdD {
-    static constexpr StringData kName = "clusterGetMore"_sd;
+    using Request = GetMoreCommandRequest;
+    using Reply = GetMoreCommandRequest::Reply;
+    static constexpr StringData kCommandName = "clusterGetMore"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
