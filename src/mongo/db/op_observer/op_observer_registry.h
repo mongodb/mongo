@@ -668,6 +668,12 @@ public:
             o->onDropDatabaseMetadata(opCtx, op);
     }
 
+    void onInvalidateCollectionMetadata(OperationContext* opCtx,
+                                        const repl::OplogEntry& op) override {
+        for (auto& o : _observers)
+            o->onInvalidateCollectionMetadata(opCtx, op);
+    }
+
     void onTruncateRange(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const RecordId& minRecordId,

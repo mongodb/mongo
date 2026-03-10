@@ -143,6 +143,9 @@ public:
     void onCreateDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override;
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) override;
+
+    void onInvalidateCollectionMetadata(OperationContext* opCtx,
+                                        const repl::OplogEntry& op) override;
 };
 
 }  // namespace mongo

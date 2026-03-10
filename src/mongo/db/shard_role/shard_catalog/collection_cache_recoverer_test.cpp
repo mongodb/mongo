@@ -187,9 +187,10 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
         recoverer.start(operationContext(), getExecutor());
         ASSERT_OK(recoverer.waitForInitialPass(operationContext()));
         // We now add an oplog entry that invalidates the previous recovery.
-        recoverer.onOplogEntry(operationContext(),
-                               Timestamp(Date_t::now()),
-                               InvalidateCollectionShardingStateOplogEntry{kTestNss, UUID::gen()});
+        recoverer.onOplogEntry(
+            operationContext(),
+            Timestamp(Date_t::now()),
+            InvalidateCollectionMetadataOplogEntry{std::string(kTestNss.coll())});
         auto collMetadata = recoverer.drainAndApply(operationContext());
         // This should've encountered an invalidate entry which triggers a new round of wait +
         // drain.

@@ -834,6 +834,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
         "//src/mongo/db/repl:oplog_application",
+        "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/db/repl:oplog_interface_local",
         "//src/mongo/db/repl:primary_only_service_test_fixture",
         "//src/mongo/db/repl:replmocks",

@@ -101,6 +101,7 @@ enums:
             kImportCollection: "importCollection"
             kCreateDatabaseMetadata: "createDatabaseMetadata"
             kDropDatabaseMetadata: "dropDatabaseMetadata"
+            kInvalidateCollectionMetadata: "invalidateCollectionMetadata"
             kTruncateRange: "truncateRange"
             kUpgradeDowngradeViewlessTimeseries: "upgradeDowngradeViewlessTimeseries"
             kSetMultikeyMetadata: "setMultikeyMetadata"

@@ -877,4 +877,22 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
     scopedDsr->clearDbMetadata(opCtx);
 }
 
+void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opCtx,
+                                                           const repl::OplogEntry& op) {
+    // TODO (SERVER-91505): Determine if we should change this to check isDataConsistent.
+    if (repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        return;
+    }
+
+    const auto nss =
+        CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
+
+    tassert(11995201,
+            "invalidateCollectionMetadata oplog entry is missing the collection UUID",
+            op.getUuid());
+
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+    scopedCsr->clearFilteringMetadata_authoritative(opCtx, *op.getUuid());
+}
+
 }  // namespace mongo

@@ -196,10 +196,9 @@ void CollectionCacheRecoverer::start(OperationContext* opCtx, ExecutorPtr execut
             .semi();
 }
 
-void CollectionCacheRecoverer::onOplogEntry(
-    OperationContext* opCtx,
-    Timestamp entryTs,
-    const InvalidateCollectionShardingStateOplogEntry& entry) {
+void CollectionCacheRecoverer::onOplogEntry(OperationContext* opCtx,
+                                            Timestamp entryTs,
+                                            const InvalidateCollectionMetadataOplogEntry& entry) {
     stdx::lock_guard lk(_mutex);
     if (_timestampToReadAt.getTimestamp() < entryTs) {
         return;
@@ -228,7 +227,7 @@ boost::optional<CollectionMetadata> applyOplogEntry(
 }
 boost::optional<CollectionMetadata> applyOplogEntry(
     OperationContext* opCtx,
-    const InvalidateCollectionShardingStateOplogEntry& entry,
+    const InvalidateCollectionMetadataOplogEntry& entry,
     CollectionMetadata collMetadata) {
     return boost::none;
 }

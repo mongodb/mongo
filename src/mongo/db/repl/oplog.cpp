@@ -1261,6 +1261,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onDropDatabaseMetadata(opCtx, *op);
          return Status::OK();
      }}},
+    {"invalidateCollectionMetadata",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         opCtx->getServiceContext()->getOpObserver()->onInvalidateCollectionMetadata(opCtx, *op);
+         return Status::OK();
+     }}},
     {"truncateRange",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

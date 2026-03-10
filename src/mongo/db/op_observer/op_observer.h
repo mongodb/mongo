@@ -744,6 +744,13 @@ public:
     virtual void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
 
     /**
+     * Called when the authoritative CSS needs to be invalidated so next operation triggers a
+     * refresh from the durable state.
+     */
+    virtual void onInvalidateCollectionMetadata(OperationContext* opCtx,
+                                                const repl::OplogEntry& op) = 0;
+
+    /**
      * Called when 'truncateRange' is called on a collection.
      * Out parameter 'opTime' is updated to the optime of the oplog entry logged.
      */

@@ -2381,6 +2381,21 @@ TEST_F(RollbackImplObserverInfoTest,
     ASSERT(expectedUUIDs == uuids);
 }
 
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfInvalidateCollectionMetadataOplogEntry) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
+    auto cmdObj = BSON("invalidateCollectionMetadata" << nss.coll());
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), cmdObj, 2);
+
+    std::set<NamespaceString> expectedNamespaces = {nss};
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
+    ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
+}
+
 using RollbackImplObserverInfoTestDeathTest = RollbackImplObserverInfoTest;
 DEATH_TEST_F(RollbackImplObserverInfoTestDeathTest,
              NamespacesForOpsInvariantsOnApplyOpsOplogEntry,

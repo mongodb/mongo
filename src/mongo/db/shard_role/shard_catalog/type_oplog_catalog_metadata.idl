@@ -62,16 +62,14 @@ structs:
 
     # TODO SERVER-121202: These two types are placeholders for the two oplog entries.
     # They will quite possibly need to be adjusted once the time comes to actually use them.
-    InvalidateCollectionShardingStateOplogEntry:
+
+    InvalidateCollectionMetadataOplogEntry:
         description: "Oplog entry format for a metadata operation that triggers a CSS recovery from the durable state"
         strict: false
         fields:
-            collectionName:
-                type: namespacestring
-                description: "Collection for which we are triggering the recovery"
-            uuid:
-                type: uuid
-                description: "The UUID of the collection we are triggering the recovery for"
+            invalidateCollectionMetadata:
+                type: string
+                description: "Collection name for which we are triggering the recovery"
 
     CollectionShardingStateDeltaOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"

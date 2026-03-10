@@ -202,6 +202,7 @@ public:
      * setFilteringMetadata which requires exclusive).
      */
     void clearFilteringMetadata_nonAuthoritative(OperationContext* opCtx);
+    void clearFilteringMetadata_authoritative(OperationContext* opCtx, const UUID& collectionUuid);
     void clearFilteringMetadata_authoritative(OperationContext* opCtx);
 
     /**

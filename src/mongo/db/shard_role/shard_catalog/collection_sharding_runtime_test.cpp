@@ -45,6 +45,7 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -55,11 +56,13 @@
 #include "mongo/db/s/range_deleter_service_test.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
@@ -154,6 +157,15 @@ public:
 
     MetadataManager* getMetadataManager(CollectionShardingRuntime& csr) {
         return csr._metadataManager.get();
+    }
+
+    static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(const NamespaceString& nss,
+                                                                       const UUID& uuid) {
+        return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
+                                           nss,
+                                           BSON("invalidateCollectionMetadata" << nss.coll()),
+                                           boost::none,
+                                           uuid);
     }
 };
 
@@ -258,6 +270,48 @@ TEST_F(CollectionShardingRuntimeTest,
     csr.setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx));
     csr.clearFilteringMetadata_nonAuthoritative(opCtx);
     ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       ClearFilteringMetadataAuthoritativeClearsMetadataWhenTrackedAndUUIDMatches) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    auto collUuid = UUID::gen();
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx, collUuid));
+    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
+
+    csr.clearFilteringMetadata_authoritative(opCtx, collUuid);
+
+    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
+    ASSERT_EQ(csr.getAuthoritativeState(),
+              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       ClearFilteringMetadataAuthoritativeClearsMetadataWhenUntracked) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, CollectionMetadata::UNTRACKED());
+    ASSERT_TRUE(csr.getCurrentMetadataIfKnown());
+
+    csr.clearFilteringMetadata_authoritative(opCtx, UUID::gen());
+
+    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
+    ASSERT_EQ(csr.getAuthoritativeState(),
+              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
+}
+
+TEST_F(CollectionShardingRuntimeTest,
+       ClearFilteringMetadataAuthoritativeClearsMetadataWhenUnknown) {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
+
+    csr.clearFilteringMetadata_authoritative(opCtx, UUID::gen());
+
+    ASSERT_FALSE(csr.getCurrentMetadataIfKnown());
+    ASSERT_EQ(csr.getAuthoritativeState(),
+              CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
 }
 
 TEST_F(CollectionShardingRuntimeTest, SetFilteringMetadataWithSameUUIDKeepsSameMetadataManager) {
@@ -552,6 +606,17 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
 }
 
 using CollectionShardingRuntimeTestDeathTest = CollectionShardingRuntimeTest;
+
+DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
+                   ClearFilteringMetadataAuthoritativeAssertsOnUUIDMismatch,
+                   "Tripwire assertion.*11995200") {
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    OperationContext* opCtx = operationContext();
+    csr.setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx, UUID::gen()));
+
+    csr.clearFilteringMetadata_authoritative(opCtx, UUID::gen());
+}
+
 DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
                    TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
                    "Tripwire assertion.*10206300") {
@@ -1226,6 +1291,30 @@ TEST_F(ShardingMongoDTestFixture, ShardingStateEnabledReturnsTrackedVersion) {
     ShardingState::get(opCtx)->setRecoveryCompleted(rcr);
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
     ASSERT_THROWS_CODE(csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::StaleConfig);
+}
+
+TEST_F(CollectionShardingRuntimeTest, OnInvalidateCollectionMetadataClearsCSRWithMatchingUUID) {
+    auto opCtx = operationContext();
+    createTestCollection(opCtx, kTestNss);
+    auto collUuid = UUID::gen();
+    CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss)
+        ->setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx, collUuid));
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_TRUE(csr->getCurrentMetadataIfKnown());
+    }
+
+    auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(kTestNss, collUuid);
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+        ASSERT_FALSE(csr->getCurrentMetadataIfKnown());
+        ASSERT_EQ(csr->getAuthoritativeState(),
+                  CollectionShardingRuntime::AuthoritativeState::kAuthoritative);
+    }
 }
 
 }  // namespace mongo

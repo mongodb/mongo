@@ -291,6 +291,9 @@ public:
 
     void onDropDatabaseMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {}
 
+    void onInvalidateCollectionMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {
+    }
+
     void onTruncateRange(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const RecordId& minRecordId,

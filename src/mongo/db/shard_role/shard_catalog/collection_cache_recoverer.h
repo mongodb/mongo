@@ -103,7 +103,7 @@ public:
      */
     void onOplogEntry(OperationContext* opCtx,
                       Timestamp entryTs,
-                      const InvalidateCollectionShardingStateOplogEntry& entry);
+                      const InvalidateCollectionMetadataOplogEntry& entry);
     void onOplogEntry(OperationContext* opCtx,
                       Timestamp entryTs,
                       const CollectionShardingStateDeltaOplogEntry& entry);
@@ -115,7 +115,7 @@ private:
     CancellationSource _cancellationSource;
     SemiFuture<CollectionMetadata> _collMetadata;
 
-    using QueuedItem = std::variant<InvalidateCollectionShardingStateOplogEntry,
+    using QueuedItem = std::variant<InvalidateCollectionMetadataOplogEntry,
                                     CollectionShardingStateDeltaOplogEntry>;
     std::queue<std::pair<Timestamp, QueuedItem>> _entriesToApply;  // (M)
 
