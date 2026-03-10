@@ -37,6 +37,15 @@ assert.commandWorked(
     }),
 );
 
+// The subject DN from client_roles.pem in RFC 4514 format (which parseDN expects).
+const kDN = "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US";
+
+// DER-encoded roles from client_roles.pem: backup@admin, readAnyDatabase@admin.
+// This is the value of the mongodbRoles extension (OID 1.3.6.1.4.1.34601.2.1.1).
+const kRolesDer = "\x31\x2b\x30\x0f\x0c\x06backup\x0c\x05admin\x30\x18\x0c\x0freadAnyDatabase\x0c\x05admin";
+
+const kSNI = "my.mongodb.com";
+
 function isEmpty(obj) {
     return obj === null || typeof obj === "undefined" || Object.keys(obj).length === 0;
 }
@@ -78,7 +87,7 @@ function runTest(tlvs, sslTlv, expectedSuccess) {
     new Mongo(uri);
 
     let tlvString = buildTLVString(tlvs);
-    let sslTlvString = buildTLVString(sslTlv["ssl"]);
+    let sslTlvString = buildTLVString(sslTlv["ssl"] || []);
 
     // Verify that log line 11978400 is emitted once with the expected data after at most 30 seconds.
     checkLog.containsRelaxedJson(
@@ -93,19 +102,22 @@ function runTest(tlvs, sslTlv, expectedSuccess) {
     );
 }
 
-// Test with tlv and ssl tlv
+jsTest.log.info("Test 1: Authority TLV with DN and roles in SSL sub-TLVs");
 runTest(
     [{"type": 0x02, "value": "authority.example.com"}],
     {
         "ssl": [
-            {"type": 0xe0, "value": "custom_tlv_data"},
-            {"type": 0xe1, "value": "hello_tlv_data"},
+            {"type": 0xe0, "value": kDN},
+            {
+                "type": 0xe1,
+                "value": kRolesDer,
+            },
         ],
     },
     true,
 );
 
-// Test with tlv no ssl tlv
+jsTest.log.info("Test 2: Authority TLV with other top-level TLV, no SSL sub-TLVs");
 runTest(
     [
         {"type": 0x02, "value": "authority.example.com"},
@@ -115,10 +127,10 @@ runTest(
     true,
 );
 
-// Test with no tlvs should fail.
+jsTest.log.info("Test 3: No TLVs should fail");
 runTest([], {}, false);
 
-// Test invalid parsing.
+jsTest.log.info("Test 4: Invalid TLV parsing");
 runTest([{"type": 0x00, "value": "Bad"}], {}, false);
 runTest([{"type": "0x01", "value": "Bad"}], {}, false);
 runTest([{"types": 0x01, "value": "Bad"}], {}, false);
@@ -128,6 +140,65 @@ runTest(
     [{"type": 0x01, "value": "Good"}, {"ssl": [{"type": 0x01, "value": "Good"}]}],
     {"ssl": [{"type": 0x05, "value": "Good"}]},
     false,
+);
+
+jsTest.log.info("Test 5: DN only in SSL sub-TLV, no Authority TLV");
+runTest(
+    [{"type": 0x01, "value": "h2"}],
+    {
+        "ssl": [{"type": 0xe0, "value": kDN}],
+    },
+    true,
+);
+
+jsTest.log.info("Test 6: SNI + other top-level TLVs + DN + roles + version in SSL sub-TLVs");
+runTest(
+    [
+        {"type": 0x01, "value": "h2"},
+        {"type": 0x02, "value": kSNI},
+        {"type": 0x05, "value": "uniqueID123"},
+    ],
+    {
+        "ssl": [
+            {"type": 0x21, "value": "TLSv1.3"},
+            {"type": 0xe0, "value": kDN},
+            {"type": 0xe1, "value": kRolesDer},
+        ],
+    },
+    true,
+);
+
+jsTest.log.info("Test 7: SSL sub-TLVs with version and cipher but no DN or roles");
+runTest(
+    [{"type": 0x02, "value": kSNI}],
+    {
+        "ssl": [
+            {"type": 0x21, "value": "TLSv1.3"},
+            {"type": 0x23, "value": "ECDHE-RSA-AES128-GCM-SHA256"},
+        ],
+    },
+    true,
+);
+
+jsTest.log.info("Test 8: Roles only, no DN, no SNI -- should fail");
+runTest(
+    [{"type": 0x01, "value": "h2"}],
+    {
+        "ssl": [{"type": 0xe1, "value": kRolesDer}],
+    },
+    false,
+);
+
+jsTest.log.info("Test 9: DN and roles without SNI");
+runTest(
+    [{"type": 0x01, "value": "h2"}],
+    {
+        "ssl": [
+            {"type": 0xe0, "value": kDN},
+            {"type": 0xe1, "value": kRolesDer},
+        ],
+    },
+    true,
 );
 
 MongoRunner.stopMongod(mongod);

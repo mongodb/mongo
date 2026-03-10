@@ -49,6 +49,18 @@ public:
           _subjectName(std::move(subjectName)),
           _sniName(std::move(sniName)),
           _roles(std::move(roles)) {}
+
+    // Similar to the above constructor, but allows explicitly setting _isTLS to false for the case
+    // where we want to populate SSLPeerInfo from proxy protocol TLVs on a non-TLS connection. In
+    // this case, we can still populate the SNI and role information from the proxy protocol header.
+    SSLPeerInfo(bool isTLS,
+                SSLX509Name subjectName,
+                boost::optional<std::string> sniName = {},
+                stdx::unordered_set<RoleName> roles = {})
+        : _isTLS(isTLS),
+          _subjectName(std::move(subjectName)),
+          _sniName(std::move(sniName)),
+          _roles(std::move(roles)) {}
     SSLPeerInfo() = default;
 
     explicit SSLPeerInfo(boost::optional<std::string> sniName)

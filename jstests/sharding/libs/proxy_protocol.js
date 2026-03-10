@@ -7,8 +7,16 @@ import {getPython3Binary} from "jstests/libs/python.js";
 export class ProxyProtocolServer {
     /**
      * Create a new proxy protocol server.
+     *
+     * @param {number} ingress_port - Port to listen on for client connections.
+     * @param {number} egress_port - Port to forward to (ignored when options.egressUnixSocket is set).
+     * @param {number} version - Proxy protocol version (1 or 2).
+     * @param {Object} [options] - Optional configuration.
+     * @param {string} [options.egressUnixSocket] - Forward to this Unix domain socket instead of TCP.
+     * @param {string} [options.ingressTLSCert] - PEM file for proxy's TLS server certificate + key.
+     * @param {string} [options.ingressTLSCA] - CA PEM file for verifying client certs on ingress.
      */
-    constructor(ingress_port, egress_port, version) {
+    constructor(ingress_port, egress_port, version, options = {}) {
         this.python = getPython3Binary();
 
         print("Using python interpreter: " + this.python);
@@ -23,6 +31,13 @@ export class ProxyProtocolServer {
 
         this.ingress_address = "127.0.0.1";
         this.egress_address = "127.0.0.1";
+
+        // Optional: forward egress to a Unix domain socket instead of TCP.
+        this.egress_unix_socket = options.egressUnixSocket || null;
+
+        // Optional: terminate TLS on the ingress side.
+        this.ingress_tls_cert = options.ingressTLSCert || null;
+        this.ingress_tls_ca = options.ingressTLSCA || null;
 
         // The file that will serve as stdin for the ProxyProtocolServer process. This file will
         // only be used to supply tlv structs to the server.
@@ -66,7 +81,31 @@ export class ProxyProtocolServer {
      * Start the server.
      */
     start() {
-        const ingressInterface = this.ingress_address + ":" + this.ingress_port;
+        const ingressHostPort = this.ingress_address + ":" + this.ingress_port;
+
+        // Build the --service source (ingress) address. When TLS is configured, use the ssl://
+        // scheme so the proxy-protocol library terminates TLS on the ingress side.
+        let serviceIngress;
+        if (this.ingress_tls_cert) {
+            const params = [`cert=${this.ingress_tls_cert}`];
+            if (this.ingress_tls_ca) {
+                params.push(`cafile=${this.ingress_tls_ca}`);
+                params.push("verify=CERT_OPTIONAL");
+            }
+            serviceIngress = `ssl://${ingressHostPort}?${params.join("&")}`;
+        } else {
+            serviceIngress = ingressHostPort;
+        }
+
+        // Build the --service destination (egress) address. When egressUnixSocket is set, the
+        // actual connection goes to the Unix socket (via --unix-egress), but the library still
+        // needs a destination address for CLI parsing, so we provide a dummy one.
+        let serviceEgress;
+        if (this.egress_unix_socket) {
+            serviceEgress = `localhost:0?pp=v${this.version}`;
+        } else {
+            serviceEgress = this.egress_address + ":" + this.egress_port + "?pp=v" + this.version;
+        }
 
         const args = [
             this.python,
@@ -74,19 +113,23 @@ export class ProxyProtocolServer {
             this.web_server_py,
             "--pp2-tlv-file",
             this.tlvFile,
-            "--service",
-            ingressInterface,
-            this.egress_address + ":" + this.egress_port + "?pp=v" + this.version,
         ];
+
+        if (this.egress_unix_socket) {
+            args.push("--unix-egress", this.egress_unix_socket);
+        }
+
+        args.push("--service", serviceIngress, serviceEgress);
 
         clearRawMongoProgramOutput();
         this.pid = _startMongoProgram({args});
 
-        // Wait for the web server to listen on the configured port.
+        // Wait for the web server to listen on the configured port. The log message always
+        // prints the host:port regardless of whether TLS is enabled.
         let checkProgramResult, checkLogResult;
         const timeoutMillis = 30_000;
         const retryIntervalMillis = 500;
-        const expectedLogPattern = `Now listening on ${ingressInterface}`;
+        const expectedLogPattern = `Now listening on ${ingressHostPort}`;
         assert.soon(
             () => {
                 checkProgramResult = checkProgram(this.pid);

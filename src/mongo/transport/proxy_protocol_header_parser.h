@@ -53,7 +53,46 @@ namespace mongo::transport {
  * the minimum TCP MTU.
  */
 constexpr size_t kDefaultProxyProtocolHeaderReadSize = 536;
+
+/**
+ * Adapted from https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+ */
+
+/**
+ * Authority TLV containing the authority portion of the HTTP request, as defined in RFC 7230
+ * Section 5.3. In the Proxy Protocol v2 (PP2), this corresponds to the top-level AUTHORITY TLV
+ * (PP2_TYPE_AUTHORITY, 0x02). It is commonly used by proxies to convey the Server Name Indication
+ * (SNI) from the TLS handshake, allowing routing of encrypted traffic based on the intended
+ * hostname without decrypting it. For example, if the client connects to https://my.mongodb.com,
+ * the kProxyProtocolTypeAuthority value will likely be my.mongodb.com. This field is used to
+ * populate the host names in SSLPeerInfo, so that downstream servers can know about the original
+ * hostname requested. It is defined in section 2.2.2 of the Proxy Protocol specification
+ * (https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt). In MongoDB, this is used by the
+ * split horizon logic to determine the horizons to apply to the connection, and is used to populate
+ * the SNI field in SSLPeerInfo.
+ */
+constexpr uint8_t kProxyProtocolTypeAuthority = 0x02;
+
+/**
+ * SSL TLV types, used to indicate various SSL-related information.
+ */
 constexpr uint8_t kProxyProtocolSSLTlvType = 0x20;
+
+/**
+ * MongoDB custom PP2 TLV type as per MongoDB Proxy Protocol Technical Design document.
+ * The kProxyProtocolSSLTlvDN TLV is used to indicate the distinguished name (DN) from the client's
+ * SSL certificate. The value of this TLV is a string representing the distinguished name, such as
+ * "CN=client.mongodb.com, OU=Clients, O=MongoDB, L=New York, ST=NY, C=US"
+ */
+constexpr uint8_t kProxyProtocolSSLTlvDN = 0xE0;
+
+/**
+ * MongoDB custom PP2 TLV type as per MongoDB Proxy Protocol Technical Design document.
+ * The kProxyProtocolSSLTlvPeerRoles TLV is used to indicate the roles of the peer in the SSL
+ * connection. The value of this TLV is a string representing the MongoDB roles. Use the
+ * parsePeerRoles function to parse this data into a format the server understands
+ */
+constexpr uint8_t kProxyProtocolSSLTlvPeerRoles = 0xE1;
 
 /**
  * Represents the true endpoints that a proxy using the Proxy Protocol is proxying for us.
