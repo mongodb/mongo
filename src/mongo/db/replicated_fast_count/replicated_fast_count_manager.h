@@ -165,6 +165,11 @@ public:
      */
     void disablePeriodicWrites_ForTest();
 
+    /**
+     * Returns true if the fastcount thread is running.
+     */
+    bool isRunning_ForTest();
+
 private:
     void _acquireAndFlush(OperationContext* opCtx, const FastSizeCountMap& dirtyMetadata);
 

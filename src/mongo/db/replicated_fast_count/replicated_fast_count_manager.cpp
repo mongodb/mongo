@@ -196,10 +196,14 @@ void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {
     _isUnderTest = true;
 }
 
+bool ReplicatedFastCountManager::isRunning_ForTest() {
+    return _backgroundThread.joinable();
+}
+
 void ReplicatedFastCountManager::_acquireAndFlush(OperationContext* opCtx,
                                                   const FastSizeCountMap& dirtyMetadata) {
     auto acquisition = _acquireFastCountCollectionForWrite(opCtx);
-    uassert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
+    massert(ErrorCodes::NamespaceNotFound, "Expected fastcount collection to exist", acquisition);
 
     const CollectionPtr& fastCountColl = acquisition->getCollectionPtr();
     invariant(fastCountColl,
@@ -348,7 +352,7 @@ void ReplicatedFastCountManager::_insertOneMetadata(OperationContext* opCtx,
                                                     const CollectionSizeCount& sizeCount,
                                                     const Timestamp& validAsOfTS) {
     // TODO SERVER-118529: Consider error handling more carefully here.
-    uassertStatusOK(collection_internal::insertDocument(
+    massertStatusOK(collection_internal::insertDocument(
         opCtx,
         fastCountColl,
         InsertStatement(_getDocForWrite(uuid, sizeCount, validAsOfTS)),

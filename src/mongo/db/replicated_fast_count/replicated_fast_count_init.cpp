@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -39,46 +40,53 @@
 
 namespace mongo {
 
-Status createFastcountCollection(OperationContext* opCtx) {
-    try {
+namespace {
 
-        WriteUnitOfWork wuow(opCtx);
-        Status createCollectionStatus = createCollection(
-            opCtx,
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()},
-            BSONObj{});
-        uassert(11757500,
-                str::stream() << "Failed to create the replicated fast count collection: "
-                              << NamespaceString::makeGlobalConfigCollection(
-                                     NamespaceString::kReplicatedFastCountStore)
-                                     .toStringForErrorMsg()
-                              << causedBy(createCollectionStatus.reason()) << "code"
-                              << createCollectionStatus.code(),
-                createCollectionStatus.isOK() ||
-                    createCollectionStatus.code() == ErrorCodes::NamespaceExists);
+void _createInternalFastCountCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        StringData collDescription) {
+    auto createCollectionStatus = createCollection(
+        opCtx,
+        nss,
+        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()},
+        BSONObj{});
 
-        if (createCollectionStatus.isOK()) {
-            LOGV2(11718601,
-                  "Created internal fastcount collection.",
-                  "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                                  NamespaceString::kReplicatedFastCountStore)
-                                  .toStringForErrorMsg());
-        } else if (createCollectionStatus.code() == ErrorCodes::NamespaceExists) {
-            LOGV2(11886900,
-                  "Internal fastcount collection already exists.",
-                  "ns"_attr = NamespaceString::makeGlobalConfigCollection(
-                                  NamespaceString::kReplicatedFastCountStore)
-                                  .toStringForErrorMsg());
-        }
+    massert(11757500,
+            fmt::format("Failed to create the {} collection with error '{}' and code {}",
+                        collDescription,
+                        createCollectionStatus.reason(),
+                        createCollectionStatus.code()),
+            createCollectionStatus.isOK() ||
+                createCollectionStatus.code() == ErrorCodes::NamespaceExists);
 
-        wuow.commit();
-
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+    if (createCollectionStatus.isOK()) {
+        LOGV2(11718601,
+              "Created internal {collDescription} collection.",
+              "collDescription"_attr = collDescription,
+              "ns"_attr = nss.toStringForErrorMsg());
+    } else if (createCollectionStatus.code() == ErrorCodes::NamespaceExists) {
+        LOGV2(11886900,
+              "{collDescription} collection already exists.",
+              "collDescription"_attr = collDescription,
+              "ns"_attr = nss.toStringForErrorMsg());
     }
+}
 
-    return Status::OK();
+void _createInternalFastCountCollections(OperationContext* opCtx) {
+    _createInternalFastCountCollection(
+        opCtx,
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+        "replicated fast count metadata store");
+    _createInternalFastCountCollection(opCtx,
+                                       NamespaceString::makeGlobalConfigCollection(
+                                           NamespaceString::kReplicatedFastCountStoreTimestamps),
+                                       "replicated fast count metadata store timestamps");
+}
+}  // namespace
+
+void setUpReplicatedFastCount(OperationContext* opCtx) {
+    _createInternalFastCountCollections(opCtx);
+    ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
 }
 
 }  // namespace mongo

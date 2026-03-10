@@ -684,8 +684,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        uassertStatusOK(createFastcountCollection(opCtx));
-        ReplicatedFastCountManager::get(opCtx->getServiceContext()).startup(opCtx);
+        setUpReplicatedFastCount(opCtx);
     }
 
     // Create the pre-images collection if it doesn't exist yet.

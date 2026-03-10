@@ -712,9 +712,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     // TODO SERVER-120855: Revisit running the thread in standalone mode.
     if (isReplicatedFastCountEnabled(startupOpCtx.get()) && isStandalone &&
         !storageGlobalParams.validate) {
-        uassertStatusOK(createFastcountCollection(startupOpCtx.get()));
-        ReplicatedFastCountManager::get(startupOpCtx.get()->getServiceContext())
-            .startup(startupOpCtx.get());
+        setUpReplicatedFastCount(startupOpCtx.get());
     }
 
     if (gFlowControlEnabled.load()) {

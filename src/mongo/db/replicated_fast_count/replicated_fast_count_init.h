@@ -32,5 +32,10 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-MONGO_MOD_PUBLIC Status createFastcountCollection(OperationContext* opCtx);
-}
+/**
+ * Sets up the internal collections that are used to persist replicated fast count metadata and
+ * starts up the replicated fast count manager thread. Throws an exception if the internal
+ * collections cannot be created.
+ */
+MONGO_MOD_PUBLIC void setUpReplicatedFastCount(OperationContext* opCtx);
+}  // namespace mongo

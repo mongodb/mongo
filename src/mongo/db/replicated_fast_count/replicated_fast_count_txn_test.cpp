@@ -85,10 +85,10 @@ protected:
 
         // Now your replicated fast count setup, using opCtx()
         _opCtx = opCtx();
-        ASSERT_OK(createFastcountCollection(_opCtx));
         _fastCountManager = &ReplicatedFastCountManager::get(_opCtx->getServiceContext());
         _fastCountManager->disablePeriodicWrites_ForTest();
-        _fastCountManager->startup(_opCtx);
+
+        setUpReplicatedFastCount(_opCtx);
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
     }

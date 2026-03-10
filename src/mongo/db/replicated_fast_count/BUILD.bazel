@@ -75,6 +75,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "replicated_fast_count_test",
     srcs = [
+        "replicated_fast_count_init_test.cpp",
         "replicated_fast_count_test.cpp",
         "replicated_fast_count_txn_test.cpp",
     ],

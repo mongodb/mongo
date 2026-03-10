@@ -64,14 +64,13 @@ protected:
         registry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
-        ASSERT_OK(createFastcountCollection(_opCtx));
-
         _fastCountManager = &ReplicatedFastCountManager::get(_opCtx->getServiceContext());
         // Allow for control over when we write to our internal collection for testing. We only
         // write to the internal collection when we explicitly call
         // ReplicatedFastCountManager::flushSync_ForTest().
         _fastCountManager->disablePeriodicWrites_ForTest();
-        _fastCountManager->startup(_opCtx);
+
+        setUpReplicatedFastCount(_opCtx);
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
