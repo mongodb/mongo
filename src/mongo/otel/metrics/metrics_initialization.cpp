@@ -168,10 +168,9 @@ Status initializePrometheusFileExporter(const std::string& directory,
           "directory"_attr = directory,
           "maxConsecutiveFailures"_attr = maxConsecutiveFailures);
 
-    auto pid = ProcessId::getCurrent().toString();
     StatusWith<std::unique_ptr<metrics_sdk::PushMetricExporter>> prometheusFileExporter =
         createPrometheusFileExporter(
-            /*filename=*/fmt::format("{}/mongodb-{}-prometheus-metrics.txt", directory, pid),
+            /*filename=*/fmt::format("{}/mongodb-prometheus-metrics.txt", directory),
             {.maxConsecutiveFailures = maxConsecutiveFailures});
     if (!prometheusFileExporter.isOK()) {
         return prometheusFileExporter.getStatus();
