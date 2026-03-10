@@ -52,7 +52,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -551,7 +551,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     boost::optional<std::vector<write_ops::UpdateOpEntry>> updates;
     boost::optional<std::vector<write_ops::DeleteOpEntry>> deletes;
 
-    unified_write_executor::WriteBatchQueryStatsRegistrar registrar;
+    query_stats::WriteCmdQueryStatsRegistrar registrar;
     for (auto&& targetedWrite : targetedBatch.getWrites()) {
         const ItemIndexChildIndexPair& writeOpRef = targetedWrite->writeOpRef;
 

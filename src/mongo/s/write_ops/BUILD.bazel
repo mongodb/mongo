@@ -73,6 +73,16 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "write_cmd_query_stats_registrar",
+    srcs = [
+        "write_cmd_query_stats_registrar.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/query_stats:update_key",
+    ],
+)
+
+mongo_cc_library(
     name = "sharded_write_ops",
     srcs = [
         "batch_write_exec.cpp",
@@ -86,10 +96,10 @@ mongo_cc_library(
         "fle",
         "pause_migrations_during_multi_updates_enablement",
         "wc_error",
+        "write_cmd_query_stats_registrar",
         "//src/mongo:base",
         "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
         "//src/mongo/s:sharding_write_without_shard_key_api",
         "//src/mongo/s/commands/query_cmd:populate_cursor",
-        "//src/mongo/s/write_ops/unified_write_executor:write_batch_query_stats_registrar",
     ],
 )

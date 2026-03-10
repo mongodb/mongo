@@ -72,7 +72,7 @@
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_upsert_detail.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -561,7 +561,7 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
     return router.routeWithRoutingContext(
         "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
             // If supported, compute QueryShapeHash and record it in CurOp
-            unified_write_executor::WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+            query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
                 opCtx, WriteCommandRef{req}, true /* skipRegistration */);
 
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
@@ -655,7 +655,7 @@ void ClusterWriteCmd::executeWriteOpExplain(OperationContext* opCtx,
     router.routeWithRoutingContext(
         "explain write"_sd, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
             // If supported, compute QueryShapeHash and record it in CurOp
-            unified_write_executor::WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+            query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
                 opCtx, WriteCommandRef{*requestPtr}, true /* skipRegistration */);
 
             const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);

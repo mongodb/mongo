@@ -33,7 +33,7 @@
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
 namespace mongo {
 namespace coordinate_multi_update_util {
@@ -102,8 +102,8 @@ BSONObj makeCommandForOp(OperationContext* opCtx,
     clientRequest.getNS().serializeCollectionName(&bob, getCommandNameForOp(op));
     if (op.getOpType() == BatchedCommandRequest::BatchType_Update) {
         auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
-        unified_write_executor::WriteBatchQueryStatsRegistrar{}
-            .setIncludeQueryStatsMetricsIfRequested(opCtx, op.getIndex(), updateOpEntry);
+        query_stats::WriteCmdQueryStatsRegistrar{}.setIncludeQueryStatsMetricsIfRequested(
+            opCtx, op.getIndex(), updateOpEntry);
         bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(updateOpEntry.toBSON()));
     } else {
         bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(getOpAsBson(op)));

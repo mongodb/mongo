@@ -30,15 +30,14 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/db/error_labels.h"
-#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
 #include "mongo/s/write_ops/wc_error.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/exit.h"
 
@@ -385,7 +384,7 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
             // Copy the UpdateOpEntry from the original command, and then update the "sampleId"
             // and "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" fields appropriately.
             std::vector<write_ops::UpdateOpEntry> updateOps;
-            WriteBatchQueryStatsRegistrar registrar;
+            query_stats::WriteCmdQueryStatsRegistrar registrar;
             for (auto& op : ops) {
                 auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
                 registrar.setIncludeQueryStatsMetricsIfRequested(

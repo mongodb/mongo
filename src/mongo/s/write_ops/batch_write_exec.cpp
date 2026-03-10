@@ -62,7 +62,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -751,7 +751,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     BatchWriteOp batchOp(opCtx, clientRequest);
 
     // Register query stats key
-    unified_write_executor::WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+    query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
         opCtx, WriteCommandRef{clientRequest});
 
     // Current batch status

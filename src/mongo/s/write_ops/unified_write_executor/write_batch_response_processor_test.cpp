@@ -2612,7 +2612,7 @@ TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromShardResp
     const bool inTransaction = false;
 
     // Set up QueryStatsInfo in OpDebug for each operation index.
-    // This simulates what WriteBatchQueryStatsRegistrar::parseAndRegisterRequest does.
+    // This simulates what WriteCmdQueryStatsRegistrar::parseAndRegisterRequest does.
     auto& opDebug = CurOp::get(opCtx)->debug();
     opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
     opDebug.setQueryStatsInfoAtOpIndex(1, OpDebug::QueryStatsInfo{});

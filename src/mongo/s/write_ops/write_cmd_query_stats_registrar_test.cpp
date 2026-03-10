@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/curop.h"
@@ -45,18 +45,18 @@
 
 #include "gtest/gtest.h"
 
-namespace mongo::unified_write_executor {
+namespace mongo::query_stats {
 
 namespace {
 
-class WriteBatchQueryStatsRegistrarTest : public ServiceContextTest {
+class WriteCmdQueryStatsRegistrarTest : public ServiceContextTest {
 public:
     const ShardId shardId1 = ShardId("shard1");
     const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("test", "coll0");
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
     const std::set<NamespaceString> nssIsViewfulTimeseries{nss1};
 
-    WriteBatchQueryStatsRegistrarTest() {
+    WriteCmdQueryStatsRegistrarTest() {
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
 
@@ -73,18 +73,18 @@ public:
 };
 
 /**
- * Test for WriteBatchQueryStatsRegistrar::parseAndRegisterRequest
+ * Test for WriteCmdQueryStatsRegistrar::parseAndRegisterRequest
  * Parametrized based on whether the command should be registered with the query stats store
  */
-class WriteBatchQueryStatsRegistrarRegisterRequestFixture
-    : public WriteBatchQueryStatsRegistrarTest,
-      public testing::WithParamInterface<bool> {};
+class WriteCmdQueryStatsRegistrarRegisterRequestFixture : public WriteCmdQueryStatsRegistrarTest,
+                                                          public testing::WithParamInterface<bool> {
+};
 
 /**
  * Registers an update batch with multiple updates
  * Note: In the multi-update case we don't compute the QueryShapeHash for the command
  */
-TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestMultiUpdate) {
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestMultiUpdate) {
     bool skipRegistration = GetParam();
 
     // Create a batch update request
@@ -101,7 +101,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequ
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
 
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
@@ -152,7 +152,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequ
 }
 
 
-TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        ParseAndRegisterRequestSingleUpdateReplacement) {
     bool skipRegistration = GetParam();
 
@@ -168,7 +168,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
 
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
@@ -210,7 +210,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
-TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        ParseAndRegisterRequestSingleUpdateModifier) {
     bool skipRegistration = GetParam();
 
@@ -226,7 +226,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
 
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
@@ -274,7 +274,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
-TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        ParseAndRegisterRequestSingleUpdatePipeline) {
     bool skipRegistration = GetParam();
 
@@ -290,7 +290,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
 
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
 
     const auto& opDebug = CurOp::get(opCtx)->debug();
 
@@ -338,7 +338,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
             opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
 }
 
-TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        RegisterRequestForShardsvrCoordinateMultiUpdateTest) {
     bool skipRegistration = GetParam();
 
@@ -363,7 +363,7 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
     BatchedCommandRequest batchRequest(updateCommandRequest);
     WriteCommandRef cmdRef{batchRequest};
 
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
 
     // Asserts that none of the update ops is registered.
     const auto& opDebug = CurOp::get(opCtx)->debug();
@@ -380,11 +380,11 @@ TEST_P(WriteBatchQueryStatsRegistrarRegisterRequestFixture,
 }
 
 INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
-                         WriteBatchQueryStatsRegistrarRegisterRequestFixture,
+                         WriteCmdQueryStatsRegistrarRegisterRequestFixture,
                          testing::Bool());
 
-TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTest) {
-    WriteBatchQueryStatsRegistrar queryStatsRegistrar;
+TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTest) {
+    WriteCmdQueryStatsRegistrar queryStatsRegistrar;
 
     auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
         OpDebug::QueryStatsInfo qsi;
@@ -422,7 +422,7 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
     // Asserts that we are allowed to request metrics for update ops up to
     // kMaxBatchOpsMetricsRequested.
     for (size_t opIndex = 2;
-         opIndex < WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
+         opIndex < WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
          opIndex++) {
         registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
 
@@ -439,8 +439,8 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
 
     // Asserts that after reaching the limit, we no longer request for metrics so as to prevent the
     // response growing beyond the allowed object size limit.
-    for (size_t opIndex = WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
-         opIndex < WriteBatchQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 10;
+    for (size_t opIndex = WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
+         opIndex < WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 10;
          opIndex++) {
         registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
 
@@ -451,12 +451,12 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequested
     }
 }
 
-TEST_F(WriteBatchQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {
+TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {
     // Setting this to simulate the scenario that a primary shard receives a dispatched update
     // command (_shardsvrCoordinateMultiUpdate) from the router and it has to act like a router.
     opCtx->setCommandForwardedFromRouter();
 
-    WriteBatchQueryStatsRegistrar queryStatsRegistrar;
+    WriteCmdQueryStatsRegistrar queryStatsRegistrar;
 
     auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
         OpDebug::QueryStatsInfo qsi;
@@ -500,7 +500,7 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinate
  * Show that we don't register writes for query stats collection when the write sample rate is zero,
  * even if the read path is configured for query stats collection.
  */
-TEST_F(WriteBatchQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRateIsZero) {
+TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRateIsZero) {
     auto& writeLimiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     writeLimiter.configureSampleBased(0, 42);
@@ -521,7 +521,7 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRate
 
         configureReadLimiter();
 
-        WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(
+        WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
             opCtx, cmdRef, false /* skip request */);
 
         const auto& opDebug = CurOp::get(opCtx)->debug();
@@ -533,4 +533,4 @@ TEST_F(WriteBatchQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRate
 }
 
 }  // namespace
-}  // namespace mongo::unified_write_executor
+}  // namespace mongo::query_stats

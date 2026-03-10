@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
@@ -38,8 +38,7 @@
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/update_request.h"
 
-namespace mongo {
-namespace unified_write_executor {
+namespace mongo::query_stats {
 
 namespace {
 
@@ -183,9 +182,9 @@ bool isAggregationPipeline(CurOp* curOp) {
 
 }  // namespace
 
-void WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCtx,
-                                                            WriteCommandRef cmdRef,
-                                                            bool skipRegistration) {
+void WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCtx,
+                                                          WriteCommandRef cmdRef,
+                                                          bool skipRegistration) {
     // Skips if the top-level command is an aggregation. An aggregation pipeline containing a merge
     // stage may directly invoke cluster::write() to insert documents using replacement updates.
     if (isAggregationPipeline(CurOp::get(opCtx))) {
@@ -232,7 +231,7 @@ void WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* op
         });
 }
 
-void WriteBatchQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
+void WriteCmdQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
     OperationContext* opCtx, int opIndex, write_ops::UpdateOpEntry& updateOpEntry) {
     CurOp* curOp = CurOp::get(opCtx);
     if (isAggregationPipeline(curOp)) {
@@ -257,5 +256,4 @@ void WriteBatchQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
     }
 }
 
-}  // namespace unified_write_executor
-}  // namespace mongo
+}  // namespace mongo::query_stats

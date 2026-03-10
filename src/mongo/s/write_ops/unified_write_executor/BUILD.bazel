@@ -10,16 +10,6 @@ exports_files(
 )
 
 mongo_cc_library(
-    name = "write_batch_query_stats_registrar",
-    srcs = [
-        "write_batch_query_stats_registrar.cpp",
-    ],
-    deps = [
-        "//src/mongo/db/query/query_stats:update_key",
-    ],
-)
-
-mongo_cc_library(
     name = "unified_write_executor",
     srcs = [
         "stats.cpp",
@@ -32,7 +22,6 @@ mongo_cc_library(
         "write_op_producer.cpp",
     ],
     deps = [
-        "write_batch_query_stats_registrar",
         "//src/mongo/db/commands/query_cmd:bulk_write_common",
         "//src/mongo/db/query/write_ops:parsed_update",
         "//src/mongo/s:sharding_router_api",
@@ -43,6 +32,7 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement",
         "//src/mongo/s/write_ops:sharded_write_ops",
         "//src/mongo/s/write_ops:wc_error",
+        "//src/mongo/s/write_ops:write_cmd_query_stats_registrar",
     ],
 )
 
@@ -51,7 +41,6 @@ mongo_cc_unit_test(
     srcs = [
         "unified_write_executor_test.cpp",
         "write_batch_executor_test.cpp",
-        "write_batch_query_stats_registrar_test.cpp",
         "write_batch_response_processor_test.cpp",
         "write_op_analyzer_test.cpp",
         "write_op_batcher_test.cpp",

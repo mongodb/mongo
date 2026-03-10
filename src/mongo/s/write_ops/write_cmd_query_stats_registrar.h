@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/db/curop.h"
+#include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
 
 #include <absl/container/flat_hash_set.h>
 
-namespace mongo {
-namespace unified_write_executor {
+namespace mongo::query_stats {
 
-class WriteBatchQueryStatsRegistrar {
+class WriteCmdQueryStatsRegistrar {
 public:
     /**
      * The maximum num of write ops allowed to be requested for query stats metrics. This limit
@@ -46,7 +46,7 @@ public:
      */
     static constexpr size_t kMaxBatchOpsMetricsRequested = 10'000;
 
-    WriteBatchQueryStatsRegistrar() {}
+    WriteCmdQueryStatsRegistrar() {}
 
     /**
      * Register the write ops inside 'cmdRef' for query stats.
@@ -70,5 +70,4 @@ public:
 private:
     size_t _numOpsWithMetricsRequested = 0;
 };
-}  // namespace unified_write_executor
-}  // namespace mongo
+}  // namespace mongo::query_stats

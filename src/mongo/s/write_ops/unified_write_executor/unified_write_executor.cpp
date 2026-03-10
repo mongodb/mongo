@@ -35,11 +35,11 @@
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_query_stats_registrar.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_scheduler.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
+#include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
 namespace mongo {
 namespace unified_write_executor {
@@ -80,7 +80,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
     // Register query stats key
-    WriteBatchQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
+    query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
 
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
