@@ -56,18 +56,18 @@ TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
     const auto savedErrno1 = errno;
     ASSERT_EQ(rlimitReturnCode, 0) << savedErrno1;
 
-    ASSERT_GTE(originalLimit.rlim_max, 10);
+    ASSERT_GTE(originalLimit.rlim_max, 20);
 
     newLimit = originalLimit;
-    newLimit.rlim_cur = 10;
+    newLimit.rlim_cur = 20;
     rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &newLimit);
     const auto savedErrno2 = errno;
     ASSERT_EQ(rlimitReturnCode, 0) << savedErrno2;
 
-    // 80% of half of 10 is 4, which is the arithmetic we want to verify in the
+    // 80% of half of 20 is 8, which is the arithmetic we want to verify in the
     // `getSupportedMax` function via the `maxOpenSessions` getter.
     SessionManagerCommonNoop sm(getServiceContext());
-    ASSERT_EQ(sm.maxOpenSessions(), 4);
+    ASSERT_EQ(sm.maxOpenSessions(), 8);
 
     rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &originalLimit);
     const auto savedErrno3 = errno;
