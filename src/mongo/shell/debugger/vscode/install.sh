@@ -25,4 +25,7 @@ npm run package
 code --install-extension $EXT_NAME-$VERSION.vsix
 rm $EXT_NAME-$VERSION.vsix
 
+# Cleanup node_modules (otherwise buildtools expect bazel files to be present)
+rm -rf node_modules
+
 popd >/dev/null
