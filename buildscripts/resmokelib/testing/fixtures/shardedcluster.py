@@ -804,9 +804,14 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         """Install a mongos. Called by a builder."""
         self.mongos.append(mongos)
 
+    _ADD_SHARD_TIMEOUT_SECS = 120
+    _ADD_SHARD_RETRY_INTERVAL_SECS = 5
+
     def _add_shard(self, client, shard, is_config_shard):
         """
         Add the specified program as a shard by executing the addShard command.
+
+        Retries on transient connection errors for up to _ADD_SHARD_TIMEOUT_SECS.
 
         See https://docs.mongodb.org/manual/reference/command/addShard for more details.
         """
@@ -814,10 +819,34 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         if is_config_shard:
             if not self.use_auto_bootstrap_procedure:
                 self.logger.info("Adding %s as config shard...", connection_string)
-                client.admin.command({"transitionFromDedicatedConfigServer": 1})
+                cmd = {"transitionFromDedicatedConfigServer": 1}
+            else:
+                return
         else:
             self.logger.info("Adding %s as a shard...", connection_string)
-            client.admin.command({"addShard": connection_string})
+            cmd = {"addShard": connection_string}
+
+        deadline = time.time() + self._ADD_SHARD_TIMEOUT_SECS
+        while True:
+            try:
+                client.admin.command(cmd)
+                return
+            except pymongo.errors.ConnectionFailure as err:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    raise self.fixturelib.ServerFailure(
+                        "Failed to add shard {} after {} seconds: {}".format(
+                            connection_string, self._ADD_SHARD_TIMEOUT_SECS, err
+                        )
+                    )
+                self.logger.info(
+                    "Retrying add shard for %s due to connection failure: %s. "
+                    "%.1f seconds remaining.",
+                    connection_string,
+                    err,
+                    remaining,
+                )
+                time.sleep(self._ADD_SHARD_RETRY_INTERVAL_SECS)
 
     def internode_validation(self):
         for replicaset in self.shards:
