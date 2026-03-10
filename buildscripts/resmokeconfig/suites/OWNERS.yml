@@ -189,6 +189,9 @@ filters:
   - "sharding_config_shard.yml":
     approvers:
       - 10gen/server-cluster-scalability
+  - "concurrency_sharded_initial_sync.yml":
+    approvers:
+      - 10gen/server-initial-sync
   - "concurrency_sharded_with_balancer_and_config_shard.yml":
     approvers:
       - 10gen/server-cluster-scalability
