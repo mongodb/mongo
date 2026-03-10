@@ -694,3 +694,30 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-2xlarge
       - name: .fuzzer_deterministic !.multiversion
+
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-with-replicated-size-and-count
+    display_name: "Amazon Linux 2023 arm64 Enterprise (all feature flags) with replicated size and count"
+    tags: []
+    cron: "0 1 * * *" # Run daily once at 4am.
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --additionalFeatureFlags=featureFlagReplicatedFastCount
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,disables_test_commands
+    tasks:
+      - name: concurrency_gen
+      - name: concurrency_replication_gen
+      - name: concurrency_sharded_replication_gen
+      - name: concurrency_sharded_replication_primary_driven_index_builds_gen
+      - name: replica_sets_jscore_passthrough_gen
+      - name: replica_sets_jscore_passthrough_primary_driven_index_builds_gen
+      - name: replica_sets_uninitialized_fcv_jscore_passthrough_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: jsCore
+      - name: jsCore_txns
