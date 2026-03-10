@@ -122,6 +122,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.wasLoadShed = true;
     currentAdditiveMetrics.wasDeprioritized = false;
     additiveMetricsToAdd.wasDeprioritized = true;
+    currentAdditiveMetrics.wasMarkedNonDeprioritizable = false;
+    additiveMetricsToAdd.wasMarkedNonDeprioritizable = true;
     currentAdditiveMetrics.numInterruptChecks = 1;
     additiveMetricsToAdd.numInterruptChecks = 2;
     currentAdditiveMetrics.overdueInterruptApproxMax = Milliseconds{100};
@@ -186,6 +188,9 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.wasLoadShed || *additiveMetricsToAdd.wasLoadShed);
     ASSERT_EQ(*currentAdditiveMetrics.wasDeprioritized,
               *additiveMetricsBeforeAdd.wasDeprioritized || *additiveMetricsToAdd.wasDeprioritized);
+    ASSERT_EQ(*currentAdditiveMetrics.wasMarkedNonDeprioritizable,
+              *additiveMetricsBeforeAdd.wasMarkedNonDeprioritizable ||
+                  *additiveMetricsToAdd.wasMarkedNonDeprioritizable);
     ASSERT_EQ(*currentAdditiveMetrics.numInterruptChecks,
               *additiveMetricsBeforeAdd.numInterruptChecks +
                   *additiveMetricsToAdd.numInterruptChecks);
@@ -221,6 +226,7 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.totalAdmissions = 1;
     additiveMetricsToAdd.wasLoadShed = true;
     additiveMetricsToAdd.wasDeprioritized = true;
+    additiveMetricsToAdd.wasMarkedNonDeprioritizable = true;
     additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds(100);
     additiveMetricsToAdd.numInterruptChecks = 1;
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
@@ -295,6 +301,8 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     ASSERT_EQ(*currentAdditiveMetrics.totalAdmissions, *additiveMetricsToAdd.totalAdmissions);
     ASSERT_EQ(*currentAdditiveMetrics.wasLoadShed, *additiveMetricsToAdd.wasLoadShed);
     ASSERT_EQ(*currentAdditiveMetrics.wasDeprioritized, *additiveMetricsToAdd.wasDeprioritized);
+    ASSERT_EQ(*currentAdditiveMetrics.wasMarkedNonDeprioritizable,
+              *additiveMetricsToAdd.wasMarkedNonDeprioritizable);
 
     // The 'planningTime' and 'nDocsSampled' fields for the current AdditiveMetrics object were not
     // initialized, so they should be treated as zero.
@@ -343,6 +351,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.totalAdmissions = 2;
     additiveMetrics.wasLoadShed = false;
     additiveMetrics.wasDeprioritized = false;
+    additiveMetrics.wasMarkedNonDeprioritizable = false;
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.nMatched = 1;
@@ -383,6 +392,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     cursorMetrics.setTotalAdmissions(5);
     cursorMetrics.setWasLoadShed(true);
     cursorMetrics.setWasDeprioritized(true);
+    cursorMetrics.setWasMarkedNonDeprioritizable(true);
 
     additiveMetrics.aggregateCursorMetrics(cursorMetrics);
 
@@ -408,6 +418,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.totalAdmissions, 7);
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
+    ASSERT_EQ(*additiveMetrics.wasMarkedNonDeprioritizable, true);
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 1);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
@@ -500,6 +511,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.totalAdmissions = 3;
     additiveMetrics.wasLoadShed = true;
     additiveMetrics.wasDeprioritized = true;
+    additiveMetrics.wasMarkedNonDeprioritizable = true;
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.planningTime = Microseconds(100);
@@ -520,6 +532,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.totalAdmissions = 2;
     remoteMetrics.wasLoadShed = false;
     remoteMetrics.wasDeprioritized = false;
+    remoteMetrics.wasMarkedNonDeprioritizable = false;
     remoteMetrics.numInterruptChecks = 1;
     remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
     remoteMetrics.planningTime = Microseconds(150);
@@ -543,6 +556,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.totalAdmissions, 5);
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
+    ASSERT_EQ(*additiveMetrics.wasMarkedNonDeprioritizable, true);
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
@@ -895,6 +909,39 @@ TEST(CurOpTest, ReportStateIncludesPriorityLowered) {
 
         ASSERT_TRUE(state.hasField("priorityLowered"));
         ASSERT_TRUE(state["priorityLowered"].Bool());
+    }
+}
+
+TEST(CurOpTest, ReportStateIncludesWasMarkedNonDeprioritizable) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+    curOp->ensureStarted();
+
+    // 1. Check the default state.
+    // The 'wasMarkedNonDeprioritizable' field should always be present and default to 'false'.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("wasMarkedNonDeprioritizable"));
+        ASSERT_FALSE(state["wasMarkedNonDeprioritizable"].Bool());
+    }
+
+    // 2. Mark the operation non-deprioritizable via the ExecutionAdmissionContext.
+    admission::execution_control::ScopedTaskTypeNonDeprioritizable nonDeprioritizableTask(
+        opCtx.get());
+
+    // 3. Check the state again.
+    // The 'wasMarkedNonDeprioritizable' field should now be 'true'.
+    {
+        BSONObjBuilder bob;
+        curOp->reportState(&bob, SerializationContext{});
+        BSONObj state = bob.obj();
+
+        ASSERT_TRUE(state.hasField("wasMarkedNonDeprioritizable"));
+        ASSERT_TRUE(state["wasMarkedNonDeprioritizable"].Bool());
     }
 }
 
@@ -1398,6 +1445,8 @@ TEST(CurOpTest, SetEndOfOpMetricsForBatchWritesPopulatesAllMetrics) {
     ASSERT_FALSE(*metrics1.wasLoadShed);
     ASSERT_TRUE(metrics1.wasDeprioritized.has_value());
     ASSERT_FALSE(*metrics1.wasDeprioritized);
+    ASSERT_TRUE(metrics1.wasMarkedNonDeprioritizable.has_value());
+    ASSERT_FALSE(*metrics1.wasMarkedNonDeprioritizable);
 
     // -- Interrupt check metrics --
     // numInterruptChecks should reflect the checkForInterrupt() call.

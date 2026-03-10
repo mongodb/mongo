@@ -513,6 +513,9 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
             metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
             metrics.wasDeprioritized =
                 metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
+            metrics.wasMarkedNonDeprioritizable =
+                metrics.wasMarkedNonDeprioritizable.value_or(false) ||
+                admCtx.getMarkedNonDeprioritizable();
         }
     }
 
@@ -1194,6 +1197,7 @@ void CurOp::reportState(BSONObjBuilder* builder,
         const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
 
         builder->append("priorityLowered", admCtx.getPriorityLowered());
+        builder->append("wasMarkedNonDeprioritizable", admCtx.getMarkedNonDeprioritizable());
 
         const auto* stats = opCtx->overdueInterruptCheckStats();
         if (admCtx.getDelinquentAcquisitions() > 0 ||

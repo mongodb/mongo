@@ -99,6 +99,7 @@ void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubse
     totalAdmissions.appendTo(*builder, "totalAdmissions");
     wasLoadShed.appendTo(*builder, "wasLoadShed");
     wasDeprioritized.appendTo(*builder, "wasDeprioritized");
+    wasMarkedNonDeprioritizable.appendTo(*builder, "wasMarkedNonDeprioritizable");
 
     numInterruptChecksPerSec.appendTo(*builder, "numInterruptChecksPerSec");
     overdueInterruptApproxMaxMillis.appendTo(*builder, "overdueInterruptApproxMaxMillis");

@@ -3712,6 +3712,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setTotalAdmissions(5);
         metrics.setWasLoadShed(false);
         metrics.setWasDeprioritized(false);
+        metrics.setWasMarkedNonDeprioritizable(false);
         metrics.setOverdueInterruptApproxMaxMillis(100);
         scheduleResponse(id, {fromjson("{_id: 1}")}, std::move(metrics));
     }
@@ -3742,6 +3743,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.totalAdmissions, 5);
         ASSERT_FALSE(remoteMetrics.wasLoadShed);
         ASSERT_FALSE(remoteMetrics.wasDeprioritized);
+        ASSERT_FALSE(remoteMetrics.wasMarkedNonDeprioritizable);
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 3);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(100));
         ASSERT_EQ(remoteMetrics.nMatched, 1);
@@ -3790,6 +3792,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         metrics.setTotalAdmissions(6);
         metrics.setWasLoadShed(true);
         metrics.setWasDeprioritized(true);
+        metrics.setWasMarkedNonDeprioritizable(true);
         metrics.setOverdueInterruptApproxMaxMillis(200);
         scheduleResponse(CursorId(0), {fromjson("{_id: 2}")}, std::move(metrics));
     }
@@ -3818,6 +3821,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.totalAdmissions, 11);
         ASSERT_TRUE(remoteMetrics.wasLoadShed);
         ASSERT_TRUE(remoteMetrics.wasDeprioritized);
+        ASSERT_TRUE(remoteMetrics.wasMarkedNonDeprioritizable);
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 5);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(200));
         ASSERT_EQ(remoteMetrics.nMatched, 3);
@@ -3853,6 +3857,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.totalAdmissions, 0);
         ASSERT_FALSE(remoteMetrics.wasLoadShed);
         ASSERT_FALSE(remoteMetrics.wasDeprioritized);
+        ASSERT_FALSE(remoteMetrics.wasMarkedNonDeprioritizable);
         ASSERT_EQ(remoteMetrics.numInterruptChecks, 0);
         ASSERT_EQ(remoteMetrics.overdueInterruptApproxMax, Milliseconds(0));
         ASSERT_EQ(remoteMetrics.nMatched, 0);

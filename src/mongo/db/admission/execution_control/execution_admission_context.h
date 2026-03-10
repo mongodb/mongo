@@ -116,6 +116,20 @@ public:
     }
 
     /**
+     * Marks this operation as having been marked non-deprioritizable.
+     */
+    void markedNonDeprioritizable() {
+        _markedNonDeprioritizable.store(true);
+    }
+
+    /**
+     * Returns true if this operation was ever marked as being non-deprioritizable.
+     */
+    bool getMarkedNonDeprioritizable() const {
+        return _markedNonDeprioritizable.loadRelaxed();
+    }
+
+    /**
      * Sets the current operation type (read or write) for stats.
      */
     void setOperationType(ec::OperationType o) {
@@ -179,6 +193,9 @@ public:
 
         // Whether this operation was deprioritized.
         bool wasDeprioritized = false;
+
+        // Whether this operation was ever marked non-deprioritizable.
+        bool wasMarkedNonDeprioritizable = false;
 
         // Whether this operation was in a multi-document transaction.
         bool wasInMultiDocTxn = false;
@@ -259,6 +276,9 @@ private:
 
     // True if this operation was ever heuristically deprioritized.
     Atomic<bool> _priorityLowered{false};
+
+    // True if this was ever marked as non-deprioritizable.
+    Atomic<bool> _markedNonDeprioritizable{false};
 
     // Task type
     Atomic<TaskType> _taskType{TaskType::Default};

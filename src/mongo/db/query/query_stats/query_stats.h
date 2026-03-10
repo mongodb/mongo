@@ -273,6 +273,7 @@ struct QueryStatsSnapshot {
     uint64_t totalAdmissions;
     bool wasLoadShed;
     bool wasDeprioritized;
+    bool wasMarkedNonDeprioritizable;
 };
 
 /**

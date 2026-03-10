@@ -61,6 +61,7 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
       _shortRunningFinalStats(other._shortRunningFinalStats),
       _longRunningFinalStats(other._longRunningFinalStats),
       _priorityLowered(other._priorityLowered.loadRelaxed()),
+      _markedNonDeprioritizable(other._markedNonDeprioritizable.loadRelaxed()),
       _taskType(other._taskType.loadRelaxed()),
       _opType(other._opType),
       _statsFinalized(other._statsFinalized.loadRelaxed()),
@@ -79,6 +80,7 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     _shortRunningFinalStats = other._shortRunningFinalStats;
     _longRunningFinalStats = other._longRunningFinalStats;
     _priorityLowered.store(other._priorityLowered.loadRelaxed());
+    _markedNonDeprioritizable.store(other._markedNonDeprioritizable.loadRelaxed());
     _taskType.store(other._taskType.loadRelaxed());
     _opType = other._opType;
     _statsFinalized.store(other._statsFinalized.loadRelaxed());
@@ -129,6 +131,7 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
     result.readDelinquency = _readDelinquencyStats;
     result.writeDelinquency = _writeDelinquencyStats;
     result.wasDeprioritized = getPriorityLowered();
+    result.wasMarkedNonDeprioritizable = getMarkedNonDeprioritizable();
     result.wasInMultiDocTxn = _wasInMultiDocTxn.loadRelaxed();
 
     return result;
@@ -280,6 +283,8 @@ admission::execution_control::ScopedTaskTypeBackground::ScopedTaskTypeBackground
 
 admission::execution_control::ScopedTaskTypeNonDeprioritizable::ScopedTaskTypeNonDeprioritizable(
     OperationContext* opCtx)
-    : ScopedTaskTypeModifierBase(opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable) {}
+    : ScopedTaskTypeModifierBase(opCtx, ExecutionAdmissionContext::TaskType::NonDeprioritizable) {
+    ExecutionAdmissionContext::get(opCtx).markedNonDeprioritizable();
+}
 
 }  // namespace mongo

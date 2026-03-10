@@ -425,6 +425,7 @@ void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
 bool TicketingSystem::_shouldDeprioritize(OperationContext* opCtx,
                                           ExecutionAdmissionContext* admCtx) const {
     if (isClientDeprioritizationExempted(opCtx->getClient())) {
+        admCtx->markedNonDeprioritizable();
         return false;
     }
 
@@ -553,6 +554,7 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
     bool pioritizationEnabled = usesPrioritization();
     _state.loadRelaxed().appendStats(b);
     b.append("totalDeprioritizations", _opsDeprioritized.loadRelaxed());
+    b.append("totalMarkedNonDeprioritizable", _opsMarkedNonDeprioritizable.loadRelaxed());
     b.append("heuristicDeprioritizationThreshold",
              admission::execution_control::gHeuristicNumAdmissionsDeprioritizeThreshold.load());
 
@@ -690,6 +692,9 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
     // Increment other global statistics counters.
     if (wasDeprioritized) {
         _opsDeprioritized.fetchAndAddRelaxed(1);
+    }
+    if (finalizedStats.wasMarkedNonDeprioritizable) {
+        _opsMarkedNonDeprioritizable.fetchAndAddRelaxed(1);
     }
 
     _admissionsHistogram.record(ExecutionAdmissionContext::get(opCtx).getAdmissions());

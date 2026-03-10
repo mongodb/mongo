@@ -55,6 +55,7 @@ function assertMetricsEqual(
     assertMetricEqual(metrics, "totalAdmissions", undefined);
     assertMetricEqual(metrics, "wasLoadShed", undefined);
     assertMetricEqual(metrics, "wasDeprioritized", undefined);
+    assertMetricEqual(metrics, "wasMarkedNonDeprioritizable", undefined);
 }
 
 function assertWriteMetricsEqual(

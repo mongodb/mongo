@@ -113,6 +113,13 @@ export function getTotalDeprioritizationCount(node) {
     return node.adminCommand({serverStatus: 1}).queues.execution.totalDeprioritizations;
 }
 
+/**
+ * Gets the total number of operations that have been marked non-deprioritizable.
+ */
+export function getTotalMarkedNonDeprioritizableCount(node) {
+    return node.adminCommand({serverStatus: 1}).queues.execution.totalMarkedNonDeprioritizable;
+}
+
 export function getNormalPriorityFinishedCount(node) {
     const stats = getExecutionControlStats(node);
     return (

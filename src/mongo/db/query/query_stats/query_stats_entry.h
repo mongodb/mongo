@@ -92,6 +92,7 @@ struct QueryExecEntry {
     AggregatedMetric<uint64_t> totalAdmissions;
     AggregatedBool wasLoadShed;
     AggregatedBool wasDeprioritized;
+    AggregatedBool wasMarkedNonDeprioritizable;
 
     /**
      * Aggregates the checkForInterrupt stats including getMore requests.

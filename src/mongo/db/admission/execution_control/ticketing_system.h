@@ -354,6 +354,13 @@ private:
     AtomicWord<std::int64_t> _opsDeprioritized;
 
     /**
+     * Counts the total number of operations marked non-deprioritizable. This includes operations
+     * that use ScopedTaskTypeNonDeprioritizable and operations which are affected by client based
+     * exemptions.
+     */
+    AtomicWord<std::int64_t> _opsMarkedNonDeprioritizable;
+
+    /**
      * Accumulate long/short operation statistics for read and write operations.
      */
     AggregatedExecutionStats _operationStats;

@@ -240,6 +240,7 @@ public:
         boost::optional<uint64_t> totalAdmissions;
         boost::optional<bool> wasLoadShed;
         boost::optional<bool> wasDeprioritized;
+        boost::optional<bool> wasMarkedNonDeprioritizable;
 
         // Amount of time spent planning the query. Begins after parsing and ends
         // after optimizations. This metric is expected to be positive regardless of whether the

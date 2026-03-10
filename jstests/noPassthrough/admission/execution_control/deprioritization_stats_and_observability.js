@@ -445,6 +445,7 @@ describe("Execution control statistics and observability", function () {
             assert.gte(statsObj.totalAdmissions.sum, 0);
             assert.gte(statsObj.wasLoadShed.false, 0);
             assert.gte(statsObj.wasDeprioritized.false, 0);
+            assert.gte(statsObj.wasMarkedNonDeprioritizable.false, 0);
         }
 
         it("should report deprioritization in query execution metrics", function () {

@@ -76,6 +76,7 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     totalAdmissions: {"$numberLong": "0"},
     wasLoadShed: false,
     wasDeprioritized: false,
+    wasMarkedNonDeprioritizable: false,
     numInterruptChecks: {"$numberLong": "0"},
     overdueInterruptApproxMaxMillis: {"$numberLong": "0"},
     nMatched: {"$numberLong": "0"},
@@ -349,6 +350,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_EQ(metrics.getTotalAdmissions(), 0);
     ASSERT_FALSE(metrics.getWasLoadShed());
     ASSERT_FALSE(metrics.getWasDeprioritized());
+    ASSERT_FALSE(metrics.getWasMarkedNonDeprioritizable());
     ASSERT_EQ(metrics.getNumInterruptChecks(), 0);
     ASSERT_EQ(metrics.getOverdueInterruptApproxMaxMillis(), 0);
     ASSERT_EQ(metrics.getNMatched(), 0);
@@ -1023,6 +1025,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getTotalAdmissions(), 0);
     ASSERT_FALSE(parsedMetrics->getWasLoadShed());
     ASSERT_FALSE(parsedMetrics->getWasDeprioritized());
+    ASSERT_FALSE(parsedMetrics->getWasMarkedNonDeprioritizable());
     ASSERT_EQ(parsedMetrics->getNumInterruptChecks(), 15);
     ASSERT_EQ(parsedMetrics->getOverdueInterruptApproxMaxMillis(), 0);
     ASSERT_EQ(parsedMetrics->getNMatched(), 1);
@@ -1084,6 +1087,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsToleratesMissingDefaultFields
     ASSERT_EQ(metrics.getTotalAdmissions(), 0);
     ASSERT_FALSE(metrics.getWasLoadShed());
     ASSERT_FALSE(metrics.getWasDeprioritized());
+    ASSERT_FALSE(metrics.getWasMarkedNonDeprioritizable());
 }
 
 }  // namespace

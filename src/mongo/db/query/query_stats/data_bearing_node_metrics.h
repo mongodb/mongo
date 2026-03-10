@@ -73,6 +73,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     uint64_t totalAdmissions = 0;
     bool wasLoadShed = false;
     bool wasDeprioritized = false;
+    bool wasMarkedNonDeprioritizable = false;
 
     Microseconds planningTime{0};
     CardinalityEstimationMethods cardinalityEstimationMethods;
@@ -109,6 +110,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         totalAdmissions += other.totalAdmissions;
         wasLoadShed = wasLoadShed || other.wasLoadShed;
         wasDeprioritized = wasDeprioritized || other.wasDeprioritized;
+        wasMarkedNonDeprioritizable =
+            wasMarkedNonDeprioritizable || other.wasMarkedNonDeprioritizable;
         planningTime += other.planningTime;
         cardinalityEstimationMethods.setHistogram(
             cardinalityEstimationMethods.getHistogram().value_or(0) +
@@ -168,6 +171,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         totalAdmissions += metrics.getTotalAdmissions();
         wasLoadShed = wasLoadShed || metrics.getWasLoadShed();
         wasDeprioritized = wasDeprioritized || metrics.getWasDeprioritized();
+        wasMarkedNonDeprioritizable =
+            wasMarkedNonDeprioritizable || metrics.getWasMarkedNonDeprioritizable();
         planningTime += Microseconds(metrics.getPlanningTimeMicros());
         const auto& ce = metrics.getCardinalityEstimationMethods();
         cardinalityEstimationMethods.setHistogram(

@@ -16,6 +16,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     getLowPriorityReadCount,
     getNormalPriorityFinishedCount,
+    getTotalMarkedNonDeprioritizableCount,
     insertTestDocuments,
     setExecutionControlDeprioritizationExemptions,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
@@ -109,16 +110,20 @@ describe("Execution control deprioritization exemptions", function () {
 
         it("should NOT deprioritize exempt apps", function () {
             const initialLowPriority = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable = getTotalMarkedNonDeprioritizableCount(primary);
             const conn = createAppConnection(primary.host, kExemptApp);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), initialLowPriority);
+            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
         });
 
         it("should deprioritize non-exempt apps", function () {
             const initialLowPriority = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable = getTotalMarkedNonDeprioritizableCount(primary);
             const conn = createAppConnection(primary.host, "nonExemptApp");
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.gt(getLowPriorityReadCount(primary), initialLowPriority);
+            assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
         });
 
         it("should handle runtime exemption changes", function () {
@@ -127,8 +132,10 @@ describe("Execution control deprioritization exemptions", function () {
             // Initially NOT exempt - should be deprioritized.
             let conn = createAppConnection(primary.host, appName);
             const before1 = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable1 = getTotalMarkedNonDeprioritizableCount(primary);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.gt(getLowPriorityReadCount(primary), before1);
+            assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable1);
 
             // Add to exemptions.
             setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
@@ -136,8 +143,10 @@ describe("Execution control deprioritization exemptions", function () {
             // New connection should be exempt.
             conn = createAppConnection(primary.host, appName);
             const before2 = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable2 = getTotalMarkedNonDeprioritizableCount(primary);
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), before2);
+            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable2);
         });
 
         it("should apply exemption change mid-operation: non-exempt to exempt", function () {
@@ -147,6 +156,7 @@ describe("Execution control deprioritization exemptions", function () {
 
             setExecutionControlDeprioritizationExemptions(primary, [kExemptApp]);
             const initialLowPriority = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable = getTotalMarkedNonDeprioritizableCount(primary);
 
             assert.commandWorked(
                 primary.adminCommand({
@@ -180,12 +190,14 @@ describe("Execution control deprioritization exemptions", function () {
                         .toArray();
                     return ops.length > 0;
                 });
+                assert.eq(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
 
                 // Add exemption mid-operation.
                 setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
             } finally {
                 assert.commandWorked(primary.adminCommand({configureFailPoint: kFailPoint, mode: "off"}));
                 if (waitForShell) waitForShell();
+                assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
             }
         });
 
@@ -196,6 +208,7 @@ describe("Execution control deprioritization exemptions", function () {
 
             setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, appName]);
             const initialLowPriority = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable = getTotalMarkedNonDeprioritizableCount(primary);
 
             assert.commandWorked(
                 primary.adminCommand({
@@ -241,14 +254,18 @@ describe("Execution control deprioritization exemptions", function () {
 
             // After removing exemption, subsequent yields should deprioritize.
             assert.gt(getLowPriorityReadCount(primary), midOpLowPriority);
+            // Since we were exempt before, the operation will be considered marked non-deprioritizable.
+            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
         });
 
         it("should exempt operations matching app name prefix", function () {
             setExecutionControlDeprioritizationExemptions(primary, [kExemptApp, "testPrefix"]);
             const initialLowPriority = getLowPriorityReadCount(primary);
+            const initialMarkedNonDeprioritizable = getTotalMarkedNonDeprioritizableCount(primary);
             const conn = createAppConnection(primary.host, "testPrefixApp1");
             conn.getDB(jsTestName()).coll.find().hint({$natural: 1}).itcount();
             assert.eq(getLowPriorityReadCount(primary), initialLowPriority);
+            assert.gt(getTotalMarkedNonDeprioritizableCount(primary), initialMarkedNonDeprioritizable);
         });
 
         it("should still use normal priority tickets for exempt apps", function () {

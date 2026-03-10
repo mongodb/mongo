@@ -212,6 +212,11 @@ structs:
                 type: bool
                 stability: unstable
                 default: false
+            wasMarkedNonDeprioritizable:
+                description: "If true, the operation was marked non-deprioritizable at some point."
+                type: bool
+                stability: unstable
+                default: false
 
     ResponseCursorBase:
         description: "Common fields of initial and subsequent cursor responses."

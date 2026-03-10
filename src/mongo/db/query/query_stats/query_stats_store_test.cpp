@@ -1583,6 +1583,7 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         .append("totalAdmissions", emptyIntMetric)
         .append("wasLoadShed", boolMetricBson(0, 0))
         .append("wasDeprioritized", boolMetricBson(0, 0))
+        .append("wasMarkedNonDeprioritizable", boolMetricBson(0, 0))
         .append("numInterruptChecksPerSec", emptyIntMetric)
         .append("overdueInterruptApproxMaxMillis", emptyIntMetric);
 

@@ -494,6 +494,7 @@ void OpDebug::report(OperationContext* opCtx,
         const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
 
         pAttrs->add("priorityLowered", admCtx.getPriorityLowered());
+        pAttrs->add("wasMarkedNonDeprioritizable", admCtx.getMarkedNonDeprioritizable());
 
         // Note that we don't record delinquency stats around ticketing when in a
         // multi-document transaction, since operations within multi-document transactions hold
@@ -1378,6 +1379,8 @@ CursorMetrics OpDebug::getCursorMetrics(size_t opIndex) const {
     metrics.setTotalAdmissions(additiveMetrics.totalAdmissions.value_or(0));
     metrics.setWasLoadShed(additiveMetrics.wasLoadShed.value_or(false));
     metrics.setWasDeprioritized(additiveMetrics.wasDeprioritized.value_or(false));
+    metrics.setWasMarkedNonDeprioritizable(
+        additiveMetrics.wasMarkedNonDeprioritizable.value_or(false));
 
     metrics.setNumInterruptChecks(additiveMetrics.numInterruptChecks.value_or(0));
     metrics.setOverdueInterruptApproxMaxMillis(
@@ -1556,6 +1559,8 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     totalAdmissions = addOptionals(totalAdmissions, otherMetrics.totalAdmissions);
     wasLoadShed = addOptionals(wasLoadShed, otherMetrics.wasLoadShed);
     wasDeprioritized = addOptionals(wasDeprioritized, otherMetrics.wasDeprioritized);
+    wasMarkedNonDeprioritizable =
+        addOptionals(wasMarkedNonDeprioritizable, otherMetrics.wasMarkedNonDeprioritizable);
 
     hasSortStage = hasSortStage || otherMetrics.hasSortStage;
     usedDisk = usedDisk || otherMetrics.usedDisk;
@@ -1616,6 +1621,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     totalAdmissions = totalAdmissions.value_or(0) + metrics.totalAdmissions;
     wasLoadShed = wasLoadShed.value_or(false) || metrics.wasLoadShed;
     wasDeprioritized = wasDeprioritized.value_or(false) || metrics.wasDeprioritized;
+    wasMarkedNonDeprioritizable =
+        wasMarkedNonDeprioritizable.value_or(false) || metrics.wasMarkedNonDeprioritizable;
 
     numInterruptChecks = numInterruptChecks.value_or(0) + metrics.numInterruptChecks;
     overdueInterruptApproxMax = std::max(overdueInterruptApproxMax.value_or(Milliseconds(0)),
@@ -1688,6 +1695,7 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         static_cast<uint64_t>(metrics.getTotalAdmissions()),
         metrics.getWasLoadShed(),
         metrics.getWasDeprioritized(),
+        metrics.getWasMarkedNonDeprioritizable(),
         Microseconds(metrics.getPlanningTimeMicros()),
         metrics.getCardinalityEstimationMethods(),
         static_cast<uint64_t>(metrics.getNDocsSampled())});
