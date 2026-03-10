@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/s/commands/query_cmd/cluster_count_cmd.h"
+#pragma once
 
-#include <set>
-#include <string>
+#include "mongo/db/query/count_command_gen.h"
 
 namespace mongo {
-namespace {
+namespace count_cmd_helper {
 
 /**
- * Implements the cluster count command on mongos.
+ * Builds a CountCommandReply from 'countResult', selecting the appropriate integer width (int32 for
+ * values < 2^31, otherwise int64) for the count field.
  */
-struct ClusterCountCmdS {
-    using Request = CountCommandRequest;
-    using Reply = CountCommandRequest::Reply;
-    static constexpr StringData kCommandName = Request::kCommandName;
+inline CountCommandReply buildCountReply(long long countResult) {
+    uassert(7145301, "count value must not be negative", countResult >= 0);
 
-    static const std::set<std::string>& getApiVersions() {
-        return kApiVersions1;
-    }
+    // Return either BSON int32 or int64, depending on the value of 'countResult'. We encode it as
+    // int32 when 'countResult' < 2^31, and as an int64 otherwise. This keeps small count output
+    // looking like {n: 2} instead of {n: Long('2')} which some client applications may still rely
+    // on.
+    auto count = [](long long countResult) -> std::variant<std::int32_t, std::int64_t> {
+        constexpr long long maxIntCountResult = std::numeric_limits<std::int32_t>::max();
+        if (countResult < maxIntCountResult) {
+            return static_cast<std::int32_t>(countResult);
+        }
+        return static_cast<std::int64_t>(countResult);
+    }(countResult);
 
-    static Status checkAuthForOperation(OperationContext*, const DatabaseName&, const Request&) {
-        // No additional required privileges on a mongos.
-        return Status::OK();
-    }
+    CountCommandReply reply;
+    reply.setCount(count);
+    return reply;
+}
 
-    static void checkCanRunHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
-    }
-
-    static void checkCanExplainHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
-    }
-};
-MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>).forRouter();
-
-}  // namespace
+}  // namespace count_cmd_helper
 }  // namespace mongo

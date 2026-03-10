@@ -52,7 +52,9 @@ namespace {
  * Implements the cluster count command on mongod.
  */
 struct ClusterCountCmdD {
-    static constexpr StringData kName = "clusterCount"_sd;
+    using Request = CountCommandRequest;
+    using Reply = CountCommandRequest::Reply;
+    static constexpr StringData kCommandName = "clusterCount"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
@@ -60,7 +62,7 @@ struct ClusterCountCmdD {
 
     static Status checkAuthForOperation(OperationContext* opCtx,
                                         const DatabaseName& dbName,
-                                        const BSONObj& cmdObj) {
+                                        const Request& req) {
         auto* as = AuthorizationSession::get(opCtx->getClient());
         if (!as->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal)) {

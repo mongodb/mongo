@@ -42,6 +42,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/count_cmd_helper.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -452,7 +453,7 @@ public:
             collectQueryStatsMongod(
                 opCtx, expCtx, std::move(curOp->debug().getQueryStatsInfo().key));
 
-            CountCommandReply reply = buildCountReply(countResult);
+            CountCommandReply reply = count_cmd_helper::buildCountReply(countResult);
             if (curOp->debug().getQueryStatsInfo().metricsRequested) {
                 reply.setMetrics(curOp->debug().getCursorMetrics().toBSON());
             }
@@ -589,27 +590,6 @@ public:
             }
         }
 
-        // Build the return value for this command.
-        CountCommandReply buildCountReply(long long countResult) {
-            uassert(7145301, "count value must not be negative", countResult >= 0);
-
-            // Return either BSON int32 or int64, depending on the value of countResult.
-            // This is required so that drivers can continue to use a BSON int32 for count
-            // values < 2 ^ 31, which is what some client applications may still depend on.
-            // int64 is only used when the count value exceeds 2 ^ 31.
-            auto count = [](long long countResult) -> std::variant<std::int32_t, std::int64_t> {
-                constexpr long long maxIntCountResult = std::numeric_limits<std::int32_t>::max();
-                if (countResult < maxIntCountResult) {
-                    return static_cast<std::int32_t>(countResult);
-                }
-                return static_cast<std::int64_t>(countResult);
-            }(countResult);
-
-            CountCommandReply reply;
-            reply.setCount(count);
-            return reply;
-        }
-
         void runExplainAsAgg(OperationContext* opCtx,
                              const RequestType& req,
                              ExplainOptions::Verbosity verbosity,
@@ -642,7 +622,7 @@ public:
                 _ns.dbName().tenantId(),
                 SerializationContext::stateCommandReply(req.getSerializationContext()));
 
-            return buildCountReply(countResult);
+            return count_cmd_helper::buildCountReply(countResult);
         }
 
     private:

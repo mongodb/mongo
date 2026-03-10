@@ -68,6 +68,13 @@ structs:
                 type: object_owned
                 optional: true
                 stability: unstable
+            shards:
+                description:
+                    "Mapping between each shard's ID to that shard's local document count for this command.
+                    This is present only when run on a sharded cluster."
+                type: object_owned
+                optional: true
+                stability: unstable
 
 commands:
     count:

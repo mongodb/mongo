@@ -65,17 +65,6 @@ public:
         const SerializationContext& serializationCtxt = SerializationContext::stateCommandReply());
 
     /**
-     * Appends fields to 'resultBuilder' as if '_response' were a response from the count command.
-     *
-     * If '_response' is not a valid cursor-based response from the aggregation command, the
-     * function uasserts and 'resultBuilder' will not be modified.
-     */
-    void appendAsCountResponse(
-        BSONObjBuilder* resultBuilder,
-        boost::optional<TenantId> tenantId,
-        const SerializationContext& serializationCtxt = SerializationContext::stateCommandReply());
-
-    /**
      * Appends fields to 'resultBuilder' as if '_response' were a response from the distinct
      * command.
      *

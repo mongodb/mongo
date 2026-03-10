@@ -73,19 +73,6 @@ long long ViewResponseFormatter::getCountValue(boost::optional<TenantId> tenantI
     }
 }
 
-void ViewResponseFormatter::appendAsCountResponse(BSONObjBuilder* resultBuilder,
-                                                  boost::optional<TenantId> tenantId,
-                                                  const SerializationContext& serializationCtxt) {
-    // Note: getCountValue() uasserts upon errors.
-    long long countResult = getCountValue(tenantId, serializationCtxt);
-    // Append either BSON int32 or int64, depending on the value of countResult.
-    // This is required so that drivers can continue to use a BSON int32 for count
-    // values < 2 ^ 31, which is what some client applications may still depend on.
-    // int64 is only used when the count value exceeds 2 ^ 31.
-    resultBuilder->appendNumber(kCountField, countResult);
-    resultBuilder->append(kOkField, 1);
-}
-
 Status ViewResponseFormatter::appendAsDistinctResponse(BSONObjBuilder* resultBuilder,
                                                        boost::optional<TenantId> tenantId,
                                                        boost::optional<BSONObj> metrics) {
