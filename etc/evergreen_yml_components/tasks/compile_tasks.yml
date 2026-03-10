@@ -853,6 +853,17 @@ tasks:
         params:
           directory: src
           clone_depth: 1
+      # Disable until this process is adhering to https://wiki.corp.mongodb.com/spaces/DBDEVPROD/pages/474349749/Valid+Server+Release+Build+Configuration
+      - command: shell.exec
+        params:
+          script: |
+            if [[ -n "${I_WILL_NOT_USE_THIS_BUILD_IN_PRODUCTION_AND_UNDERSTAND_THE_LEGAL_RISKS_OF_DOING_SO|}" ]]; then
+              exit 0
+            fi
+
+            echo "Custom builds are disabled until the process is following https://wiki.corp.mongodb.com/spaces/DBDEVPROD/pages/474349749/Valid+Server+Release+Build+Configuration to prevent publishing invalid binaries in production"
+            echo "Ask in #ask-devprod if you need this urgently, or pass in --param I_WILL_NOT_USE_THIS_BUILD_IN_PRODUCTION_AND_UNDERSTAND_THE_LEGAL_RISKS_OF_DOING_SO=1 in the evergreen command line to bypass this check"
+            exit 1
       - func: "f_expansions_write"
       - command: subprocess.exec
         params:
