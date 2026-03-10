@@ -6,9 +6,20 @@
  * ]
  */
 
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
+
+// The $initialSyncId is only present in the resume token when the persistence provider supports
+// local collections (where the initialSyncId is stored). DSC (Disaggregated Storage Cluster)
+// doesn't have initial sync - data comes from the Storage Layer Service instead - so it doesn't
+// have an initialSyncId.
+const supportsInitialSyncId = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+    st.s,
+    "supportsLocalCollections",
+    true,
+);
 const kDbName = "db";
 const collName = "foo";
 const mongos = st.s0;
@@ -39,7 +50,11 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue,
 );
 
-jsTest.log("aggregate with $requestResumeToken should return PBRT with recordId and an initialSyncId.");
+jsTest.log(
+    "aggregate with $requestResumeToken should return PBRT with recordId" +
+        (supportsInitialSyncId ? " and an initialSyncId" : "") +
+        ".",
+);
 let res = db.runCommand({
     aggregate: collName,
     pipeline: [],
@@ -49,7 +64,9 @@ let res = db.runCommand({
 });
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$recordId"]);
-assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
+if (supportsInitialSyncId) {
+    assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
+}
 const resumeToken = res.cursor.postBatchResumeToken;
 
 jsTest.log("aggregate with wrong $recordId type in $resumeAfter should fail");
