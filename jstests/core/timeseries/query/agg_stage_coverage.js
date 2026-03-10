@@ -19,7 +19,7 @@
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-// TODO: SERVER-119726 try to enable multi-router once all aggregation stages are supported on multi-router.
+// TODO: SERVER-60746 try to enable multi-router once all aggregation stages are supported on multi-router.
 TestData.pinToSingleMongos = true;
 
 const tsColl = db[jsTestName()];

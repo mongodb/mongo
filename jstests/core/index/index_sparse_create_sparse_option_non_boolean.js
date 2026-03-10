@@ -12,7 +12,7 @@
  * ]
  */
 
-// TODO: SERVER-119726 enable multi-router once $listCatalog is supported on multi-router.
+// TODO: SERVER-60746 enable multi-router once $listCatalog is supported on multi-router.
 TestData.pinToSingleMongos = true;
 
 import {IndexUtils} from "jstests/libs/index_utils.js";

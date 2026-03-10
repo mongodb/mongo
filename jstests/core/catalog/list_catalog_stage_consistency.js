@@ -19,7 +19,7 @@ import {assertCatalogListOperationsConsistencyForCollection} from "jstests/libs/
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 
-// TODO: SERVER-119726 enable multi-router once $listCatalog is supported on multi-router.
+// TODO: SERVER-60746 enable multi-router once $listCatalog is supported on multi-router.
 TestData.pinToSingleMongos = true;
 
 // Validate catalog list operations consistency after each command,
