@@ -86,7 +86,6 @@ public:
         // Ensure N is significantly larger then internalQueryPlanEvaluationWorks.
         ASSERT_GTE(N, internalQueryPlanEvaluationWorks.load() + 1000);
 
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
     }
 

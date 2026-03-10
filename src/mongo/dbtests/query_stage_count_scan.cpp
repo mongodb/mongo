@@ -62,7 +62,6 @@ public:
     CountBase() : _client(&_opCtx) {}
 
     virtual ~CountBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns().ns_forTest());
         _client.dropCollection(ns());
     }
 

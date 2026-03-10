@@ -89,7 +89,6 @@ public:
     }
 
     virtual ~QueryStageDeleteBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         _client.dropCollection(nss);
     }
 

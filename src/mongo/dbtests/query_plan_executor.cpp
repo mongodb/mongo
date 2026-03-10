@@ -219,15 +219,18 @@ private:
  * Test dropping the collection while an agg PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScanAgg) {
-    dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
-
-    insert(BSON("_id" << 1 << "a" << 6));
-    insert(BSON("_id" << 2 << "a" << 7));
-    insert(BSON("_id" << 3 << "a" << 8));
     BSONObj indexSpec = BSON("a" << 1);
-    addIndex(indexSpec);
+
+    {
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
+        insert(BSON("_id" << 1 << "a" << 6));
+        insert(BSON("_id" << 2 << "a" << 7));
+        insert(BSON("_id" << 3 << "a" << 8));
+        addIndex(indexSpec);
+    }
 
     auto outerExec = [&]() {
+        dbtests::WriteContextForTests ctx(&_opCtx, nss.ns_forTest());
         const auto collection = ctx.getCollection();
 
         // Create the aggregation pipeline.

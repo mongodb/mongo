@@ -50,9 +50,15 @@ for (let i = 0; i < kNumWriteTickets; ++i) {
             const conn = new Mongo(host);
             const db = conn.getDB("test");
 
-            // Dropping a collection requires a database X lock and therefore blocks behind the
-            // transaction committing or aborting.
-            db.mycoll.drop();
+            // Enqueue a collection X lock blocking behind the transaction committing or aborting.
+            assert.commandWorked(
+                db.adminCommand({
+                    sleep: 1,
+                    millis: 1,
+                    lock: "w",
+                    lockTarget: "test.mycoll",
+                }),
+            );
 
             return {ok: 1};
         } catch (e) {
@@ -64,15 +70,16 @@ for (let i = 0; i < kNumWriteTickets; ++i) {
     thread.start();
 }
 
-// We wait until all of the drop commands are waiting for a lock to know that we've exhausted
+// We wait until all of the sleep commands are waiting for a lock to know that we've exhausted
 // all of the available write tickets.
+let ops;
 assert.soon(
     () => {
-        const ops = db.currentOp({"command.drop": "mycoll", waitingForLock: true});
+        ops = db.currentOp({"command.lockTarget": "test.mycoll", waitingForLock: true});
         return ops.inprog.length === kNumWriteTickets;
     },
     () => {
-        return `Didn't find ${kNumWriteTickets} drop commands running: ` + tojson(db.currentOp());
+        return `Didn't find ${kNumWriteTickets} sleep commands running: ` + tojson(db.currentOp());
     },
 );
 

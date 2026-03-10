@@ -87,7 +87,6 @@ public:
     }
 
     virtual ~IndexScanBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         _client.dropCollection(nss());
     }
 

@@ -84,7 +84,6 @@ public:
     QueryStageMergeSortTestBase() : _client(&_opCtx) {}
 
     virtual ~QueryStageMergeSortTestBase() {
-        dbtests::WriteContextForTests ctx(&_opCtx, ns());
         _client.dropCollection(nss());
     }
 
