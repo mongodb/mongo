@@ -15,6 +15,7 @@
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
@@ -80,7 +81,9 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     // It's possible to create 'hashed','2d','2dsphere' and 'text' indexes on the cluster key.
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "hashed")));
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "2d")));
-    assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "2dsphere")));
+    assert.commandWorked(
+        db[collName].createIndex(overrideIndexType(clusterKey, "2dsphere"), add2dsphereVersionIfNeeded()),
+    );
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "text")));
 
     const finalIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));

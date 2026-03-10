@@ -128,7 +128,9 @@ assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).count(), 1)
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count(), 2);
 
 // 2. Building index fails due to big polygon
-assert.commandFailed(coll.createIndex({loc: "2dsphere"}));
+// note: even though this index build should fail, add2dsphereVersionIfNeeded is necessary
+// because an FCV downgrade that happens partway through the build may still fail on the new index version
+assert.commandFailed(coll.createIndex({loc: "2dsphere"}, add2dsphereVersionIfNeeded()));
 
 // 3. After removing big polygon, index builds successfully
 assert.commandWorked(coll.remove({_id: "bigPoly10"}));

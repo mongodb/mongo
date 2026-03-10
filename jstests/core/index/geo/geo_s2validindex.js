@@ -16,13 +16,13 @@ assert.commandWorked(coll.createIndex({geo: "2dsphere", other: 1, geo2: "2dspher
 
 // Invalid index, using hash with 2dsphere
 coll.drop();
-assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "hash"}));
+assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "hash"}, add2dsphereVersionIfNeeded()));
 
 // Invalid index, using 2d with 2dsphere
 coll.drop();
-assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "2d"}));
+assert.commandFailed(coll.createIndex({geo: "2dsphere", other: "2d"}, add2dsphereVersionIfNeeded()));
 
-jsTest.log("Success!");
+jsTest.log.info("Success!");
 
 // Ensure the empty collection is gone, so that small_oplog passes.
 coll.drop();

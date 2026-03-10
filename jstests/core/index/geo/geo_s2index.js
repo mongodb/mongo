@@ -181,7 +181,9 @@ assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordina
 
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
-assert.commandFailed(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5}));
+assert.commandFailed(
+    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5}, add2dsphereVersionIfNeeded()),
+);
 
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
@@ -203,24 +205,32 @@ assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: "Point", coordina
 
 t.drop();
 assert.commandWorked(t.insert({loc: [0, 0]}));
-assert.commandFailed(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1}));
+assert.commandFailed(
+    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1}, add2dsphereVersionIfNeeded()),
+);
 
 // SERVER-21491 Verify that 2dsphere index options require correct types.
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {"2dsphereIndexVersion": "NOT_A_NUMBER"}),
+    t.createIndex({loc: "2dsphere"}, {"2dsphereIndexVersion": "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
     ErrorCodes.TypeMismatch,
 );
 
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: "NOT_A_NUMBER"}),
+    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
     ErrorCodes.TypeMismatch,
 );
 assert.commandFailedWithCode(
-    t.createIndex({loc: "2dsphere"}, {coarsestIndexedLevel: "NOT_A_NUMBER"}),
+    t.createIndex({loc: "2dsphere"}, {coarsestIndexedLevel: "NOT_A_NUMBER"}, add2dsphereVersionIfNeeded()),
     ErrorCodes.TypeMismatch,
 );
-assert.commandFailedWithCode(t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: true}), ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(t.createIndex({loc: "2dsphere"}, {coarsestIndexedLevel: true}), ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: true}, add2dsphereVersionIfNeeded()),
+    ErrorCodes.TypeMismatch,
+);
+assert.commandFailedWithCode(
+    t.createIndex({loc: "2dsphere"}, {coarsestIndexedLevel: true}, add2dsphereVersionIfNeeded()),
+    ErrorCodes.TypeMismatch,
+);
 
 // Ensure polygon which previously triggered an assertion error in SERVER-19674
 // is able to be indexed.

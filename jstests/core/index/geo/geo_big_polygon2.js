@@ -800,7 +800,10 @@ objects.forEach(function (o) {
 // Try creating other index types
 assert.commandWorked(coll.createIndex({geo: "2dsphere", a: 1}, add2dsphereVersionIfNeeded()), "compound index, geo");
 // These other index types will fail because of the GeoJSON documents
-assert.commandFailed(coll.createIndex({geo: "2dsphere", a: "text"}), "compound index, geo & text");
+assert.commandFailed(
+    coll.createIndex({geo: "2dsphere", a: "text"}, add2dsphereVersionIfNeeded()),
+    "compound index, geo & text",
+);
 assert.commandFailed(coll.createIndex({geo: "2d"}), "2d index");
 
 totalObjects = coll.count();
