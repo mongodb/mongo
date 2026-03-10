@@ -207,7 +207,7 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     return lpds;
 }
 
-const std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getSubPipelines() const {
+std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getMutableSubPipelines() {
     return kNoSubPipeline;
 }
 

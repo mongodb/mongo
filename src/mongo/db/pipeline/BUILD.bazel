@@ -1640,7 +1640,10 @@ mongo_cc_library(
         "lite_parsed_desugarer.cpp",
     ],
     visibility = ["//visibility:public"],
-    deps = [":lite_parsed_document_source"],
+    deps = [
+        ":lite_parsed_document_source",
+        "//src/mongo/db/query:query_knobs",
+    ],
 )
 
 mongo_cc_library(

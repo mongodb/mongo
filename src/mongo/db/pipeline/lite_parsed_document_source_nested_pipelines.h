@@ -99,7 +99,7 @@ public:
         return Status::OK();
     }
 
-    const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
+    std::vector<LiteParsedPipeline>& getMutableSubPipelines() override {
         return _pipelines;
     }
 

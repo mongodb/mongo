@@ -63,6 +63,16 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
 
 DocumentSourceMergeCursors::~DocumentSourceMergeCursors() {
     if (_ownCursors) {
+        // Skip cursor cleanup when using StubMongoProcessInterface. populateMerger() requires a
+        // valid task executor, which stubs do not provide. A stub is used during parse-only (e.g.,
+        // when we know we must reparse from LPP due to desugaring or view changes). With nested
+        // pipelines like $unionWith, a DocumentSourceMergeCursors may be created with a stub
+        // (eventually to be reparsed) but then destructed due to failed desugaring or view
+        // validation. No cursors exist in this case, so skipping cleanup is safe.
+        if (!getExpCtx()->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+            return;
+        }
+
         tassert(10561404, "_armParams must be set", _armParams);
         BSONObj armParamsForLog = _armParams->toBSON();
         if (getExpCtx()->getOperationContext()) {

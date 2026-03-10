@@ -29,6 +29,9 @@
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
+// TODO SERVER-120179 Remove when the feature flag is enabled.
+#include "mongo/db/query/query_feature_flags_gen.h"
+
 namespace mongo {
 
 bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline) {
@@ -38,6 +41,18 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline) {
     while (i < stages.size()) {
         tassert(11507800, "Stage pointer is null", stages[i].get());
         auto& stage = *stages[i];
+
+        // Recursively desugar any subpipelines for this stage. If any of the subpipelines indicates
+        // that the subpipeline was modified, we will need to potentially reparse the full pipeline
+        // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
+        // StageParams.
+        // TODO SERVER-120179 Remove the feature flag guard when the feature flag is enabled.
+        if (feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+            auto& subpipelines = stage.getMutableSubPipelines();
+            for (auto& subpipelineLpp : subpipelines) {
+                modified |= LiteParsedDesugarer::desugar(&subpipelineLpp);
+            }
+        }
 
         // Check if the stage is desugarable by looking in the stageExpander map.
         if (auto it = _stageExpanders.find(stage.getStageParams()->getId());
