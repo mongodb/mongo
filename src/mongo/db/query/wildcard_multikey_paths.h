@@ -59,13 +59,4 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
                                               const IndexCatalogEntry* entry,
                                               const stdx::unordered_set<std::string>& fieldSet,
                                               MultikeyMetadataAccessStats* stats);
-
-/**
- * Returns the set of all paths for which the wildcard index has multikey metadata keys.
- * Statistics reporting index seeks and keys examined are written to 'stats'.
- */
-std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
-                                              const IndexCatalogEntry* entry,
-                                              MultikeyMetadataAccessStats* stats);
-
 }  // namespace mongo

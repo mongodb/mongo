@@ -133,6 +133,11 @@ public:
     }
 
 protected:
+    void populateCollectionFieldNames(const NamespaceString& nss = kDefaultNSS) {
+        const auto collection = acquireCollForRead(opCtx(), nss);
+        _fieldNames = _collectAllFieldNamesFromDocuments(collection.getCollectionPtr());
+    }
+
     void assertSetupEnvironment(bool background,
                                 std::vector<BSONObj> initialDocs = {},
                                 BSONObj indexKey = kDefaultIndexKey,
@@ -205,7 +210,7 @@ protected:
         const auto collection = acquireCollForRead(opCtx(), nss);
         auto indexEntry = getIndexCatalogEntry(collection.getCollectionPtr(), indexName);
         MultikeyMetadataAccessStats stats;
-        auto multikeyPathSet = getWildcardMultikeyPathSet(opCtx(), indexEntry, &stats);
+        auto multikeyPathSet = getWildcardMultikeyPathSet(opCtx(), indexEntry, _fieldNames, &stats);
 
         ASSERT(expectedFieldRefs == multikeyPathSet);
     }
@@ -309,7 +314,54 @@ protected:
         return collOpts;
     }
 
+    // Store all field names contained in the documents inserted by each individual test.
+    stdx::unordered_set<std::string> _fieldNames;
+
 private:
+    /**
+     * Given a BSONObj document, extract all the field names as dotted paths from the document.
+     */
+    void _extractDottedFieldNames(const BSONObj& doc,
+                                  const std::string prefix,
+                                  stdx::unordered_set<std::string>& fieldNames) {
+        for (const auto& elem : doc) {
+            std::string newFieldName(elem.fieldNameStringData());
+
+            if (!prefix.empty()) {
+                std::string withPrefix = prefix;
+                withPrefix += ".";
+                withPrefix += newFieldName;
+                newFieldName = withPrefix;
+            }
+
+            fieldNames.insert(newFieldName);
+
+            if (elem.type() == BSONType::object) {
+                _extractDottedFieldNames(elem.Obj(), newFieldName, fieldNames);
+            } else if (elem.type() == BSONType::array) {
+                for (auto&& elem : elem.embeddedObject()) {
+                    if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
+                        _extractDottedFieldNames(elem.Obj(), newFieldName, fieldNames);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Given a collection pointer, extracts the field names included in the documents in the
+     * collection.
+     */
+    stdx::unordered_set<std::string> _collectAllFieldNamesFromDocuments(
+        const CollectionPtr& collectionPtr) {
+        stdx::unordered_set<std::string> fieldNames;
+        auto cursor = collectionPtr->getCursor(opCtx());
+        for (auto record = cursor->next(); record; record = cursor->next()) {
+            _extractDottedFieldNames(record->data.toBson(), "" /*prefix*/, fieldNames);
+        }
+        return fieldNames;
+    }
+
     ServiceContext::UniqueOperationContext _opCtx;
     repl::StorageInterfaceImpl _storage;
     bool _origWildcardKnob{false};
@@ -326,7 +378,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, RecordMultikeyPathsInBulkIndexBui
                                                {fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -341,7 +393,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, RecordMultikeyPathsInBackgroundIn
                                                {fromjson("{'': 'a', '': 1}"), RecordId(1)},
                                                {fromjson("{'': 'b.c', '': 2}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -361,7 +413,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DedupMultikeyPathsInBulkIndexBuil
                                                {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -381,7 +433,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DedupMultikeyPathsInBackgroundInd
                                                {fromjson("{'': 'b.c', '': 3}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -404,7 +456,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnPost
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -427,7 +479,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, AddAndDedupNewMultikeyPathsOnUpse
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -459,7 +511,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnUpdate) {
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.f', '': 4}"), RecordId(1)},
                                                {fromjson("{'': 'b.g', '': 5}"), RecordId(1)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "b.d.f", "b.g"});
 }
@@ -489,7 +541,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, AddNewMultikeyPathsOnReplacement)
                                                {fromjson("{'': 'b.c', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.f', '': 5}"), RecordId(1)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "b.d.f"});
 }
@@ -512,7 +564,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotRemoveMultikeyPathsOnDocDele
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
 
     // Now remove all documents in the collection, and verify that only the multikey paths
@@ -543,7 +595,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBulkB
                                                {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -562,7 +614,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexKeyPatternSubTreeInBackg
                                                {fromjson("{'': 'b', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e"});
 }
@@ -584,7 +636,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBulkBuild
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -606,7 +658,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsInBackgroun
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -628,7 +680,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 
@@ -646,6 +698,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, OnlyIndexIncludedPathsOnUpdate) {
 
     // Verify that only the key {'d.e.g': 6} has been added to the index.
     expectedKeys.push_back({fromjson("{'': 'd.e.g', '': 6}"), RecordId(3)});
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -669,7 +722,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBulkBuil
         {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
         {fromjson("{'': 'd', '': {}}"), RecordId(3)},
     };
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 }
@@ -693,7 +746,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsInBackgrou
         {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
         {fromjson("{'': 'd', '': {}}"), RecordId(3)},
     };
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 }
@@ -715,7 +768,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
                                                {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
                                                {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'd', '': {}}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 
@@ -734,6 +787,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotIndexExcludedPathsOnUpdate) 
     // The key {d: {}} is no longer present, since it will be replaced by a key for subpath
     // 'd.h'.
     expectedKeys.back() = {fromjson("{'': 'd.h', '': 7}"), RecordId(3)};
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 }
@@ -758,7 +812,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInInclusio
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b", "b.d.e", "d.e.f"});
 }
@@ -783,7 +837,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, IndexIdFieldIfSpecifiedInExclusio
                                                {fromjson("{'': 'b.d', '': {}}"), RecordId(1)},
                                                {fromjson("{'': 'b.d', '': {}}"), RecordId(2)},
                                                {fromjson("{'': 'd', '': {}}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys);
     assertMultikeyPathSetEquals({"b"});
 }
@@ -804,7 +858,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBu
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys, expectIndexIsMultikey);
     assertMultikeyPathSetEquals({});
 }
@@ -825,7 +879,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, DoNotMarkAsMultikeyIfNoArraysInBa
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys, expectIndexIsMultikey);
     assertMultikeyPathSetEquals({});
 }
@@ -846,7 +900,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayI
                                                {fromjson("{'': 'b.d.e', '': 3}"), RecordId(1)},
                                                {fromjson("{'': 'b.d.e', '': 4}"), RecordId(2)},
                                                {fromjson("{'': 'd.e.f', '': 5}"), RecordId(3)}};
-
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys, expectIndexIsMultikey);
     assertMultikeyPathSetEquals({});
 
@@ -858,6 +912,7 @@ TEST_F(WildcardMultikeyPersistenceTestFixture, IndexShouldBecomeMultikeyIfArrayI
     expectedKeys.insert(expectedKeys.begin(), {fromjson("{'': 1, '': 'g.h'}"), kMetadataId});
     expectedKeys.push_back({fromjson("{'': 'g.h', '': undefined}"), RecordId(1)});
 
+    populateCollectionFieldNames();
     assertIndexContentsEquals(expectedKeys, expectIndexIsMultikey);
     assertMultikeyPathSetEquals({"g.h"});
 }
