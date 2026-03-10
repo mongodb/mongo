@@ -35,95 +35,103 @@ qsutils.removeAllQuerySettings();
  *  params.querySettingsB - query setting for all queries of the shape as params.queryB
  */
 function testQuerySettingsUsing(params) {
-    const queryShapeHashA = qsutils.getQueryShapeHashFromExplain(params.queryA);
+    assert.soonNoExcept(() => {
+        qsutils.removeAllQuerySettings();
 
-    // Ensure that query settings cluster parameter is empty.
-    {
-        qsutils.assertQueryShapeConfiguration([]);
-    }
+        const queryShapeHashA = qsutils.getQueryShapeHashFromExplain(params.queryA);
 
-    // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after
-    // invoking setQuerySettings command.
-    {
-        qsutils.assertExplainQuerySettings(params.queryA, undefined);
-        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryA, settings: params.querySettingsA}));
-        qsutils.assertQueryShapeConfiguration([
-            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
-        ]);
-    }
+        // Ensure that query settings cluster parameter is empty.
+        {
+            qsutils.assertQueryShapeConfiguration([]);
+        }
 
-    // Ensure that 'querySettings' cluster parameter contains both QueryShapeConfigurations
-    // after invoking setQuerySettings command.
-    {
-        qsutils.assertExplainQuerySettings(params.queryB, undefined);
-        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryB, settings: params.querySettingsB}));
-        qsutils.assertQueryShapeConfiguration([
-            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
-        ]);
-    }
+        // Ensure that 'querySettings' cluster parameter contains QueryShapeConfiguration after
+        // invoking setQuerySettings command.
+        {
+            qsutils.assertExplainQuerySettings(params.queryA, undefined);
+            assert.commandWorked(db.adminCommand({setQuerySettings: params.queryA, settings: params.querySettingsA}));
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
+            ]);
+        }
 
-    // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
-    // setQuerySettings by passing a QueryShapeHash.
-    {
-        assert.neq(queryShapeHashA, undefined);
-        assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
-        qsutils.assertQueryShapeConfiguration([
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
-        ]);
-    }
+        // Ensure that 'querySettings' cluster parameter contains both QueryShapeConfigurations
+        // after invoking setQuerySettings command.
+        {
+            qsutils.assertExplainQuerySettings(params.queryB, undefined);
+            assert.commandWorked(db.adminCommand({setQuerySettings: params.queryB, settings: params.querySettingsB}));
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
+                qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
+            ]);
+        }
 
-    // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
-    // setQuerySettings by passing a different QueryInstance with the same QueryShape.
-    {
-        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryBPrime, settings: params.querySettingsA}));
-        qsutils.assertQueryShapeConfiguration([
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryBPrime),
-        ]);
-    }
+        // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
+        // setQuerySettings by passing a QueryShapeHash.
+        {
+            assert.neq(queryShapeHashA, undefined);
+            assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
+                qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
+            ]);
+        }
 
-    // Ensure that removeQuerySettings command removes one query settings from the
-    // 'settingsArray' of the 'querySettings' cluster parameter by providing a query instance.
-    {
-        assert.commandWorked(db.adminCommand({removeQuerySettings: params.queryBPrime}));
-        qsutils.assertQueryShapeConfiguration([
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-        ]);
-        qsutils.assertExplainQuerySettings(params.queryB, undefined);
-    }
+        // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
+        // setQuerySettings by passing a different QueryInstance with the same QueryShape.
+        {
+            assert.commandWorked(
+                db.adminCommand({setQuerySettings: params.queryBPrime, settings: params.querySettingsA}),
+            );
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
+                qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryBPrime),
+            ]);
+        }
 
-    // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings
-    // command providing a query shape hash.
-    {
-        assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
-        qsutils.assertQueryShapeConfiguration([]);
-        qsutils.assertExplainQuerySettings(params.queryA, undefined);
-    }
+        // Ensure that removeQuerySettings command removes one query settings from the
+        // 'settingsArray' of the 'querySettings' cluster parameter by providing a query instance.
+        {
+            assert.commandWorked(db.adminCommand({removeQuerySettings: params.queryBPrime}));
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
+            ]);
+            qsutils.assertExplainQuerySettings(params.queryB, undefined);
+        }
 
-    // Ensure that query settings can also be added for a query shape hash without providing a
-    // representative query.
-    {
-        assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsA}));
+        // Ensure that query settings cluster parameter is empty by issuing a removeQuerySettings
+        // command providing a query shape hash.
+        {
+            assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
+            qsutils.assertQueryShapeConfiguration([]);
+            qsutils.assertExplainQuerySettings(params.queryA, undefined);
+        }
 
-        // Call 'assertQueryShapeConfiguration()' with shouldRunExplain = false, because we
-        // don't have a representative query.
-        qsutils.assertQueryShapeConfiguration([{settings: params.querySettingsA}], false /* shouldRunExplain */);
-        // Run 'assertExplainQuerySettings()' separately with a query.
-        qsutils.assertExplainQuerySettings(params.queryA, params.querySettingsA);
+        // Ensure that query settings can also be added for a query shape hash without providing a
+        // representative query.
+        {
+            assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsA}));
 
-        // Assert there is no 'debugQueryShape'.
-        assert(
-            !qsutils
-                .getQuerySettings({
-                    showDebugQueryShape: true,
-                })[0]
-                .hasOwnProperty("debugQueryShape"),
-        );
-        assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
-        qsutils.assertQueryShapeConfiguration([]);
-    }
+            // Call 'assertQueryShapeConfiguration()' with shouldRunExplain = false, because we
+            // don't have a representative query.
+            qsutils.assertQueryShapeConfiguration([{settings: params.querySettingsA}], false /* shouldRunExplain */);
+            // Run 'assertExplainQuerySettings()' separately with a query.
+            qsutils.assertExplainQuerySettings(params.queryA, params.querySettingsA);
+
+            // Assert there is no 'debugQueryShape'.
+            assert(
+                !qsutils
+                    .getQuerySettings({
+                        showDebugQueryShape: true,
+                    })[0]
+                    .hasOwnProperty("debugQueryShape"),
+            );
+            assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
+            qsutils.assertQueryShapeConfiguration([]);
+        }
+
+        return true;
+    });
 }
 
 function testQuerySettingsParameterized({find, distinct, aggregate}) {
