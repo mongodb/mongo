@@ -54,7 +54,11 @@ function singleDocWrite(dbName, collName, op) {
 function writeStarted(opType) {
     // In the unified write executor, the opType is 'bulkWrite' instead of 'insert', 'update', or
     // 'remove' due to an internal implementation detail.
-    return testDB.currentOp().inprog.some((op) => {
+    const result = testDB.currentOp();
+    if (!result.inprog) {
+        return false;
+    }
+    return result.inprog.some((op) => {
         return op.active && op.ns === testColl.getFullName() && op.op === opType && op.writeConflicts > 0;
     });
 }
