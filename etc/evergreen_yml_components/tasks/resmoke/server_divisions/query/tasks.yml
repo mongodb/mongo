@@ -2641,11 +2641,9 @@ tasks:
 
   - <<: *task_template
     name: query_cbr_automatic_cost_choice_jscore_passthrough
-    # Currently disabled until SERVER-x?
-    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "blocked_in_query_alias", # We explicitly specify this task in query alias
       ]
     commands:
@@ -2656,11 +2654,9 @@ tasks:
 
   - <<: *task_template
     name: query_cbr_automatic_cost_choice_aggregation_passthrough
-    # Currently disabled until SERVER-x?
-    disable: true
     tags: [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "blocked_in_query_alias", # We explicitly specify this task in query alias
       ]
     commands:
@@ -2673,7 +2669,7 @@ tasks:
     name: query_golden_cbr_automatic_cost_choice
     tags: [
         "assigned_to_jira_team_server_query_optimization",
-        "experimental",
+        "default",
         "blocked_in_query_alias", # We explicitly specify this task in query alias
       ]
     commands:
