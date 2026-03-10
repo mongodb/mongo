@@ -31,10 +31,13 @@
 
 #include "mongo/base/data_type.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/modules.h"
 
 #include <cstring>
 #include <iosfwd>
 #include <type_traits>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

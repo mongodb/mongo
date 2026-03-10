@@ -36,6 +36,7 @@
 #include "mongo/platform/endian.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
@@ -43,6 +44,8 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 class ConstDataRange {

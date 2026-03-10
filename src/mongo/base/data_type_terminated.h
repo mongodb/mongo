@@ -31,9 +31,12 @@
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 #include <cstring>
 #include <iosfwd>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

@@ -321,11 +321,9 @@ struct MemBaseMetricPolicy {
             b.appendBool("supported", false);
         }
 
-        using namespace mongo::secure_allocator_details;
-        b.appendNumber("secureAllocByteCount",
-                       static_cast<int>(gSecureAllocCountInfo().getSecureAllocByteCount()));
-        b.appendNumber("secureAllocBytesInPages",
-                       static_cast<int>(gSecureAllocCountInfo().getSecureAllocBytesInPages()));
+        auto secAlloc = getSecureAllocatorStats();
+        b.appendNumber("secureAllocByteCount", static_cast<long long>(secAlloc.bytes));
+        b.appendNumber("secureAllocBytesInPages", static_cast<long long>(secAlloc.pages));
     }
 };
 auto& memBase = *CustomMetricBuilder<MemBaseMetricPolicy>{".mem"};

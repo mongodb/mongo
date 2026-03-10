@@ -51,7 +51,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo {
+namespace mongo::initializer_details {
 namespace {
 
 template <typename C, typename T>
@@ -317,4 +317,4 @@ TEST_F(DependencyGraphTest, TopSortShufflesChildren) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::initializer_details

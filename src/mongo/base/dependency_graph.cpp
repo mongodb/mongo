@@ -46,7 +46,7 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>  // IWYU pragma: keep
 
-namespace mongo {
+namespace mongo::initializer_details {
 
 void DependencyGraph::addNode(const std::string& name,
                               const std::vector<std::string>& prerequisites,
@@ -212,4 +212,4 @@ DependencyGraph::Payload* DependencyGraph::find(const std::string& name) {
     return (iter == _nodes.end()) ? nullptr : iter->second.payload.get();
 }
 
-}  // namespace mongo
+}  // namespace mongo::initializer_details

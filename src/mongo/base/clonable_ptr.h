@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <cstddef>
 #include <memory>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace clonable_ptr_detail {

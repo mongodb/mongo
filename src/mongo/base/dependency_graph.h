@@ -32,13 +32,14 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace mongo::initializer_details {
 
 /**
  * To separate concerns, this just captures the setup and execution of a
@@ -97,4 +98,4 @@ private:
     std::map<std::string, Node> _nodes;
 };
 
-}  // namespace mongo
+}  // namespace mongo::initializer_details

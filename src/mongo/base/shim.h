@@ -32,12 +32,15 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/config.h"     // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 /**
  * The `WeakFunction` mechanism allows for the creation of "weak-symbol-like" functions

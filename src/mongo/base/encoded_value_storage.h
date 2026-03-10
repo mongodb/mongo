@@ -30,17 +30,19 @@
 #pragma once
 
 #include "mongo/base/data_view.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 
 #include <cstring>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
 struct ZeroInitTag_t {
-    ZeroInitTag_t() {};
+    constexpr explicit ZeroInitTag_t() = default;
 };
 
-const ZeroInitTag_t kZeroInitTag;
+constexpr inline ZeroInitTag_t kZeroInitTag;
 
 template <typename Layout, typename ConstView, typename View>
 class MONGO_MOD_OPEN EncodedValueStorage {

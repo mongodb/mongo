@@ -33,10 +33,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <cstddef>
@@ -48,6 +49,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -63,22 +66,22 @@ void deallocate(void* ptr, std::size_t bytes);
 
 class SecureAllocCountInfo {
 public:
-    uint32_t getSecureAllocByteCount() {
+    size_t getSecureAllocByteCount() const {
         return secureAllocByteCount.load();
     }
-    uint32_t getSecureAllocBytesInPages() {
+    size_t getSecureAllocBytesInPages() const {
         return secureAllocBytesInPages.load();
     }
-    void updateSecureAllocByteCount(int32_t cnt) {
+    void updateSecureAllocByteCount(size_t cnt) {
         secureAllocByteCount.fetchAndAdd(cnt);
     }
-    void updateSecureAllocBytesInPages(int32_t cnt) {
+    void updateSecureAllocBytesInPages(size_t cnt) {
         secureAllocBytesInPages.fetchAndAdd(cnt);
     }
 
 private:
-    AtomicWord<uint32_t> secureAllocByteCount{0};
-    AtomicWord<uint32_t> secureAllocBytesInPages{0};
+    Atomic<size_t> secureAllocByteCount{0};
+    Atomic<size_t> secureAllocBytesInPages{0};
 };
 
 SecureAllocCountInfo& gSecureAllocCountInfo();
@@ -111,6 +114,12 @@ struct TraitNamedDomain {
 };
 
 }  // namespace secure_allocator_details
+
+struct SecureAllocatorStats {
+    size_t bytes{};
+    size_t pages{};
+};
+SecureAllocatorStats getSecureAllocatorStats();
 
 /**
  * Provides a secure allocator for trivially copyable types. By secure we mean

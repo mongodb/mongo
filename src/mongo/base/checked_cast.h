@@ -31,9 +31,12 @@
 
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <type_traits>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

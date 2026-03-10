@@ -34,6 +34,7 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <concepts>
@@ -48,6 +49,8 @@
 
 #include <absl/hash/hash.h>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

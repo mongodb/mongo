@@ -72,7 +72,7 @@ bool mustRunSilently(const auto& args) {
 
 class Initializer::Graph {
 public:
-    class Payload : public DependencyGraph::Payload {
+    class Payload : public initializer_details::DependencyGraph::Payload {
     public:
         InitializerFunction initFn;
         DeinitializerFunction deinitFn;
@@ -121,7 +121,7 @@ private:
      * explicitly added will either be absent from this map or be present with
      * a null-valude initFn.
      */
-    DependencyGraph _graph;
+    initializer_details::DependencyGraph _graph;
 };
 
 Initializer::Initializer() : _graph(std::make_unique<Graph>()) {}

@@ -36,8 +36,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

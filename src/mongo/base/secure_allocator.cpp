@@ -59,7 +59,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
-namespace mongo::secure_allocator_details {
+namespace mongo {
+namespace secure_allocator_details {
 
 namespace {
 
@@ -435,4 +436,14 @@ SecureAllocCountInfo& gSecureAllocCountInfo() {
     return *obj;
 }
 
-}  // namespace mongo::secure_allocator_details
+}  // namespace secure_allocator_details
+
+SecureAllocatorStats getSecureAllocatorStats() {
+    const auto& stats = secure_allocator_details::gSecureAllocCountInfo();
+    return {
+        .bytes = stats.getSecureAllocByteCount(),
+        .pages = stats.getSecureAllocBytesInPages(),
+    };
+}
+
+}  // namespace mongo

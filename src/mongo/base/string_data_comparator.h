@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

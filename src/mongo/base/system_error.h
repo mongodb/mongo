@@ -30,9 +30,12 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/modules.h"
 
 #include <system_error>
 #include <type_traits>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

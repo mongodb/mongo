@@ -36,6 +36,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/stringify.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 #include <string>
@@ -44,6 +45,8 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

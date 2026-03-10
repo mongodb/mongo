@@ -37,6 +37,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
 
 #include <iosfwd>
@@ -50,6 +51,8 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

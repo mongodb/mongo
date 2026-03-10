@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/visibility.h"
+#include "mongo/util/modules.h"
 
 #include <string_view>
 

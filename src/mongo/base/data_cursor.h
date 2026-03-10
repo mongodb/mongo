@@ -32,9 +32,12 @@
 #include "mongo/base/data_type.h"
 #include "mongo/base/data_view.h"
 #include "mongo/platform/endian.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstring>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

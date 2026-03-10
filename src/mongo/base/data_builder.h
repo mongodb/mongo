@@ -34,6 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -42,6 +43,8 @@
 #include <limits>
 #include <memory>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

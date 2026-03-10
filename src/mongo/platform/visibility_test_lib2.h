@@ -32,6 +32,7 @@
 
 #include "mongo/platform/visibility.h"
 #include "mongo/platform/visibility_test_lib1.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

@@ -30,12 +30,15 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

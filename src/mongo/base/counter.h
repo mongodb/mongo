@@ -29,9 +29,12 @@
 
 #pragma once
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 /**
@@ -74,7 +77,7 @@ public:
     }
 
 private:
-    AtomicWord<long long> _counter;
+    Atomic<long long> _counter;
 };
 
 /**
@@ -101,6 +104,6 @@ public:
     }
 
 private:
-    AtomicWord<value_type> _value;
+    Atomic<value_type> _value;
 };
 }  // namespace mongo

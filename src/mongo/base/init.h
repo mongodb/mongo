@@ -43,9 +43,12 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
+
+MONGO_MOD_PUBLIC;
 
 /**
  * Macro to define an initializer function named "NAME" with the default

@@ -35,12 +35,15 @@
 #include "mongo/base/status_with.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <cstring>
 #include <limits>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
