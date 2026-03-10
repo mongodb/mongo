@@ -6,7 +6,11 @@
  */
 
 import {describe, it} from "jstests/libs/mochalite.js";
-import {getLatestMetrics} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
+import {
+    extractPrometheusMetricIntValue,
+    extractPrometheusMetricTime,
+    getLatestMetrics,
+} from "jstests/noPassthrough/observability/libs/otel_file_export_helpers.js";
 
 function makeRecord(metrics) {
     return {
@@ -372,5 +376,150 @@ describe("getLatestMetrics", function () {
             const result = getLatestMetrics(dir);
             assert.eq(result.time, kTime3Ms);
         });
+    });
+});
+
+describe("extractPrometheusMetricIntValue", function () {
+    it("returns the integer value for a metric with empty labels", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "network_connections_processed_total{} 42 123456\n",
+                /*metricName=*/ "network.connections_processed",
+            ),
+            42,
+        );
+    });
+
+    it("returns the integer value for a metric with a scope label", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ 'network_connections_processed_total{otel_scope_name="mongodb"} 99 123456\n',
+                /*metricName=*/ "network.connections_processed",
+            ),
+            99,
+        );
+    });
+
+    it("replaces dots with underscores in the metric name for matching", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(/*metricsText=*/ "a_b_c_total{} 7 123456\n", /*metricName=*/ "a.b.c"),
+            7,
+        );
+    });
+
+    it("returns null when the metric is not present in the text", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "some_other_metric_total{} 10 123456\n",
+                /*metricName=*/ "network.connections_processed",
+            ),
+            null,
+        );
+    });
+
+    it("returns null for null metricsText", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(/*metricsText=*/ null, /*metricName=*/ "network.connections_processed"),
+            null,
+        );
+    });
+
+    it("returns null for empty metricsText", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(/*metricsText=*/ "", /*metricName=*/ "network.connections_processed"),
+            null,
+        );
+    });
+
+    it("extracts the correct metric when multiple metrics are present", function () {
+        const text =
+            [
+                'network_bytes_sent_bytes{otel_scope_name="mongodb"} 1024 123456',
+                'network_connections_processed_total{otel_scope_name="mongodb"} 50 123456',
+                'db_operations_total{otel_scope_name="mongodb"} 200 123456',
+            ].join("\n") + "\n";
+
+        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"), 50);
+        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.bytes_sent"), 1024);
+        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "db.operations"), 200);
+    });
+
+    it("handles Prometheus comment and TYPE lines without false matches", function () {
+        const text =
+            [
+                "# HELP network_connections_processed_total Total connections processed",
+                "# TYPE network_connections_processed_total counter",
+                'network_connections_processed_total{otel_scope_name="mongodb"} 77 123456',
+            ].join("\n") + "\n";
+
+        assert.eq(extractPrometheusMetricIntValue(text, /*metricName=*/ "network.connections_processed"), 77);
+    });
+
+    it("matches metrics with different unit suffixes", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "request_duration_seconds{} 15 123456\n",
+                /*metricName=*/ "request.duration",
+            ),
+            15,
+        );
+    });
+
+    it("ignores leading and trailing whitespace", function () {
+        assert.eq(
+            extractPrometheusMetricIntValue(
+                /*metricsText=*/ "  \t network_connections_processed_total{} 33 123456  \t \n",
+                /*metricName=*/ "network.connections_processed",
+            ),
+            33,
+        );
+    });
+});
+
+describe("extractPrometheusMetricTime", function () {
+    it("returns the timestamp from a target_info line with empty braces", function () {
+        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 1 1700000000000\n"), 1700000000000);
+    });
+
+    it("returns the timestamp from a target_info line with attributes", function () {
+        assert.eq(
+            extractPrometheusMetricTime(
+                /*metricsText=*/ 'target_info{service_name="mongodb",service_instance_id="abc123"} 1 1700000000000\n',
+            ),
+            1700000000000,
+        );
+    });
+
+    it("returns null for null metricsText", function () {
+        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ null), null);
+    });
+
+    it("returns null for empty metricsText", function () {
+        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ ""), null);
+    });
+
+    it("returns null when no target_info line is present", function () {
+        assert.eq(
+            extractPrometheusMetricTime(
+                /*metricsText=*/ 'network_connections_processed_total{otel_scope_name="mongodb"} 50 123456\n',
+            ),
+            null,
+        );
+    });
+
+    it("extracts the timestamp when target_info is not the first line", function () {
+        const text =
+            [
+                "# HELP target_info Target metadata",
+                "# TYPE target_info gauge",
+                'network_connections_processed_total{otel_scope_name="mongodb"} 50 123456',
+                'target_info{service_name="mongodb"} 1 1700000000000',
+            ].join("\n") + "\n";
+
+        assert.eq(extractPrometheusMetricTime(text), 1700000000000);
+    });
+
+    it("ignores the value and only returns the timestamp", function () {
+        assert.eq(extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 99 1700000055555\n"), 1700000055555);
     });
 });

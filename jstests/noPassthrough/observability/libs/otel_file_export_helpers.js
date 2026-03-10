@@ -1,13 +1,15 @@
 /**
  * Finds metrics files in the given directory.
  * @param {string} directory - The directory path to search in.
- * @returns {Array<Object>} An array of file objects (from listFiles()) whose names end with "-metrics.jsonl". Each file
+ * @param {string} fileSuffix - The suffix of the metrics files to search for. Defaults to "-metrics.jsonl" (the suffix
+ *    for the opentelemetry metrics files in JSONL format).
+ * @returns {Array<Object>} An array of file objects (from listFiles()) whose names end with `fileSuffix`. Each file
  *     object has a 'name' property containing the full file path.
  */
-function findMetricsFiles(directory) {
+export function findMetricsFiles(directory, fileSuffix = "-metrics.jsonl") {
     const files = listFiles(directory);
     return files.filter(function (file) {
-        if (!file.name.endsWith("-metrics.jsonl")) {
+        if (!file.name.endsWith(fileSuffix)) {
             return false;
         }
         return true;
@@ -149,6 +151,51 @@ export function getLatestMetrics(directory) {
     );
     result.time = latestTime(record);
     return result;
+}
+
+/**
+ * Parses the integer value of the metric from Prometheus text format.
+ * @param {string} metricsText - The text of the metrics file.
+ * @param {string} metricName - The name of the metric to extract the value of.
+ * @returns {number} The integer value of the metric. Returns null if the metric is not found.
+ */
+export function extractPrometheusMetricIntValue(metricsText, metricName) {
+    // Match lines like: network_connections_processed{} <value>
+    // `.` gets replaced with `_` when switching to Prometheus format.
+    // There is also a unit suffix which we need to skip, and there may be a scope label.
+    const leadingWhitespaceRe = "(?:^|\\s)+";
+    const metricNameRe = metricName.replace(/\./g, "_");
+    const unitSuffixRe = "_[a-zA-Z]+";
+    const scopeRe = '\\{(?:\\w+\\="\\w+")?\\}';
+    const valueRe = "\\s+(\\d+)";
+
+    const regexp = new RegExp(leadingWhitespaceRe + metricNameRe + unitSuffixRe + scopeRe + valueRe, "m");
+    const match = metricsText && metricsText.match(regexp);
+    if (match) {
+        return parseInt(match[1], 10);
+    }
+    return null;
+}
+
+/**
+ * Parses the time of the set of metrics from Prometheus text format.
+ * @param {string} metricsText - The text of the metrics file.
+ * @returns {numeric} The time of the metrics in milliseconds. Returns null no timestamp is found.
+ */
+export function extractPrometheusMetricTime(metricsText) {
+    // Match lines like: target_info{...} <some_number> <timestamp>
+    // The timestamp is the third value in the line.
+    const leadingWhitespaceRe = "(?:^|\\s)+";
+    const targetInfoRe = "target_info\\{[^}]*\\}";
+    const numberRe = "\\s+(\\d+)";
+    const timestampRe = "\\s+(\\d+)";
+
+    const regexp = new RegExp(leadingWhitespaceRe + targetInfoRe + numberRe + timestampRe, "m");
+    const match = metricsText && metricsText.match(regexp);
+    if (match) {
+        return parseInt(match[2], 10);
+    }
+    return null;
 }
 
 /**
