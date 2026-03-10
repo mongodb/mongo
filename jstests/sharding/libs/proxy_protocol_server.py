@@ -3,6 +3,7 @@
 Python script to interact with proxy protocol server.
 """
 
+import ssl
 import sys
 from typing import Dict, Optional, Tuple, List
 
@@ -13,6 +14,41 @@ from proxyprotocol.server.main import main
 _tlv_structs = None  # type: Optional[Dict[int, bytes]]
 _ssl_tlv_structs = None  # type: Optional[Dict[int, bytes]]
 _tlv_file_path = None  # type: Optional[str]
+
+# Optional Unix domain socket path for egress connections.
+_unix_egress_path = None  # type: Optional[str]
+
+# SNI store: maps id(ssl_object) -> server_name captured via sni_callback.
+_sni_store = {}  # type: Dict[int, str]
+
+# OID for the MongoDB roles X509v3 extension.
+_MONGO_ROLES_OID_DOTTED = "1.3.6.1.4.1.34601.2.1.1"
+
+
+def _extract_cert_info(der_cert_bytes: bytes) -> Tuple[Optional[str], Optional[bytes]]:
+    """Extract subject DN (RFC 4514 string) and roles (raw DER) from a DER certificate.
+
+    Returns (dn_string, roles_der). Either may be None if not present.
+    """
+    from cryptography import x509
+    from cryptography.x509.oid import ObjectIdentifier
+
+    cert = x509.load_der_x509_certificate(der_cert_bytes)
+
+    # Subject DN as RFC 4514 string (e.g. "CN=foo,OU=bar,O=baz")
+    dn_str = cert.subject.rfc4514_string()
+
+    # Roles extension (OID 1.3.6.1.4.1.34601.2.1.1) — raw DER value
+    roles_der = None
+    try:
+        ext = cert.extensions.get_extension_for_oid(
+            ObjectIdentifier(_MONGO_ROLES_OID_DOTTED)
+        )
+        roles_der = ext.value.value  # raw DER bytes of the extension value
+    except x509.ExtensionNotFound:
+        pass
+
+    return dn_str, roles_der
 
 
 # See setTLVs docstring in jstests/sharding/libs/proxy_protocol.js for format.
@@ -76,6 +112,7 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
 
     return tlvs, ssl_tlvs
 
+
 # Monkey-patch the library's run() function to add close_clients() call during shutdown.
 #
 # IMPORTANT: The code below is copied from proxyprotocol.server.main.run() v0.11.3
@@ -83,7 +120,7 @@ def _parse_pp2_tlv_structs_json(raw_json_tlv: str) -> Dict[int, bytes]:
 # with minimal modifications.
 #
 # CHANGES FROM LIBRARY SOURCE:
-# 1. Added support for injecting TLV vectors into the proxy protocol header 
+# 1. Added support for injecting TLV vectors into the proxy protocol header
 #
 _original_run = proxyprotocol.server.main.run
 
@@ -111,10 +148,27 @@ async def _patched_run(args):
     # --- BEGIN: Code copied from library's run() function ---
     loop = asyncio.get_running_loop()
 
-    services = [(Address(source, server=True), Address(dest)) for (source, dest) in args.services]
+    services = [
+        (Address(source, server=True), Address(dest))
+        for (source, dest) in args.services
+    ]
     buf_len = args.buf_len
     dnsbl = Dnsbl.load(args.dnsbl, timeout=args.dnsbl_timeout)
-    
+
+    # --- BEGIN MODIFICATION: SNI callback for capturing TLS server_name ---
+    def _sni_callback(ssl_obj, server_name, ssl_ctx):
+        """Capture the client's SNI (Server Name Indication) during the TLS handshake."""
+        _sni_store[id(ssl_obj)] = server_name
+
+    for source, _dest in services:
+        if source.ssl is not None:
+            source.ssl.sni_callback = _sni_callback
+            # Python 3.13's create_default_context(CLIENT_AUTH) sets VERIFY_X509_STRICT,
+            # which rejects CA certs lacking a keyUsage extension. Our test CA certs
+            # don't include keyUsage, so clear this flag to stay compatible.
+            source.ssl.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    # --- END MODIFICATION ---
+
     # --- BEGIN MODIFICATION: Injecting TLV into proxy protocol header ---
     def _reload_tlv_file() -> None:
         global _tlv_structs, _ssl_tlv_structs
@@ -130,22 +184,32 @@ async def _patched_run(args):
                         if raw:
                             # Only read the last line
                             continue
-                        _tlv_structs, _ssl_tlv_structs = _parse_pp2_tlv_structs_json(line)
+                        _tlv_structs, _ssl_tlv_structs = _parse_pp2_tlv_structs_json(
+                            line
+                        )
                 else:
                     _tlv_structs, _ssl_tlv_structs = {}, {}
         except FileNotFoundError:
             pass
         except Exception as e:
             _tlv_structs, _ssl_tlv_structs = {}, {}
-            print(f"Failed to reload TLV file {path!r}: {e}", file=sys.stderr, flush=True)
+            print(
+                f"Failed to reload TLV file {path!r}: {e}", file=sys.stderr, flush=True
+            )
 
     def _with_tlv(result: ProxyResult, tlv: ProxyProtocolTLV) -> ProxyResult:
         if is_ipv4(result):
-            return ProxyResultIPv4(result.source, result.dest, protocol=result.protocol, tlv=tlv)
+            return ProxyResultIPv4(
+                result.source, result.dest, protocol=result.protocol, tlv=tlv
+            )
         if is_ipv6(result):
-            return ProxyResultIPv6(result.source, result.dest, protocol=result.protocol, tlv=tlv)
+            return ProxyResultIPv6(
+                result.source, result.dest, protocol=result.protocol, tlv=tlv
+            )
         if is_unix(result):
-            return ProxyResultUnix(result.source, result.dest, protocol=result.protocol, tlv=tlv)
+            return ProxyResultUnix(
+                result.source, result.dest, protocol=result.protocol, tlv=tlv
+            )
         return result
 
     class UpstreamProtocolWithTLV(UpstreamProtocol):
@@ -156,20 +220,111 @@ async def _patched_run(args):
                     self.downstream.transport,
                     dnsbl=dnsbl,
                 )
-            cur_tlv = _tlv_structs or {}
-            cur_ssl_tlv = _ssl_tlv_structs or {}
+
+            # Start with file-based TLVs (backward compat with setTLVs/proxy_server_tlv_headers).
+            cur_tlv = dict(_tlv_structs) if _tlv_structs else {}
+            cur_ssl_tlv = dict(_ssl_tlv_structs) if _ssl_tlv_structs else {}
+
+            # When TLS is active on the ingress, extract cert-based TLVs automatically.
+            if self.downstream.connected:
+                ssl_obj = self.downstream.transport.get_extra_info("ssl_object")
+                if ssl_obj is not None:
+                    # SNI → TLV 0x02 (AUTHORITY)
+                    sni = _sni_store.pop(id(ssl_obj), None)
+                    if sni and 0x02 not in cur_tlv:
+                        cur_tlv[0x02] = sni.encode("utf-8")
+
+                    # Peer certificate → subject DN (0xE0) and roles (0xE1)
+                    der_cert = ssl_obj.getpeercert(binary_form=True)
+                    if der_cert:
+                        try:
+                            dn_str, roles_der = _extract_cert_info(der_cert)
+                            if dn_str and 0xE0 not in cur_ssl_tlv:
+                                cur_ssl_tlv[0xE0] = dn_str.encode("utf-8")
+                            if roles_der and 0xE1 not in cur_ssl_tlv:
+                                cur_ssl_tlv[0xE1] = roles_der
+                        except Exception as e:
+                            print(
+                                f"[proxy] Failed to extract cert info: {e!r}",
+                                file=sys.stderr,
+                                flush=True,
+                            )
 
             if not cur_tlv and not cur_ssl_tlv:
                 return self.pp.pack(result)
             return self.pp.pack(
                 _with_tlv(
                     result,
-                    ProxyProtocolTLV(init=cur_tlv, ssl=ProxyProtocolSSLTLV(init=cur_ssl_tlv)),
+                    ProxyProtocolTLV(
+                        init=cur_tlv, ssl=ProxyProtocolSSLTLV(init=cur_ssl_tlv)
+                    ),
                 )
             )
 
-    new_server = partial(DownstreamProtocol, UpstreamProtocolWithTLV, loop, buf_len, dnsbl)
     # --- END MODIFICATION ---
+
+    # --- BEGIN MODIFICATION: Unix domain socket egress support ---
+    # When --unix-egress is specified, override DownstreamProtocol.connection_made
+    # to use loop.create_unix_connection() instead of loop.create_connection().
+    downstream_cls = DownstreamProtocol
+    if _unix_egress_path:
+
+        class DownstreamProtocolUnixEgress(DownstreamProtocol):
+            """Connects to a Unix domain socket instead of TCP for egress."""
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+            def connection_made(self, transport):
+                try:
+                    # Call grandparent (_Base) connection_made for basic transport setup.
+                    super(DownstreamProtocol, self).connection_made(transport)
+
+                    loop = self.loop
+                    self._dnsbl_task = loop.create_task(
+                        self.dnsbl.lookup(self.sock_info)
+                    )
+                    self._connect_task = connect_task = loop.create_task(
+                        loop.create_unix_connection(
+                            self._upstream_factory, _unix_egress_path
+                        )
+                    )
+                    result = build_transport_result(transport, unique_id=self.id)
+                    connect_task.add_done_callback(
+                        partial(self._unix_set_client, result)
+                    )
+                except Exception as e:
+                    print(
+                        f"[proxy-uds] Error in connection_made: {e!r}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    import traceback
+
+                    traceback.print_exc(file=sys.stderr)
+                    if hasattr(self, "_transport") and self._transport:
+                        self._transport.close()
+
+            def _unix_set_client(self, result, connect_task):
+                """Wrapper around _set_client that prints errors to stderr."""
+                try:
+                    _, upstream = connect_task.result()
+                except Exception as e:
+                    print(
+                        f"[proxy-uds] Unix egress connection FAILED: {e!r}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    import traceback
+
+                    traceback.print_exc(file=sys.stderr)
+                # Delegate to the original _set_client for the actual handling.
+                self._set_client(result, connect_task)
+
+        downstream_cls = DownstreamProtocolUnixEgress
+    # --- END MODIFICATION ---
+
+    new_server = partial(downstream_cls, UpstreamProtocolWithTLV, loop, buf_len, dnsbl)
 
     servers = [
         await loop.create_server(
@@ -193,17 +348,23 @@ async def _patched_run(args):
     # --- END: Code copied from library's run() function ---
     return 0
 
+
 proxyprotocol.server.main.run = _patched_run
 
-def _parse_pp2_tlvs_from_argv(argv: List[str]) -> Tuple[List[str], Optional[str]]:
+
+def _parse_wrapper_flags_from_argv(
+    argv: List[str],
+) -> Tuple[List[str], Optional[str], Optional[str]]:
     """
-    Strip wrapper-specific TLV flags from argv.
+    Strip wrapper-specific flags from argv.
 
     Supported flags:
       - --pp2-tlv-file PATH
+      - --unix-egress PATH   (connect egress to a Unix domain socket instead of TCP)
     """
     filtered: List[str] = []
     tlv_file: Optional[str] = None
+    unix_egress: Optional[str] = None
 
     i = 0
     while i < len(argv):
@@ -214,20 +375,31 @@ def _parse_pp2_tlvs_from_argv(argv: List[str]) -> Tuple[List[str], Optional[str]
             tlv_file = argv[i + 1]
             i += 2
             continue
+        if arg == "--unix-egress":
+            if i + 1 >= len(argv):
+                raise ValueError("--unix-egress requires a path argument")
+            unix_egress = argv[i + 1]
+            i += 2
+            continue
         filtered.append(arg)
         i += 1
 
-    return filtered, tlv_file
+    return filtered, tlv_file, unix_egress
+
 
 if __name__ == "__main__":
     # Parse and strip wrapper-specific flags before invoking the library's CLI.
     try:
-        filtered_argv, tlv_file = _parse_pp2_tlvs_from_argv(sys.argv[1:])
+        filtered_argv, tlv_file, unix_egress = _parse_wrapper_flags_from_argv(
+            sys.argv[1:]
+        )
         sys.argv = [sys.argv[0], *filtered_argv]
         if tlv_file:
             _tlv_file_path = tlv_file
+        if unix_egress:
+            _unix_egress_path = unix_egress
     except Exception as e:
-        print(f"Failed to parse TLV flags: {e}", file=sys.stderr, flush=True)
+        print(f"Failed to parse wrapper flags: {e}", file=sys.stderr, flush=True)
         sys.exit(2)
     print("Starting proxy protocol server...")
     sys.exit(main())

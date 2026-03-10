@@ -229,6 +229,7 @@ mongo_cc_library(
     name = "transport_layer",
     srcs = [
         "proxy_protocol_header_parser.cpp",
+        "proxy_protocol_tlv_extraction.cpp",
         "//src/mongo/transport/asio:asio_session_impl.cpp",
         "//src/mongo/transport/asio:asio_session_manager.cpp",
         "//src/mongo/transport/asio:asio_tcp_fast_open.cpp",
@@ -331,6 +332,7 @@ mongo_cc_unit_test(
     srcs = [
         "max_conns_override_test.cpp",
         "proxy_protocol_header_parser_test.cpp",
+        "proxy_protocol_tlv_ssl_peer_info_test.cpp",
         "service_executor_test.cpp",
         "session_manager_test.cpp",
         "session_workflow_test.cpp",
@@ -360,6 +362,7 @@ mongo_cc_unit_test(
         "//src/mongo/rpc:message",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:ssl_manager",
         "//src/third_party/asio-master:asio",
     ],
 )

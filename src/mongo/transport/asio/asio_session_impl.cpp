@@ -41,6 +41,7 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
+#include "mongo/transport/proxy_protocol_tlv_extraction.h"
 #include "mongo/transport/session_util.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -609,6 +610,11 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
                 _proxiedDstEndpoint = {};
             }
 
+            // Extract the SNI, DN and optional roles from the proxy protocol header TLVs if present
+            // and apply them to the session's tags. This is used to populate the SSLPeerInfo for
+            // the session.
+            applyProxyProtocolTlvs(*results, shared_from_this());
+
             // `opportunisticRead` expects to run as part of an asynchronous operation. We start the
             // operation below and make sure to mark it as completed, regardless of the completion
             // status of the future continuation returned by `opportunisticRead`.
@@ -875,6 +881,21 @@ Future<void> CommonAsioSession::opportunisticWrite(Stream& stream,
 template <typename MutableBufferSequence>
 Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer) {
     invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
+
+    // Skip TLS handshake for connections over the unix proxy socket. The proxy protocol
+    // connection is local and trusted, so TLS is unnecessary. This also avoids hitting
+    // the requireSSL assertion below for non-TLS connections on the proxy socket.
+    if (isConnectedToProxyUnixSocket()) {
+        MSGHEADER::ConstView proxyHeaderView(static_cast<const char*>(buffer.data()));
+        auto proxyResponseTo = proxyHeaderView.getResponseToMsgId();
+        if (proxyResponseTo != 0 && proxyResponseTo != -1) {
+            return Future<bool>::makeReady(
+                Status(ErrorCodes::SSLHandshakeFailed,
+                       "TLS hello received on proxy protocol unix socket"));
+        }
+        return Future<bool>::makeReady(false);
+    }
+
     MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
     auto responseTo = headerView.getResponseToMsgId();
 
