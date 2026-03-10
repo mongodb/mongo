@@ -115,6 +115,7 @@ selector:
     - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
     - jstests/core/timeseries/query/timeseries_lookup.js
     - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos

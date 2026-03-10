@@ -96,6 +96,7 @@ selector:
     - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
     - jstests/core/timeseries/query/timeseries_lookup.js
     - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
     - jstests/core/catalog/list_collections_correctness.js
     - jstests/core/query/change_streams_pre_and_post_images_in_create_and_collmod.js
     - jstests/core/timeseries/ddl/bucket_granularity.js
@@ -114,7 +115,6 @@ selector:
     - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
     - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
     - jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js
-    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
     - jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
     - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
     - jstests/core/timeseries/write/timeseries_viewless_oplog_entries.js

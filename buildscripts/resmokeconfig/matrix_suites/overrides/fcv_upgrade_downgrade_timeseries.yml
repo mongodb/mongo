@@ -19,6 +19,9 @@
       # In the FCV upgrade/downgrade suite this can actually happen when we upgrade/downgrade the timeseries collection.
       - jstests/core/timeseries/query/timeseries_lastpoint.js
 
+      # TODO SERVER-112816 re-enable tests that uses out stage on timeseries collections
+      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
+
 - name: sharded_collections_exclude_files
   value:
     exclude_files:
@@ -54,7 +57,6 @@
       - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
       - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
       - jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js
-      - jstests/core/timeseries/query/timeseries_out_non_sharded.js
       - jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
       - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
       - jstests/core/timeseries/write/timeseries_viewless_oplog_entries.js

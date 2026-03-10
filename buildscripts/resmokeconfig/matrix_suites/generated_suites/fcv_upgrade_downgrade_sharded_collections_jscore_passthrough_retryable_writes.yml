@@ -224,6 +224,7 @@ selector:
     - jstests/core/timeseries/geo/timeseries_geonear_lookup.js
     - jstests/core/timeseries/query/timeseries_lookup.js
     - jstests/core/timeseries/query/timeseries_lastpoint.js
+    - jstests/core/timeseries/query/timeseries_out_non_sharded.js
     - jstests/core/timeseries/ddl/timeseries_index_partial.js
     - jstests/core/timeseries/query/timeseries_partial_index_opt.js
     - jstests/core/timeseries/query/timeseries_find.js
