@@ -30,24 +30,11 @@
 #pragma once
 
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
-
-template <int level = 0>
-struct LeveledSynchronizedValueMutexPolicy {
-    using mutex_type = stdx::mutex;
-    static mutex_type construct() {
-        return stdx::mutex();
-    }
-};
-
-struct RawSynchronizedValueMutexPolicy {
-    using mutex_type = stdx::mutex;
-    static mutex_type construct() {
-        return {};
-    }
-};
-
 
 /**
  * Provides mutex guarded access to an object.
@@ -61,13 +48,10 @@ struct RawSynchronizedValueMutexPolicy {
  *
  * Inspired by https://isocpp.org/files/papers/n4033.html and boost::synchronized_value
  */
-template <typename T, typename MutexPolicy = LeveledSynchronizedValueMutexPolicy<>>
+template <typename T>
 class synchronized_value {
 public:
     using value_type = T;
-    using mutex_policy_type = MutexPolicy;
-
-    using mutex_type = typename MutexPolicy::mutex_type;
 
     template <typename SV>
     class UpdateGuard {
@@ -113,7 +97,7 @@ public:
 
     private:
         SV& _sv;
-        stdx::unique_lock<mutex_type> _lock;
+        stdx::unique_lock<stdx::mutex> _lock;
     };
 
     synchronized_value() = default;
@@ -183,7 +167,7 @@ public:
 
 private:
     value_type _value;  ///< guarded by _mutex
-    mutable mutex_type _mutex = mutex_policy_type::construct();
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace mongo

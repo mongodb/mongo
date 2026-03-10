@@ -160,7 +160,7 @@ SSLConnectionContext::~SSLConnectionContext() = default;
 
 class AsioReactorTimer final : public ReactorTimer {
 public:
-    using TimerType = synchronized_value<asio::system_timer, RawSynchronizedValueMutexPolicy>;
+    using TimerType = synchronized_value<asio::system_timer>;
     explicit AsioReactorTimer(asio::io_context& ctx)
         : _timer(std::make_shared<TimerType>(asio::system_timer(ctx))) {}
 
