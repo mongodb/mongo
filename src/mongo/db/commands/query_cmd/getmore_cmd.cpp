@@ -307,19 +307,8 @@ void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
  * Can be used in combination with any cursor-generating command (e.g. find, aggregate,
  * listIndexes).
  */
-class GetMoreCmd final : public Command {
+class GetMoreCmd final : public GetMoreCmdVersion1Gen<GetMoreCmd> {
 public:
-    GetMoreCmd() : Command("getMore") {}
-
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
-
-    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& opMsgRequest) override {
-        return std::make_unique<Invocation>(this, opMsgRequest);
-    }
-
     bool allowedInTransactions() const final {
         return true;
     }
@@ -332,16 +321,14 @@ public:
         return true;
     }
 
-    class Invocation final : public CommandInvocation {
+    class Invocation final : public MinimalInvocationBase {
     public:
-        Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse(request, IDLParserContext{"getMore"})) {
-            NamespaceString nss(
-                NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection()));
+        Invocation(OperationContext* opCtx, Command* cmd, const OpMsgRequest& opMsgRequest)
+            : MinimalInvocationBase(opCtx, cmd, opMsgRequest) {
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace for getMore: " << nss.toStringForErrorMsg(),
-                    nss.isValid());
+                    str::stream() << "Invalid namespace for getMore: "
+                                  << ns().toStringForErrorMsg(),
+                    ns().isValid());
         }
 
     private:
@@ -355,7 +342,7 @@ public:
         }
 
         bool isSubjectToIngressAdmissionControl() const override {
-            return !_cmd.getTerm().has_value();
+            return !request().getTerm().has_value();
         }
 
         bool allowsAfterClusterTime() const override {
@@ -367,25 +354,26 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceStringUtil::deserialize(_cmd.getDbName(), _cmd.getCollection());
+            return NamespaceStringUtil::deserialize(request().getDbName(),
+                                                    request().getCollection());
         }
 
         const DatabaseName& db() const override {
-            return _cmd.getDbName();
+            return request().getDbName();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
                                                       ns(),
-                                                      _cmd.getCommandParameter(),
-                                                      _cmd.getTerm().has_value()));
+                                                      request().getCommandParameter(),
+                                                      request().getTerm().has_value()));
         }
 
         const GenericArguments& getGenericArguments() const override {
-            return _cmd.getGenericArguments();
+            return request().getGenericArguments();
         }
 
-        bool canRetryOnStaleShardMetadataError(const OpMsgRequest& request) const override {
+        bool canRetryOnStaleShardMetadataError(const OpMsgRequest& opMsgRequest) const override {
             // Can not rerun the command when executing a GetMore command as the cursor may already
             // be lost.
             return false;
@@ -514,12 +502,13 @@ public:
                                           rpc::ReplyBuilderInterface* reply,
                                           ClientCursorPin& cursorPin,
                                           CurOp* curOp) {
+            const auto& cmd = request();
             const bool disableAwaitDataFailpointActive =
                 MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
 
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
             setUpOperationContextAndCurOpStateForGetMore(
-                opCtx, curOp, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
+                opCtx, curOp, *cursorPin.getCursor(), cmd, disableAwaitDataFailpointActive);
 
             NamespaceString nss = ns();
             CursorLocks locks{opCtx, nss, cursorPin};
@@ -602,7 +591,7 @@ public:
 
             // Mark this as an AwaitData operation if appropriate.
             if (cursorPin->isAwaitData() && !disableAwaitDataFailpointActive) {
-                auto lastKnownCommittedOpTime = _cmd.getLastKnownCommittedOpTime();
+                auto lastKnownCommittedOpTime = cmd.getLastKnownCommittedOpTime();
                 if (opCtx->isExhaust() && cursorPin->getLastKnownCommittedOpTime()) {
                     // Use the commit point of the last batch for exhaust cursors.
                     lastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
@@ -623,7 +612,7 @@ public:
 
             const auto shouldSaveCursor = generateBatch(opCtx,
                                                         cursorPin.getCursor(),
-                                                        _cmd,
+                                                        cmd,
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
                                                         &numResults);
@@ -680,13 +669,13 @@ public:
             curOp->setEndOfOpMetrics(numResults);
             collectQueryStatsMongod(opCtx, cursorPin);
 
-            boost::optional<CursorMetrics> metrics = _cmd.getIncludeQueryStatsMetrics()
+            boost::optional<CursorMetrics> metrics = cmd.getIncludeQueryStatsMetrics()
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
             nextBatch.done(respondWithId,
                            nss,
                            metrics,
-                           SerializationContext::stateCommandReply(_cmd.getSerializationContext()));
+                           SerializationContext::stateCommandReply(cmd.getSerializationContext()));
 
             if (respondWithId) {
                 cursorDeleter.dismiss();
@@ -708,7 +697,7 @@ public:
                 validateTxnNumber(opCtx, cursorId, &cc);
                 validateAuthorization(opCtx, cc);
                 validateNamespace(nss, cc);
-                validateMaxTimeMS(_cmd.getMaxTimeMS(), cc);
+                validateMaxTimeMS(request().getMaxTimeMS(), cc);
             };
 
             Backoff retryBackoff{Seconds(1), Milliseconds::max()};
@@ -743,6 +732,7 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            const auto& cmd = request();
             // Gets the number of write ops in the current multidocument transaction.
             auto getNumTxnOps = [opCtx]() -> boost::optional<size_t> {
                 if (opCtx->inMultiDocumentTransaction()) {
@@ -766,17 +756,17 @@ public:
             serviceOpCounters(opCtx).gotGetMore();
             auto curOp = CurOp::get(opCtx);
             NamespaceString nss = ns();
-            int64_t cursorId = _cmd.getCommandParameter();
+            int64_t cursorId = cmd.getCommandParameter();
             curOp->debug().cursorid = cursorId;
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
             boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
-            if (_cmd.getTerm() && nss == NamespaceString::kRsOplogNamespace) {
+            if (cmd.getTerm() && nss == NamespaceString::kRsOplogNamespace) {
                 // Validate term before acquiring locks.
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.
-                uassertStatusOK(replCoord->updateTerm(opCtx, *_cmd.getTerm()));
+                uassertStatusOK(replCoord->updateTerm(opCtx, *cmd.getTerm()));
 
                 // If the term field is present in an oplog request, it means this is an oplog
                 // getMore for replication oplog fetching because the term field is only allowed for
@@ -790,7 +780,7 @@ public:
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
-            if (_cmd.getIncludeQueryStatsMetrics()) {
+            if (cmd.getIncludeQueryStatsMetrics()) {
                 curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
 
@@ -843,6 +833,7 @@ public:
             }
         }
 
+        // TODO SERVER-121034: Remove validateResult() once CursorResponseBuilder is typed.
         void validateResult(OperationContext* opCtx,
                             rpc::ReplyBuilderInterface* reply,
                             boost::optional<TenantId> tenantId) {
@@ -854,10 +845,8 @@ public:
                                                        auth::ValidatedTenancyScope::get(opCtx),
                                                        tenantId,
                                                        SerializationContext::stateCommandReply(
-                                                           _cmd.getSerializationContext())));
+                                                           request().getSerializationContext())));
         }
-
-        const GetMoreCommandRequest _cmd;
     };
 
     bool maintenanceOk() const override {
