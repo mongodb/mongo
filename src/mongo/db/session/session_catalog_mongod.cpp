@@ -486,9 +486,9 @@ void abortInProgressTransactions(OperationContext* opCtx,
             auto lk = stdx::lock_guard(*opCtx->getClient());
             opCtx->setKillOpsExempt();
             opCtx->setLogicalSessionId(txnRecord.getSessionId());
+            opCtx->setTxnNumber(txnRecord.getTxnNum());
+            opCtx->setInMultiDocumentTransaction();
         }
-        opCtx->setTxnNumber(txnRecord.getTxnNum());
-        opCtx->setInMultiDocumentTransaction();
 
         hangDuringStepUpAbortInProgressTransactions.pauseWhileSet();
         auto ocs = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
@@ -606,10 +606,10 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
                 auto lk = stdx::lock_guard(*newOpCtx->getClient());
                 newOpCtx->setKillOpsExempt();
                 newOpCtx->setLogicalSessionId(*sessionInfo.getSessionId());
+                newOpCtx->setTxnNumber(*sessionInfo.getTxnNumber());
+                newOpCtx->setTxnRetryCounter(*sessionInfo.getTxnRetryCounter());
+                newOpCtx->setInMultiDocumentTransaction();
             }
-            newOpCtx->setTxnNumber(*sessionInfo.getTxnNumber());
-            newOpCtx->setTxnRetryCounter(*sessionInfo.getTxnRetryCounter());
-            newOpCtx->setInMultiDocumentTransaction();
 
             hangDuringStepUpPrepareRestoreLocks.pauseWhileSet();
 

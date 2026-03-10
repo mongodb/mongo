@@ -325,7 +325,10 @@ int insertBatchTransactionally(OperationContext* opCtx,
     while (true) {
         try {
             ++txnNumber;
-            opCtx->setTxnNumber(txnNumber);
+            {
+                stdx::lock_guard<Client> lg(*opCtx->getClient());
+                opCtx->setTxnNumber(txnNumber);
+            }
             runWithTransactionFromOpCtx(opCtx, nss, [&](OperationContext* opCtx) {
                 const auto outputColl =
                     acquireCollection(opCtx,
@@ -445,7 +448,10 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
 
     AuthorizationSession::get(client)->grantInternalAuthorization();
     TxnNumber txnNumber = *opCtx->getTxnNumber();
-    opCtx->setInMultiDocumentTransaction();
+    {
+        stdx::lock_guard<Client> lg(*client);
+        opCtx->setInMultiDocumentTransaction();
+    }
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);

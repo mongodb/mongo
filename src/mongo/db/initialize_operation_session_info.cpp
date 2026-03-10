@@ -186,6 +186,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
     if (osi.getAutocommit()) {
         invariant(osi.getTxnNumber());
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying autocommit=true is not allowed.",
                 !osi.getAutocommit().value());
