@@ -374,7 +374,12 @@ crate.annotation_select(
         "s390x-unknown-linux-gnu",
     ],
 )
-crate.from_specs()
+
+# Update the lock file using "CARGO_BAZEL_REPIN=1 bazel sync --only=crates"
+crate.from_specs(
+    cargo_lockfile = "//bazel:crates.lock",
+    lockfile = "//bazel:crates.lock",
+)
 use_repo(crate, "crates")
 #################### END RUST DEPS ####################
 
