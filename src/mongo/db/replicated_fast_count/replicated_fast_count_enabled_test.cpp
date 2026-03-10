@@ -67,5 +67,27 @@ TEST_F(IsReplicatedFastCountEnabledWithProviderTest, EnabledWhenBothFlagAndProvi
     ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
+TEST(ReplicatedFastCountEligibleNsTest, NormalCollectionsEligible) {
+    const NamespaceString normalNss =
+        NamespaceString::createNamespaceString_forTest("test", "coll1");
+    EXPECT_TRUE(isReplicatedFastCountEligible(normalNss));
+}
+
+TEST(ReplicatedFastCountEligibleNsTest, InternalLocalCollectionsEligible) {
+    const NamespaceString localNss =
+        NamespaceString::createNamespaceString_forTest("local", "coll1");
+    EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
+}
+
+TEST(ReplicatedFastCountEligibleNsTest, InternalNonLocalCollectionNotEligible) {
+    const NamespaceString configNss =
+        NamespaceString::createNamespaceString_forTest("config", "coll1");
+    EXPECT_TRUE(isReplicatedFastCountEligible(configNss));
+
+    const NamespaceString adminNss =
+        NamespaceString::createNamespaceString_forTest("admin", "coll1");
+    EXPECT_TRUE(isReplicatedFastCountEligible(adminNss));
+}
+
 }  // namespace
 }  // namespace mongo

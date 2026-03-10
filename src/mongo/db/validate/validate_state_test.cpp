@@ -123,16 +123,25 @@ TEST_F(ValidateStateTest, EnforceOnNonInternalNamespaceReplicatedFastCountFeatur
     EXPECT_EQ(validateState.shouldEnforceFastCount(operationContext()), true);
 }
 
-TEST_F(ValidateStateTest, DoNotEnforceOnInternalNamespaceReplicatedFastCountFeatureFlagOn) {
+TEST_F(ValidateStateTest, SkipEnforcementOnAdminAndConfigWithReplicatedFastCount) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    std::vector<StringData> dbNames{"config", "local", "admin"};
 
-    for (auto& dbName : dbNames) {
+    for (const auto& db : {"config", "admin"}) {
         const NamespaceString nss =
-            NamespaceString::createNamespaceString_forTest(dbName + ".validateState");
-        ValidateState validateState(operationContext(), nss, kValidationOptionsEnforceFastCount);
-        EXPECT_EQ(validateState.shouldEnforceFastCount(operationContext()), false);
+            NamespaceString::createNamespaceString_forTest(std::string(db) + ".validateState");
+        const ValidateState validateState(
+            operationContext(), nss, kValidationOptionsEnforceFastCount);
+        EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext()));
     }
+}
+
+TEST_F(ValidateStateTest, EnforceOnLocalDbWithReplicatedFastCount) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("local.validateState");
+    const ValidateState validateState(operationContext(), nss, kValidationOptionsEnforceFastCount);
+    EXPECT_TRUE(validateState.shouldEnforceFastCount(operationContext()));
 }
 
 DEATH_TEST(FastCountToStringDeathTest, DiesOnBadFastCountType, "11853100") {

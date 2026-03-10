@@ -404,6 +404,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             /*defaultFromMigrate=*/fromMigrate);
         if (isReplicatedFastCountEnabled(opCtx)) {
             UncommittedFastCountChange::getForWrite(opCtx).record(
+                collection->ns(),
                 collection->uuid(),
                 records.size(),
                 std::accumulate(records.begin(), records.end(), 0LL, [](auto acc, const Record& r) {
@@ -774,7 +775,7 @@ void updateDocument(OperationContext* opCtx,
 
     if (isReplicatedFastCountEnabled(opCtx)) {
         UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+            collection->ns(), collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
     }
 }
 
@@ -870,7 +871,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     if (isReplicatedFastCountEnabled(opCtx)) {
         UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
+            collection->ns(), collection->uuid(), 0, newDoc.objsize() - oldDoc.value().objsize());
     }
     return newDoc;
 }
@@ -962,7 +963,7 @@ void deleteDocument(OperationContext* opCtx,
 
     if (isReplicatedFastCountEnabled(opCtx)) {
         UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->uuid(), -1, -doc.value().objsize());
+            collection->ns(), collection->uuid(), -1, -doc.value().objsize());
     }
 
     if (opDebug) {
@@ -1033,7 +1034,7 @@ repl::OpTime truncateRange(OperationContext* opCtx,
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
     if (isReplicatedFastCountEnabled(opCtx)) {
         UncommittedFastCountChange::getForWrite(opCtx).record(
-            collection->uuid(), -docsDeleted, -bytesDeleted);
+            collection->ns(), collection->uuid(), -docsDeleted, -bytesDeleted);
     }
     return opTime;
 }

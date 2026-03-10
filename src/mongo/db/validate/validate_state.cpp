@@ -183,8 +183,8 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx) const {
             // size storer counts for the 'config.image_collection' collection. We therefore do not
             // enforce fast count on it.
             return false;
-        } else if (isReplicatedFastCountEnabled(opCtx) && _nss.isOnInternalDb()) {
-            // SERVER-119984 TODO: Revisit this, enforce if possible.
+        } else if (isReplicatedFastCountEnabled(opCtx) && (_nss.isAdminDB() || _nss.isConfigDB())) {
+            // TODO(SERVER-119984): Revisit this, enforce if possible.
             return false;
         }
 

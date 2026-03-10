@@ -35,6 +35,7 @@ mongo_cc_library(
     ],
     deps = [
         "replicated_fast_count_committer",
+        "replicated_fast_count_enabled",
     ],
 )
 

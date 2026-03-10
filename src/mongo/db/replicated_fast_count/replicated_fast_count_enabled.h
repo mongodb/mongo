@@ -29,9 +29,21 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-// TODO(SERVER-119896): Delete this function and the associated library.
+
+/**
+ * Returns whether the replicated fast count collection is enabled on the provided operation
+ * context.
+ */
+// TODO(SERVER-119896): Delete this function and rename library.
 MONGO_MOD_PUBLIC bool isReplicatedFastCountEnabled(OperationContext* opCtx);
+
+/**
+ * Returns whether the provided namespace string can be tracked by the replicated fast count
+ * collection.
+ */
+MONGO_MOD_PUBLIC bool isReplicatedFastCountEligible(NamespaceString nss);
 }  // namespace mongo

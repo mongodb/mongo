@@ -45,4 +45,9 @@ bool isReplicatedFastCountEnabled(OperationContext* opCtx) {
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount();
 }
+
+bool isReplicatedFastCountEligible(NamespaceString nss) {
+    // TODO(SERVER-120741): Allow if the local DB is the oplog.
+    return !nss.isLocalDB();
+}
 }  // namespace mongo

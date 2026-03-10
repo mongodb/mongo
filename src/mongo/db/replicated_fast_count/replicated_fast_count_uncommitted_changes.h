@@ -61,9 +61,11 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
-     * Records a change in count and size for the given collection UUID.
+     * Records a change in count and size for the given collection UUID. This is a no-op when both
+     * deltas are zero or if the provided namespace string is not eligible to be tracked by the
+     * replicated fast count collection.
      */
-    void record(const UUID& uuid, int64_t numDelta, int64_t sizeDelta);
+    void record(const NamespaceString& nss, const UUID& uuid, int64_t numDelta, int64_t sizeDelta);
 
 private:
     // Map of collection UUID to uncommitted values for size and count.

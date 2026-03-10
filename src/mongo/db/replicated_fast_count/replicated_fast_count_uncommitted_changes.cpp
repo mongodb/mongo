@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_committer.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -92,10 +93,17 @@ CollectionSizeCount UncommittedFastCountChange::find(const UUID& uuid) const {
     return {};
 }
 
-void UncommittedFastCountChange::record(const UUID& uuid, int64_t numDelta, int64_t sizeDelta) {
+void UncommittedFastCountChange::record(const NamespaceString& nss,
+                                        const UUID& uuid,
+                                        int64_t numDelta,
+                                        int64_t sizeDelta) {
+    if (!isReplicatedFastCountEligible(nss)) {
+        return;
+    }
     if (numDelta == 0 && sizeDelta == 0) {
         return;
     }
+
     auto& collChanges = _trackedChanges[uuid];
     collChanges.count += numDelta;
     collChanges.size += sizeDelta;
