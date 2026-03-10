@@ -60,3 +60,6 @@ filters:
   - "verify_all_extensions_visibility.sh":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "fetch_mongodb_database_tools.sh":
+    approvers:
+      - 10gen/query-optimization-correctness

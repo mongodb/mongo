@@ -3689,3 +3689,22 @@ functions:
   "save tracing data":
     - *tar_tracing_data
     - *archive_tracing_data
+
+  "fetch tpch dataset":
+    - *f_expansions_write
+    - command: s3.get
+      params:
+        role_arn: arn:aws:iam::579766882180:role/evergreen.mongo-db-master
+        bucket: query-benchmark-data
+        region: us-east-1
+        remote_file: tpc-h/tpch-${scale}-normalized.archive.gz
+        local_file: tpc-h/tpch-${scale}-normalized.archive.gz
+        require_checksum_sha256: ${checksum}
+
+  "fetch mongodb database tools":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/fetch_mongodb_database_tools.sh"

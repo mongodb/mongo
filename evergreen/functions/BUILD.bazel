@@ -48,6 +48,11 @@ sh_binary(
 )
 
 sh_binary(
+    name = "get_mongodb_tools_url",
+    srcs = ["get_mongodb_tools_url.sh"],
+)
+
+sh_binary(
     name = "modified_patch_files_get_all",
     srcs = ["modified_patch_files_get_all.sh"],
 )

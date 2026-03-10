@@ -1,5 +1,6 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
+source "$DIR/functions/get_mongodb_tools_url.sh"
 
 cd src
 
@@ -21,37 +22,7 @@ if [ -z "${build_patch_id}" ] || [ -z "${reuse_compile_from}" ] || [ "${is_patch
     mkdir -p mongodb/server_params
     cp ./all_server_params.txt mongodb/server_params
 
-    # Download mongo tools
-    arch=$(uname -m)
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        if [ "$ID" == "amzn" ]; then
-            case $arch in
-            "x86_64" | "aarch64")
-                case $VERSION_ID in
-                "2" | "2023")
-                    binary_url="https://fastdl.mongodb.org/tools/db/mongodb-database-tools-amazon${VERSION_ID}-${arch}-100.9.4.tgz"
-                    ;;
-                *)
-                    echo "Unsupported Amazon Linux version: $VERSION_ID"
-                    exit 1
-                    ;;
-                esac
-                ;;
-            *)
-                echo "Unsupported architecture: $arch"
-                exit 1
-                ;;
-            esac
-        else
-            echo "Unsupported Linux distribution: $ID"
-            exit 1
-        fi
-    else
-        echo "Unable to determine Linux distribution"
-        exit 1
-    fi
-
+    binary_url="$(get_mongodb_tools_url 100.9.4)" || exit 1
     wget "$binary_url" -O mongo-tools.tar.gz
     tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
 

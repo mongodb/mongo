@@ -160,6 +160,11 @@ sh_binary(
 )
 
 sh_binary(
+    name = "fetch_mongodb_database_tools",
+    srcs = ["fetch_mongodb_database_tools.sh"],
+)
+
+sh_binary(
     name = "garasign_gpg_crypt_sign",
     srcs = ["garasign_gpg_crypt_sign.sh"],
 )
