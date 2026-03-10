@@ -117,4 +117,4 @@ assert.eq(ErrorCodes.IllegalOperation, res.code);
 
 // At this point, all the user documents are gone, so further activity may be unauthorized,
 // depending on cluster configuration.  So, this is the end of the test.
-MongoRunner.stopMongod(conn, {user: "userAdmin", pwd: "password"});
+MongoRunner.stopMongod(conn, null, {user: "userAdmin", pwd: "password"});
