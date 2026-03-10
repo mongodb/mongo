@@ -195,9 +195,7 @@ buildvariants:
       - name: query_golden_disagg_gen
       - name: query_golden_sharding_disagg_gen
       - name: streams_build_only_gen
-      # TODO (SERVER-120830): Reenable suite with only passing tests.
-      # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-      # - name: no_passthrough_disagg_override_gen
+      - name: no_passthrough_disagg_override_gen
 
   - name: amazon-linux2023-arm64-tests-lto-pgo-bolt
     display_name: "Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags) LTO/PGO/BOLT"
