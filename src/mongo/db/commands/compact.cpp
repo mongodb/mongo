@@ -46,6 +46,7 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -222,6 +223,12 @@ private:
                 "Compact command with extra options requires its feature flag to be enabled",
                 gFeatureFlagCompactOptions.isEnabled() ||
                     (!params.getFreeSpaceTargetMB() && !params.getDryRun()));
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream() << "Compact command is not supported in this storage mode: "
+                              << provider.name(),
+                provider.supportsCompaction());
     }
 };
 
