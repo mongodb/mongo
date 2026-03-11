@@ -465,7 +465,13 @@ __rec_write_page_status(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
      */
     mod->rec_max_txn = r->max_txn;
     mod->rec_max_timestamp = r->max_ts;
+
+    /*
+     * Track the timestamps used in the current reconciliation to decide if we can skip the next
+     * reconciliation.
+     */
     mod->rec_pinned_stable_timestamp = r->rec_start_pinned_stable_ts;
+    mod->rec_prune_timestamp = r->rec_prune_timestamp;
 
     /* Track the page's most recent LSN. */
     if (page->disagg_info != NULL) {
@@ -3336,6 +3342,12 @@ __wti_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV
 
     /* Track if page has overflow items. */
     r->ovfl_items = true;
+
+    /*
+     * Disaggregated trees are not allowed to create overflow keys or values. In diagnostic builds,
+     * assert if reconciliation ever tries to do so.
+     */
+    WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_DISAGGREGATED));
 
     /*
      * See if this overflow record has already been written and reuse it if possible, otherwise

@@ -1160,23 +1160,66 @@ err:
 }
 
 /*
+ * __disagg_mark_btrees_readonly_then_step_down --
+ *     Mark all disaggregated btrees as readonly. This must be called during leader step-down. And
+ *     then step down to the follower mode.
+ */
+static void
+__disagg_mark_btrees_readonly_then_step_down(WT_SESSION_IMPL *session)
+{
+    WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+
+    conn = S2C(session);
+
+    for (dhandle = NULL;;) {
+        WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q);
+        if (dhandle == NULL)
+            break;
+
+        /* Only care about open disaggregated btree dhandles. */
+        if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+            continue;
+
+        btree = (WT_BTREE *)dhandle->handle;
+
+        if (!F_ISSET(btree, WT_BTREE_DISAGGREGATED) || F_ISSET(btree, WT_BTREE_READONLY))
+            continue;
+
+        WT_WITH_BTREE(session, btree, ret = __wt_evict_file_exclusive_on(session));
+        WT_IGNORE_RET(ret);
+
+        /* Mark the disaggregated as readonly. */
+        F_SET(btree, WT_BTREE_READONLY);
+
+        WT_WITH_BTREE(session, btree, __wt_evict_file_exclusive_off(session));
+    }
+
+    /* Step down to the follower mode. */
+    conn->layered_table_manager.leader = false;
+    WT_STAT_CONN_SET(session, disagg_role_leader, 0);
+}
+
+/*
  * __disagg_step_down --
  *     Step down to the follower mode.
  */
 static void
 __disagg_step_down(WT_SESSION_IMPL *session)
 {
-    WT_CONNECTION_IMPL *conn;
-
-    conn = S2C(session);
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
     __wt_verbose_debug1(
       session, WT_VERB_DISAGGREGATED_STORAGE, "%s", "Stepping down to the follower mode");
 
-    conn->layered_table_manager.leader = false;
-    WT_STAT_CONN_SET(session, disagg_role_leader, 0);
+    /*
+     * Mark disaggregated btrees read-only before switching role to follower to prevent concurrent
+     * eviction paths, especially parent split path, from dirtying pages during the step-down
+     * window.
+     */
+    WT_WITH_HANDLE_LIST_READ_LOCK(session, __disagg_mark_btrees_readonly_then_step_down(session));
 
     /* Do some cleanup as we are abandoning the current checkpoint. */
     __disagg_shared_metadata_queue_clear(session);

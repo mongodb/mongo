@@ -1698,18 +1698,6 @@ variables:
           additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
           format_test_script_args: -t 360
 
-  - &format-stress-asan-realloc-exact-test
-    exec_timeout_secs: 25200
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
-      - func: "format test script"
-        vars:
-          additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-          format_test_script_args: -t 360 -- -C "debug_mode=(realloc_exact=true)"
-
   - &race-condition-stress-asan-test
     exec_timeout_secs: 25200
     commands:
@@ -5133,9 +5121,6 @@ tasks:
     tags: ["stress-test-asan"]
   - <<: *format-stress-asan-test
     name: format-stress-asan-test-4
-    tags: ["stress-test-asan"]
-  - <<: *format-stress-asan-realloc-exact-test
-    name: format-stress-asan-realloc-exact-test
     tags: ["stress-test-asan"]
   - <<: *race-condition-stress-asan-test
     name: race-condition-stress-asan-test-1

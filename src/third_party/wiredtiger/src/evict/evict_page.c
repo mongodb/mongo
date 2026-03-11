@@ -984,7 +984,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
-    wt_timestamp_t checkpoint_timestamp;
     bool closing, modified;
 
     *inmem_splitp = false;
@@ -1063,16 +1062,34 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         return (__wt_set_return(session, EBUSY));
     }
 
-    /*
-     * If precise checkpoints are enabled, and this page was already reconciled at a time that
-     * services the checkpoint, don't try again. Reconciling the page again without the timestamp
-     * moving would result in the same page being written out as last time.
-     */
-    checkpoint_timestamp = __wt_atomic_load_uint64_acquire(&conn->txn_global.checkpoint_timestamp);
-    if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) && checkpoint_timestamp != WT_TS_NONE &&
-      page->modify->rec_pinned_stable_timestamp >= checkpoint_timestamp) {
-        WT_STAT_CONN_INCR(session, cache_eviction_blocked_precise_checkpoint);
-        return (__wt_set_return(session, EBUSY));
+    if (!F_ISSET(session, WT_SESSION_DEBUG_RELEASE_EVICT) && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
+        if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT)) {
+            /*
+             * If garbage collection is enabled and this page was already reconciled at the current
+             * prune timestamp, do not attempt reconciliation again. Repeating the reconciliation
+             * without the prune timestamp advancing will yield no progress in garbage collection.
+             */
+            wt_timestamp_t prune_timestamp =
+              __wt_atomic_load_uint64_acquire(&btree->prune_timestamp);
+            if (prune_timestamp != WT_TS_NONE &&
+              page->modify->rec_prune_timestamp >= prune_timestamp) {
+                WT_STAT_CONN_INCR(session, cache_eviction_blocked_prune_timestamp);
+                return (__wt_set_return(session, EBUSY));
+            }
+        } else if (F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
+            /*
+             * If precise checkpoints are enabled, and this page was already reconciled at a time
+             * that services the checkpoint, don't try again. Reconciling the page again without the
+             * timestamp moving would result in the same page being written out as last time.
+             */
+            wt_timestamp_t checkpoint_timestamp =
+              __wt_atomic_load_uint64_acquire(&conn->txn_global.checkpoint_timestamp);
+            if (checkpoint_timestamp != WT_TS_NONE &&
+              page->modify->rec_pinned_stable_timestamp >= checkpoint_timestamp) {
+                WT_STAT_CONN_INCR(session, cache_eviction_blocked_precise_checkpoint);
+                return (__wt_set_return(session, EBUSY));
+            }
+        }
     }
 
     /*

@@ -1,0 +1,14 @@
+#WT-4658 Apply Clang Format
+7dfd9391862bc9a6d84868c4dc51689c45a3aacf
+
+# WT-13817 Move functions from the meta module to the checkpoint one
+33839af5ccd37021d4a00e09aa77adda13c811c2
+
+# WT-13556 Separate conn_evict.c from conn_cache.c
+e4e7e8219a0a1300c8e56fe42732e8afc5313108
+
+# WT-13533 Separate eviction from cache
+c12c796f486b852da1737a25f66bcd59e9975d69
+
+# WT-14619 Merge layered tables
+5d8fe009553e4ae547dc809be535822b1cd1b5a0
