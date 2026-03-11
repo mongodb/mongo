@@ -228,6 +228,11 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider method not implemented");
     }
+
+    bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const override {
+        uasserted(mongo::ErrorCodes::NotImplemented,
+                  "StubPersistenceProvider::oplogHasBeenTruncated() method not implemented");
+    }
 };
 
 }  // namespace mongo::rss

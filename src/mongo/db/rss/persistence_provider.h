@@ -236,6 +236,13 @@ public:
      * being reaped immediately.
      */
     virtual bool shouldDeferUntimestampedDrops() const = 0;
+
+    /**
+     * Returns whether the oplog has been truncated, based on inspection of the first oplog entry.
+     * The check is provider-specific because the format of the initialization entry differs between
+     * persistence providers.
+     */
+    virtual bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const = 0;
 };
 
 }  // namespace rss

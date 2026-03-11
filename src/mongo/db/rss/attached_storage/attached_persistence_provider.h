@@ -201,6 +201,12 @@ public:
      * Attached storage does not need to defer untimestamped drops.
      */
     bool shouldDeferUntimestampedDrops() const override;
+
+    /**
+     * The oplog has been truncated if the first entry is not a noop with an "initiating set"
+     * message (the initialization entry in attached storage).
+     */
+    bool oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const override;
 };
 
 }  // namespace mongo::rss

@@ -61,7 +61,9 @@ assert.eq(next.o2._id, 1);
 // Confirm that we can begin an aggregation at a timestamp that precedes the start of the oplog, if
 // the first entry in the oplog is the replica set initialization message.
 const firstOplogEntry = getFirstOplogEntry(rst.getPrimary());
-assert.eq(firstOplogEntry.o.msg, "initiating set");
+assert(
+    firstOplogEntry.o.msg === "initiating set" || (firstOplogEntry.o.msg === "new primary" && firstOplogEntry.t == 1),
+);
 assert.eq(firstOplogEntry.op, "n");
 
 aggCmdRes = assert.commandWorked(

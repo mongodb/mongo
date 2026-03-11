@@ -31,18 +31,21 @@ function assertAllEventsObserved(changeStream, expectedDocs, eventList) {
 }
 
 // Helper function to add a new ReplSetTest shard into the cluster. Using single-node shards
-// ensures that the "initiating set" entry cannot be rolled back.
+// ensures that the replset initialization entry cannot be rolled back.
 function addShardToCluster(shardName) {
     const replTest = new ReplSetTest({name: shardName, nodes: 1, nodeOptions: rsNodeOptions});
     replTest.startSet({shardsvr: ""});
     replTest.initiate();
     assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
 
-    // Verify that the new shard's first oplog entry contains the string "initiating set". This
-    // is used by change streams as a sentinel to indicate that no writes have occurred on the
-    // replica set before this point.
+    // Verify that the new shard's first oplog entry is the replset initialization sentinel,
+    // used by change streams to indicate that no writes have occurred on the replica set
+    // before this point. This is either "initiating set" or "new primary".
     const firstOplogEntry = replTest.getPrimary().getCollection("local.oplog.rs").findOne();
-    assert.docEq({msg: "initiating set"}, firstOplogEntry.o);
+    assert(
+        firstOplogEntry.o.msg === "initiating set" ||
+            (firstOplogEntry.o.msg === "new primary" && firstOplogEntry.t == 1),
+    );
     assert.eq(firstOplogEntry.op, "n");
 
     return replTest;

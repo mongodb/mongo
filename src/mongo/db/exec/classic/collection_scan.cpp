@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_data.h"
@@ -210,8 +211,9 @@ std::unique_ptr<SeekableRecordCursor> initCursorAndAssertTsHasNotFallenOff(
         // If the first entry we see in the oplog is the replset initialization, then it doesn't
         // matter if its timestamp is later than the timestamp that should not have fallen off the
         // oplog; no events earlier can have fallen off this oplog.
-        isNewRS = oplogEntryParser.getOpType() == repl::OpTypeEnum::kNoop &&
-            oplogEntryParser.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg));
+        isNewRS = !rss::ReplicatedStorageService::get(opCtx)
+                       .getPersistenceProvider()
+                       .oplogHasBeenTruncated(firstEntry);
     } catch (const AssertionException& exception) {
         uasserted(8881102,
                   str::stream() << "Failed to parse the oldest oplog entry" << causedBy(exception));

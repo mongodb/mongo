@@ -18,6 +18,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/rss:snapshot_window_options",
     ],

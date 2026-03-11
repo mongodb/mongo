@@ -29,6 +29,7 @@
 
 #include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
 
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/rss/snapshot_window_options_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -205,6 +206,12 @@ bool AttachedPersistenceProvider::settingsProvideMajorityWriteJournalDurability(
 
 bool AttachedPersistenceProvider::shouldDeferUntimestampedDrops() const {
     return false;
+}
+
+bool AttachedPersistenceProvider::oplogHasBeenTruncated(const BSONObj& firstOplogEntry) const {
+    repl::OplogEntryParserNonStrict parser{firstOplogEntry};
+    return parser.getOpType() != repl::OpTypeEnum::kNoop ||
+        parser.getObject().getStringField(repl::kNewPrimaryMsgField) != repl::kInitiatingSetMsg;
 }
 
 }  // namespace mongo::rss
