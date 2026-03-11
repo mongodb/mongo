@@ -25,6 +25,8 @@ if not gdb:
         lookup_type,
     )
     from buildscripts.gdb.optimizer_printers import register_optimizer_printers
+else:
+    from buildscripts.gdb.mongo import lookup_type
 
 try:
     import collections
@@ -225,6 +227,338 @@ class BSONObjPrinter(object):
             # errors out early when the date is out of range.
             suffix = " - unprintable or invalid"
         return "%s BSONObj %s bytes @ %s%s" % (ownership, size, self.ptr, suffix)
+
+
+class MessagePrinter(object):
+    """Pretty-printer for mongo::Message. Reads raw memory (no method calls) for coredump debugging."""
+
+    # NetworkOp enum values from message.h
+    _NETWORK_OP_NAMES = {
+        0: "opInvalid",
+        1: "opReply",
+        2001: "dbUpdate",
+        2002: "dbInsert",
+        2004: "dbQuery",
+        2005: "dbGetMore",
+        2006: "dbDelete",
+        2007: "dbKillCursors",
+        2012: "dbCompressed",
+        2013: "dbMsg",
+    }
+
+    # OpMsg flags from op_msg.h
+    _OP_MSG_FLAGS = {
+        1 << 0: "checksumPresent",
+        1 << 1: "moreToCome",
+        1 << 16: "exhaustSupported",
+    }
+
+    # Section kinds from op_msg.cpp
+    _SECTION_BODY = 0
+    _SECTION_DOC_SEQUENCE = 1
+    _SECTION_SECURITY_TOKEN = 2
+
+    # MsgData header size (sizeof MSGHEADER::Layout)
+    _MSG_DATA_HEADER_SIZE = 16
+
+    def __init__(self, val):
+        """Initialize MessagePrinter."""
+        self.val = val
+        self.size = 0
+        self.op_code = None
+        self.flags = None
+        self.buf_addr = None
+        self.op_msg_body = None  # Parsed body as JSON string or error
+        self.op_msg_body_addr = None  # Address of body BSON for BSON printer display
+        self.op_msg_sequences = None  # List of (name, doc_count) for doc sequences
+        self.op_msg_ns = None  # For legacy dbQuery: namespace string
+        self._parse()
+
+    def _get_holder_ptr(self):
+        """Get the Holder* from SharedBuffer. Tries multiple paths for different layout versions."""
+        buf = self.val["_buf"]
+        for holder_path in [
+            ["_holderAndAllocator", "holder", "px"],
+            ["_holderAndAllocator", "holder", "ptr"],
+            ["_holder", "px"],
+            ["_holder", "ptr"],
+        ]:
+            try:
+                obj = buf
+                for part in holder_path:
+                    obj = obj[part]
+                if obj and int(obj) != 0:
+                    return obj
+            except (gdb.error, TypeError, KeyError):
+                continue
+        return None
+
+    def _parse(self):
+        """Parse Message from raw memory without calling any methods."""
+        holder_ptr = self._get_holder_ptr()
+        if not holder_ptr:
+            return
+
+        try:
+            # Data starts immediately after Holder (Holder::data() returns reinterpret_cast<char*>(this+1))
+            buf_addr_val = (holder_ptr + 1).dereference().cast(lookup_type("char")).address
+            self.buf_addr = buf_addr_val
+
+            inferior = gdb.selected_inferior()
+            # First 4 bytes: message length (little-endian int32, wire protocol header)
+            raw_len = inferior.read_memory(buf_addr_val, 4).tobytes()
+            self.size = struct.unpack("<i", raw_len)[0]
+
+            # Bytes 12-15: opCode (NetworkOp)
+            if self.size >= 16:
+                op_addr = buf_addr_val + 12
+                raw_op = inferior.read_memory(op_addr, 4).tobytes()
+                self.op_code = struct.unpack("<i", raw_op)[0]
+
+            # For OP_MSG (dbMsg=2013), flags are first 4 bytes of body at offset 16
+            if self.op_code == 2013 and self.size >= 20:
+                flags_addr = buf_addr_val + 16
+                raw_flags = inferior.read_memory(flags_addr, 4).tobytes()
+                self.flags = struct.unpack("<I", raw_flags)[0]
+
+            # Parse OpMsg/OpMsgRequest for display (dbMsg or dbQuery)
+            if self.op_code == 2013:
+                self._parse_op_msg(inferior, buf_addr_val)
+            elif self.op_code == 2004:
+                self._parse_legacy_query(inferior, buf_addr_val)
+        except (gdb.error, struct.error, ValueError):
+            pass
+
+    def _flags_str(self):
+        """Return human-readable flags string for OP_MSG, or None for other message types."""
+        if self.flags is None:
+            return None
+        if self.flags == 0:
+            return "0"
+        names = [name for bit, name in self._OP_MSG_FLAGS.items() if self.flags & bit]
+        return "|".join(names) if names else hex(self.flags)
+
+    def _parse_op_msg(self, inferior, buf_addr_val):
+        """Parse OP_MSG sections (body, doc sequences) from raw memory. Mirrors OpMsg::parse."""
+        try:
+            data_size = self.size - self._MSG_DATA_HEADER_SIZE
+            if data_size <= 4:
+                return
+
+            # Skip flags (4 bytes), sections start at offset 20
+            k_checksum_present = 1 << 0
+            if self.flags & k_checksum_present:
+                data_size -= 4  # Checksum at end
+
+            sections_size = data_size - 4  # After flags
+            if sections_size <= 0:
+                return
+
+            base_addr = int(buf_addr_val)
+            pos = base_addr + 20  # After header + flags
+            end_pos = base_addr + self.size
+            if self.flags & k_checksum_present:
+                end_pos -= 4
+
+            body_json = None
+            sequences = []
+
+            while pos < end_pos and pos + 1 <= end_pos:
+                section_kind = struct.unpack("<B", inferior.read_memory(pos, 1).tobytes())[0]
+                pos += 1
+
+                if section_kind == self._SECTION_BODY:
+                    if pos + 4 > end_pos:
+                        break
+                    body_addr = pos
+                    bson_size = struct.unpack("<i", inferior.read_memory(pos, 4).tobytes())[0]
+                    if bson_size < 5 or bson_size > 17 * 1024 * 1024 or pos + bson_size > end_pos:
+                        body_json = "<invalid BSON size %d>" % bson_size
+                        break
+                    raw_bson = inferior.read_memory(pos, bson_size).tobytes()
+                    if bson and bson.is_valid(raw_bson):
+                        options = CodecOptions(document_class=collections.OrderedDict)
+                        doc = bson.decode(raw_bson, codec_options=options)
+                        body_json = bson.json_util.dumps(doc)
+                        self.op_msg_body_addr = body_addr
+                    else:
+                        body_json = "<invalid BSON>"
+                    pos += bson_size
+
+                elif section_kind == self._SECTION_DOC_SEQUENCE:
+                    if pos + 4 > end_pos:
+                        break
+                    seq_total = struct.unpack("<i", inferior.read_memory(pos, 4).tobytes())[0]
+                    pos += 4
+                    if seq_total < 4 or pos + seq_total - 4 > end_pos:
+                        sequences.append(("<invalid>", 0))
+                        break
+                    seq_end = pos + seq_total - 4
+                    # Read cstr name
+                    name_end = pos
+                    while name_end < seq_end and inferior.read_memory(name_end, 1).tobytes()[0]:
+                        name_end += 1
+                    name = (
+                        inferior.read_memory(pos, name_end - pos)
+                        .tobytes()
+                        .decode("utf-8", errors="replace")
+                    )
+                    pos = name_end + 1
+                    # Count BSONObjs in sequence
+                    doc_count = 0
+                    while pos + 4 <= seq_end:
+                        doc_size = struct.unpack("<i", inferior.read_memory(pos, 4).tobytes())[0]
+                        if doc_size < 5 or pos + doc_size > seq_end:
+                            break
+                        doc_count += 1
+                        pos += doc_size
+                    sequences.append((name, doc_count))
+                    pos = seq_end
+
+                elif section_kind == self._SECTION_SECURITY_TOKEN:
+                    # Skip cstr
+                    while pos < end_pos and inferior.read_memory(pos, 1).tobytes()[0]:
+                        pos += 1
+                    pos += 1
+                else:
+                    body_json = "<unknown section kind %d>" % section_kind
+                    break
+
+            self.op_msg_body = body_json
+            self.op_msg_sequences = sequences
+        except (gdb.error, struct.error, ValueError, KeyError):
+            pass
+
+    def _parse_legacy_query(self, inferior, buf_addr_val):
+        """Parse dbQuery (OP_QUERY) format. Extracts command body for $cmd namespace. Mirrors opMsgRequestFromLegacyRequest."""
+        try:
+            base_addr = int(buf_addr_val)
+            pos = base_addr + self._MSG_DATA_HEADER_SIZE
+            end_pos = base_addr + self.size
+            if pos + 4 > end_pos:
+                return
+
+            # reserved (queryOptions)
+            pos += 4
+            # ns (cstr)
+            ns_start = pos
+            while pos < end_pos and inferior.read_memory(pos, 1).tobytes()[0]:
+                pos += 1
+            if pos >= end_pos:
+                return
+            self.op_msg_ns = (
+                inferior.read_memory(ns_start, pos - ns_start)
+                .tobytes()
+                .decode("utf-8", errors="replace")
+            )
+            pos += 1
+            # nToSkip, nToReturn
+            if pos + 8 > end_pos:
+                return
+            pos += 8
+            # query (BSONObj) - this is the command for $cmd
+            if pos + 5 > end_pos:
+                return
+            body_addr = pos
+            bson_size = struct.unpack("<i", inferior.read_memory(pos, 4).tobytes())[0]
+            if bson_size < 5 or bson_size > 17 * 1024 * 1024 or pos + bson_size > end_pos:
+                self.op_msg_body = "<invalid query BSON>"
+                return
+            raw_bson = inferior.read_memory(pos, bson_size).tobytes()
+            if bson and bson.is_valid(raw_bson):
+                options = CodecOptions(document_class=collections.OrderedDict)
+                doc = bson.decode(raw_bson, codec_options=options)
+                self.op_msg_body = bson.json_util.dumps(doc)
+                self.op_msg_sequences = []
+                self.op_msg_body_addr = body_addr
+            else:
+                self.op_msg_body = "<invalid BSON>"
+        except (gdb.error, struct.error, ValueError, KeyError):
+            pass
+
+    def get_flags(self):
+        """
+        Return the OpMsg flags (uint32) for OP_MSG messages, or None for other message types.
+        Only valid for dbMsg (OP_MSG) messages; returns 0 for non-OP_MSG.
+        """
+        return self.flags if self.flags is not None else 0
+
+    def get_op_msg_display(self):
+        """
+        Return parsed OpMsg/OpMsgRequest as a string for display.
+        For dbMsg: parses OP_MSG sections (body + doc sequences).
+        For dbQuery: parses legacy format and extracts command body.
+        Returns None if not parseable or not a request message type.
+        """
+        if self.op_msg_body is None:
+            return None
+        lines = []
+        if self.op_msg_ns is not None:
+            lines.append("ns: %s" % self.op_msg_ns)
+        lines.append("body: %s" % self.op_msg_body)
+        if self.op_msg_sequences:
+            for name, count in self.op_msg_sequences:
+                lines.append("sequence %s: %d docs" % (name, count))
+        return "\n".join(lines)
+
+    def print_op_msg_body_as_bson(self):
+        """
+        Print the OpMsg body as a BSON object using the BSON pretty-printer.
+        Uses a convenience variable to construct an unowned BSONObj view of the
+        body memory, then prints it to trigger BSONObjPrinter. Falls back to
+        mongodb-pprint-bson style output if the BSONObj cast fails.
+        """
+        if self.op_msg_body_addr is None:
+            print("No OpMsg body to display (not a parsed request message)")
+            return
+        addr = self.op_msg_body_addr
+        try:
+            # Store body ptr in convenience var; BSONObj's _objdata is first member.
+            # Casting &$var to BSONObj* yields unowned BSONObj viewing body at addr.
+            gdb.execute("set $__opmsg_body_ptr = (void*)%d" % addr, to_string=True)
+            gdb.execute("print *(mongo::BSONObj*)&$__opmsg_body_ptr", to_string=False)
+        except gdb.error:
+            # Fallback: use mongodb-pprint-bson to display raw BSON at address
+            try:
+                gdb.execute("mongodb-pprint-bson %d" % addr, to_string=False)
+            except gdb.error as e:
+                print("Error displaying OpMsg body as BSON: %s" % e)
+
+    def to_string(self):
+        """Return Message for printing."""
+        if self.buf_addr is None:
+            return "Message (empty)"
+
+        op_str = self._NETWORK_OP_NAMES.get(
+            self.op_code, "op=%d" % self.op_code if self.op_code is not None else "op=?"
+        )
+        result = "Message size=%d %s" % (self.size, op_str)
+        flags_str = self._flags_str()
+        if flags_str is not None:
+            result += " flags=%s" % flags_str
+        result += " @ %s" % self.buf_addr
+        return result
+
+    def children(self):
+        """Expose size, operation, flags, OpMsg body, and buffer address as children for inspection."""
+        if self.buf_addr is not None:
+            yield "size", self.size
+            yield (
+                "operation",
+                (
+                    self._NETWORK_OP_NAMES.get(self.op_code, str(self.op_code))
+                    if self.op_code is not None
+                    else "?"
+                ),
+            )
+            if self.flags is not None:
+                yield "flags", self.get_flags()
+                yield "flags_str", self._flags_str()
+            if self.op_msg_body is not None:
+                yield "opMsg", self.get_op_msg_display()
+            if self.op_msg_body_addr is not None:
+                yield "body_addr", self.op_msg_body_addr
+            yield "buf", self.buf_addr
 
 
 class OplogEntryPrinter(object):
@@ -1190,6 +1524,7 @@ def build_pretty_printer():
     pp.add("RecordId", "mongo::RecordId", False, RecordIdPrinter)
     pp.add("UUID", "mongo::UUID", False, UUIDPrinter)
     pp.add("OID", "mongo::OID", False, OIDPrinter)
+    pp.add("Message", "mongo::Message", False, MessagePrinter)
     pp.add("OplogEntry", "mongo::repl::OplogEntry", False, OplogEntryPrinter)
     pp.add("__wt_cursor", "__wt_cursor", False, WtCursorPrinter)
     pp.add("__wt_session_impl", "__wt_session_impl", False, WtSessionImplPrinter)

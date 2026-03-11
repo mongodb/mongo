@@ -1028,6 +1028,70 @@ class MongoDBPPrintBsonAtPointer(gdb.Command):
 MongoDBPPrintBsonAtPointer()
 
 
+class MongoDBOpMsg(gdb.Command):
+    """Parse and display OpMsg/OpMsgRequest from a Message variable (dbMsg or dbQuery).
+
+    Example: mongodb-opmsg msg
+    """
+
+    def __init__(self):
+        """Init."""
+        RegisterMongoCommand.register(self, "mongodb-opmsg", gdb.COMMAND_DATA)
+
+    def invoke(self, args, _from_tty):
+        """Invoke."""
+        args = args.strip()
+        if not args:
+            print("Usage: mongodb-opmsg <message-variable>")
+            return
+        try:
+            val = gdb.parse_and_eval(args)
+            pp = gdb.default_visualizer(val)
+            if pp and hasattr(pp, "get_op_msg_display"):
+                result = pp.get_op_msg_display()
+                if result:
+                    print(result)
+                else:
+                    print("Could not parse OpMsg (not a request message or parse failed)")
+            else:
+                print("Not a mongo::Message or pretty printer unavailable")
+        except gdb.error as e:
+            print("Error: %s" % e)
+
+
+MongoDBOpMsg()
+
+
+class MongoDBOpMsgBson(gdb.Command):
+    """Print the OpMsg body from a Message as a BSON object using the BSON pretty-printer.
+
+    Example: mongodb-opmsg-bson msg
+    """
+
+    def __init__(self):
+        """Init."""
+        RegisterMongoCommand.register(self, "mongodb-opmsg-bson", gdb.COMMAND_DATA)
+
+    def invoke(self, args, _from_tty):
+        """Invoke."""
+        args = args.strip()
+        if not args:
+            print("Usage: mongodb-opmsg-bson <message-variable>")
+            return
+        try:
+            val = gdb.parse_and_eval(args)
+            pp = gdb.default_visualizer(val)
+            if pp and hasattr(pp, "print_op_msg_body_as_bson"):
+                pp.print_op_msg_body_as_bson()
+            else:
+                print("Not a mongo::Message or pretty printer unavailable")
+        except gdb.error as e:
+            print("Error: %s" % e)
+
+
+MongoDBOpMsgBson()
+
+
 class MongoDBHelp(gdb.Command):
     """Dump list of mongodb commands."""
 
