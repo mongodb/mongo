@@ -22,7 +22,9 @@ from buildscripts.util.expansions import get_expansion
 LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
 
-RELEASES_LOCAL_FILE = os.path.join("src", "mongo", "util", "version", "releases.yml")
+RELEASES_LOCAL_FILE = os.path.join(
+    _config.RESMOKE_ROOT, "src", "mongo", "util", "version", "releases.yml"
+)
 # We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
 # with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
 # it in the multiversion config and therefore don't test against it.

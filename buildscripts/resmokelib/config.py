@@ -5,8 +5,17 @@ import datetime
 import itertools
 import os
 import time
+from pathlib import Path
 
 import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
+
+# Resmoke root directory (MongoDB repo root where resmoke is installed)
+# This is the parent directory of buildscripts/
+RESMOKE_ROOT = str(Path(__file__).parent.parent.parent)
+
+# External module root directory (current working directory where resmoke is being run from)
+# This is used when external projects import and use resmoke as a module
+EXTERNAL_MODULE_ROOT = os.getcwd()
 
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
@@ -191,6 +200,8 @@ DEFAULTS = {
     "config_dir": "buildscripts/resmokeconfig",
     # Directory with jstests
     "jstests_dir": "jstests",
+    # External module configuration file
+    "external_module_config": None,
     # Generate multiversion exclude tags options
     "exclude_tags_file_path": "generated_resmoke_config/multiversion_exclude_tags.yml",
     # Limit the number of tests to execute
@@ -395,6 +406,15 @@ MODULE_MATRIX_SUITE_DIRS = []
 # list of dirs from disabled modules to filter out of suite selectors
 MODULE_DISABLED_JSTEST_DIRS = []
 
+# External module configuration file path (YAML file defining external modules)
+EXTERNAL_MODULE_CONFIG = None
+
+# List of suite directories from external modules
+EXTERNAL_MODULE_SUITE_DIRS = []
+
+# List of matrix suite directories from external modules
+EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
+
 # if set, enables test selection using the Evergreen API
 ENABLE_EVERGREEN_API_TEST_SELECTION = False
 
@@ -407,10 +427,12 @@ EVERGREEN_TEST_SELECTION_STRATEGY = None
 TSS_ENABLED = None
 
 # Path to the YAML file containing the current `mongo_version`
-MONGO_VERSION_FILE = ".resmoke_mongo_version.yml"
+# Use RESMOKE_ROOT so it works when running from external directories
+MONGO_VERSION_FILE = os.path.join(RESMOKE_ROOT, ".resmoke_mongo_version.yml")
 
 # Path to the releases YAML file.
-RELEASES_FILE = ".resmoke_mongo_release_values.yml"
+# Use RESMOKE_ROOT so it works when running from external directories
+RELEASES_FILE = os.path.join(RESMOKE_ROOT, ".resmoke_mongo_release_values.yml")
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None
@@ -806,7 +828,7 @@ EXTERNAL_SUITE_SELECTORS = (
 )
 
 # Where to look for logging and suite configuration files
-CONFIG_DIR = None
+CONFIG_DIR = os.path.join(RESMOKE_ROOT, "buildscripts", "resmokeconfig")
 LOGGER_DIR = None
 
 # Where to look for jstests existence

@@ -119,6 +119,55 @@ def _set_up_modules():
                 _config.MODULE_DISABLED_JSTEST_DIRS.append(jstest_dir)
 
 
+def _load_external_module_config(config_path: str):
+    """Load external module configuration from YAML file.
+
+    Expected YAML format:
+    suite_directories: [list of suite directories relative to EXTERNAL_MODULE_ROOT]
+    matrix_suite_directories: [list of matrix suite directories relative to EXTERNAL_MODULE_ROOT]
+    """
+    if not os.path.isabs(config_path):
+        # If relative path provided, resolve relative to EXTERNAL_MODULE_ROOT
+        config_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, config_path)
+
+    if not os.path.exists(config_path):
+        raise RuntimeError(f"External module config file not found: {config_path}")
+
+    with open(config_path, "r") as file:
+        external_config = yaml.safe_load(file)
+
+    if not external_config:
+        raise RuntimeError(f"External module config file is empty: {config_path}")
+
+    # Reset external module lists
+    _config.EXTERNAL_MODULE_SUITE_DIRS = []
+    _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS = []
+
+    # Load suite directories
+    suite_dirs = external_config.get("suite_directories", [])
+    if not isinstance(suite_dirs, list):
+        raise RuntimeError("'suite_directories' must be a list")
+
+    for suite_dir in suite_dirs:
+        full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, suite_dir)
+        if os.path.exists(full_path):
+            _config.EXTERNAL_MODULE_SUITE_DIRS.append(full_path)
+        else:
+            print(f"Warning: External suite directory not found: {full_path}")
+
+    # Load matrix suite directories
+    matrix_suite_dirs = external_config.get("matrix_suite_directories", [])
+    if not isinstance(matrix_suite_dirs, list):
+        raise RuntimeError("'matrix_suite_directories' must be a list")
+
+    for suite_dir in matrix_suite_dirs:
+        full_path = os.path.join(_config.EXTERNAL_MODULE_ROOT, suite_dir)
+        if os.path.exists(full_path):
+            _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS.append(full_path)
+        else:
+            print(f"Warning: External matrix suite directory not found: {full_path}")
+
+
 def _validate_options(parser: argparse.ArgumentParser, args: dict):
     """Do preliminary validation on the options and error on any invalid options."""
 
@@ -281,7 +330,9 @@ def _find_resmoke_wrappers():
     # /data/mongo, build-dir at /data/build)
     # We assume that users who fall under either case will explicitly pass the
     # --installDir argument.
-    candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
+    # Search from RESMOKE_ROOT (MongoDB repo) rather than cwd (which might be external module)
+    search_pattern = os.path.join(_config.RESMOKE_ROOT, "**/bin/resmoke.py")
+    candidate_installs = glob.glob(search_pattern, recursive=True)
     candidate_installs = [
         wrapper for wrapper in candidate_installs if not wrapper.startswith("bazel-mongo/")
     ]
@@ -427,9 +478,10 @@ be invoked as either:
         # valid yaml. This comments out these print statements when the output is parsed.
         print("# Fetching feature flags...")
         if os.path.exists(BAZEL_GENERATED_OFF_FEATURE_FLAGS):
-            with open(
-                "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
-            ) as fully_disabled_ffs:
+            fully_disabled_path = os.path.join(
+                _config.RESMOKE_ROOT, "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+            )
+            with open(fully_disabled_path, encoding="utf8") as fully_disabled_ffs:
                 force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
             default_disabled_feature_flags = list(
@@ -538,9 +590,10 @@ flags in common: {common_set}
         "include_fully_disabled_feature_tests"
     )
     if not _config.INCLUDE_FULLY_DISABLED_FEATURE_TESTS:
-        with open(
-            "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml", encoding="utf8"
-        ) as fully_disabled_ffs:
+        fully_disabled_path = os.path.join(
+            _config.RESMOKE_ROOT, "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+        )
+        with open(fully_disabled_path, encoding="utf8") as fully_disabled_ffs:
             # the ENABLED_FEATURE_FLAGS list already excludes the fully disabled features flags
             # This keeps any feature flags enabled that were manually turned on from being excluded
             force_disabled_flags = set(yaml.safe_load(fully_disabled_ffs)) - set(
@@ -598,7 +651,10 @@ flags in common: {common_set}
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
     _config.MAJORITY_READ_CONCERN = config.pop("majority_read_concern") == "on"
-    _config.MODULES_CONFIG_PATH = config.pop("resmoke_modules_path")
+    modules_path = config.pop("resmoke_modules_path")
+    _config.MODULES_CONFIG_PATH = (
+        os.path.join(_config.RESMOKE_ROOT, modules_path) if modules_path else None
+    )
     modules = config.pop("modules").strip()
     if modules == "default":
         # try turning on all modules
@@ -653,7 +709,8 @@ flags in common: {common_set}
 
     _config.INSTALL_DIR = config.pop("install_dir")
     if values["command"] == "run" and _config.INSTALL_DIR is None:
-        bazel_bin_path = os.path.abspath("bazel-bin/install/bin")
+        # Search for bazel-bin in RESMOKE_ROOT (MongoDB repo) rather than cwd (which might be external module)
+        bazel_bin_path = os.path.join(_config.RESMOKE_ROOT, "bazel-bin/install/bin")
         if os.path.exists(bazel_bin_path):
             _config.INSTALL_DIR = bazel_bin_path
         else:
@@ -965,10 +1022,18 @@ flags in common: {common_set}
     _config.BENCHMARK_REPETITIONS = config.pop("benchmark_repetitions")
 
     # Config Dir options.
-    _config.CONFIG_DIR = config.pop("config_dir")
+    config_dir = config.pop("config_dir")
+    _config.CONFIG_DIR = os.path.join(_config.RESMOKE_ROOT, config_dir) if config_dir else None
 
     # Directory with jstests option
-    _config.JSTESTS_DIR = config.pop("jstests_dir")
+    jstests_dir = config.pop("jstests_dir")
+    _config.JSTESTS_DIR = os.path.join(_config.RESMOKE_ROOT, jstests_dir) if jstests_dir else None
+
+    # External module configuration
+    external_module_config = config.pop("external_module_config")
+    _config.EXTERNAL_MODULE_CONFIG = external_module_config
+    if external_module_config:
+        _load_external_module_config(external_module_config)
 
     # Mocha-style test options
     _config.MOCHA_GREP = config.pop("mocha_grep")
@@ -1138,7 +1203,9 @@ def add_otel_args(parser: argparse.ArgumentParser):
         "--otelCollectorDir",
         dest="otel_collector_dir",
         type=str,
-        default=os.environ.get("OTEL_COLLECTOR_DIR", "build/metrics/"),
+        default=os.environ.get(
+            "OTEL_COLLECTOR_DIR", os.path.join(_config.RESMOKE_ROOT, "build/metrics/")
+        ),
         help="Open Collector Files",
     )
 

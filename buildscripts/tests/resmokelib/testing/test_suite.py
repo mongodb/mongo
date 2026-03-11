@@ -1,6 +1,7 @@
 """Unit tests for the resmokelib.testing.suite module."""
 
 import logging
+import os
 import unittest
 
 from mock import MagicMock
@@ -63,6 +64,12 @@ class TestGetTestsForKind(unittest.TestCase):
             "include_files": ["testroot/test1.js, testroot/test2.js", "testroot/test3.js"],
         }
 
+        # Register the test suite in the suite configuration so _get_suite_root() can find it
+        from buildscripts.resmokelib import suitesconfig
+
+        self.original_explicit_suite_roots = suitesconfig.ExplicitSuiteConfig._suite_roots.copy()
+        suitesconfig.ExplicitSuiteConfig._suite_roots["suite_name"] = os.getcwd()
+
         self.default_evergreen_task_id = under_test._config.EVERGREEN_TASK_ID
         self.default_enable_evergreen_api_test_selection = (
             under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION
@@ -78,6 +85,11 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_tss_enabled = under_test._config.TSS_ENABLED
 
     def tearDown(self):
+        # Restore original suite configuration
+        from buildscripts.resmokelib import suitesconfig
+
+        suitesconfig.ExplicitSuiteConfig._suite_roots = self.original_explicit_suite_roots
+
         under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = (
             self.default_enable_evergreen_api_test_selection
         )
@@ -133,7 +145,7 @@ class TestGetTestsForKind(unittest.TestCase):
         self.assertEqual(excluded, ["excluded_test"])
 
         mock_selector.filter_tests.assert_called_once_with(
-            "js_test", self.suite.get_selector_config()
+            "js_test", self.suite.get_selector_config(), suite_root=os.getcwd()
         )
 
         if under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION:

@@ -1,0 +1,6 @@
+test_kind: js_test
+selector:
+  roots:
+    - external_module_test/tests/*.js
+    - builtin:buildscripts/tests/resmoke_end2end/testfiles/one.js
+    - builtin:buildscripts/tests/resmoke_end2end/testfiles/two.js

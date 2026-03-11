@@ -1,0 +1,14 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - external_module_test/tests/mongo_test.js
+    - builtin:buildscripts/tests/resmoke_end2end/testfiles/one.js
+
+executor:
+  config: {}
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1

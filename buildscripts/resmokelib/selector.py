@@ -182,24 +182,67 @@ class _TestList(object):
         tests_are_files: indicates if the tests are file paths. If so the _TestList will perform
             glob expansion of paths and check if they are existing files. If not, calling
             'include_files()' or 'exclude_files()' will raise an TypeError.
+        suite_root: the root directory to resolve relative paths against. Defaults to current directory.
     """
 
     def __init__(
-        self, test_file_explorer: TestFileExplorer, roots: list[str], tests_are_files: bool = True
+        self,
+        test_file_explorer: TestFileExplorer,
+        roots: list[str],
+        tests_are_files: bool = True,
+        suite_root: str = None,
     ) -> None:
         """Initialize the _TestList with a TestFileExplorer component and a list of root tests."""
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
+        self._suite_root = suite_root or os.getcwd()
         self._roots = self._expand_roots(roots) if tests_are_files else roots
         self._filtered = set(self._roots)
+
+    def _resolve_path(self, path: str) -> str:
+        """Resolve a potentially relative path against suite_root.
+
+        Supports 'builtin:' prefix to reference MongoDB built-in tests from external modules.
+
+        When suite_root equals cwd, paths are kept relative.
+        When suite_root differs from cwd, paths are made absolute (for external modules).
+
+        Examples:
+            'builtin:jstests/core/*.js' -> resolves relative to RESMOKE_ROOT
+            'external_tests/*.js' -> resolves relative to suite_root
+            '/absolute/path/*.js' -> used as-is
+        """
+
+        builtin_prefix = "builtin:"
+        # Handle builtin: prefix for cross-root references
+        if path.startswith(builtin_prefix):
+            # Strip 'builtin:' prefix and resolve relative to RESMOKE_ROOT
+            builtin_path = path.removeprefix(builtin_prefix)
+            return os.path.join(config.RESMOKE_ROOT, builtin_path)
+
+        # Handle absolute paths
+        if os.path.isabs(path):
+            return path
+
+        # If suite_root equals cwd, keep paths relative
+        normalized_suite_root = os.path.normpath(os.path.abspath(self._suite_root))
+        normalized_cwd = os.path.normpath(os.path.abspath(os.getcwd()))
+        if normalized_suite_root == normalized_cwd:
+            return path
+
+        # For external modules, resolve relative paths against suite_root
+        return os.path.join(self._suite_root, path)
 
     def _evaluate_paths(self, paths: list[str]) -> _EvaluatePathsResult:
         evaluated = []
         unrecognized = []
 
         for path in paths:
-            if self._test_file_explorer.is_glob_pattern(path):
-                expanded_paths = self._test_file_explorer.glob(path)
+            # Resolve paths against suite_root
+            resolved_path = self._resolve_path(path)
+
+            if self._test_file_explorer.is_glob_pattern(resolved_path):
+                expanded_paths = self._test_file_explorer.glob(resolved_path)
                 len_before = len(evaluated)
                 evaluated.extend(expanded_paths)
                 len_after = len(evaluated)
@@ -209,8 +252,8 @@ class _TestList(object):
                 ):
                     unrecognized.append(path)
 
-            elif self._test_file_explorer.isfile(path):
-                evaluated.append(os.path.normpath(path))
+            elif self._test_file_explorer.isfile(resolved_path):
+                evaluated.append(os.path.normpath(resolved_path))
 
             elif path.startswith(self._test_file_explorer.get_jstests_dir()):
                 unrecognized.append(path)
@@ -540,11 +583,12 @@ class _Selector(object):
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
 
-    def select(self, selector_config):  # noqa: D406,D407,D411,D413
+    def select(self, selector_config, suite_root=None):  # noqa: D406,D407,D411,D413
         """Select the test files that match the given configuration.
 
         Args:
             selector_config: a _SelectorConfig instance.
+            suite_root: the root directory to resolve relative paths against.
         Returns:
             A tuple with the list of selected tests and the list of excluded tests.
         """
@@ -558,7 +602,7 @@ class _Selector(object):
             roots = []
 
         # 2. Create a _TestList.
-        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files)
+        test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files, suite_root)
         # 3. Apply the exclude_files.
         if self._tests_are_files and selector_config.exclude_files:
             test_list.exclude_files(selector_config.exclude_files)
@@ -631,11 +675,11 @@ class _JSTestSelector(_Selector):
         _Selector.__init__(self, test_file_explorer)
         self._tags = self._test_file_explorer.parse_tag_files("js_test", config.TAG_FILES)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         self._tags = self._test_file_explorer.parse_tag_files(
             "js_test", [selector_config.tag_file], self._tags
         )
-        return _Selector.select(self, selector_config)
+        return _Selector.select(self, selector_config, suite_root)
 
     def get_tags(self, test_file):
         """Return tags from test_file."""
@@ -741,14 +785,16 @@ class _CppTestSelector(_Selector):
         """Initialize _CppTestSelector."""
         _Selector.__init__(self, test_file_explorer)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Return selected tests."""
         if selector_config.roots:
             # Tests have been specified on the command line. We use them without additional
             # filtering.
-            test_list = _TestList(self._test_file_explorer, selector_config.roots)
+            test_list = _TestList(
+                self._test_file_explorer, selector_config.roots, suite_root=suite_root
+            )
             return test_list.get_tests()
-        return _Selector.select(self, selector_config)
+        return _Selector.select(self, selector_config, suite_root)
 
 
 class _PrettyPrinterTestSelectorConfig(_SelectorConfig):
@@ -781,14 +827,16 @@ class _PrettyPrinterTestSelector(_Selector):
         """Initialize _PrettyPrinterTestSelector."""
         _Selector.__init__(self, test_file_explorer)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Return selected tests."""
         if selector_config.roots:
             # Tests have been specified on the command line. We use them without additional
             # filtering.
-            test_list = _TestList(self._test_file_explorer, selector_config.roots)
+            test_list = _TestList(
+                self._test_file_explorer, selector_config.roots, suite_root=suite_root
+            )
             return test_list.get_tests()
-        return _Selector.select(self, selector_config)
+        return _Selector.select(self, selector_config, suite_root)
 
 
 class _DbTestSelectorConfig(_SelectorConfig):
@@ -816,7 +864,7 @@ class _DbTestSelector(_Selector):
         """Initialize _DbTestSelector."""
         _Selector.__init__(self, test_file_explorer, tests_are_files=False)
 
-    def select(self, selector_config):
+    def select(self, selector_config, suite_root=None):
         """Return selected tests."""
         if selector_config.roots:
             roots = selector_config.roots
@@ -911,7 +959,7 @@ _SELECTOR_REGISTRY = {
 
 
 def filter_tests(
-    test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER
+    test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FILE_EXPLORER, suite_root=None
 ) -> tuple[list[str], list[str]]:
     """Filter the tests according to a specified configuration.
 
@@ -920,13 +968,14 @@ def filter_tests(
         selector_config: a dict containing the selector configuration.
         test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
         the default one should not be needed except for mocking purposes.
+        suite_root: the root directory to resolve relative test paths against.
     """
     if test_kind not in _SELECTOR_REGISTRY:
         raise ValueError("Unknown test kind '{}'".format(test_kind))
     selector_config_class, selector_class = _SELECTOR_REGISTRY[test_kind]
     selector = selector_class(test_file_explorer)
     selector_config = selector_config_class(**selector_config)
-    return selector.select(selector_config)
+    return selector.select(selector_config, suite_root)
 
 
 def group_tests(

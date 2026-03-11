@@ -1,6 +1,5 @@
 """The unittest.TestCase for Python unittests."""
 
-import os
 import sys
 
 from buildscripts.resmokelib import core, logging
@@ -23,10 +22,5 @@ class PyTestCase(interface.ProcessTestCase):
         # Merge fixture environment variables into program_options
         self._merge_fixture_environment_variables(program_options)
         return core.programs.generic_program(
-            self.logger, [sys.executable, "-m", "unittest", self.test_module_name], program_options
+            self.logger, [sys.executable, "-m", "unittest", self.test_name], program_options
         )
-
-    @property
-    def test_module_name(self):
-        """Get the dotted module name from the path."""
-        return os.path.splitext(self.test_name)[0].replace(os.sep, ".")

@@ -1,6 +1,7 @@
 """Parser for command line arguments."""
 
 import argparse
+import os
 import shlex
 
 from buildscripts.resmokelib import configure_resmoke
@@ -40,6 +41,13 @@ def get_parser(usage=None):
         dest="jstests_dir",
         metavar="CONFIG_DIR",
         help="Directory to search for jstests files existence while suite validation",
+    )
+    parser.add_argument(
+        "--externalModuleConfig",
+        dest="external_module_config",
+        metavar="CONFIG_FILE",
+        default=os.environ.get("EXTERNAL_MODULE_CONFIG", None),
+        help="Path to external module configuration YAML file (can also use EXTERNAL_MODULE_CONFIG env var)",
     )
 
     # Add sub-commands.

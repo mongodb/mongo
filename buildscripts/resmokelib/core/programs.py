@@ -585,11 +585,18 @@ def mongo_shell_program(
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
 
+    # Set MONGO_PATH for mongo shell to find scripts from both MongoDB repo and external module
+    env_vars = process_kwargs.get("env_vars", {}).copy()
+    mongo_path_dirs = [config.RESMOKE_ROOT]
+
     # Add MONGO_PATH environment variable for the shell if specified
     if config.APPEND_MONGO_PATH:
-        env_vars = process_kwargs.get("env_vars", {}).copy()
-        env_vars["MONGO_PATH"] = os.pathsep.join(config.APPEND_MONGO_PATH)
-        process_kwargs["env_vars"] = env_vars
+        mongo_path_dirs.extend(config.APPEND_MONGO_PATH)
+
+    if config.EXTERNAL_MODULE_ROOT != config.RESMOKE_ROOT:
+        mongo_path_dirs.append(config.EXTERNAL_MODULE_ROOT)
+    env_vars["MONGO_PATH"] = os.pathsep.join(mongo_path_dirs)
+    process_kwargs["env_vars"] = env_vars
 
     return make_process(logger, args, **process_kwargs)
 

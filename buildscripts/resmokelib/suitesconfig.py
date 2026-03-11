@@ -318,6 +318,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
 
     _name_suites_lock = Lock()
     _named_suites = {}
+    _suite_roots = {}  # Maps suite name → root directory path
 
     @classmethod
     def get_config_obj_no_verify(cls, suite_name: str) -> dict:
@@ -344,19 +345,29 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         """Populate the named suites by scanning config_dir/suites."""
         with cls._name_suites_lock:
             if not cls._named_suites:
-                suites_dirs = [
-                    os.path.join(_config.CONFIG_DIR, "suites")
-                ] + _config.MODULE_SUITE_DIRS
-                for suites_dir in suites_dirs:
-                    root = os.path.abspath(suites_dir)
-                    if not os.path.exists(root):
+                # Scan built-in suite directory - root is RESMOKE_ROOT
+                builtin_suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+                suites_dirs = [(builtin_suites_dir, _config.RESMOKE_ROOT)]
+
+                # Add module suite directories - these are also built-in to MongoDB, so use RESMOKE_ROOT
+                for module_suite_dir in _config.MODULE_SUITE_DIRS:
+                    suites_dirs.append((module_suite_dir, _config.RESMOKE_ROOT))
+
+                # Add external module suite directories - use EXTERNAL_MODULE_ROOT
+                for external_suite_dir in _config.EXTERNAL_MODULE_SUITE_DIRS:
+                    suites_dirs.append((external_suite_dir, _config.EXTERNAL_MODULE_ROOT))
+
+                for suites_dir, suite_root in suites_dirs:
+                    suites_dir_abs = os.path.abspath(suites_dir)
+                    if not os.path.exists(suites_dir_abs):
                         continue
-                    files = os.listdir(root)
+                    files = os.listdir(suites_dir_abs)
                     for filename in files:
                         (short_name, ext) = os.path.splitext(filename)
                         if ext in (".yml", ".yaml"):
-                            pathname = os.path.join(root, filename)
+                            pathname = os.path.join(suites_dir_abs, filename)
                             cls._named_suites[short_name] = pathname
+                            cls._suite_roots[short_name] = suite_root
 
             return cls._named_suites
 
@@ -365,12 +376,27 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         """Get the suite files."""
         return cls.get_named_suites()
 
+    @classmethod
+    def get_suite_root(cls, suite_name: str) -> str:
+        """Get the root directory for a given suite name.
+
+        Args:
+            suite_name: The name of the suite.
+
+        Returns:
+            The root directory path for the suite, or RESMOKE_ROOT if not found.
+        """
+        # Ensure suites are loaded
+        cls.get_named_suites()
+        return cls._suite_roots.get(suite_name)
+
 
 class MatrixSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
     _all_mappings = {}
     _all_overrides = {}
+    _suite_roots = {}  # Maps suite name → root directory path
 
     @classmethod
     def get_suite_files(cls) -> dict[str, str]:
@@ -386,12 +412,13 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             ValueError: If a suite name appears in multiple directories.
         """
         result = {}
-        for suites_dir in cls.get_suites_dirs():
+        for suites_dir, suite_root in cls.get_suites_dirs_with_roots():
             mappings_dir = os.path.join(suites_dir, "mappings")
             for suite_name, path in cls.__get_suite_files_in_dir(mappings_dir).items():
                 if suite_name in result:
                     raise ValueError(f"Duplicate matrix suite definition for {suite_name}")
                 result[suite_name] = path
+                cls._suite_roots[suite_name] = suite_root
         return result
 
     @classmethod
@@ -417,6 +444,45 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return [
             os.path.join(_config.CONFIG_DIR, "matrix_suites")
         ] + _config.MODULE_MATRIX_SUITE_DIRS
+
+    @staticmethod
+    def get_suites_dirs_with_roots() -> list[tuple[str, str]]:
+        """Get all matrix suite directories with their corresponding root directories.
+
+        Returns a list of tuples (suites_dir, suite_root) where:
+        - suites_dir: Path to the matrix suite directory
+        - suite_root: Root directory for resolving test paths (RESMOKE_ROOT for built-in, module root for others)
+
+        Returns:
+            List of tuples (suites_dir, suite_root).
+        """
+        # Built-in matrix suites - root is RESMOKE_ROOT
+        builtin_dir = os.path.join(_config.CONFIG_DIR, "matrix_suites")
+        result = [(builtin_dir, _config.RESMOKE_ROOT)]
+
+        # Module matrix suite directories - these are also built-in to MongoDB, so use RESMOKE_ROOT
+        for module_suite_dir in _config.MODULE_MATRIX_SUITE_DIRS:
+            result.append((module_suite_dir, _config.RESMOKE_ROOT))
+
+        # External module matrix suite directories - use EXTERNAL_MODULE_ROOT
+        for external_matrix_suite_dir in _config.EXTERNAL_MODULE_MATRIX_SUITE_DIRS:
+            result.append((external_matrix_suite_dir, _config.EXTERNAL_MODULE_ROOT))
+
+        return result
+
+    @classmethod
+    def get_suite_root(cls, suite_name: str) -> str:
+        """Get the root directory for a given matrix suite name.
+
+        Args:
+            suite_name: The name of the suite.
+
+        Returns:
+            The root directory path for the suite, or RESMOKE_ROOT if not found.
+        """
+        # Ensure suites are loaded
+        cls.get_suite_files()
+        return cls._suite_roots.get(suite_name)
 
     @classmethod
     def get_config_obj_and_verify(cls, suite_name):
