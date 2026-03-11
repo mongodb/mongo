@@ -102,18 +102,71 @@ inline const char* getValue(const char* be) noexcept {
 inline std::pair<value::TypeTags, value::Value> getField(const char* be,
                                                          StringData fieldStr) noexcept {
     const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-
-    // Skip document length.
     be += sizeof(int);
-    const char fst =
-        MONGO_likely(fieldStr.size()) ? *fieldStr.data() : '\0';  // handle empty strings
+    const auto targetSize = fieldStr.size();
+    const char* targetData = fieldStr.data();
+
+    bool match;
+    size_t size;
     while (be != end - 1) {
-        auto size = strlen(be + 1);
-        if (size == fieldStr.size() &&  // skip over strings on non-equal sizes
-            *(be + 1) == fst &&         // skip over strings with different first chars
-            std::memcmp(be + 1, fieldStr.data(), size) == 0) {
-            auto [tag, val] = bson::convertFrom<true>(be, end, fieldStr.size());
-            return {tag, val};
+        if (MONGO_unlikely(*(be + 1) == '\0')) {
+            size = 0;
+        } else if (*(be + 2) == '\0') {
+            size = 1;
+        } else if (*(be + 3) == '\0') {
+            size = 2;
+        } else if (*(be + 4) == '\0') {
+            size = 3;
+        } else if (*(be + 5) == '\0') {
+            size = 4;
+        } else if (*(be + 6) == '\0') {
+            size = 5;
+        } else if (*(be + 7) == '\0') {
+            size = 6;
+        } else if (*(be + 8) == '\0') {
+            size = 7;
+        } else if (*(be + 9) == '\0') {
+            size = 8;
+        } else {
+            size = 8 + strlen(be + 9);
+        }
+        if (size == targetSize) {
+            match = true;
+            switch (targetSize) {
+                case 8:
+                    match &= *(be + 8) == targetData[7];
+                    [[fallthrough]];
+                case 7:
+                    match &= *(be + 7) == targetData[6];
+                    [[fallthrough]];
+                case 6:
+                    match &= *(be + 6) == targetData[5];
+                    [[fallthrough]];
+                case 5:
+                    match &= *(be + 5) == targetData[4];
+                    [[fallthrough]];
+                case 4:
+                    match &= *(be + 4) == targetData[3];
+                    [[fallthrough]];
+                case 3:
+                    match &= *(be + 3) == targetData[2];
+                    [[fallthrough]];
+                case 2:
+                    match &= *(be + 2) == targetData[1];
+                    [[fallthrough]];
+                case 1:
+                    match &= *(be + 1) == targetData[0];
+                    [[fallthrough]];
+                case 0:
+                    break;
+                default:
+                    match =
+                        *(be + 1) == targetData[0] && std::memcmp(be + 1, targetData, size) == 0;
+                    break;
+            }
+            if (match) {
+                return bson::convertFrom<true>(be, end, targetSize);
+            }
         }
         be = bson::advance(be, size);
     }

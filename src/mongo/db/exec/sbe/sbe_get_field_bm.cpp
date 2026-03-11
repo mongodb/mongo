@@ -62,105 +62,106 @@ public:
 };
 
 /**
- * Field-name policies (key size / spelling).
+ * Helper: build a string of exactly 'len' characters from a base character and a numeric suffix.
+ * E.g., makePaddedName('p', 8, 42) -> "p0000042" (8 chars total).
  */
-struct ShortFieldName {
-    static StringData hit() {
-        static const char* k = "z";  // 1-char key
-        return StringData(k);
+inline std::string makePaddedName(char base, int len, int idx) {
+    std::string suffix = std::to_string(idx);
+    int prefixLen = len - static_cast<int>(suffix.size());
+    if (prefixLen < 1) {
+        prefixLen = 1;
     }
-    static StringData miss() {
-        static const char* k = "q";
-        return StringData(k);
-    }
-    static std::string pad(int i) {
-        return "pad" + std::to_string(i);
-    }
-};
-
-struct MediumFieldName {
-    static StringData hit() {
-        static const char* k = "veryLongFieldName";
-        return StringData(k);
-    }
-    static StringData miss() {
-        static const char* k = "anotherLongFieldName";
-        return StringData(k);
-    }
-    static std::string pad(int i) {
-        return "pad_medium_" + std::to_string(i);
-    }
-};
-
-struct LongFieldName {
-    static const std::string& hitStorage() {
-        static const std::string s(64, 'a');  // 64-char key
-        return s;
-    }
-    static const std::string& missStorage() {
-        static const std::string s(64, 'b');
-        return s;
-    }
-    static StringData hit() {
-        return StringData(hitStorage());
-    }
-    static StringData miss() {
-        return StringData(missStorage());
-    }
-    static std::string pad(int i) {
-        return "pad_long_field_name_" + std::to_string(i);
-    }
-};
+    return std::string(prefixLen, base) + suffix.substr(0, len - prefixLen);
+}
 
 /**
- * Shape policies (document layout / target position).
+ * Field-name policy template.
+ *
+ * Each instantiation provides:
+ *  - hit()              : the target field name (length N, starts with HitChar)
+ *  - miss()             : a non-existent name (length N, different first character)
+ *  - missCommonPrefix() : a non-existent name (length N, same first character as hit)
+ *  - pad(int i)         : unique pad field names, each exactly length N
+ *
+ * Miss names differ from hit names to ensure they never accidentally match a pad field.
  */
+template <int N, char HitChar, char MissChar, char MissCommonPrefixFill>
+struct FieldNamePolicy {
+    static_assert(HitChar != MissChar, "miss must differ in first character");
 
-// Single-field document: just the target key.
-struct OneFieldShape {
-    template <class ValuePolicy, class FieldNamePolicy>
-    static BSONObj makeDoc() {
-        BSONObjBuilder bob;
-        ValuePolicy::append(bob, FieldNamePolicy::hit());
-        return bob.obj();
+    static StringData hit() {
+        static const std::string s(N, HitChar);
+        return StringData(s);
+    }
+
+    static StringData miss() {
+        static const std::string s(N, MissChar);
+        return StringData(s);
+    }
+
+    static StringData missCommonPrefix() {
+        // Same first character as hit(), rest differs.
+        // For N == 1, a common-prefix miss is impossible (the single character must differ
+        // to guarantee a miss), so we fall back to the regular miss.
+        static const std::string s = [] {
+            if constexpr (N == 1) {
+                return std::string(1, MissChar);
+            } else {
+                std::string r(N, MissCommonPrefixFill);
+                r[0] = HitChar;
+                return r;
+            }
+        }();
+        return StringData(s);
+    }
+
+    static std::string pad(int i) {
+        return makePaddedName('p', N, i);
     }
 };
 
-// Many fields, target first.
-struct ManyFieldsTargetFirst {
-    static constexpr int kNumPad = 100;
+// Concrete field-name policies: sizes 1, 4, 8, 16, 64.
+//   hit:              N × HitChar
+//   miss:             N × MissChar  (different first char → exercises first-char skip)
+//   missCommonPrefix: HitChar + (N-1) × MissCommonPrefixFill (same first char → bypasses skip)
+using FieldName1 = FieldNamePolicy<1, 'z', 'q', 'y'>;
+using FieldName4 = FieldNamePolicy<4, 'a', 'x', 'b'>;
+using FieldName8 = FieldNamePolicy<8, 'a', 'x', 'b'>;
+using FieldName16 = FieldNamePolicy<16, 'a', 'x', 'b'>;
+using FieldName64 = FieldNamePolicy<64, 'a', 'x', 'b'>;
 
+/**
+ * Shape policies (document layout / number of fields / target position).
+ *
+ * Template parameters:
+ *  - NumPad: number of padding (non-target) fields
+ *  - TargetFirst: if true, the target field is placed before the pad fields;
+ *                 if false, the target field is placed after (worst-case scan)
+ */
+template <int NumPad, bool TargetFirst>
+struct FieldsShape {
     template <class ValuePolicy, class FieldNamePolicy>
     static BSONObj makeDoc() {
         BSONObjBuilder bob;
-        // Target first.
-        ValuePolicy::append(bob, FieldNamePolicy::hit());
-        // Pads use the same value and field-name policies.
-        for (int i = 0; i < kNumPad; ++i) {
+        if constexpr (TargetFirst) {
+            ValuePolicy::append(bob, FieldNamePolicy::hit());
+        }
+        for (int i = 0; i < NumPad; ++i) {
             const std::string name = FieldNamePolicy::pad(i);
             ValuePolicy::append(bob, name);
+        }
+        if constexpr (!TargetFirst) {
+            ValuePolicy::append(bob, FieldNamePolicy::hit());
         }
         return bob.obj();
     }
 };
 
-// Many fields, target last.
-struct ManyFieldsTargetLast {
-    static constexpr int kNumPad = 100;
-
-    template <class ValuePolicy, class FieldNamePolicy>
-    static BSONObj makeDoc() {
-        BSONObjBuilder bob;
-        // Pads first, using the same value + field-name policies.
-        for (int i = 0; i < kNumPad; ++i) {
-            const std::string name = FieldNamePolicy::pad(i);
-            ValuePolicy::append(bob, name);
-        }
-        // Target last.
-        ValuePolicy::append(bob, FieldNamePolicy::hit());
-        return bob.obj();
-    }
-};
+// Concrete shape policies: vary field count, target position.
+using Fields10TargetLast = FieldsShape<10, false>;
+using Fields100TargetLast = FieldsShape<100, false>;
+using Fields1000TargetLast = FieldsShape<1000, false>;
+using Fields100TargetFirst = FieldsShape<100, true>;
 
 /**
  * Value policies (value type / size for the target field).
@@ -205,6 +206,22 @@ struct Hit90Miss10 {
     }
 };
 
+// Miss with a common first character — bypasses the first-char skip optimization.
+struct AlwaysMissCommonPrefix {
+    template <class FieldNamePolicy>
+    static StringData selectField(size_t /*i*/) {
+        return FieldNamePolicy::missCommonPrefix();
+    }
+};
+
+struct Hit90MissCommonPrefix10 {
+    template <class FieldNamePolicy>
+    static StringData selectField(size_t i) {
+        // Every 10th lookup is a common-prefix miss.
+        return (i % 10 == 0) ? FieldNamePolicy::missCommonPrefix() : FieldNamePolicy::hit();
+    }
+};
+
 /**
  * Helper macro to define a benchmark for a given combination of policies.
  */
@@ -214,24 +231,29 @@ struct Hit90Miss10 {
         runPolicyBm<shape, value, fname, presence>(state);                 \
     }
 
-#define FOR_EACH_PRESENCE(M, shape, value, fname) \
-    M(shape, value, fname, AlwaysHit)             \
-    M(shape, value, fname, AlwaysMiss)            \
-    M(shape, value, fname, Hit90Miss10)
+#define FOR_EACH_PRESENCE(M, shape, value, fname)  \
+    M(shape, value, fname, AlwaysHit)              \
+    M(shape, value, fname, AlwaysMiss)             \
+    M(shape, value, fname, AlwaysMissCommonPrefix) \
+    M(shape, value, fname, Hit90Miss10)            \
+    M(shape, value, fname, Hit90MissCommonPrefix10)
 
-#define FOR_EACH_FNAME(M, shape, value)                 \
-    FOR_EACH_PRESENCE(M, shape, value, ShortFieldName)  \
-    FOR_EACH_PRESENCE(M, shape, value, MediumFieldName) \
-    FOR_EACH_PRESENCE(M, shape, value, LongFieldName)
+#define FOR_EACH_FNAME(M, shape, value)             \
+    FOR_EACH_PRESENCE(M, shape, value, FieldName1)  \
+    FOR_EACH_PRESENCE(M, shape, value, FieldName4)  \
+    FOR_EACH_PRESENCE(M, shape, value, FieldName8)  \
+    FOR_EACH_PRESENCE(M, shape, value, FieldName16) \
+    FOR_EACH_PRESENCE(M, shape, value, FieldName64)
 
 #define FOR_EACH_VALUE(M, shape)         \
     FOR_EACH_FNAME(M, shape, Int32Small) \
     FOR_EACH_FNAME(M, shape, String1KB)
 
-#define FOR_EACH_SHAPE(M)                    \
-    FOR_EACH_VALUE(M, OneFieldShape)         \
-    FOR_EACH_VALUE(M, ManyFieldsTargetFirst) \
-    FOR_EACH_VALUE(M, ManyFieldsTargetLast)
+#define FOR_EACH_SHAPE(M)                   \
+    FOR_EACH_VALUE(M, Fields10TargetLast)   \
+    FOR_EACH_VALUE(M, Fields100TargetLast)  \
+    FOR_EACH_VALUE(M, Fields1000TargetLast) \
+    FOR_EACH_VALUE(M, Fields100TargetFirst)
 
 #define GEN_GETFIELD_BM(shape, value, fname, presence) \
     DEFINE_GETFIELD_BM(shape, value, fname, presence)
