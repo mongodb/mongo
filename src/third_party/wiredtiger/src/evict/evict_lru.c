@@ -2147,10 +2147,6 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
                 WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp);
                 return (true);
             }
-            if (page->modify->rec_prune_timestamp >= prune_timestamp) {
-                WT_STAT_CONN_INCR(session, eviction_server_skip_pages_prune_timestamp_not_move);
-                return (true);
-            }
         } else {
             if (newest_commit_timestamp > __wt_txn_pinned_stable_timestamp(session)) {
                 WT_STAT_CONN_INCR(session, eviction_server_skip_pages_checkpoint_timestamp);

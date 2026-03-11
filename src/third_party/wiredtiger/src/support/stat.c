@@ -89,8 +89,6 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: eviction walk target pages histogram - 32-63",
   "cache: eviction walk target pages histogram - 64-128",
   "cache: eviction walk target pages reduced due to history store cache pressure",
-  "cache: garbage collection from the ingest btree page is skipped because the prune timestamp has "
-  "not moved",
   "cache: hazard pointer blocked page eviction",
   "cache: history store cursor not cached during eviction",
   "cache: history store table insert calls",
@@ -548,7 +546,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_eviction_target_page_lt64 = 0;
     stats->cache_eviction_target_page_lt128 = 0;
     stats->cache_eviction_target_page_reduced = 0;
-    stats->cache_eviction_blocked_prune_timestamp = 0;
     stats->cache_eviction_blocked_hazard = 0;
     stats->cache_eviction_hs_cursor_not_cached = 0;
     stats->cache_hs_insert = 0;
@@ -981,7 +978,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_eviction_target_page_lt64 += from->cache_eviction_target_page_lt64;
     to->cache_eviction_target_page_lt128 += from->cache_eviction_target_page_lt128;
     to->cache_eviction_target_page_reduced += from->cache_eviction_target_page_reduced;
-    to->cache_eviction_blocked_prune_timestamp += from->cache_eviction_blocked_prune_timestamp;
     to->cache_eviction_blocked_hazard += from->cache_eviction_blocked_hazard;
     to->cache_eviction_hs_cursor_not_cached += from->cache_eviction_hs_cursor_not_cached;
     to->cache_hs_insert += from->cache_hs_insert;
@@ -1441,8 +1437,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_eviction_target_page_lt128);
     to->cache_eviction_target_page_reduced +=
       WT_STAT_DSRC_READ(from, cache_eviction_target_page_reduced);
-    to->cache_eviction_blocked_prune_timestamp +=
-      WT_STAT_DSRC_READ(from, cache_eviction_blocked_prune_timestamp);
     to->cache_eviction_blocked_hazard += WT_STAT_DSRC_READ(from, cache_eviction_blocked_hazard);
     to->cache_eviction_hs_cursor_not_cached +=
       WT_STAT_DSRC_READ(from, cache_eviction_hs_cursor_not_cached);
@@ -2006,8 +2000,6 @@ static const char *const __stats_connection_desc[] = {
   "running",
   "cache: eviction server skips pages that are written with transactions greater than the prune "
   "timestamp",
-  "cache: eviction server skips pages that have been reconciled previously at the same prune "
-  "timestamp",
   "cache: eviction server skips pages that previously failed eviction and likely will again",
   "cache: eviction server skips pages that we do not want to evict",
   "cache: eviction server skips stable btrees in disagg",
@@ -2074,8 +2066,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: forced eviction - pages selected because of too many deleted items count",
   "cache: forced eviction - pages selected count",
   "cache: forced eviction - pages selected unable to be evicted count",
-  "cache: garbage collection from the ingest btree page is skipped because the prune timestamp has "
-  "not moved",
   "cache: hazard pointer blocked page eviction",
   "cache: hazard pointer check calls",
   "cache: hazard pointer check entries walked",
@@ -3078,7 +3068,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_server_skip_pages_checkpoint_timestamp = 0;
     stats->eviction_server_skip_pages_last_running = 0;
     stats->eviction_server_skip_pages_prune_timestamp = 0;
-    stats->eviction_server_skip_pages_prune_timestamp_not_move = 0;
     stats->eviction_server_skip_pages_retry = 0;
     stats->eviction_server_skip_unwanted_pages = 0;
     stats->eviction_server_skip_stable_trees = 0;
@@ -3141,7 +3130,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_force_delete = 0;
     stats->eviction_force = 0;
     stats->eviction_force_fail = 0;
-    stats->cache_eviction_blocked_prune_timestamp = 0;
     stats->cache_eviction_blocked_hazard = 0;
     stats->cache_hazard_checks = 0;
     stats->cache_hazard_walks = 0;
@@ -4149,8 +4137,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, eviction_server_skip_pages_last_running);
     to->eviction_server_skip_pages_prune_timestamp +=
       WT_STAT_CONN_READ(from, eviction_server_skip_pages_prune_timestamp);
-    to->eviction_server_skip_pages_prune_timestamp_not_move +=
-      WT_STAT_CONN_READ(from, eviction_server_skip_pages_prune_timestamp_not_move);
     to->eviction_server_skip_pages_retry +=
       WT_STAT_CONN_READ(from, eviction_server_skip_pages_retry);
     to->eviction_server_skip_unwanted_pages +=
@@ -4239,8 +4225,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->eviction_force_delete += WT_STAT_CONN_READ(from, eviction_force_delete);
     to->eviction_force += WT_STAT_CONN_READ(from, eviction_force);
     to->eviction_force_fail += WT_STAT_CONN_READ(from, eviction_force_fail);
-    to->cache_eviction_blocked_prune_timestamp +=
-      WT_STAT_CONN_READ(from, cache_eviction_blocked_prune_timestamp);
     to->cache_eviction_blocked_hazard += WT_STAT_CONN_READ(from, cache_eviction_blocked_hazard);
     to->cache_hazard_checks += WT_STAT_CONN_READ(from, cache_hazard_checks);
     to->cache_hazard_walks += WT_STAT_CONN_READ(from, cache_hazard_walks);
