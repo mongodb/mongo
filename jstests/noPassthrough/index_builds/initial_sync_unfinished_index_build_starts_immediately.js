@@ -3,17 +3,15 @@
  * from the sync source and only setup the index builder threads for any unfinished index builds
  * grouped by their buildUUID.
  *
- * Previously, an initial syncing node would start and finish the index build when it applied the
- * "commitIndexBuild" oplog entry, but the primary will no longer send that oplog entry until the
- * commit quorum is satisfied, which may depend on the initial syncing nodes vote.
+ * Since the primary only writes the "commitIndexBuild" oplog entry once the commit quorum is
+ * satisfied by receiving the expected number of votes (default is all "votingMembers"), an initial
+ * syncing node should not wait for applying that oplog entry to start the index build.
  *
- * Take into consideration the following scenario where the primary could not achieve the commit
- * quorum without the initial syncing nodes vote:
- * 1. Node A (primary) starts a two-phase index build "x_1" with commit quorum "votingMembers".
- * 2. Node B (secondary) shuts down while building the "x_1" index, preventing the node from sending
- *    its vote to the primary.
- * 3. Node A cannot achieve the commit quorum and is stuck. The "commitIndexBuild" oplog entry does
- *    not get sent to any other nodes.
+ * Although the number of votingMembers can be lowered to avoid the initial syncing node,
+ * starting the index build as soon as possible helps ensure that initial syncing ends sooner,
+ * since once the "commitIndexBuild" oplog entry has been written by the primary and replicated,
+ * further oplog entry application will be blocked on the initial syncing node until the index
+ * build is complete.
  *
  * @tags: [
  *   requires_commit_quorum,
@@ -23,8 +21,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-const dbName = jsTestName();
-const collName = "commitQuorumWithInitialSync";
+const dbName = "test";
+const collName = jsTestName();
 
 const rst = new ReplSetTest({
     nodes: [
@@ -47,6 +45,7 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
+/** @type {Mongo} */
 const primary = rst.getPrimary();
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
@@ -61,22 +60,29 @@ jsTest.log("Pausing index builds on the secondary");
 let secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
 
-TestData.dbName = dbName;
-TestData.collName = collName;
-const awaitFirstIndexBuild = startParallelShell(() => {
-    const coll = db.getSiblingDB(TestData.dbName).getCollection(TestData.collName);
-    assert.commandWorked(coll.createIndex({b: 1}, {}, "votingMembers"));
-}, primary.port);
-
-const awaitSecondIndexBuild = startParallelShell(() => {
-    const coll = db.getSiblingDB(TestData.dbName).getCollection(TestData.collName);
-    assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}], {}, "votingMembers"));
-}, primary.port);
-
-const awaitThirdIndexBuild = startParallelShell(() => {
-    const coll = db.getSiblingDB(TestData.dbName).getCollection(TestData.collName);
-    assert.commandWorked(coll.createIndexes([{e: 1}, {f: 1}, {g: 1}], {}, "votingMembers"));
-}, primary.port);
+const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    {b: 1},
+    {},
+    [],
+    "votingMembers",
+);
+const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    [{c: 1}, {d: 1}],
+    {},
+    [],
+    "votingMembers",
+);
+const awaitThirdIndexBuild = IndexBuildTest.startIndexBuild(
+    primary,
+    coll.getFullName(),
+    [{e: 1}, {f: 1}, {g: 1}],
+    {},
+    "votingMembers",
+);
 
 // Wait for all the indexes to start building on the primary.
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "b_1");

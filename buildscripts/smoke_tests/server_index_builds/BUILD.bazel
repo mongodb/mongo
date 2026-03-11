@@ -54,7 +54,6 @@ resmoke_suite_test(
     srcs = [
         "//jstests/noPassthrough/index_builds:absent_ns_field_in_index_specs.js",
         "//jstests/noPassthrough/index_builds:commit_quorum.js",
-        "//jstests/noPassthrough/index_builds:commit_quorum_does_not_hang_with_initial_sync.js",
         "//jstests/noPassthrough/index_builds:commit_quorum_standalones.js",
         "//jstests/noPassthrough/index_builds:compound_2dsphere_max_index_keys.js",
         "//jstests/noPassthrough/index_builds:create_indexes_fails_if_insufficient_disk_space.js",
@@ -143,6 +142,8 @@ resmoke_suite_test(
         "//jstests/noPassthrough/index_builds:initial_sync_aborts_two_phase_index_builds_hide_index.js",
         "//jstests/noPassthrough/index_builds:initial_sync_aborts_two_phase_index_builds_rename.js",
         "//jstests/noPassthrough/index_builds:initial_sync_drops_ready_indexes_while_having_index_builds.js",
+        "//jstests/noPassthrough/index_builds:initial_sync_unfinished_index_build_does_not_hang_commit_quorum.js",
+        "//jstests/noPassthrough/index_builds:initial_sync_unfinished_index_build_starts_immediately.js",
         "//jstests/noPassthrough/index_builds:list_indexes_ready_and_in_progress.js",
         "//jstests/noPassthrough/index_builds:list_indexes_with_build_uuids.js",
         "//jstests/noPassthrough/index_builds:missing_index_ident_standalone_drop.js",

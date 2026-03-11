@@ -308,6 +308,46 @@ export var IndexBuildTest = class {
         rst.restart(node);
         rst.awaitReplication();
     }
+
+    /**
+     * This function checks that the given logID has been emitted for the buildUUID of each
+     * index in indexesToCheck (or notReadyIndexes, if the former is not provided).
+     *
+     * @param {DBCollection} coll
+     * @param {number} logID
+     * @param {string[]} readyIndexes
+     * @param {string[]} notReadyIndexes
+     * @param {string[]} [indexesToCheck=notReadyIndexes]
+     * @returns {Object} indexMap
+     */
+    static checkLogByBuildUUIDForIndexes(coll, logID, readyIndexes, notReadyIndexes, indexesToCheck) {
+        indexesToCheck ??= notReadyIndexes;
+
+        const indexMap = IndexBuildTest.assertIndexesIdHelper(
+            coll,
+            readyIndexes.length + notReadyIndexes.length,
+            readyIndexes,
+            notReadyIndexes,
+            {includeBuildUUIDs: true},
+        );
+
+        const extractedBuildUUIDs = {};
+        for (let indexName of indexesToCheck) {
+            let extractedBuildUUID = extractUUIDFromObject(indexMap[indexName].buildUUID);
+            extractedBuildUUIDs[extractedBuildUUID] = true;
+        }
+
+        for (let extractedBuildUUID in extractedBuildUUIDs) {
+            jsTest.log(`Checking for logID ${logID} for index build ${extractedBuildUUID}`);
+            checkLog.containsJson(coll.getMongo(), logID, {
+                buildUUID: function (uuid) {
+                    return uuid && uuid["uuid"]["$uuid"] === extractedBuildUUID;
+                },
+            });
+        }
+
+        return indexMap;
+    }
 };
 
 export const ResumableIndexBuildTest = class {
