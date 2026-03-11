@@ -81,6 +81,35 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "execution_admission_context_test",
+    srcs = [
+        "execution_admission_context_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":execution_admission_context",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ticketing_system_test",
+    srcs = [
+        "ticketing_system_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":execution_admission_context",
+        ":ticketing_system",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "throughput_probing_test",
     srcs = [
         "throughput_probing_test.cpp",
