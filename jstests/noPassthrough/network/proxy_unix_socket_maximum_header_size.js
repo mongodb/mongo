@@ -2,6 +2,7 @@
  * Test the proxyUnixSocketMaximumHeaderSize server parameter.
  * This parameter controls the maximum size of the proxy protocol header
  * that can be read from proxy Unix domain sockets.
+ * Uses real proxy unix domain socket (no isConnectedToProxyUnixSocketOverride).
  *
  * @tags: [
  *   grpc_incompatible,
@@ -13,9 +14,12 @@ if (_isWindows()) {
     quit();
 }
 
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+function makeProxySocketPath(prefix, port) {
+    return `${prefix}/unix-mongodb-${port}.sock`;
+}
 
 const kDefaultHeaderSize = 536;
 const kDefaultProxyUnixSocketHeaderSize = 4096;
@@ -26,9 +30,7 @@ const kProxyVersion = 2;
 const uri = `mongodb://127.0.0.1:${kProxyIngressPort}`;
 
 let currentProxyProtocolSize = 0;
-
-const proxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
-proxyServer.start();
+let currentProxyServer = null;
 
 function setParameterWithAssert(conn, kvp, shouldSucceed = true) {
     const command = {setParameter: 1, ...kvp};
@@ -79,7 +81,7 @@ function assertConnectWithProxyProtocolHeader(size, shouldSucceed) {
     );
 }
 
-// Helper function to set the size of the proxy protocol emitted by the proxyServer.
+// Helper function to set the size of the proxy protocol emitted by the current proxy.
 function setProxyProtocolSize(size) {
     // Calculate the size of the TLV object based on the required total size.
     // Breakdown of proxy protocol v2 size components:
@@ -89,66 +91,84 @@ function setProxyProtocolSize(size) {
     const tlvSize = size - 16 - 12 - 3;
     assert(tlvSize);
     const valueStr = "a".repeat(tlvSize);
-    proxyServer.setTLVs([{"type": 0xe0, "value": valueStr}]);
+    currentProxyServer.setTLVs([{"type": 0xe0, "value": valueStr}]);
 }
 
-function runConnectTest(conn) {
+function runConnectTest(conn, prefix) {
     setParameterWithAssert(conn, {logComponentVerbosity: {network: {verbosity: 4}}});
     setParameterWithAssert(conn, {proxyProtocolTimeoutSecs: 1});
 
-    // When not using the proxy unix socket, we can only use a header up to kDefaultHeaderSize.
-    assertConnectWithProxyProtocolHeader(kDefaultHeaderSize, true);
+    // Phase 1: Proxy with TCP egress to the TCP proxy port — connection is not on proxy unix socket, so default limit applies.
+    currentProxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
+    currentProxyServer.start();
+    try {
+        // When not using the proxy unix socket, we can only use a header up to kDefaultHeaderSize.
+        assertConnectWithProxyProtocolHeader(kDefaultHeaderSize, true);
+        // Proxy protocol size larger than kDefaultHeaderSize should fail.
+        assertConnectWithProxyProtocolHeader(kDefaultHeaderSize + 1, false);
+    } finally {
+        currentProxyServer.stop();
+    }
 
-    // Proxy protocol size larger than kDefaultHeaderSize should fail.
-    assertConnectWithProxyProtocolHeader(kDefaultHeaderSize + 1, false);
+    // Phase 2: Proxy with real unix socket egress — connection is on proxy unix socket.
+    const proxySocketPath = makeProxySocketPath(prefix, conn.port);
+    assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
+    currentProxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion, {
+        egressUnixSocket: proxySocketPath,
+    });
+    currentProxyServer.start();
+    try {
+        // Now we can go past kDefaultHeaderSize.
+        assertConnectWithProxyProtocolHeader(kDefaultHeaderSize + 1, true);
 
-    // Now set failpoint to start using the proxy unix socket.
-    const fp = configureFailPoint(conn, "isConnectedToProxyUnixSocketOverride");
+        // On the proxy unix socket, the largest we can read by default is kDefaultProxyUnixSocketHeaderSize.
+        assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize, true);
 
-    // Now we can go past kDefaultHeaderSize.
-    assertConnectWithProxyProtocolHeader(kDefaultHeaderSize + 1, true);
+        // Proxy protocol size larger than kDefaultProxyUnixSocketHeaderSize should fail.
+        assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, false);
 
-    // On the proxy unix socket, the largest we can read by default is kDefaultProxyUnixSocketHeaderSize.
-    assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize, true);
+        // Test that we can configure the proxy unix socket max header size and have the previous header succeed.
+        setParameterWithAssert(conn, {proxyUnixSocketMaximumHeaderSize: kDefaultProxyUnixSocketHeaderSize + 1000});
+        assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, true);
+        assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1000, true);
 
-    // Proxy protocol size larger than kDefaultProxyUnixSocketHeaderSize should fail.
-    assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, false);
-
-    // Test that we can configure the proxy unix socket max header size and have the previous header succeed.
-    setParameterWithAssert(conn, {proxyUnixSocketMaximumHeaderSize: kDefaultProxyUnixSocketHeaderSize + 1000});
-    assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1, true);
-    assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 1000, true);
-
-    // Going past the configured max should fail.
-    setProxyProtocolSize(kDefaultProxyUnixSocketHeaderSize + 2000);
-    assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 2000, false);
-
-    fp.off();
+        // Going past the configured max should fail.
+        setProxyProtocolSize(kDefaultProxyUnixSocketHeaderSize + 2000);
+        assertConnectWithProxyProtocolHeader(kDefaultProxyUnixSocketHeaderSize + 2000, false);
+    } finally {
+        currentProxyServer.stop();
+    }
 }
 
-function runTestSuite(conn) {
+function runTestSuite(conn, prefix) {
     setParameterTest(conn);
-    runConnectTest(conn);
+    runConnectTest(conn, prefix);
 }
 
 {
-    const mongod = MongoRunner.runMongod({proxyPort: kProxyEgressPort});
-    runTestSuite(mongod);
+    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongod`;
+    mkdir(prefix);
+    const mongod = MongoRunner.runMongod({
+        proxyUnixSocketPrefix: prefix,
+        proxyPort: kProxyEgressPort,
+    });
+    runTestSuite(mongod, prefix);
     MongoRunner.stopMongod(mongod);
 }
 
 {
+    const prefix = `${MongoRunner.dataPath}${jsTestName()}_mongos`;
+    mkdir(prefix);
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
-        mongosOptions: {
-            setParameter: {
-                "loadBalancerPort": kProxyEgressPort,
+        other: {
+            mongosOptions: {
+                proxyUnixSocketPrefix: prefix,
+                setParameter: {loadBalancerPort: kProxyEgressPort},
             },
         },
     });
-    runTestSuite(st.s);
+    runTestSuite(st.s, prefix);
     st.stop();
 }
-
-proxyServer.stop();

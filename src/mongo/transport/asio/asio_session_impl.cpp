@@ -66,6 +66,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
 MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 MONGO_FAIL_POINT_DEFINE(isConnectedToProxyUnixSocketOverride);
+MONGO_FAIL_POINT_DEFINE(proxyUnixDomainSocketPeerCredentialValidationOverride);
 
 namespace {
 
@@ -275,6 +276,29 @@ bool CommonAsioSession::isLoadBalancerPeer() const {
 bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
     return _isConnectedToProxyUnixSocket ||
         MONGO_unlikely(isConnectedToProxyUnixSocketOverride.shouldFail());
+}
+
+Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
+#ifndef _WIN32
+    if (auto fp = proxyUnixDomainSocketPeerCredentialValidationOverride.scoped();
+        MONGO_unlikely(fp.isActive()))
+        if (auto data = fp.getData()["data"]; data.ok())
+            if (auto code = data["code"]; code.ok())
+                return Status(static_cast<ErrorCodes::Error>(code.numberInt()), "Failpoint result");
+
+    struct ucred credentials;
+    auto handle = getSocket().native_handle();
+    socklen_t optLen = sizeof(credentials);
+    if (::getsockopt(handle, SOL_SOCKET, SO_PEERCRED, &credentials, &optLen) != 0)
+        return Status(ErrorCodes::InternalError, errorMessage(lastSocketError()));
+    auto expectedUid = ::geteuid();
+    if (expectedUid != credentials.uid)
+        return Status(ErrorCodes::Unauthorized,
+                      fmt::format("Proxy unix domain socket peer UID mismatch: expected {}, got {}",
+                                  expectedUid,
+                                  credentials.uid));
+#endif
+    return Status::OK();
 }
 
 void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {

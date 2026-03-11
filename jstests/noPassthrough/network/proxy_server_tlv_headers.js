@@ -1,5 +1,7 @@
 /**
- * Tests that the proxy server correctly sends tlv data to a mongod.
+ * Tests that the proxy server correctly sends tlv data to a mongod over the real proxy unix
+ * domain socket. TLV parsing happens only for connections that arrive on the proxy unix socket.
+ *
  * @tags: [
  *   multiversion_incompatible,
  *   grpc_incompatible,
@@ -12,30 +14,30 @@ if (_isWindows()) {
 
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
+function makeProxySocketPath(prefix, port) {
+    return `${prefix}/unix-mongodb-${port}.sock`;
+}
+
 const kProxyIngressPort = allocatePort();
-const kProxyEgressPort = allocatePort();
 const kProxyVersion = 2;
 
-let proxyServer = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
-proxyServer.start();
+const prefix = `${MongoRunner.dataPath}${jsTestName()}_tlv`;
+mkdir(prefix);
 
-let mongod = MongoRunner.runMongod({proxyPort: kProxyEgressPort});
-const admin = mongod.getDB("admin");
-
-// Enable the isConnectedToProxyUnixSocketOverride failpoint so that the proxy protocol header
-// parsing logic treats this TCP connection as if it arrived on a proxy unix socket. TLV parsing
-// happens only for such connections.
-assert.commandWorked(
-    admin.adminCommand({configureFailPoint: "isConnectedToProxyUnixSocketOverride", mode: "alwaysOn"}),
-);
-
-// Increase network log verbosity so we can see log 11978400 emitted.
-assert.commandWorked(
-    admin.runCommand({
-        setParameter: 1,
+let mongod = MongoRunner.runMongod({
+    proxyUnixSocketPrefix: prefix,
+    setParameter: {
         logComponentVerbosity: {network: {verbosity: 4}},
-    }),
-);
+    },
+});
+
+const proxySocketPath = makeProxySocketPath(prefix, mongod.port);
+assert(fileExists(proxySocketPath), `Expected proxy socket to exist: ${proxySocketPath}`);
+
+let proxyServer = new ProxyProtocolServer(kProxyIngressPort, mongod.port, kProxyVersion, {
+    egressUnixSocket: proxySocketPath,
+});
+proxyServer.start();
 
 // The subject DN from client_roles.pem in RFC 4514 format (which parseDN expects).
 const kDN = "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US";

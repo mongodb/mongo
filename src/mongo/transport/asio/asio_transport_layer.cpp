@@ -1642,6 +1642,11 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         }
 #endif
 
+        ScopeGuard nextAcceptGuarantee([&]() {
+            _listenerProcessingTotalMicros.fetchAndAdd(timer.micros());
+            _acceptConnection(acceptor);
+        });
+
         try {
             std::shared_ptr<AsioSession> session(
                 new SyncAsioSession(this, std::move(peerSocket), true));
@@ -1666,8 +1671,30 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
                         "remote"_attr = session->remote(),
                         "limit"_attr = gProxyProtocolMaximumPendingConnections.loadRelaxed(),
                         "rejected"_attr = _discardedDueToMaximumPendingOnProxyHeader.get());
-                    _acceptConnection(acceptor);
                     return;
+                }
+                if (session->isConnectedToProxyUnixSocket() &&
+                    serverGlobalParams.proxySocketCheckPermissions) {
+                    Status status = session->validateProxyUnixSocketPeerPermissions();
+                    if (status.code() == ErrorCodes::Unauthorized) {
+                        static logv2::SeveritySuppressor suppressor{Seconds(10),
+                                                                    logv2::LogSeverity::Warning(),
+                                                                    logv2::LogSeverity::Debug(2)};
+                        LOGV2_DEBUG(11793400,
+                                    suppressor().toInt(),
+                                    "Unauthorized proxy unix domain socket peer credential",
+                                    "error"_attr = status);
+                        return;
+                    }
+                    if (!status.isOK()) {
+                        static logv2::SeveritySuppressor suppressor{
+                            Seconds(10), logv2::LogSeverity::Error(), logv2::LogSeverity::Debug(2)};
+                        LOGV2_DEBUG(11793401,
+                                    suppressor().toInt(),
+                                    "Proxy unix domain socket peer credential check failure",
+                                    "error"_attr = status);
+                        return;
+                    }
                 }
                 session->parseProxyProtocolHeader(_listenerInterfaceMainPort->getReactor())
                     .getAsync([this, session = std::move(session), t = std::move(token)](Status s) {
@@ -1689,9 +1716,6 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         } catch (const DBException& e) {
             LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
         }
-
-        _listenerProcessingTotalMicros.fetchAndAdd(timer.micros());
-        _acceptConnection(acceptor);
     };
 
     asioTransportLayerHangBeforeAcceptCallback.pauseWhileSet();

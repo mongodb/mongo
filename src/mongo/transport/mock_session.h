@@ -97,6 +97,10 @@ public:
         return false;
     }
 
+    Status validateProxyUnixSocketPeerPermissions() override {
+        return Status::OK();
+    }
+
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
 
     bool bindsToOperationState() const override {

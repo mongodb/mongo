@@ -141,6 +141,8 @@ public:
 
     bool isConnectedToProxyUnixSocket() const override;
 
+    Status validateProxyUnixSocketPeerPermissions() override;
+
     bool isLoadBalancerPeer() const override;
 
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override;

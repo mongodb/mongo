@@ -124,7 +124,9 @@ struct MONGO_MOD_PUB ServerGlobalParams {
     bool isMongoBridge = false;
 
     std::string proxySocketPrefix;  // Proxy UNIX domain socket directory
-    std::string socket = "/tmp";    // UNIX domain socket directory
+    bool proxySocketCheckPermissions =
+        true;  // Check the permissions for the process connecting to the UNIX domain socket
+    std::string socket = "/tmp";  // UNIX domain socket directory
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
     VersionedValue<CIDRList> maxIncomingConnsOverride;

@@ -132,6 +132,13 @@ configs:
         default: ""
         condition:
             preprocessor: "!defined(_WIN32)"
+    "net.proxyUnixDomainSocket.checkPermissions":
+        short_name: proxyUnixSocketCheckPermissions
+        description: "Check that the connecting process is running under the same user ID."
+        arg_vartype: Bool
+        default: true
+        condition:
+            preprocessor: "!defined(_WIN32)"
     "net.unixDomainSocket.enabled":
         description: "Disable listening on unix sockets"
         arg_vartype: Bool

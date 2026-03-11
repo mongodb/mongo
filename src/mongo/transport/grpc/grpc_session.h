@@ -182,6 +182,13 @@ public:
     }
 
     /**
+     * Returns the status of unix socket peer permission validation
+     */
+    Status validateProxyUnixSocketPeerPermissions() final {
+        return Status::OK();
+    }
+
+    /**
      * All gRPC sessions are considered bound to the operation state.
      */
     bool bindsToOperationState() const final {
