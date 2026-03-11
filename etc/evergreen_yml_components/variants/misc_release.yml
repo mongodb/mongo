@@ -92,6 +92,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2-latest-small
+  tags: ["emergency_release"]
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -211,6 +212,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2-arm64-latest-small
+  tags: ["emergency_release"]
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -599,6 +601,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2023.0-small
+  tags: ["emergency_release"]
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux
@@ -808,6 +811,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - amazon2023.0-arm64-small
+  tags: ["emergency_release"]
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: linux

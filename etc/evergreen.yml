@@ -1902,6 +1902,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-build
+  tags: ["emergency_release"]
   stepback: false
   expansions:
     toolchain_version: stable
@@ -2020,6 +2021,7 @@ buildvariants:
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
   - rhel80-build
+  tags: ["emergency_release"]
   expansions: &aubsan-lite-required-expansions
     compile_variant: *linux_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
@@ -2061,6 +2063,7 @@ buildvariants:
   name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
   display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  tags: ["emergency_release"]
   expansions:
     <<: *aubsan-lite-required-expansions
     # To force disable feature flags even on the all feature flags variant, please use this file:
@@ -2134,6 +2137,7 @@ buildvariants:
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-large
+  tags: ["emergency_release"]
   stepback: false
   expansions: &enterprise-rhel8-debug-tsan-expansions-template
     additional_package_targets: >-
@@ -2291,6 +2295,7 @@ buildvariants:
   activate: false
   run_on:
   - rhel80-large
+  tags: ["emergency_release"]
   stepback: false
   expansions:
     <<: *enterprise-rhel8-debug-tsan-expansions-template
