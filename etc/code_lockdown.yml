@@ -114,6 +114,11 @@ groups:
       - "Storage Engines - Transactions"
       - "Storage Engines - Persistence"
       - "Storage Layer Services"
+      - "SLS - CIS"
+      - "SLS - CMS"
+      - "SLS - CRS"
+      - "SLS - Log Service"
+      - "SLS - Page Services"
     slack_tags:
       - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
       - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
@@ -218,28 +223,28 @@ teams:
       cold: 0
   - name: "Storage Engines - Server Integration"
     slack_tags:
-      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U09EG3B1MR6>" # nick.beckenham@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
       hot: 3
       cold: 5
   - name: "Storage Engines - Foundations"
     slack_tags:
-      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U094DFQ4JGL>" # radoslav.kardum@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
       hot: 3
       cold: 5
   - name: "Storage Engines - Transactions"
     slack_tags:
-      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@UKGR8F9C7>" # haribabu.kommi@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
       hot: 3
       cold: 5
   - name: "Storage Engines - Persistence"
     slack_tags:
-      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U01JK626XEY>" # etienne.petrel@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
       hot: 3
@@ -248,6 +253,44 @@ teams:
     slack_tags:
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
       - "<!subteam^S08RZGCJWT0>" # @sls-leaders - Leads
+    thresholds: # triage should route these elsewhere quickly (ie faster than the cooldown)
+      hot: 0
+      cold: 0
+  - name: "SLS - CIS"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@UK30W5J75>" # lamont.nelson@mongodb.com - Lead
+    thresholds: # Reduced Quotas for SLS
+      hot: 1
+      cold: 3
+  - name: "SLS - CMS"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0LNBJVFA>" # jonathan.reams@mongodb.com - Lead
+    thresholds: # Reduced Quotas for SLS
+      hot: 1
+      cold: 3
+  - name: "SLS - CRS"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@UAX8EUQ3A>" # thomas.zembowicz@mongodb.com - Lead
+    thresholds: # Reduced Quotas for SLS
+      hot: 1
+      cold: 3
+  - name: "SLS - Log Service"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@UH210P78V>" # lingzhi.deng@mongodb.com - Lead
+    thresholds: # Reduced Quotas for SLS
+      hot: 1
+      cold: 3
+  - name: "SLS - Page Services"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@U0Z7JD2G4>" # siyuan.zhou@mongodb.com - Lead
+    thresholds: # Reduced Quotas for SLS
+      hot: 1
+      cold: 3
 
   # Query teams
   - name: "Query Execution"
