@@ -151,6 +151,8 @@ last-continuous:
       ticket: SERVER-110728
     - test_file: jstests/aggregation/expressions/trim.js
       ticket: SERVER-120668
+    - test_file: jstests/replsets/election_term_over_int_max.js
+      ticket: SERVER-119413
   suites: null
 last-lts:
   all:
@@ -800,4 +802,6 @@ last-lts:
       ticket: SERVER-110728
     - test_file: jstests/aggregation/expressions/trim.js
       ticket: SERVER-120668
+    - test_file: jstests/replsets/election_term_over_int_max.js
+      ticket: SERVER-119413
   suites: null

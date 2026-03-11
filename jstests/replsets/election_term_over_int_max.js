@@ -3,7 +3,7 @@
  * then the full replica set brought back up. While standalone, we manually corrupt the
  * election term document.
  *
- * @tags: [requires_persistence, requires_replication, requires_fcv_83]
+ * @tags: [requires_persistence, requires_replication]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
