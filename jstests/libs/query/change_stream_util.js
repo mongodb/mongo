@@ -280,7 +280,7 @@ export function ChangeStreamTest(_db, options) {
                     res = assert.commandWorked(
                         runCommandChangeStreamPassthroughAware(
                             _db,
-                            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
+                            Object.merge({aggregate: collName, pipeline}, aggregateOptions),
                             doNotModifyInPassthroughs,
                         ),
                     );
@@ -328,6 +328,7 @@ export function ChangeStreamTest(_db, options) {
             throw new Error("Cannot resume change stream - no resume token available for cursor");
         }
         const pipeline = addResumeToken(cursorInfo.pipeline, cursorInfo.resumeToken);
+
         const newCursor = self.startWatchingChanges({
             pipeline: pipeline,
             collection: cursorInfo.collName,
@@ -335,6 +336,18 @@ export function ChangeStreamTest(_db, options) {
             doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
         });
         Object.assign(cursor, newCursor);
+    };
+
+    /**
+     * Returns the resume token for the most recent batch returned by the change stream cursor. Throws an error if there is no resume token available for the cursor.
+     */
+    self.getResumeToken = function (cursor) {
+        const cursorId = String(cursor.id);
+        const cursorInfo = _cursorData.get(cursorId);
+        if (!cursorInfo || !cursorInfo.resumeToken) {
+            throw new Error("Cannot get resume token - no resume token available for cursor");
+        }
+        return cursorInfo.resumeToken;
     };
 
     /**

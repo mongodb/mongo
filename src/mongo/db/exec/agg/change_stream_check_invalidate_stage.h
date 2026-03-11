@@ -55,6 +55,33 @@ public:
 private:
     GetNextResult doGetNext() final;
 
+    /**
+     * Classifies how an invalidation events (e.g. "drop", "dropDatabase", "rename") will be
+     * handled.
+     */
+    enum class ClassificationType {
+        // Generate an "invalidate" and buffer it as the next to-be-returned event. Still return the
+        // current event.
+        kGenerateInvalidateEvent,
+
+        // Rethrow the invalidation event as a 'ChangeStreamStartAfterInvalidateInfo' exception.
+        // The 'ChangeStreamEnsureResumeTokenPresent' stage will catch this and handle it.
+        kRethrowForResumeTokenVerification,
+
+        // Return the incoming invalidation event as is.
+        kSwallow,
+    };
+
+    ClassificationType _classifyInvalidationForStartAfter(
+        const ResumeTokenData& resumeTokenData) const;
+
+    /**
+     * Build an "invalidate" change event from an invalidation event (e.g. "drop", "dropDatabase",
+     * "rename").
+     */
+    Document _buildInvalidateEvent(const ResumeTokenData& resumeTokenData,
+                                   const Document& doc) const;
+
     boost::optional<ResumeTokenData> _startAfterInvalidate;
 
     boost::optional<Document> _queuedInvalidate;

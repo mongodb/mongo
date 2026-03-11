@@ -191,10 +191,6 @@ resumeCursor = cst.startWatchingChanges({
     collection: 1,
     aggregateOptions: {cursor: {batchSize: 0}},
 });
-cst.consumeDropUpTo({
-    cursor: resumeCursor,
-    dropType: "dropDatabase",
-    expectedNext: expectedInsert,
-});
+cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: [expectedInsert]});
 
 cst.cleanUp();

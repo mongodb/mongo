@@ -147,6 +147,10 @@ last-continuous:
       ticket: SERVER-120210
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
+    - test_file: jstests/change_streams/multiple_invalidate_events.js
+      ticket: SERVER-120644
+    - test_file: jstests/change_streams/whole_db_resumability.js
+      ticket: SERVER-120644
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
     - test_file: jstests/aggregation/expressions/trim.js
@@ -798,6 +802,10 @@ last-lts:
       ticket: SERVER-120210
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
+    - test_file: jstests/change_streams/multiple_invalidate_events.js
+      ticket: SERVER-120644
+    - test_file: jstests/change_streams/whole_db_resumability.js
+      ticket: SERVER-120644
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
     - test_file: jstests/aggregation/expressions/trim.js

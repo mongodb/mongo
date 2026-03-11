@@ -83,7 +83,7 @@ namespace {
 
 // Returns true if the given 'operationType' should invalidate the change stream based on the
 // namespace in 'pExpCtx'.
-bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+bool isInvalidationCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            StringData operationType) {
     if (expCtx->isSingleNamespaceAggregation()) {
         return operationType == DSCS::kDropCollectionOpType ||
@@ -101,12 +101,11 @@ ChangeStreamCheckInvalidateStage::ChangeStreamCheckInvalidateStage(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     boost::optional<ResumeTokenData> startAfterInvalidate)
-    : Stage(stageName, pExpCtx), _startAfterInvalidate(startAfterInvalidate) {}
+    : Stage(stageName, pExpCtx), _startAfterInvalidate(std::move(startAfterInvalidate)) {}
 
 GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     // To declare a change stream as invalidated, this stage first emits an invalidate event and
     // then throws a 'ChangeStreamInvalidated' exception on the next call to this method.
-
     if (_queuedInvalidate) {
         auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.value()));
         _queuedInvalidate.reset();
@@ -118,75 +117,88 @@ GetNextResult ChangeStreamCheckInvalidateStage::doGetNext() {
     }
 
     auto nextInput = pSource->getNext();
-    if (!nextInput.isAdvanced())
+    if (!nextInput.isAdvanced()) {
         return nextInput;
-
-    auto& doc = nextInput.getDocument();
-    DSCS::checkValueType(
-        doc[DSCS::kOperationTypeField], DSCS::kOperationTypeField, BSONType::string);
-    auto operationType = doc[DSCS::kOperationTypeField].getString();
-
-    // If this command should invalidate the stream, generate an invalidate entry and queue it up
-    // to be returned after the notification of this command. The new entry will have a nearly
-    // identical resume token to the notification for the command, except with an extra flag
-    // indicating that the token is from an invalidate. This flag is necessary to disambiguate
-    // the two tokens, and thus preserve a total ordering on the stream.
-    if (isInvalidatingCommand(pExpCtx, operationType)) {
-        // Regardless of whether we generate an invalidation event or, in the case of startAfter,
-        // swallow it, we should clear the _startAfterInvalidate field once this block completes.
-        ON_BLOCK_EXIT([this] { _startAfterInvalidate.reset(); });
-
-        // Extract the resume token from the invalidating command and set the 'fromInvalidate' bit.
-        auto resumeTokenData = ResumeToken::parse(doc[DSCS::kIdField].getDocument()).getData();
-        resumeTokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
-
-        // If a client receives an invalidate and wants to start a new stream after the invalidate,
-        // they can use the 'startAfter' option. In this case, '_startAfterInvalidate' will be set
-        // to the resume token with which the client restarted the stream. We must be sure to avoid
-        // re-invalidating the new stream, and so we will swallow the first invalidate we see on
-        // each shard. The one exception is the invalidate which matches the 'startAfter' resume
-        // token. We must re-generate this invalidate, since DSEnsureResumeTokenPresent needs to see
-        // (and will take care of swallowing) the event which exactly matches the client's token.
-        if (_startAfterInvalidate && resumeTokenData != *_startAfterInvalidate) {
-            return nextInput;
-        }
-
-        auto resumeTokenDoc = ResumeToken(resumeTokenData).toDocument();
-
-        // Note: if 'showExpandedEvents' is false, 'wallTime' will be missing in the input document.
-        MutableDocument result(Document{{DSCS::kIdField, resumeTokenDoc},
-                                        {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
-                                        {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]},
-                                        {DSCS::kWallTimeField, doc[DSCS::kWallTimeField]}});
-        result.copyMetaDataFrom(doc);
-
-        // We set the resume token as the document's sort key in both the sharded and non-sharded
-        // cases, since we will later rely upon it to generate a correct postBatchResumeToken. We
-        // must therefore update the sort key to match the new resume token that we generated above.
-        const bool isSingleElementKey = true;
-        result.metadata().setSortKey(Value{resumeTokenDoc}, isSingleElementKey);
-
-        // If we are here and '_startAfterInvalidate' is present, then the current event matches the
-        // resume token. We throw the event up to DSCSEnsureResumeTokenPresent, to ensure that it is
-        // always delivered regardless of any intervening $match stages.
-        uassert(ChangeStreamStartAfterInvalidateInfo(result.freeze().toBsonWithMetaData()),
-                "Change stream 'startAfter' invalidate event",
-                !_startAfterInvalidate);
-
-        // Otherwise, we are in a normal invalidation scenario. Queue up an invalidation event to be
-        // returned on the following call to getNext, and an invalidation exception to be thrown on
-        // the call after that.
-        _queuedInvalidate = result.freeze();
-        _queuedException = ChangeStreamInvalidationInfo(
-            _queuedInvalidate->metadata().getSortKey().getDocument().toBson());
     }
 
-    // Regardless of whether the first document we see is an invalidating command, we only skip the
-    // first invalidate for streams with the 'startAfter' option, so we should not skip any
-    // invalidates that come after the first one.
-    _startAfterInvalidate.reset();
+    const auto& doc = nextInput.getDocument();
+    DSCS::checkValueType(
+        doc[DSCS::kOperationTypeField], DSCS::kOperationTypeField, BSONType::string);
 
-    return nextInput;
+    ON_BLOCK_EXIT([this] { _startAfterInvalidate.reset(); });
+
+    // If it's not an invalidation event, just forward the event.
+    if (!isInvalidationCommand(pExpCtx, doc[DSCS::kOperationTypeField].getString())) {
+        return nextInput;
+    }
+
+    // Extract the resume token from the invalidating command and set the 'fromInvalidate' bit.
+    auto resumeTokenData = ResumeToken::parse(doc[DSCS::kIdField].getDocument()).getData();
+    resumeTokenData.fromInvalidate = ResumeTokenData::FromInvalidate::kFromInvalidate;
+
+    switch (_classifyInvalidationForStartAfter(resumeTokenData)) {
+        case ClassificationType::kRethrowForResumeTokenVerification: {
+            Document result = _buildInvalidateEvent(resumeTokenData, doc);
+            uasserted(ChangeStreamStartAfterInvalidateInfo(result.toBsonWithMetaData()),
+                      "Change stream 'startAfter' invalidate event");
+        }
+        case ClassificationType::kGenerateInvalidateEvent: {
+            _queuedInvalidate = _buildInvalidateEvent(resumeTokenData, doc);
+            _queuedException = ChangeStreamInvalidationInfo(
+                _queuedInvalidate->metadata().getSortKey().getDocument().toBson());
+        }
+            [[fallthrough]];
+        case ClassificationType::kSwallow: {
+            return nextInput;
+        }
+    }
+
+    MONGO_UNREACHABLE_TASSERT(12064400);
+}
+
+ChangeStreamCheckInvalidateStage::ClassificationType
+ChangeStreamCheckInvalidateStage::_classifyInvalidationForStartAfter(
+    const ResumeTokenData& resumeTokenData) const {
+    if (!_startAfterInvalidate) {
+        return ClassificationType::kGenerateInvalidateEvent;
+    }
+
+    if (resumeTokenData == *_startAfterInvalidate) {
+        // Exact match — this is the event the client resumed from. Rethrow it so
+        // EnsureResumeTokenPresent can verify the resume point.
+        return ClassificationType::kRethrowForResumeTokenVerification;
+    }
+
+    if (resumeTokenData.clusterTime > _startAfterInvalidate->clusterTime) {
+        // This event has a strictly later clusterTime than the resume point. It is a
+        // genuinely new invalidation — not part of the original event we're resuming from.
+        return ClassificationType::kGenerateInvalidateEvent;
+    }
+
+    // Different token at the same or earlier clusterTime. Since this
+    // is part of the same logical event the client already moved past, suppress the invalidation.
+    return ClassificationType::kSwallow;
+}
+
+Document ChangeStreamCheckInvalidateStage::_buildInvalidateEvent(
+    const ResumeTokenData& resumeTokenData, const Document& doc) const {
+    auto resumeTokenDoc = ResumeToken(resumeTokenData).toDocument();
+
+    // Note: if 'showExpandedEvents' is false, 'wallTime' will be missing in the input
+    // document.
+    MutableDocument result(Document{{DSCS::kIdField, resumeTokenDoc},
+                                    {DSCS::kOperationTypeField, DSCS::kInvalidateOpType},
+                                    {DSCS::kClusterTimeField, doc[DSCS::kClusterTimeField]},
+                                    {DSCS::kWallTimeField, doc[DSCS::kWallTimeField]}});
+    result.copyMetaDataFrom(doc);
+
+    // We set the resume token as the document's sort key in both the sharded and
+    // non-sharded cases, since we will later rely upon it to generate a correct
+    // postBatchResumeToken. We must therefore update the sort key to match the new resume
+    // token that we generated above.
+    const bool isSingleElementKey = true;
+    result.metadata().setSortKey(Value{resumeTokenDoc}, isSingleElementKey);
+    return result.freeze();
 }
 
 }  // namespace exec::agg
