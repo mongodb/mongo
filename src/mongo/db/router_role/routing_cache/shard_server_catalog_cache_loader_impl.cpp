@@ -350,7 +350,7 @@ ShardId getSelfShardId(OperationContext* opCtx) {
     }
 
     auto const shardingState = ShardingState::get(opCtx);
-    invariant(shardingState->enabled());
+    tassert(12109000, "Sharding state is not enabled", shardingState->enabled());
     return shardingState->shardId();
 }
 
