@@ -50,8 +50,6 @@ std::string makeUnixSockPath(int port, StringData label = "");
 // Constructs a proxy Unix socket path from the given prefix and port. `prefix` must be non-empty.
 std::string makeProxyUnixSockPath(int port, StringData prefix);
 
-int parsePortFromUnixSockPath(StringData path);
-
 inline bool isUnixDomainSocket(StringData hostname) {
     return hostname.find('/') != std::string::npos;
 }
