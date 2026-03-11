@@ -73,11 +73,14 @@ function runInitialCacheTest(isMultiplanning) {
     assert.eq(entry.isActive, false);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
 
-    // TODO SERVER-117243: Add else clause with assertions on length in CBR cases.
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     } else {
+        // TODO SERVER-116684: Change these assertions.
+        assert.eq(entry.creationExecStats.length, 1);
+        assert.eq(entry.candidatePlanScores.length, 1);
+
         // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
         assert(
             checkLog.checkContainsWithCountJson(
@@ -97,11 +100,14 @@ function runInitialCacheTest(isMultiplanning) {
     assert.eq(entry.isActive, true);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
 
-    // TODO SERVER-117243: Add else clause with assertions on length in CBR cases.
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     } else {
+        // TODO SERVER-116684: Change these assertions.
+        assert.eq(entry.creationExecStats.length, 1);
+        assert.eq(entry.candidatePlanScores.length, 1);
+
         // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
         assert(
             checkLog.checkContainsWithCountJson(
@@ -138,10 +144,23 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
 
-    // TODO SERVER-117243: Add else clause with assertions on length in CBR cases.
-    if (isMultiplanning) {
+    const strategy = assert.commandWorked(
+        db.adminCommand({
+            getParameter: 1,
+            automaticCEPlanRankingStrategy: 1,
+        }),
+    )["automaticCEPlanRankingStrategy"];
+    // We happen to use CBR to pick the winning plan for 'bIndexQuery' with CBRCostBasedRankerChoice,
+    // and MP with CBRForNoMultiplanningResults.
+    if (isMultiplanning || strategy === "CBRForNoMultiplanningResults") {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
+    } else if (strategy == "CBRCostBasedRankerChoice" || strategy === "HistogramCEWithHeuristicFallback") {
+        // TODO SERVER-116684: Change these assertions.
+        assert.eq(entry.creationExecStats.length, 1);
+        assert.eq(entry.candidatePlanScores.length, 1);
+    } else {
+        assert(false, `Unhandled strategy: ${strategy}`);
     }
 
     // This query will trigger replanning since the number of works is vastly higher than the cached plan.
@@ -152,11 +171,14 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
 
-    // TODO SERVER-117243: Add else clause with assertions on length in CBR cases.
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
     } else {
+        // TODO SERVER-116684: Change these assertions.
+        assert.eq(entry.creationExecStats.length, 1);
+        assert.eq(entry.candidatePlanScores.length, 1);
+
         // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
         assert(
             checkLog.checkContainsWithCountJson(
