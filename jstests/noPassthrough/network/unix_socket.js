@@ -47,30 +47,18 @@ let doesLogMatchRegex = function (logArray, regex) {
     return false;
 };
 
-// The server expects a port to be after the last hyphen and before .sock.
-let pathHasPort = function (path) {
-    const suffixIndex = path.lastIndexOf("-");
-    if (suffixIndex === -1 || !path.endsWith(".sock")) {
-        return false;
-    }
-
-    const port = path.substring(suffixIndex + 1, path.length - ".sock".length);
-    return /^[0-9]+$/.test(port);
-};
-
-let checkClientMetadataLog = function (serverHandle, path, isProxy) {
+let checkConnectionAcceptedLog = function (serverHandle, path) {
     // The remote attribute of the client metadata log behaves differently when the client connects
     // over gRPC.
     if (jsTestOptions().shellGRPC) {
         return;
     }
 
-    let hasPort = pathHasPort(path);
     checkLog.containsRelaxedJson(
         serverHandle,
-        51800,
+        22943,
         {
-            "remote": `anonymous unix socket:${hasPort ? serverHandle.port : 27017}`,
+            "unixSockPath": `${path}`,
         },
         1,
         30 * 1000,
@@ -84,20 +72,7 @@ let checkSocket = function (serverHandle, path) {
 
     let conn = new Mongo(path);
     assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
-    checkClientMetadataLog(serverHandle, path, false);
-
-    // TODO(SERVER-121137): Since the python proxy server can't make a connection to the unix domain
-    // socket, we have no way of connecting to the proxy unix socket with a proxy protocol header.
-    // Therefore, these failpoints were added to trick the server into thinking that it's connected
-    // to the proxy unix socket. Once the python proxy server can make connections to unix domain
-    // sockets, we can remove these failpoints and start up the proxy server instead.
-    const proxySockFp = configureFailPoint(serverHandle, "isConnectedToProxyUnixSocketOverride");
-    const noProxyProtocolFp = configureFailPoint(serverHandle, "skipProxyProtocolParsing");
-    conn = new Mongo(path);
-    assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
-    checkClientMetadataLog(serverHandle, path, true);
-    proxySockFp.off();
-    noProxyProtocolFp.off();
+    checkConnectionAcceptedLog(serverHandle, path);
 };
 
 let testSockOptions = function (bindPath, expectSockPath, optDict, bindSep = ",", optMongos) {
