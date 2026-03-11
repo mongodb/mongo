@@ -67,6 +67,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/random_migration_testing_utils.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -424,7 +425,8 @@ void MigrationSourceManager::startClone() {
     auto supportsPreservingPreparedTxnInPreciseCheckpoints =
         rss::ReplicatedStorageService::get(_opCtx->getServiceContext())
             .getPersistenceProvider()
-            .supportsPreservingPreparedTxnInPreciseCheckpoints();
+            .supportsPreservingPreparedTxnInPreciseCheckpoints() &&
+        gFeatureFlagPreparedTransactionsPreciseCheckpoints.isEnabled();
 
     if (supportsPreservingPreparedTxnInPreciseCheckpoints) {
         auto preparedTxnResolved =
