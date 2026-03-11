@@ -1,4 +1,4 @@
-import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
+import {MetadataConsistencyChecker} from "jstests/libs/server_catalog/check_metadata_consistency_helpers.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a server?");

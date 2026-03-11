@@ -1,4 +1,4 @@
-import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
+import {MetadataConsistencyChecker} from "jstests/libs/server_catalog/check_metadata_consistency_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 ShardingTest.prototype.checkMetadataConsistency = function () {
