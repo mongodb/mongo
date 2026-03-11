@@ -498,9 +498,14 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
     // Create viewless timeseries at main namespace
     createViewlessTimeseriesCollection(nss1);
 
-    // Create a conflicting viewless timeseries at the buckets namespace.
-    // This simulates an inconsistent state where both foo and system.buckets.foo have collections.
-    createViewlessTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+    {
+        FailPointEnableBlock allowConflictingCollCreation(
+            "skipCheckCreateConflictingTimeseriesBuckets");
+        // Create a conflicting viewless timeseries at the buckets namespace.
+        // This simulates an inconsistent state where both foo and system.buckets.foo have
+        // collections.
+        createViewlessTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+    }
 
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);

@@ -115,6 +115,7 @@ MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 MONGO_FAIL_POINT_DEFINE(skipIdIndex);
 MONGO_FAIL_POINT_DEFINE(hangCreateCollectionBeforeLockAcquisition);
+MONGO_FAIL_POINT_DEFINE(skipCheckCreateConflictingTimeseriesBuckets);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -371,6 +372,35 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
         wuow.commit();
         return Status::OK();
     });
+}
+
+Status _checkNamespaceOrTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
+                                                       const NamespaceString& nss) {
+    auto statusNss = catalog::checkIfNamespaceExists(opCtx, nss);
+    if (!statusNss.isOK()) {
+        return statusNss;
+    }
+
+    // (Ignore FCV check) we want to perform this check only in binaries where the viewless
+    // timeseries are enabled. This intentionally does not depend on FCV state, only binary version
+    // and feature flag status.
+    //
+    // TODO SERVER-121290 do not skip this check when viewless timeseries feature flag is disabled
+    // once 8.3 becomes last continuous.
+    const auto skipOtherTimeseriesNssCheck =
+        !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe() ||
+        MONGO_unlikely(skipCheckCreateConflictingTimeseriesBuckets.shouldFail());
+
+    if (!skipOtherTimeseriesNssCheck) {
+        auto otherTimeseriesNss = nss.isTimeseriesBucketsCollection()
+            ? nss.getTimeseriesViewNamespace()
+            : nss.makeTimeseriesBucketsNamespace();
+        auto statusOtherNss = catalog::checkIfNamespaceExists(opCtx, otherTimeseriesNss);
+        if (!statusOtherNss.isOK()) {
+            return statusOtherNss.addContext("Conflicitng namespace already exists");
+        }
+    }
+    return Status::OK();
 }
 
 Status _performCollectionCreationChecks(OperationContext* opCtx,
@@ -710,6 +740,10 @@ Status _createView(OperationContext* opCtx,
                                                CollectionOrViewAcquisitionRequest::fromOpCtx(
                                                    opCtx, nss, AcquisitionPrerequisites::kWrite),
                                                MODE_IX);
+        auto status = _checkNamespaceOrTimeseriesBucketsAlreadyExists(opCtx, nss);
+        if (!status.isOK()) {
+            return status;
+        }
         return _createViewNoRetry(opCtx, nss, viewAcq, collectionOptions);
     });
 }
@@ -902,8 +936,13 @@ Status _createLegacyTimeseries(
     }
 
     CollectionOptions viewOptions = _generateLegacyTimeseriesViewOptions(bucketsNs, options);
-
-    const auto viewCreationStatus = _createView(opCtx, ns, viewOptions);
+    const auto viewCreationStatus = writeConflictRetry(opCtx, "create timeseries view", ns, [&] {
+        auto viewAcq = acquireCollectionOrView(opCtx,
+                                               CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                                   opCtx, ns, AcquisitionPrerequisites::kWrite),
+                                               MODE_IX);
+        return _createViewNoRetry(opCtx, ns, viewAcq, viewOptions);
+    });
     if (!viewCreationStatus.isOK()) {
         return viewCreationStatus.withContext(
             str::stream() << "Failed to create view on " << bucketsNs.toStringForErrorMsg()
@@ -929,10 +968,10 @@ Status _createCollection(
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
 
-        // This is a top-level handler for collection creation name conflicts. New commands coming
-        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
-        // on conflict.
-        Status status = catalog::checkIfNamespaceExists(opCtx, nss);
+        // This is a top-level handler for collection creation name conflicts. New commands
+        // coming in, or commands that generated a WriteConflict must return a NamespaceExists
+        // error here on conflict.
+        auto status = _checkNamespaceOrTimeseriesBucketsAlreadyExists(opCtx, nss);
         if (!status.isOK()) {
             return status;
         }
