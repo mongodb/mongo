@@ -16,11 +16,9 @@
 
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    areViewlessTimeseriesEnabled,
-    isShardedTimeseries,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const testdb = db.getSiblingDB(jsTestName());
@@ -287,7 +285,7 @@ TimeseriesTest.run((insert) => {
     const twoDSphereTimeseriesIndexSpec = {[metaFieldName]: "2dsphere"};
     const twoDSphereBucketsIndexSpec = {["meta"]: "2dsphere"};
     assert.commandWorked(
-        timeseriescoll.createIndex(twoDSphereTimeseriesIndexSpec),
+        timeseriescoll.createIndex(twoDSphereTimeseriesIndexSpec, add2dsphereVersionIfNeeded()),
         "Failed to create a 2dsphere index with: " + tojson(twoDSphereTimeseriesIndexSpec),
     );
 
