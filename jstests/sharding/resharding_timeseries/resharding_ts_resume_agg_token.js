@@ -6,10 +6,18 @@
  * ]
  */
 
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
+
+const supportsInitialSyncId = PersistenceProviderUtil.allNodesHavePropertyWithValue(
+    st.s,
+    "supportsLocalCollections",
+    true,
+);
+
 const kDbName = "db";
 const kCollName = "foo";
 const ns = kDbName + "." + kCollName;
@@ -63,7 +71,11 @@ assert.commandWorked(sDB.getCollection(kCollName).insertOne(doc4));
 const db = st.rs0.getPrimary().getDB(kDbName);
 const coll = db.getCollection(kCollName);
 
-jsTest.log("aggregate with $requestResumeToken should return PBRT with recordId and an initialSyncId.");
+jsTest.log(
+    "aggregate with $requestResumeToken should return PBRT with recordId" +
+        (supportsInitialSyncId ? " and an initialSyncId" : "") +
+        ".",
+);
 let res = assert.commandWorked(
     db.runCommand({
         aggregate: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -76,7 +88,9 @@ let res = assert.commandWorked(
 );
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$recordId"]);
-assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
+if (supportsInitialSyncId) {
+    assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
+}
 
 assert.eq(res.cursor.firstBatch[0].meta, doc1.meta);
 const resumeToken = res.cursor.postBatchResumeToken;
