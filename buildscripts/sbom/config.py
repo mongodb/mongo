@@ -27,6 +27,8 @@ components_remove = [
     "amokhuginnsson/replxx",
     # a transitive dependency of s2 that is not necessary to include
     "sparsehash/sparsehash",
+    # a false match under iceberg-cpp, should be resolved when iceberg-cpp is added to Endor OSS DB
+    "dmlc/xgboost",
 ]
 
 for component in components_remove:
