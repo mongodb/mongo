@@ -10,6 +10,7 @@
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {ChangeStreamTest, ChangeStreamWatchMode, isInvalidated} from "jstests/libs/query/change_stream_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 /**
  * Reading mode constants.
@@ -26,8 +27,74 @@ class ChangeStreamReader {
     /** Default batch size for cursor getMore operations. */
     static kDefaultGetMoreBatchSize = 1;
 
+    /** All threads spawned by run(), must be joined before shell exit. */
+    static _threads = [];
+
     /**
-     * Run the change stream reader with the given configuration.
+     * Spawn the reader in a background Thread.
+     *
+     * The config object is serialized to BSON and passed to the thread, which
+     * creates its own Mongo connection and runs the reader logic. Callers
+     * synchronize via Connector.waitForDone(conn, config.instanceName).
+     *
+     * Threads are tracked internally -- call joinAll() before test teardown.
+     *
+     * @param {Mongo} conn - MongoDB connection (host is extracted for the thread).
+     * @param {Object} config - BSON-serializable configuration (see _execute for fields).
+     */
+    static run(conn, config) {
+        const host = conn.host;
+        const thread = new Thread(
+            async function (host, config) {
+                const {ChangeStreamReader} = await import("jstests/libs/util/change_stream/change_stream_reader.js");
+                const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
+                const conn = new Mongo(host);
+                try {
+                    ChangeStreamReader._execute(conn, config);
+                } catch (e) {
+                    jsTest.log.info("ChangeStreamReader thread FAILED", {
+                        instanceName: config.instanceName,
+                        error: e.toString(),
+                        stack: e.stack,
+                    });
+                    Connector.notifyDone(conn, config.instanceName);
+                    throw e;
+                }
+            },
+            host,
+            config,
+        );
+        thread.start();
+        ChangeStreamReader._threads.push(thread);
+    }
+
+    /**
+     * Join all threads spawned by run().
+     * Must be called before the test exits to avoid shell abort (SIGABRT).
+     * Safe to call multiple times -- clears the list after joining.
+     */
+    static joinAll() {
+        const threads = ChangeStreamReader._threads;
+        ChangeStreamReader._threads = [];
+        const errors = [];
+        for (const t of threads) {
+            try {
+                t.join();
+            } catch (e) {
+                errors.push(e);
+            }
+        }
+        if (errors.length > 0) {
+            jsTest.log.error("ChangeStreamReader threads failed", {errors});
+            throw new Error(
+                `${errors.length} ChangeStreamReader thread(s) failed: ${errors.map((e) => e.toString()).join("; ")}`,
+            );
+        }
+    }
+
+    /**
+     * Internal entry point called by run() via the background Thread.
+     *
      * @param {Mongo} conn - MongoDB connection.
      * @param {Object} config - Configuration object containing:
      *   - instanceName: Name of the reader instance (used as collection name for storing events).
@@ -41,8 +108,17 @@ class ChangeStreamReader {
      *   - excludeOperationTypes: Optional array of operation types to filter out at the
      *       pipeline level (e.g., ["createIndexes", "dropIndexes"]). Use this for tests
      *       that don't want to deal with unpredictable per-shard event counts.
+     *   - startAtClusterTime: Optional Timestamp to start at (reconstructed after
+     *       thread boundary crossing).
+     * @private
      */
-    static run(conn, config) {
+    static _execute(conn, config) {
+        // Timestamp loses its BSON type when crossing thread boundaries.
+        if (config.startAtClusterTime && !(config.startAtClusterTime instanceof Timestamp)) {
+            const ts = config.startAtClusterTime;
+            config.startAtClusterTime = new Timestamp(ts.t, ts.i);
+        }
+
         switch (config.readingMode) {
             case ChangeStreamReadingMode.kContinuous:
                 ChangeStreamReader._readContinuous(conn, config);
@@ -74,6 +150,9 @@ class ChangeStreamReader {
         const changeStreamSpec = {
             showExpandedEvents: config.showExpandedEvents ?? true,
         };
+        if (config.version) {
+            changeStreamSpec.version = config.version;
+        }
         if (config.watchMode === ChangeStreamWatchMode.kCluster) {
             changeStreamSpec.allChangesForCluster = true;
         }
@@ -118,10 +197,7 @@ class ChangeStreamReader {
      * @private
      */
     static _readContinuous(conn, cfg) {
-        const version = cfg.version ?? "default";
-        jsTest.log.info(
-            `ChangeStreamReader [${cfg.instanceName}]: Starting continuous read, expecting ${cfg.numberOfEventsToRead} events, version: ${version}`,
-        );
+        jsTest.log.info("ChangeStreamReader Starting continuous read", cfg);
         let {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg);
         const readEventTypes = [];
 
@@ -136,9 +212,12 @@ class ChangeStreamReader {
             const isInvalidate = isInvalidated(changeEvent);
             readEventTypes.push(changeEvent.operationType);
 
-            jsTest.log.info(
-                `ChangeStreamReader [${cfg.instanceName}]: Read event ${count + 1}/${cfg.numberOfEventsToRead}: ${changeEvent.operationType}`,
-            );
+            jsTest.log.info("ChangeStreamReader Read event", {
+                instanceName: cfg.instanceName,
+                eventIndex: count + 1,
+                total: cfg.numberOfEventsToRead,
+                operationType: changeEvent.operationType,
+            });
 
             // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
@@ -153,7 +232,10 @@ class ChangeStreamReader {
             }
         }
 
-        jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
+        jsTest.log.info("ChangeStreamReader Read events", {
+            instanceName: cfg.instanceName,
+            readEventTypes,
+        });
         cst.cleanUp();
     }
 
@@ -164,10 +246,7 @@ class ChangeStreamReader {
      * @private
      */
     static _readFetchOneAndResume(conn, cfg) {
-        const version = cfg.version ?? "default";
-        jsTest.log.info(
-            `ChangeStreamReader [${cfg.instanceName}]: Starting fetch-one-and-resume, expecting ${cfg.numberOfEventsToRead} events, version: ${version}`,
-        );
+        jsTest.log.info("ChangeStreamReader Starting fetch-one-and-resume", cfg);
         let resumeToken = null;
         let useStartAfter = false;
         const readEventTypes = [];
@@ -182,9 +261,12 @@ class ChangeStreamReader {
             const isInvalidate = isInvalidated(changeEvent);
             readEventTypes.push(changeEvent.operationType);
 
-            jsTest.log.info(
-                `ChangeStreamReader [${cfg.instanceName}]: Read event ${count + 1}/${cfg.numberOfEventsToRead}: ${changeEvent.operationType}`,
-            );
+            jsTest.log.info("ChangeStreamReader Read event", {
+                instanceName: cfg.instanceName,
+                eventIndex: count + 1,
+                total: cfg.numberOfEventsToRead,
+                operationType: changeEvent.operationType,
+            });
 
             // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
@@ -199,7 +281,10 @@ class ChangeStreamReader {
             cst.cleanUp();
         }
 
-        jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
+        jsTest.log.info("ChangeStreamReader Read events", {
+            instanceName: cfg.instanceName,
+            readEventTypes,
+        });
     }
 }
 

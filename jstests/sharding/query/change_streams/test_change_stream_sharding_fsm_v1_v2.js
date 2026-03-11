@@ -2,7 +2,13 @@
  * FSM test: V1 vs V2 change stream version comparison.
  * Verifies that both change stream versions produce identical events.
  *
- * @tags: [assumes_balancer_off, does_not_support_stepdowns, uses_change_streams]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns,
+ *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_sharding,
+ *   uses_change_streams,
+ * ]
  */
 import {ChangeStreamReader} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {Verifier, SequentialPairwiseFetchingTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";

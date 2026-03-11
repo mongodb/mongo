@@ -2,7 +2,12 @@
  * FSM test: Continuous reading mode verification.
  * Verifies that continuous reading mode captures all expected events.
  *
- * @tags: [assumes_balancer_off, does_not_support_stepdowns, uses_change_streams]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns,
+ *   requires_sharding,
+ *   uses_change_streams,
+ * ]
  */
 import {ChangeStreamReader} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {Verifier, SingleReaderVerificationTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";

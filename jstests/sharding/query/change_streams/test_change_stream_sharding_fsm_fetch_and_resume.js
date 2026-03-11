@@ -2,7 +2,12 @@
  * FSM test: Fetch-one-and-resume vs continuous reading mode comparison.
  * Verifies that both reading modes produce equivalent results.
  *
- * @tags: [assumes_balancer_off, does_not_support_stepdowns, uses_change_streams]
+ * @tags: [
+ *   assumes_balancer_off,
+ *   does_not_support_stepdowns,
+ *   requires_sharding,
+ *   uses_change_streams,
+ * ]
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";

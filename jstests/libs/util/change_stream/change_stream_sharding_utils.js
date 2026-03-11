@@ -12,7 +12,7 @@ import {Connector} from "jstests/libs/util/change_stream/change_stream_connector
 import {ChangeEventMatcher} from "jstests/libs/util/change_stream/change_stream_event.js";
 import {SingleChangeStreamMatcher} from "jstests/libs/util/change_stream/change_stream_matcher.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
+import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 
 // Default test database name - all tests use this.
@@ -163,6 +163,7 @@ function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1
         const setupResult = setupFsmTest(ctx, testName);
         testFn(fsmSt, setupResult, instancesToCleanup);
     } finally {
+        ChangeStreamReader.joinAll();
         for (const instanceName of instancesToCleanup) {
             Connector.cleanup(fsmSt.s, instanceName);
         }

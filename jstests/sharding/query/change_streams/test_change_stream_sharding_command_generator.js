@@ -330,6 +330,8 @@ describe("ChangeStreamReader integration", function () {
     });
 
     afterEach(() => {
+        ChangeStreamReader.joinAll();
+
         // Clean up any change events captured during the test.
         for (const instanceName of this.instanceNamesToCleanup) {
             Connector.cleanup(this.st.s, instanceName);
@@ -393,6 +395,7 @@ describe("ChangeStreamReader integration", function () {
         };
 
         ChangeStreamReader.run(ctx.st.s, readerConfig);
+        Connector.waitForDone(ctx.st.s, readerInstanceName);
 
         // Read captured events.
         const capturedRecords = Connector.readAllChangeEvents(ctx.st.s, readerInstanceName);
@@ -511,6 +514,7 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`Running ChangeStreamReader.run()...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
+        Connector.waitForDone(this.st.s, readerInstanceName);
 
         // Read captured events from Connector.
         const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
@@ -609,6 +613,7 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`Running ChangeStreamReader in FetchOneAndResume mode...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
+        Connector.waitForDone(this.st.s, readerInstanceName);
 
         const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
         const events = capturedRecords.map((r) => r.changeEvent);
@@ -677,6 +682,7 @@ describe("ChangeStreamReader integration", function () {
 
         jsTest.log.info(`Running ChangeStreamReader with database-level watch...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
+        Connector.waitForDone(this.st.s, readerInstanceName);
 
         const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
 
