@@ -47,15 +47,28 @@ const bIndexQuery = {a: {$gte: 1}, b: {$gte: 14500}, c: 1};
 // Predicate on 'a' is more selective.
 const aIndexQuery = {a: {$gte: 100}, b: {$gte: 1}, c: 1};
 
+const aIndexQueryExpectedCQLog =
+    "ns=test.cbr_plan_cacheTree: $and\n    c $eq 1.0\n    a $gte 100.0\n    b $gte 1.0\nSort: {}\nProj: {}\n";
+// We expect this to be increased only on 'aIndexQuery', if CBR is enabled.
+let expectedNumCBRChoseCachedPlanLogs = 0;
+
+function runCommand(command, isMultiplanning) {
+    command();
+    if (!isMultiplanning) {
+        expectedNumCBRChoseCachedPlanLogs += 1;
+    }
+}
+
 function runInitialCacheTest(isMultiplanning) {
     jsTest.log.info("Running runInitialCacheTest", {isMultiplanning});
     coll.getPlanCache().clear();
 
     // aIndexQuery will hit the CBR fallback mechanism.
-    let _ = coll.find(aIndexQuery).toArray();
+    runCommand(() => coll.find(aIndexQuery).toArray(), isMultiplanning);
 
     // The plan cache should now hold an inactive entry.
     let entry = getCachedPlanForQuery(db, coll, aIndexQuery);
+
     let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     assert.eq(entry.isActive, false);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
@@ -64,15 +77,23 @@ function runInitialCacheTest(isMultiplanning) {
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
+    } else {
+        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
+        assert(
+            checkLog.checkContainsWithCountJson(
+                db,
+                11918000,
+                {query: aIndexQueryExpectedCQLog},
+                expectedNumCBRChoseCachedPlanLogs,
+            ),
+        );
     }
 
-    // TODO SERVER-119180: Add a log line that shows when CBR chose a plan that's cached.
-    // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
-    // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
-
     // Running the query again activates the cache entry.
-    _ = coll.find(aIndexQuery).toArray();
+    runCommand(() => coll.find(aIndexQuery).toArray(), isMultiplanning);
+
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
+
     assert.eq(entry.isActive, true);
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
 
@@ -80,18 +101,24 @@ function runInitialCacheTest(isMultiplanning) {
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
+    } else {
+        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
+        assert(
+            checkLog.checkContainsWithCountJson(
+                db,
+                11918000,
+                {query: aIndexQueryExpectedCQLog},
+                expectedNumCBRChoseCachedPlanLogs,
+            ),
+        );
     }
-
-    // TODO SERVER-119180: Add a log line that shows when CBR chose a plan that's cached.
-    // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
-    // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
 }
 
 function runReplanningTest(isMultiplanning) {
     jsTest.log.info("Running runReplanningTest", {isMultiplanning});
     coll.getPlanCache().clear();
 
-    let _ = coll.find(bIndexQuery).toArray();
+    coll.find(bIndexQuery).toArray();
     let currWorks = isSbeEnabled ? 1000 : 501;
 
     // The plan cache should now hold an inactive entry.
@@ -104,7 +131,7 @@ function runReplanningTest(isMultiplanning) {
     assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
 
     // Running the query again activates the cache entry.
-    _ = coll.find(bIndexQuery).toArray();
+    coll.find(bIndexQuery).toArray();
     entry = getCachedPlanForQuery(db, coll, bIndexQuery);
     assert.eq(entry.isActive, true);
     assert.eq(entry.works, entryWorks);
@@ -119,7 +146,7 @@ function runReplanningTest(isMultiplanning) {
 
     // This query will trigger replanning since the number of works is vastly higher than the cached plan.
     // Because of this, the new plan will not be active at first.
-    _ = coll.find(aIndexQuery).toArray();
+    runCommand(() => coll.find(aIndexQuery).toArray(), isMultiplanning);
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, false);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
@@ -129,11 +156,17 @@ function runReplanningTest(isMultiplanning) {
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
         assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
+    } else {
+        // TODO SERVER-116684: Check the output of $planCacheStats instead, and confirm that the plan in the cache has costs.
+        assert(
+            checkLog.checkContainsWithCountJson(
+                db,
+                11918000,
+                {query: aIndexQueryExpectedCQLog},
+                expectedNumCBRChoseCachedPlanLogs,
+            ),
+        );
     }
-
-    // TODO SERVER-119180: Add a log line that shows when CBR chose a new plan via replanning.
-    // And then check that log here when CBR is enabled. Note that it would be more ideal to check $planCacheStats here,
-    // but the output of that does not differentiate between a CBR-chosen plan and a multiplanner-chosen plan.
 
     const growthCoefficient = assert.commandWorked(
         db.adminCommand({getParameter: 1, internalQueryCacheWorksGrowthCoefficient: 1}),
@@ -151,7 +184,8 @@ function runReplanningTest(isMultiplanning) {
         currWorks *= growthCoefficient;
         assert.eq(entry.works, currWorks);
 
-        _ = coll.find(aIndexQuery).toArray();
+        runCommand(() => coll.find(aIndexQuery).toArray(), isMultiplanning);
+
         entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     }
 
@@ -176,6 +210,7 @@ const prevQueryKnobs = assert.commandWorked(
 );
 
 const prevSequentialSamplingScan = prevQueryKnobs.internalQuerySamplingBySequentialScan;
+let originalLogLevel = assert.commandWorked(db.setLogLevel(2, "query")).was.query.verbosity;
 
 // Use deterministic sampling to avoid plan instability.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
@@ -212,4 +247,6 @@ try {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: prevSequentialSamplingScan}),
     );
+
+    assert.commandWorked(db.setLogLevel(originalLogLevel, "query"));
 }

@@ -488,9 +488,18 @@ public:
         // 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
         // 'needsWorksMeasured' and the number of rejected plans and instead only check whether
         // we should force running the single solution plan through the multiplanner.
-        return (!internalQueryDisablePlanCache.load() && hasRejectedPlans &&
-                rankerResult.needsWorksMeasured) ||
-            forceMultiPlanForSingleSolution;
+        auto shouldMultiplanForCBRChosenPlan = !internalQueryDisablePlanCache.load() &&
+            hasRejectedPlans && rankerResult.needsWorksMeasured;
+
+        // We will not cache for an explain command.
+        if (!expCtx->getExplain().has_value() && shouldMultiplanForCBRChosenPlan) {
+            LOGV2_DEBUG(11918000,
+                        2,
+                        "CBR picked the best plan and it will be cached via multiplanning",
+                        "query"_attr = cq->toString());
+        }
+
+        return shouldMultiplanForCBRChosenPlan || forceMultiPlanForSingleSolution;
     }
 
 protected:
