@@ -1,22 +1,81 @@
 /**
- * Writer class for executing commands and notifying completion.
- * Executes a sequence of commands and signals test completion via the Connector.
+ * Writer class for executing commands in a background Thread.
+ *
+ * Commands are passed as BSON specs (from Command.toSpec()) and reconstructed
+ * in the thread via Command.fromSpec(). Callers synchronize via Connector.waitForDone().
  */
 import {Connector} from "jstests/libs/util/change_stream/change_stream_connector.js";
+import {Command} from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 class Writer {
+    static _threads = [];
+
     /**
-     * Execute all commands in the configuration and notify completion.
      * @param {Mongo} conn - MongoDB connection.
-     * @param {Object} config - Configuration object containing:
-     *   - commands: Array of command objects to execute
-     *   - instanceName: Name of the test instance (also used as collection name)
+     * @param {string} instanceName - Writer instance name for Connector signaling.
+     * @param {Array} commands - Command objects (converted to specs before crossing thread boundary).
+     * @param {number} seed - Random seed for reproducibility.
      */
-    static run(conn, config) {
-        for (const cmd of config.commands) {
+    static run(conn, instanceName, commands, seed) {
+        const config = {
+            instanceName,
+            commandSpecs: commands.map((cmd) => cmd.toSpec()),
+            seed,
+        };
+        const host = conn.host;
+        const thread = new Thread(
+            async function (host, config) {
+                const {Writer} = await import("jstests/libs/util/change_stream/change_stream_writer.js");
+                const {Connector} = await import("jstests/libs/util/change_stream/change_stream_connector.js");
+                const conn = new Mongo(host);
+                try {
+                    Writer._execute(conn, config);
+                } catch (e) {
+                    jsTest.log.info("Writer thread FAILED", {
+                        instanceName: config.instanceName,
+                        error: e.toString(),
+                        stack: e.stack,
+                    });
+                    Connector.notifyDone(conn, config.instanceName);
+                    throw e;
+                }
+            },
+            host,
+            config,
+        );
+        thread.start();
+        Writer._threads.push(thread);
+    }
+
+    static joinAll() {
+        const threads = Writer._threads;
+        Writer._threads = [];
+        const errors = [];
+        for (const t of threads) {
+            try {
+                t.join();
+            } catch (e) {
+                errors.push(e);
+            }
+        }
+        if (errors.length > 0) {
+            jsTest.log.error("Writer threads failed", {errors});
+            throw new Error(`${errors.length} Writer thread(s) failed: ${errors.map((e) => e.toString()).join("; ")}`);
+        }
+    }
+
+    static _execute(conn, config) {
+        Random.setRandomSeed(config.seed);
+
+        for (let i = 0; i < config.commandSpecs.length; i++) {
+            const spec = config.commandSpecs[i];
+            const cmd = Command.fromSpec(spec);
+            jsTest.log.info(`Writer [${config.instanceName}]: cmd[${i}] ${spec.type}`);
             cmd.execute(conn);
         }
 
+        jsTest.log.info(`Writer [${config.instanceName}]: all ${config.commandSpecs.length} commands completed`);
         Connector.notifyDone(conn, config.instanceName);
     }
 }

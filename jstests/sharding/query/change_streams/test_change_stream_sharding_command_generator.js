@@ -35,17 +35,10 @@ import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js"
  * @param {string} instanceName - Writer instance name
  * @returns {Object} Writer configuration
  */
-function setupWriterConfig(seed, params, instanceName) {
+function generateCommands(seed, params) {
     const generator = new ShardingCommandGenerator(seed);
     const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
-    const commands = generator.generateCommands(testModel, params);
-
-    jsTest.log.info(`Generated ${commands.length} commands for ${instanceName}`);
-
-    return {
-        commands: commands,
-        instanceName: instanceName,
-    };
+    return generator.generateCommands(testModel, params);
 }
 
 describe("ShardingCommandGenerator", function () {
@@ -56,6 +49,10 @@ describe("ShardingCommandGenerator", function () {
 
     after(() => {
         this.st.stop();
+    });
+
+    afterEach(() => {
+        Writer.joinAll();
     });
 
     it("should generate identical command sequences for the same seed", () => {
@@ -106,58 +103,48 @@ describe("ShardingCommandGenerator", function () {
         // Clean database.
         assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
 
-        // Set up writer config.
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
-        const config = setupWriterConfig(TEST_SEED, params, instanceName);
+        const commands = generateCommands(TEST_SEED, params);
 
-        // Execute commands using Writer.
-        jsTest.log.info(`Executing ${config.commands.length} commands using Writer...`);
-        Writer.run(this.st.s, config);
+        jsTest.log.info(`Executing ${commands.length} commands using Writer...`);
+        Writer.run(this.st.s, instanceName, commands, TEST_SEED);
+        Connector.waitForDone(this.st.s, instanceName);
         jsTest.log.info(`✓ Writer completed successfully`);
-
-        // Verify completion was signaled.
-        assert(Connector.isDone(this.st.s, instanceName), "Writer should have signaled completion");
-        jsTest.log.info(`✓ Completion was properly signaled`);
     });
 
-    it("should execute two Writers sequentially on different collections", () => {
-        const dbName = TEST_DB;
-        const collName1 = "test_coll_multi_writer1";
-        const collName2 = "test_coll_multi_writer2";
+    it("should execute two Writers in parallel on different databases", () => {
+        const dbNameA = TEST_DB + "_writer_a";
+        const dbNameB = TEST_DB + "_writer_b";
+        const collName = "test_coll";
         const writerA = "writer_instance_A";
         const writerB = "writer_instance_B";
 
-        jsTest.log.info(`Testing two Writers running sequentially (seed: ${TEST_SEED})`);
+        jsTest.log.info(`Testing two Writers running in parallel (seed: ${TEST_SEED})`);
 
-        // Clean database.
-        assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
+        assert.commandWorked(this.st.s.getDB(dbNameA).dropDatabase());
+        assert.commandWorked(this.st.s.getDB(dbNameB).dropDatabase());
 
-        // Set up writer configs with same seed but different collections.
-        const writerAParams = new ShardingCommandGeneratorParams(dbName, collName1, this.shards);
-        const writerBParams = new ShardingCommandGeneratorParams(dbName, collName2, this.shards);
+        // Separate databases so DropDatabaseCommand in one writer doesn't affect the other.
+        const writerAParams = new ShardingCommandGeneratorParams(dbNameA, collName, this.shards);
+        const writerBParams = new ShardingCommandGeneratorParams(dbNameB, collName, this.shards);
 
-        const writerAConfig = setupWriterConfig(TEST_SEED, writerAParams, writerA);
-        const writerBConfig = setupWriterConfig(TEST_SEED, writerBParams, writerB);
+        const commandsA = generateCommands(TEST_SEED, writerAParams);
+        const commandsB = generateCommands(TEST_SEED, writerBParams);
 
-        // Execute writers sequentially.
-        Writer.run(this.st.s, writerAConfig);
-        Writer.run(this.st.s, writerBConfig);
+        Writer.run(this.st.s, writerA, commandsA, TEST_SEED);
+        Writer.run(this.st.s, writerB, commandsB, TEST_SEED);
 
-        // Verify both completed.
-        assert(Connector.isDone(this.st.s, writerA), "Writer A should be done");
-        assert(Connector.isDone(this.st.s, writerB), "Writer B should be done");
+        Connector.waitForDone(this.st.s, writerA);
+        const countA = this.st.s.getDB(dbNameA).getCollection(collName).countDocuments({});
+        Connector.waitForDone(this.st.s, writerB);
+        const countB = this.st.s.getDB(dbNameB).getCollection(collName).countDocuments({});
 
-        // Verify both collections have same count (same command sequence).
-        const testDb = this.st.s.getDB(dbName);
-        const coll1 = testDb.getCollection(collName1);
-        const coll2 = testDb.getCollection(collName2);
-        assert.eq(
-            coll1.countDocuments({}),
-            coll2.countDocuments({}),
-            "Both collections should have same document count",
-        );
+        assert.eq(countA, countB, "Both writers should produce same document count");
 
-        jsTest.log.info("✓ Sequential multi-Writer test passed");
+        assert.commandWorked(this.st.s.getDB(dbNameA).dropDatabase());
+        assert.commandWorked(this.st.s.getDB(dbNameB).dropDatabase());
+
+        jsTest.log.info("✓ Parallel multi-Writer test passed");
     });
 
     it("runs the graph mutator and exercises all FSM transitions", () => {
@@ -330,6 +317,7 @@ describe("ChangeStreamReader integration", function () {
     });
 
     afterEach(() => {
+        Writer.joinAll();
         ChangeStreamReader.joinAll();
 
         // Clean up any change events captured during the test.
@@ -374,15 +362,9 @@ describe("ChangeStreamReader integration", function () {
         for (let i = 0; i < numInserts; i++) {
             insertCommands.push(new InsertDocCommand(dbName, collName, ctx.shards, {exists: true, nonEmpty: i > 0}));
         }
-        const writerConfig = {
-            commands: insertCommands,
-            instanceName: writerInstanceName,
-        };
-        Writer.run(ctx.st.s, writerConfig);
+        Writer.run(ctx.st.s, writerInstanceName, insertCommands, TEST_SEED);
 
-        // Use ChangeStreamReader with specified mode.
         // showExpandedEvents: false because this test verifies DML (insert) behavior only.
-        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -454,20 +436,10 @@ describe("ChangeStreamReader integration", function () {
             return db.getCollection(collName);
         };
 
-        /**
-         * Execute commands using Writer.
-         */
         const executeCommands = () => {
-            const writerConfig = {
-                commands: commands,
-                instanceName: writerInstanceName,
-            };
-            Writer.run(this.st.s, writerConfig);
+            Writer.run(this.st.s, writerInstanceName, commands, TEST_SEED);
         };
 
-        /**
-         * Verify events match expected types.
-         */
         const verifyEvents = (events) => {
             jsTest.log.info(`Verifying ${events.length} events`);
             events.forEach((event, idx) => {
@@ -559,11 +531,7 @@ describe("ChangeStreamReader integration", function () {
         };
 
         const executeCommands = () => {
-            const writerConfig = {
-                commands: commands,
-                instanceName: writerInstanceName,
-            };
-            Writer.run(this.st.s, writerConfig);
+            Writer.run(this.st.s, writerInstanceName, commands, TEST_SEED);
         };
 
         const verifyEvents = (events, testName) => {
@@ -660,15 +628,9 @@ describe("ChangeStreamReader integration", function () {
         // Get cluster time strictly AFTER setup.
         const startTime = getCurrentClusterTime(this.st.s, dbName);
 
-        // Execute commands using Writer.
-        const writerConfig = {
-            commands: commands,
-            instanceName: writerInstanceName,
-        };
-        Writer.run(this.st.s, writerConfig);
+        Writer.run(this.st.s, writerInstanceName, commands, TEST_SEED);
 
         // showExpandedEvents: false because this test verifies DML (insert) behavior only.
-        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kDb,

@@ -73,6 +73,23 @@ class Command {
         throw new Error("execute() method must be implemented by subclasses");
     }
 
+    static kRetryableDDLErrors = [ErrorCodes.ReshardCollectionInProgress];
+
+    /**
+     * Wrap a DDL operation with retry logic to handle transient conflicts
+     * (e.g., concurrent DDL on the same namespace from parallel writers).
+     */
+    _executeWithDDLRetry(connection, fn) {
+        assert.soonRetryOnAcceptableErrors(
+            () => {
+                fn(connection);
+                return true;
+            },
+            Command.kRetryableDDLErrors,
+            `${this.toString()}: timed out after retries`,
+        );
+    }
+
     /**
      * String representation of the command.
      */
@@ -91,6 +108,28 @@ class Command {
     getChangeEvents(watchMode) {
         throw new Error("getChangeEvents() must be implemented by subclasses");
     }
+
+    /**
+     * Serialize this command to a plain BSON-serializable object.
+     * Used to pass commands across Thread boundaries.
+     */
+    toSpec() {
+        return {type: this.constructor.name, ...this};
+    }
+
+    /** Registry populated by _registerAll() at module load time. */
+    static _registry = {};
+
+    /**
+     * Reconstruct a Command instance from a spec produced by toSpec().
+     */
+    static fromSpec(spec) {
+        const cls = Command._registry[spec.type];
+        assert(cls, `Unknown command type: ${spec.type}. Did you forget to add it to _registerAll()?`);
+        const cmd = Object.create(cls.prototype);
+        Object.assign(cmd, spec);
+        return cmd;
+    }
 }
 
 /**
@@ -100,11 +139,13 @@ class Command {
 class InsertDocCommand extends Command {
     constructor(dbName, collName, shardSet, collectionCtx) {
         super(dbName, collName, shardSet, collectionCtx);
-        // Create the document in the constructor so it can be used by both execute() and getChangeEvents().
+        // Use ObjectId().str to get the unique hex string. The ObjectId BSON wrapper
+        // itself becomes `{}` when passed through Thread boundaries, but the extracted
+        // string survives serialization and is globally unique.
+        const id = new ObjectId().str;
         this.document = {
-            _id: new ObjectId(),
-            timestamp: new Date(),
-            data: `test_data`,
+            _id: id,
+            data: `data_${id}`,
         };
     }
 
@@ -215,8 +256,7 @@ class DropCollectionCommand extends Command {
     }
 
     execute(connection) {
-        const db = connection.getDB(this.dbName);
-        assert.commandWorked(db.runCommand({drop: this.collName}));
+        assert.commandWorked(connection.getDB(this.dbName).runCommand({drop: this.collName}));
     }
 
     toString() {
@@ -263,8 +303,9 @@ class DropDatabaseCommand extends Command {
     }
 
     execute(connection) {
-        const db = connection.getDB(this.dbName);
-        assert.commandWorked(db.dropDatabase());
+        this._executeWithDDLRetry(connection, (conn) => {
+            assert.commandWorked(conn.getDB(this.dbName).dropDatabase());
+        });
     }
 
     toString() {
@@ -486,21 +527,20 @@ class ShardCollectionCommand extends Command {
     }
 
     execute(connection) {
-        const ns = `${this.dbName}.${this.collName}`;
+        this._executeWithDDLRetry(connection, (conn) => {
+            const ns = `${this.dbName}.${this.collName}`;
 
-        // Configure zones to restrict data to shardSet shards only.
-        _configureZonesForShardSet(connection, ns, this.shardKey, this.shardSet);
+            _configureZonesForShardSet(conn, ns, this.shardKey, this.shardSet);
 
-        // Shard the collection with presplitHashedZones for hashed keys.
-        // Note: presplitHashedZones only works when collection is empty.
-        const shardCmd = {
-            shardCollection: ns,
-            key: this.shardKey,
-        };
-        if (isHashedShardKey(this.shardKey) && !this.collectionCtx.nonEmpty) {
-            shardCmd.presplitHashedZones = true;
-        }
-        assert.commandWorked(connection.adminCommand(shardCmd));
+            const shardCmd = {
+                shardCollection: ns,
+                key: this.shardKey,
+            };
+            if (isHashedShardKey(this.shardKey) && !this.collectionCtx.nonEmpty) {
+                shardCmd.presplitHashedZones = true;
+            }
+            assert.commandWorked(conn.adminCommand(shardCmd));
+        });
     }
 
     toString() {
@@ -556,15 +596,20 @@ class UnshardCollectionCommand extends Command {
     }
 
     execute(connection) {
-        assert(this.shardSet && this.shardSet.length > 0, "Shard set must be provided for UnshardCollectionCommand");
-        const targetShard = this.shardSet[Random.randInt(this.shardSet.length)];
-        const ns = `${this.dbName}.${this.collName}`;
-        assert.commandWorked(
-            connection.adminCommand({
-                unshardCollection: ns,
-                toShard: targetShard._id,
-            }),
-        );
+        this._executeWithDDLRetry(connection, (conn) => {
+            assert(
+                this.shardSet && this.shardSet.length > 0,
+                "Shard set must be provided for UnshardCollectionCommand",
+            );
+            const targetShard = this.shardSet[Random.randInt(this.shardSet.length)];
+            const ns = `${this.dbName}.${this.collName}`;
+            assert.commandWorked(
+                conn.adminCommand({
+                    unshardCollection: ns,
+                    toShard: targetShard._id,
+                }),
+            );
+        });
     }
 
     toString() {
@@ -618,31 +663,30 @@ class ReshardCollectionCommand extends Command {
     }
 
     execute(connection) {
-        const ns = `${this.dbName}.${this.collName}`;
+        this._executeWithDDLRetry(connection, (conn) => {
+            const ns = `${this.dbName}.${this.collName}`;
 
-        // Update zones for the new shard key to restrict data to shardSet shards.
-        _configureZonesForShardSet(connection, ns, this.newShardKey, this.shardSet);
+            _configureZonesForShardSet(conn, ns, this.newShardKey, this.shardSet);
 
-        // Build the zones array for reshardCollection.
-        const zoneName = _getZoneName(ns);
-        const shardKeyField = Object.keys(this.newShardKey)[0];
-        const zones = [
-            {
-                zone: zoneName,
-                min: {[shardKeyField]: MinKey},
-                max: {[shardKeyField]: MaxKey},
-            },
-        ];
+            const zoneName = _getZoneName(ns);
+            const shardKeyField = Object.keys(this.newShardKey)[0];
+            const zones = [
+                {
+                    zone: zoneName,
+                    min: {[shardKeyField]: MinKey},
+                    max: {[shardKeyField]: MaxKey},
+                },
+            ];
 
-        // Reshard with zones. numInitialChunks requires zones parameter to be passed directly.
-        assert.commandWorked(
-            connection.adminCommand({
-                reshardCollection: ns,
-                key: this.newShardKey,
-                numInitialChunks: ReshardCollectionCommand.numInitialChunks,
-                zones: zones,
-            }),
-        );
+            assert.commandWorked(
+                conn.adminCommand({
+                    reshardCollection: ns,
+                    key: this.newShardKey,
+                    numInitialChunks: ReshardCollectionCommand.numInitialChunks,
+                    zones: zones,
+                }),
+            );
+        });
     }
 
     toString() {
@@ -886,7 +930,33 @@ class MoveChunkCommand extends MoveCommandBase {
     }
 }
 
-// Export classes.
+function _registerAll(...classes) {
+    for (const cls of classes) {
+        Command._registry[cls.name] = cls;
+    }
+}
+
+_registerAll(
+    InsertDocCommand,
+    CreateDatabaseCommand,
+    CreateIndexCommand,
+    DropIndexCommand,
+    ShardCollectionCommand,
+    CreateUnsplittableCollectionCommand,
+    CreateUntrackedCollectionCommand,
+    DropCollectionCommand,
+    DropDatabaseCommand,
+    RenameToNonExistentSameDbCommand,
+    RenameToExistentSameDbCommand,
+    RenameToNonExistentDifferentDbCommand,
+    RenameToExistentDifferentDbCommand,
+    UnshardCollectionCommand,
+    ReshardCollectionCommand,
+    MovePrimaryCommand,
+    MoveCollectionCommand,
+    MoveChunkCommand,
+);
+
 export {
     Command,
     InsertDocCommand,

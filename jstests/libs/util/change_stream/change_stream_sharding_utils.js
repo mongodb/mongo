@@ -18,7 +18,7 @@ import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 // Default test database name - all tests use this.
 const TEST_DB = "test_cs";
 
-// Default seed for deterministic test reproducibility.
+// TODO SERVER-121182: Replace with a random seed (already logged in setupFsmTest).
 const TEST_SEED = 42;
 
 /**
@@ -98,6 +98,7 @@ function cleanupTestDatabase(mongos, dbName = TEST_DB) {
  * @returns {Object} Setup result with dbName, collName, commands, expectedEvents, baseReaderConfig, createInstanceName
  */
 function setupFsmTest(ctx, testName) {
+    jsTest.log.info(`FSM ${testName}: using seed ${TEST_SEED}`);
     Random.setRandomSeed(TEST_SEED);
     const dbName = TEST_DB;
     const collName = "test_coll_fsm";
@@ -123,7 +124,7 @@ function setupFsmTest(ctx, testName) {
 
     const writerInstanceName = `writer_${testName}_${ts}`;
     ctx.fsmInstancesToCleanup.push(writerInstanceName);
-    Writer.run(ctx.fsmSt.s, {commands, instanceName: writerInstanceName});
+    Writer.run(ctx.fsmSt.s, writerInstanceName, commands, TEST_SEED);
 
     const createInstanceName = (prefix) => {
         const name = `${prefix}_${testName}_${ts}`;
@@ -153,6 +154,26 @@ function setupFsmTest(ctx, testName) {
  * @param {number} [shards=1] - Number of shards
  * @param {number} [rsNodes=1] - Number of replica set nodes per shard
  */
+/**
+ * Run each teardown step independently so one failure doesn't prevent the rest.
+ * Collects all errors and throws a combined error at the end.
+ */
+function runTeardownSteps(...steps) {
+    const errors = [];
+    for (const step of steps) {
+        try {
+            step();
+        } catch (e) {
+            errors.push(e);
+        }
+    }
+    if (errors.length > 0) {
+        throw new Error(
+            `Teardown encountered ${errors.length} error(s):\n` + errors.map((e) => e.toString()).join("\n"),
+        );
+    }
+}
+
 function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1) {
     const fsmSt = createShardingTest(mongos, shards, rsNodes);
     const fsmShards = assert.commandWorked(fsmSt.s.adminCommand({listShards: 1})).shards;
@@ -163,12 +184,13 @@ function runWithFsmCluster(testName, testFn, mongos = 1, shards = 1, rsNodes = 1
         const setupResult = setupFsmTest(ctx, testName);
         testFn(fsmSt, setupResult, instancesToCleanup);
     } finally {
-        ChangeStreamReader.joinAll();
-        for (const instanceName of instancesToCleanup) {
-            Connector.cleanup(fsmSt.s, instanceName);
-        }
-        fsmSt.s.getDB(TEST_DB).dropDatabase();
-        fsmSt.stop();
+        runTeardownSteps(
+            () => Writer.joinAll(),
+            () => ChangeStreamReader.joinAll(),
+            ...instancesToCleanup.map((name) => () => Connector.cleanup(fsmSt.s, name)),
+            () => fsmSt.s.getDB(TEST_DB).dropDatabase(),
+            () => fsmSt.stop(),
+        );
     }
 }
 
