@@ -115,6 +115,6 @@ translateOptionsIfClusterByDefault(const NamespaceString& nss,
  *  - throws NamespaceExists error if a collection or view already exists with different options
  */
 MONGO_MOD_PRIVATE
-bool checkNamespaceAndTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
-                                                     const CreateCommand& cmd);
+bool checkNamespaceAndTimeseriesBucketsAlreadyExistsAndCompatible(OperationContext* opCtx,
+                                                                  const CreateCommand& cmd);
 }  // namespace mongo

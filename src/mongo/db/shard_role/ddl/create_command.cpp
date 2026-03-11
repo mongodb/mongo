@@ -391,7 +391,8 @@ public:
             // if a collection with identical options already exists.
             if (createStatus == ErrorCodes::NamespaceExists &&
                 !opCtx->inMultiDocumentTransaction()) {
-                auto collExists = checkNamespaceAndTimeseriesBucketsAlreadyExists(opCtx, cmd);
+                auto collExists =
+                    checkNamespaceAndTimeseriesBucketsAlreadyExistsAndCompatible(opCtx, cmd);
                 if (!collExists) {
                     // If the collection/view disappeared in between attempting to create it
                     // and retrieving the options, just propagate the original error.

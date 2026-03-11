@@ -424,9 +424,19 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status _createView(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const CollectionOptions& collectionOptions) {
+/**
+ * Internal function to create a view.
+ *
+ * Not idempotent, it will throw NamepsaceExists error if the same namespace already exists.
+ * Does not retry in case of WriteConflict error.
+ *
+ * The @viewAcq parameter is not used in practice but it is here to force callers to acquire the
+ * corresponding view before creation attempt.
+ */
+Status _createViewNoRetry(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const CollectionOrViewAcquisition& viewAcq,
+                          const CollectionOptions& collectionOptions) {
     // system.profile will have new document inserts due to profiling. Inserts aren't supported
     // on views.
     uassert(ErrorCodes::IllegalOperation,
@@ -440,84 +450,267 @@ Status _createView(OperationContext* opCtx,
             "The 'clusteredIndex' option is not supported with views",
             !collectionOptions.clusteredIndex);
 
-    // This must be checked before we take locks in order to avoid attempting to take multiple locks
-    // on the <db>.system.views namespace: first a IX lock on 'ns' and then a X lock on the database
-    // system.views collection.
+    // This must be checked before we acquire X lock on the '<db>.system.views' namespace in order
+    // to avoid taking multiple locks on this namespace.
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Cannot create a view called '" << nss.coll()
                           << "': this is a reserved system namespace",
             !nss.isSystemDotViews());
 
-    return writeConflictRetry(opCtx, "create", nss, [&] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        // Operations all lock system.views in the end to prevent deadlock.
-        Lock::CollectionLock systemViewsLock(
-            opCtx, NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X);
+    // Operations all lock system.views in the end to prevent deadlock.
+    Lock::CollectionLock systemViewsLock(
+        opCtx, NamespaceString::makeSystemDotViewsNamespace(nss.dbName()), MODE_X);
 
-        auto db = autoDb.ensureDbExists(opCtx);
+    // The caller provided a CollectionOrViewAcquisition, which means a catalog instance is stashed
+    // in the snapshot/RecoveryUnit associated to the OperationContext.
+    //
+    // Abandon that snapshot so that all subsequent catalog accesses use one taken after we lock
+    // system.views in MODE_X. This guarantees the new snapshot reflects all modifications to
+    // system.views made so far.
+    //
+    // See SERVER-117478 for additional details.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-        if (opCtx->writesAreReplicated() &&
-            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            return Status(ErrorCodes::NotWritablePrimary,
-                          str::stream() << "Not primary while creating collection "
-                                        << nss.toStringForErrorMsg());
-        }
+    auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
 
-        // This is a top-level handler for collection creation name conflicts. New commands coming
-        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
-        // on conflict.
-        Status statusNss = catalog::checkIfNamespaceExists(opCtx, nss);
-        if (!statusNss.isOK()) {
-            return statusNss;
-        }
+    if (opCtx->writesAreReplicated() &&
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
+        return Status(ErrorCodes::NotWritablePrimary,
+                      str::stream()
+                          << "Not primary while creating collection " << nss.toStringForErrorMsg());
+    }
 
-        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-            ->checkShardVersionOrThrow(opCtx);
+    // This is a top-level handler for collection creation name conflicts. New commands coming
+    // in, or commands that generated a WriteConflict must return a NamespaceExists error here
+    // on conflict.
+    Status statusNss = catalog::checkIfNamespaceExists(opCtx, nss);
+    if (!statusNss.isOK()) {
+        return statusNss;
+    }
 
-        if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
-            return Status(ErrorCodes::InvalidOptions,
-                          "option not supported on a view: changeStreamPreAndPostImages");
-        }
+    if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "option not supported on a view: changeStreamPreAndPostImages");
+    }
 
-        db->createSystemDotViewsIfNecessary(opCtx);
+    db->createSystemDotViewsIfNecessary(opCtx);
 
-        WriteUnitOfWork wunit(opCtx);
+    WriteUnitOfWork wunit(opCtx);
 
-        AutoStatsTracker statsTracker(opCtx,
-                                      nss,
-                                      Top::LockType::NotLocked,
-                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                          .getDatabaseProfileLevel(nss.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
 
-        // If the view creation rolls back, ensure that the Top entry created for the view is
-        // deleted.
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [nss](OperationContext* opCtx) { Top::getDecoration(opCtx).collectionDropped(nss); });
+    // If the view creation rolls back, ensure that the Top entry created for the view is
+    // deleted.
+    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        [nss](OperationContext* opCtx) { Top::getDecoration(opCtx).collectionDropped(nss); });
 
-        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&nss](const BSONObj& data) {
-                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
-                return fpNss == nss;
-            }))) {
-            LOGV2(5490200,
-                  "failTimeseriesViewCreation fail point enabled. Failing creation of view "
-                  "definition.");
-            return Status{ErrorCodes::OperationFailed,
-                          str::stream() << "View definition " << nss.toStringForErrorMsg()
-                                        << " creation failed due to 'failTimeseriesViewCreation' "
-                                           "fail point enabled."};
-        }
+    if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&nss](const BSONObj& data) {
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+            return fpNss == nss;
+        }))) {
+        LOGV2(5490200,
+              "failTimeseriesViewCreation fail point enabled. Failing creation of view "
+              "definition.");
+        return Status{ErrorCodes::OperationFailed,
+                      str::stream() << "View definition " << nss.toStringForErrorMsg()
+                                    << " creation failed due to 'failTimeseriesViewCreation' "
+                                       "fail point enabled."};
+    }
 
-        // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
-        // because 'userCreateNS' may throw a WriteConflictException.
-        Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
-        if (!status.isOK()) {
-            return status;
-        }
-        wunit.commit();
+    Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+    if (!status.isOK()) {
+        return status;
+    }
+    wunit.commit();
 
-        return Status::OK();
+    return Status::OK();
+}
+
+BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
+    BSONArrayBuilder builder;
+    for (const auto& stage : pipeline) {
+        builder.append(stage);
+    }
+    return builder.obj();
+}
+
+/**
+ * Given a create timeseries collection options generates and returns the corresponding options for
+ * the creation of the corresponding timeseries view.
+ */
+CollectionOptions _generateLegacyTimeseriesViewOptions(const NamespaceString& bucketsNss,
+                                                       const CollectionOptions& requestedOptions) {
+    tassert(12128201,
+            "Attempt to generate legacy timeseries view options from a non-timeseries collection "
+            "options",
+            requestedOptions.timeseries.has_value());
+    tassert(12128202,
+            "Attempt to generate legacy timeseries view options with a target namespace that is "
+            "not system.buckets timeseries",
+            bucketsNss.isTimeseriesBucketsCollection());
+    CollectionOptions timeseriesViewOptions;
+    timeseriesViewOptions.viewOn = std::string{bucketsNss.coll()};
+    timeseriesViewOptions.collation = requestedOptions.collation;
+
+    constexpr bool asArray = true;
+    auto timeseriesOptions = requestedOptions.timeseries.get();
+    uassertStatusOK(timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+    timeseriesViewOptions.pipeline = timeseries::generateViewPipeline(timeseriesOptions, asArray);
+
+    return timeseriesViewOptions;
+}
+
+/**
+ * Check if an existing collection `collPtr` is compatible with the given collection options.
+ *
+ * Throws NamespaceExists error if some of the requested options are not compatible with the already
+ * existing collection.
+ */
+void checkExistingCollectionIsCompatible(OperationContext* opCtx,
+                                         const CollectionPtr& collPtr,
+                                         const CollectionOptions& requestedOptions) {
+    tassert(9086200, "Cannot check options for a non-existing collection", collPtr);
+
+    const auto& nss = collPtr->ns();
+
+    uassert(ErrorCodes::NamespaceExists,
+            fmt::format("namespace '{}' already exists, but is a collection rather than a view",
+                        nss.toStringForErrorMsg()),
+            !requestedOptions.isView());
+
+    auto normalizedRequestedOptions = requestedOptions;
+    auto existingOptions = collPtr->getCollectionOptions();
+    if (requestedOptions.timeseries) {
+        uassert(ErrorCodes::NamespaceExists,
+                fmt::format("namespace '{}' already exists, but is not a timeseries collection",
+                            nss.toStringForErrorMsg()),
+                existingOptions.timeseries);
+
+        // When checking that the options for the timeseries collection are the same,
+        // filter out the options that were internally generated upon time-series
+        // collection creation (i.e. were not specified by the user).
+        uassertStatusOK(timeseries::validateAndSetBucketingParameters(
+            normalizedRequestedOptions.timeseries.get()));
+        existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
+            false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
+    }
+
+    const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+    uassert(ErrorCodes::NamespaceExists,
+            fmt::format("namespace '{}' already exists, but with different options: {}",
+                        nss.toStringForErrorMsg(),
+                        existingOptions.toBSON().toString()),
+            normalizedRequestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
+}
+
+/**
+ * Check if an existing view is compatible with the given collection options.
+ *
+ * Throws NamespaceExists error if some of the requested options are not compatible with the already
+ * existing view.
+ */
+void checkExistingViewIsCompatible(OperationContext* opCtx,
+                                   const ViewDefinition& view,
+                                   const CollectionOptions& requestedOptions) {
+    tassert(11896700,
+            fmt::format("Found existing view under prohibited timeseries buckets namespace '{}'",
+                        view.name().toStringForErrorMsg()),
+            !view.name().isTimeseriesBucketsCollection());
+
+    uassert(ErrorCodes::NamespaceExists,
+            fmt::format("namespace '{}' already exists, but is a view",
+                        view.name().toStringForErrorMsg()),
+            requestedOptions.isView());
+
+    auto requestedTargetNss =
+        NamespaceStringUtil::deserialize(view.name().dbName(), requestedOptions.viewOn);
+    uassert(ErrorCodes::NamespaceExists,
+            fmt::format("namespace '{}' already exists, but is a view on '{}' rather than '{}'",
+                        view.name().toStringForErrorMsg(),
+                        view.viewOn().toStringForErrorMsg(),
+                        requestedTargetNss.toStringForErrorMsg()),
+            view.viewOn() == requestedTargetNss);
+
+    // Skip view pipeline equality check for legacy timeseries views.
+    // The format of the auto-generated pipeline used for timeseries views have evolved during
+    // past versions. For instance in SERVER-55315 (v6.0) we removed the 'exclude' field. Thus we
+    // can't easily compare them.
+    //
+    // TODO SERVER-118970 always perform pipeline check once 9.0 becomes last LTS and all timeseries
+    // collection are viewless.
+    if (!requestedOptions.timeseries) {
+        auto existingPipeline = pipelineAsBsonObj(view.pipeline());
+        uassert(ErrorCodes::NamespaceExists,
+                fmt::format("namespace '{}' already exists, but with pipeline {} rather than {}",
+                            view.name().toStringForErrorMsg(),
+                            existingPipeline.toString(),
+                            requestedOptions.pipeline.toString()),
+                existingPipeline.woCompare(requestedOptions.pipeline) == 0);
+    }
+    const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+    // Note: the server can add more values to collation options which were not
+    // specified in the original user request. Use the collator to check for
+    // equivalence.
+    auto newCollator = requestedOptions.collation.isEmpty()
+        ? nullptr
+        : uassertStatusOK(collatorFactory->makeFromBSON(requestedOptions.collation));
+
+    if (!CollatorInterface::collatorsMatch(view.defaultCollator(), newCollator.get())) {
+        const auto defaultCollatorSpecBSON =
+            view.defaultCollator() ? view.defaultCollator()->getSpec().toBSON() : BSONObj();
+        uasserted(
+            ErrorCodes::NamespaceExists,
+            fmt::format("namespace '{}' already exists, but with collation: {} rather than {}",
+                        view.name().toStringForErrorMsg(),
+                        defaultCollatorSpecBSON.toString(),
+                        requestedOptions.collation.toString()));
+    }
+}
+
+/**
+ * Check if we already have a collection or view compatible with the given create command.
+ *
+ * Returns:
+ *  - false: if no conflicting collection or view exists
+ *  - true: if the namespace already exists and has same options
+ *  - throws NamespaceExists error if a collection or view already exists with different options
+ */
+bool checkNamespaceAlreadyExistsAndCompatible(OperationContext* opCtx,
+                                              const CollectionOrViewAcquisition& collAcq,
+                                              const CollectionOptions& requestedOptions) {
+    if (collAcq.collectionExists()) {
+        checkExistingCollectionIsCompatible(opCtx, collAcq.getCollectionPtr(), requestedOptions);
+        return true;
+    } else if (collAcq.isView()) {
+        const auto& requestedViewOptions = [&] {
+            if (requestedOptions.timeseries) {
+                return _generateLegacyTimeseriesViewOptions(
+                    collAcq.nss().makeTimeseriesBucketsNamespace(), requestedOptions);
+            }
+            return requestedOptions;
+        }();
+        checkExistingViewIsCompatible(
+            opCtx, collAcq.getView().getViewDefinition(), requestedViewOptions);
+        return true;
+    }
+
+    return false;
+}
+
+Status _createView(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const CollectionOptions& collectionOptions) {
+    return writeConflictRetry(opCtx, "create view", nss, [&] {
+        auto viewAcq = acquireCollectionOrView(opCtx,
+                                               CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                                   opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                               MODE_IX);
+        return _createViewNoRetry(opCtx, nss, viewAcq, collectionOptions);
     });
 }
 
@@ -708,12 +901,7 @@ Status _createLegacyTimeseries(
         return bucketCreationStatus;
     }
 
-
-    CollectionOptions viewOptions;
-    viewOptions.viewOn = std::string{bucketsNs.coll()};
-    viewOptions.collation = options.collation;
-    constexpr bool asArray = true;
-    viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
+    CollectionOptions viewOptions = _generateLegacyTimeseriesViewOptions(bucketsNs, options);
 
     const auto viewCreationStatus = _createView(opCtx, ns, viewOptions);
     if (!viewCreationStatus.isOK()) {
@@ -926,130 +1114,10 @@ std::pair<CollectionOptions, boost::optional<BSONObj>> getCollectionOptionsFromC
     return {std::move(options), std::move(idIndex)};
 }
 
-BSONObj pipelineAsBsonObj(const std::vector<BSONObj>& pipeline) {
-    BSONArrayBuilder builder;
-    for (const auto& stage : pipeline) {
-        builder.append(stage);
-    }
-    return builder.obj();
-}
-
-/**
- * Check if we already have a collection or view compatible with the given create command.
- *
- * Returns:
- *  - false: if no conflicting collection or view exists
- *  - true: if the namespace already exists and has same options
- *  - throws NamespaceExists error if a collection or view already exists with different options
- */
-bool checkNamespaceAlreadyExists(OperationContext* opCtx,
-                                 const CollectionOrViewAcquisition& collAcq,
-                                 const CollectionOptions& requestedOptions) {
-
-    auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
-
-    if (collAcq.collectionExists()) {
-        auto existingOptions = collAcq.getCollectionPtr()->getCollectionOptions();
-
-        uassert(ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but is a collection rather than a view",
-                            collAcq.nss().toStringForErrorMsg()),
-                !requestedOptions.isView());
-
-        auto normalizedRequestedOptions = requestedOptions;
-        if (requestedOptions.timeseries) {
-            uassert(ErrorCodes::NamespaceExists,
-                    fmt::format("namespace '{}' already exists, but is not a timeseries collection",
-                                collAcq.nss().toStringForErrorMsg()),
-                    existingOptions.timeseries);
-
-            // When checking that the options for the timeseries collection are the same,
-            // filter out the options that were internally generated upon time-series
-            // collection creation (i.e. were not specified by the user).
-            uassertStatusOK(timeseries::validateAndSetBucketingParameters(
-                normalizedRequestedOptions.timeseries.get()));
-            existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
-                false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
-        }
-
-        uassert(ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but with different options: {}",
-                            collAcq.nss().toStringForErrorMsg(),
-                            existingOptions.toBSON().toString()),
-                normalizedRequestedOptions.matchesStorageOptions(existingOptions, collatorFactory));
-        return true;
-    } else if (collAcq.isView()) {
-        auto& view = collAcq.getView().getViewDefinition();
-
-        tassert(
-            11896700,
-            fmt::format("Found existing view under prohibited timeseries buckets namespace '{}'",
-                        collAcq.nss().toStringForErrorMsg()),
-            !collAcq.nss().isTimeseriesBucketsCollection());
-
-        // TODO SERVER-118970 update this logic once all timeseries collection are viewless
-        if (requestedOptions.timeseries) {
-            uassert(
-                ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but is a view on '{}' rather than "
-                            "a timeseries view on '{}'",
-                            collAcq.nss().toStringForErrorMsg(),
-                            view.viewOn().toStringForErrorMsg(),
-                            collAcq.nss().makeTimeseriesBucketsNamespace().toStringForErrorMsg()),
-                view.viewOn() == collAcq.nss().makeTimeseriesBucketsNamespace());
-        } else {
-            uassert(ErrorCodes::NamespaceExists,
-                    fmt::format("namespace '{}' already exists, but is a view",
-                                collAcq.nss().toStringForErrorMsg()),
-                    requestedOptions.isView());
-
-            auto requestedTargetNss =
-                NamespaceStringUtil::deserialize(collAcq.nss().dbName(), requestedOptions.viewOn);
-            uassert(
-                ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but is a view on '{}' rather than '{}'",
-                            collAcq.nss().toStringForErrorMsg(),
-                            view.viewOn().toStringForErrorMsg(),
-                            requestedTargetNss.toStringForErrorMsg()),
-                view.viewOn() == requestedTargetNss);
-
-            auto existingPipeline = pipelineAsBsonObj(view.pipeline());
-            uassert(
-                ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but with pipeline {} rather than {}",
-                            collAcq.nss().toStringForErrorMsg(),
-                            existingPipeline.toString(),
-                            requestedOptions.pipeline.toString()),
-                existingPipeline.woCompare(requestedOptions.pipeline) == 0);
-        }
-
-        // Note: the server can add more values to collation options which were not
-        // specified in the original user request. Use the collator to check for
-        // equivalence.
-        auto newCollator = requestedOptions.collation.isEmpty()
-            ? nullptr
-            : uassertStatusOK(collatorFactory->makeFromBSON(requestedOptions.collation));
-
-        if (!CollatorInterface::collatorsMatch(view.defaultCollator(), newCollator.get())) {
-            const auto defaultCollatorSpecBSON =
-                view.defaultCollator() ? view.defaultCollator()->getSpec().toBSON() : BSONObj();
-            uasserted(
-                ErrorCodes::NamespaceExists,
-                fmt::format("namespace '{}' already exists, but with collation: {} rather than {}",
-                            collAcq.nss().toStringForErrorMsg(),
-                            defaultCollatorSpecBSON.toString(),
-                            requestedOptions.collation.toString()));
-        }
-        return true;
-    }
-
-    return false;
-}
-
 }  // namespace
 
-bool checkNamespaceAndTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
-                                                     const CreateCommand& cmd) {
+bool checkNamespaceAndTimeseriesBucketsAlreadyExistsAndCompatible(OperationContext* opCtx,
+                                                                  const CreateCommand& cmd) {
     auto originalNss = cmd.getNamespace();
     auto mainNss = originalNss.isTimeseriesBucketsCollection()
         ? originalNss.getTimeseriesViewNamespace()
@@ -1073,19 +1141,20 @@ bool checkNamespaceAndTimeseriesBucketsAlreadyExists(OperationContext* opCtx,
     // TODO SERVER-118970 update this logic once all timeseries collection are viewless
     // By then we should never receive a create operation over a system.buckets collection.
     if (originalNss.isTimeseriesBucketsCollection() &&
-        checkNamespaceAlreadyExists(opCtx, bucketsAcq, requestedOptions)) {
+        checkNamespaceAlreadyExistsAndCompatible(opCtx, bucketsAcq, requestedOptions)) {
         // The create command is targeting directly a system.buckets collections.  The timeseries
         // buckets collection already exists and is compatible with the requested options.
         return true;
     }
 
-    auto mainNssAlreadyExists = checkNamespaceAlreadyExists(opCtx, mainAcq, requestedOptions);
+    auto mainNssAlreadyExists =
+        checkNamespaceAlreadyExistsAndCompatible(opCtx, mainAcq, requestedOptions);
 
     // TODO SERVER-118970 remove this if altogether once all timeseries collections are viewless
     if (requestedOptions.timeseries && mainNssAlreadyExists && mainAcq.isView()) {
         // we found a compatible timeseries view, thus we need to check for the corresponding
         // timeseries buckets namespace
-        return checkNamespaceAlreadyExists(opCtx, bucketsAcq, requestedOptions);
+        return checkNamespaceAlreadyExistsAndCompatible(opCtx, bucketsAcq, requestedOptions);
     }
 
     return mainNssAlreadyExists;
