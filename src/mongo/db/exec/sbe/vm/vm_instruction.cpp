@@ -380,8 +380,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         dispatchTable.begin(), dispatchTable.end(), [](void* p) { return p == nullptr; }));
 #endif
 
+    // Validate that 'position' points into the code segment or directly behind it.
+    tassert(12123300,
+            "position points outside of bytecode fragment",
+            position >= 0 && static_cast<size_t>(position) <= code->instrs().size());
+
     auto pcPointer = code->instrs().data() + position;
-    auto pcEnd = pcPointer + code->instrs().size();
+    auto pcEnd = code->instrs().data() + code->instrs().size();
 
     /*
      * When support is available for the computed goto extension, use it to execute SBE bytecode
