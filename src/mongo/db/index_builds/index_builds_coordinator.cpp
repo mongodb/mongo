@@ -3674,12 +3674,14 @@ IndexBuildsCoordinator::prepareSpecListForCreate(OperationContext* opCtx,
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     for (const BSONObj& spec : filteredSpecs) {
         if (spec[kUniqueFieldName].trueValue() || spec[kPrepareUniqueFieldName].trueValue()) {
+            auto collation = spec["collation"].ok() ? spec["collation"].Obj() : BSONObj();
             uassert(
                 ErrorCodes::CannotCreateIndex,
                 str::stream() << "cannot create index with 'unique' or 'prepareUnique' option over "
                               << spec[kKeyFieldName].Obj() << " with shard key pattern "
-                              << shardKeyPattern.toBSON(),
-                shardKeyPattern.isIndexUniquenessCompatible(spec[kKeyFieldName].Obj()));
+                              << shardKeyPattern.toBSON() << " and collation " << collation,
+                shardKeyPattern.isIndexUniquenessAndCollationCompatible(spec[kKeyFieldName].Obj(),
+                                                                        collation));
         }
     }
 
