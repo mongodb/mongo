@@ -22,7 +22,7 @@ Extension 'mongo-shell-debugger-1.0.0.vsix' was successfully installed.
 
 > **One-time setup: Launch Configuration**
 >
-> Add a "mongo-shell" type configuration in your `~/.vscode/launch.json` file:
+> Add a "mongo-shell" type configuration in your `.vscode/launch.json` file:
 >
 > ```json
 > {

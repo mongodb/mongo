@@ -8,7 +8,7 @@
 console.log("Starting MongoDB Shell JS Debug Adapter...");
 
 const {MongoShellDebugSession} = require("./session");
-const {DebugSession} = require("vscode-debugadapter");
+const {DebugSession} = require("@vscode/debugadapter");
 
 // Start the debug session
 DebugSession.run(MongoShellDebugSession);

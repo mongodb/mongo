@@ -13,7 +13,7 @@ const {
     OutputEvent,
     StoppedEvent,
     // https://github.com/microsoft/vscode-debugadapter-node/tree/main/adapter
-} = require("vscode-debugadapter");
+} = require("@vscode/debugadapter");
 const net = require("net");
 
 // ID of the associated thread in the debug protocol.

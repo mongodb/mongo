@@ -2,7 +2,7 @@
   "name": "mongo-shell-debugger",
   "displayName": "MongoDB Shell Debugger",
   "description": "Debug JavaScript code in MongoDB Shell (MozJS)",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "publisher": "mongodb",
   "repository": {
     "type": "git",
@@ -23,6 +23,7 @@
   "main": "./extension.js",
   "files": [
     "*.js",
+    "node_modules",
     "README.md"
   ],
   "activationEvents": [
@@ -82,10 +83,13 @@
     ]
   },
   "scripts": {
-    "package": "vsce package --skip-license"
+    "package": "vsce package --skip-license --dependencies --baseImagesUrl https://github.com/mongodb/mongo/raw/HEAD/src/mongo/shell/debugger/vscode/"
   },
   "devDependencies": {
     "@types/vscode": "^1.75.0",
     "@vscode/vsce": "^3.7.1"
+  },
+  "dependencies": {
+    "@vscode/debugadapter": "^1.68.0"
   }
 }
