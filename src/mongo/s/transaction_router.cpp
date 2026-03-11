@@ -152,29 +152,46 @@ BSONObj sendCommitDirectlyToShards(OperationContext* opCtx, const std::vector<Sh
         Shard::RetryPolicy::kIdempotent);
 
     BSONObj lastResult;
+    bool errorOccurred = false;
+    Status errStatus(Status::OK());
 
     // Receive the responses.
     while (!ars.done()) {
         auto response = ars.next();
 
-        uassertStatusOK(response.swResponse);
-        lastResult = response.swResponse.getValue().data;
+        // Skip validation if an error already occurred. But we still want to consume all responses
+        // from the ars to make sure all the commit requests were sent to the different shards.
+        // If we miss sending a commit request to one of the shards, this shard will be left in a
+        // dangling state and have a lock on the collection(s) targeted by this transaction.
+        if (errorOccurred)
+            continue;
 
-        // If any shard returned an error, return the error immediately.
-        const auto commandStatus = getStatusFromCommandResult(lastResult);
-        if (!commandStatus.isOK()) {
-            return lastResult;
+        if (!response.swResponse.isOK()) {
+            errorOccurred = true;
+            errStatus = response.swResponse.getStatus();
+            continue;
         }
 
-        // If any participant had a writeConcern error, return the participant's writeConcern
-        // error immediately.
+        lastResult = response.swResponse.getValue().data;
+
+        const auto commandStatus = getStatusFromCommandResult(lastResult);
+        if (!commandStatus.isOK()) {
+            errorOccurred = true;
+            continue;
+        }
+
         const auto writeConcernStatus = getWriteConcernStatusFromCommandResult(lastResult);
         if (!writeConcernStatus.isOK()) {
-            return lastResult;
+            errorOccurred = true;
+            continue;
         }
     }
 
+    // Throws if one of the responses was not valid.
+    uassertStatusOK(errStatus);
+
     // If all the responses were ok, return the last response.
+    // If an error occurred, return the first error.
     return lastResult;
 }
 

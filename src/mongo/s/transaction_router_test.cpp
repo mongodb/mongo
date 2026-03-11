@@ -122,6 +122,7 @@ const BSONObj kOkReadOnlyTrueAdditionalParticipantsShard1 = BSON(
 
 const BSONObj kNoSuchTransactionResponse =
     BSON("ok" << 0 << "code" << ErrorCodes::NoSuchTransaction);
+const BSONObj kInternalErrorResponse = BSON("ok" << 0 << "code" << ErrorCodes::InternalError);
 const BSONObj kDummyFindCmd = BSON("find" << "dummy");
 
 class TransactionRouterTest : public virtual service_context_test::RouterRoleOverride,
@@ -2559,6 +2560,127 @@ TEST_F(
     });
 
     future.default_timed_get();
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       SendCommitDirectlyForMultipleParticipantsReadOnlyReplyWithError) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyTrueResponse));
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard2,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyTrueResponse));
+
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setRecoveryShardId(shard1);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    auto future =
+        launchAsync([&] { return txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    // The requests are scheduled in a nondeterministic order, since they are scheduled by iterating
+    // over the participant list, which is stored as a hash map. So, just check that all expected
+    // hosts and ports were targeted at the end.
+    std::set<HostAndPort> expectedHostAndPorts{hostAndPort1, hostAndPort2};
+    std::set<HostAndPort> seenHostAndPorts;
+    for (int i = 0; i < 2; i++) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            seenHostAndPorts.insert(request.target);
+
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "commitTransaction");
+
+            // The shard with hostAndPort1 is expected to be the coordinator.
+            checkSessionDetails(
+                request.cmdObj, getSessionId(), txnNum, (request.target == hostAndPort1));
+
+            if (i == 0) {
+                return kInternalErrorResponse;
+            } else {
+                return kOkReadOnlyTrueResponse;
+            }
+        });
+    }
+
+    auto response = future.default_timed_get();
+    ASSERT_BSONOBJ_EQ(kInternalErrorResponse, response);
+    ASSERT_EQ(expectedHostAndPorts, seenHostAndPorts);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       SendCommitDirectlyForMultipleParticipantsReadOnlyNoResponse) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyTrueResponse));
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        shard2,
+        TransactionRouter::Router::parseParticipantResponseMetadata(kOkReadOnlyTrueResponse));
+
+    TxnRecoveryToken recoveryToken;
+    recoveryToken.setRecoveryShardId(shard1);
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kCommit);
+
+    auto future =
+        launchAsync([&] { return txnRouter.commitTransaction(operationContext(), recoveryToken); });
+
+    // The requests are scheduled in a nondeterministic order, since they are scheduled by iterating
+    // over the participant list, which is stored as a hash map. So, just check that all expected
+    // hosts and ports were targeted at the end.
+    std::set<HostAndPort> expectedHostAndPorts{hostAndPort1, hostAndPort2};
+    std::set<HostAndPort> seenHostAndPorts;
+    for (int i = 0; i < 2; i++) {
+        onCommand([&](const RemoteCommandRequest& request) {
+            seenHostAndPorts.insert(request.target);
+
+            ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
+
+            auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
+            ASSERT_EQ(cmdName, "commitTransaction");
+
+            // The shard with hostAndPort1 is expected to be the coordinator.
+            checkSessionDetails(
+                request.cmdObj, getSessionId(), txnNum, (request.target == hostAndPort1));
+
+            if (i == 0) {
+                return StatusWith<BSONObj>(ErrorCodes::FailedToParse, std::string("error"));
+            } else {
+                return StatusWith<BSONObj>(kOkReadOnlyTrueResponse);
+            }
+        });
+    }
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::FailedToParse);
+    ASSERT_EQ(expectedHostAndPorts, seenHostAndPorts);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
