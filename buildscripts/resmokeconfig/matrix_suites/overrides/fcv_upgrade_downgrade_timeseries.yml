@@ -25,12 +25,6 @@
 - name: sharded_collections_exclude_files
   value:
     exclude_files:
-      # TODO SERVER-120883 include these tests once the timeseriesBucketsMayHaveMixedSchemaData property is set
-      # appropriately in the global catalog upon timeseries upgrade.
-      - jstests/core/timeseries/ddl/timeseries_index_partial.js
-      - jstests/core/timeseries/query/timeseries_partial_index_opt.js
-      - jstests/core/timeseries/query/timeseries_find.js
-
       # TODO SERVER-120567 include these tests once view over timeseries works properly
       # when executed concurrently with FCV upgrade/downgrade
       - jstests/core/timeseries/query/timeseries_view_aggregate.js
