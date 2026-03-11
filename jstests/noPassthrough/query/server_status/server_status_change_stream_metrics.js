@@ -61,9 +61,18 @@ function checkOplogMetrics(db, changeStream, previousMetrics, expectedDocsReturn
     // collections), we can only guarantee that there are *at least* the expected number of
     // documents scanned.
     assert.lte(expectedDocsScanned, oplogDocsScanned);
+
     // Check oplog stats are added to total stats.
-    assert.eq(oplogDocsReturned, newMetrics.document.returned - previousMetrics.document.returned);
-    assert.eq(oplogDocsScanned, newMetrics.queryExecutor.scannedObjects - previousMetrics.queryExecutor.scannedObjects);
+    // 'serverStatus' metrics do not provide a consistent snapshot of the metrics. The individual metrics are updated
+    // one by one, so an operation can have them only partially updated when the metrics are retrieved.
+    // The oplog metrics are updated on the server side only after the 'document.returned' and 'queryExecuted.scannedObjects'
+    // counters are increased. That means we can only guarantee that the oplog values are at most as high as the other
+    // execution metrics.
+    assert.lte(oplogDocsReturned, newMetrics.document.returned - previousMetrics.document.returned);
+    assert.lte(
+        oplogDocsScanned,
+        newMetrics.queryExecutor.scannedObjects - previousMetrics.queryExecutor.scannedObjects,
+    );
 
     changeStream.close();
 }
