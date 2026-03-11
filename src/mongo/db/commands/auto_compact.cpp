@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/compact_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -54,6 +55,13 @@ Status autoCompact(OperationContext* opCtx,
     if (!opCtx->getServiceContext()->userWritesAllowed()) {
         return Status(ErrorCodes::IllegalOperation,
                       "autoCompact can only be executed when writes are allowed");
+    }
+
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    if (!provider.supportsCompaction()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "autoCompact is not supported in this storage mode: "
+                                    << provider.name());
     }
 
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
