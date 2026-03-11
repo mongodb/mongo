@@ -397,4 +397,49 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
         << seenFastCountOps;
 }
 
+void assertReplicatedSizeCountMeta(const repl::OplogEntry& oplogEntry, int32_t expectedSizeDelta) {
+    const auto entrySizeMeta = oplogEntry.getSizeMetadata();
+    ASSERT_TRUE(entrySizeMeta.has_value());
+    ASSERT_EQ(entrySizeMeta->getSz(), expectedSizeDelta);
+}
+
+void assertOpMatchesSpec(const repl::OplogEntry& oplogEntry, const OpValidationSpec& entrySpec) {
+    ASSERT_EQ(entrySpec.uuid, oplogEntry.getUuid());
+    ASSERT_EQ(entrySpec.opType, oplogEntry.getOpType());
+    assertReplicatedSizeCountMeta(oplogEntry, entrySpec.expectedSizeDelta);
+}
+
+void assertOpsMatchSpecs(const std::vector<repl::OplogEntry>& oplogEntries,
+                         const std::vector<OpValidationSpec>& entrySpecs) {
+    ASSERT_EQ(entrySpecs.size(), oplogEntries.size());
+    for (size_t i = 0; i < oplogEntries.size(); i++) {
+        const auto opSpec = entrySpecs[i];
+        const auto opEntry = oplogEntries[i];
+        replicated_fast_count_test_helpers::assertOpMatchesSpec(opEntry, opSpec);
+    }
+}
+
+boost::optional<repl::OplogEntry> getMostRecentOplogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const repl::OpTypeEnum& opType) {
+    repl::OplogInterfaceLocal oplogInterface(opCtx);
+    auto oplogIter = oplogInterface.makeIterator();
+
+    while (true) {
+        auto sw = oplogIter->next();
+        if (sw.getStatus() == ErrorCodes::CollectionIsEmpty) {
+            break;
+        }
+        ASSERT_OK(sw.getStatus());
+        auto obj = sw.getValue().first.getOwned();
+
+        auto swEntry = repl::OplogEntry::parse(obj);
+        ASSERT_OK(swEntry.getStatus());
+        const auto& entry = swEntry.getValue();
+        if (entry.getNss() == nss && entry.getOpType() == opType) {
+            return entry;
+        }
+    }
+    return boost::none;  // No oplog entry found.
+}
 }  // namespace mongo::replicated_fast_count_test_helpers

@@ -770,7 +770,9 @@ void updateDocument(OperationContext* opCtx,
 
     invariant(sid == shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId());
     args->updatedDoc = newDoc;
-
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        onUpdateArgs.replicatedSizeDelta = newDoc.objsize() - oldDoc.value().objsize();
+    }
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
     if (isReplicatedFastCountEnabled(opCtx)) {
@@ -836,6 +838,9 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
     args->updatedDoc = newDoc;
     args->changeStreamPreAndPostImagesEnabledForCollection =
         collection->isChangeStreamPreAndPostImagesEnabled();
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        onUpdateArgs.replicatedSizeDelta = newDoc.objsize() - oldDoc.value().objsize();
+    }
 
     // don't update the indexes if kUpdateNoIndexes has been specified.
     if (opDiff != kUpdateNoIndexes) {
@@ -924,6 +929,10 @@ void deleteDocument(OperationContext* opCtx,
     OplogDeleteEntryArgs deleteArgs;
     if (collection->areRecordIdsReplicated()) {
         deleteArgs.replicatedRecordId = loc;
+    }
+
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        deleteArgs.replicatedSizeDelta = -doc.value().objsize();
     }
 
     invariant(doc.value().isOwned(),
@@ -1030,6 +1039,7 @@ repl::OpTime truncateRange(OperationContext* opCtx,
                                                     -docsDeleted);
     uassertStatusOK(status);
 
+    // TODO SERVER-121175: Add size delta to onTruncateRange oplog entries.
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
     if (isReplicatedFastCountEnabled(opCtx)) {

@@ -33,6 +33,7 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -91,6 +92,7 @@ protected:
         setUpReplicatedFastCount(_opCtx);
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
+        ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
     }
 
     void tearDown() override {
@@ -193,6 +195,8 @@ protected:
     ReplicatedFastCountManager* _fastCountManager = nullptr;
     NamespaceString _nss1 =
         NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll1");
+    NamespaceString _nss2 =
+        NamespaceString::createNamespaceString_forTest("replicated_fast_count_test", "coll2");
 };
 
 TEST_F(ReplicatedFastCountTxnFixture,
@@ -335,6 +339,121 @@ TEST_F(ReplicatedFastCountTxnFixture, FastCountResetForSessionBetweenTransaction
         replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 0, 0);
     });
     abortTxn(_opCtx, sessionId, txnNumber);
+}
+
+TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadataSingleInsert) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber(0);
+    UUID uuid = UUID::gen();
+    beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
+        AutoGetCollection coll(opCtx1, _nss1, LockMode::MODE_IX);
+        {
+            WriteUnitOfWork wuow{opCtx1};
+            ASSERT_OK(Helpers::insert(opCtx1, *coll, doc));
+            wuow.commit();
+        }
+        uuid = coll->uuid();
+    });
+    continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext*) {});
+
+    const auto applyOpsOplogEntry =
+        replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
+
+    // Confirm the applyOps entry generated includes replicated size count metadata in the inner
+    // insert oplog entry.
+    ASSERT_EQ(1, innerEntries.size());
+    const auto insertOp = innerEntries[0];
+    replicated_fast_count_test_helpers::assertOpMatchesSpec(
+        insertOp,
+        {.uuid = uuid, .opType = repl::OpTypeEnum::kInsert, .expectedSizeDelta = doc.objsize()});
+}
+
+TEST_F(ReplicatedFastCountTxnFixture, ApplyOpsOplogEntryContainsSizeDeltaMetadata) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    auto doc = BSON("_id" << 0 << "x" << 1);
+    std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{};
+
+    auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNumber(0);
+
+    // Perform ops on 2 separate collections as a part of the same multi-doc transaction.
+    beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
+        // '_nss1': Insert op and update op.
+        {
+            auto coll = acquireCollection(opCtx1,
+                                          CollectionAcquisitionRequest::fromOpCtx(
+                                              opCtx1, _nss1, AcquisitionPrerequisites::kWrite),
+                                          MODE_IX);
+            const auto uuid = coll.getCollectionPtr()->uuid();
+            {
+                WriteUnitOfWork wuow{opCtx1};
+                ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc));
+                wuow.commit();
+                expectedOps.push_back({.uuid = uuid,
+                                       .opType = repl::OpTypeEnum::kInsert,
+                                       .expectedSizeDelta = doc.objsize()});
+            }
+
+            {
+                WriteUnitOfWork wuow{opCtx1};
+                Helpers::update(opCtx1,
+                                coll,
+                                BSON("_id" << 0),
+                                BSON("$set" << BSON("note" << "Make Doc Larger")));
+                wuow.commit();
+                const auto docSizeAfterUpdate =
+                    Helpers::findOneForTesting(opCtx1, coll, BSON("_id" << 0)).objsize();
+                const auto updateDelta = docSizeAfterUpdate - doc.objsize();
+                expectedOps.push_back({.uuid = uuid,
+                                       .opType = repl::OpTypeEnum::kUpdate,
+                                       .expectedSizeDelta = updateDelta});
+            }
+        }
+
+        // '_nss2': Insert op and delete op.
+        {
+            auto coll = acquireCollection(opCtx1,
+                                          CollectionAcquisitionRequest::fromOpCtx(
+                                              opCtx1, _nss2, AcquisitionPrerequisites::kWrite),
+                                          MODE_IX);
+            const auto uuid = coll.getCollectionPtr()->uuid();
+            {
+                WriteUnitOfWork wuow{opCtx1};
+                ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc));
+                wuow.commit();
+                expectedOps.push_back({.uuid = uuid,
+                                       .opType = repl::OpTypeEnum::kInsert,
+                                       .expectedSizeDelta = doc.objsize()});
+            }
+            const auto rid = Helpers::findOne(opCtx1, coll, BSON("_id" << 0));
+            ASSERT_FALSE(rid.isNull());
+
+            {
+                WriteUnitOfWork wuow{opCtx1};
+                Helpers::deleteByRid(opCtx1, coll, rid);
+                wuow.commit();
+                expectedOps.push_back({.uuid = uuid,
+                                       .opType = repl::OpTypeEnum::kDelete,
+                                       .expectedSizeDelta = -doc.objsize()});
+            }
+        }
+    });
+    continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext*) {});
+
+    // The applyOps should cover both namespaces, so searching by _nss1 should be sufficient.
+    const auto applyOpsOplogEntry =
+        replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
+    replicated_fast_count_test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
 }
 
 }  // namespace

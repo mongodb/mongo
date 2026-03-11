@@ -733,6 +733,10 @@ boost::optional<bool> OplogEntry::getIsTimeseries() const {
     return _entry.getIsTimeseries();
 }
 
+boost::optional<OplogEntrySizeMetadata> OplogEntry::getSizeMetadata() const {
+    return _entry.getSizeMetadata();
+}
+
 boost::optional<bool> OplogEntry::getUpsert() const {
     return _entry.getUpsert();
 }

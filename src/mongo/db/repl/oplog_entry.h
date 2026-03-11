@@ -374,6 +374,10 @@ public:
         getDurableReplOperation().setIsTimeseries(true);
     }
 
+    void setSizeMetadata(boost::optional<OplogEntrySizeMetadata> value) & {
+        getDurableReplOperation().setSizeMetadata(std::move(value));
+    }
+
     void setRecordId(RecordId rid) & {
         getDurableReplOperation().setRecordId(std::move(rid));
     }
@@ -528,6 +532,7 @@ public:
     using MutableOplogEntry::kPreImageOpTimeFieldName;
     using MutableOplogEntry::kPrevWriteOpTimeInTransactionFieldName;
     using MutableOplogEntry::kSessionIdFieldName;
+    using MutableOplogEntry::kSizeMetadataFieldName;
     using MutableOplogEntry::kStatementIdsFieldName;
     using MutableOplogEntry::kTermFieldName;
     using MutableOplogEntry::kTidFieldName;
@@ -558,6 +563,7 @@ public:
     using MutableOplogEntry::getPreImageOpTime;
     using MutableOplogEntry::getPrevWriteOpTimeInTransaction;
     using MutableOplogEntry::getSessionId;
+    using MutableOplogEntry::getSizeMetadata;
     using MutableOplogEntry::getStatementIds;
     using MutableOplogEntry::getTerm;
     using MutableOplogEntry::getTid;
@@ -812,6 +818,7 @@ public:
     static constexpr auto kObject2FieldName = DurableOplogEntry::kObject2FieldName;
     static constexpr auto kObjectFieldName = DurableOplogEntry::kObjectFieldName;
     static constexpr auto kIsTimeseriesFieldName = DurableOplogEntry::kIsTimeseriesFieldName;
+    static constexpr auto kSizeMetadataFieldName = DurableOplogEntry::kSizeMetadataFieldName;
     static constexpr auto kOperationSessionInfoFieldName =
         DurableOplogEntry::kOperationSessionInfoFieldName;
     static constexpr auto kOplogVersion = DurableOplogEntry::kOplogVersion;
@@ -872,6 +879,7 @@ public:
     const mongo::BSONObj& getObject() const;
     const boost::optional<mongo::BSONObj>& getObject2() const;
     boost::optional<bool> getIsTimeseries() const;
+    boost::optional<mongo::repl::OplogEntrySizeMetadata> getSizeMetadata() const;
     boost::optional<bool> getUpsert() const;
     const boost::optional<mongo::repl::OpTime>& getPreImageOpTime() const;
     const boost::optional<mongo::ShardId>& getDestinedRecipient() const;

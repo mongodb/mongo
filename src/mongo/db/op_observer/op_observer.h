@@ -126,6 +126,10 @@ struct OplogUpdateEntryArgs {
 
     OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, const CollectionPtr& coll)
         : updateArgs(updateArgs), coll(coll) {}
+
+    // Present when replicated fast count/size is enabled; stores the document size delta for this
+    // operation.
+    boost::optional<int32_t> replicatedSizeDelta;
 };
 
 /**
@@ -151,6 +155,10 @@ struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     // other way round (because of multi-doc transactions).
     // See reserveOplogSlotsForRetryableFindAndModify() in collection_write_path.cpp.
     std::vector<OplogSlot> retryableFindAndModifyOplogSlots;
+
+    // Present when replicated fast count/size is enabled; stores the document size delta for this
+    // operation.
+    boost::optional<int32_t> replicatedSizeDelta;
 };
 
 struct IndexCollModInfo {

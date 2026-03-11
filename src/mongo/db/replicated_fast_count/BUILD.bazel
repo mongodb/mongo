@@ -67,6 +67,7 @@ mongo_cc_library(
     deps = [
         "replicated_fast_count_manager",
         "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_interface_local",
         "//src/mongo/unittest",
     ],

@@ -55,6 +55,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/set_multikey_metadata_oplog_entry_gen.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/resharding/sharding_write_router.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -119,6 +120,15 @@ constexpr long long kInvalidNumRecords = -1LL;
 
 Date_t getWallClockTimeForOpLog(OperationContext* opCtx) {
     return opCtx->fastClockSource().now();
+}
+
+/**
+ * Generates contents for the 'm' field of an OplogEntry.
+ */
+repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
+    repl::OplogEntrySizeMetadata m;
+    m.setSz(replicatedSizeDelta);
+    return m;
 }
 
 repl::OpTime logOperation(OperationContext* opCtx,
@@ -624,15 +634,21 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = operationLogger->getNextOpTimes(opCtx, 1U)[0];
         }
-        const auto docKey = getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
         if (!recordIds.empty()) {
             oplogEntry.setRecordId(recordIds[i]);
         }
         if (collectionPtr->isNewTimeseriesWithoutView()) {
             oplogEntry.setIsTimeseries();
         }
-        oplogEntry.setObject(begin[i].doc);
+
+        const auto& insertedDoc = begin[i].doc;
+        oplogEntry.setObject(insertedDoc);
+
+        const auto docKey = getDocumentKey(collectionPtr, insertedDoc).getShardKeyAndId();
         oplogEntry.setObject2(docKey);
+        if (isReplicatedFastCountEnabled(opCtx)) {
+            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(insertedDoc.objsize()));
+        }
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(
             shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
@@ -731,6 +747,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     repl::OpTime lastOpTime;
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
+    const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
 
     if (inBatchedWrite) {
         dassert(!defaultFromMigrate ||
@@ -745,6 +762,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             if (coll->isNewTimeseriesWithoutView()) {
                 operation.setIsTimeseries(true);
+            }
+            if (useReplicatedSizeCount) {
+                operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
             }
 
             // versionContext is set in the batched write oplog entry, but not each individual op.
@@ -780,6 +800,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             operation.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             if (!recordIds.empty()) {
                 operation.setRecordId(recordIds[i++]);
+            }
+            if (useReplicatedSizeCount) {
+                operation.setSizeMetadata(makeOperationSizeMetadata(iter->doc.objsize()));
             }
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
@@ -893,6 +916,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         operation.setDestinedRecipient(
             shardingWriteRouter->getReshardingDestinedRecipient(args.updateArgs->updatedDoc));
         operation.setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
+        if (args.replicatedSizeDelta) {
+            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
+        }
         if (args.updateArgs->mustCheckExistenceForInsertOperations) {
             operation.setCheckExistenceForDiffInsert(true);
         }
@@ -966,6 +992,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             operation.setRecordId(args.updateArgs->replicatedRecordId);
         }
 
+        if (args.replicatedSizeDelta) {
+            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
+        }
+
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
             invariant(!args.updateArgs->preImageDoc.isEmpty(),
                       str::stream()
@@ -1010,6 +1040,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
         if (!args.updateArgs->replicatedRecordId.isNull()) {
             oplogEntry.setRecordId(args.updateArgs->replicatedRecordId);
+        }
+
+        if (args.replicatedSizeDelta) {
+            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
         }
 
         opTime = replLogUpdate(opCtx, args, &oplogEntry, _operationLogger.get());
@@ -1077,6 +1111,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
+        if (args.replicatedSizeDelta) {
+            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
+        }
         if (coll->isNewTimeseriesWithoutView()) {
             operation.setIsTimeseries(true);
         }
@@ -1110,7 +1147,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (!args.replicatedRecordId.isNull()) {
             operation.setRecordId(args.replicatedRecordId);
         }
-
+        if (args.replicatedSizeDelta) {
+            operation.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
+        }
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds({stmtId});
             if (args.retryableFindAndModifyLocation ==
@@ -1152,6 +1191,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         if (!args.replicatedRecordId.isNull()) {
             oplogEntry.setRecordId(args.replicatedRecordId);
+        }
+
+        if (args.replicatedSizeDelta) {
+            oplogEntry.setSizeMetadata(makeOperationSizeMetadata(*args.replicatedSizeDelta));
         }
 
         opTime = replLogDelete(opCtx,

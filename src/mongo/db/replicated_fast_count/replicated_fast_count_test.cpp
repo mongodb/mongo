@@ -925,6 +925,152 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
     }
 }
 
+/**
+ * Set of tests confirming oplog entries are generated with replicated size count metadata.
+ */
+class ReplicatedFastCountOplogEntryTest : public ReplicatedFastCountTest {};
+
+TEST_F(ReplicatedFastCountOplogEntryTest, BasicInsertOplogEntry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    AutoGetCollection coll(_opCtx, _nss1, LockMode::MODE_IX);
+
+    const auto docToInsert = docGeneratorForInsert(0);
+    const auto expectedSizeDelta = docToInsert.objsize();
+
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, *coll, docToInsert));
+        wuow.commit();
+    }
+
+    const auto insertOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
+        _opCtx, _nss1, repl::OpTypeEnum::kInsert);
+    ASSERT_TRUE(insertOplogEntry.has_value());
+
+    // Confirm the generated oplog entry includes replicated size count information.
+    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*insertOplogEntry,
+                                                                      expectedSizeDelta);
+}
+
+TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    auto coll = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    std::string smallNote("hi");
+    const auto docInitial = BSON("_id" << 0 << "note" << smallNote);
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), docInitial));
+        wuow.commit();
+    }
+
+    std::string largerNote("a slightly larger note to increase the size when we update");
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        Helpers::update(_opCtx, coll, BSON("_id" << 0), BSON("$set" << BSON("note" << largerNote)));
+        wuow.commit();
+    }
+    const auto docAfterUpdate = Helpers::findOneForTesting(_opCtx, coll, BSON("_id" << 0));
+    const auto expectedSizeDelta = docAfterUpdate.objsize() - docInitial.objsize();
+
+    const auto updateOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
+        _opCtx, _nss1, repl::OpTypeEnum::kUpdate);
+    ASSERT_TRUE(updateOplogEntry.has_value());
+
+    // Confirm the generated oplog entry includes replicated size count information.
+    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry,
+                                                                      expectedSizeDelta);
+}
+
+TEST_F(ReplicatedFastCountOplogEntryTest, BasicUpdateOplogEntryWithNegativeDelta) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    auto coll = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    std::string largeNote(
+        "a slightly large note to force the doc to start out as larger before the update");
+    const auto docInitial = BSON("_id" << 0 << "note" << largeNote);
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), docInitial));
+        wuow.commit();
+    }
+
+    std::string smallerNote("hi");
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        Helpers::update(
+            _opCtx, coll, BSON("_id" << 0), BSON("$set" << BSON("note" << smallerNote)));
+        wuow.commit();
+    }
+    const auto docAfterUpdate = Helpers::findOneForTesting(_opCtx, coll, BSON("_id" << 0));
+    const auto expectedSizeDelta = docAfterUpdate.objsize() - docInitial.objsize();
+
+    const auto updateOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
+        _opCtx, _nss1, repl::OpTypeEnum::kUpdate);
+    ASSERT_TRUE(updateOplogEntry.has_value());
+    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry,
+                                                                      expectedSizeDelta);
+}
+
+TEST_F(ReplicatedFastCountOplogEntryTest, BasicDeleteOplogEntry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    auto coll = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto doc = BSON("_id" << 0 << "x" << 0);
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc));
+        wuow.commit();
+    }
+
+    const auto rid = Helpers::findOne(_opCtx, coll, BSON("_id" << 0));
+    ASSERT_FALSE(rid.isNull());
+
+    {
+        WriteUnitOfWork wuow{_opCtx};
+        Helpers::deleteByRid(_opCtx, coll, rid);
+        wuow.commit();
+    }
+    const auto expectedSizeDelta = doc.objsize();
+    const auto deleteOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
+        _opCtx, _nss1, repl::OpTypeEnum::kDelete);
+    ASSERT_TRUE(deleteOplogEntry.has_value());
+    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*deleteOplogEntry,
+                                                                      -expectedSizeDelta);
+}
+
+TEST_F(ReplicatedFastCountOplogEntryTest, BasicGroupCommit) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    auto coll = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto doc1 = BSON("_id" << 0 << "x" << 0);
+    const auto doc2 = BSON("_id" << 1 << "abcdefg" << 1);
+    {
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc1));
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc2));
+        wuow.commit();
+    }
+    std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{
+        {.uuid = _uuid1, .opType = repl::OpTypeEnum::kInsert, .expectedSizeDelta = doc1.objsize()},
+        {.uuid = _uuid1, .opType = repl::OpTypeEnum::kInsert, .expectedSizeDelta = doc2.objsize()}};
+
+    const auto applyOpsOplogEntry =
+        replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1);
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
+    replicated_fast_count_test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
+}
+
 using ReplicatedFastCountDeathTest = ReplicatedFastCountTest;
 
 // TODO SERVER-120203: Re-enable this test.

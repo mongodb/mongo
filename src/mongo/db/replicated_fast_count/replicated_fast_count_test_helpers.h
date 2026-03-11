@@ -234,4 +234,45 @@ struct ExpectedFastCountOp {
 void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
                                     const NamespaceString& internalNss,
                                     const std::vector<ExpectedFastCountOp>& expectedOps);
+
+/**
+ * Expected values for validating individual operations in an oplog entry or applyOps inner ops with
+ * respect to the replicated fast count information.
+ */
+struct OpValidationSpec {
+    /**
+     * The collection UUID for the operation.
+     */
+    UUID uuid;
+
+    /**
+     * The operation type (e.g., insert, update, delete).
+     */
+    repl::OpTypeEnum opType;
+
+    /**
+     * The expected size delta for 'o2.m.sz' in the oplog entry.
+     */
+    int32_t expectedSizeDelta;
+};
+
+/**
+ * Asserts the replicated size count information in 'oplogEntry' is 'expectedSizeDelta'.
+ */
+void assertReplicatedSizeCountMeta(const repl::OplogEntry& oplogEntry, int32_t expectedSizeDelta);
+
+/**
+ * Asserts the information encoded in 'oplogEntry' aligns with that of 'entrySpecs'.
+ */
+void assertOpMatchesSpec(const repl::OplogEntry& oplogEntry, const OpValidationSpec& entrySpecs);
+void assertOpsMatchSpecs(const std::vector<repl::OplogEntry>& oplogEntries,
+                         const std::vector<OpValidationSpec>& entrySpecs);
+
+/**
+ * Gets the most recent oplog entry matching 'nss' and 'opType'.
+ */
+boost::optional<repl::OplogEntry> getMostRecentOplogEntry(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const repl::OpTypeEnum& opType);
+
 }  // namespace mongo::replicated_fast_count_test_helpers

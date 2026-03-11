@@ -181,6 +181,10 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             if (collection->areRecordIdsReplicated()) {
                 args.replicatedRecordId = record->id;
             }
+            if (isReplicatedFastCountEnabled(opCtx)) {
+                args.replicatedSizeDelta = -doc.objsize();
+            }
+
             // Reserves an optime for the deletion and sets the timestamp for future writes.
             opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, documentKey, args);
         }
