@@ -28,14 +28,14 @@
  */
 
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/version.h"
+
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -113,12 +113,11 @@ private:
     // clang-format on
 };
 
-const InterpolatedVersionInfo interpolatedVersionInfo;
-
-MONGO_INITIALIZER_GENERAL(EnableVersionInfo, (), ("BeginStartupOptionRegistration"))
-(InitializerContext*) {
-    VersionInfoInterface::enable(&interpolatedVersionInfo);
-}
+bool enableVersionInfoDummy = [] {
+    static StaticImmortal<InterpolatedVersionInfo> obj{};
+    VersionInfoInterface::enable(&*obj);
+    return false;
+}();
 
 }  // namespace
 }  // namespace mongo

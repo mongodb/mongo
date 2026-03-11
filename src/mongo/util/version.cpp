@@ -106,17 +106,20 @@ public:
     }
 };
 
-const VersionInfoInterface* globalVersionInfo = nullptr;
+const VersionInfoInterface*& globalVersionInfoPtr() {
+    static const VersionInfoInterface* p = nullptr;
+    return p;
+}
 
 }  // namespace
 
 void VersionInfoInterface::enable(const VersionInfoInterface* handler) {
-    globalVersionInfo = handler;
+    globalVersionInfoPtr() = handler;
 }
 
 const VersionInfoInterface& VersionInfoInterface::instance(NotEnabledAction action) noexcept {
-    if (globalVersionInfo) {
-        return *globalVersionInfo;
+    if (auto p = globalVersionInfoPtr()) {
+        return *p;
     }
 
     if (action == NotEnabledAction::kFallback) {
