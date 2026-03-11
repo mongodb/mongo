@@ -121,6 +121,7 @@ public:
      *   that opening/closing of cursors will happen after this method returns.
      * - In Degraded mode requests to open and/or close cursors cannot be made - the set of tracked
      *   shards for a bounded change stream segment is fixed.
+     * - Returns appropriate ShardTargeterDecision based on the system state.
      */
     virtual ShardTargeterDecision handleEvent(OperationContext* opCtx,
                                               const Document& event,

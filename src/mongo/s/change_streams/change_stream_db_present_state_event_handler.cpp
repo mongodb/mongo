@@ -40,6 +40,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#define STAGE_LOG_PREFIX "ChangeStreamShardTargeterDbPresentStateEventHandler: "
+
 namespace mongo {
 
 namespace {
@@ -137,12 +139,13 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
 
     LOGV2_DEBUG(10922912,
                 3,
-                "Handling placement refresh",
+                STAGE_LOG_PREFIX "Handling placement refresh",
                 "atClusterTime"_attr = clusterTime,
                 "anyRemovedShardDetected"_attr =
                     placement.getAnyRemovedShardDetected().value_or(false),
                 "openCursorAt"_attr = placement.getOpenCursorAt(),
                 "nextPlacementChangedAt"_attr = placement.getNextPlacementChangedAt(),
+                "isCursorOnConfigServerOpen"_attr = readerCtx.isCursorOnConfigServerOpen(),
                 "currentActiveShards"_attr = readerCtx.getCurrentlyTargetedDataShards(),
                 "shards"_attr = shards);
 

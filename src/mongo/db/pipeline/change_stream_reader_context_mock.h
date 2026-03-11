@@ -70,6 +70,10 @@ public:
         ++closeCursorOnConfigServerCount;
     }
 
+    bool isCursorOnConfigServerOpen() const override {
+        return cursorOnConfigServerOpen;
+    }
+
     const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const override {
         return currentlyTargetedShards;
     }
@@ -80,6 +84,10 @@ public:
 
     bool inDegradedMode() const override {
         return degradedMode;
+    }
+
+    void setCursorOnConfigServerOpen(bool val) {
+        cursorOnConfigServerOpen = val;
     }
 
     void setTargetedShards(stdx::unordered_set<ShardId> val) {
@@ -96,16 +104,21 @@ public:
         openCursorOnConfigServerCalls.clear();
         closeCursorOnConfigServerCount = 0;
         currentlyTargetedShards.clear();
+        cursorOnConfigServerOpen = false;
         degradedMode = false;
     }
 
+    const ChangeStream changeStream;
+
+    // State changes caused by calls made to open/close cursors.
     std::vector<OpenDataShardCall> openCursorsOnDataShardsCalls;
     std::vector<CloseDataShardCall> closeCursorsOnDataShardsCalls;
     std::vector<OpenConfigServerCall> openCursorOnConfigServerCalls;
     int closeCursorOnConfigServerCount = 0;
 
+    // Initial state, to be set before making calls to open/close cursors.
     stdx::unordered_set<ShardId> currentlyTargetedShards;
-    ChangeStream changeStream;
+    bool cursorOnConfigServerOpen = false;
     bool degradedMode = false;
 };
 }  // namespace mongo

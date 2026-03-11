@@ -31,11 +31,17 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/db/pipeline/change_stream_read_mode.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 #include <variant>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+#define STAGE_LOG_PREFIX "ChangeStreamShardTargeterDbAbsentStateEventHandler: "
 
 namespace mongo {
 
@@ -59,11 +65,25 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
         return ShardTargeterDecision::kSwitchToV1;
     }
 
+    const auto& shards = placement.getShards();
+
+    LOGV2_DEBUG(12013809,
+                3,
+                STAGE_LOG_PREFIX "Handling event",
+                "changeStream"_attr = readerCtx.getChangeStream(),
+                "atClusterTime"_attr = clusterTime,
+                "anyRemovedShardDetected"_attr =
+                    placement.getAnyRemovedShardDetected().value_or(false),
+                "openCursorAt"_attr = placement.getOpenCursorAt(),
+                "nextPlacementChangedAt"_attr = placement.getNextPlacementChangedAt(),
+                "isCursorOnConfigServerOpen"_attr = readerCtx.isCursorOnConfigServerOpen(),
+                "currentActiveShards"_attr = readerCtx.getCurrentlyTargetedDataShards(),
+                "shards"_attr = shards);
+
     // Validate status and other fields of historical placement result.
     change_streams::assertHistoricalPlacementStatusOK(placement);
     change_streams::assertHistoricalPlacementHasNoSegment(placement);
 
-    const auto& shards = placement.getShards();
     tassert(10915201,
             "HistoricalPlacementStatus must have at least one shard after DatabaseCreated "
             "control event",

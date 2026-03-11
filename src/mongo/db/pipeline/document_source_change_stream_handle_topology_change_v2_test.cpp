@@ -139,6 +139,10 @@ public:
                                   OperationContext* opCtx,
                                   Timestamp atClusterTime) override {
         throwShardNotFoundExceptionIfRequired();
+        throwRetryChangeStreamExceptionIfRequired();
+        tassert(12013807,
+                "expecting no prior call to openCursorOnConfigServer()",
+                !_cursorOpenedOnConfigServer);
         _cursorOpenedOnConfigServer = true;
     }
 
@@ -149,7 +153,14 @@ public:
     }
 
     void closeCursorOnConfigServer(OperationContext* opCtx) override {
+        tassert(12013808,
+                "expecting prior call to openCursorOnConfigServer()",
+                _cursorOpenedOnConfigServer);
         _cursorOpenedOnConfigServer = false;
+    }
+
+    bool isCursorOnConfigServerOpen() const override {
+        return _cursorOpenedOnConfigServer;
     }
 
     const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const override {
@@ -205,15 +216,28 @@ public:
         return _cursorOpenedOnConfigServer;
     }
 
-    void setThrowShardNotFoundException(bool value) {
-        _throwShardNotFoundException = value;
+    void setThrowShardNotFoundExceptions(int value) {
+        _throwShardNotFoundExceptions = value;
+    }
+
+    void setThrowRetryChangeStreamExceptions(int value) {
+        _throwRetryChangeStreamExceptions = value;
     }
 
 private:
-    void throwShardNotFoundExceptionIfRequired() const {
-        if (_throwShardNotFoundException) {
+    void throwShardNotFoundExceptionIfRequired() {
+        if (_throwShardNotFoundExceptions > 0) {
+            _throwShardNotFoundExceptions--;
             error_details::throwExceptionForStatus(
                 Status(ErrorCodes::ShardNotFound, "shard not found"));
+        }
+    }
+
+    void throwRetryChangeStreamExceptionIfRequired() {
+        if (_throwRetryChangeStreamExceptions > 0) {
+            _throwRetryChangeStreamExceptions--;
+            error_details::throwExceptionForStatus(
+                Status(ErrorCodes::RetryChangeStream, "please retry change stream"));
         }
     }
 
@@ -221,11 +245,15 @@ private:
     ChangeStreamReaderBuilder* _readerBuilder;
     stdx::unordered_set<ShardId> _currentlyTargetedDataShards;
 
+    // If set, this many attempts to open a cursor will throw a 'ShardNotFound' exception.
+    int _throwShardNotFoundExceptions = 0;
+
+    // If set, this many attempts to open a config server cursor will throw a 'RetryChangeStream'
+    // exception.
+    int _throwRetryChangeStreamExceptions = 0;
+
     // Will be set to true if a request was made to open a cursor on the config server.
     bool _cursorOpenedOnConfigServer = false;
-
-    // IF set to 'true', any attempt to open a cursor will throw a 'ShardNotFound' exception.
-    bool _throwShardNotFoundException = false;
 
     // Resume token used when initializing the 'CursorManager'.
     boost::optional<ResumeToken> _resumeToken;
@@ -1577,7 +1605,7 @@ TEST_F(DSV2StageTest, StateFetchingStartingChangeStreamSegmentOpenCursorFailsWit
     docSource->setSegmentStartTimestamp_forTest(ts);
 
     // Makes cursor manager throw a 'ShardNotFound' exception when trying to open a cursor.
-    getCursorManagerMock(params)->setThrowShardNotFoundException(true);
+    getCursorManagerMock(params)->setThrowShardNotFoundExceptions(1);
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
 
@@ -1585,8 +1613,6 @@ TEST_F(DSV2StageTest, StateFetchingStartingChangeStreamSegmentOpenCursorFailsWit
     ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
     ASSERT_FALSE(docSource->getSegmentEndTimestamp_forTest().has_value());
 
-    // Remove exception throwing again.
-    getCursorManagerMock(params)->setThrowShardNotFoundException(false);
     result = docSource->runGetNextStateMachine_forTest();
     // boost::none is returned because of the state transition.
     ASSERT_FALSE(result.has_value());
@@ -1603,10 +1629,8 @@ TEST_F(DSV2StageTest, StateFetchingStartingChangeStreamSegmentOpenCursorFailsWit
 // Tests state machine for input state kFetchingStartingChangeStreamSegment, when we try to open a
 // new cursor on a shard and this fails with 'ShardNotFound' exceptions repeatedly until the max
 // number of consecutive failures is reached.
-DEATH_TEST_REGEX_F(
-    DSV2StageTestDeathTest,
-    StateFetchingStartingChangeStreamSegmentOpenCursorFailsWithShardNotFoundRepeatedly,
-    "Tripwire assertion.*10657541") {
+TEST_F(DSV2StageTest,
+       StateFetchingStartingChangeStreamSegmentOpenCursorFailsWithShardNotFoundRepeatedly) {
     const Timestamp ts = Timestamp(23, 0);
 
     getExpCtx()->setChangeStreamSpec(
@@ -1648,8 +1672,9 @@ DEATH_TEST_REGEX_F(
                                 false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(ts);
 
-    getCursorManagerMock(params)->setThrowShardNotFoundException(true);
-    for (int i = 0; i < V2Stage::kMaxShardNotFoundFailuresInARow; ++i) {
+    getCursorManagerMock(params)->setThrowShardNotFoundExceptions(
+        V2Stage::kMaxShardNotFoundFailuresInARow);
+    for (int i = 0; i < V2Stage::kMaxShardNotFoundFailuresInARow - 1; ++i) {
         auto result = docSource->runGetNextStateMachine_forTest();
         ASSERT_FALSE(result.has_value());
 
@@ -1658,7 +1683,68 @@ DEATH_TEST_REGEX_F(
         ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
     }
 
-    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657541);
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
+                       AssertionException,
+                       ErrorCodes::RetryChangeStream);
+}
+
+// Tests state machine for input state kFetching for a control event, when we try to open a new
+// cursor on the config server and this fails with 'RetryChangeStream' exception.
+TEST_F(DSV2StageTest,
+       StateFetchingStartingChangeStreamSegmentOpenConfigServerCursorFailsWitRetryChangeStream) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    // Prepare ShardTargeterMock responses.
+    ChangeStreamShardTargeterMock::ReaderContextCallback shardTargeterCallback =
+        [=](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDocument,
+            ChangeStreamReaderContext& context) {
+            Timestamp openTs = std::get<Timestamp>(tsOrDocument);
+            context.openCursorOnConfigServer(openTs);
+        };
+
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(Timestamp(23, 0),
+                                        ShardTargeterDecision::kContinue,
+                                        boost::optional<Timestamp>{},
+                                        shardTargeterCallback);
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {};
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setSource(source.get());
+    docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
+                                false /* validateStateTransition */);
+    docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
+
+    // Enable 'RetryChangeStream' exception, so opening the cursor on the config server will throw.
+    // This makes the stage fail.
+    getCursorManagerMock(params)->setThrowRetryChangeStreamExceptions(1);
+
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
+                       AssertionException,
+                       ErrorCodes::RetryChangeStream);
+
+    ASSERT_EQ(V2Stage::State::kFinal, docSource->getState_forTest());
+
+    // Calling 'getNext()' again should return the same error.
+    ASSERT_THROWS_CODE(docSource->getNext(), AssertionException, ErrorCodes::RetryChangeStream);
 }
 
 // Tests state machine for input state kFetchingNormalGettingChangeEvent for non-control events.
@@ -1798,15 +1884,19 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventControlEvent) {
 }
 
 // Tests state machine for input state kFetching for a control event, when we try to open a new
-// cursor on a shard and this fails with 'ShardNotFound' exceptions.
-TEST_F(DSV2StageTest,
-       StateFetchingNormalGettingChangeEventControlEventOpenCursorFailsWithShardNotFound) {
+// cursor on a shard and this fails with 'ShardNotFound' exceptions. The state then transitions into
+// degraded mode.
+TEST_F(
+    DSV2StageTest,
+    StateFetchingNormalGettingChangeEventControlEventOpenCursorFailsWithShardNotFoundTransitionToDegradedFetching) {
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
 
-    const BSONObj event = BSON("operationType" << "test" << "foo" << "bar" << "_id"
-                                               << buildHighWaterMarkToken(Timestamp(23, 1))
-                                               << Document::metaFieldChangeStreamControlEvent << 1);
+    const BSONObj event =
+        BSON("operationType" << "test" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 1)))
+                             << Document::metaFieldChangeStreamControlEvent << 1);
 
     // Prepare ShardTargeterMock responses.
     std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
@@ -1846,12 +1936,17 @@ TEST_F(DSV2StageTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
-
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
                                 false /* validateStateTransition */);
 
-    // Enable 'ShardNotFound' exceptions, which makes the stage go into degraded fetching mode.
-    getCursorManagerMock(params)->setThrowShardNotFoundException(true);
+    // Before executing the stage, fake that there is already another data-shard cursor open.
+    getCursorManagerMock(params)->openCursorsOnDataShards(
+        getExpCtx(), getOpCtx(), Timestamp(23, 0), {ShardId{"shardB"}});
+
+    // Enable 'ShardNotFound' exceptions, so opening the next cursor will throw. This makes the
+    // stage go into degraded fetching mode.
+    getCursorManagerMock(params)->setThrowShardNotFoundExceptions(1);
+
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
 
@@ -1861,8 +1956,7 @@ TEST_F(DSV2StageTest,
     // Undo mode must have been turned on when entering the degraded fetching state.
     ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
 
-    // Disable exceptions again. Calling the state machine will start a new segment.
-    getCursorManagerMock(params)->setThrowShardNotFoundException(false);
+    // Calling the state machine will start a new segment.
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 3));
 
     result = docSource->runGetNextStateMachine_forTest();
@@ -1875,12 +1969,93 @@ TEST_F(DSV2StageTest,
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
 
+    const stdx::unordered_set<ShardId> expectedShardCursors = {ShardId("shardB")};
+    ASSERT_FALSE(params->cursorManager->isCursorOnConfigServerOpen());
+    ASSERT_EQ(expectedShardCursors, params->cursorManager->getCurrentlyTargetedDataShards());
+
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isEOF());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
     ASSERT_EQ(Timestamp(23, 2), *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
+}
+
+// Tests state machine for input state kFetching for a control event, when we try to open a new
+// cursor on a shard and this fails with 'ShardNotFound' exceptions. When there are no other data
+// shard cursors open, the state transitions to starting a new segment.
+TEST_F(
+    DSV2StageTest,
+    StateFetchingNormalGettingChangeEventControlEventOpenCursorFailsWithShardNotFoundStartNewSegment) {
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(Timestamp(23, 0), ChangeStreamReadMode::kIgnoreRemovedShards));
+
+    const BSONObj event =
+        BSON("operationType" << "test" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 1)))
+                             << Document::metaFieldChangeStreamControlEvent << 1);
+
+    // Prepare ShardTargeterMock responses.
+    std::vector<ChangeStreamShardTargeterMock::Response> shardTargeterResponses;
+    shardTargeterResponses.emplace_back(
+        Document{event},
+        ShardTargeterDecision::kContinue,
+        boost::optional<Timestamp>{},
+        [](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDoc,
+           ChangeStreamReaderContext& readerContext) {
+            readerContext.closeCursorOnConfigServer();
+            readerContext.openCursorsOnDataShards(
+                V2Stage::extractTimestampFromDocument(std::get<Document>(tsOrDoc)),
+                stdx::unordered_set<ShardId>{{"shardA"}});
+        });
+
+    auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
+        [=](OperationContext* opCtx, const ChangeStream& changeStream) {
+            auto shardTargeter = std::make_unique<ChangeStreamShardTargeterMock>();
+            shardTargeter->bufferResponses(shardTargeterResponses);
+            return shardTargeter;
+        });
+    auto dataToShardsAllocationQueryService =
+        std::make_unique<DataToShardsAllocationQueryServiceMock>();
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(
+            Document::fromBsonWithMetaData(event))};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    // Before executing the stage, fake that there is already a cursor open for the config server.
+    getCursorManagerMock(params)->openCursorOnConfigServer(
+        getExpCtx(), getOpCtx(), Timestamp(23, 0));
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setSource(source.get());
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    // Enable 'ShardNotFound' exceptions, so opening the next cursor will throw. This makes the
+    // stage start a new segment.
+    getCursorManagerMock(params)->setThrowShardNotFoundExceptions(1);
+
+    auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+
+    // We must have transitioned to starting a new segment.
+    ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
+    ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
+
+    // The cursor on the config server should have been closed, the new data shard cursor should not
+    // have been opened.
+    ASSERT_FALSE(params->cursorManager->isCursorOnConfigServerOpen());
+    ASSERT_TRUE(params->cursorManager->getCurrentlyTargetedDataShards().empty());
 }
 
 // Tests state machine for input state kFetchingNormalGettingChangeEvent and the shard targeter
@@ -1941,6 +2116,9 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventShardTargeterReturnsD
                        AssertionException,
                        ErrorCodes::RetryChangeStream);
     ASSERT_EQ(V2Stage::State::kFinal, docSource->getState_forTest());
+
+    // Calling 'getNext()' again should return the same error.
+    ASSERT_THROWS_CODE(docSource->getNext(), AssertionException, ErrorCodes::RetryChangeStream);
 }
 
 // Tests state machine for input state kFetchingDegradedGettingChangeEvent for non-control events.
@@ -2168,10 +2346,14 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
 
-    const BSONObj event1 = BSON("operationType" << "test1" << "foo" << "bar" << "_id"
-                                                << buildHighWaterMarkToken(Timestamp(23, 2)));
-    const BSONObj event2 = BSON("operationType" << "test2" << "foo" << "bar" << "_id"
-                                                << buildHighWaterMarkToken(Timestamp(24, 0)));
+    const BSONObj event1 =
+        BSON("operationType" << "test1" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 2)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
+    const BSONObj event2 =
+        BSON("operationType" << "test2" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(24, 0)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(24, 0))));
 
     MutableDocument docBuilder(Document{event1});
     docBuilder.metadata().setChangeStreamControlEvent();
@@ -2270,8 +2452,10 @@ DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
     getExpCtx()->setChangeStreamSpec(
         buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
 
-    const BSONObj event = BSON("operationType" << "test1" << "foo" << "bar" << "_id"
-                                               << buildHighWaterMarkToken(Timestamp(23, 2)));
+    const BSONObj event =
+        BSON("operationType" << "test1" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 2)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 2))));
 
     MutableDocument docBuilder(Document{event});
     docBuilder.metadata().setChangeStreamControlEvent();
@@ -2340,6 +2524,9 @@ TEST_F(DSV2StageTest, StateDowngrading) {
                        AssertionException,
                        ErrorCodes::RetryChangeStream);
     ASSERT_EQ(V2Stage::State::kFinal, docSource->getState_forTest());
+
+    // Calling 'getNext()' again should return the same error.
+    ASSERT_THROWS_CODE(docSource->getNext(), AssertionException, ErrorCodes::RetryChangeStream);
 }
 
 // Tests opening cursor on the config server.
@@ -2401,11 +2588,13 @@ TEST_F(DSV2StageTest, OpenCursorOnConfigServer) {
     ASSERT_EQ(kNoShards, getCursorManagerMock(params)->getCurrentlyTargetedDataShards());
 }
 
-// Tests closing cursor on the config server.
-TEST_F(DSV2StageTest, CloseCursorOnConfigServer) {
+// Tests closing cursor on the config server when reentering the
+// "kFetchingStartingChangeStreamSegment" state.
+TEST_F(DSV2StageTest, CloseCursorOnConfigServerWhenReenteringFetchingStartingChangeStreamSegment) {
     const Timestamp ts = Timestamp(42, 0);
 
-    getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(ts, ChangeStreamReadMode::kStrict));
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
 
     ChangeStreamShardTargeterMock::ReaderContextCallback shardTargeterCallback =
         [](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDocument,
@@ -2445,7 +2634,10 @@ TEST_F(DSV2StageTest, CloseCursorOnConfigServer) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
+    handleTopologyChangeStage->setState_forTest(
+        V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
     handleTopologyChangeStage->setSource(source.get());
+    handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
     getCursorManagerMock(params)->openCursorOnConfigServer(getExpCtx(), getOpCtx(), ts);
     ASSERT_TRUE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
@@ -2519,12 +2711,14 @@ TEST_F(DSV2StageTest, OpenCursorsOnDataShards) {
     ASSERT_EQ(shardSet, getCursorManagerMock(params)->getCurrentlyTargetedDataShards());
 }
 
-// Tests closing cursors on data shards.
-TEST_F(DSV2StageTest, CloseCursorsOnDataShards) {
+// Tests closing cursors on data shards when reentering the "kFetchingStartingChangeStreamSegment"
+// state.
+TEST_F(DSV2StageTest, CloseCursorsOnDataShardsWhenReenteringStartingChangeStreamSegment) {
     const Timestamp ts = Timestamp(42, 0);
     const stdx::unordered_set<ShardId> shardSet = {ShardId("abc"), ShardId("xyz")};
 
-    getExpCtx()->setChangeStreamSpec(buildChangeStreamSpec(ts, ChangeStreamReadMode::kStrict));
+    getExpCtx()->setChangeStreamSpec(
+        buildChangeStreamSpec(ts, ChangeStreamReadMode::kIgnoreRemovedShards));
 
     ChangeStreamShardTargeterMock::ReaderContextCallback shardTargeterCallback =
         [=](ChangeStreamShardTargeterMock::TimestampOrDocument tsOrDocument,
@@ -2564,7 +2758,10 @@ TEST_F(DSV2StageTest, CloseCursorsOnDataShards) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
+    handleTopologyChangeStage->setState_forTest(
+        V2Stage::State::kFetchingStartingChangeStreamSegment, false /* validateStateTransition */);
     handleTopologyChangeStage->setSource(source.get());
+    handleTopologyChangeStage->setSegmentStartTimestamp_forTest(ts);
 
     getCursorManagerMock(params)->openCursorsOnDataShards(getExpCtx(), getOpCtx(), ts, shardSet);
 

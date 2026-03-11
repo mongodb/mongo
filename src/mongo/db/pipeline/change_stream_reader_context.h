@@ -88,6 +88,7 @@ public:
      *
      * Preconditions:
      * - atClusterTime > cluster time of the control event that is being processed.
+     * - There is no cursor open on the config server.
      *
      * Postconditions:
      * - The cursor is open and the results from it are merged into the change stream before
@@ -103,6 +104,13 @@ public:
      * - The cursor is ultimately closed.
      */
     virtual void closeCursorOnConfigServer() = 0;
+
+    /**
+     * Determines if a change stream cursor on the config server for the change stream associated
+     * with this context is open. Note that opening and closing of cursors happens after
+     * ChangeStreamShardTargeter is invoked.
+     */
+    virtual bool isCursorOnConfigServerOpen() const = 0;
 
     /**
      * Returns a set of data shards that are currently targeted, that is, shards that have change

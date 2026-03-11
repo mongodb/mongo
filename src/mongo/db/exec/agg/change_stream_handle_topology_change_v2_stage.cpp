@@ -46,8 +46,6 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
@@ -63,6 +61,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <string>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -157,14 +156,22 @@ public:
                                         false /* allowPartialResults */);
             });
 
-        _mergeCursors->addNewShardCursors(std::move(openedCursors), ShardTag::kDataShard);
+        tassert(12013801,
+                str::stream() << "number of opened cursors (" << openedCursors.size()
+                              << ") does not match expected value (" << shardIds.size() << ")",
+                openedCursors.size() == shardIds.size());
 
+        _mergeCursors->addNewShardCursors(std::move(openedCursors), ShardTag::kDataShard);
         _currentlyTargetedDataShards.insert(shardIds.begin(), shardIds.end());
     }
 
     void openCursorOnConfigServer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   OperationContext* opCtx,
                                   Timestamp atClusterTime) override {
+        tassert(12013803,
+                "expected to not have a cursor open on the config server when opening it",
+                !_hasOpenConfigServerCursor);
+
         const auto shardId = getConfigShardId(opCtx);
         auto openedCursors =
             openCursors(opCtx, atClusterTime, {shardId}, true /* isConfigServer */, [&]() {
@@ -205,7 +212,12 @@ public:
                                         false /* allowPartialResults */);
             });
 
+        tassert(12013800,
+                "expecting exactly one cursor to be established for the config server",
+                openedCursors.size() == 1);
+
         _mergeCursors->addNewShardCursors(std::move(openedCursors), ShardTag::kConfigServer);
+        _hasOpenConfigServerCursor = true;
     }
 
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardIds) override {
@@ -217,7 +229,15 @@ public:
     }
 
     void closeCursorOnConfigServer(OperationContext* opCtx) override {
+        tassert(12013802,
+                "expected to have a cursor open on the config server when closing it",
+                _hasOpenConfigServerCursor);
         closeCursors({getConfigShardId(opCtx)}, true /* isConfigServer */);
+        _hasOpenConfigServerCursor = false;
+    }
+
+    bool isCursorOnConfigServerOpen() const override {
+        return _hasOpenConfigServerCursor;
     }
 
     const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const override {
@@ -411,6 +431,9 @@ private:
 
     // The currently targeted data shards. This does not include the config server.
     stdx::unordered_set<ShardId> _currentlyTargetedDataShards;
+
+    // If a cursor to the config server is currently open.
+    bool _hasOpenConfigServerCursor = false;
 };
 
 // A ChangeStreamReaderContext implementation used by this stage
@@ -465,11 +488,10 @@ public:
      * Record the request to open the cursor on the config server.
      *
      * Preconditions for calling this method:
-     * - no previous call to "closeCursorOnConfigServer()" has been made in the same context.
      * - no previous call to "openCursorOnConfigServer()" has been made in the same context.
      */
     void openCursorOnConfigServer(Timestamp atClusterTime) override {
-        _bufferedRequests.validateStateForConfigServerAction();
+        _bufferedRequests.validateStateForConfigServerAction(true /* isOpen */);
         _bufferedRequests.openCursorOnConfigServer.emplace(atClusterTime);
     }
 
@@ -478,11 +500,14 @@ public:
      *
      * Preconditions for calling this method:
      * - no previous call to "closeCursorOnConfigServer()" has been made in the same context.
-     * - no previous call to "openCursorOnConfigServer()" has been made in the same context.
      */
     void closeCursorOnConfigServer() override {
-        _bufferedRequests.validateStateForConfigServerAction();
+        _bufferedRequests.validateStateForConfigServerAction(false /* isOpen */);
         _bufferedRequests.closeCursorOnConfigServer = true;
+    }
+
+    bool isCursorOnConfigServerOpen() const override {
+        return _cursorManager.isCursorOnConfigServerOpen();
     }
 
     const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const override {
@@ -505,39 +530,125 @@ public:
     }
 
     /**
-     * Executes the opening and closing of cursors for all batches cursor open/close calls.
-     * First opens additional cursors, then closes obsolete cursors.
-     * The rationale for this is to always keep at least one cursor open at any time, because the
-     * 'AsyncResultsMerger' relies on remotes being present.
+     * Executes the opening and closing of cursors for all batched cursor open/close calls.
      *
-     * If an exception escapes during the execution of this method, the cursor open/close requests
-     * executed by the method are not rolled back.
+     * Executes the operations in the following order (each only if requested):
+     * 1. close existing cursor on config server
+     * 2. open new cursor on config server
+     * 3. close existing cursors on data shards
+     * 4. open new cursors on data shards
+     *
+     * The operations may contain both a close and an open call for the config server. In this case,
+     * the old config server cursor will be closed first before the new one is opened. The new
+     * config server cursor may be opened with an arbitrary 'clusterTime' value, so we cannot simply
+     * reuse the existing config server cursor.
+     *
+     * If an exception escapes during the execution of this method, the already-executed cursor
+     * open/close requests are not rolled back.
      */
     void executeCursorRequests() {
-        auto& requests = _bufferedRequests;
+        LOGV2_DEBUG(12013810,
+                    3,
+                    STAGE_LOG_PREFIX "Executing buffered cursor requests",
+                    "requests"_attr = _bufferedRequests.stringifyForLogging());
 
-        // Execute buffered requests to open cursors.
-        if (requests.openCursorsOnDataShards.has_value()) {
-            _cursorManager.openCursorsOnDataShards(_expCtx,
-                                                   _opCtx,
-                                                   requests.openCursorsOnDataShards->first,
-                                                   requests.openCursorsOnDataShards->second);
-        }
-        if (requests.openCursorOnConfigServer.has_value()) {
-            _cursorManager.openCursorOnConfigServer(
-                _expCtx, _opCtx, *requests.openCursorOnConfigServer);
-        }
-
-        // Execute buffered requests to close cursors.
-        if (requests.closeCursorsOnDataShards.has_value()) {
-            _cursorManager.closeCursorsOnDataShards(*requests.closeCursorsOnDataShards);
-        }
-        if (requests.closeCursorOnConfigServer) {
+        // Close existing cursor on config server.
+        if (_bufferedRequests.closeCursorOnConfigServer) {
             _cursorManager.closeCursorOnConfigServer(_opCtx);
+        }
+
+        // Open cursor on config server.
+        if (_bufferedRequests.openCursorOnConfigServer.has_value()) {
+            try {
+                _cursorManager.openCursorOnConfigServer(
+                    _expCtx, _opCtx, *_bufferedRequests.openCursorOnConfigServer);
+            } catch (const DBException& ex) {
+                // The config server is always expected to be present, and if it is required for the
+                // change stream, we cannot continue without it. Especially because we now may have
+                // zero cursors open. Rethrow the exception as a 'RetryChangeStream' error, so the
+                // change stream consumer can try again.
+                uasserted(ErrorCodes::RetryChangeStream,
+                          str::stream()
+                              << "unable to open cursor on config server: " << ex.toStatus());
+            }
+        }
+
+        // Execute buffered requests to close cursors on data shards.
+        if (_bufferedRequests.closeCursorsOnDataShards.has_value()) {
+            _cursorManager.closeCursorsOnDataShards(*_bufferedRequests.closeCursorsOnDataShards);
+        }
+
+        // Execute buffered requests to open cursors on data shards.
+        if (_bufferedRequests.openCursorsOnDataShards.has_value()) {
+            tassert(12013812,
+                    "expecting to have buffered requests for opening data shard cursors",
+                    !_bufferedRequests.openCursorsOnDataShards->second.empty());
+
+            try {
+                // Try fast path first. This attempts to opens all cursors at once in parallel.
+                // This is an all-or-nothing attempt, and if it fails, the state of the
+                // 'CursorManager' is not modified w.r.t. newly opened data shard cursors.
+                openDataShardCursorsAllAtOnce();
+            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
+                // If the fast path fails, rethrow the 'ShardNotFound' exception when the change
+                // stream reader is opened in strict mode or there was only a single data shard
+                // cursor to open. In this case, the state of the 'CursorManager' is not modified.
+                if (getChangeStream().getReadMode() == ChangeStreamReadMode::kIgnoreRemovedShards &&
+                    _bufferedRequests.openCursorsOnDataShards->second.size() >= 2) {
+                    // When in ignoreRemovedShards mode and there is more than a single data shard
+                    // cursor to open, open the cursors individually, one by one. This allows
+                    // opening cursors to still-available shards while ignoring the shards that are
+                    // currently unavailable. This is the slow path.
+                    // 'ShardNotFound' exceptions are silenced here. Any non-'ShardNotFound'
+                    // exceptions will be bubbled up to the caller, potentially leaving additional
+                    // cursors open. This is not a problem, as any non-'ShardNotFound' error will
+                    // abort the change stream anyway.
+                    openAvailableDataShardCursors();
+                }
+
+                // Always rethrow the original 'ShardNotFound' exception, so the caller knows that
+                // at least one shard is missing.
+                throw ex;
+            }
         }
     }
 
 private:
+    /**
+     * Opens all data shard cursors at once. The cursors will be opened in parallel, so this is the
+     * fast path. Any exception while opening the cursors will be bubbled up to the caller. In case
+     * an exception occurs, the state of the 'CursorManager' does not change, and none of the
+     * specified cursors will be opened.
+     */
+    void openDataShardCursorsAllAtOnce() {
+        _cursorManager.openCursorsOnDataShards(_expCtx,
+                                               _opCtx,
+                                               _bufferedRequests.openCursorsOnDataShards->first,
+                                               _bufferedRequests.openCursorsOnDataShards->second);
+    }
+
+    /**
+     * Opens all data shard cursors that are still available, swallowing any 'ShardNotFound'
+     * exceptions for non-available shards along the way. The cursors will be opened sequentially,
+     * so this is the slow path. Should only be called if there is more than one cursor to open, and
+     * trying the fast path has already failed.
+     * As the cursors are opened one after the other and 'ShardNotFound' exceptions are ignored,
+     * this method modifies the state of the 'CursorManager' and opens as many cursors as possible,
+     * even if opening some cursors fails. The method will rethrow any non-'ShardNotFound' exception
+     * to the caller. If this happens, it won't roll back any of the cursor open requests that it
+     * already successfully executed.
+     */
+    void openAvailableDataShardCursors() {
+        for (const auto& shardId : _bufferedRequests.openCursorsOnDataShards->second) {
+            try {
+                _cursorManager.openCursorsOnDataShards(
+                    _expCtx, _opCtx, _bufferedRequests.openCursorsOnDataShards->first, {shardId});
+            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+                // Intentionally ignore all 'ShardNotFound' exceptions.
+            }
+        }
+    }
+
     // This struct keeps track of which cursor open/close calls have been recorded in the context.
     // The buffered requests will be executed in one go in the 'executeCursorRequests()' method of
     // the context.
@@ -574,18 +685,63 @@ private:
             }
         }
 
-        void validateStateForConfigServerAction() const {
-            tassert(10657538,
-                    "expecting open cursor request for the config server to be missing",
-                    !openCursorOnConfigServer.has_value());
-            tassert(10657539,
-                    "expecting close cursor request for the config server to be missing",
-                    !closeCursorOnConfigServer);
+        void validateStateForConfigServerAction(bool isOpen) const {
+            if (isOpen) {
+                tassert(10657538,
+                        "expecting open cursor request for the config server to be missing",
+                        !openCursorOnConfigServer.has_value());
+            } else {
+                tassert(10657539,
+                        "expecting close cursor request for the config server to be missing",
+                        !closeCursorOnConfigServer);
+            }
         }
 
+        /**
+         * Returns true if there are no buffered requests to open/close cursors, false otherwise.
+         */
         bool empty() const {
             return !(openCursorsOnDataShards.has_value() || openCursorOnConfigServer.has_value() ||
                      closeCursorsOnDataShards.has_value() || closeCursorOnConfigServer);
+        }
+
+        /**
+         * Stringifies the buffered requests to open/close cursors for usage in a log message.
+         */
+        std::string stringifyForLogging() const {
+            auto appendShardset = [&](const auto& shardSet) {
+                str::stream result;
+                StringData sep;
+                result << "{";
+                for (const auto& shardId : shardSet) {
+                    result << std::exchange(sep, ", ") << shardId.toString();
+                }
+                result << "}";
+                return result.ss.str();
+            };
+
+            str::stream s;
+
+            if (closeCursorOnConfigServer) {
+                s << ", close cursor on config server";
+            }
+            if (openCursorOnConfigServer.has_value()) {
+                s << ", open cursor on config server at " << *openCursorOnConfigServer;
+            }
+
+            if (closeCursorsOnDataShards.has_value()) {
+                s << ", close cursor on data shards " << appendShardset(*closeCursorsOnDataShards);
+            }
+
+            if (openCursorsOnDataShards.has_value()) {
+                s << ", open cursor on data shards "
+                  << appendShardset(openCursorsOnDataShards->second) << " at "
+                  << openCursorsOnDataShards->first;
+            }
+
+            // Strip leading comma
+            auto result = s.ss.str();
+            return result.empty() ? "none" : result.substr(2);
         }
     };
 
@@ -706,9 +862,9 @@ void ChangeStreamHandleTopologyChangeV2Stage::setState_forTest(State state,
 
 Timestamp ChangeStreamHandleTopologyChangeV2Stage::extractTimestampFromDocument(
     const Document& input) {
-    return ResumeToken::parse(input[DocumentSourceChangeStream::kIdField].getDocument())
-        .getData()
-        .clusterTime;
+    // Extract cluster time from the current event via the sortkey metadata field. This does not
+    // rely on the "_id" field being present in the event.
+    return ResumeToken::parse(input.metadata().getSortKey().getDocument()).getData().clusterTime;
 }
 
 DocumentSource::GetNextResult ChangeStreamHandleTopologyChangeV2Stage::doGetNext() {
@@ -863,7 +1019,7 @@ void ChangeStreamHandleTopologyChangeV2Stage::_assertState(
     if (expectedMode.has_value()) {
         auto actualMode = _params->changeStream.getReadMode();
         tassert(10657515,
-                str::stream() << "expecting change stream to be opened in mode "
+                str::stream() << "expecting change stream to be open in mode "
                               << modeToString(*expectedMode) << ", but got "
                               << modeToString(actualMode) << " in " << context << "()",
                 *expectedMode == actualMode);
@@ -1039,6 +1195,11 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
 
     _ensureShardTargeter();
 
+    tassert(12013805,
+            "expecting no cursors to be open when initializing fetching",
+            !_params->cursorManager->isCursorOnConfigServerOpen() &&
+                _params->cursorManager->getCurrentlyTargetedDataShards().empty());
+
     if (_params->changeStream.getReadMode() == ChangeStreamReadMode::kIgnoreRemovedShards) {
         // Enter state machine for ignoreRemovedShards mode.
         _segmentStartTimestamp = _params->resumeToken.clusterTime;
@@ -1172,13 +1333,20 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
                             "error"_attr = redact(ex.toStatus()),
                             "shardNotFoundFailuresInARow"_attr = _shardNotFoundFailuresInARow,
                             "maxShardNotFoundFailuresInARow"_attr = kMaxShardNotFoundFailuresInARow,
+                            "isCursorOnConfigServerOpen"_attr =
+                                _params->cursorManager->isCursorOnConfigServerOpen(),
+                            "currentlyTargetedDataShards"_attr =
+                                _params->cursorManager->getCurrentlyTargetedDataShards(),
                             "changeStream"_attr = _params->changeStream,
                             "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
 
                 // Avoid an infinite loop here by counting the number of failures in a row, and
                 // break out with a tassert if we have already seen too many.
-                tassert(10657541,
-                        "encountered too many consecutive 'ShardNotFound' errors",
+                uassert(ErrorCodes::RetryChangeStream,
+                        str::stream()
+                            << "Encountered too many consecutive 'ShardNotFound' errors in change "
+                               "stream, try reopening the change stream at a later point: "
+                            << ex.reason(),
                         ++_shardNotFoundFailuresInARow < kMaxShardNotFoundFailuresInARow);
 
                 // No state change has happened yet. We are returning nothing here so the state
@@ -1189,6 +1357,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
             // State change to either degraded or normal fetching.
             _segmentEndTimestamp = segmentEndTimestamp;
             if (segmentEndTimestamp.has_value()) {
+                // When entering degraded mode fetching, no cursors to the config server should be
+                // open. This must be ensured by the shard targeter in the above call to
+                // 'startChangeStreamSegment()'.
+                tassert(12013806,
+                        "expecting no config server cursor to be open",
+                        !_params->cursorManager->isCursorOnConfigServerOpen());
+
                 _setState(State::kFetchingDegradedGettingChangeEvent);
             } else {
                 _setState(State::kFetchingNormalGettingChangeEvent);
@@ -1243,26 +1418,49 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
             try {
                 readerContext.executeCursorRequests();
             } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
-                // Adjust end timestamp of the current segment and transition to degraded mode.
-                _segmentEndTimestamp =
-                    ResumeToken::parse(
-                        input.getDocument()[DocumentSourceChangeStream::kIdField].getDocument())
-                        .getData()
-                        .clusterTime +
-                    1;
+                if (!_params->cursorManager->isCursorOnConfigServerOpen() &&
+                    _params->cursorManager->getCurrentlyTargetedDataShards().empty()) {
+                    // No cursor is open, so we cannot proceed with fetching from the $mergeCursors
+                    // stage. Instead, start a new segment at the current event's timestamp to open
+                    // the required cursors from this point onwards.
+                    _segmentStartTimestamp = extractTimestampFromDocument(input.getDocument());
+                    LOGV2_DEBUG(12013811,
+                                3,
+                                STAGE_LOG_PREFIX
+                                "Encountered 'ShardNotFound' error and not having any cursors "
+                                "open. Adjusting start timestamp for "
+                                "segment and transitioning to starting new segment",
+                                "state"_attr = stateToString(_state),
+                                "error"_attr = redact(ex.toStatus()),
+                                "startTimestamp"_attr = _segmentStartTimestamp.value(),
+                                "isCursorOnConfigServerOpen"_attr =
+                                    _params->cursorManager->isCursorOnConfigServerOpen(),
+                                "currentlyTargetedDataShards"_attr =
+                                    _params->cursorManager->getCurrentlyTargetedDataShards(),
+                                "changeStream"_attr = _params->changeStream,
+                                "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
+                    _setState(State::kFetchingStartingChangeStreamSegment);
+                } else {
+                    // Adjust end timestamp of the current segment and transition to degraded mode.
+                    _segmentEndTimestamp = extractTimestampFromDocument(input.getDocument()) + 1;
 
-                LOGV2_DEBUG(10657543,
-                            3,
-                            STAGE_LOG_PREFIX
-                            "Encountered 'ShardNotFound' error. Adjusting end timestamp for "
-                            "segment and transitioning to degraded mode",
-                            "state"_attr = stateToString(_state),
-                            "error"_attr = redact(ex.toStatus()),
-                            "endTimestamp"_attr = _segmentEndTimestamp.value(),
-                            "changeStream"_attr = _params->changeStream,
-                            "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
+                    LOGV2_DEBUG(10657543,
+                                3,
+                                STAGE_LOG_PREFIX
+                                "Encountered 'ShardNotFound' error. Adjusting end timestamp for "
+                                "segment and transitioning to degraded mode",
+                                "state"_attr = stateToString(_state),
+                                "error"_attr = redact(ex.toStatus()),
+                                "endTimestamp"_attr = _segmentEndTimestamp.value(),
+                                "isCursorOnConfigServerOpen"_attr =
+                                    _params->cursorManager->isCursorOnConfigServerOpen(),
+                                "currentlyTargetedDataShards"_attr =
+                                    _params->cursorManager->getCurrentlyTargetedDataShards(),
+                                "changeStream"_attr = _params->changeStream,
+                                "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
 
-                _setState(State::kFetchingDegradedGettingChangeEvent);
+                    _setState(State::kFetchingDegradedGettingChangeEvent);
+                }
                 // Note: the current control event is lost here and will not be processed again.
             }
             return boost::none;
@@ -1314,9 +1512,8 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
 
     Timestamp eventTimestamp = [&]() {
         if (input.isAdvancedControlDocument()) {
-            // Extract the cluster time from the current event, via the "_id" field. This requires
-            // the "_id" field to be present for all events on mongos. It also requires parsing the
-            // resume token data, so we limit it to control events.
+            // Extract the cluster time from the current event. This requires parsing the resume
+            // token data, so we limit it to control events.
             return extractTimestampFromDocument(input.getDocument());
         }
 

@@ -165,6 +165,11 @@ public:
         virtual void closeCursorOnConfigServer(OperationContext* opCtx) = 0;
 
         /**
+         * Returns true if there is a cursor open on the config server.
+         */
+        virtual bool isCursorOnConfigServerOpen() const = 0;
+
+        /**
          * Returns the shards ids of the currently targeted data shards.
          */
         virtual const stdx::unordered_set<ShardId>& getCurrentlyTargetedDataShards() const = 0;

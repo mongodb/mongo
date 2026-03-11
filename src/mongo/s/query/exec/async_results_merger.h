@@ -339,6 +339,9 @@ public:
      * we will never return any future results which precede this key. If no results are ready to be
      * returned, this method may cause the high water mark to advance to the lowest promised sortkey
      * received from the shards. Returns an empty BSONObj if no such sort key is available.
+     *
+     * A side-effect of calling this method is that it can advance the 'AsyncResultsMerger's high
+     * watermark.
      */
     BSONObj getHighWaterMark();
 

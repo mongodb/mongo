@@ -163,6 +163,7 @@ ChangeStreamShardTargeterBase::startChangeStreamSegment(OperationContext* opCtx,
                     placement.getAnyRemovedShardDetected().value_or(false),
                 "openCursorAt"_attr = openCursorAt,
                 "nextPlacementChangedAt"_attr = nextPlacementChangedAt,
+                "isCursorOnConfigServerOpen"_attr = readerContext.isCursorOnConfigServerOpen(),
                 "currentActiveShards"_attr = readerContext.getCurrentlyTargetedDataShards(),
                 "shards"_attr = shards);
 
@@ -187,16 +188,19 @@ ChangeStreamShardTargeterBase::startChangeStreamSegment(OperationContext* opCtx,
     auto adjustCursors = [&]() {
         change_streams::updateActiveShardCursors(openCursorAt, shards, readerContext);
 
-        if (shards.empty()) {
-            // Collection/database was not allocated to any shards at PIT 'atClusterTime'. This
-            // means we need to wait for the database to be created. Open a cursor on the config
-            // server, so we get notified about future "insert" events into the "config.databases"
-            // namespaces that signals database creation.
+        if (shards.empty() && !nextPlacementChangedAt.has_value()) {
+            // The change stream segment is open-ended, and the collection/database was not
+            // allocated to any shards at PIT 'atClusterTime'. This means we need to wait for the
+            // database to be created. Open a cursor on the config server, so we get notified about
+            // future "insert" events into the "config.databases" namespaces that signals database
+            // creation.
             readerContext.openCursorOnConfigServer(openCursorAt);
         } else {
             // Collection/database is allocated to at least one shard, so we do not need the cursor
             // on the config server anymore (in case one was opened before).
-            readerContext.closeCursorOnConfigServer();
+            if (readerContext.isCursorOnConfigServerOpen()) {
+                readerContext.closeCursorOnConfigServer();
+            }
         }
     };
 
