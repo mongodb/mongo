@@ -10,6 +10,9 @@ exports_files(
     ]),
 )
 
+# Compiled without PGO because profile-guided optimization makes suboptimal decisions for
+# the bsoncolumn decompression templates, causing timeseries performance regressions.
+# Default -O2 heuristics produce better code for these files.
 mongo_cc_library(
     name = "column",
     srcs = [
@@ -18,6 +21,7 @@ mongo_cc_library(
         "bsoncolumnbuilder.cpp",
         "simple8b_type_util.cpp",
     ],
+    features = ["-pgo_profile_use"],
     deps = [
         "//src/mongo:base",
     ],
