@@ -111,7 +111,23 @@ const pipeline2 = [
     // },
 ];
 
-for (let pipeline of [pipeline1, pipeline2]) {
+const pipeline3 = [
+    {
+        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
+    },
+    {$unwind: {path: "$location", includeArrayIndex: "index"}},
+    // TODO SERVER-118768: Investigate why hybrid aggregate / SBE queries do not report spills.
+    // {
+    //     $project: {
+    //         locationName: false,
+    //         "location.extra": false,
+    //         "location.coordinates": false,
+    //         "colors": false,
+    //     },
+    // },
+];
+
+for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
     jsTest.log.info("Running pipeline: ", pipeline);
 
     const explain = animals.explain().aggregate(pipeline);

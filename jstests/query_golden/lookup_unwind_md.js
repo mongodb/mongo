@@ -7,7 +7,12 @@ import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md
 
 const lookups = [{$lookup: {from: "cities", localField: "_id", foreignField: "countryId", as: "cities"}}];
 
-const unwinds = [{$unwind: "$cities"}, {$unwind: {path: "$cities", preserveNullAndEmptyArrays: true}}];
+const unwinds = [
+    {$unwind: "$cities"},
+    {$unwind: {path: "$cities", preserveNullAndEmptyArrays: true}},
+    {$unwind: {path: "$cities", includeArrayIndex: "index"}},
+    {$unwind: {path: "$cities", preserveNullAndEmptyArrays: true, includeArrayIndex: "index"}},
+];
 
 const matches = [
     null, // Indicates no $match should be performed.

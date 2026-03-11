@@ -1154,7 +1154,8 @@ std::pair<SbStage, SbSlot> SbBuilder::makeHashLookupUnwind(
     SbSlot foreignKeySlot,
     SbSlot foreignRecordSlot,
     boost::optional<sbe::value::SlotId> collatorSlot,
-    sbe::JoinType joinType) {
+    sbe::JoinType joinType,
+    boost::optional<sbe::value::SlotId> indexSlot) {
     auto outputSlot = SbSlot{_state.slotId()};
 
     auto stage = sbe::makeS<sbe::HashLookupUnwindStage>(std::move(localStage),
@@ -1165,6 +1166,7 @@ std::pair<SbStage, SbSlot> SbBuilder::makeHashLookupUnwind(
                                                         outputSlot.getId(),
                                                         collatorSlot,
                                                         joinType,
+                                                        indexSlot,
                                                         _nodeId);
 
     return {std::move(stage), outputSlot};

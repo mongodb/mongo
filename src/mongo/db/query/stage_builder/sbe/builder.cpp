@@ -1995,84 +1995,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const Quer
                            getFieldSlot);
 }  // buildUnwind
 
-namespace {
-/**
- * This function produces an updated document expression by taking an input document ('docExpr')
- * and applying '{$addFields: {<outputPath>: <outputExpr>}}' to it with traversalDepth=0.
- */
-SbExpr projectUnwindOutputs(StageBuilderState& state,
-                            SbExpr docExpr,
-                            std::string outputPath,
-                            SbExpr outputExpr) {
-    constexpr int32_t traversalDepth = 0;
-
-    std::vector<std::string> paths;
-    std::vector<ProjectNode> nodes;
-
-    paths.emplace_back(std::move(outputPath));
-    nodes.emplace_back(std::move(outputExpr));
-
-    return generateProjection(state,
-                              projection_ast::ProjectType::kAddition,
-                              std::move(paths),
-                              std::move(nodes),
-                              std::move(docExpr),
-                              nullptr,
-                              traversalDepth);
-}
-
-/**
- * This function produces an updated document expression by taking an input document ('docExpr'),
- * applying '{$addFields: {<firstOutputPath>: <firstOutputExpr>}}' to it with traversalDepth=0,
- * and then applying '{$addFields: {<secondOutputPath>: <secondOutputExpr>}}' to it with
- * traversalDepth=0.
- *
- * As an optimization, if the two ouput paths do not conflict with each other, then the two
- * $addFields operations will be combined into a single $addFields operation like so:
- *   {$addFields: {<firstOutputPath>: <firstOutputExpr>, <secondOutputPath>: <secondOutputExpr>}}
- */
-SbExpr projectUnwindOutputs(StageBuilderState& state,
-                            SbExpr docExpr,
-                            std::string firstOutputPath,
-                            SbExpr firstOutputExpr,
-                            std::string secondOutputPath,
-                            SbExpr secondOutputExpr) {
-    constexpr int32_t traversalDepth = 0;
-
-    bool hasConflictingPaths = pathsAreConflicting(firstOutputPath, secondOutputPath);
-
-    if (!hasConflictingPaths) {
-        // If the first path and second path don't conflict with each other, then we can do a
-        // single projection to update both paths.
-        std::vector<std::string> paths;
-        std::vector<ProjectNode> nodes;
-
-        paths.emplace_back(std::move(firstOutputPath));
-        nodes.emplace_back(std::move(firstOutputExpr));
-
-        paths.emplace_back(std::move(secondOutputPath));
-        nodes.emplace_back(std::move(secondOutputExpr));
-
-        docExpr = generateProjection(state,
-                                     projection_ast::ProjectType::kAddition,
-                                     std::move(paths),
-                                     std::move(nodes),
-                                     std::move(docExpr),
-                                     nullptr,
-                                     traversalDepth);
-    } else {
-        // If the first path and second path conflict, then we do 2 projections: one projection
-        // to update the first path, and another projection to update the second path.
-        docExpr = projectUnwindOutputs(
-            state, std::move(docExpr), std::move(firstOutputPath), std::move(firstOutputExpr));
-        docExpr = projectUnwindOutputs(
-            state, std::move(docExpr), std::move(secondOutputPath), std::move(secondOutputExpr));
-    }
-
-    return docExpr;
-}
-}  // namespace
-
 /**
  * Builds only the unwind and project results part of an $unwind stage, allowing an $LU stage to
  * invoke just these parts of building its absorbed $unwind. For stand-alone $unwind this method is
@@ -2124,12 +2046,12 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
         // childResultSlot will be Nothing. Include the array index unconditionally.
         finalProjectExpr = b.makeIf(
             b.makeFunction("exists", getFieldSlot),
-            projectUnwindOutputs(
+            generateUnwindProjection(
                 _state, childResultSlot, unwindPath, unwindSlot, indexOutputPath, arrayIndexSlot),
-            projectUnwindOutputs(_state, childResultSlot, indexOutputPath, arrayIndexSlot));
+            generateUnwindProjection(_state, childResultSlot, indexOutputPath, arrayIndexSlot));
     } else {
         SbExpr unwindValProjExpr =
-            projectUnwindOutputs(_state, childResultSlot, unwindPath, unwindSlot);
+            generateUnwindProjection(_state, childResultSlot, unwindPath, unwindSlot);
 
         // If 'preserveNullAndEmptyArrays' is false, 'arrayIndexSlot' is Null if and only if
         // 'getFieldSlot' is Nothing or Null.

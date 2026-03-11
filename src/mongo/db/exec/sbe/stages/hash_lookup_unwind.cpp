@@ -49,6 +49,7 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
                                              value::SlotId lookupStageOutputSlot,
                                              boost::optional<value::SlotId> collatorSlot,
                                              sbe::JoinType joinType,
+                                             boost::optional<value::SlotId> indexSlot,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
     : PlanStage("hash_lookup_unwind"_sd,
@@ -60,6 +61,7 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
       _innerProjectSlot(innerProjectSlot),
       _lookupStageOutputSlot(lookupStageOutputSlot),
       _collatorSlot(collatorSlot),
+      _indexSlot(indexSlot),
       _joinType(joinType) {
     _children.emplace_back(std::move(outer));
     _children.emplace_back(std::move(inner));
@@ -78,6 +80,7 @@ std::unique_ptr<PlanStage> HashLookupUnwindStage::clone() const {
                                                    _lookupStageOutputSlot,
                                                    _collatorSlot,
                                                    _joinType,
+                                                   _indexSlot,
                                                    _commonStats.nodeId,
                                                    participateInTrialRunTracking());
 }
@@ -89,7 +92,7 @@ void HashLookupUnwindStage::prepare(CompileCtx& ctx) {
     if (_collatorSlot) {
         _collatorAccessor = getAccessor(ctx, *_collatorSlot);
         tassert(8229802,
-                "collator accessor should exist if collator slot provided to HashJoinStage",
+                "collator accessor should exist if collator slot provided to HashLookupUnwindStage",
                 _collatorAccessor != nullptr);
         auto [collatorTag, collatorVal] = _collatorAccessor->getViewOfValue();
         tassert(8229803,
@@ -128,6 +131,9 @@ void HashLookupUnwindStage::prepare(CompileCtx& ctx) {
 value::SlotAccessor* HashLookupUnwindStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (slot == _lookupStageOutputSlot) {
         return &_lookupStageOutputAccessor;
+    }
+    if (_indexSlot && *_indexSlot == slot) {
+        return &_lookupStageIndexAccessor;
     }
     return outerChild()->getAccessor(ctx, slot);
 }
@@ -200,6 +206,7 @@ PlanState HashLookupUnwindStage::getNext() {
             _hashTable.htIter.reset(_inOuterMatchAccessor->getViewOfValue());
             // No match yet.
             _innerSideMatched = false;
+            _matchIndex = 0;
         }
 
         size_t matchIndex = _hashTable.htIter.getNextMatchingIndex();
@@ -208,12 +215,21 @@ PlanState HashLookupUnwindStage::getNext() {
                 _hashTable.getValueAtIndex(matchIndex);
             tassert(11846701, "Expected non-empty innerMatch", innerMatch);
             _lookupStageOutputAccessor.reset(*innerMatch);
+            if (_indexSlot) {
+                _lookupStageIndexAccessor.reset(
+                    false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(_matchIndex));
+                ++_matchIndex;
+            }
             _innerSideMatched = true;
             return trackPlanState(PlanState::ADVANCED);
         }
         _outerKeyOpen = false;
         if (_joinType == sbe::JoinType::Left && !_innerSideMatched) {
             _lookupStageOutputAccessor.reset(false, value::TypeTags::Nothing, 0);
+            if (_indexSlot) {
+                // Match $unwind semantics: null when no match/element.
+                _lookupStageIndexAccessor.reset(false, value::TypeTags::Null, 0);
+            }
             return trackPlanState(PlanState::ADVANCED);
         }
     }  // while true
@@ -277,6 +293,9 @@ void HashLookupUnwindStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);
+    }
+    if (_indexSlot) {
+        DebugPrinter::addIdentifier(ret, *_indexSlot);
     }
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);

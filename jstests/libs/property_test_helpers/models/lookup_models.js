@@ -24,9 +24,14 @@ export function getEqLookupUnwindArb(fromArb) {
             localField: fieldArb,
             foreignField: fieldArb,
             as: assignableFieldArb,
+            preserveNullAndEmptyArrays: fc.boolean(),
         })
-        .map(({from, localField, foreignField, as}) => {
+        .map(({from, localField, foreignField, as, preserveNullAndEmptyArrays}) => {
             // The foreign side matches may appear out-of-order between control and experiment, so $unwind them as a workaround for result set comparison.
-            return [{$lookup: {from, localField, foreignField, as}}, {$unwind: {path: "$" + as}}];
+            const unwindSpec = {path: "$" + as};
+            if (preserveNullAndEmptyArrays) {
+                unwindSpec.preserveNullAndEmptyArrays = true;
+            }
+            return [{$lookup: {from, localField, foreignField, as}}, {$unwind: unwindSpec}];
         });
 }

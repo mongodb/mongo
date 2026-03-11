@@ -702,6 +702,39 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
     }
 }  // buildForeignMatches
 
+/**
+ * If 'indexSlotId' is provided, creates AggProjectStage that is used to build a 0-based counter per
+ * foreign row.
+ *
+ * Returns the vector of inner slots to be used in projections.
+ */
+std::pair<SbSlotVector /*inner projects*/, SbStage> buildLoopJoinInnerProjects(
+    StageBuilderState& state,
+    SbStage innerStage,
+    const PlanNodeId nodeId,
+    SbSlot matchedRecordSlot,
+    boost::optional<sbe::value::SlotId> indexSlotId) {
+    if (!indexSlotId) {
+        return {SbExpr::makeSV(matchedRecordSlot), std::move(innerStage)};
+    }
+
+    SbBuilder b(state, nodeId);
+    SbSlot indexSlot{*indexSlotId};
+    auto innerProj = SbExpr::makeSV(matchedRecordSlot, indexSlot);
+
+    // Build a 0-based counter per foreign row.
+    SbBlockAggExprVector sbAggExprs;
+    sbAggExprs.emplace_back(SbBlockAggExpr{b.makeInt64Constant(-1) /*init*/,
+                                           SbExpr{} /*blockAgg*/,
+                                           b.makeFunction("sum", b.makeInt64Constant(1)) /*agg*/},
+                            indexSlot);
+
+    VariableTypes varTypes;  // empty; we only use constants.
+    auto [aggStage, _] = b.makeAggProject(varTypes, std::move(innerStage), std::move(sbAggExprs));
+
+    return {innerProj, std::move(aggStage)};
+}  // buildLoopJoinInnerProjects
+
 std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     StageBuilderState& state,
     SbStage localStage,
@@ -712,6 +745,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
+    boost::optional<sbe::value::SlotId> indexSlot,
     bool forwardScanDirection) {
     SbBuilder b(state, nodeId);
 
@@ -730,14 +764,17 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     // Build the inner branch that will get the foreign key values, compare them to the local key
     // values and accumulate all matching foreign records into an array that is placed into
     // 'matchedRecordsSlot'.
-    auto [matchedRecordsSlot, innerRootStage] = buildForeignMatches(localKeySlot,
-                                                                    std::move(foreignStage),
-                                                                    foreignRecordSlot,
-                                                                    foreignFieldName,
-                                                                    scanFieldSlots[0],
-                                                                    nodeId,
-                                                                    state,
-                                                                    unwindSpec.has_value());
+    auto [matchedRecordsSlot, innerStage] = buildForeignMatches(localKeySlot,
+                                                                std::move(foreignStage),
+                                                                foreignRecordSlot,
+                                                                foreignFieldName,
+                                                                scanFieldSlots[0],
+                                                                nodeId,
+                                                                state,
+                                                                unwindSpec.has_value());
+
+    auto [innerProj, innerRootStage] = buildLoopJoinInnerProjects(
+        state, std::move(innerStage), nodeId, matchedRecordsSlot, indexSlot);
 
     // 'innerRootStage' should not participate in trial run tracking as the number of reads that
     // it performs should not influence planning decisions made for 'outerRootStage'.
@@ -754,7 +791,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
                                  std::move(innerRootStage),
                                  buildLocalSlots(state, localRecordSlot),
                                  SbExpr::makeSV(localKeySlot) /* outerCorrelated */,
-                                 SbExpr::makeSV(matchedRecordsSlot) /* innerProjects */,
+                                 std::move(innerProj) /* innerProjects */,
                                  SbExpr{} /* predicate */,
                                  joinType);
 
@@ -992,7 +1029,8 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     const IndexEntry& index,
     boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    boost::optional<UnwindNode::UnwindSpec> unwindSpec) {
+    boost::optional<UnwindNode::UnwindSpec> unwindSpec,
+    boost::optional<sbe::value::SlotId> indexSlot) {
     SbBuilder b(state, nodeId);
 
     CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
@@ -1016,14 +1054,17 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
     // value in BTree index, such as undefined, null and empty array. In hashed indexes, hash
     // collisions are possible.
-    auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatches(localKeysSetSlot,
-                                                                     std::move(scanNljStage),
-                                                                     foreignRecordSlot,
-                                                                     foreignFieldName,
-                                                                     foreignFieldTopLevelSlot,
-                                                                     nodeId,
-                                                                     state,
-                                                                     unwindSpec.has_value());
+    auto [foreignGroupSlot, foreignStage] = buildForeignMatches(localKeysSetSlot,
+                                                                std::move(scanNljStage),
+                                                                foreignRecordSlot,
+                                                                foreignFieldName,
+                                                                foreignFieldTopLevelSlot,
+                                                                nodeId,
+                                                                state,
+                                                                unwindSpec.has_value());
+
+    auto [innerProj, foreignGroupStage] = buildLoopJoinInnerProjects(
+        state, std::move(foreignStage), nodeId, foreignGroupSlot, indexSlot);
 
     // 'foreignGroupStage' should not participate in trial run tracking as the number of reads
     // that it performs should not influence planning decisions for 'localKeysSetStage'.
@@ -1039,7 +1080,7 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                    std::move(foreignGroupStage),
                                    buildLocalSlots(state, localRecordSlot),
                                    SbExpr::makeSV(localKeysSetSlot) /* outerCorrelated */,
-                                   SbExpr::makeSV(foreignGroupSlot) /* innerProjects */,
+                                   std::move(innerProj) /* innerProjects */,
                                    SbExpr{} /* predicate */,
                                    joinType);
     return {foreignGroupSlot, std::move(nljStage)};
@@ -1087,6 +1128,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
+    boost::optional<sbe::value::SlotId> indexSlot,
     bool forwardScanDirection) {
 
     SbBuilder b(state, nodeId);
@@ -1147,14 +1189,17 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                                     nestedLoopBranchForeignFieldTopLevelSlots[0]));
 
     SbSlot resultSlot = branchSlots[0];
-    auto [finalForeignSlot, finalForeignStage] = buildForeignMatches(localKeysSetSlot,
-                                                                     std::move(branchStage),
-                                                                     resultSlot,
-                                                                     foreignFieldName,
-                                                                     branchSlots[2],
-                                                                     nodeId,
-                                                                     state,
-                                                                     unwindSpec.has_value());
+    auto [finalForeignSlot, foreignStage] = buildForeignMatches(localKeysSetSlot,
+                                                                std::move(branchStage),
+                                                                resultSlot,
+                                                                foreignFieldName,
+                                                                branchSlots[2],
+                                                                nodeId,
+                                                                state,
+                                                                unwindSpec.has_value());
+
+    auto [innerProj, finalForeignStage] = buildLoopJoinInnerProjects(
+        state, std::move(foreignStage), nodeId, finalForeignSlot, indexSlot);
 
     //  'finalForeignStage' should not participate in trial run tracking as the number of
     //  reads that it performs should not influence planning decisions for 'outerRootStage'.
@@ -1172,7 +1217,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                        std::move(finalForeignStage),
                        buildLocalSlots(state, localRecordSlot),
                        SbExpr::makeSV(localKeysSetSlot, localRecordSlot) /* outerCorrelated */,
-                       SbExpr::makeSV(finalForeignSlot) /* innerProjects */,
+                       std::move(innerProj) /* innerProjects */,
                        SbExpr{} /* predicate */,
                        joinType);
 
@@ -1190,6 +1235,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
     boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
+    boost::optional<sbe::value::SlotId> indexSlot,
     bool forwardScanDirection) {
     SbBuilder b(state, nodeId);
 
@@ -1230,7 +1276,8 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
                                                                   foreignKeySlot,
                                                                   foreignRecordSlot,
                                                                   collatorSlot,
-                                                                  joinType);
+                                                                  joinType,
+                                                                  indexSlot);
         return {lookupStageOutputSlot, std::move(hl)};
     } else {
         // Plain $lookup without $unwind: use HashLookupStage.
@@ -1292,6 +1339,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
     const PlanNodeId nodeId,
     size_t numChildren,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
+    boost::optional<sbe::value::SlotId> indexSlot,
     bool forwardScanDirection) {
     SbBuilder b(state, nodeId);
 
@@ -1318,7 +1366,8 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
                                              *index,
                                              collatorSlot,
                                              nodeId,
-                                             unwindSpec);
+                                             unwindSpec,
+                                             indexSlot);
         }
         case mongo::EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
             tassert(8155500,
@@ -1336,6 +1385,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
                                                           collatorSlot,
                                                           nodeId,
                                                           unwindSpec,
+                                                          indexSlot,
                                                           forwardScanDirection);
         }
         case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
@@ -1350,6 +1400,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
                                        collatorSlot,
                                        nodeId,
                                        unwindSpec,
+                                       indexSlot,
                                        forwardScanDirection);
         }
         case EqLookupNode::LookupStrategy::kHashJoin: {
@@ -1364,6 +1415,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
                                             collatorSlot,
                                             nodeId,
                                             unwindSpec,
+                                            indexSlot,
                                             forwardScanDirection);
         }
         default:
@@ -1397,28 +1449,45 @@ std::pair<SbSlot, SbStage> buildLookupResultObject(SbStage stage,
     return {updatedDocSlot, std::move(outStage)};
 }
 
-std::pair<SbSlot, SbStage> buildLookupResultObject(SbStage stage,
-                                                   SbSlot localDocSlot,
-                                                   SbSlot resultArraySlot,
-                                                   const FieldPath& fieldPath,
-                                                   const PlanNodeId nodeId,
-                                                   StageBuilderState& state,
-                                                   bool shouldProduceBson) {
-    std::vector<std::string> paths;
-    paths.emplace_back(fieldPath.fullPath());
+std::pair<SbSlot, SbStage> buildLookupResultObject(
+    SbStage stage,
+    SbSlot localDocSlot,
+    SbSlot resultArraySlot,
+    const FieldPath& fieldPath,
+    const PlanNodeId nodeId,
+    StageBuilderState& state,
+    bool shouldProduceBson,
+    boost::optional<std::pair<FieldPath, SbSlot>> includeArrayIndex = boost::none) {
+    // Only "as" path.
+    if (!includeArrayIndex) {
+        std::vector<std::string> paths;
+        paths.emplace_back(fieldPath.fullPath());
 
-    std::vector<ProjectNode> nodes;
-    nodes.emplace_back(resultArraySlot);
+        std::vector<ProjectNode> nodes;
+        nodes.emplace_back(resultArraySlot);
 
-    return buildLookupResultObject(std::move(stage),
-                                   localDocSlot,
-                                   std::move(nodes),
-                                   std::move(paths),
-                                   nodeId,
-                                   state,
-                                   shouldProduceBson);
+        return buildLookupResultObject(std::move(stage),
+                                       localDocSlot,
+                                       std::move(nodes),
+                                       std::move(paths),
+                                       nodeId,
+                                       state,
+                                       shouldProduceBson);
+    }
+
+    // $LU case: project both "as" and "includeArrayIndex", honoring conflicting paths.
+    SbExpr updatedDocExpr = generateUnwindProjection(state,
+                                                     localDocSlot,
+                                                     fieldPath.fullPath(),
+                                                     resultArraySlot,
+                                                     includeArrayIndex->first.fullPath(),
+                                                     includeArrayIndex->second,
+                                                     shouldProduceBson);
+    SbBuilder b(state, nodeId);
+    auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(updatedDocExpr));
+    SbSlot updatedDocSlot = outSlots[0];
+    return {updatedDocSlot, std::move(outStage)};
 }
-
 
 }  // namespace
 
@@ -1467,6 +1536,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                          eqLookupNode->nodeId(),
                          eqLookupNode->children.size(),
                          boost::none /*unwindSpec*/,
+                         boost::none /*indexSlot*/,
                          isForward(eqLookupNode->scanDirection));
 
     auto [resultSlot, resultStage] = buildLookupResultObject(std::move(foreignStage),
@@ -1512,6 +1582,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
                 (foreignColl && foreignColl->ns() == foreignNss));
 
     boost::optional<sbe::value::SlotId> collatorSlot = _state.getCollatorSlot();
+    boost::optional<sbe::value::SlotId> indexSlotId = boost::none;
+    if (eqLookupUnwindNode->unwindSpec.indexPath.has_value()) {
+        indexSlotId = _state.slotId();
+    }
 
     auto [matchedDocumentsSlot, foreignStage] =
         buildLookupStage(_state,
@@ -1526,6 +1600,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
                          eqLookupUnwindNode->nodeId(),
                          eqLookupUnwindNode->children.size(),
                          eqLookupUnwindNode->unwindSpec,
+                         indexSlotId,
                          isForward(eqLookupUnwindNode->scanDirection));
 
     if (eqLookupUnwindNode->lookupStrategy ==
@@ -1544,13 +1619,30 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
                                matchedDocumentsSlot);
     }
 
+    boost::optional<std::pair<FieldPath, SbSlot>> includeArrayIndex = boost::none;
+    if (indexSlotId) {
+        SbSlot indexSlot{*indexSlotId};
+        // Loop joins use AggProjectStage to build a counter for the matched array index.
+        if (eqLookupUnwindNode->lookupStrategy != EqLookupNode::LookupStrategy::kHashJoin) {
+            // Handle missing (unmatched left join) as null.
+            SbExpr idxExpr = b.makeFillEmptyNull(SbSlot{*indexSlotId});
+
+            // Materialize idxExpr into a slot.
+            auto [projStage, outSlot] = b.makeProject(std::move(foreignStage), std::move(idxExpr));
+            foreignStage = std::move(projStage);
+            indexSlot = outSlot[0];
+        }
+        includeArrayIndex = boost::make_optional(
+            std::make_pair(*eqLookupUnwindNode->unwindSpec.indexPath, indexSlot));
+    }
     auto [resultSlot, resultStage] = buildLookupResultObject(std::move(foreignStage),
                                                              localRecordSlot,
                                                              matchedDocumentsSlot,
                                                              eqLookupUnwindNode->joinField,
                                                              eqLookupUnwindNode->nodeId(),
                                                              _state,
-                                                             eqLookupUnwindNode->shouldProduceBson);
+                                                             eqLookupUnwindNode->shouldProduceBson,
+                                                             includeArrayIndex);
 
     PlanStageSlots outputs;
     outputs.set(kResult, resultSlot);

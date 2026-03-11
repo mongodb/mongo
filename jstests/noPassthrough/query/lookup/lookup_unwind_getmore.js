@@ -89,6 +89,26 @@ runTest({
         {
             $lookup: {
                 from: "dest",
+                localField: "x",
+                foreignField: "x",
+                as: "matches",
+            },
+        },
+        {
+            $unwind: {
+                path: "$matches",
+                includeArrayIndex: "index",
+            },
+        },
+    ],
+    numResults: 5,
+});
+
+runTest({
+    pipeline: [
+        {
+            $lookup: {
+                from: "dest",
                 let: {x1: "$x"},
                 pipeline: [
                     {$match: {$expr: {$eq: ["$$x1", "$x"]}}},

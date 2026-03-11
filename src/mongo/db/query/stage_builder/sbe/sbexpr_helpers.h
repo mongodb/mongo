@@ -683,7 +683,8 @@ public:
         SbSlot foreignKeySlot,
         SbSlot foreignRecordSlot,
         boost::optional<sbe::value::SlotId> collatorSlot,
-        sbe::JoinType joinType = sbe::JoinType::Inner) {
+        sbe::JoinType joinType = sbe::JoinType::Inner,
+        boost::optional<sbe::value::SlotId> indexSlot = boost::none) {
         return makeHashLookupUnwind(VariableTypes{},
                                     std::move(localStage),
                                     std::move(foreignStage),
@@ -691,7 +692,8 @@ public:
                                     foreignKeySlot,
                                     foreignRecordSlot,
                                     collatorSlot,
-                                    joinType);
+                                    joinType,
+                                    indexSlot);
     }
 
     std::pair<SbStage, SbSlot> makeHashLookupUnwind(
@@ -702,7 +704,8 @@ public:
         SbSlot foreignKeySlot,
         SbSlot foreignRecordSlot,
         boost::optional<sbe::value::SlotId> collatorSlot,
-        sbe::JoinType joinType = sbe::JoinType::Inner);
+        sbe::JoinType joinType = sbe::JoinType::Inner,
+        boost::optional<sbe::value::SlotId> indexSlot = boost::none);
 
     SbStage makeHashJoin(SbStage outerStage,
                          SbStage innerStage,

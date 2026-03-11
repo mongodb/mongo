@@ -670,9 +670,8 @@ DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(
     // would be hard to do so here as it requires several inputs we do not have. It is also hard to
     // move that determination earlier as it occurs in the deep stack under createLegacyExecutor().
     if (nextUnwind && !_unwindSrc && nextUnwind->getUnwindPath() == _as.fullPath()) {
-        if (nextUnwind->indexPath() ||
-            // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
-            internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
+        // TODO SERVER-118544: Read the knob value through QueryKnobConfiguration.
+        if (internalQuerySlotBasedExecutionDisableLookupUnwindPushdown.loadRelaxed()) {
             downgradeSbeCompatibility(SbeCompatibility::notCompatible);
         } else if (!feature_flags::gFeatureFlagSbeEqLookupUnwind.checkWithContext(
                        getExpCtx()->getVersionContext(),

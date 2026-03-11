@@ -14,6 +14,7 @@ import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/comm
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getEqLookupUnwindAggPipelineArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
+import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
@@ -92,7 +93,13 @@ describe("$lookup-$unwind", function () {
             correctnessProperty,
             {controlColl, experimentColl, foreignControlColl, foreignExperimentColl},
             makeWorkloadModel({
-                collModel: getCollectionModel(),
+                collModel: getCollectionModel({
+                    docsModel: getDatasetModel({
+                        // PBT puts the query result set in a single document, so use less documents to not
+                        // exceed limit of 16793600 bytes.
+                        maxNumDocs: 100,
+                    }),
+                }),
                 aggModel,
                 numQueriesPerRun,
                 includeForeignCollection: true,

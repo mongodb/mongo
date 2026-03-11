@@ -85,7 +85,7 @@ void HashLookupStage::prepare(CompileCtx& ctx) {
     if (_collatorSlot) {
         _collatorAccessor = getAccessor(ctx, *_collatorSlot);
         tassert(6367801,
-                "collator accessor should exist if collator slot provided to HashJoinStage",
+                "collator accessor should exist if collator slot provided to HashLookupStage",
                 _collatorAccessor != nullptr);
         auto [collatorTag, collatorVal] = _collatorAccessor->getViewOfValue();
         tassert(6367805,

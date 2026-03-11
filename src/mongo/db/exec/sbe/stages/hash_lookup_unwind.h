@@ -75,9 +75,12 @@ namespace mongo::sbe {
  * for string equality. For example, this can be used to perform a case-insensitive matching on
  * string values.
  *
+ * An optional 'indexSlot' can be provided to get the matching index (in addition to matching
+ * document).
+ *
  * Debug string representation:
  *
- *   hash_lookup_unwind [inner|left] lookupStageOutputSlot collatorSlot?
+ *   hash_lookup_unwind [inner|left] lookupStageOutputSlot collatorSlot? indexSlot?
  *     outer outerKeySlot outerStage
  *     inner innerKeySlot innerProject innerStage
  */
@@ -91,6 +94,7 @@ public:
                           value::SlotId lookupStageOutputSlot,
                           boost::optional<value::SlotId> collatorSlot,
                           sbe::JoinType joinType,
+                          boost::optional<value::SlotId> indexSlot,
                           PlanNodeId planNodeId,
                           bool participateInTrialRunTracking = true);
 
@@ -164,6 +168,10 @@ private:
     value::MaterializedRow _lookupStageOutput;
     value::MaterializedSingleRowAccessor _lookupStageOutputAccessor{_lookupStageOutput,
                                                                     0 /* column */};
+
+    const boost::optional<value::SlotId> _indexSlot;
+    value::OwnedValueAccessor _lookupStageIndexAccessor;
+    int64_t _matchIndex{0};
 
     // LookupHashTable instance holding the inner collection.
     LookupHashTable _hashTable;

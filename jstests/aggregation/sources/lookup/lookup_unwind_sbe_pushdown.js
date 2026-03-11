@@ -131,14 +131,14 @@ describe("$LU pushdown", function () {
         assertSbeLookupUnwind(explain);
     });
 
-    it("Should not pushdown when includeArrayIndex is set", function () {
+    it("Should pushdown when includeArrayIndex is set", function () {
         const explain = this.collection
             .explain()
             .aggregate([
                 {$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "c"}},
                 {$unwind: {path: "$c", includeArrayIndex: "idx"}},
             ]);
-        assertClassicLookupUnwind(explain);
+        assertSbeLookupUnwind(explain);
     });
 
     it("Should not pushdown if a project is between lookup and unwind", function () {

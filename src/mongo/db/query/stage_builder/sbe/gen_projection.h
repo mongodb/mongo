@@ -305,6 +305,34 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      bool shouldProduceBson = true);
 
 /**
+ * This function produces an updated document expression by taking an input document ('docExpr')
+ * and applying '{$addFields: {<outputPath>: <outputExpr>}}' to it with traversalDepth=0.
+ */
+SbExpr generateUnwindProjection(StageBuilderState& state,
+                                SbExpr docExpr,
+                                std::string outputPath,
+                                SbExpr outputExpr,
+                                bool shouldProduceBson = true);
+
+/**
+ * This function produces an updated document expression by taking an input document ('docExpr'),
+ * applying '{$addFields: {<firstOutputPath>: <firstOutputExpr>}}' to it with traversalDepth=0,
+ * and then applying '{$addFields: {<secondOutputPath>: <secondOutputExpr>}}' to it with
+ * traversalDepth=0.
+ *
+ * As an optimization, if the two output paths do not conflict with each other, then the two
+ * $addFields operations will be combined into a single $addFields operation like so:
+ *   {$addFields: {<firstOutputPath>: <firstOutputExpr>, <secondOutputPath>: <secondOutputExpr>}}
+ */
+SbExpr generateUnwindProjection(StageBuilderState& state,
+                                SbExpr docExpr,
+                                std::string firstOutputPath,
+                                SbExpr firstOutputExpr,
+                                std::string secondOutputPath,
+                                SbExpr secondOutputExpr,
+                                bool shouldProduceBson = true);
+
+/**
  * Generates an SbExpr applies 'effects' to a document, retrieving the new values for each field
  * from 'slots'. The 'inputExpr' parameter provides the input document.
  */

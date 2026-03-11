@@ -25,7 +25,17 @@ function createIndex(currentJoinAlgorithm, coll, field) {
 
 function runTest(
     testConfig,
-    {testDescription, localRecords, localField, foreignRecords, foreignField, preserveNullAndEmptyArrays, matches},
+    {
+        testDescription,
+        localRecords,
+        localField,
+        foreignRecords,
+        foreignField,
+        preserveNullAndEmptyArrays,
+        matches,
+        joinPath = "matched",
+        indexPath = "index",
+    },
 ) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     testDescription += ` (joinAlgorithm: ${currentJoinAlgorithm.name})`;
@@ -38,13 +48,14 @@ function runTest(
                 from: foreignColl.getName(),
                 localField: localField,
                 foreignField: foreignField,
-                as: "matched",
+                as: joinPath,
             },
         },
         {
             $unwind: {
-                path: "$matched",
+                path: `\$${joinPath}`,
                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                includeArrayIndex: indexPath,
             },
         },
     ];
@@ -53,15 +64,28 @@ function runTest(
     const results = localColl.aggregate(pipeline, aggOptions).toArray();
     const explain = localColl.explain().aggregate(pipeline, aggOptions);
 
+    function getNestedValue(obj, path) {
+        return path.split(".").reduce((current, key) => current?.[key], obj);
+    }
+
     // Build the array of ids for the results.
     const matchedIds = results
         // -1 is used for no match.
         .map((x) => [x._id, x.matched ? x.matched._id : -1]);
 
+    // Build the array of indexes (includeArrayIndex) for the results.
+    // Note: A separate array is used because the order of the matches is not guaranteed.
+    const indexIds = results.map((x) => [x._id, getNestedValue(x, indexPath)]);
+
     // Order of the elements within the arrays is not significant for 'assertArrayEq'.
     assertArrayEq({
         actual: matchedIds,
-        expected: matches,
+        expected: matches.map((x) => [x[0], x[1]]),
+        extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain),
+    });
+    assertArrayEq({
+        actual: indexIds,
+        expected: matches.map((x) => [x[0], x[2]]),
         extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain),
     });
 }
@@ -101,15 +125,15 @@ function runTests(testConfig) {
             foreignField: "b",
             preserveNullAndEmptyArrays: false,
             matches: [
-                [0, 0],
-                [0, 1],
-                [1, 0],
-                [1, 1],
-                [2, 2],
-                [2, 4],
-                [3, 3],
-                [3, 4],
-                [4, 5],
+                [0, 0, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 1, 1],
+                [2, 2, 0],
+                [2, 4, 1],
+                [3, 3, 0],
+                [3, 4, 1],
+                [4, 5, 0],
             ],
         });
         runTest(testConfig, {
@@ -120,16 +144,16 @@ function runTests(testConfig) {
             foreignField: "b",
             preserveNullAndEmptyArrays: true,
             matches: [
-                [0, 0],
-                [0, 1],
-                [1, 0],
-                [1, 1],
-                [2, 2],
-                [2, 4],
-                [3, 3],
-                [3, 4],
-                [4, 5],
-                [5, -1],
+                [0, 0, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 1, 1],
+                [2, 2, 0],
+                [2, 4, 1],
+                [3, 3, 0],
+                [3, 4, 1],
+                [4, 5, 0],
+                [5, -1, null],
             ],
         });
         runTest(testConfig, {
@@ -140,15 +164,15 @@ function runTests(testConfig) {
             foreignField: "a",
             preserveNullAndEmptyArrays: false,
             matches: [
-                [0, 0],
-                [0, 1],
-                [1, 0],
-                [1, 1],
-                [2, 2],
-                [3, 3],
-                [4, 2],
-                [4, 3],
-                [5, 4],
+                [0, 0, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 1, 1],
+                [2, 2, 0],
+                [3, 3, 0],
+                [4, 2, 0],
+                [4, 3, 1],
+                [5, 4, 0],
             ],
         });
         runTest(testConfig, {
@@ -159,16 +183,58 @@ function runTests(testConfig) {
             foreignField: "a",
             preserveNullAndEmptyArrays: true,
             matches: [
-                [0, 0],
-                [0, 1],
-                [1, 0],
-                [1, 1],
-                [2, 2],
-                [3, 3],
-                [4, 2],
-                [4, 3],
-                [5, 4],
-                [6, -1],
+                [0, 0, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 1, 1],
+                [2, 2, 0],
+                [3, 3, 0],
+                [4, 2, 0],
+                [4, 3, 1],
+                [5, 4, 0],
+                [6, -1, null],
+            ],
+        });
+        // Join path is prefix of index path. Index is part of the matched foreign document.
+        runTest(testConfig, {
+            testDescription: `${testDescription}. `,
+            localRecords: localDocs,
+            localField: "a",
+            foreignRecords: foreignDocs,
+            foreignField: "b",
+            preserveNullAndEmptyArrays: false,
+            indexPath: "matched.index",
+            matches: [
+                [0, 0, 0],
+                [0, 1, 1],
+                [1, 0, 0],
+                [1, 1, 1],
+                [2, 2, 0],
+                [2, 4, 1],
+                [3, 3, 0],
+                [3, 4, 1],
+                [4, 5, 0],
+            ],
+        });
+        // Index path is prefix of join path. Index overwrites matched foreign document.
+        runTest(testConfig, {
+            testDescription: `${testDescription}. `,
+            localRecords: localDocs,
+            localField: "a",
+            foreignRecords: foreignDocs,
+            foreignField: "b",
+            preserveNullAndEmptyArrays: false,
+            joinPath: "index.matched",
+            matches: [
+                [0, -1, 0],
+                [0, -1, 1],
+                [1, -1, 0],
+                [1, -1, 1],
+                [2, -1, 0],
+                [2, -1, 1],
+                [3, -1, 0],
+                [3, -1, 1],
+                [4, -1, 0],
             ],
         });
     }
@@ -198,8 +264,8 @@ function runTests(testConfig) {
             foreignField: "b",
             preserveNullAndEmptyArrays: true,
             matches: [
-                [0, -1],
-                [1, -1],
+                [0, -1, null],
+                [1, -1, null],
             ],
         });
     }
@@ -247,6 +313,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$foreign1",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index1",
                             },
                         },
                         {
@@ -261,6 +328,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$foreign2",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index2",
                             },
                         },
                     ],
@@ -282,10 +350,12 @@ function runTests(testConfig) {
                         "_id": 0,
                         "b": 0,
                     },
+                    "index1": 0,
                     "foreign2": {
                         "_id": 0,
                         "c": 0,
                     },
+                    "index2": 0,
                 },
             ],
             false /*preserveNullAndEmptyArrays*/,
@@ -299,10 +369,12 @@ function runTests(testConfig) {
                         "_id": 0,
                         "b": 0,
                     },
+                    "index1": 0,
                     "foreign2": {
                         "_id": 0,
                         "c": 0,
                     },
+                    "index2": 0,
                 },
                 {
                     "_id": 1,
@@ -311,18 +383,24 @@ function runTests(testConfig) {
                         "_id": 1,
                         "b": 1,
                     },
+                    "index1": 0,
+                    "index2": null,
                 },
                 {
                     "_id": 2,
                     "a": 2,
+                    "index1": null,
                     "foreign2": {
                         "_id": 2,
                         "c": 2,
                     },
+                    "index2": 0,
                 },
                 {
                     "_id": 3,
                     "a": 42,
+                    "index1": null,
+                    "index2": null,
                 },
             ],
             true /*preserveNullAndEmptyArrays*/,
@@ -368,6 +446,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$foreign1",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index1",
                             },
                         },
                         {
@@ -382,6 +461,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$foreign2",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index2",
                             },
                         },
                     ],
@@ -403,10 +483,12 @@ function runTests(testConfig) {
                         "_id": 0,
                         "b": 0,
                     },
+                    "index1": 0,
                     "foreign2": {
                         "_id": 0,
                         "c": 0,
                     },
+                    "index2": 0,
                 },
             ],
             false /*preserveNullAndEmptyArrays*/,
@@ -420,10 +502,12 @@ function runTests(testConfig) {
                         "_id": 0,
                         "b": 0,
                     },
+                    "index1": 0,
                     "foreign2": {
                         "_id": 0,
                         "c": 0,
                     },
+                    "index2": 0,
                 },
                 {
                     "_id": 1,
@@ -432,13 +516,17 @@ function runTests(testConfig) {
                         "_id": 1,
                         "b": 1,
                     },
+                    "index1": 0,
+                    "index2": null,
                 },
                 {
                     "_id": 2,
                     "a": 42,
+                    "index1": null,
                     foreign2: {
                         _id: 3,
                     },
+                    "index2": 0,
                 },
             ],
             true /*preserveNullAndEmptyArrays*/,
@@ -473,6 +561,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$matched",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index",
                             },
                         },
                     ],
@@ -488,18 +577,18 @@ function runTests(testConfig) {
 
         testRunner(
             [
-                {_id: 0, a: 2, matched: {_id: 1, a: 0}},
-                {_id: 1, a: 0, matched: {_id: 2, a: 1}},
-                {_id: 2, a: 1, matched: {_id: 0, a: 2}},
+                {_id: 0, a: 2, matched: {_id: 1, a: 0}, index: 0},
+                {_id: 1, a: 0, matched: {_id: 2, a: 1}, index: 0},
+                {_id: 2, a: 1, matched: {_id: 0, a: 2}, index: 0},
             ],
             false /*preserveNullAndEmptyArrays*/,
         );
         testRunner(
             [
-                {_id: 0, a: 2, matched: {_id: 1, a: 0}},
-                {_id: 1, a: 0, matched: {_id: 2, a: 1}},
-                {_id: 2, a: 1, matched: {_id: 0, a: 2}},
-                {_id: 3, a: 42},
+                {_id: 0, a: 2, matched: {_id: 1, a: 0}, index: 0},
+                {_id: 1, a: 0, matched: {_id: 2, a: 1}, index: 0},
+                {_id: 2, a: 1, matched: {_id: 0, a: 2}, index: 0},
+                {_id: 3, a: 42, index: null},
             ],
             true /*preserveNullAndEmptyArrays*/,
         );
@@ -529,6 +618,7 @@ function runTests(testConfig) {
                             $unwind: {
                                 path: "$matched",
                                 preserveNullAndEmptyArrays: preserveNullAndEmptyArrays,
+                                includeArrayIndex: "index",
                             },
                         },
                     ],
@@ -543,7 +633,7 @@ function runTests(testConfig) {
         }
 
         testRunner([], false /*preserveNullAndEmptyArrays*/);
-        testRunner([{_id: 0, a: 1}], true /*preserveNullAndEmptyArrays*/);
+        testRunner([{_id: 0, a: 1, index: null}], true /*preserveNullAndEmptyArrays*/);
     }
 
     // Hashed indexes do not currently support array values, so skip the test.

@@ -686,6 +686,79 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
     return expr;
 }
 
+SbExpr generateUnwindProjection(StageBuilderState& state,
+                                SbExpr docExpr,
+                                std::string outputPath,
+                                SbExpr outputExpr,
+                                bool shouldProduceBson) {
+    constexpr int32_t traversalDepth = 0;
+
+    std::vector<std::string> paths;
+    std::vector<ProjectNode> nodes;
+
+    paths.emplace_back(std::move(outputPath));
+    nodes.emplace_back(std::move(outputExpr));
+
+    return generateProjection(state,
+                              projection_ast::ProjectType::kAddition,
+                              std::move(paths),
+                              std::move(nodes),
+                              std::move(docExpr),
+                              nullptr /* slots */,
+                              traversalDepth,
+                              shouldProduceBson);
+}
+
+
+SbExpr generateUnwindProjection(StageBuilderState& state,
+                                SbExpr docExpr,
+                                std::string firstOutputPath,
+                                SbExpr firstOutputExpr,
+                                std::string secondOutputPath,
+                                SbExpr secondOutputExpr,
+                                bool shouldProduceBson) {
+    constexpr int32_t traversalDepth = 0;
+
+    const bool hasConflictingPaths = pathsAreConflicting(firstOutputPath, secondOutputPath);
+
+    if (!hasConflictingPaths) {
+        // If the first path and second path don't conflict with each other, then we can do a
+        // single projection to update both paths.
+        std::vector<std::string> paths;
+        std::vector<ProjectNode> nodes;
+
+        paths.emplace_back(std::move(firstOutputPath));
+        nodes.emplace_back(std::move(firstOutputExpr));
+
+        paths.emplace_back(std::move(secondOutputPath));
+        nodes.emplace_back(std::move(secondOutputExpr));
+
+        return generateProjection(state,
+                                  projection_ast::ProjectType::kAddition,
+                                  std::move(paths),
+                                  std::move(nodes),
+                                  std::move(docExpr),
+                                  nullptr /* slots */,
+                                  traversalDepth,
+                                  shouldProduceBson);
+    }
+
+    // If the first path and second path conflict, then we do 2 projections: one projection
+    // to update the first path, and another projection to update the second path.
+    docExpr = generateUnwindProjection(state,
+                                       std::move(docExpr),
+                                       std::move(firstOutputPath),
+                                       std::move(firstOutputExpr),
+                                       shouldProduceBson);
+    docExpr = generateUnwindProjection(state,
+                                       std::move(docExpr),
+                                       std::move(secondOutputPath),
+                                       std::move(secondOutputExpr),
+                                       shouldProduceBson);
+
+    return docExpr;
+}
+
 ProjectActions evaluateFieldEffects(StageBuilderState& state,
                                     const FieldEffects& effects,
                                     const PlanStageSlots& slots) {

@@ -141,6 +141,44 @@ TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
     ASSERT(PlanState::IS_EOF == loopJoin->getNext());
 }
 
+TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
+    auto ctx = makeCompileCtx();
+
+    // Build a scan for the outer loop.
+    auto [outerScanSlot, outerScanStage] = generateVirtualScan(BSON_ARRAY(1 << 2));
+
+    // Build a scan for the inner loop.
+    auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
+
+    // Build and prepare for execution loop join of the two scan stages.
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(innerScanStage),
+                                         makeSV(outerScanSlot) /*outerProjects*/,
+                                         makeSV() /*outerCorrelated*/,
+                                         makeSV(innerScanSlot) /*innerProjects*/,
+                                         makeBoolConstant(false) /*predicate*/,
+                                         JoinType::Left,
+                                         kEmptyPlanNodeId);
+    prepareTree(ctx.get(), loopJoin.get());
+    auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
+    auto inner = loopJoin->getAccessor(*ctx, innerScanSlot);
+
+    // Expected output: each outer doc has no match, but it's part of the results due to left join
+    // being used.
+    std::vector<int> expected{1, 2};
+    int i = 0;
+    for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
+        ASSERT_LT(i, expected.size());
+
+        auto [outerTag, outerVal] = outer->getViewOfValue();
+        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i]);
+
+        auto [innerTag, innerVal] = inner->getViewOfValue();
+        assertValuesEqual(innerTag, innerVal, value::TypeTags::Nothing, 0);
+    }
+    ASSERT_EQ(i, expected.size());
+}
+
 TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
     auto ctx = makeCompileCtx();
 
