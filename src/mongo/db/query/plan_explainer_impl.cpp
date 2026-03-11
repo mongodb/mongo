@@ -962,6 +962,20 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                 break;
             }
             case STAGE_MULTI_PLAN: {
+                const MultiPlanStage* multiPlan = static_cast<const MultiPlanStage*>(stage);
+                const MultiPlanStats* multiPlanStats =
+                    static_cast<const MultiPlanStats*>(multiPlan->getSpecificStats());
+                // We want to ensure that the replanReason isn't both populated in MultiPlanStats
+                // and stored in this class. If the replanReason was already populated above then
+                // there should not also be a replanReason stored in MultiPlanStats.
+                if (!statsOut->replanReason.has_value()) {
+                    statsOut->replanReason = multiPlanStats->replanReason;
+                } else {
+                    tassert(12131700,
+                            "Replan reason should only come from one source",
+                            !multiPlanStats->replanReason.has_value());
+                }
+
                 statsOut->fromMultiPlanner = true;
                 break;
             }
