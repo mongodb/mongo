@@ -226,29 +226,29 @@ teams:
       - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U09EG3B1MR6>" # nick.beckenham@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
-      hot: 3
-      cold: 5
+      hot: 2
+      cold: 4
   - name: "Storage Engines - Foundations"
     slack_tags:
       - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U094DFQ4JGL>" # radoslav.kardum@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
-      hot: 3
-      cold: 5
+      hot: 2
+      cold: 4
   - name: "Storage Engines - Transactions"
     slack_tags:
       - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@UKGR8F9C7>" # haribabu.kommi@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
-      hot: 3
-      cold: 5
+      hot: 2
+      cold: 4
   - name: "Storage Engines - Persistence"
     slack_tags:
       - "<@U0AJK68RVGT>" # mark.hunter@mongodb.com - Director
       - "<@U01JK626XEY>" # etienne.petrel@mongodb.com - Lead
     thresholds: # Reduced Quotas for Storage Engines
-      hot: 3
-      cold: 5
+      hot: 2
+      cold: 4
   - name: "Storage Layer Services"
     slack_tags:
       - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
