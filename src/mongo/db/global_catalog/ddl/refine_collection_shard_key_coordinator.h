@@ -72,9 +72,7 @@ private:
         return idl::serialize(phase);
     }
 
-    bool _mustAlwaysMakeProgress() override {
-        return _doc.getPhase() > Phase::kRemoteIndexValidation;
-    }
+    bool _mustAlwaysMakeProgress() override;
 
     void _performNoopWriteOnDataShardsAndConfigServer(
         OperationContext* opCtx,
@@ -85,6 +83,14 @@ private:
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
+    void _exitCriticalSection(OperationContext* opCtx,
+                              const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                              const CancellationToken& token);
 
     const mongo::RefineCollectionShardKeyRequest _request;
 

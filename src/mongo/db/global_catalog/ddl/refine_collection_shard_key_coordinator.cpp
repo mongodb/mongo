@@ -71,7 +71,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
 
 namespace {
@@ -154,6 +153,14 @@ void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& 
 
 void RefineCollectionShardKeyCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
     cmdInfoBuilder->appendElements(_request.toBSON());
+}
+
+bool RefineCollectionShardKeyCoordinator::_mustAlwaysMakeProgress() {
+    // In phases equal or greater than kRemoteIndexValidation, always make progress means cleanup
+    // must be called to ensure migrations are re-enabled and the critical section released. In
+    // phases equal or greater than kCommit always make progress means to repeat the phases until
+    // the DDL finishes succesfully.
+    return _doc.getPhase() >= Phase::kRemoteIndexValidation;
 }
 
 void RefineCollectionShardKeyCoordinator::_performNoopWriteOnDataShardsAndConfigServer(
@@ -346,28 +353,16 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 // removable that was committed during the critical section.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
-        .then(_buildPhaseHandler(
-            Phase::kReleaseCritSec,
-            [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
-                if (!_firstExecution) {
-                    const auto session = getNewSession(opCtx);
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), session, **executor, token);
-                }
+        .then(_buildPhaseHandler(Phase::kReleaseCritSec,
+                                 [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
+                                     if (!_firstExecution) {
+                                         const auto session = getNewSession(opCtx);
+                                         _performNoopWriteOnDataShardsAndConfigServer(
+                                             opCtx, nss(), session, **executor, token);
+                                     }
 
-                ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
-                unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-                unblockCRUDOperationsRequest.setReason(_critSecReason);
-                unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
-
-                generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
-                generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
-                                                               getNewSession(opCtx));
-                auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
-                    **executor, token, unblockCRUDOperationsRequest);
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
-            }))
+                                     _exitCriticalSection(opCtx, executor, token);
+                                 }))
         .then(_buildPhaseHandler(
             Phase::kResumeMigrations,
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
@@ -388,6 +383,18 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             sharding_util::tellShardsToRefreshCollection(
                 opCtx, getShardsWithDataForCollection(opCtx, nss()), nss(), **executor);
         })
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            // Ensure migrations are re-enabled and the critical section released if we haven't
+            // committed.
+            if (!_isRetriableErrorForDDLCoordinator(status) && _doc.getPhase() < Phase::kCommit &&
+                _doc.getPhase() >= Phase::kRemoteIndexValidation) {
+                const auto opCtxHolder = makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                triggerCleanup(opCtx, status);
+                MONGO_UNREACHABLE_TASSERT(11761500);
+            }
+            return status;
+        })
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
@@ -399,18 +406,48 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 notifyChangeStreamsOnRefineCollectionShardKeyComplete(
                     opCtx, nss(), _doc.getNewShardKey(), _doc.getOldKey().get(), *_doc.getUuid());
             }
-
-            // If a non retriable error during index validation occurs we will end the coordinator,
-            // so we need to resume migrations just in case we managed to stop them in the first
-            // phase.
-            if (!finalStatus.isOK() && _doc.getPhase() >= Phase::kRemoteIndexValidation &&
-                !_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(finalStatus)) {
-                const auto session = getNewSession(opCtx);
-                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
-            }
-
             return finalStatus;
         });
 }
 
+ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+
+            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                opCtx, getNewSession(opCtx), **executor, token);
+
+            if (_doc.getPhase() >= Phase::kBlockCrud) {
+                _exitCriticalSection(opCtx, executor, token);
+            }
+
+            if (_doc.getPhase() >= Phase::kRemoteIndexValidation) {
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
+            }
+        });
+}
+
+void RefineCollectionShardKeyCoordinator::_exitCriticalSection(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
+    unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
+    unblockCRUDOperationsRequest.setReason(_critSecReason);
+    unblockCRUDOperationsRequest.setClearFilteringMetadata(true);
+
+    generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
+    generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
+                                                   getNewSession(opCtx));
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+        **executor, token, unblockCRUDOperationsRequest);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, getShardsWithDataForCollection(opCtx, nss()));
+}
 }  // namespace mongo
