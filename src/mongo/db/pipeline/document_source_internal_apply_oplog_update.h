@@ -86,6 +86,7 @@ public:
                                      LookupRequirement::kNotAllowed,
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
+        constraints.preservesCardinality = true;
         constraints.canSwapWithMatch = false;
         constraints.canSwapWithSkippingOrLimitingStage = true;
         constraints.isAllowedWithinUpdatePipeline = true;

@@ -320,6 +320,7 @@ struct MONGO_MOD_PUBLIC StageConstraints {
     void setConstraintsForNoInputSources() {
         requiresInputDocSource = false;
         consumesLogicalCollectionData = false;
+        preservesCardinality = false;
     }
 
     // Indicates whether this stage needs to be at a particular position in the pipeline.
@@ -357,6 +358,10 @@ struct MONGO_MOD_PUBLIC StageConstraints {
     // input DocumentSource (via 'pSource'). Must be set using the 'setConstraintsForNoInputSources'
     // helper method.
     bool requiresInputDocSource = true;
+
+    // True if this stage may increase or reduce the number of documents it outputs compared to the
+    // main input collection. By default we are assuming that the stage may alter the cardinality.
+    bool preservesCardinality = false;
 
     // True if this stage operates on a global or database level, like $currentOp.
     bool isIndependentOfAnyCollection = false;
@@ -422,6 +427,7 @@ struct MONGO_MOD_PUBLIC StageConstraints {
             transactionRequirement == other.transactionRequirement &&
             lookupRequirement == other.lookupRequirement && streamType == other.streamType &&
             requiresInputDocSource == other.requiresInputDocSource &&
+            preservesCardinality == other.preservesCardinality &&
             isIndependentOfAnyCollection == other.isIndependentOfAnyCollection &&
             canSwapWithMatch == other.canSwapWithMatch &&
             canSwapWithSkippingOrLimitingStage == other.canSwapWithSkippingOrLimitingStage &&

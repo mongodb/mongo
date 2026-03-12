@@ -102,6 +102,7 @@ public:
             LookupRequirement::kAllowed,
             UnionRequirement::kAllowed,
         };
+        result.preservesCardinality = true;
         result.canSwapWithMatch = true;
         return result;
     }

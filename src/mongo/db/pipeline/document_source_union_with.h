@@ -194,6 +194,9 @@ public:
             unionConstraints = StageConstraints::getStrictestConstraints(
                 _sharedState->_pipeline->getSources(), unionConstraints);
         }
+        // unionWith alters the number of documents compared to the main collection. Thus, we set
+        // that it doesn't preserve cardinality.
+        unionConstraints.preservesCardinality = false;
         // DocumentSourceUnionWith cannot directly swap with match but it contains custom logic in
         // the optimizeAt() member function to allow itself to duplicate any match ahead in the
         // current pipeline and place one copy inside its sub-pipeline and one copy behind in the

@@ -101,6 +101,7 @@ public:
                                          ? LookupRequirement::kNotAllowed
                                          : LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed};
+        constraints.preservesCardinality = true;
         if (_mergeShardId) {
             constraints.mergeShardId = _mergeShardId;
         }

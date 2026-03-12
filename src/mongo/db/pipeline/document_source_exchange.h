@@ -65,14 +65,18 @@ public:
                            const std::shared_ptr<ResourceYielder>& yielder);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kNone,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kNotAllowed,
+                                     UnionRequirement::kNotAllowed);
+        // Given that the exchange stage accumulates results from all workers, the overall logical
+        // number of documents remains the same.
+        constraints.preservesCardinality = true;
+        return constraints;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(

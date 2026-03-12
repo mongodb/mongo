@@ -76,15 +76,19 @@ public:
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
-        return StageConstraints{StreamType::kStreaming,
-                                PositionRequirement::kNone,
-                                HostTypeRequirement::kNone,
-                                DiskUseRequirement::kNoDiskUse,
-                                FacetRequirement::kAllowed,
-                                TransactionRequirement::kAllowed,
-                                LookupRequirement::kAllowed,
-                                UnionRequirement::kAllowed,
-                                ChangeStreamRequirement::kAllowlist};
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kAllowlist);
+        // Given that InternalInhibit stage despite being a passthrough stage, should not take part
+        // in any optimization, we explicitely set that it doesn't preserve cardinality.
+        constraints.preservesCardinality = false;
+        return constraints;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(

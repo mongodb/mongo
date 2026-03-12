@@ -112,6 +112,7 @@ public:
                 _subPipeline->getSources(), setVariableConstraints);
         }
         // This stage doesn't modify documents.
+        setVariableConstraints.preservesCardinality = true;
         setVariableConstraints.preservesOrderAndMetadata = true;
         setVariableConstraints.canSwapWithSkippingOrLimitingStage = true;
         return setVariableConstraints;

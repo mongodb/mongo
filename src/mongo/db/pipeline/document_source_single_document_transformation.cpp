@@ -77,6 +77,7 @@ StageConstraints DocumentSourceSingleDocumentTransformation::constraints(
                                  LookupRequirement::kAllowed,
                                  UnionRequirement::kAllowed,
                                  ChangeStreamRequirement::kAllowlist);
+    constraints.preservesCardinality = true;
     constraints.canSwapWithMatch = true;
     constraints.canSwapWithSkippingOrLimitingStage = true;
     constraints.isAllowedWithinUpdatePipeline = true;

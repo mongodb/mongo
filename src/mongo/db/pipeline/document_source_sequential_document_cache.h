@@ -88,6 +88,7 @@ public:
                                      UnionRequirement::kAllowed);
 
         if (_cache->isBuilding()) {
+            constraints.preservesCardinality = true;
             constraints.requiresInputDocSource = true;
         } else {
             constraints.setConstraintsForNoInputSources();

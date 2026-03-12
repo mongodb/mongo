@@ -80,6 +80,7 @@ StageConstraints DocumentSourceReshardingAddResumeId::constraints(
                                  LookupRequirement::kNotAllowed,
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kDenylist);
+    constraints.preservesCardinality = true;
     constraints.consumesLogicalCollectionData = false;
     return constraints;
 }

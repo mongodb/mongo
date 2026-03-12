@@ -71,6 +71,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kAllowlist);
+        constraints.preservesCardinality = true;
         constraints.isAllowedWithinUpdatePipeline = true;
         return constraints;
     }

@@ -108,6 +108,7 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kChangeStreamStage);
 
+        constraints.preservesCardinality = true;
         constraints.canSwapWithMatch = true;
         constraints.consumesLogicalCollectionData = false;
         return constraints;
