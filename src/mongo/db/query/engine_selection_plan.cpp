@@ -28,9 +28,6 @@
  */
 #include "mongo/db/query/engine_selection_plan.h"
 
-#include "mongo/bson/json.h"
-#include "mongo/db/query/canonical_query.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {

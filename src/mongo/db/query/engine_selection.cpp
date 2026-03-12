@@ -29,23 +29,10 @@
 
 #include "mongo/db/query/engine_selection.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/db/exec/classic/delete_stage.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/sbe_pushdown.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/engine_selection_plan.h"
-#include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/query_utils.h"
-
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -359,6 +359,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "query_planner_params",
+    srcs = [
+        "query_planner_params.cpp",
+        "wildcard_multikey_paths.cpp",
+    ],
+    deps = [
+        "collection_query_info",
+        "query_planner",
+        "//src/mongo/s/query:sharding_helpers",
+        "//src/mongo/s/query/exec:target_write_op",
+    ],
+)
+
+mongo_cc_library(
     name = "bucket_predicate_generator",
     srcs = [
         "//src/mongo/db/query/timeseries:bucket_level_comparison_predicate_generator.cpp",
@@ -551,6 +565,21 @@ mongo_cc_library(
         ":canonical_query_base",
         ":query_test_service_context",
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "engine_selection",
+    srcs = [
+        "engine_selection.cpp",
+        "engine_selection_plan.cpp",
+        "//src/mongo/db/pipeline:sbe_pushdown.cpp",
+    ],
+    deps = [
+        "canonical_query_base",
+        "query_planner",
+        "query_planner_params",
+        "//src/mongo/db/pipeline",
     ],
 )
 
