@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
@@ -79,7 +80,8 @@ MONGO_FAIL_POINT_DEFINE(keyRefreshFailWithReadConcernMajorityNotAvailableYet);
 // Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
 // a successful refresh.
 MONGO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
-
+// Verifies that the key refresh task type is non-deprioritizable
+MONGO_FAIL_POINT_DEFINE(verifyKeyRefreshTaskType);
 }  // unnamed namespace
 
 namespace keys_collection_manager_util {
@@ -318,6 +320,15 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
         {
             auto opCtx = cc().makeOperationContext();
+
+            // Mark key collection operations non-deprioritizable
+            mongo::admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
+                opCtx.get());
+
+            verifyKeyRefreshTaskType.execute([&](const BSONObj&) {
+                invariant(ExecutionAdmissionContext::get(opCtx.get()).getTaskType() ==
+                          ExecutionAdmissionContext::TaskType::NonDeprioritizable);
+            });
 
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
             latestKeyStatus = latestKeyStatusWith.getStatus();

@@ -684,6 +684,17 @@ public:
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
+            // TODO: SERVER-121373 remove this and provide a more
+            // generic way of marking remote query as non-deprioritizable Key collection operations
+            // issued remotely by shards/mongos for key refresh should not be deprioritized. These
+            // are system-critical operations that must complete to allow cluster time validation.
+            const bool isKeysCollectionNss = (_ns == NamespaceString::kKeysCollectionNamespace);
+            boost::optional<admission::execution_control::ScopedTaskTypeNonDeprioritizable>
+                keysCollectionTaskType;
+            if (isKeysCollectionNss && opCtx->getClient()->isInternalClient()) {
+                keysCollectionTaskType.emplace(opCtx);
+            }
+
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility
             // rules in the case of secondaries. We normally only read from these nodes at batch
             // boundaries, but in this specific case we should fetch all new entries, to be

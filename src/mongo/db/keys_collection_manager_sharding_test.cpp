@@ -583,6 +583,79 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
 }
 
+TEST_F(KeysManagerShardedTest, RefreshOperationsAreNonDeprioritizable) {
+    // This test verifies that key refresh operations are marked with
+    // TaskType::NonDeprioritizable to prevent them from being demoted to low priority
+    // by the heuristic deprioritization mechanism.
+    //
+    // The failpoint 'verifyKeyRefreshTaskType' contains an invariant that checks
+    // the TaskType is NonDeprioritizable. If the invariant fails, the test will crash.
+    // If the test completes successfully, the TaskType was correctly set.
+
+    keyManager()->startMonitoring(getServiceContext());
+
+    const LogicalTime currentTime(Timestamp(100, 0));
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
+
+    keyManager()->enableKeyGenerator(operationContext(), true);
+
+    {
+        // Enable the failpoint that verifies TaskType is NonDeprioritizable.
+        // The failpoint will trigger an invariant failure if the TaskType is wrong.
+        FailPointEnableBlock verifyTaskType("verifyKeyRefreshTaskType");
+
+        // Trigger a refresh - this will execute the failpoint check inside the
+        // background thread where ScopedTaskTypeNonDeprioritizable is applied.
+        keyManager()->refreshNow(operationContext());
+    }
+
+    // If we reach here, the invariant in the failpoint passed, meaning the
+    // TaskType was correctly set to NonDeprioritizable during the refresh.
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 100)));
+    ASSERT_OK(keyStatus.getStatus());
+}
+
+TEST_F(KeysManagerShardedTest, KeyGenerationOperationsAreNonDeprioritizable) {
+    // This test verifies that key generation operations are marked with
+    // TaskType::NonDeprioritizable to prevent them from being demoted to low priority
+    // by the heuristic deprioritization mechanism.
+    //
+    // Key generation occurs when enableKeyGenerator(true) is called, which switches
+    // the refresh function to include KeyGenerator::generateNewKeysIfNeeded().
+    // The failpoint 'verifyKeyRefreshTaskType' contains an invariant that checks
+    // the TaskType is NonDeprioritizable during both refresh and key generation.
+
+    keyManager()->startMonitoring(getServiceContext());
+
+    const LogicalTime currentTime(Timestamp(100, 0));
+    VectorClockMutable::get(operationContext())->tickClusterTimeTo(currentTime);
+
+    // Enable key generation - this switches the refresh function to include key generation
+    keyManager()->enableKeyGenerator(operationContext(), true);
+
+    {
+        // Enable the failpoint that verifies TaskType is NonDeprioritizable.
+        // The failpoint will trigger an invariant failure if the TaskType is wrong.
+        FailPointEnableBlock verifyTaskType("verifyKeyRefreshTaskType");
+
+        // Trigger a refresh with key generation enabled - this will:
+        // 1. Apply ScopedTaskTypeNonDeprioritizable
+        // 2. Execute KeyGenerator::generateNewKeysIfNeeded()
+        // 3. Refresh the cache
+        // The failpoint verifies the TaskType during this entire operation.
+        keyManager()->refreshNow(operationContext());
+    }
+
+    // If we reach here, the invariant in the failpoint passed, meaning the
+    // TaskType was correctly set to NonDeprioritizable during key generation.
+    auto keyStatus = keyManager()->getKeyForSigning(nullptr, LogicalTime(Timestamp(100, 100)));
+    ASSERT_OK(keyStatus.getStatus());
+
+    // Verify a key was actually generated
+    auto key = keyStatus.getValue();
+    ASSERT_EQ(Timestamp(101, 0), key.getExpiresAt().asTimestamp());
+}
+
 class KeysManagerDirectTest : public ConfigServerTestFixture {
 protected:
     KeysManagerDirectTest() : ConfigServerTestFixture(Options{}.useMockClock(true)) {}

@@ -1208,6 +1208,7 @@ mongo_cc_library(
         ":service_context",
         ":signed_logical_time",
         "//src/mongo/crypto:sha_block",
+        "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/repl:repl_coordinator_interface",
