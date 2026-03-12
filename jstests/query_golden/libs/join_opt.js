@@ -57,7 +57,6 @@ export function joinTestWrapper(testFun) {
             internalEnableJoinOptimization: 1,
             internalJoinReorderMode: 1,
             internalJoinPlanTreeShape: 1,
-            internalRandomJoinReorderDefaultToHashJoin: 1,
             internalMaxNodesInJoinGraph: 1,
             internalMaxEdgesInJoinGraph: 1,
             internalMaxNumberNodesConsideredForImplicitEdges: 1,

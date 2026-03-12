@@ -106,7 +106,7 @@ function runBasicJoinTest(pipeline) {
         "With random order, index join",
         coll,
         pipeline,
-        {internalJoinReorderMode: "random", internalRandomJoinReorderDefaultToHashJoin: false},
+        {internalJoinReorderMode: "random"},
         noJoinOptResults,
     );
 

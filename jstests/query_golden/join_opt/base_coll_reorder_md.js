@@ -72,7 +72,6 @@ function runRandomReorderTests(pipeline) {
             setParameter: 1,
             internalJoinReorderMode: "random",
             internalEnableJoinOptimization: true,
-            internalRandomJoinReorderDefaultToHashJoin: true,
         }),
     );
     let seed = 0;

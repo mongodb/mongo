@@ -86,7 +86,6 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
         internalQueryPlannerUseMultiplannerForSingleSolutions.loadRelaxed();
 
     _isJoinOrderingEnabled = internalEnableJoinOptimization.load();
-    _randomJoinReorderDefaultToHashJoin = internalRandomJoinReorderDefaultToHashJoin.load();
     _randomJoinOrderSeed = internalRandomJoinOrderSeed.load();
     _joinReorderMode = ServerParameterSet::getNodeParameterSet()
                            ->get<JoinReorderMode>("internalJoinReorderMode")
@@ -142,10 +141,6 @@ size_t QueryKnobConfiguration::getRandomJoinOrderSeed() const {
 
 bool QueryKnobConfiguration::isJoinOrderingEnabled() const {
     return _isJoinOrderingEnabled;
-}
-
-bool QueryKnobConfiguration::getRandomJoinReorderDefaultToHashJoin() const {
-    return _randomJoinReorderDefaultToHashJoin;
 }
 
 JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {

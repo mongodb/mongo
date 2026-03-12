@@ -77,7 +77,6 @@ public:
      * Query knobs configuring join reordering.
      */
     bool isJoinOrderingEnabled() const;
-    bool getRandomJoinReorderDefaultToHashJoin() const;
     size_t getRandomJoinOrderSeed() const;
     JoinReorderModeEnum getJoinReorderMode() const;
     JoinPlanTreeShapeEnum getJoinPlanTreeShape() const;
@@ -142,7 +141,6 @@ private:
 
     // Join-ordering values.
     bool _isJoinOrderingEnabled;
-    bool _randomJoinReorderDefaultToHashJoin;
     int64_t _randomJoinOrderSeed;
     JoinReorderModeEnum _joinReorderMode;
     JoinPlanTreeShapeEnum _joinPlanTreeShape;

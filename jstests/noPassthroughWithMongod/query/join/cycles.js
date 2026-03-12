@@ -381,14 +381,6 @@ print(`Running all test cases with random enumeration and NLJ`);
 runAllTestCases({
     internalJoinReorderMode: "random",
     internalRandomJoinOrderSeed: 44,
-    internalRandomJoinReorderDefaultToHashJoin: false,
-});
-
-print(`Running all test cases with random enumeration and default to HJ`);
-runAllTestCases({
-    internalJoinReorderMode: "random",
-    internalRandomJoinOrderSeed: 44,
-    internalRandomJoinReorderDefaultToHashJoin: true,
 });
 
 // Construct indexes to test INLJ.
@@ -416,5 +408,4 @@ print(`Running all test cases with random enumeration and INLJ`);
 runAllTestCases({
     internalJoinReorderMode: "random",
     internalRandomJoinOrderSeed: 44,
-    internalRandomJoinReorderDefaultToHashJoin: false,
 });

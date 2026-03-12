@@ -39,12 +39,10 @@ const testCases = [
     },
     {
         internalJoinReorderMode: "random",
-        internalRandomJoinReorderDefaultToHashJoin: true,
         internalRandomJoinOrderSeed: 42,
     },
     {
         internalJoinReorderMode: "random",
-        internalRandomJoinReorderDefaultToHashJoin: false,
         internalRandomJoinOrderSeed: 64,
     },
 ];

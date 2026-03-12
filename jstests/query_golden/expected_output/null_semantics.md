@@ -25,7 +25,7 @@ rightEmbeddingField: "lf"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -39,7 +39,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -98,7 +98,7 @@ rightEmbeddingField: "lf"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -112,7 +112,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -151,7 +151,7 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -165,7 +165,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -216,7 +216,7 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -230,7 +230,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -282,7 +282,7 @@ rightEmbeddingField: "lf2"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -303,7 +303,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -361,7 +361,7 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -382,7 +382,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -453,7 +453,7 @@ rightEmbeddingField: "cor2"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -474,7 +474,7 @@ rightEmbeddingField: "cor2"
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -532,7 +532,7 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -561,7 +561,7 @@ rightEmbeddingField: "lf"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
@@ -628,7 +628,7 @@ rightEmbeddingField: "c4"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
 ```
@@ -663,7 +663,7 @@ rightEmbeddingField: "none"
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
 ```
-### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
+### internalJoinReorderMode = random, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
 ```
