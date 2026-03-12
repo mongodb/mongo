@@ -16,8 +16,10 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
-    areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps,
+    isViewlessTimeseriesOnlySuite,
+    isViewfulTimeseriesOnlySuite,
+    isTrackedTimeseries,
+    getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 // TODO (SERVER-117871) remove once the topologyTime is guaranteed to be gossiped out to all routers.
@@ -30,10 +32,9 @@ const timeFieldName = "timestamp";
 const metaFieldName = "metadata";
 
 function validateCollectionMetadata(coll, metadata, onAdminDB) {
-    jsTest.log(`Context | nss: ${coll.getFullName()}, tracked: ${coll._isSharded()}, onAdminDB: ${onAdminDB}`);
+    jsTest.log(`Context | nss: ${coll.getFullName()}, tracked: ${isTrackedTimeseries(coll)}, onAdminDB: ${onAdminDB}`);
     jsTest.log(`Collection metadata: ${tojson(metadata)}`);
-    const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
-    if (viewlessTimeseriesEnabled) {
+    if (metadata.name != getTimeseriesBucketsColl(coll).getName()) {
         assert.eq("timeseries", metadata.type);
     } else {
         assert.eq("collection", metadata.type);
@@ -57,7 +58,7 @@ function validateListCatalog(coll, listCatalogRes, onAdminDB, collExists) {
         return;
     }
 
-    if (!coll._isSharded()) {
+    if (!isTrackedTimeseries(coll)) {
         assert.eq(
             1,
             listCatalogRes.length,
@@ -80,28 +81,36 @@ function testListCatalog(coll, collExists) {
             {
                 $match: {
                     "db": coll.getDB().getName(),
-                    "name": getTimeseriesCollForDDLOps(coll.getDB(), coll).getName(),
+                    // TODO(SERVER-120014): Simplify to `name: coll.getName()`.
+                    "name": {$in: [coll.getName(), getTimeseriesBucketsColl(coll.getName())]},
+                    "md.options.uuid": {$exists: true},
                 },
             },
         ])
         .toArray();
-    validateListCatalog(
-        getTimeseriesCollForDDLOps(coll.getDB(), coll),
-        listCatalogRes,
-        true /* onAdminDB */,
-        collExists,
-    );
+    validateListCatalog(coll, listCatalogRes, true /* onAdminDB */, collExists);
 
     // Check output of listCatalog on collection namespace
-    listCatalogRes = getTimeseriesCollForDDLOps(coll.getDB(), coll)
-        .aggregate([{$listCatalog: {}}])
-        .toArray();
-    validateListCatalog(
-        getTimeseriesCollForDDLOps(coll.getDB(), coll),
-        listCatalogRes,
-        false /* onAdminDB */,
-        collExists,
-    );
+    try {
+        listCatalogRes = coll.aggregate([{$listCatalog: {}}]).toArray();
+        validateListCatalog(coll, listCatalogRes, false /* onAdminDB */, collExists);
+    } catch (e) {
+        if (e.code != 40602) {
+            throw e;
+        }
+
+        // Acceptable error: "$listCatalog is only valid as the first stage in a pipeline":
+        // $listCatalog fails with this error against a viewful timeseries (but works with viewless timeseries).
+        assert(!isViewlessTimeseriesOnlySuite(db));
+    }
+
+    if (isViewfulTimeseriesOnlySuite(db)) {
+        // Check output of listCatalog on buckets namespace
+        listCatalogRes = getTimeseriesBucketsColl(coll)
+            .aggregate([{$listCatalog: {}}])
+            .toArray();
+        validateListCatalog(coll, listCatalogRes, false /* onAdminDB */, collExists);
+    }
 }
 
 const coll = db[collName];

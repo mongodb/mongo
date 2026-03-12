@@ -8,8 +8,8 @@
  * ]
  */
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const collName = jsTestName();
@@ -19,7 +19,7 @@ coll.drop();
 const timeField = "badInput']}}}}}}";
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeField}}));
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     const timeseriesCollInfo = getTimeseriesBucketsColl(coll).getMetadata();
     jsTestLog("Timeseries system collection info: " + tojson(timeseriesCollInfo));
     const properties = {};

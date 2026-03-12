@@ -9,7 +9,11 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
+// Checks if the viewless timeseries feature flag is currently enabled.
+// Do not use this function in passthrough tests, because the feature flag may get enabled or
+// disabled at any time by the background FCV upgrade/downgrade hook.
 export function areViewlessTimeseriesEnabled(db) {
+    // TODO(SERVER-121092): Remove this workaround.
     if (
         !isStableFCVSuite() &&
         FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
@@ -20,6 +24,28 @@ export function areViewlessTimeseriesEnabled(db) {
         quit();
     }
     return FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+}
+
+// Returns true if the suite creates all timeseries collections in viewless format.
+export function isViewlessTimeseriesOnlySuite(db) {
+    return isStableFCVSuite() && FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+}
+
+// Returns true if the suite creates all timeseries collections in viewful format.
+export function isViewfulTimeseriesOnlySuite(db) {
+    return isStableFCVSuite() && !FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+}
+
+/**
+ * Asserts that `value` is truthy for viewless timeseries and falsy for viewful timeseries.
+ * In suites with mixed viewless/viewful timeseries, no assertion is made.
+ */
+export function assertOnlyForViewlessTimeseries(db, value, msg) {
+    if (isViewlessTimeseriesOnlySuite(db)) {
+        assert(value, msg);
+    } else if (isViewfulTimeseriesOnlySuite(db)) {
+        assert(!value, msg);
+    }
 }
 
 /**
@@ -66,11 +92,7 @@ export function getTimeseriesCollForDDLOps(db, coll) {
     return getTimeseriesBucketsColl(coll);
 }
 
-/**
- * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
- * FixtureHelpers::isSharded on the given collection.
- */
-export function isShardedTimeseries(coll) {
+function findTimeseriesConfigCollectionsDocument(coll) {
     // We must use snapshot read concern to avoid racing with viewless timeseries upgrade/downgrade,
     // so bypass overrides, which may want to impose a different read concern (e.g. majority).
     return OverrideHelpers.withPreOverrideRunCommand(() => {
@@ -84,19 +106,36 @@ export function isShardedTimeseries(coll) {
                     {} /* options */,
                     "snapshot",
                 );
-            if (collEntry === null) {
-                return false;
-            }
-            return collEntry.unsplittable === null || !collEntry.unsplittable;
+            return collEntry;
         } catch (e) {
             // readConcern "snapshot" is not supported on standalone nodes, but on a sharded cluster
             // there can be no standalone nodes, so the collection is not sharded.
             if (e.code === ErrorCodes.NotAReplicaSet) {
-                return false;
+                return null;
             }
             throw e;
         }
     });
+}
+
+/**
+ * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
+ * FixtureHelpers::isSharded on the given collection.
+ */
+export function isShardedTimeseries(coll) {
+    const collEntry = findTimeseriesConfigCollectionsDocument(coll);
+    if (collEntry === null) {
+        return false;
+    }
+    return collEntry.unsplittable === null || !collEntry.unsplittable;
+}
+
+/**
+ * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
+ * FixtureHelpers::isTracked on the given collection.
+ */
+export function isTrackedTimeseries(coll) {
+    return findTimeseriesConfigCollectionsDocument(coll) !== null;
 }
 
 /**

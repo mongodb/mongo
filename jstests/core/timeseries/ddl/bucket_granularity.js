@@ -14,15 +14,16 @@
  */
 
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {assertOnlyForViewlessTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 function assertBucketMaxSpanSecondsEquals(coll, expectedValue) {
     const cSeconds = coll.getMetadata().options.timeseries.bucketMaxSpanSeconds;
     assert.eq(cSeconds, expectedValue, `expected collection 'bucketMaxSpanSeconds' to equal ${expectedValue}`);
 
-    if (!areViewlessTimeseriesEnabled(db)) {
-        const vProps = db.system.views.find({_id: `${db.getName()}.${coll.getName()}`}).toArray()[0];
+    const vProps = db.system.views.find({_id: `${db.getName()}.${coll.getName()}`}).toArray()[0];
+    assertOnlyForViewlessTimeseries(db, !vProps);
+    if (vProps) {
         const vSeconds = vProps.pipeline[0].$_internalUnpackBucket.bucketMaxSpanSeconds;
         assert.eq(cSeconds, vSeconds, `expected view pipeline 'bucketMaxSpanSeconds' to match timeseries options`);
     }

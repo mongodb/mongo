@@ -6,7 +6,6 @@
  *   requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -40,11 +39,11 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-let collInfo = getTimeseriesCollForDDLOps(db, coll).getMetadata();
+let collInfo = coll.getMetadata();
 assert.eq(
     expireAfterSeconds,
     collInfo.options.expireAfterSeconds,
-    getTimeseriesCollForDDLOps(db, coll).getName() + ": " + expireAfterSeconds + ": " + tojson(collInfo),
+    coll.getName() + ": " + expireAfterSeconds + ": " + tojson(collInfo),
 );
 
 /**
@@ -59,7 +58,7 @@ const runTest = function (collToChange, expireAfterSeconds) {
         }),
     );
 
-    collInfo = getTimeseriesCollForDDLOps(db, coll).getMetadata();
+    collInfo = coll.getMetadata();
     if (expireAfterSeconds !== "off") {
         assert.eq(
             expireAfterSeconds,

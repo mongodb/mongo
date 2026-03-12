@@ -15,14 +15,9 @@ import {
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps,
-    isShardedTimeseries,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isShardedTimeseries, getTimeseriesBucketsColl} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {add2dsphereVersionIfNeededForSpec, has2dsphereIndex} from "jstests/libs/query/geo_index_version_helpers.js";
 
-const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
 const isMultiversion =
     Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
@@ -186,7 +181,11 @@ TimeseriesTest.run((insert) => {
         cursorDoc = assert.commandWorked(
             db.runCommand(Object.extend({listIndexes: getTimeseriesCollForRawOps(coll).getName()}, kRawOperationSpec)),
         ).cursor;
-        assert.eq(getTimeseriesCollForDDLOps(db, coll).getFullName(), cursorDoc.ns, tojson(cursorDoc));
+        // TODO(SERVER-120476): Change this assertion to cursorDoc.ns === coll.getFullName().
+        assert(
+            cursorDoc.ns === coll.getFullName() || cursorDoc.ns === getTimeseriesBucketsColl(coll).getFullName(),
+            tojson(cursorDoc),
+        );
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(
             bucketSpec,

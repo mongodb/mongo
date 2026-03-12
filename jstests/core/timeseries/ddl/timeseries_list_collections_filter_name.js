@@ -7,7 +7,7 @@
  *   requires_timeseries,
  * ]
  */
-import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {assertOnlyForViewlessTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const timeFieldName = "time";
 
@@ -22,7 +22,7 @@ assert.eq(1, collections.length);
 const collectionDocument = collections[0];
 
 // Exclude the collection UUID from the comparison, as it is randomly generated.
-assert.eq(areViewlessTimeseriesEnabled(db), collectionDocument.info.uuid !== undefined);
+assertOnlyForViewlessTimeseries(db, collectionDocument.info.uuid !== undefined);
 delete collectionDocument.info.uuid;
 
 const timeseriesOptions = {

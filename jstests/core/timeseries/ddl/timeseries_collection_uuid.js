@@ -8,8 +8,9 @@
  */
 
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesCollForDDLOps,
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -38,6 +39,10 @@ assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: 
 const nonexistentUUID = UUID();
 
 // TODO SERVER-105742 simplify once 9.0 becomes last LTS
+if (!isViewfulTimeseriesOnlySuite(testDB) && !isViewlessTimeseriesOnlySuite(testDB)) {
+    jsTest.log.info("Skipping test because the namespace associated to the UUID isn't stable.");
+    quit();
+}
 // For legacy "viewful" timeseries: timeseriesCollUUID === undefined, bucketsCollUUID !== undefined
 // For viewless timeseries: timeseriesCollUUID !== undefined, timeseriesCollUUID === bucketsCollUUID
 const timeseriesCollUUID = coll.getUUID();
@@ -142,7 +147,7 @@ for (const uuid of [nonexistentUUID, bucketsCollUUID]) {
     if (
         FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport") &&
         // TODO SERVER-112063 re-enable this in viewless timeseries suites with retriable writes
-        (!areViewlessTimeseriesEnabled(db) || !db.getSession().getOptions().shouldRetryWrites())
+        (isViewfulTimeseriesOnlySuite(db) || !db.getSession().getOptions().shouldRetryWrites())
     ) {
         testUpdate(uuid, "m");
         testUpdate(uuid, "a");

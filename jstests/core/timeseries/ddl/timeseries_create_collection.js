@@ -9,10 +9,10 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -56,12 +56,10 @@ describe("Non existing collection", () => {
             testDB.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
         );
         assertCollExists(true, testDB, collName);
-        if (isStableFCVSuite()) {
-            if (areViewlessTimeseriesEnabled(db)) {
-                assertCollExists(false, testDB, bucketsName);
-            } else {
-                assertCollExists(true, testDB, bucketsName); // listCollection should show bucket collection
-            }
+        if (isViewlessTimeseriesOnlySuite(db)) {
+            assertCollExists(false, testDB, bucketsName);
+        } else if (isViewfulTimeseriesOnlySuite(db)) {
+            assertCollExists(true, testDB, bucketsName); // listCollection should show bucket collection
         }
     });
     it("Create view", () => {

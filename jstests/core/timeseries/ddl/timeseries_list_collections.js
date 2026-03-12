@@ -8,8 +8,9 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
-    areViewlessTimeseriesEnabled,
+    assertOnlyForViewlessTimeseries,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -59,27 +60,24 @@ const testOptions = function (options) {
 
     const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
     jsTestLog("Checking listCollections result: " + tojson(collections));
-    if (areViewlessTimeseriesEnabled(db)) {
-        // Expected number of collections >= timeseries collections
-        // 'test' database may contain collections from other tests running in parallel.
-        assert.gte(collections.length, collCount);
-    } else {
+    if (isViewfulTimeseriesOnlySuite(testDB)) {
         // Expected number of collections >= system.views + 2 * timeseries collections
         // 'test' database may contain collections from other tests running in parallel.
         assert.gte(collections.length, collCount * 2 + 1);
         assert(collections.find((entry) => entry.name === "system.views"));
+    } else {
+        // Expected number of collections >= timeseries collections
+        // 'test' database may contain collections from other tests running in parallel.
+        assert.gte(collections.length, collCount);
     }
 
     const bucketsCollName = getTimeseriesBucketsColl(coll).getName();
-    assert.eq(
-        !areViewlessTimeseriesEnabled(db),
-        collections.some((entry) => entry.name === bucketsCollName),
-    );
+    assertOnlyForViewlessTimeseries(testDB, !collections.some((entry) => entry.name === bucketsCollName));
 
     const collectionDocument = collections.find((entry) => entry.name === coll.getName());
 
     // Exclude the collection UUID from the comparison, as it is randomly generated.
-    assert.eq(areViewlessTimeseriesEnabled(db), collectionDocument.info.uuid !== undefined);
+    assertOnlyForViewlessTimeseries(testDB, collectionDocument.info.uuid !== undefined);
     delete collectionDocument.info.uuid;
 
     assert.docEq(

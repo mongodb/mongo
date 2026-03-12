@@ -8,8 +8,9 @@
  */
 import {kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {
-    areViewlessTimeseriesEnabled,
     getTimeseriesCollForDDLOps,
+    isViewfulTimeseriesOnlySuite,
+    isViewlessTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -21,6 +22,10 @@ coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 (function assertHasCollectionTypeAndAdditionalProperties() {
+    if (!isViewfulTimeseriesOnlySuite(testDB) && !isViewlessTimeseriesOnlySuite(testDB)) {
+        return;
+    }
+
     const collectionDocument = getTimeseriesCollForDDLOps(testDB, coll).getMetadata(kRawOperationSpec);
 
     const expectedCollectionDocument = getTimeseriesCollForDDLOps(testDB, coll).getMetadata();
@@ -33,6 +38,10 @@ assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeF
 })();
 
 (function assertFoundWhenFilteringByTypeCollection() {
+    if (!isViewfulTimeseriesOnlySuite(testDB) && !isViewlessTimeseriesOnlySuite(testDB)) {
+        return;
+    }
+
     const collectionDocument = assert.commandWorked(
         testDB.runCommand({
             listCollections: 1,
@@ -45,7 +54,7 @@ assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeF
 })();
 
 (function assertLegacyTimeseriesNotAffectedByRawData() {
-    if (areViewlessTimeseriesEnabled(testDB)) {
+    if (!isViewfulTimeseriesOnlySuite(testDB)) {
         return;
     }
 

@@ -11,7 +11,10 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    assertOnlyForViewlessTimeseries,
+    getTimeseriesBucketsColl,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -39,7 +42,7 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
     );
 
     const collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-    assert.isnull(collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName()));
+    assert.isnull(collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName()));
     assert.isnull(collections.find((entry) => entry.name === coll.getName()));
 };
 
@@ -60,10 +63,12 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
 
     let collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-    let collectionEntry = collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
-    assert(collectionEntry);
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketRoundingSecondsTime);
-    assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsTime);
+    let collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+    assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
+    if (collectionEntry) {
+        assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketRoundingSecondsTime);
+        assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsTime);
+    }
 
     collectionEntry = collections.find((entry) => entry.name === coll.getName());
     assert(collectionEntry);
@@ -85,13 +90,15 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
         );
         collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-        collectionEntry = collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
-        assert(collectionEntry);
-        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
-        assert.eq(
-            collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-            TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
-        );
+        collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+        assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
+        if (collectionEntry) {
+            assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
+            assert.eq(
+                collectionEntry.options.timeseries.bucketMaxSpanSeconds,
+                TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
+            );
+        }
 
         collectionEntry = collections.find((entry) => entry.name === coll.getName());
         assert(collectionEntry);
@@ -116,13 +123,15 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
         );
         collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-        collectionEntry = collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
-        assert(collectionEntry);
-        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
-        assert.eq(
-            collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-            TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
-        );
+        collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+        assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
+        if (collectionEntry) {
+            assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
+            assert.eq(
+                collectionEntry.options.timeseries.bucketMaxSpanSeconds,
+                TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime),
+            );
+        }
 
         collectionEntry = collections.find((entry) => entry.name === coll.getName());
         assert(collectionEntry);
@@ -146,13 +155,15 @@ const verifyCreateCommandFails = function (secondsOptions = {}, errorCode) {
     );
     collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-    collectionEntry = collections.find((entry) => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
-    assert(collectionEntry);
-    assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
-    assert.eq(
-        collectionEntry.options.timeseries.bucketMaxSpanSeconds,
-        TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularitySeconds),
-    );
+    collectionEntry = collections.find((entry) => entry.name === getTimeseriesBucketsColl(coll).getName());
+    assertOnlyForViewlessTimeseries(testDB, !collectionEntry);
+    if (collectionEntry) {
+        assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
+        assert.eq(
+            collectionEntry.options.timeseries.bucketMaxSpanSeconds,
+            TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularitySeconds),
+        );
+    }
 
     collectionEntry = collections.find((entry) => entry.name === coll.getName());
     assert(collectionEntry);

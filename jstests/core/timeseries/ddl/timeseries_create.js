@@ -7,7 +7,7 @@
  * ]
  */
 import {
-    areViewlessTimeseriesEnabled,
+    assertOnlyForViewlessTimeseries,
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
@@ -60,10 +60,8 @@ const testOptions = function ({
         }
 
         const bucketsColl = collections.find((coll) => coll.name == getTimeseriesBucketsColl(collName));
-        if (areViewlessTimeseriesEnabled(db)) {
-            assert(!bucketsColl, collections);
-        } else {
-            assert(bucketsColl, collections);
+        assertOnlyForViewlessTimeseries(testDB, !bucketsColl, collections);
+        if (bucketsColl) {
             assert.eq(bucketsColl.type, "collection", bucketsColl);
             assert(bucketsColl.options.clusteredIndex, bucketsColl);
         }

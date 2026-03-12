@@ -12,8 +12,9 @@
  */
 
 import {
-    areViewlessTimeseriesEnabled,
+    assertOnlyForViewlessTimeseries,
     getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const collName = jsTestName();
@@ -57,7 +58,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     // Tries to set the validator for a time-series collection using the buckets namespace.
     assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validator": {required: ["time"]}}), [
         ErrorCodes.InvalidNamespace,
@@ -74,7 +75,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     // Tries to set the validationLevel for a time-series collection using the buckets namespace.
     assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validationLevel": "moderate"}), [
         ErrorCodes.InvalidNamespace,
@@ -91,7 +92,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions,
 );
 
-if (!areViewlessTimeseriesEnabled(db)) {
+if (isViewfulTimeseriesOnlySuite(db)) {
     // Tries to set the validationLevel for a time-series collection using the buckets namespace.
     assert.commandFailedWithCode(db.runCommand({"collMod": bucketsCollName, "validationAction": "warn"}), [
         ErrorCodes.InvalidNamespace,
@@ -255,13 +256,12 @@ assert.commandFailedWithCode(
 
 // Verify seconds was correctly set on the collection and granularity removed since a custom
 // value was added.
-if (!areViewlessTimeseriesEnabled(db)) {
-    const collectionEntry = getTimeseriesBucketsColl(coll).getMetadata();
-    assert(collectionEntry);
-
-    assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketMaxSpanSecondsHours + 1);
-    assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsHours + 1);
-    assert.isnull(collectionEntry.options.timeseries.granularity);
+const bucketsEntry = getTimeseriesBucketsColl(coll).getMetadata();
+assertOnlyForViewlessTimeseries(db, !bucketsEntry);
+if (bucketsEntry) {
+    assert.eq(bucketsEntry.options.timeseries.bucketRoundingSeconds, bucketMaxSpanSecondsHours + 1);
+    assert.eq(bucketsEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsHours + 1);
+    assert.isnull(bucketsEntry.options.timeseries.granularity);
 }
 
 const collectionEntry = coll.getMetadata();

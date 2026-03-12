@@ -10,18 +10,17 @@
  * ]
  */
 import {
-    getTimeseriesCollForDDLOps,
-    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+    isViewfulTimeseriesOnlySuite,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const tsColl = testDB.clustered_index_options;
 
 function testInvalidCreateBucketsCollectionOptions(invalidOptions, expectedErrorCodes) {
-    assert.commandFailedWithCode(
-        testDB.createCollection(getTimeseriesCollForDDLOps(testDB, tsColl).getName(), invalidOptions),
-        expectedErrorCodes,
-    );
+    const collToClone = !isViewfulTimeseriesOnlySuite(testDB) ? tsColl : getTimeseriesBucketsColl(tsColl);
+
+    assert.commandFailedWithCode(testDB.createCollection(collToClone.getName(), invalidOptions), expectedErrorCodes);
 }
 
 // Tests time-series creation can be (somewhat)round-tripped to time-series buckets collection
@@ -36,12 +35,11 @@ function roundTripTimeseriesToBucketsCreateOptions() {
     assert.commandWorked(
         testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "time"}, expireAfterSeconds: 10}),
     );
-    let res = assert.commandWorked(
-        testDB.runCommand({listCollections: 1, filter: {name: getTimeseriesCollForDDLOps(testDB, tsColl).getName()}}),
-    );
+    const collToClone = !isViewfulTimeseriesOnlySuite(testDB) ? tsColl : getTimeseriesBucketsColl(tsColl);
+    let res = assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}));
     const options = res.cursor.firstBatch[0].options;
 
-    if (areViewlessTimeseriesEnabled(testDB)) {
+    if (!isViewfulTimeseriesOnlySuite(testDB)) {
         // Ensure clusteredIndex options is never returned on the listCollection logical format output
         assert(
             !options.hasOwnProperty("clusteredIndex"),
@@ -51,12 +49,11 @@ function roundTripTimeseriesToBucketsCreateOptions() {
         // Ensure the 'clusteredIndex' legacy format is used {'clusteredIndex': true>}.
         assert.eq(tojson(options.clusteredIndex), tojson(true));
     }
+
     assert(tsColl.drop());
 
-    assert.commandWorked(testDB.createCollection(getTimeseriesCollForDDLOps(testDB, tsColl).getName(), options));
-    res = assert.commandWorked(
-        testDB.runCommand({listCollections: 1, filter: {name: getTimeseriesCollForDDLOps(testDB, tsColl).getName()}}),
-    );
+    assert.commandWorked(testDB.createCollection(collToClone.getName(), options));
+    res = assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: collToClone.getName()}}));
     assert.eq(options, res.cursor.firstBatch[0].options);
     assert.commandWorked(testDB.dropDatabase());
     return options;
