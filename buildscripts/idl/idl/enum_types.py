@@ -72,14 +72,12 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
     def get_enum_deserializer_name(self):
         # type: () -> str
         """Return the C++ name of the public deserializer function."""
-        return f"::mongo::idl::deserialize<::{common.qualify_cpp_name(
-            self._enum.cpp_namespace, self.get_cpp_type_name())}>"
+        return f"::mongo::idl::deserialize<::{self.get_qualified_cpp_type_name()}>"
 
     def get_enum_serializer_name(self):
         # type: () -> str
         """Return the C++ name of the public serializer function."""
-        return f"::mongo::idl::serialize<::{common.qualify_cpp_name(
-            self._enum.cpp_namespace, self.get_cpp_type_name())}>"
+        return f"::mongo::idl::serialize<::{self.get_qualified_cpp_type_name()}>"
 
     def _get_enum_extra_data_name(self):
         # type: () -> str
