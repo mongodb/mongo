@@ -82,6 +82,7 @@ public:
         tassert(11216705, "ExecAggStage 'open' is null", vtable.open != nullptr);
         tassert(11216706, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
         tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
+        tassert(12149001, "ExecAggStage 'explain' is null", vtable.explain != nullptr);
     }
 };
 }  // namespace mongo::extension

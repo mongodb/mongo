@@ -236,6 +236,11 @@ DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "11
     ExecAggStageAPI::assertVTableConstraints(vtable);
 };
 
+DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsExplain, "12149001") {
+    auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
+    vtable.explain = nullptr;
+    ExecAggStageAPI::assertVTableConstraints(vtable);
+};
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "10956801") {
     auto invalidExtensionExecAggStageAdvancedState =

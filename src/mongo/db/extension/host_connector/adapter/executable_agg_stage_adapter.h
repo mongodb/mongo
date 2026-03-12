@@ -200,6 +200,16 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostExplain(const ::MongoExtensionExecAggStage* execAggStage,
+                                                ::MongoExtensionExplainVerbosity verbosity,
+                                                ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(12149000,
+                      "_hostExplain should not be called. Ensure that execAggStage is "
+                      "extension-allocated, not host-allocated.");
+        });
+    }
+
     static constexpr ::MongoExtensionExecAggStageVTable VTABLE = {.destroy = &_hostDestroy,
                                                                   .get_next = &_hostGetNext,
                                                                   .get_name = &_hostGetName,
@@ -208,7 +218,8 @@ private:
                                                                   .set_source = &_hostSetSource,
                                                                   .open = &_hostOpen,
                                                                   .reopen = &_hostReopen,
-                                                                  .close = &_hostClose};
+                                                                  .close = &_hostClose,
+                                                                  .explain = &_hostExplain};
 
     std::unique_ptr<host::ExecAggStage> _execAggStage;
     CachedGetNextResult _lastGetNextResult;
