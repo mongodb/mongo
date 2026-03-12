@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
@@ -35,6 +36,7 @@
 #include "mongo/stdx/thread.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <algorithm>
 #include <ctime>
@@ -1507,7 +1509,50 @@ TEST_F(BoundedSorterTest, LargeSpill) {
     assertSorted(sort(input));
     ASSERT_GTE(sorter->stats().spilledRanges(), 1);
 }
+template <typename Traits>
+class SpillerMergeDiskSpaceTest : public MakeFromExistingRangesTypedTestBase<Traits> {};
 
+TYPED_TEST_SUITE(SpillerMergeDiskSpaceTest, MakeFromExistingRangesTypes);
+
+TYPED_TEST(SpillerMergeDiskSpaceTest, MergeSpillsRespectsDiskSpaceCheck) {
+    using Traits = TypeParam;
+    // Simulate available disk space strictly below the test threshold so that any
+    // call to ensureSufficientDiskSpaceForSpilling() will fail with OutOfDiskSpace.
+    FailPointEnableBlock fp(
+        "simulateAvailableDiskSpace",
+        BSON("bytes" << static_cast<long long>(testSpillingMinAvailableDiskSpaceBytes - 1)));
+
+    unittest::TempDir storageLocation = makeTempDir();
+    SortOptions opts;
+    opts.TempDir(storageLocation.path());
+
+    auto& storage = this->storage();
+    auto spiller = storage.makeSpiller(opts, sorter::kLatestChecksumVersion);
+    ASSERT(spiller);
+
+    using IteratorPtr = std::shared_ptr<sorter::Iterator<IntWrapper, IntWrapper>>;
+
+    std::vector<IWPair> data{{1, 10}, {2, 20}, {3, 30}, {4, 40}};
+    std::span<IWPair> span{data};
+
+    std::vector<IteratorPtr> ranges;
+    ranges.push_back(spiller->spill(opts, IWSorter::Settings{}, span.subspan(0, 2), 0));
+    ranges.push_back(spiller->spill(opts, IWSorter::Settings{}, span.subspan(2, 2), 0));
+
+    SorterStats sorterStats{/*sorterTracker=*/nullptr};
+
+    // mergeSpills() must call ensureSufficientDiskSpaceForSpilling(...) and propagate
+    // OutOfDiskSpace when the simulated available space is below the threshold.
+    ASSERT_THROWS_CODE(spiller->mergeSpills(opts,
+                                            IWSorter::Settings{},
+                                            sorterStats,
+                                            ranges,
+                                            IWComparator(ASC),
+                                            /*numTargetedSpills=*/1,
+                                            /*numParallelSpills=*/2),
+                       DBException,
+                       ErrorCodes::OutOfDiskSpace);
+}
 }  // namespace
 }  // namespace sorter
 }  // namespace mongo
