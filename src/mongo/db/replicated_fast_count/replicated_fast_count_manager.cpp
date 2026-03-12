@@ -77,10 +77,11 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     LOGV2(11648800, "Shutting down ReplicatedFastCountManager");
-    massert(11751500,
-            "ReplicatedFastCountManager background thread is not already running. It should be"
-            " started before calling shutdown().",
-            _backgroundThread.joinable());
+    if (!_backgroundThread.joinable()) {
+        LOGV2(12150400,
+              "ReplicatedFastCountManager background thread is not running; skipping shutdown");
+        return;
+    }
 
     // Shutdown background thread.
     _isEnabled.store(false);
