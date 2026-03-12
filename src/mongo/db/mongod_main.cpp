@@ -985,6 +985,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
                     "document's history will be overwritten with the new value since the beginning "
                     "of time. This can break snapshot isolation within the storage engine.");
             }
+        } else if (storageGlobalParams.magicRestore &&
+                   !rss.getPersistenceProvider().supportsClassicMagicRestore()) {
+            LOGV2(12052600, "Not starting TTL monitor because we are in magic restore.");
         } else {
             startTTLMonitor(serviceContext);
         }
