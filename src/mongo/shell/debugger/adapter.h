@@ -67,6 +67,8 @@ public:
     void handleRequest(StackTraceRequest& request) override;
     void handleRequest(ScopesRequest& request) override;
     void handleRequest(VariablesRequest& request) override;
+    void handleRequest(EvaluateRequest& request) override;
+    void handleRequest(SetVariableRequest& request) override;
     void handleRequest(UnknownRequest& request) override;
 };
 

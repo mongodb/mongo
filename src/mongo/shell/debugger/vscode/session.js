@@ -47,6 +47,8 @@ class MongoShellDebugSession extends DebugSession {
     initializeRequest(response) {
         response.body = {
             supportsConfigurationDoneRequest: true,
+            supportsEvaluateForHovers: true,
+            supportsSetVariable: true,
         };
         this.sendResponse(response);
         this.sendEvent(new InitializedEvent());
@@ -368,7 +370,7 @@ class MongoShellDebugSession extends DebugSession {
      * @overload
      */
     scopesRequest(response, args) {
-        this.sendCommand("scopes", {frameId: args.frameId})
+        this.sendCommand("scopes", args)
             .then((result) => {
                 response.body = result;
                 this.sendResponse(response);
@@ -383,12 +385,52 @@ class MongoShellDebugSession extends DebugSession {
      * @overload
      */
     variablesRequest(response, args) {
-        this.sendCommand("variables", {variablesReference: args.variablesReference})
+        this.sendCommand("variables", args)
             .then((result) => {
                 response.body = result;
                 this.sendResponse(response);
             })
             .catch((err) => this.sendErrorResponse(response, 1015, `Variables failed: ${err.message}`));
+    }
+
+    /**
+     * Evaluate expression - can come from hover or REPL
+     * @param {DebugProtocol.EvaluateResponse} response
+     * @param {DebugProtocol.EvaluateArguments} args
+     * @overload
+     */
+    evaluateRequest(response, args) {
+        this.sendCommand("evaluate", args)
+            .then((result) => {
+                response.body = {
+                    result: result.result, // String representation: "42" or "{x: 1, y: 2}"
+                    variablesReference: result.variablesReference || 0, // >0 if expandable
+                };
+                this.sendResponse(response);
+            })
+            .catch((err) => {
+                this.sendErrorResponse(response, 1018, `Evaluation failed: ${err.message}`);
+            });
+    }
+
+    /**
+     * Set Variable - allows changing variable values in the debugger UI
+     * @param {DebugProtocol.SetVariableResponse} response
+     * @param {DebugProtocol.SetVariableArguments} args
+     * @overload
+     */
+    setVariableRequest(response, args) {
+        this.sendCommand("setVariable", args)
+            .then((result) => {
+                response.body = {
+                    value: result.value, // Confirmed new value
+                    variablesReference: result.variablesReference || 0,
+                };
+                this.sendResponse(response);
+            })
+            .catch((err) => {
+                this.sendErrorResponse(response, 1017, `Set variable failed: ${err.message}`);
+            });
     }
 
     // Send command to debug server

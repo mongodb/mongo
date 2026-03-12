@@ -64,7 +64,6 @@ static std::string _pausedScript;
 static int _pausedLine{0};
 
 AtomicWord<bool> _configurationDone{false};
-static stdx::mutex _pauseMutex;
 static stdx::condition_variable _pauseCV;
 
 // Evaluation state for debugger REPL
@@ -80,7 +79,7 @@ std::vector<protocol::StackFrame> _capturedStackFrames;
 
 // Debugger state
 static std::unique_ptr<DebuggerObject> _debuggerObject;
-static std::unique_ptr<JS::PersistentRooted<JSObject*>> _debuggerGlobal;
+static JS::PersistentRootedObject _debuggerGlobal;
 
 // Pending breakpoints: map from source URL to set of line numbers
 static std::map<std::string, std::set<int>> _pendingBreakpoints;
@@ -580,6 +579,38 @@ void DebuggerObject::setBreakpoints(SetBreakpointsRequest request) {
     // TODO: Try to apply to already-loaded scripts, where users add more breakpoints as they go
 }
 
+std::string evaluateInREPL(std::string expression) {
+    // We do the evaluation via frame.eval in the JS frame context while in a spin-wait.
+    // This logic allows us to pass requests and retrieves results from that loop.
+
+    _pendingEval = expression;
+    _evalComplete.store(false);
+    _hasEvalRequest.store(true);
+
+    // Wait for the JavaScript spin-wait loop to process it
+    auto delay = std::chrono::milliseconds(100);
+    int retries = 50;  // 5 seconds total
+    while (!_evalComplete.load() && retries > 0) {
+        std::this_thread::sleep_for(delay);
+        retries--;
+    }
+
+    if (_evalComplete.load()) {
+        return _evalResult;
+    }
+
+    _hasEvalRequest.store(false);
+    return "ERROR: Evaluation timed out";
+};
+
+std::string DebuggerObject::evaluate(EvaluateRequest request) {
+    return evaluateInREPL(request.expression);
+}
+
+std::string DebuggerObject::setVariable(SetVariableRequest request) {
+    return evaluateInREPL(request.name + " = " + request.value);
+}
+
 Status DebuggerObject::compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out) {
     auto code = std::string(toStdStringViewForInterop(jsfile.source));
     auto name = jsfile.name;
@@ -687,11 +718,12 @@ bool DebuggerScript::breakpointHandler(JSContext* cx, unsigned argc, JS::Value* 
 
     DebugAdapter::sendPause();
 
-    std::unique_lock<std::mutex> lock(_pauseMutex);
+    // The JS client should already be in a spin-loop, so we don't need to wait here.
+    // Just signal to the JS when it should keep looping versus continue
     _paused.store(true);
-    _pauseCV.wait(lock, [] { return !_paused.load(); });
 
     // Resumption value of 'undefined': The debuggee should continue execution normally.
+    // This lets JS continue its spin-wait loop.
     args.rval().setUndefined();
 
     return true;
@@ -727,6 +759,14 @@ std::vector<Variable> DebuggerGlobal::getVariables(int variablesReference) {
 
 std::vector<protocol::StackFrame> DebuggerGlobal::getStackFrames() {
     return _capturedStackFrames;
+}
+
+std::string DebuggerGlobal::evaluate(EvaluateRequest request) {
+    return _debuggerObject->evaluate(request);
+}
+
+std::string DebuggerGlobal::setVariable(SetVariableRequest request) {
+    return _debuggerObject->setVariable(request);
 }
 
 void DebuggerGlobal::unpause() {
@@ -778,27 +818,9 @@ void DebuggerGlobal::handleStdinThread() {
                 fflush(tty_out);
                 _paused.store(false);
             } else if (!command.empty()) {
-                // Command to be evaluated in the frame
-                _pendingEval = command;
-                _evalComplete.store(false);
-                _hasEvalRequest.store(true);
-
-                // Wait for the evaluation to complete (with timeout)
-                auto delay = std::chrono::milliseconds(100);
-                int retries = 100;  // total 10 secs
-                while (!_evalComplete.load() && retries > 0) {
-                    std::this_thread::sleep_for(delay);
-                    retries--;
-                }
-
-                if (_evalComplete.load()) {
-                    fprintf(tty_out, "%s\n", _evalResult.c_str());
-                    fflush(tty_out);
-                } else {
-                    fprintf(tty_out, "ERROR: Evaluation timed out\n");
-                    fflush(tty_out);
-                    _hasEvalRequest.store(false);
-                }
+                auto result = evaluateInREPL(command);
+                fprintf(tty_out, "%s\n", result.c_str());
+                fflush(tty_out);
             }
         } else {
             // Not paused, sleep a bit to avoid spinning
@@ -835,7 +857,7 @@ Status DebuggerGlobal::init(JSContext* cx) {
     if (!debuggerGlobal) {
         return Status(ErrorCodes::JSInterpreterFailure, "Failed to create debugger compartment");
     }
-    _debuggerGlobal = std::make_unique<JS::PersistentRooted<JSObject*>>(cx, debuggerGlobal);
+    _debuggerGlobal.init(cx, debuggerGlobal);
 
     Status status = Status::OK();
 

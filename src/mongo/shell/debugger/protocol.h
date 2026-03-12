@@ -48,6 +48,8 @@ class ContinueRequest;
 class StackTraceRequest;
 class ScopesRequest;
 class VariablesRequest;
+class EvaluateRequest;
+class SetVariableRequest;
 class UnknownRequest;
 
 
@@ -61,6 +63,8 @@ public:
     virtual void handleRequest(StackTraceRequest& req) = 0;
     virtual void handleRequest(ScopesRequest& req) = 0;
     virtual void handleRequest(VariablesRequest& req) = 0;
+    virtual void handleRequest(EvaluateRequest& req) = 0;
+    virtual void handleRequest(SetVariableRequest& req) = 0;
     virtual void handleRequest(UnknownRequest& req) = 0;
 };
 
@@ -213,6 +217,27 @@ public:
 
     VariablesRequest(const PartialRequest& partial);
     Response response(std::vector<Variable> variables);
+};
+
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate
+class EvaluateRequest : public VisitableRequest<EvaluateRequest> {
+public:
+    inline static constexpr std::string_view COMMAND = "evaluate";
+    std::string expression;
+
+    EvaluateRequest(const PartialRequest& partial);
+    Response response(std::string result);
+};
+
+// https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable
+class SetVariableRequest : public VisitableRequest<SetVariableRequest> {
+public:
+    inline static constexpr std::string_view COMMAND = "setVariable";
+    std::string name;
+    std::string value;
+
+    SetVariableRequest(const PartialRequest& partial);
+    Response response(std::string value);
 };
 
 // Not technically in the spec, but allows us to use a Null Object pattern on non-matches

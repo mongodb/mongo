@@ -131,6 +131,35 @@ TEST(VariablesRequest, parseRequestAndResponse) {
     ASSERT_EQ(response.getJson(), expectedResponse);
 }
 
+TEST(EvaluateRequest, parseRequestAndResponse) {
+
+    std::string json =
+        R"({"type":"request","seq":63,"command":"evaluate","arguments":{"expression":"myVariable"}})";
+    auto request = std::static_pointer_cast<EvaluateRequest>(Request::fromJSON(json));
+    ASSERT_EQ(request->seq, 63);
+    ASSERT_EQ(request->expression, "myVariable");
+
+    auto response = request->response("my result");
+    std::string expectedResponse =
+        R"({ "type" : "response", "seq" : 63, "body" : { "result" : "my result" } })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
+}
+
+TEST(SetVariableRequest, parseRequestAndResponse) {
+
+    std::string json =
+        R"({"type":"request","seq":45,"command":"setVariable","arguments":{"name":"myName","value":"myValue"}})";
+    auto request = std::static_pointer_cast<SetVariableRequest>(Request::fromJSON(json));
+    ASSERT_EQ(request->seq, 45);
+    ASSERT_EQ(request->name, "myName");
+    ASSERT_EQ(request->value, "myValue");
+
+    auto response = request->response("my new value");
+    std::string expectedResponse =
+        R"({ "type" : "response", "seq" : 45, "body" : { "value" : "my new value" } })";
+    ASSERT_EQ(response.getJson(), expectedResponse);
+}
+
 TEST(StoppedEvent, parseEvent) {
 
     auto event = StoppedEvent();

@@ -66,6 +66,12 @@ std::shared_ptr<Request> Request::fromJSON(std::string line) {
     if (command == VariablesRequest::COMMAND) {
         return std::make_shared<VariablesRequest>(partial);
     }
+    if (command == EvaluateRequest::COMMAND) {
+        return std::make_shared<EvaluateRequest>(partial);
+    }
+    if (command == SetVariableRequest::COMMAND) {
+        return std::make_shared<SetVariableRequest>(partial);
+    }
     if (command == ConfigurationDoneRequest::COMMAND) {
         return std::make_shared<ConfigurationDoneRequest>(partial);
     }
@@ -262,6 +268,50 @@ BSONObj Variable::toBSON() const {
     obj.append("variablesReference", variablesReference);
     return obj.obj();
 }
+
+
+/**
+ * EvaluateRequest
+ */
+
+EvaluateRequest::EvaluateRequest(const PartialRequest& partial) : VisitableRequest(partial) {
+    expression = std::string(toStdStringViewForInterop(arguments.getStringField("expression")));
+}
+
+Response EvaluateRequest::response(std::string result) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("type", "response");
+    responseBuilder.append("seq", seq);
+
+    BSONObjBuilder bodyBuilder;
+    bodyBuilder.append("result", result);
+    responseBuilder.append("body", bodyBuilder.obj());
+
+    Response response(seq, responseBuilder.obj().getOwned());
+    return response;
+}
+
+/**
+ * SetVariableRequest
+ */
+SetVariableRequest::SetVariableRequest(const PartialRequest& partial) : VisitableRequest(partial) {
+    name = std::string(toStdStringViewForInterop(arguments.getStringField("name")));
+    value = std::string(toStdStringViewForInterop(arguments.getStringField("value")));
+}
+
+Response SetVariableRequest::response(std::string value) {
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append("type", "response");
+    responseBuilder.append("seq", seq);
+
+    BSONObjBuilder bodyBuilder;
+    bodyBuilder.append("value", value);
+    responseBuilder.append("body", bodyBuilder.obj());
+
+    Response response(seq, responseBuilder.obj().getOwned());
+    return response;
+}
+
 
 /**
  * StoppedEvent

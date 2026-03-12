@@ -60,6 +60,8 @@ public:
     static std::vector<Variable> getVariables(int variablesReference);
     static std::vector<protocol::StackFrame> getStackFrames();
 
+    static std::string evaluate(EvaluateRequest request);
+    static std::string setVariable(SetVariableRequest request);
     static void unpause();
 };
 
@@ -70,7 +72,7 @@ public:
 class DebuggerObject {
 private:
     JSContext* _cx;
-    JS::PersistentRooted<JSObject*> _debugger;
+    JS::PersistentRootedObject _debugger;
 
     // Invoked when the JS "debugger" keyword is executed.
     static bool onDebuggerStatementCallback(JSContext* cx, unsigned argc, JS::Value* vp);
@@ -114,6 +116,9 @@ public:
 
     // Set breakpoints for the given request
     void setBreakpoints(SetBreakpointsRequest request);
+
+    std::string evaluate(EvaluateRequest request);
+    std::string setVariable(SetVariableRequest request);
 };
 
 /**

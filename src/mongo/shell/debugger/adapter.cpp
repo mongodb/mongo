@@ -133,6 +133,18 @@ void DebugAdapter::handleRequest(VariablesRequest& request) {
     sendMessage(response);
 }
 
+void DebugAdapter::handleRequest(EvaluateRequest& request) {
+    std::string result = DebuggerGlobal::evaluate(request);
+    auto response = request.response(result);
+    sendMessage(response);
+}
+
+void DebugAdapter::handleRequest(SetVariableRequest& request) {
+    std::string value = DebuggerGlobal::setVariable(request);
+    auto response = request.response(value);
+    sendMessage(response);
+}
+
 void DebugAdapter::handleRequest(UnknownRequest& request) {
     std::cerr << "Unknown request for command '" << request.command << "'" << std::endl;
 }
