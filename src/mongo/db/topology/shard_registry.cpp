@@ -176,12 +176,17 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
                 "Can't perform ShardRegistry lookup while holding locks",
                 !shard_role_details::getLocker(opCtx)->isLocked());
 
-        LOGV2_DEBUG(4620250,
+        LOGV2(11993900,
+              "Started ShardRegistry lookup",
+              "numShards"_attr = cachedData ? cachedData->getAllShardIds().size() : 0,
+              "cachedDataTime"_attr = cachedData ? cachedData.getTime() : Time{},
+              "latestKnownTime"_attr = timeInStore);
+        LOGV2_DEBUG(11993901,
                     2,
-                    "Starting ShardRegistry::_lookup",
+                    "ShardRegistry lookup starting with",
                     "cachedData"_attr = cachedData ? cachedData->toBSON() : BSONObj{},
-                    "cachedData.getTime()"_attr = cachedData ? cachedData.getTime() : Time{},
-                    "timeInStore"_attr = timeInStore);
+                    "cachedDataTime"_attr = cachedData ? cachedData.getTime() : Time{},
+                    "latestKnownTime"_attr = timeInStore);
 
         auto [returnData, returnTime, removedShards] =
             [&]() -> std::tuple<ShardRegistryData, Time, ShardRegistryData::ShardMap> {
@@ -311,11 +316,14 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
             }
         }
 
-        LOGV2_DEBUG(4620251,
+        LOGV2_DEBUG(11993902,
                     2,
-                    "Finished ShardRegistry::_lookup",
+                    "ShardRegistry lookup completing with",
                     "returnData"_attr = returnData.toBSON(),
                     "returnTime"_attr = returnTime);
+        LOGV2(11993903,
+              "Completed ShardRegistry lookup",
+              "numShards"_attr = cachedData ? cachedData->getAllShardIds().size() : 0);
         return Cache::LookupResult{returnData, returnTime};
     } catch (const DBException&) {
         _stats.failedRefreshCount.fetchAndAdd(1);
