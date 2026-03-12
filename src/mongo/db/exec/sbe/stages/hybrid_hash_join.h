@@ -106,6 +106,8 @@ using FileValue = value::MaterializedRow;
 // Iterator type for reading from spill files
 using SpillIterator = sorter::Iterator<FileKey, FileValue>;
 
+enum class HashJoinPhase { kBuild, kProbe, kProcessSpilled };
+
 // Represents a single match between a build row and probe row.
 // Pointers are valid only until the next JoinCursor::next() call.
 struct MatchResult {
@@ -145,45 +147,48 @@ private:
     std::unique_ptr<Impl> _impl;
 };
 
-// Encapsulates spill storage and writer for a single side (build or probe).
-struct SpillHandle {
-    sorter::FileBasedSorterStorage<FileKey, FileValue> storage;
-    std::unique_ptr<SortedStorageWriter<FileKey, FileValue>> writer;
-    SorterRange range;
-    int64_t size = 0;  // refers to size in memory rather than serialized size
-
+// Encapsulates spill storage and writer for a single HHJ partition (build and probe).
+class SpilledPartition {
+public:
     static constexpr int64_t kWriteBufferSize = (int64_t)sorter::kSortedFileBufferSize;
 
-    SpillHandle(const boost::filesystem::path& tempDir, SorterFileStats* fileStats)
-        : storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
-                  tempDir,
-                  /*dbName=*/boost::none,
-                  sorter::kLatestChecksumVersion),
-          writer(storage.makeWriter(SortOptions{}, /*settings=*/{})) {}
-
-    void finishWrite() {
-        range = writer->done()->getRange();
-    }
-
-    std::shared_ptr<SpillIterator> getIterator() {
-        return storage.getSortedIterator(range, SpillIterator::Settings());
-    }
-};
-
-struct SpilledPartition {
-    SpillHandle buildSpill;
-    SpillHandle probeSpill;
-
     SpilledPartition(const boost::filesystem::path& tempDir, SorterFileStats* fileStats)
-        : buildSpill(tempDir, fileStats), probeSpill(tempDir, fileStats) {}
+        : _storage(std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
+                   tempDir,
+                   /*dbName=*/boost::none,
+                   sorter::kLatestChecksumVersion),
+          _writer(_storage.makeWriter(SortOptions{}, /*settings=*/{})) {}
 
-    bool swapIfProbeIsSmaller() {
-        if (buildSpill.size > probeSpill.size) {
-            std::swap(buildSpill, probeSpill);
-            return true;
-        }
-        return false;
+    void writeBuildRecord(const FileKey& key, const FileValue& value, int64_t memSize);
+    void finishBuildWrite();
+
+    void writeProbeRecord(const FileKey& key, const FileValue& value, int64_t memSize);
+    void finishProbeWrite();
+
+    bool swapIfProbeIsSmaller();
+    std::shared_ptr<SpillIterator> getBuildIterator();
+    std::shared_ptr<SpillIterator> getProbeIterator();
+
+    int64_t buildMemSize() {
+        return _buildMemSize;
     }
+
+    void incrementBuildMemSize(int64_t memSize) {
+        _buildMemSize += memSize;
+    }
+
+    int64_t probeMemSize() {
+        return _probeMemSize;
+    }
+
+private:
+    sorter::FileBasedSorterStorage<FileKey, FileValue> _storage;
+    std::unique_ptr<SortedStorageWriter<FileKey, FileValue>> _writer;
+    SorterRange _buildRange{};
+    SorterRange _probeRange{};
+    int64_t _buildMemSize{0};
+    int64_t _probeMemSize{0};
+    HashJoinPhase _joinPhase{HashJoinPhase::kBuild};
 };
 
 /**
@@ -265,8 +270,6 @@ public:
     void reset();
 
 private:
-    enum class Phase { kBuild, kProbe, kProcessSpilled };
-
     // Computes partition index using hash bits at the current recursion level.
     int getPartitionId(size_t hash) const;
 
@@ -322,7 +325,7 @@ private:
     // True once we've switched from pure in-memory to hybrid partitioned mode.
     bool _isPartitioned = false;
 
-    Phase _phase{Phase::kBuild};
+    HashJoinPhase _phase{HashJoinPhase::kBuild};
     size_t _currentSpilledPartitionIdx{0};
 
     uint64_t _recordsAddedToWriter = 0;  // track record for spillingStats
