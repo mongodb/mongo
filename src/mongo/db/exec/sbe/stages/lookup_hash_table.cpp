@@ -31,8 +31,8 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 
 #include <algorithm>

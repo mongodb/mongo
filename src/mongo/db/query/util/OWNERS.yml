@@ -18,6 +18,3 @@ filters:
   - "retry*":
     approvers:
       - 10gen/query-integration
-  - "spill_util*":
-    approvers:
-      - 10gen/query-execution-classic

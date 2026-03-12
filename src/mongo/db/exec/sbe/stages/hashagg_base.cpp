@@ -35,8 +35,8 @@
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 
 #include <memory>

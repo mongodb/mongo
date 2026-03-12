@@ -18,11 +18,11 @@ mongo_cc_library(
     deps = [
         ":working_set",
         "//src/mongo/db/pipeline/spilling:spilling_stats",
-        "//src/mongo/db/query:spill_util",
         "//src/mongo/db/query/compiler/logical_model/sort_pattern",
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:spill_util",
         "//src/mongo/db/storage:storage_options",
         "//src/third_party/snappy",
     ],

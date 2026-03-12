@@ -39,12 +39,12 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
-#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/spill_util.h"
 #include "mongo/util/assert_util.h"
 
 #include <iterator>

@@ -32,11 +32,11 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/stats/counters_sort.h"
 #include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/spill_util.h"
 #include "mongo/logv2/log.h"
 
 #include <snappy.h>

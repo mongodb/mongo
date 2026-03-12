@@ -670,6 +670,16 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_library(
+    name = "spill_util",
+    srcs = [
+        "//src/mongo/db/storage:spill_util.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/storage:disk_space_util",
+    ],
+)
+
 mongo_cc_library(name = "sorted_data_interface_test_assert")
 
 mongo_cc_library(

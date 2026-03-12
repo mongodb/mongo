@@ -260,16 +260,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "spill_util",
-    srcs = [
-        "//src/mongo/db/query/util:spill_util.cpp",
-    ],
-    deps = [
-        "//src/mongo/db/storage:disk_space_util",
-    ],
-)
-
-mongo_cc_library(
     name = "on_parameter_change_updaters",
     srcs = [
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
