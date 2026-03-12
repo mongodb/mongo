@@ -88,7 +88,8 @@ StatusWith<PlanRankingResult> getBestMPPlan(classic_runtime_planner::MultiPlanne
     }
     PlanRankingResult out;
     auto soln = mp.extractQuerySolution();
-    tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
+    // TODO SERVER-117118 Reenable this assertion once we can decouple from multiplanner.
+    // tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
     out.solutions.push_back(std::move(soln));
     out.execState = std::move(mp).extractExecState();
     return std::move(out);

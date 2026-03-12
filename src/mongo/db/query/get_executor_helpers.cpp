@@ -101,8 +101,15 @@ void inspectPlannerResult(
             "Replanning should not have resulted in a SubPlanner, but it did",
             !dynamic_cast<classic_runtime_planner::SubPlanner*>(planner));
 
-    const auto isSameAsCachedPlan =
-        planner->querySolution() && replanningData->oldPlanHash == planner->querySolution()->hash();
+    const QuerySolution* solution = planner->querySolution();
+    if (!solution) {
+        // Solution may live in the MultiPlanStage.
+        // TODO SERVER-117118 This should not be needed once we decouple the MultiPlanStage.
+        if (auto* mps = dynamic_cast<MultiPlanStage*>(planner->getRoot())) {
+            solution = mps->bestSolution();
+        }
+    }
+    const auto isSameAsCachedPlan = solution && replanningData->oldPlanHash == solution->hash();
 
     LOGV2_DEBUG(
         20582,

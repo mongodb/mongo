@@ -725,11 +725,17 @@ private:
                 "Ranker saved execution state but it wasn't a multi plan stage",
                 dynamic_cast<MultiPlanStage*>(maybeExecState->root.get()));
 
+        tassert(12078400,
+                "Expected null solution to have been produced since it is expected to be owned in "
+                "the MultiPlanStage",
+                solutions[0] == nullptr);
+
         auto result = releaseResult();
         result->runtimePlanner =
             std::make_unique<mongo::classic_runtime_planner::SingleSolutionPassthroughPlanner>(
                 makePlannerData(),
-                std::move(solutions[0]),
+                nullptr,  // The solution is owned by the MultiPlanStage, so we pass a nullptr here
+                          // to avoid confusion.
                 std::move(explainData),
                 std::move(*maybeExecState));
         return result;

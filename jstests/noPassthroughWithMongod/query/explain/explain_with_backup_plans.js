@@ -136,21 +136,20 @@ try {
             "Expected all " + N + " documents to be returned by the backup plan after the sort plan failed",
         );
 
-        // TODO SERVER-120784. Assert (uncomment below) explain's output once SIGSEGV is fixed.
-        // const explain = assert.commandWorked(coll.find({a: 1, b: 1}).sort({b: 1}).explain("executionStats"));
-        // const qp = getQueryPlanner(explain);
-        // assert(qp.winningPlan, "Expected a winningPlan, got: " + tojson(qp));
-        // // The backup plan should be the winner after the sort plan fails during execution.
-        // assert(!planHasStage(db, qp.winningPlan, "SORT"),
-        //        "Expected winning plan to NOT have a SORT stage, got: " +
-        //            tojson(qp));
-        // // Plans containing blocking sort should appear as rejected plans.
-        // assert.eq(qp.rejectedPlans.length,
-        //           2,
-        //           "Expected two rejected plan. Got: " + tojson(qp));
-        // assert(planHasStage(db, qp.rejectedPlans[0], "SORT") && planHasStage(db, qp.rejectedPlans[1], "SORT"),
-        //        "Expected rejected plans to have a SORT stage, got: " +
-        //            tojson(qp));
+        const explain = assert.commandWorked(coll.find({a: 1, b: 1}).sort({b: 1}).explain("allPlansExecution"));
+        const qp = getQueryPlanner(explain);
+        assert(qp.winningPlan, "Expected a winningPlan, got: " + tojson(qp));
+        // The backup plan should be the winner after the sort plan fails during execution.
+        assert(
+            !planHasStage(db, qp.winningPlan, "SORT"),
+            "Expected winning plan to NOT have a SORT stage, got: " + tojson(qp),
+        );
+        // Plans containing blocking sort should appear as rejected plans.
+        assert.eq(qp.rejectedPlans.length, 2, "Expected two rejected plan. Got: " + tojson(qp));
+        assert(
+            planHasStage(db, qp.rejectedPlans[0], "SORT") && planHasStage(db, qp.rejectedPlans[1], "SORT"),
+            "Expected rejected plans to have a SORT stage, got: " + tojson(qp),
+        );
     }
 } finally {
     for (const [param, value] of Object.entries(savedParams)) {

@@ -90,10 +90,6 @@ Status MultiPlanner::pickBestPlan() {
 
 std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
     // The query solutions are owned by the 'MultiPlan' stage.
-    if (_state == kInitialized) {
-        _state = kDisposed;
-        return _multiplanStage->extractBestSolution();
-    }
     return nullptr;
 }
 
