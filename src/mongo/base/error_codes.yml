@@ -1190,5 +1190,21 @@ error_codes:
 
   - {code: 491, name: CommandNotSupportedOnLegacyTimeseriesBucketsNamespace}
 
+  - {
+      code: 492,
+      name: StreamProcessorPubSubAuthenticationError,
+      categories: [StreamProcessorUserError],
+    }
+  - {
+      code: 493,
+      name: StreamProcessorPubSubPermissionDeniedError,
+      categories: [StreamProcessorUserError],
+    }
+  - {
+      code: 494,
+      name: StreamProcessorPubSubConnectionError,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
