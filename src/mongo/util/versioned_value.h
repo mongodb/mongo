@@ -70,16 +70,20 @@ struct DefaultLockPolicy {
 }  // namespace versioned_value_detail
 
 /**
- * The ideal synchronization primitive for values that are accessed frequently, but updated rarely.
- * So long as the value remains unchanged, readers can hold on to their snapshots and access the
- * value without acquiring any locks (see `Snapshot`). Readers must make a new snapshot once their
- * current snapshot gets stale -- i.e. `isStale(mySnapshot)` returns `true`.
+ * VersionedValue is a synchronization primitive for values that are accessed frequently, but
+ * updated rarely. So long as the value remains unchanged, readers can hold on to their snapshots
+ * and access the value without acquiring any locks (see `Snapshot`). Readers must make a new
+ * snapshot once their current snapshot gets stale -- i.e. `isStale(mySnapshot)` returns `true`.
  *
- * When updates to the value are synchronized via an external mutex, users can call into `peek` to
- * read the latest configuration without holding onto a snapshot.
+ * When updates to the value are synchronized via an external mutex, users can call into
+ * `unsafePeek` to read the latest configuration without holding onto a snapshot.
  *
  * You can also bring your own `MutexType` for synchronizing reads and writes. You may need to
  * define a new `LockPolicy` if your custom `MutexType` is not covered by the default policy above.
+ *
+ * Note that while updates to the versioned value via `update` are synchronized, updates to
+ * individual snapshots via `refreshSnapshot` are not synchronized. Access to
+ * `VersionedValue<...>::Snapshot` values must be synchronized by users of `VersionedValue`.
  */
 template <typename ValueType,
           typename MutexType = stdx::mutex,

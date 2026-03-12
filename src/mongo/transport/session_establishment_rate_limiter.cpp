@@ -41,6 +41,7 @@ namespace transport {
 namespace {
 
 VersionedValue<CIDRList> maxEstablishingConnsOverride;
+thread_local VersionedValue<CIDRList>::Snapshot maxEstablishingConnsOverrideSnapshot;
 
 }  // namespace
 
@@ -91,9 +92,9 @@ Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
     }
 
     // Exempt session from rate limiters when its IP is whitelisted
-    maxEstablishingConnsOverride.refreshSnapshot(_maxEstablishingConnsOverride);
-    if (_maxEstablishingConnsOverride &&
-        client->session()->isExemptedByCIDRList(*_maxEstablishingConnsOverride)) {
+    maxEstablishingConnsOverride.refreshSnapshot(maxEstablishingConnsOverrideSnapshot);
+    if (maxEstablishingConnsOverrideSnapshot &&
+        client->session()->isExemptedByCIDRList(*maxEstablishingConnsOverrideSnapshot)) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }

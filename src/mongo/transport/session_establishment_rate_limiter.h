@@ -52,6 +52,7 @@ namespace mongo::transport {
  * - ingressConnectionEstablishmentRatePerSec
  * - ingressConnectionEstablishmentBurstCapacitySecs
  * - ingressConnectionEstablishmentMaxQueueDepth
+ * - ingressConnectionEstablishmentRateLimiterBypass
  *
  * SessionEstablishmentRateLimiter is used in SessionWorkflow if the following feature flag
  * server parameter is true:
@@ -106,7 +107,6 @@ public:
 
 private:
     admission::RateLimiter _rateLimiter;
-    VersionedValue<CIDRList>::Snapshot _maxEstablishingConnsOverride;
 
     // Stats
     Counter64 _exempted;
