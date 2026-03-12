@@ -11,12 +11,26 @@ export var FeatureFlagUtil = (function () {
         kNotFound: "kNotFound",
     };
 
+    // Cache for mongod connections to avoid connection storms when checking feature flags
+    // repeatedly (e.g., in concurrent FSM workloads). Maps connection string -> Mongo connection.
+    const _connectionCache = new Map();
+
+    // Helper to check if a cached connection is still valid.
+    function _isConnectionValid(conn) {
+        try {
+            const res = conn.adminCommand({ping: 1});
+            return res.ok === 1;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function _getConnectionToMongod(db) {
         // If db represents a connection to mongos, or some other configuration, we need
         // to obtain the correct connection to a mongod.
         const getMongodConn = (db) => {
             if (!FixtureHelpers.isMongos(db)) {
-                return {conn: db, shouldClose: false};
+                return db;
             }
 
             // For sharded cluster get a connection to the config server through a Mongo
@@ -24,13 +38,23 @@ export var FeatureFlagUtil = (function () {
             // retry on retryable errors. After the connection is established, runCommand overrides
             // should guarantee that subsequent operations on the connection are retried in the
             // event of network errors in suites where that possibility exists.
+            const connString = FixtureHelpers.getConfigServerConnString(db);
+
+            // Check if we have a cached connection for this connection string.
+            if (_connectionCache.has(connString)) {
+                const cachedConn = _connectionCache.get(connString);
+                if (_isConnectionValid(cachedConn)) {
+                    return cachedConn;
+                }
+                // Connection is stale, remove it from cache.
+                _connectionCache.delete(connString);
+            }
+
+            // Create a new connection and cache it.
             return retryOnRetryableError(() => {
-                const conn = new Mongo(
-                    FixtureHelpers.getConfigServerConnString(db),
-                    undefined /*encryptedDBClientCallback */,
-                    {gRPC: false},
-                );
-                return {conn, shouldClose: true};
+                const conn = new Mongo(connString, undefined /*encryptedDBClientCallback */, {gRPC: false});
+                _connectionCache.set(connString, conn);
+                return conn;
             });
         };
         try {
@@ -48,19 +72,9 @@ export var FeatureFlagUtil = (function () {
         }
     }
 
-    function _withConnectionToMongod(db, callback) {
-        const {conn, shouldClose} = _getConnectionToMongod(db);
-        try {
-            return callback(conn, shouldClose);
-        } finally {
-            if (shouldClose) {
-                try {
-                    conn.close();
-                } catch (closeErr) {
-                    // Best-effort close to avoid masking the original error path.
-                }
-            }
-        }
+    function _getAuthenticatedConnectionToMongod(db) {
+        let mongodConn = _getConnectionToMongod(db);
+        return mongodConn;
     }
 
     function _getFullFeatureFlagName(featureFlagName) {
@@ -110,16 +124,15 @@ export var FeatureFlagUtil = (function () {
     }
 
     function getFeatureFlagDoc(db, flagName) {
-        return _withConnectionToMongod(db, (conn) => _getFeatureFlagDoc(conn, flagName));
+        const conn = _getAuthenticatedConnectionToMongod(db);
+        return _getFeatureFlagDoc(conn, flagName);
     }
 
     function getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) {
         // TODO (SERVER-102609): Remove _getStatusLegacy() once v9.0 becomes last-LTS.
-        return _withConnectionToMongod(db, (conn) =>
-            flagDoc.hasOwnProperty("currentlyEnabled")
-                ? _getStatus(ignoreFCV, flagDoc)
-                : _getStatusLegacy(conn, ignoreFCV, flagDoc),
-        );
+        return flagDoc.hasOwnProperty("currentlyEnabled")
+            ? _getStatus(ignoreFCV, flagDoc)
+            : _getStatusLegacy(_getAuthenticatedConnectionToMongod(db), ignoreFCV, flagDoc);
     }
 
     /**
@@ -139,15 +152,9 @@ export var FeatureFlagUtil = (function () {
     function getStatus(db, featureFlag, ignoreFCV) {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
         // a mongod.
-        return _withConnectionToMongod(db, (conn) => {
-            const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
-            if (!flagDoc) {
-                return FlagStatus.kNotFound;
-            }
-            return flagDoc.hasOwnProperty("currentlyEnabled")
-                ? _getStatus(ignoreFCV, flagDoc)
-                : _getStatusLegacy(conn, ignoreFCV, flagDoc);
-        });
+        const conn = _getAuthenticatedConnectionToMongod(db);
+        const flagDoc = _getFeatureFlagDoc(conn, featureFlag);
+        return flagDoc ? getFeatureFlagDocStatus(db, flagDoc, ignoreFCV) : FlagStatus.kNotFound;
     }
 
     /**
