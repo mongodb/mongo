@@ -32,4 +32,6 @@ selector:
     - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
     - jstests/sharding/**/*.js
+    - src/mongo/db/modules/enterprise/jstests/sharding/range_deleter_script_with_shard_keys.js
+    - src/mongo/db/modules/enterprise/jstests/sharding/range_deleter_script_with_crud.js
 test_kind: js_test
