@@ -170,6 +170,18 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
     });
 }
 
+bool canBatchedWritesCommit(OperationContext* opCtx) {
+    auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
+    auto mustUsePrimaryDrivenIndexBuilds =
+        rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
+
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    bool batchedWritesExist = batchedWriteContext.writesAreBatched() &&
+        !batchedWriteContext.getBatchedOperations(opCtx)->isEmpty();
+
+    return batchedWritesExist && mustUsePrimaryDrivenIndexBuilds;
+}
+
 void ReshardingOplogApplicationRules::_applyInsertOrUpdate(OperationContext* opCtx,
                                                            const repl::OplogEntry& op) const {
 
@@ -209,14 +221,7 @@ void ReshardingOplogApplicationRules::_applyInsertOrUpdate(OperationContext* opC
             MONGO_UNREACHABLE;
     }
 
-    auto& rss = rss::ReplicatedStorageService::get(opCtx->getServiceContext());
-    auto mustUsePrimaryDrivenIndexBuilds =
-        rss.getPersistenceProvider().mustUsePrimaryDrivenIndexBuilds();
-
-    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
-    bool batchedWritesExist = batchedWriteContext.writesAreBatched() &&
-        !batchedWriteContext.getBatchedOperations(opCtx)->isEmpty();
-    bool allowBatchedWritesToCommit = batchedWritesExist && mustUsePrimaryDrivenIndexBuilds;
+    bool allowBatchedWritesToCommit = canBatchedWritesCommit(opCtx);
 
     // Batched writes are assigned their timestamp upon committing, unlike regular writes. In the
     // Primary Driven Index Builds mode, write operations are combined into batches instead of being
@@ -470,7 +475,14 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
         invariant(!outputCollDoc.isEmpty());
         auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
-        invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+
+        // Batched writes are assigned their timestamp upon committing, unlike regular writes. In
+        // the Primary Driven Index Builds mode, write operations are combined into batches instead
+        // of being processed individually.
+        bool allowBatchedWritesToCommit = canBatchedWritesCommit(opCtx);
+
+        invariant(allowBatchedWritesToCommit ||
+                  shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
         wuow.commit();
 
         return;
@@ -481,15 +493,18 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
         // apply rule #1 and delete the doc from the stash collection.
         WriteUnitOfWork wuow(opCtx);
         const auto stashColl = acquireCollectionAndAssertExists(opCtx, _myStashNss);
-
         auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
         if (!stashCollDoc.isEmpty()) {
             auto nDeleted = deleteObjects(opCtx, stashColl, idQuery, true /* justOne */);
             invariant(nDeleted != 0);
 
             _applierMetrics->onWriteToStashCollections();
-
-            invariant(shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+            // Batched writes are assigned their timestamp upon committing, unlike regular writes.
+            // In the Primary Driven Index Builds mode, write operations are combined into batches
+            // instead of being processed individually.
+            bool allowBatchedWritesToCommit = canBatchedWritesCommit(opCtx);
+            invariant(allowBatchedWritesToCommit ||
+                      shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
             wuow.commit();
 
             return;
