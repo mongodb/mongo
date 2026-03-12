@@ -36,60 +36,42 @@
 
 namespace mongo::otel::metrics {
 
-TEST(Int64CounterImplTest, Adds) {
-    CounterImpl<int64_t> counter;
-    ASSERT_EQ(counter.value(), 0);
+using testing::DoubleEq;
+
+template <typename T>
+class CounterImplTest : public testing::Test {};
+
+using CounterTypes = testing::Types<int64_t, double>;
+TYPED_TEST_SUITE(CounterImplTest, CounterTypes);
+
+TYPED_TEST(CounterImplTest, Adds) {
+    CounterImpl<TypeParam> counter;
+    EXPECT_EQ(counter.value(), 0);
     counter.add(1);
-    ASSERT_EQ(counter.value(), 1);
+    EXPECT_EQ(counter.value(), 1);
     counter.add(10);
-    ASSERT_EQ(counter.value(), 11);
+    EXPECT_EQ(counter.value(), 11);
 }
 
-TEST(DoubleCounterImplTest, Adds) {
-    CounterImpl<double> counter;
-    ASSERT_EQ(counter.value(), 0.0);
-    counter.add(1.1);
-    ASSERT_APPROX_EQUAL(counter.value(), 1.1, 0.01);
-    counter.add(10.5);
-    ASSERT_APPROX_EQUAL(counter.value(), 11.6, 0.01);
-}
-
-TEST(Int64CounterImplTest, AddsZero) {
-    CounterImpl<int64_t> counter;
-    ASSERT_EQ(counter.value(), 0);
+TYPED_TEST(CounterImplTest, AddsZero) {
+    CounterImpl<TypeParam> counter;
+    EXPECT_EQ(counter.value(), 0);
     counter.add(0);
-    ASSERT_EQ(counter.value(), 0);
+    EXPECT_EQ(counter.value(), 0);
     counter.add(10);
     counter.add(0);
-    ASSERT_EQ(counter.value(), 10);
+    EXPECT_EQ(counter.value(), 10);
 }
 
-TEST(DoubleCounterImplTest, AddsZero) {
-    CounterImpl<double> counter;
-    ASSERT_EQ(counter.value(), 0.0);
-    counter.add(0.0);
-    ASSERT_EQ(counter.value(), 0.0);
-    counter.add(0.1);
-    counter.add(0.0);
-    ASSERT_APPROX_EQUAL(counter.value(), 0.1, 0.01);
-}
-
-TEST(Int64CounterImplTest, ExceptionOnNegativeAdd) {
-    CounterImpl<int64_t> counter;
+TYPED_TEST(CounterImplTest, ExceptionOnNegativeAdd) {
+    CounterImpl<TypeParam> counter;
     counter.add(1);
-    counter.add(3);
     ASSERT_THROWS_CODE(counter.add(-1), DBException, ErrorCodes::BadValue);
 }
 
-TEST(DoubleCounterImplTest, ExceptionOnNegativeAdd) {
-    CounterImpl<int64_t> counter;
-    counter.add(1.0);
-    ASSERT_THROWS_CODE(counter.add(-1.0), DBException, ErrorCodes::BadValue);
-}
-
 // Any issues with thread safety should be caught by tsan on this test.
-TEST(Int64CounterImplTest, ConcurrentAdds) {
-    CounterImpl<int64_t> counter;
+TYPED_TEST(CounterImplTest, ConcurrentAdds) {
+    CounterImpl<TypeParam> counter;
     constexpr int kNumThreads = 10;
     constexpr int kIncrementsPerThread = 1000;
 
@@ -106,16 +88,25 @@ TEST(Int64CounterImplTest, ConcurrentAdds) {
         thread.join();
     }
 
-    ASSERT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
+    EXPECT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
 }
 
-TEST(Int64CounterImplTest, Serialization) {
-    CounterImpl<int64_t> counter;
+TYPED_TEST(CounterImplTest, Serialization) {
+    CounterImpl<TypeParam> counter;
     const std::string key = "a";
     ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
     counter.add(0);
     ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
     counter.add(10);
     ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 10));
+}
+
+TEST(DoubleCounterImplTest, AddsFractionalValues) {
+    CounterImpl<double> counter;
+    EXPECT_EQ(counter.value(), 0.0);
+    counter.add(1.1);
+    EXPECT_THAT(counter.value(), DoubleEq(1.1));
+    counter.add(10.5);
+    EXPECT_THAT(counter.value(), DoubleEq(11.6));
 }
 }  // namespace mongo::otel::metrics

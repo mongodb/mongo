@@ -36,37 +36,34 @@
 
 namespace mongo::otel::metrics {
 
-TEST(Int64GaugeImplTest, Sets) {
-    GaugeImpl<int64_t> gauge;
-    ASSERT_EQ(gauge.value(), 0);
-    gauge.set(1);
-    ASSERT_EQ(gauge.value(), 1);
-    gauge.set(10);
-    ASSERT_EQ(gauge.value(), 10);
-    gauge.set(-1);
-    ASSERT_EQ(gauge.value(), -1);
-}
+using testing::DoubleEq;
 
-TEST(DoubleGaugeImplTest, Sets) {
-    GaugeImpl<double> gauge;
-    ASSERT_EQ(gauge.value(), 0.0);
-    gauge.set(1.0);
-    ASSERT_EQ(gauge.value(), 1.0);
-    gauge.set(10.0);
-    ASSERT_EQ(gauge.value(), 10.0);
-    gauge.set(-1.0);
-    ASSERT_EQ(gauge.value(), -1.0);
+template <typename T>
+class GaugeImplTest : public testing::Test {};
+
+using GaugeTypes = testing::Types<int64_t, double>;
+TYPED_TEST_SUITE(GaugeImplTest, GaugeTypes);
+
+TYPED_TEST(GaugeImplTest, Sets) {
+    GaugeImpl<TypeParam> gauge;
+    EXPECT_EQ(gauge.value(), 0);
+    gauge.set(1);
+    EXPECT_EQ(gauge.value(), 1);
+    gauge.set(10);
+    EXPECT_EQ(gauge.value(), 10);
+    gauge.set(-1);
+    EXPECT_EQ(gauge.value(), -1);
 }
 
 // Any issues with thread safety should be caught by tsan on this test.
-TEST(Int64GaugeImplTest, ConcurrentAdds) {
-    GaugeImpl<int64_t> gauge;
+TYPED_TEST(GaugeImplTest, ConcurrentSets) {
+    GaugeImpl<TypeParam> gauge;
     constexpr int kNumThreads = 10;
     constexpr int kIterationsPerThread = 1000;
 
     std::vector<stdx::thread> threads;
     for (int i = 0; i < kNumThreads; ++i) {
-        threads.emplace_back([&gauge, i]() {
+        threads.emplace_back([&gauge]() {
             for (int j = 0; j < kIterationsPerThread; ++j) {
                 gauge.set(j);
             }
@@ -77,7 +74,15 @@ TEST(Int64GaugeImplTest, ConcurrentAdds) {
         thread.join();
     }
 
-    ASSERT_EQ(gauge.value(), kIterationsPerThread - 1);
+    EXPECT_EQ(gauge.value(), kIterationsPerThread - 1);
+}
+
+TEST(DoubleGaugeImplTest, SetsFractionalValues) {
+    GaugeImpl<double> gauge;
+    gauge.set(1.1);
+    EXPECT_THAT(gauge.value(), DoubleEq(1.1));
+    gauge.set(-3.14);
+    EXPECT_THAT(gauge.value(), DoubleEq(-3.14));
 }
 
 }  // namespace mongo::otel::metrics

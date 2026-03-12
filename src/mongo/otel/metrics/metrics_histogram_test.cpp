@@ -37,71 +37,60 @@
 
 namespace mongo::otel::metrics {
 
-TEST(OtelMetricsHistogramTest, Int64Histogram) {
+template <typename T>
+std::unique_ptr<HistogramImpl<T>> createHistogram() {
 #ifdef MONGO_CONFIG_OTEL
-    HistogramImpl<int64_t> histogram(
+    return std::make_unique<HistogramImpl<T>>(
         *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
         "name",
         "description",
         "unit",
         boost::none);
 #else
-    HistogramImpl<int64_t> histogram;
+    return std::make_unique<HistogramImpl<T>>();
 #endif  // MONGO_CONFIG_OTEL
+}
 
-    histogram.record(0);
-    histogram.record(std::numeric_limits<int64_t>::max());
-    // Implicit cast to int
-    histogram.record(1.0);
-    ASSERT_THROWS_CODE(histogram.record(-1), DBException, ErrorCodes::BadValue);
+template <typename T>
+class HistogramImplTest : public testing::Test {};
+
+using HistogramTypes = testing::Types<int64_t, double>;
+TYPED_TEST_SUITE(HistogramImplTest, HistogramTypes);
+
+TYPED_TEST(HistogramImplTest, Records) {
+    std::unique_ptr<HistogramImpl<TypeParam>> histogram = createHistogram<TypeParam>();
+    histogram->record(0);
+    histogram->record(std::numeric_limits<TypeParam>::max());
+    ASSERT_THROWS_CODE(histogram->record(-1), DBException, ErrorCodes::BadValue);
+}
+
+TYPED_TEST(HistogramImplTest, Serialization) {
+    std::unique_ptr<HistogramImpl<TypeParam>> histogram = createHistogram<TypeParam>();
+    const std::string key = "histogram_seconds";
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 0.0 << "count" << 0)));
+
+    histogram->record(10);
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 10.0 << "count" << 1)));
+
+    ASSERT_THROWS_CODE(histogram->record(-1), DBException, ErrorCodes::BadValue);
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson(key),
+                      BSON(key << BSON("average" << 10.0 << "count" << 1)));
+}
+
+TEST(Int64HistogramImplTest, RejectsUint64Max) {
+    std::unique_ptr<HistogramImpl<int64_t>> histogram = createHistogram<int64_t>();
     // Using two's complement, 0xFFFFFFFFFFFFFFFF interpreted as int64_t is -1.
     ASSERT_THROWS_CODE(
-        histogram.record(std::numeric_limits<uint64_t>::max()), DBException, ErrorCodes::BadValue);
+        histogram->record(std::numeric_limits<uint64_t>::max()), DBException, ErrorCodes::BadValue);
 }
 
-TEST(OtelMetricsHistogramTest, DoubleHistogram) {
-#ifdef MONGO_CONFIG_OTEL
-    HistogramImpl<double> histogram(
-        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
-        "name",
-        "description",
-        "unit",
-        boost::none);
-#else
-    HistogramImpl<double> histogram;
-#endif  // MONGO_CONFIG_OTEL
-
-    histogram.record(0.0);
-    histogram.record(std::numeric_limits<double>::max());
-    // Implicit cast to double.
-    histogram.record(1);
-    ASSERT_THROWS_CODE(histogram.record(-1), DBException, ErrorCodes::BadValue);
+TEST(DoubleHistogramImplTest, RecordsFractionalValues) {
+    std::unique_ptr<HistogramImpl<double>> histogram = createHistogram<double>();
+    histogram->record(3.14);
+    ASSERT_BSONOBJ_EQ(histogram->serializeToBson("histogram"),
+                      BSON("histogram" << BSON("average" << 3.14 << "count" << 1)));
 }
 
-TEST(OtelMetricsHistogramTest, HistogramSerialization) {
-#ifdef MONGO_CONFIG_OTEL
-    HistogramImpl<int64_t> histogram(
-        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
-        "name",
-        "description",
-        "unit",
-        boost::none);
-#else
-    HistogramImpl<int64_t> histogram;
-#endif  // MONGO_CONFIG_OTEL
-
-    const auto document1 = histogram.serializeToBson("histogram_seconds");
-    ASSERT_BSONOBJ_EQ(document1,
-                      BSON("histogram_seconds" << BSON("average" << 0.0 << "count" << 0)));
-
-    histogram.record(10);
-    const auto document2 = histogram.serializeToBson("histogram_seconds");
-    ASSERT_BSONOBJ_EQ(document2,
-                      BSON("histogram_seconds" << BSON("average" << 10.0 << "count" << 1)));
-
-    ASSERT_THROWS_CODE(histogram.record(-1), DBException, ErrorCodes::BadValue);
-    const auto document3 = histogram.serializeToBson("histogram_seconds");
-    ASSERT_BSONOBJ_EQ(document3,
-                      BSON("histogram_seconds" << BSON("average" << 10.0 << "count" << 1)));
-}
 }  // namespace mongo::otel::metrics
