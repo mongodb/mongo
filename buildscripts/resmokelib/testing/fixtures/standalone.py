@@ -346,6 +346,27 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             )
             return
 
+        exceptions = []
+        try:
+            self._do_teardown_mongot(mode)
+        except Exception as err:
+            exceptions.append(err)
+        try:
+            self._do_teardown_mongod(mode)
+        except Exception as err:
+            exceptions.append(err)
+
+        if exceptions:
+            # Combine all error messages and raise
+            error_messages = " - ".join(str(e) for e in exceptions)
+            raise self.fixturelib.ServerFailure(error_messages)
+
+    def _do_teardown_mongot(self, mode=None):
+        if self.mongot is not None:
+            self.mongot._do_teardown(mode)
+
+    def _do_teardown_mongod(self, mode=None):
+        """Stop the mongod process."""
         if self.mongod is None:
             self.logger.warning("The mongod fixture has not been set up yet.")
             return  # Still a success even if nothing is running.
@@ -368,9 +389,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             ).format(self.port, exit_code)
             self.logger.warning(msg)
             raise self.fixturelib.ServerFailure(msg)
-
-        if self.mongot is not None:
-            self.mongot._do_teardown(mode)
 
         self.mongod.stop(mode)
         exit_code = self.mongod.wait()

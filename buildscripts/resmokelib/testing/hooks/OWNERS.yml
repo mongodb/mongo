@@ -88,3 +88,6 @@ filters:
   - "lifecycle.py":
     approvers:
       - 10gen/server-jstest-infra
+  - "cleanup.py":
+    approvers:
+      - 10gen/devprod-correctness

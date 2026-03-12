@@ -4,6 +4,7 @@ import os
 
 import pymongo
 
+from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -86,17 +87,30 @@ class CleanEveryNTestCase(interface.DynamicTestCase):
 
     def run_test(self):
         """Execute test hook."""
+        self.logger.info(
+            "%d tests have been run against the fixture, stopping it...", self._hook.tests_run
+        )
+        self._hook.tests_run = 0
+
+        # Collect errors but always attempt setup to leave fixture in usable state
+        exceptions = []
+
         try:
-            self.logger.info(
-                "%d tests have been run against the fixture, stopping it...", self._hook.tests_run
-            )
-            self._hook.tests_run = 0
-
             self.fixture.teardown()
+        except Exception as err:
+            self.logger.exception("Encountered an error during fixture teardown.")
+            exceptions.append(err)
 
+        # Always attempt to setup the fixture, even if teardown failed
+        try:
             self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
-        except:
-            self.logger.exception("Encountered an error while restarting the fixture.")
-            raise
+        except Exception as err:
+            self.logger.exception("Encountered an error while setting up the fixture.")
+            exceptions.append(err)
+
+        # Raise combined error after ensuring setup was attempted
+        if exceptions:
+            error_messages = " - ".join(str(e) for e in exceptions)
+            raise errors.ServerFailure(error_messages)
