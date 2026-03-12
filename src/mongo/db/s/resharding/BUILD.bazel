@@ -11,6 +11,16 @@ exports_files(
 )
 
 idl_generator(
+    name = "shardsvr_resharding_commands_gen",
+    src = "shardsvr_resharding_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/s/resharding:common_types_gen",
+    ],
+)
+
+idl_generator(
     name = "coordinator_document_gen",
     src = "coordinator_document.idl",
     deps = [

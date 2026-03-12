@@ -3532,6 +3532,32 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "_shardsvrReshardRecipientInitialize",
+            command: {
+                _shardsvrReshardRecipientInitialize: UUID(),
+                commonReshardingMetadata: {
+                    _id: UUID(),
+                    ns: "test.x",
+                    ui: UUID(),
+                    tempNs: "test.resharding.x",
+                    reshardingKey: {x: 1},
+                },
+                donorShards: [],
+                minimumOperationDurationMillis: NumberLong(0),
+            },
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {__system: 1},
+                    privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                    expectFail: true,
+                },
+                {runOnDb: firstDbName, roles: {}},
+                {runOnDb: secondDbName, roles: {}},
+            ],
+        },
+        {
             testname: "_shardsvrReshardRecipientClone",
             command: {
                 _shardsvrReshardRecipientClone: UUID(),
