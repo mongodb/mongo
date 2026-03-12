@@ -215,8 +215,6 @@ assertPipelineDoesNotUseAggregation({
 });
 assertPipelineIfSbeEnabled(
     function () {
-        // When SBE is fully enabled, all stages will be pushed into the find layer because they are
-        // all fully supported.
         assertPipelineDoesNotUseAggregation({
             pipeline: [
                 {$match: {x: {$gte: 20}}},
@@ -229,9 +227,6 @@ assertPipelineIfSbeEnabled(
         });
     },
     function () {
-        // Otherwise, when the $project is computed, pushing it down into the find() layer would
-        // sometimes have the effect of reordering it before the $sort and $limit. This can cause
-        // a valid query to throw an error, as in SERVER-54128.
         assertPipelineUsesAggregation({
             pipeline: [
                 {$match: {x: {$gte: 20}}},
@@ -243,7 +238,7 @@ assertPipelineIfSbeEnabled(
             expectedResult: [{x: ""}],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    false /* hasEligibleRestrictedStage */,
 );
 
 assert.commandWorked(coll.dropIndexes());
@@ -376,7 +371,7 @@ assertPipelineIfSbeEnabled(
             optimizedAwayStages: ["$limit"],
         });
     },
-    sbeNonLeadingMatchEnabled /* hasEligibleRestrictedStage */,
+    false /* hasEligibleRestrictedStage */,
 );
 
 // $match, $project, $limit can be optimized away when the projection is covered.
@@ -854,7 +849,7 @@ assertPipelineIfSbeEnabled(
             expectedStages: ["PROJECTION_SIMPLE", "COLLSCAN", "$addFields", "$replaceRoot"],
         });
     },
-    sbeTransformStagesEnabled /* hasEligibleRestrictedStage */,
+    false /* hasEligibleRestrictedStage */,
 );
 
 // getMore cases.

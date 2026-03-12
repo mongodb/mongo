@@ -7,7 +7,12 @@
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({
+    setParameter: {
+        internalQueryFrameworkControl: "trySbeRestricted",
+        featureFlagSbeFull: false,
+    },
+});
 const db = conn.getDB("test");
 const coll = db.t;
 const foreignColl = db.f;
@@ -177,8 +182,8 @@ function runAllExamples() {
                     "ex6",
                     plan,
                     {
-                        engine: allOn ? "sbe" : "classic",
-                        inClassic: {"$group": true, "$lookup": true, "$sort": true},
+                        engine: "classic",
+                        inClassic: {"$group": true, "$lookup": true, "$sort": true, "$match": true},
                     },
                     ctx,
                 );
