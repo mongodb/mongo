@@ -1,4 +1,9 @@
 module(
     name = "zlib",
+    version = "0.0.0",
+    compatibility_level = 1,
 )
-bazel_dep(name = "platforms", version = "1.3.1")
+
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_cc", version = "0.0.16")
+bazel_dep(name = "rules_license", version = "1.0.0")

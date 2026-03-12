@@ -21,12 +21,11 @@ zlib.pc.cmakein zlib.pc template for cmake
 zlib2ansi       perl script to convert source files for C++ compilation
 
 amiga/          makefiles for Amiga SAS C
-as400/          makefiles for AS/400
 doc/            documentation for formats and algorithms
 msdos/          makefiles for MSDOS
-nintendods/     makefile for Nintendo DS
 old/            makefiles for various architectures and zlib documentation
                 files that have not yet been updated for zlib 1.2.x
+os400/          makefiles for OS/400
 qnx/            makefiles for QNX
 watcom/         makefiles for OpenWatcom
 win32/          makefiles for Windows
