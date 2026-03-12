@@ -263,6 +263,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_oplog_applier_progress_gen",
         "//src/mongo/db/s/resharding:resharding_oplog_fetcher_progress_gen",
         "//src/mongo/db/s/resharding:resharding_recipient_service.cpp",
+        "//src/mongo/db/s/resharding:shardsvr_resharding_commands_gen",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
@@ -703,7 +704,6 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:shardsvr_reshard_collection_command.cpp",
         "//src/mongo/db/s/resharding:shardsvr_reshard_donor_initialize_command.cpp",
         "//src/mongo/db/s/resharding:shardsvr_reshard_recipient_initialize_command.cpp",
-        "//src/mongo/db/s/resharding:shardsvr_resharding_commands_gen",
         "//src/mongo/db/shard_role/ddl:clone_catalog_data_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:flush_database_cache_updates_command.cpp",
         "//src/mongo/db/shard_role/shard_catalog:flush_routing_table_cache_updates_command.cpp",

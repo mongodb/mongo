@@ -36,8 +36,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 

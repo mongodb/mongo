@@ -36,10 +36,10 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/otel/telemetry_context.h"
 #include "mongo/otel/traces/span/span.h"
-#include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 

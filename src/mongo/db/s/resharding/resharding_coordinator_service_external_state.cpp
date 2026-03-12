@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"

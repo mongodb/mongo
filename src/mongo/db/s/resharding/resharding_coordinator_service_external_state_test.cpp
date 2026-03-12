@@ -34,6 +34,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/s/resharding/recipient_resume_document_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/mock_async_rpc.h"
