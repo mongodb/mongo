@@ -86,16 +86,17 @@ export class InsertCommand {
     run(model, real) {
         const {tsColl, ctrlColl} = real;
 
-        const resTs = tsColl.insertOne(this.doc);
-        if (resTs && resTs.acknowledged === false) {
-            throw new Error("Insert into tsColl failed");
-        }
+        const {resTs, resCtrl} = [tsColl, ctrlColl].map((coll) => {
+            try {
+                return coll.insertOne(this.doc);
+            } catch (e) {
+                return e;
+            }
+        });
 
-        const resCtrl = ctrlColl.insertOne(this.doc);
-        if (resCtrl && resCtrl.acknowledged === false) {
-            throw new Error("Insert into ctrlColl failed");
-        }
-
+        // TODO SERVER-120457 remove model updates when ctrlColl replaces model
+        // Deletes may attempt to delete missing documents
+        assert.docEq(resTs, resCtrl);
         modelInsert(model, this.doc);
     }
 }
@@ -132,18 +133,18 @@ export class BatchInsertCommand {
         if (!this.docs || this.docs.length === 0) {
             return;
         }
-
-        const resTs = tsColl.insertMany(this.docs);
-        if (resTs && resTs.acknowledged === false) {
-            throw new Error("Batch insert into tsColl failed");
-        }
-
-        const resCtrl = ctrlColl.insertMany(this.docs);
-        if (resCtrl && resCtrl.acknowledged === false) {
-            throw new Error("Batch insert into ctrlColl failed");
-        }
+        const {resTs, resCtrl} = [tsColl, ctrlColl].map((coll) => {
+            try {
+                return coll.insertMany(this.docs);
+            } catch (e) {
+                return e;
+            }
+        });
+        assert.docEq(resTs, resCtrl);
 
         // Use the helper that understands the Map-shaped model.
+        // TODO SERVER-120457 remove model updates when ctrlColl replaces model
+        // Deletes may attempt to delete missing documents
         modelInsertMany(model, this.docs);
     }
 }
@@ -388,15 +389,11 @@ export class DeleteByRandomIdCommand {
         this._id = chosenId; // save for logging/debugging
 
         const resTs = tsColl.deleteOne({_id: chosenId});
-        if (resTs && resTs.acknowledged === false) {
-            throw new Error("Delete from tsColl failed");
-        }
-
         const resCtrl = ctrlColl.deleteOne({_id: chosenId});
-        if (resCtrl && resCtrl.acknowledged === false) {
-            throw new Error("Delete from ctrlColl failed");
-        }
+        assert.docEq(resTs, resCtrl);
 
+        // TODO SERVER-120457 remove model updates when ctrlColl replaces model
+        // Deletes may attempt to delete missing documents
         modelDeleteById(model, chosenId);
     }
 }
@@ -447,10 +444,12 @@ export class DeleteByFilterCommand {
             return;
         }
 
-        tsColl.deleteMany(query);
-        ctrlColl.deleteMany(query);
+        const resTs = tsColl.deleteMany(query);
+        const resCtrl = ctrlColl.deleteMany(query);
+        assert.docEq(resTs, resCtrl);
 
-        // Update model.
+        // TODO SERVER-120457 remove model updates when ctrlColl replaces model
+        // Deletes may attempt to delete missing documents
         for (const id of ids) {
             model.docs.delete(String(id));
         }
