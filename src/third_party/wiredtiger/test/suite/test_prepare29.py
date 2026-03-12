@@ -33,6 +33,7 @@ from wtscenario import make_scenarios
 # test_prepare29.py
 # Test that updates preceding an unstable prepared tombstone are restored with the correct
 # transaction IDs.
+@wttest.skip_for_hook("disagg", "This test relies on RTS, which is not used in disagg.")
 class test_prepare29(wttest.WiredTigerTestCase):
 
     format_values = [

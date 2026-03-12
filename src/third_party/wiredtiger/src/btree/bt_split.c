@@ -1429,6 +1429,30 @@ __split_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *last_upd, size_t *
 }
 
 /*
+ * __split_multi_inmem_mod_stats_update --
+ *     Update the reconciliation stats in the page modify structure.
+ */
+static WT_INLINE void
+__split_multi_inmem_mod_stats_update(WT_PAGE_MODIFY *mod, WT_PAGE_MODIFY *orig_modify)
+{
+    /*
+     * Restore the previous page's modify state to avoid repeatedly attempting eviction on the same
+     * page.
+     */
+    mod->last_evict_pass_gen = orig_modify->last_evict_pass_gen;
+    mod->last_eviction_id = orig_modify->last_eviction_id;
+    mod->last_eviction_timestamp = orig_modify->last_eviction_timestamp;
+    mod->rec_max_txn = orig_modify->rec_max_txn;
+    mod->rec_max_timestamp = orig_modify->rec_max_timestamp;
+    /*
+     * Ensure the reconciliation timestamps are passed to the new page; otherwise, this information
+     * will be lost following an update restore eviction.
+     */
+    mod->rec_pinned_stable_timestamp = orig_modify->rec_pinned_stable_timestamp;
+    mod->rec_prune_timestamp = orig_modify->rec_prune_timestamp;
+}
+
+/*
  * __split_multi_inmem --
  *     Instantiate a page from a disk image.
  */
@@ -1497,8 +1521,11 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * If there are no updates to apply to the page, we're done. Otherwise, there are updates we
      * need to restore.
      */
-    if (!F_ISSET(multi, WT_MULTI_SUPD_RESTORE))
+    if (!F_ISSET(multi, WT_MULTI_SUPD_RESTORE)) {
+        if (page->modify != NULL)
+            __split_multi_inmem_mod_stats_update(page->modify, orig->modify);
         return (0);
+    }
 
     free_size = 0;
 
@@ -1693,25 +1720,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      */
     mod = page->modify;
     mod->first_dirty_txn = WT_TXN_FIRST;
+    __split_multi_inmem_mod_stats_update(mod, orig->modify);
 
-    /*
-     * Restore the previous page's modify state to avoid repeatedly attempting eviction on the same
-     * page.
-     */
-    mod->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
-    mod->last_eviction_id = orig->modify->last_eviction_id;
-    mod->last_eviction_timestamp = orig->modify->last_eviction_timestamp;
-    mod->rec_max_txn = orig->modify->rec_max_txn;
-    mod->rec_max_timestamp = orig->modify->rec_max_timestamp;
-    /*
-     * Ensure the reconciliation timestamps are passed to the new page; otherwise, this information
-     * will be lost following an update restore eviction.
-     */
-    mod->rec_pinned_stable_timestamp = orig->modify->rec_pinned_stable_timestamp;
-    mod->rec_prune_timestamp = orig->modify->rec_prune_timestamp;
-
-    /* Add the update/restore flag to any previous state. */
-    mod->restore_state = orig->modify->restore_state;
     FLD_SET(mod->restore_state, WT_PAGE_RS_RESTORED);
 
 err:

@@ -22,24 +22,19 @@ test_empty.py
 test_encrypt06.py
 test_env01.py
 test_error_info01.py
-test_error_info03.py
+test_error_info03.py    # FIXME: WT-16872
 test_hs01.py  # FIXME: WT-15371
 test_hs18.py
 test_hs21.py
-test_hs24.py
+test_hs24.py    # FIXME: WT-16872
 test_hs30.py
-test_hs_evict_race01.py
+test_hs_evict_race01.py # FIXME: WT-16872
 test_log03.py
 test_metadata_cursor01.py
 test_metadata_cursor04.py
-test_prepare03.py
-test_prepare28.py
-test_prepare29.py
-test_prepare_cursor01.py
-test_prepare_hs03.py
-test_prepare_hs04.py
+test_prepare28.py   # FIXME: WT-16872
 test_readonly01.py
-test_readonly03.py  # WT-14582
+test_readonly03.py  # FIXME: WT-14582
 test_shared_cache01.py
 test_stat01.py
 test_stat_log02.py

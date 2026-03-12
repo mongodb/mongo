@@ -1533,6 +1533,7 @@ err:
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
     } else if (ret != WT_PREPARE_CONFLICT) {
+        /* FIXME-WT-16880: Fix layered search_near() incorrectly resetting the cursor. */
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         clayered->current_cursor = NULL;
     }

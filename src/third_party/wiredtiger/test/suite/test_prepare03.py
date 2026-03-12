@@ -77,7 +77,11 @@ class test_prepare03(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor(tablearg, None, None)
         self.assertCursorHasNoKeyValue(cursor)
-        self.assertEqual(cursor.uri, tablearg)
+
+        # If we're running the disagg hook then the actual uri might start with 'layered:' instead
+        # of "table:", so we skip this check.
+        if not self.runningHook('disagg'):
+            self.assertEqual(cursor.uri, tablearg)
 
         # Check insert operation
         for i in range(0, self.nentries):
@@ -176,14 +180,16 @@ class test_prepare03(wttest.WiredTigerTestCase):
         cursor.update()
         cursor.remove()
 
-        # Check search_near operation
-        cursor.set_key(self.genkey(self.nentries))
-        self.session.begin_transaction()
-        self.session.prepare_transaction("prepare_timestamp=2a")
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:cursor.search_near(), preparemsg)
-        self.session.timestamp_transaction("commit_timestamp=2b")
-        self.session.timestamp_transaction("durable_timestamp=2b")
-        self.session.commit_transaction()
-        cursor.search_near()
-        cursor.close()
+        # FIXME-WT-16880: Fix layered search_near() incorrectly unpositioning the cursor.
+        if not self.runningHook('disagg'):
+            # Check search_near operation
+            cursor.set_key(self.genkey(self.nentries))
+            self.session.begin_transaction()
+            self.session.prepare_transaction("prepare_timestamp=2a")
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda:cursor.search_near(), preparemsg)
+            self.session.timestamp_transaction("commit_timestamp=2b")
+            self.session.timestamp_transaction("durable_timestamp=2b")
+            self.session.commit_transaction()
+            cursor.search_near()
+            cursor.close()

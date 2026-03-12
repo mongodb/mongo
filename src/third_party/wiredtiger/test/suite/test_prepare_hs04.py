@@ -35,7 +35,7 @@ from wiredtiger import stat
 # test_prepare_hs04.py
 # Read prepared updates from on-disk with ignore_prepare.
 # Committing or aborting a prepared update when there exists a tombstone for that key already.
-#
+@wttest.skip_for_hook("disagg", "This test relies on RTS, which is not used in disagg.")
 class test_prepare_hs04(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=5MB,statistics=(fast)'

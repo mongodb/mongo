@@ -836,6 +836,9 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         except BaseException as err:
             self.pr('Exception raised shown as string: "' + \
                     str(err) + '"')
+            if isinstance(err, unittest.case.SkipTest):
+                # Bypass the assert if the test is being skipped.
+                raise err
             if not isinstance(err, exceptionType):
                 self.fail('Exception of incorrect type raised, got type: ' + \
                     str(type(err)))
