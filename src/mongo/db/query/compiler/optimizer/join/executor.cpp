@@ -309,28 +309,34 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .uniqueFieldInfo = std::move(uniqueFieldInfo),
                               .explain = expCtx->getExplain().has_value()};
 
-    ReorderedJoinSolution reordered;
-    switch (qkc.getJoinReorderMode()) {
-        case JoinReorderModeEnum::kBottomUp: {
-            // Optimize join order using bottom-up Sellinger-style algorithm.
-            auto cardEstimator =
-                std::make_unique<JoinCardinalityEstimator>(JoinCardinalityEstimator::make(
-                    ctx, swAccessPlans.getValue().estimate, samplingEstimators));
-            auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(ctx, *cardEstimator);
-            reordered = constructSolutionBottomUp(ctx,
-                                                  std::move(cardEstimator),
-                                                  std::move(costEstimator),
-                                                  getEnumerationStrategy(qkc));
-            break;
+    JoinCardinalityEstimator cardEstimator(
+        JoinCardinalityEstimator::make(ctx, swAccessPlans.getValue().estimate, samplingEstimators));
+    JoinCostEstimatorImpl costEstimator(ctx, cardEstimator);
+
+    StatusWith<ReorderedJoinSolution> swReordered = [&]() {
+        switch (qkc.getJoinReorderMode()) {
+            case JoinReorderModeEnum::kBottomUp: {
+                // Optimize join order using bottom-up Sellinger-style algorithm.
+                return constructSolutionBottomUp(
+                    ctx, cardEstimator, costEstimator, getEnumerationStrategy(qkc));
+            }
+            case JoinReorderModeEnum::kRandom:
+                // Randomly reorder joins (while still passing through bottom-up enumerator). NOTE:
+                // this currently ignores all query knobs other than the random seed & plan tree
+                // shape, but could easily be modified to take the values of other query knobs as
+                // "overrides".
+                return constructSolutionWithRandomOrder(
+                    ctx,
+                    &cardEstimator,
+                    &costEstimator,
+                    qkc.getRandomJoinOrderSeed(),
+                    getPlanTreeShape(qkc.getJoinPlanTreeShape()));
+            default:
+                MONGO_UNREACHABLE_TASSERT(11336911);
         }
-        case JoinReorderModeEnum::kRandom:
-            // Randomly reorder joins.
-            reordered = constructSolutionWithRandomOrder(
-                ctx, qkc.getRandomJoinOrderSeed(), qkc.getRandomJoinReorderDefaultToHashJoin());
-            break;
-        default:
-            MONGO_UNREACHABLE_TASSERT(11336911);
-    }
+    }();
+    uassertStatusOK(swReordered.getStatus());
+    auto reordered = std::move(swReordered.getValue());
 
     // Lower to SBE.
     // TODO SERVER-112232: Identify SBE suffixes that are eligible for pushdown & push them to the

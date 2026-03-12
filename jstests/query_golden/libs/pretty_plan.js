@@ -18,9 +18,9 @@ function getStageAbbreviation(stageName) {
     switch (stageName) {
         case "HASH_JOIN_EMBEDDING":
             return "HJ";
-        case "NESTED_LOOP_JOIN":
+        case "NESTED_LOOP_JOIN_EMBEDDING":
             return "NLJ";
-        case "INDEX_NESTED_LOOP_JOIN":
+        case "INDEX_NESTED_LOOP_JOIN_EMBEDDING":
             return "INLJ";
         default:
             return stageName;

@@ -300,130 +300,9 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
                                       std::move(rightChild),
                                       rightEmbedding);
 }
-}  // namespace
 
-ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingContext& ctx,
-                                                       int seed,
-                                                       bool defaultHJ) {
-    random_utils::PseudoRandomGenerator rand(seed);
-
-    // Set of nodes we have already visited
-    NodeSet visited;
-    // Ordered queue of nodes we need to visit
-    std::vector<NodeId> frontier;
-
-    // Randomly select a base collection.
-    NodeId baseId = rand.generateUniformInt(0, (int)(ctx.joinGraph.numNodes() - 1));
-    frontier.push_back(baseId);
-
-    // Final query solution
-    std::unique_ptr<QuerySolutionNode> soln;
-    boost::optional<FieldPath> leftMostFieldPath;
-
-    while (!frontier.empty()) {
-        auto current = frontier.back();
-        auto& currentNode = ctx.joinGraph.getNode(current);
-
-        // In the case of a cycle, we may have already seen this node. Skip it.
-        if (visited.test(current)) {
-            frontier.pop_back();
-            continue;
-        }
-
-        // Update solution to join the current node.
-        if (!soln) {
-            // This is the first node we encountered.
-            // TODO SERVER-111913: Avoid this clone
-            soln = ctx.cbrCqQsns.at(currentNode.accessPath.get())->root()->clone();
-            leftMostFieldPath = currentNode.embedPath;
-        } else {
-            // Generate an INLJ if possible, otherwise generate a NLJ.
-
-            // TODO SERVER-111913: Avoid this clone
-            auto rhs = ctx.cbrCqQsns.at(currentNode.accessPath.get())->root()->clone();
-
-            NodeSet currentNodeSet{};
-            currentNodeSet.set(current);
-            auto edges = getEdges(ctx.joinGraph, visited, currentNodeSet);
-
-            boost::optional<FieldPath> lhsEmbedPath;
-            bool expandLeftPredicate;
-            if (auto lhs = dynamic_cast<BinaryJoinEmbeddingNode*>(soln.get()); !lhs) {
-                // We are joining two "base" nodes in the tree and thus don't need to expand the
-                // field referenced in the join predicate.
-                lhsEmbedPath = leftMostFieldPath;
-                // In this case, we don't want to expand either field in the predicate! Instead, we
-                // want to use the SBE slot for both fields.
-                expandLeftPredicate = false;
-            } else {
-                // Our rhs is an access path node, and our lhs is some embedding node tree. We want
-                // to expand only the path corresponding to the left subtree in the predicate;
-                // however, note that the order of paths may not match the order of nodes.
-                expandLeftPredicate = true;
-            }
-
-
-            // At this point, there may be multiple edges connecting left and right. Take a random
-            // one to use for finding the best index to use for INLJ.
-            // TODO SERVER-XXX: Pick best index from all edges, not just the first one.
-            size_t joiningEdge = rand.generateUniformInt(0, (int)(edges.size() - 1));
-
-            // Attempt to use INLJ if possible, otherwise fallback to NLJ or HJ depending on the
-            // query knob.
-            JoinMethod method = JoinMethod::NLJ;
-            if (auto ice = bestIndexSatisfyingJoinPredicates(ctx, current, edges[joiningEdge]);
-                ice) {
-                rhs = createIndexProbeQSN(currentNode, ice);
-                method = JoinMethod::INLJ;
-            } else if (defaultHJ) {
-                method = JoinMethod::HJ;
-            }
-
-            auto joinPreds = makeJoinPreds(
-                ctx, edges, expandLeftPredicate, false /* Left-deep => never expand RHS. */);
-            soln = makeBinaryJoinEmbeddingQSN(method,
-                                              std::move(joinPreds),
-                                              std::move(soln),
-                                              lhsEmbedPath,
-                                              std::move(rhs),
-                                              currentNode.embedPath);
-        }
-
-        frontier.pop_back();
-        visited.set(current);
-
-        // Get unvisited neighbors
-        auto neighbors = ctx.joinGraph.getNeighbors(current);
-        std::vector<uint32_t> unvisited;
-        for (size_t i = 0; i < neighbors.size(); ++i) {
-            if (!neighbors.test(i)) {
-                continue;
-            }
-            if (!visited.test(i)) {
-                unvisited.push_back(i);
-            }
-        }
-        // Randomize the order of the neighbors and add them to the queue
-        rand.shuffleVector(unvisited);
-        for (auto n : unvisited) {
-            frontier.push_back(n);
-        }
-    }
-
-    auto ret = std::make_unique<QuerySolution>();
-    ret->setRoot(std::move(soln));
-
-    LOGV2_DEBUG(11179801, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
-    return {.soln = std::move(ret), .baseNode = baseId};
-}
-
-ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
-                                                std::unique_ptr<JoinCardinalityEstimator> estimator,
-                                                std::unique_ptr<JoinCostEstimator> coster,
-                                                EnumerationStrategy strategy) {
-    PlanEnumeratorContext peCtx(ctx, estimator.get(), coster.get(), std::move(strategy));
-
-    peCtx.enumerateJoinSubsets();
+ReorderedJoinSolution makeReorderedJoinSoln(const JoinReorderingContext& ctx,
+                                            const PlanEnumeratorContext& peCtx) {
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
     const auto& registry = peCtx.registry();
@@ -458,5 +337,198 @@ ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx
     }
 
     return out;
+}
+
+/**
+ * Traverses the join graph randomly to generate a join order (expressed as a vector of NodeIds).
+ */
+std::vector<NodeId> pickRandomJoinOrder(const JoinReorderingContext& ctx,
+                                        random_utils::PseudoRandomGenerator& rand) {
+    // Set of nodes we have already visited
+    NodeSet visited;
+    // Final join order, and ordered queue of nodes we still need to visit.
+    std::vector<NodeId> order, frontier;
+    order.reserve(ctx.joinGraph.numNodes());
+
+    // Randomly select a base collection.
+    NodeId baseId = rand.generateUniformInt(0, (int)(ctx.joinGraph.numNodes() - 1));
+    frontier.push_back(baseId);
+
+    boost::optional<FieldPath> leftMostFieldPath;
+
+    while (!frontier.empty()) {
+        auto current = frontier.back();
+
+        // In the case of a cycle, we may have already seen this node. Skip it.
+        if (visited.test(current)) {
+            frontier.pop_back();
+            continue;
+        }
+
+        frontier.pop_back();
+        order.push_back(current);
+        visited.set(current);
+
+        // Get unvisited neighbors
+        auto neighbors = ctx.joinGraph.getNeighbors(current);
+        std::vector<uint32_t> unvisited;
+        for (size_t i = 0; i < neighbors.size(); ++i) {
+            if (!neighbors.test(i)) {
+                continue;
+            }
+            if (!visited.test(i)) {
+                unvisited.push_back(i);
+            }
+        }
+        // Randomize the order of the neighbors and add them to the queue
+        rand.shuffleVector(unvisited);
+        for (auto n : unvisited) {
+            frontier.push_back(n);
+        }
+    }
+
+    return order;
+}
+
+PerSubsetLevelEnumerationMode makeRandomizedEnumerationHint(
+    const JoinReorderingContext& ctx,
+    random_utils::PseudoRandomGenerator& rand,
+    PlanTreeShape planShape,
+    boost::optional<JoinMethod> overrideMethod) {
+    auto nodes = pickRandomJoinOrder(ctx, rand);
+
+    // If we are given a specific shape of plan, make sure we only produce a hint that would be
+    // valid for that shape, otherwise randomize the shape by randomly picking which side to add the
+    // next base node to.
+    auto pickChildSide = [planShape, &rand, overrideMethod]() {
+        switch (planShape) {
+            case PlanTreeShape::LEFT_DEEP:
+                return false;
+            case PlanTreeShape::RIGHT_DEEP:
+                return true;
+            case PlanTreeShape::ZIG_ZAG: {
+                if (overrideMethod &&
+                    (*overrideMethod == JoinMethod::INLJ || *overrideMethod == JoinMethod::NLJ)) {
+                    // We only allow NLJ/INLJ to take a base node on the RHS.
+                    return false;
+                }
+                return rand.generateRandomBool();
+            }
+        };
+        MONGO_UNREACHABLE_TASSERT(11458201);
+    };
+
+    // If we're given a specific method, use that for every join- otherwise, randomly pick between
+    // available methods.
+    auto pickMethod = [&rand,
+                       &ctx](NodeId node, NodeSet prevNodeSet, bool isLeftChild, size_t level) {
+        if (isLeftChild && level > 1) {
+            // Only hash joins can have a base node on the left, unless we're at level 0/1.
+            return JoinMethod::HJ;
+        }
+
+        // Only bother hinting INLJ if we could actually use INLJ (otherwise we will have many
+        // retries).
+        auto edges = ctx.joinGraph.getJoinEdges(NodeSet{}.set(node), prevNodeSet);
+        bool canUseINLJ = std::any_of(edges.begin(), edges.end(), [&ctx, node](const auto& e) {
+            const auto& edge = ctx.joinGraph.getEdge(e);
+            return bestIndexSatisfyingJoinPredicates(ctx, node, edge) != nullptr;
+        });
+
+        const auto v = rand.generateUniformInt(0, canUseINLJ ? 2 : 1);
+        switch (v) {
+            case 0:
+                return JoinMethod::NLJ;
+            case 1:
+                return JoinMethod::HJ;
+            case 2:
+                return JoinMethod::INLJ;
+            default:
+                break;
+        }
+        MONGO_UNREACHABLE_TASSERT(11458202);
+    };
+
+    // Pick the shape of the tree & the join methods used.
+    std::vector<PerSubsetLevelEnumerationMode::SubsetLevelMode> modes;
+    modes.reserve(nodes.size());
+    size_t level = 0;
+    NodeSet prevSubset;
+    for (auto&& node : nodes) {
+        // NOTE: both of these are ignored for the first hint/ the base node.
+        bool isLeftChild = pickChildSide();
+        auto method =
+            overrideMethod ? *overrideMethod : pickMethod(node, prevSubset, isLeftChild, level);
+        modes.push_back(
+            {.level = level,
+             .mode = PlanEnumerationMode::HINTED,
+             .hint = JoinHint{.node = node, .method = method, .isLeftChild = isLeftChild}});
+        level++;
+        prevSubset.set(node);
+    }
+    return modes;
+}
+
+}  // namespace
+
+StatusWith<ReorderedJoinSolution> constructSolutionWithRandomOrder(
+    const JoinReorderingContext& ctx,
+    JoinCardinalityEstimator* estimator,
+    JoinCostEstimator* coster,
+    int seed,
+    PlanTreeShape planShape,
+    boost::optional<JoinMethod> method,
+    bool enableHJOrderPruning,
+    size_t maxRandomHintRetries) {
+    random_utils::PseudoRandomGenerator rand(seed);
+
+    // We always run once, then rety up to 'maxRandomHintTries' times.
+    for (size_t tries = 0; tries <= maxRandomHintRetries; tries++) {
+        if (tries > 0) {
+            LOGV2_DEBUG(11458205, 5, "Hint failed, trying again", "try"_attr = tries);
+        }
+        auto mode = makeRandomizedEnumerationHint(ctx, rand, planShape, method);
+        LOGV2_DEBUG(11458203,
+                    5,
+                    "Generated random order with hint",
+                    "seed"_attr = seed,
+                    "planShape"_attr = planShape,
+                    "mode"_attr = mode,
+                    "enableHJOrderPruning"_attr = enableHJOrderPruning);
+
+        PlanEnumeratorContext peCtx(
+            ctx,
+            estimator,
+            coster,
+            EnumerationStrategy{.planShape = planShape,
+                                .mode = std::move(mode),
+                                .enableHJOrderPruning = enableHJOrderPruning});
+        peCtx.enumerateJoinSubsets();
+
+        if (peCtx.enumerationSuccessful()) {
+            return makeReorderedJoinSoln(ctx, peCtx);
+        }
+    }
+
+    return Status(ErrorCodes::QueryRejectedBySettings,
+                  "The randomized enumerator was unable to generate a valid hint for plan "
+                  "enumeration with the current settings");
+}
+
+StatusWith<ReorderedJoinSolution> constructSolutionBottomUp(const JoinReorderingContext& ctx,
+                                                            JoinCardinalityEstimator& estimator,
+                                                            JoinCostEstimator& coster,
+                                                            EnumerationStrategy strategy) {
+
+    PlanEnumeratorContext peCtx(ctx, &estimator, &coster, std::move(strategy));
+    peCtx.enumerateJoinSubsets();
+    if (!peCtx.enumerationSuccessful()) {
+        return Status(
+            ErrorCodes::QueryRejectedBySettings,
+            "Expected the bottom-up enumerator to generate a solution, but found none with the "
+            "provided enumeration settings");
+    }
+
+    return makeReorderedJoinSoln(ctx, peCtx);
 }
 }  // namespace mongo::join_ordering

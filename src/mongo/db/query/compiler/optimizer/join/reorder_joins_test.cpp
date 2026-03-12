@@ -73,21 +73,35 @@ protected:
         return *graph.addNode(nss, std::move(cq), params.embedPath);
     }
 
-    void outputSolutions(std::ostream& out) {
+    void outputSolutions(std::ostream& out,
+                         const JoinReorderingContext& jCtx,
+                         PlanTreeShape planShape = PlanTreeShape::ZIG_ZAG,
+                         boost::optional<JoinMethod> method = boost::none,
+                         size_t retries = 0 /* No retries. */) {
         // Ensure each solution has a different base node.
         std::set<NodeId> baseNodes;
-        auto jCtx = makeContext();
         for (auto seed : seeds) {
             auto clonedMap = cloneSolnMap(jCtx.cbrCqQsns);
-            auto r = constructSolutionWithRandomOrder(jCtx, seed);
-            ASSERT(r.soln);
+            auto r = constructSolutionWithRandomOrder(
+                jCtx, nullptr, nullptr, seed, planShape, method, false /* No pruning. */, retries);
+            // For tests expecting an error, we uassert.
+            uassertStatusOK(r.getStatus());
+            auto v = std::move(r.getValue());
+            ASSERT(v.soln);
             // Ensure our seeds produce different base collections.
-            ASSERT(!baseNodes.contains(r.baseNode));
-            baseNodes.emplace(r.baseNode);
+            ASSERT(!baseNodes.contains(v.baseNode));
+            baseNodes.emplace(v.baseNode);
 
             out << "Solution with seed " << seed << ":" << std::endl;
-            out << r.soln->toString() << std::endl;
+            out << v.soln->toString() << std::endl;
         }
+    }
+
+    void outputSolutions(std::ostream& out,
+                         PlanTreeShape planShape = PlanTreeShape::ZIG_ZAG,
+                         boost::optional<JoinMethod> method = boost::none) {
+        auto jCtx = makeContext();
+        outputSolutions(out, jCtx, planShape, method);
     }
 };
 
@@ -108,7 +122,7 @@ TEST_F(ReorderGraphTest, SimpleGraph) {
 
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
 
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::NLJ);
 }
 
 TEST_F(ReorderGraphTest, TwoJoins) {
@@ -136,7 +150,7 @@ TEST_F(ReorderGraphTest, TwoJoins) {
     seeds = {0, 4};
 
     // Demonstrate that different join orders are constructed with different seeds
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::NLJ);
 }
 
 TEST_F(ReorderGraphTest, SimpleINLJ) {
@@ -159,7 +173,7 @@ TEST_F(ReorderGraphTest, SimpleINLJ) {
     seeds = {0, 1};
 
     // Demonstrate that different join orders are constructed with different seeds
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ);
 }
 
 TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
@@ -183,7 +197,7 @@ TEST_F(ReorderGraphTest, SimpleINLJSwapEdge) {
     seeds = {0, 1};
 
     // Demonstrate that different join orders are constructed with different seeds
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ);
 }
 
 TEST_F(ReorderGraphTest, MultipleINLJ) {
@@ -209,9 +223,21 @@ TEST_F(ReorderGraphTest, MultipleINLJ) {
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.b*/);
     graph.addSimpleEqualityEdge(id1, id3, 0 /*a*/, 2 /*c.c*/);
 
+    auto jCtx = makeContext();
     seeds = {5, 7};
     // Demonstrate that different join orders are constructed with different seeds
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), jCtx, PlanTreeShape::ZIG_ZAG);
+
+    // We can't force INLJ for node with id1 (no indexes). Pick a seed that
+    // uses id1 as the base node.
+    seeds = {0};
+    ASSERT_THROWS_CODE(
+        outputSolutions(goldenCtx.outStream(), jCtx, PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ),
+        AssertionException,
+        ErrorCodes::QueryRejectedBySettings);
+
+    goldenCtx.outStream() << "With retries force INLJ, Graph:\n C -- A -- B" << std::endl;
+    outputSolutions(goldenCtx.outStream(), jCtx, PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ, 3);
 }
 
 TEST_F(ReorderGraphTest, JoinWithDeps) {
@@ -251,7 +277,7 @@ TEST_F(ReorderGraphTest, JoinWithDeps) {
     seeds = {0, 4};
 
     // Demonstrate that different join orders are constructed with different seeds
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::NLJ);
 }
 
 TEST_F(ReorderGraphTest, INLJResidualPred) {
@@ -276,7 +302,7 @@ TEST_F(ReorderGraphTest, INLJResidualPred) {
     seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ);
 }
 
 // Probe using prefix
@@ -301,7 +327,7 @@ TEST_F(ReorderGraphTest, INLJUseIndexPrefix) {
     seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ);
 }
 
 // Index {b: 1, c: 1} cannot be used to satisfy join predicate on c
@@ -323,9 +349,20 @@ TEST_F(ReorderGraphTest, AvoidINLJOverIneligibleIndex) {
     graph.addSimpleEqualityEdge(id1, id2, 0 /*a*/, 1 /*b.c*/);
 
     seeds = {0, 1};
+    auto jCtx = makeContext();
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), jCtx);
+
+    // If we force INLJ when id2 is on the RHS we must try to use it in the enumerator & fail.
+    seeds = {9};
+    ASSERT_THROWS_CODE(
+        outputSolutions(goldenCtx.outStream(), jCtx, PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ),
+        AssertionException,
+        ErrorCodes::QueryRejectedBySettings);
+
+    goldenCtx.outStream() << "With retries force INLJ, Graph:\nA -- B" << std::endl;
+    outputSolutions(goldenCtx.outStream(), jCtx, PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ, 3);
 }
 
 TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
@@ -352,7 +389,7 @@ TEST_F(ReorderGraphTest, INLJCompoundJoinPredicate) {
     seeds = {0};
 
     goldenCtx.outStream() << "Graph:\nA -- B" << std::endl;
-    outputSolutions(goldenCtx.outStream());
+    outputSolutions(goldenCtx.outStream(), PlanTreeShape::ZIG_ZAG, JoinMethod::INLJ);
 }
 
 IndexedJoinPredicate makeIndexedPredicate(std::string path) {

@@ -73,6 +73,11 @@ public:
         return (gen() % (max - min + 1)) + min;
     }
 
+    // Helper to generate a random boolean (like a coin flip).
+    bool generateRandomBool() {
+        return generateUniformInt(0, 1) == 0;
+    }
+
 private:
     std::mt19937 gen;
 };

@@ -1,12 +1,20 @@
 Graph:
 C -- A -- B
 Solution with seed 5:
-INDEXED_NESTED_LOOP_JOIN
----leftEmbeddingField: (none)
----rightEmbeddingField: b
+HASH_JOIN
+---leftEmbeddingField: b
+---rightEmbeddingField: (none)
 ---joinPredicates:
-------a = b
+------b = a
 ---Outer:
+------COLLSCAN
+---------ns = test.b
+---------filter = $and
+---------nodeId = 1
+---------fetched = 1
+---------sortedByDiskLoc = 0
+---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Inner:
 ------NESTED_LOOP_JOIN
 ---------leftEmbeddingField: c
 ---------rightEmbeddingField: (none)
@@ -16,13 +24,42 @@ INDEXED_NESTED_LOOP_JOIN
 ------------COLLSCAN
 ---------------ns = test.c
 ---------------filter = $and
----------------nodeId = 1
+---------------nodeId = 2
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------COLLSCAN
 ---------------ns = test.a
+---------------filter = $and
+---------------nodeId = 3
+---------------fetched = 1
+---------------sortedByDiskLoc = 0
+---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+
+Solution with seed 7:
+INDEXED_NESTED_LOOP_JOIN
+---leftEmbeddingField: (none)
+---rightEmbeddingField: b
+---joinPredicates:
+------a = b
+---Outer:
+------NESTED_LOOP_JOIN
+---------leftEmbeddingField: (none)
+---------rightEmbeddingField: c
+---------joinPredicates:
+------------a = c
+---------Outer:
+------------COLLSCAN
+---------------ns = test.a
+---------------filter = $and
+---------------nodeId = 1
+---------------fetched = 1
+---------------sortedByDiskLoc = 0
+---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---------Inner:
+------------COLLSCAN
+---------------ns = test.c
 ---------------filter = $and
 ---------------nodeId = 2
 ---------------fetched = 1
@@ -39,18 +76,20 @@ INDEXED_NESTED_LOOP_JOIN
 ------------INDEX_PROBE
 ---------------Namespace: test.b Index: { b: 1 }
 
-Solution with seed 7:
+With retries force INLJ, Graph:
+ C -- A -- B
+Solution with seed 0:
 INDEXED_NESTED_LOOP_JOIN
 ---leftEmbeddingField: (none)
----rightEmbeddingField: b
+---rightEmbeddingField: c
 ---joinPredicates:
-------a = b
+------a = c
 ---Outer:
 ------INDEXED_NESTED_LOOP_JOIN
 ---------leftEmbeddingField: (none)
----------rightEmbeddingField: c
+---------rightEmbeddingField: b
 ---------joinPredicates:
-------------a = c
+------------a = b
 ---------Outer:
 ------------COLLSCAN
 ---------------ns = test.a
@@ -61,22 +100,22 @@ INDEXED_NESTED_LOOP_JOIN
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Inner:
 ------------FETCH
----------------ns = test.c
+---------------ns = test.b
 ---------------nodeId = 3
 ---------------fetched = 1
 ---------------sortedByDiskLoc = 0
 ---------------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------------Child:
 ------------------INDEX_PROBE
----------------------Namespace: test.c Index: { c: 1 }
+---------------------Namespace: test.b Index: { b: 1 }
 ---Inner:
 ------FETCH
----------ns = test.b
+---------ns = test.c
 ---------nodeId = 6
 ---------fetched = 1
 ---------sortedByDiskLoc = 0
 ---------providedSorts = {baseSortPattern: {}, ignoredFields: []}
 ---------Child:
 ------------INDEX_PROBE
----------------Namespace: test.b Index: { b: 1 }
+---------------Namespace: test.c Index: { c: 1 }
 

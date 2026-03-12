@@ -413,8 +413,11 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
 
         auto& joinSubsetsPrevLevel = _joinSubsets[level - 1];
         auto& joinSubsetsCurrLevel = _joinSubsets[level];
-        // Preallocate entries for all subsets in the current level.
-        joinSubsetsCurrLevel.reserve(cs.next());
+        if (!_mode.hint) {
+            // Preallocate entries for all subsets in the current level, but not if we're hinting
+            // (in which case, we will just enumerate one subset).
+            joinSubsetsCurrLevel.reserve(cs.next());
+        }
 
         // Tracks seen subsets along with their indexes in 'joinSubsetsCurrLevel'. This lets us
         // quickly find a subset and update its plans if we see it again.
