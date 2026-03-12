@@ -51,7 +51,6 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/idl_parser.h"
@@ -821,17 +820,10 @@ void StorageEngineImpl::setRecoveryCheckpointMetadata(StringData checkpointMetad
 
 void StorageEngineImpl::promoteToLeader() {
     _engine->promoteToLeader();
-    _dropPendingIdentReaper.configureDelay(Seconds(0));
 }
 
 void StorageEngineImpl::demoteFromLeader() {
     // The engine itself doesn't need to do anything here yet.
-
-    // The contract with drops is that the primary must always see at least one table drop. To
-    // handle cases where a secondary sees a drop before the primary, and then the primary crashes,
-    // we have a 24-hour delay when dropping tables. This keeps the table data around long enough to
-    // drop it again on step-up -- see SERVER-117458.
-    _dropPendingIdentReaper.configureDelay(Seconds(gStandbyDropDelaySeconds.load()));
 }
 
 void StorageEngineImpl::setStableTimestamp(Timestamp stableTimestamp, bool force) {

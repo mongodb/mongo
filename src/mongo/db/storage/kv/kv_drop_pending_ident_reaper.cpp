@@ -31,7 +31,9 @@
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -72,25 +74,11 @@ bool KVDropPendingIdentReaper::IdentInfo::isExpired(const KVEngine* engine,
               dropTime);
 }
 
-KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine)
-    : _engine(engine), _delay(Seconds(0)) {}
-
-void KVDropPendingIdentReaper::configureDelay(Seconds delay) {
-    stdx::lock_guard lock(_mutex);
-    invariant(delay >= Seconds(0));
-    _delay = delay;
-}
+KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
 void KVDropPendingIdentReaper::enableDeferUntimestampedDrops() {
     stdx::lock_guard lock(_mutex);
     _deferUntimestampedDrops = true;
-}
-
-Timestamp KVDropPendingIdentReaper::_applyDelay(const Timestamp& ts) const {
-    if (ts == Timestamp::min()) {
-        return ts;
-    }
-    return Timestamp(ts.getSecs() - _delay.count(), ts.getInc());
 }
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const StorageEngine::DropTime& dropTime,
@@ -181,11 +169,10 @@ std::shared_ptr<Ident> KVDropPendingIdentReaper::markIdentInUse(StringData ident
 
 bool KVDropPendingIdentReaper::hasExpiredIdents(const Timestamp& ts) const {
     stdx::lock_guard lock(_mutex);
-    auto delayedTs = _applyDelay(ts);
     for (auto& info : _timestampOrderedIdents) {
-        if (info->isExpired(_engine, delayedTs))
+        if (info->isExpired(_engine, ts))
             return true;
-        if (info->dropTime > delayedTs)
+        if (info->dropTime > ts)
             return false;
     }
     return false;
@@ -218,16 +205,28 @@ size_t KVDropPendingIdentReaper::getNumIdents() const {
     return _timestampOrderedIdents.size();
 };
 
-void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx,
-                                                   const Timestamp& rawTs) {
-    auto ts = [&] {
-        stdx::lock_guard lock(_mutex);
-        return _applyDelay(rawTs);
-    }();
+void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
+    const bool shouldTimestampIdentDrops = rss::ReplicatedStorageService::get(opCtx)
+                                               .getPersistenceProvider()
+                                               .shouldTimestampTableCreations();
+    boost::optional<rss::consensus::IntentGuard> writeIntentGuard;
+
+    if (shouldTimestampIdentDrops) {
+        // Replicated drop mode: only primary can proceed.
+        try {
+            writeIntentGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            LOGV2_DEBUG(11873700, 1, "Not primary, will skip replicated ident drops");
+        }
+    }
 
     stdx::lock_guard lock(_dropMutex);
 
-    std::vector<std::shared_ptr<IdentInfo>> toDrop;
+    struct ToDropEntry {
+        std::shared_ptr<IdentInfo> identInfo;
+        DropExecution execution;
+    };
+    std::vector<ToDropEntry> toDrop;
     {
         stdx::lock_guard lock(_mutex);
         for (auto& info : _timestampOrderedIdents) {
@@ -237,8 +236,20 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx,
             // also check that there are no active operations remaining that still retain a
             // reference by which to access the collection/index data.
             if (info->isExpired(_engine, ts)) {
+                const bool isTimestampedDrop = info->dropTime > Timestamp::min();
+                const bool shouldTimestampThisIdentDrop =
+                    isTimestampedDrop && shouldTimestampIdentDrops;
+                if (shouldTimestampThisIdentDrop && !writeIntentGuard) {
+                    // Skip because only the primary can initiate timestamp ident drops.
+                    continue;
+                }
+
+                const DropExecution dropExecution = shouldTimestampThisIdentDrop
+                    ? DropExecution{DropAsReplicatedPrimary{}}
+                    : DropExecution{DropUnreplicated{}};
+
                 info->dropInProgress = true;
-                toDrop.push_back(info);
+                toDrop.push_back({info, dropExecution});
             }
         }
     }
@@ -247,24 +258,32 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx,
         return;
     }
 
-    for (auto& identInfo : toDrop) {
+    for (auto& toDropElem : toDrop) {
+        auto& identInfo = toDropElem.identInfo;
+
         // Dropping tables can be expensive since it involves disk operations. If the table also
         // needs a checkpoint, that adds even more overhead.
         if (auto interruptStatus = opCtx->checkForInterruptNoAssert(); !interruptStatus.isOK()) {
             stdx::lock_guard lock(_mutex);
-            for (auto& identInfo : toDrop) {
-                identInfo->dropInProgress = false;
+            for (auto& elem : toDrop) {
+                elem.identInfo->dropInProgress = false;
             }
             uassertStatusOK(interruptStatus);
         }
 
-        auto status = _tryToDrop(lock, opCtx, *identInfo, boost::none);
+        auto status = _tryToDrop(lock, opCtx, *identInfo, toDropElem.execution);
         if (status == ErrorCodes::ObjectIsBusy) {
             LOGV2_PROD_ONLY(6936300,
                             "Drop-pending ident is still in use",
                             "ident"_attr = identInfo->identName,
                             "dropTimestamp"_attr = identInfo->dropTime,
                             "error"_attr = status);
+        } else if (status.isA<ErrorCategory::Interruption>()) {
+            LOGV2(11873702,
+                  "Interruption while dropping ident",
+                  "ident"_attr = identInfo->identName,
+                  "dropTimestamp"_attr = identInfo->dropTime,
+                  "error"_attr = status);
         } else if (!status.isOK()) {
             LOGV2_FATAL_NOTRACE(51022,
                                 "Failed to remove drop-pending ident",
@@ -385,26 +404,66 @@ Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
         // While we held no mutexes another thread completed the drop on this ident
         return Status::OK();
     }
-    return _tryToDrop(dropLock, opCtx, *info, replicatedIdentDropTimestamp);
+
+    const DropExecution execution = replicatedIdentDropTimestamp
+        ? DropExecution{DropAsReplicatedApply{*replicatedIdentDropTimestamp}}
+        : DropExecution{DropUnreplicated{}};
+
+    return _tryToDrop(dropLock, opCtx, *info, execution);
 }
 
-Status KVDropPendingIdentReaper::_tryToDrop(
-    WithLock,
-    OperationContext* opCtx,
-    IdentInfo& identInfo,
-    boost::optional<Timestamp> replicatedIdentDropTimestamp) {
+Status KVDropPendingIdentReaper::_tryToDrop(WithLock,
+                                            OperationContext* opCtx,
+                                            IdentInfo& identInfo,
+                                            DropExecution dropExecution) {
     LOGV2_PROD_ONLY(22237,
                     "Completing drop for ident",
                     "ident"_attr = identInfo.identName,
                     "dropTimestamp"_attr = identInfo.dropTime);
 
-    // Ident drops are non-transactional and cannot be rolled back. So this does not
-    // need to be in a WriteUnitOfWork.
-    auto status = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
-                                     identInfo.identName,
-                                     ident::isCollectionIdent(identInfo.identName),
-                                     identInfo.onDrop,
-                                     replicatedIdentDropTimestamp);
+    auto status =
+        std::visit(OverloadedVisitor{
+                       [&](const DropAsReplicatedPrimary&) -> Status {
+                           try {
+                               Lock::GlobalLock gl(opCtx, MODE_IX);
+                               WriteUnitOfWork wuow(opCtx);
+                               repl::OpTime reservedIdentDropTimestamp;
+
+                               // Call opObserver so that it generates an oplog entry.
+                               opCtx->getServiceContext()->getOpObserver()->onReplicatedIdentDrop(
+                                   opCtx, identInfo.identName, reservedIdentDropTimestamp);
+                               invariant(!reservedIdentDropTimestamp.isNull());
+
+                               auto s =
+                                   _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                                      identInfo.identName,
+                                                      ident::isCollectionIdent(identInfo.identName),
+                                                      identInfo.onDrop,
+                                                      reservedIdentDropTimestamp.getTimestamp());
+                               if (s.isOK()) {
+                                   wuow.commit();
+                               }
+                               return s;
+                           } catch (const DBException& ex) {
+                               return ex.toStatus();
+                           }
+                       },
+                       [&](const DropAsReplicatedApply& mode) -> Status {
+                           return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                                     identInfo.identName,
+                                                     ident::isCollectionIdent(identInfo.identName),
+                                                     identInfo.onDrop,
+                                                     mode.timestamp);
+                       },
+                       [&](const DropUnreplicated&) -> Status {
+                           return _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
+                                                     identInfo.identName,
+                                                     ident::isCollectionIdent(identInfo.identName),
+                                                     identInfo.onDrop,
+                                                     boost::none);
+                       }},
+                   dropExecution);
+
     if (!status.isOK()) {
         stdx::lock_guard lock(_mutex);
         identInfo.dropInProgress = false;

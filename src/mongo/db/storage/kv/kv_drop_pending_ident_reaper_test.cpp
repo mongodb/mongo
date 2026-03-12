@@ -33,6 +33,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/rss/stub_persistence_provider.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -50,6 +57,7 @@
 #include <functional>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -57,11 +65,34 @@
 namespace mongo {
 namespace {
 
+using ::testing::_;
+using ::testing::Return;
+
+class ReaperTestPersistenceProvider : public rss::StubPersistenceProvider {
+public:
+    MOCK_METHOD(std::string, name, (), (const, override));
+    MOCK_METHOD(bool, shouldTimestampTableCreations, (), (const, override));
+};
+
+class ReplicatedIdentDropOpObserverMock : public OpObserverNoop {
+public:
+    MOCK_METHOD(void,
+                onReplicatedIdentDrop,
+                (OperationContext * opCtx, const std::string& ident, repl::OpTime& opTime),
+                (override));
+};
+
 /**
  * Test-only implementation of KVEngine that tracks idents that have been dropped.
  */
 class KVEngineMock : public KVEngine {
 public:
+    struct DroppedIdent {
+        std::string identName;
+        // Set for replicated ident drops. boost::none for non-replicated drops.
+        boost::optional<Timestamp> replicatedIdentDropTimestamp;
+    };
+
     Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
@@ -234,9 +265,16 @@ public:
         return checkpointIteration;
     }
 
-    // List of ident names removed using dropIdent().
-    std::vector<std::string> droppedIdents;
-    std::vector<boost::optional<Timestamp>> droppedReplicatedIdentDropTimestamps;
+    // List of idents removed using dropIdent().
+    std::vector<DroppedIdent> droppedIdents;
+
+    std::vector<std::string> getDroppedIdentNames() const {
+        std::vector<std::string> names;
+        for (const auto& droppedIdent : droppedIdents) {
+            names.push_back(droppedIdent.identName);
+        }
+        return names;
+    }
 
     // Override to modify dropIdent() behavior.
     using DropIdentFn = std::function<Status(RecoveryUnit&, StringData)>;
@@ -257,8 +295,7 @@ Status KVEngineMock::dropIdent(RecoveryUnit& ru,
         if (onDrop) {
             onDrop();
         }
-        droppedIdents.push_back(std::string{ident});
-        droppedReplicatedIdentDropTimestamps.push_back(replicatedIdentDropTimestamp);
+        droppedIdents.push_back(DroppedIdent{std::string{ident}, replicatedIdentDropTimestamp});
     }
     return status;
 }
@@ -279,8 +316,15 @@ public:
      */
     OperationContext* getOpCtx() const;
 
+    void setShouldTimestampTableCreations(bool shouldTimestampTableCreations);
+
+    void setPrimary(bool isPrimary);
+
+    ReplicatedIdentDropOpObserverMock* _opObserverMock = nullptr;
+
 private:
     std::unique_ptr<KVEngineMock> _engineMock;
+    ReaperTestPersistenceProvider* _persistenceProviderMock = nullptr;
 };
 
 Timestamp makeTimestampWithNextInc(const Timestamp& ts) {
@@ -289,10 +333,27 @@ Timestamp makeTimestampWithNextInc(const Timestamp& ts) {
 
 void KVDropPendingIdentReaperTest::setUp() {
     ServiceContextTest::setUp();
+    repl::ReplicationCoordinator::set(
+        getServiceContext(),
+        std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
+    auto persistenceProvider = std::make_unique<testing::NiceMock<ReaperTestPersistenceProvider>>();
+    _persistenceProviderMock = persistenceProvider.get();
+    ON_CALL(*_persistenceProviderMock, name())
+        .WillByDefault(testing::Return("ReaperTestPersistenceProvider"));
+    rss::ReplicatedStorageService::get(getServiceContext())
+        .setPersistenceProvider(std::move(persistenceProvider));
+
+    auto opObserver = std::make_unique<ReplicatedIdentDropOpObserverMock>();
+    _opObserverMock = opObserver.get();
+    getServiceContext()->setOpObserver(std::move(opObserver));
+    setShouldTimestampTableCreations(false);
+    setPrimary(true);
     _engineMock = std::make_unique<KVEngineMock>();
 }
 void KVDropPendingIdentReaperTest::tearDown() {
     _engineMock = {};
+    _persistenceProviderMock = nullptr;
+    _opObserverMock = nullptr;
     ServiceContextTest::tearDown();
 }
 
@@ -303,6 +364,19 @@ KVEngineMock* KVDropPendingIdentReaperTest::getEngine() const {
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
+}
+
+void KVDropPendingIdentReaperTest::setShouldTimestampTableCreations(
+    bool shouldTimestampTableCreations) {
+    ASSERT(_persistenceProviderMock);
+    ON_CALL(*_persistenceProviderMock, shouldTimestampTableCreations())
+        .WillByDefault(testing::Return(shouldTimestampTableCreations));
+}
+
+void KVDropPendingIdentReaperTest::setPrimary(bool isPrimary) {
+    auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+    ASSERT_OK(replCoord->setFollowerMode(isPrimary ? repl::MemberState::RS_PRIMARY
+                                                   : repl::MemberState::RS_SECONDARY));
 }
 
 using KVDropPendingIdentReaperTestDeathTest = KVDropPendingIdentReaperTest;
@@ -349,7 +423,7 @@ TEST_F(KVDropPendingIdentReaperTest, AddDropPendingIdentAcceptsNullDropTimestamp
     auto opCtx = makeOpCtx();
     reaper.dropIdentsOlderThan(opCtx.get(), {Seconds(100), 0});
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName, engine->droppedIdents.front());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front().identName);
 }
 
 TEST_F(KVDropPendingIdentReaperTest,
@@ -384,8 +458,8 @@ TEST_F(KVDropPendingIdentReaperTest,
     // Drop all idents managed by reaper and confirm number of drops.
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
     ASSERT_EQUALS(2U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName1, engine->droppedIdents.front());
-    ASSERT_EQUALS(identName2, engine->droppedIdents.back());
+    ASSERT_EQUALS(identName1, engine->droppedIdents.front().identName);
+    ASSERT_EQUALS(identName2, engine->droppedIdents.back().identName);
 }
 
 TEST_F(KVDropPendingIdentReaperTest,
@@ -420,23 +494,23 @@ TEST_F(KVDropPendingIdentReaperTest,
     reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(ts[1]));
     ASSERT_EQUALS(ts[2], *reaper.getEarliestDropTimestamp());
     ASSERT_EQUALS(2U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName[0], engine->droppedIdents[0]);
-    ASSERT_EQUALS(identName[1], engine->droppedIdents[1]);
+    ASSERT_EQUALS(identName[0], engine->droppedIdents[0].identName);
+    ASSERT_EQUALS(identName[1], engine->droppedIdents[1].identName);
 
     // Committed optime between third and fourth optimes will result in the third collection
     // being removed.
     reaper.dropIdentsOlderThan(opCtx.get(), {Seconds(35), 0});
     ASSERT_EQUALS(ts[3], *reaper.getEarliestDropTimestamp());
     ASSERT_EQUALS(3U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName[2], engine->droppedIdents[2]);
+    ASSERT_EQUALS(identName[2], engine->droppedIdents[2].identName);
 
     // Committed optime after last optime will result in all drop-pending collections being
     // removed.
     reaper.dropIdentsOlderThan(opCtx.get(), {Seconds(100), 0});
     ASSERT_FALSE(reaper.getEarliestDropTimestamp());
     ASSERT_EQUALS(5U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName[3], engine->droppedIdents[3]);
-    ASSERT_EQUALS(identName[4], engine->droppedIdents[4]);
+    ASSERT_EQUALS(identName[3], engine->droppedIdents[3].identName);
+    ASSERT_EQUALS(identName[4], engine->droppedIdents[4].identName);
 }
 
 TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanSkipsIdentsStillReferencedElsewhere) {
@@ -467,8 +541,8 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanSkipsIdentsStillReferenc
         // should be dropped because ident0 and ident1 are still referenced.
         reaper.dropIdentsOlderThan(opCtx.get(), laterThanDropTimestamp);
         ASSERT_EQUALS(2U, engine->droppedIdents.size());
-        ASSERT_EQUALS(identNames[2], engine->droppedIdents[0]);
-        ASSERT_EQUALS(identNames[3], engine->droppedIdents[1]);
+        ASSERT_EQUALS(identNames[2], engine->droppedIdents[0].identName);
+        ASSERT_EQUALS(identNames[3], engine->droppedIdents[1].identName);
         ASSERT_EQUALS(dropTimestamp, reaper.getEarliestDropTimestamp());
     }
 
@@ -476,8 +550,8 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanSkipsIdentsStillReferenc
     // references to them and should be able to drop them..
     reaper.dropIdentsOlderThan(opCtx.get(), laterThanDropTimestamp);
     ASSERT_EQUALS(4U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identNames[0], engine->droppedIdents[2]);
-    ASSERT_EQUALS(identNames[1], engine->droppedIdents[3]);
+    ASSERT_EQUALS(identNames[0], engine->droppedIdents[2].identName);
+    ASSERT_EQUALS(identNames[1], engine->droppedIdents[3].identName);
     ASSERT_FALSE(reaper.getEarliestDropTimestamp());
 }
 
@@ -515,7 +589,7 @@ TEST_F(KVDropPendingIdentReaperTest, MarkUnexpiredIdentInUse) {
 
     reaper.dropIdentsOlderThan(opCtx.get(), Timestamp::max());
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName, engine->droppedIdents.front());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front().identName);
 }
 
 TEST_F(KVDropPendingIdentReaperTest, MarkExpiredIdentInUse) {
@@ -548,7 +622,7 @@ TEST_F(KVDropPendingIdentReaperTest, MarkExpiredIdentInUse) {
 
     reaper.dropIdentsOlderThan(opCtx.get(), Timestamp::max());
     ASSERT_EQUALS(1U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName, engine->droppedIdents.front());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front().identName);
 }
 
 DEATH_TEST_F(KVDropPendingIdentReaperTestDeathTest,
@@ -592,7 +666,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropUntimestampedDrop) {
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
     ASSERT_TRUE(reaper.getAllIdentNames().empty());
 }
 
@@ -625,9 +699,10 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropTimestampedDropAtTimestampPa
         opCtx.get(), identName, replicatedIdentDropTimestamp));
 
     // Assert ident was dropped with the expected timestamp.
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
-    ASSERT_EQUALS(engine->droppedReplicatedIdentDropTimestamps.size(), 1U);
-    ASSERT_EQUALS(engine->droppedReplicatedIdentDropTimestamps.front(),
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
+    ASSERT_EQUALS(engine->droppedIdents.size(), 1U);
+    ASSERT_EQUALS(engine->droppedIdents.front().identName, identName);
+    ASSERT_EQUALS(engine->droppedIdents.front().replicatedIdentDropTimestamp,
                   replicatedIdentDropTimestamp);
 
     // Assert the ident is no longer tracked as pending by the reaper.
@@ -696,7 +771,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropImpreciseTimestamp) {
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
     ASSERT_TRUE(reaper.getAllIdentNames().empty());
 }
 
@@ -708,7 +783,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropIdentNotInCatalog) {
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
     ASSERT_TRUE(reaper.getAllIdentNames().empty());
 }
 
@@ -722,7 +797,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropOnlyDropsTheRequestedIdent) 
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
     ASSERT_EQUALS(reaper.getAllIdentNames(), std::vector{otherIdentName});
 }
 
@@ -736,7 +811,7 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropCallsOnDropCallback) {
 
     auto opCtx = makeOpCtx();
     ASSERT_OK(reaper.immediatelyCompletePendingDrop(opCtx.get(), identName));
-    ASSERT_EQUALS(engine->droppedIdents, std::vector{identName});
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
     ASSERT(onDropCalled);
 }
 
@@ -827,70 +902,6 @@ TEST_F(KVDropPendingIdentReaperTest, HasExpiredChecksForCheckpointIteration) {
     ASSERT_TRUE(reaper.hasExpiredIdents(Timestamp::min()));
 }
 
-TEST_F(KVDropPendingIdentReaperTest, IdentWithDelayDroppedAtCorrectTime) {
-    auto engine = getEngine();
-    KVDropPendingIdentReaper reaper(engine);
-    reaper.configureDelay(Seconds(5));
-
-    Timestamp dropTimestamp{Seconds(10), 0};
-    std::string identName = "ident";
-
-    {
-        // The reaper must have the only references to the ident before it will drop it.
-        std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
-        reaper.addDropPendingIdent(dropTimestamp, ident);
-    }
-
-    // This should have no effect.
-    auto opCtx = makeOpCtx();
-    ASSERT_FALSE(reaper.hasExpiredIdents(Timestamp{Seconds(14), 0}));
-    reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(14), 0));
-    ASSERT_EQUALS(0U, engine->droppedIdents.size());
-
-    // After adding the delay, the ident should finally be dropped.
-    Timestamp extendedDropTimestamp{Seconds(15), 1};
-    ASSERT_TRUE(reaper.hasExpiredIdents(extendedDropTimestamp));
-    reaper.dropIdentsOlderThan(opCtx.get(), extendedDropTimestamp);
-    ASSERT_EQUALS(1U, engine->droppedIdents.size());
-    ASSERT_EQUALS(identName, engine->droppedIdents.front());
-}
-
-TEST_F(KVDropPendingIdentReaperTest, UpdatingDelayDynamicallyUpdatesWhichIdentsAreDroppable) {
-    auto engine = getEngine();
-    KVDropPendingIdentReaper reaper(engine);
-    reaper.configureDelay(Seconds(10));
-
-    for (int i = 10; i < 15; ++i) {
-        reaper.addDropPendingIdent(Timestamp(Seconds(i), 0),
-                                   std::make_shared<Ident>(fmt::format("table-{}", i)));
-    }
-
-    Timestamp dropTimestamp{Seconds(15), 1};
-
-    auto opCtx = makeOpCtx();
-
-    // Would drop everything with no delay, but current delay means nothing is dropped
-    ASSERT_FALSE(reaper.hasExpiredIdents(dropTimestamp));
-    reaper.dropIdentsOlderThan(opCtx.get(), dropTimestamp);
-    ASSERT_EQUALS(0U, engine->droppedIdents.size());
-
-    // Lowering the delay lets it drop some but not all of the idents
-    reaper.configureDelay(Seconds(4));
-    ASSERT_TRUE(reaper.hasExpiredIdents(dropTimestamp));
-    reaper.dropIdentsOlderThan(opCtx.get(), dropTimestamp);
-    ASSERT_FALSE(reaper.hasExpiredIdents(dropTimestamp));
-    ASSERT_EQUALS((std::vector<std::string>{"table-10", "table-11"}), engine->droppedIdents);
-
-    // Removing the delay entirely allows all the idents to be dropped
-    reaper.configureDelay(Seconds(0));
-    ASSERT_TRUE(reaper.hasExpiredIdents(dropTimestamp));
-    reaper.dropIdentsOlderThan(opCtx.get(), dropTimestamp);
-    ASSERT_FALSE(reaper.hasExpiredIdents(dropTimestamp));
-    ASSERT_EQUALS(
-        (std::vector<std::string>{"table-10", "table-11", "table-12", "table-13", "table-14"}),
-        engine->droppedIdents);
-}
-
 TEST_F(KVDropPendingIdentReaperTest, DropIdentsChecksForInterruptsBeforeDropping) {
     auto engine = getEngine();
     KVDropPendingIdentReaper reaper(engine);
@@ -914,6 +925,178 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsChecksForInterruptsBeforeDropping
         auto opCtx = makeOpCtx();
         reaper.dropIdentsOlderThan(opCtx.get(), makeTimestampWithNextInc(dropTimestamp));
         ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    }
+}
+
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_ASCPrimaryAndSecondaryDropIndependently) {
+    setShouldTimestampTableCreations(false);
+    auto engine = getEngine();
+
+    // Expect the replicated ident drop observer NOT to be called.
+    EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, _, _)).Times(0);
+
+    auto opCtx = makeOpCtx();
+    auto runDropCase = [&](bool isPrimary, StringData identName) {
+        setPrimary(isPrimary);
+        KVDropPendingIdentReaper reaper(engine);
+        reaper.addDropPendingIdent(Timestamp(10, 0),
+                                   std::make_shared<Ident>(std::string(identName)));
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+    };
+
+    runDropCase(true, "ident-1"_sd);
+    runDropCase(false, "ident-2"_sd);
+
+    ASSERT_EQUALS((std::vector<std::string>{"ident-1", "ident-2"}), engine->getDroppedIdentNames());
+    ASSERT_EQUALS(2U, engine->droppedIdents.size());
+    ASSERT_FALSE(engine->droppedIdents[0].replicatedIdentDropTimestamp);
+    ASSERT_FALSE(engine->droppedIdents[1].replicatedIdentDropTimestamp);
+}
+
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryReplicatesIdentDrop) {
+    setShouldTimestampTableCreations(true);
+    setPrimary(true);
+
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    const std::string identName("my-ident");
+    const Timestamp replicatedIdentDropOpTime(100, 0);
+    reaper.addDropPendingIdent(Timestamp(10, 0), std::make_shared<Ident>(identName));
+
+    EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
+        .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
+            opTime = repl::OpTime(replicatedIdentDropOpTime, repl::OpTime::kUninitializedTerm);
+        });
+
+    auto opCtx = makeOpCtx();
+    reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+
+    ASSERT_EQUALS(1U, engine->droppedIdents.size());
+    ASSERT_EQUALS(identName, engine->droppedIdents.front().identName);
+    ASSERT_EQUALS(replicatedIdentDropOpTime,
+                  engine->droppedIdents.front().replicatedIdentDropTimestamp.value());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCPrimaryOnlyReplicatesTimestampedDrops) {
+    setShouldTimestampTableCreations(true);
+    setPrimary(true);
+
+    auto engine = getEngine();
+    auto opCtx = makeOpCtx();
+    {
+        const std::string identName("i-timestamped-drop");
+        const Timestamp replicatedIdentDropOpTime(200, 0);
+        KVDropPendingIdentReaper reaper(engine);
+        EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
+            .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
+                opTime = repl::OpTime(replicatedIdentDropOpTime, repl::OpTime::kUninitializedTerm);
+            });
+        reaper.addDropPendingIdent(Timestamp(10, 0), std::make_shared<Ident>(identName));
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+        ASSERT_EQ(1U, engine->droppedIdents.size());
+        engine->droppedIdents.clear();
+    }
+
+    {
+        KVDropPendingIdentReaper reaper(engine);
+        reaper.enableDeferUntimestampedDrops();
+        const std::string identName("i-drop-on-CheckpointIteration");
+        engine->checkpointIteration = StorageEngine::CheckpointIteration{5};
+        reaper.addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(identName));
+        EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, _, _)).Times(0);
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(1000000), 0));
+        ASSERT_TRUE(engine->droppedIdents.empty());
+        engine->checkpointIteration = StorageEngine::CheckpointIteration{6};
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(1000000), 0));
+        ASSERT_EQUALS((std::vector<std::string>{identName}), engine->getDroppedIdentNames());
+        ASSERT_FALSE(engine->droppedIdents.front().replicatedIdentDropTimestamp);
+        engine->droppedIdents.clear();
+    }
+
+    {
+        KVDropPendingIdentReaper reaper(engine);
+        const std::string identName("i-drop-on-timestamp-0");
+        reaper.addDropPendingIdent(Timestamp(0, 0), std::make_shared<Ident>(identName));
+        EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, _, _)).Times(0);
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+        ASSERT_EQUALS((std::vector<std::string>{identName}), engine->getDroppedIdentNames());
+        ASSERT_FALSE(engine->droppedIdents.front().replicatedIdentDropTimestamp);
+    }
+}
+
+TEST_F(KVDropPendingIdentReaperTest,
+       DropIdentsOlderThan_DSCSecondaryTimestampedDropReapedAfterBecomingPrimary) {
+    setShouldTimestampTableCreations(true);
+    setPrimary(false);
+
+    auto engine = getEngine();
+    auto opCtx = makeOpCtx();
+
+    {
+        const std::string identName("dscSecondary");
+        KVDropPendingIdentReaper reaper(engine);
+        reaper.addDropPendingIdent(Timestamp(10, 0), std::make_shared<Ident>(identName));
+        EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, _, _)).Times(0);
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+
+        ASSERT_TRUE(engine->droppedIdents.empty());
+        ASSERT_EQUALS((std::vector<std::string>{identName}), reaper.getAllIdentNames());
+        testing::Mock::VerifyAndClearExpectations(_opObserverMock);
+
+        // Once the same node becomes primary, the pending ident should be reaped.
+        setPrimary(true);
+        EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, identName, _))
+            .WillOnce([&](OperationContext*, const std::string&, repl::OpTime& opTime) {
+                opTime = repl::OpTime(Timestamp(300, 0), repl::OpTime::kUninitializedTerm);
+            });
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+        ASSERT_EQUALS((std::vector<std::string>{identName}), engine->getDroppedIdentNames());
+        ASSERT(engine->droppedIdents.front().replicatedIdentDropTimestamp);
+        ASSERT_EQUALS(Timestamp(300, 0),
+                      engine->droppedIdents.front().replicatedIdentDropTimestamp.value());
+        engine->droppedIdents.clear();
+    }
+}
+
+TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThan_DSCSecondaryDoesOnlyUnreplicatedDrops) {
+    setShouldTimestampTableCreations(true);
+    setPrimary(false);
+
+    auto engine = getEngine();
+    auto opCtx = makeOpCtx();
+    EXPECT_CALL(*_opObserverMock, onReplicatedIdentDrop(_, _, _)).Times(0);
+
+    {
+        KVDropPendingIdentReaper reaper(engine);
+        const std::string identName("timestampedSecondary");
+        reaper.addDropPendingIdent(Timestamp(10, 0), std::make_shared<Ident>(identName));
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+        ASSERT_TRUE(engine->droppedIdents.empty());
+        ASSERT_EQUALS((std::vector<std::string>{identName}), reaper.getAllIdentNames());
+    }
+
+    {
+        KVDropPendingIdentReaper reaper(engine);
+        reaper.enableDeferUntimestampedDrops();
+        const std::string identName("secondaryCheckpointStyle");
+        engine->checkpointIteration = StorageEngine::CheckpointIteration{5};
+        reaper.addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(identName));
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(1000000), 0));
+        ASSERT_TRUE(engine->droppedIdents.empty());
+        engine->checkpointIteration = StorageEngine::CheckpointIteration{6};
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(Seconds(1000000), 0));
+        ASSERT_EQUALS((std::vector<std::string>{identName}), engine->getDroppedIdentNames());
+        ASSERT_FALSE(engine->droppedIdents.front().replicatedIdentDropTimestamp);
+        engine->droppedIdents.clear();
+    }
+
+    {
+        KVDropPendingIdentReaper reaper(engine);
+        const std::string identName("secondaryTimestampZero");
+        reaper.addDropPendingIdent(Timestamp(0, 0), std::make_shared<Ident>(identName));
+        reaper.dropIdentsOlderThan(opCtx.get(), Timestamp(11, 0));
+        ASSERT_EQUALS((std::vector<std::string>{identName}), engine->getDroppedIdentNames());
+        ASSERT_FALSE(engine->droppedIdents.front().replicatedIdentDropTimestamp);
     }
 }
 

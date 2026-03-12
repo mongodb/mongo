@@ -166,12 +166,6 @@ public:
                                                      Timestamp timestamp);
 
     /**
-     * Wait some fixed amount of additional time before dropping an ident. This gets added to the
-     * timestamp of each ident getting dropped. Has no effect on checkpoint-style drops.
-     */
-    void configureDelay(Seconds delay);
-
-    /**
      * Enable deferring untimestamped drops until the next checkpoint completes.
      */
     void enableDeferUntimestampedDrops();
@@ -202,17 +196,22 @@ private:
         bool isExpired(const KVEngine* engine, const Timestamp& ts) const;
     };
 
+    struct DropUnreplicated {};
+    struct DropAsReplicatedPrimary {};
+    struct DropAsReplicatedApply {
+        Timestamp timestamp;
+    };
+    using DropExecution =
+        std::variant<DropUnreplicated, DropAsReplicatedPrimary, DropAsReplicatedApply>;
     Status _tryToDrop(WithLock,  // Must hold _dropMutex but *not* _mutex
                       OperationContext* opCtx,
                       IdentInfo& identInfo,
-                      boost::optional<Timestamp> replicatedIdentDropTimestamp);
+                      DropExecution dropExecution);
 
     Status _immediatelyAttemptToCompletePendingDrop(
         OperationContext* opCtx,
         StringData ident,
         boost::optional<Timestamp> replicatedIdentDropTimestamp);
-
-    Timestamp _applyDelay(const Timestamp& ts) const;
 
     struct CompareByDropTime {
         using is_transparent = bool;
@@ -263,10 +262,6 @@ private:
 
     // Ident to drop timestamp map. Used for efficient lookups into _timestampOrderedIdents.
     StringMap<std::shared_ptr<IdentInfo>> _dropPendingIdents;
-
-    // How long to extend the timeout on all requested drops with a timestamp. Has no effect
-    // on checkpoints.
-    Seconds _delay;
 
     // If true, untimestamped drops are converted to checkpoint-based drops, deferring them until
     // the next checkpoint completes rather than reaping immediately.
