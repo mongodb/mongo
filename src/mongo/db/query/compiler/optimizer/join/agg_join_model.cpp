@@ -132,6 +132,12 @@ std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
 }
 
 bool isLookupEligible(const DocumentSourceLookUp& lookup) {
+
+    if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
+        // We've descended into a subpipelined, fallback.
+        return false;
+    }
+
     if (!lookup.hasUnwindSrc()) {
         return false;
     }
