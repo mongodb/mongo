@@ -4,6 +4,7 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**
  * Enumeration of the possible types of change streams.
@@ -967,4 +968,15 @@ export function distributeCollectionDataOverShards(db, collection, distributionC
             }),
         );
     }
+}
+
+/**
+ * Helper function to add a new ReplSetTest shard into the cluster.
+ */
+export function addShardToCluster(st, shardName, numNodes, rsNodeOptions) {
+    const replTest = new ReplSetTest({name: shardName, nodes: numNodes, nodeOptions: rsNodeOptions});
+    replTest.startSet({shardsvr: ""});
+    replTest.initiate();
+    assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: shardName}));
+    return replTest;
 }

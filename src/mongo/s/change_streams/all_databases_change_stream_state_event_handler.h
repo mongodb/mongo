@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2025-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,40 +29,40 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
-#include "mongo/db/pipeline/change_stream_reader_context.h"
-#include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
 #include "mongo/util/modules.h"
 
-#include <vector>
+namespace mongo {
 
-namespace mongo::change_streams {
-/**
- * Issues the required cursor open/close requests on the change stream reader context based on the
- * difference between 'newActiveShards' and the set of cursors currently tracked by the reader
- * context.
- */
-void updateActiveShardCursors(Timestamp atClusterTime,
-                              const std::vector<ShardId>& newActiveShards,
-                              ChangeStreamReaderContext& readerCtx);
+class AllDatabasesShardTargeterStateEventHandler
+    : public ChangeStreamShardTargeterStateEventHandler {
+public:
+    ChangeStreamShardTargeterStateEventHandler::DbPresenceState getDbPresenceState()
+        const override {
+        return ChangeStreamShardTargeterStateEventHandler::DbPresenceState::kUnknown;
+    }
 
-/**
- * Validates that the status of the historical placement result is 'OK', and tasserts otherwise.
- */
-void assertHistoricalPlacementStatusOK(const HistoricalPlacement& placement);
+    ShardTargeterDecision handleEvent(OperationContext* opCtx,
+                                      const ControlEvent& event,
+                                      ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+                                      ChangeStreamReaderContext& readerCtx) override;
 
-/**
- * Validates that the 'openCursorAt' and 'nextPlacementChangedAt' fields of the historical
- * placement result are not set, and tasserts otherwise.
- */
-void assertHistoricalPlacementHasNoSegment(const HistoricalPlacement& placement);
+    ShardTargeterDecision handleEventInDegradedMode(
+        OperationContext* opCtx,
+        const ControlEvent& event,
+        ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+        ChangeStreamReaderContext& readerCtx) override;
 
-/**
- * Returns a pointer to the data to shards allocation query service from the context, asserting
- * if one is not set.
- */
-DataToShardsAllocationQueryService* getDataToShardsAllocationQueryService(OperationContext* opCtx);
+protected:
+    std::string toString() const override;
 
-}  // namespace mongo::change_streams
+private:
+    ShardTargeterDecision handlePlacementRefresh(
+        OperationContext* opCtx,
+        const ControlEvent& event,
+        Timestamp clusterTime,
+        ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+        ChangeStreamReaderContext& readerCtx);
+};
+
+}  // namespace mongo
