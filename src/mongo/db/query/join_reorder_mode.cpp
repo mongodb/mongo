@@ -47,11 +47,11 @@ void JoinReorderMode::append(OperationContext*,
                              BSONObjBuilder* b,
                              StringData name,
                              const boost::optional<TenantId>&) {
-    *b << name << JoinReorderMode_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status JoinReorderMode::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = JoinReorderMode_parse(value, IDLParserContext("joinReorderMode"));
+    _data = idl::deserialize<JoinReorderModeEnum>(value, IDLParserContext("joinReorderMode"));
     return Status::OK();
 }
 

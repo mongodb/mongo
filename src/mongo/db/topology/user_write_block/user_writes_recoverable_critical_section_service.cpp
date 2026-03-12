@@ -78,8 +78,7 @@ const auto serviceDecorator =
     ServiceContext::declareDecoration<UserWritesRecoverableCriticalSectionService>();
 
 inline StringData reasonText(const boost::optional<UserWritesBlockReasonEnum>& reason) {
-    return UserWritesBlockReason_serializer(
-        reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
+    return idl::serialize(reason.value_or(UserWritesBlockReasonEnum::kUnspecified));
 }
 
 BSONObj findRecoverableCriticalSectionDoc(OperationContext* opCtx, const NamespaceString& nss) {

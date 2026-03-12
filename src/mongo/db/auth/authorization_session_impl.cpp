@@ -115,7 +115,7 @@ MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
 
     for (std::size_t i = 0; i < idlEnumCount<MatchTypeEnum>; ++i) {
         auto matchType = static_cast<MatchTypeEnum>(i);
-        auto matchTypeName = MatchType_serializer(matchType);
+        auto matchTypeName = idl::serialize(matchType);
         auto dataObj = MatchType_get_extra_data(matchType);
         auto data = MatchTypeExtraData::parse(dataObj, IDLParserContext{matchTypeName});
 
@@ -154,7 +154,7 @@ void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs
         // This actually can't happen since the initializer above populated the map with all match
         // types.
         uassert(6161701,
-                str::stream() << "Unknown matchType: " << MatchType_serializer(matchType),
+                str::stream() << "Unknown matchType: " << idl::serialize(matchType),
                 it != kServerlessPrivilegesPermitted.end());
         if (MONGO_unlikely(!it->second.isSupersetOf(actions))) {
             auto unauthorized = actions;
@@ -163,7 +163,7 @@ void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs
                       str::stream()
                           << "Security Token user has one or more actions not approved for "
                              "resource matchType '"
-                          << MatchType_serializer(matchType) << "': " << unauthorized.toString());
+                          << idl::serialize(matchType) << "': " << unauthorized.toString());
         }
     }
 }

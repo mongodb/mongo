@@ -292,7 +292,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
 }
 
 StringData readConcernLevels::toString(ReadConcernLevel level) {
-    return ReadConcernLevel_serializer(level);
+    return idl::serialize(level);
 }
 
 }  // namespace repl

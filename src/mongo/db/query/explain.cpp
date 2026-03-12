@@ -269,7 +269,7 @@ void generateExecutionInfo(PlanExecutor* exec,
     tassert(11320911,
             fmt::format("The explain verbosity must be at least 'kExecStats' when generating "
                         "execution info, but found {}",
-                        explain::Verbosity_serializer(verbosity)),
+                        idl::serialize(verbosity)),
             verbosity >= ExplainOptions::Verbosity::kExecStats);
 
     auto&& explainer = exec->getPlanExplainer();

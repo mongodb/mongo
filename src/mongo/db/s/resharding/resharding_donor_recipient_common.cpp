@@ -278,7 +278,7 @@ void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
         uassert(5498100,
                 fmt::format("reshardingFields must not contain donorFields or recipientFields when"
                             " the coordinator is in state {}. Got reshardingFields {}",
-                            CoordinatorState_serializer(reshardingFields.getState()),
+                            idl::serialize(reshardingFields.getState()),
                             reshardingFields.toBSON().toString()),
                 !reshardingFields.getDonorFields() && !reshardingFields.getRecipientFields());
     } else if (coordinatorState < CoordinatorStateEnum::kCommitting) {
@@ -289,7 +289,7 @@ void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
                 fmt::format("reshardingFields must contain exactly one of donorFields and"
                             " recipientFields when the coordinator is in state {}. Got"
                             " reshardingFields {}",
-                            CoordinatorState_serializer(reshardingFields.getState()),
+                            idl::serialize(reshardingFields.getState()),
                             reshardingFields.toBSON().toString()),
                 bool(reshardingFields.getDonorFields()) !=
                     bool(reshardingFields.getRecipientFields()));

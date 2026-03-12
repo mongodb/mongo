@@ -70,7 +70,7 @@ protected:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return ReshardCollectionCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     BSONObj _computeFinalShardKey(const CurrentChunkManager& cmOld);

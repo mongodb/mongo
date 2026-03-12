@@ -197,7 +197,7 @@ public:
      * For queries that have multiple executors, this can be used to differentiate between them.
      */
     boost::optional<StringData> getExecutorType() const final {
-        return CursorType_serializer(_cursorType);
+        return idl::serialize(_cursorType);
     }
 
 private:

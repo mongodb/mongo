@@ -47,9 +47,9 @@ namespace {
 using Verbosity = explain::VerbosityEnum;
 
 TEST(ExplainTest, VerbosityEnumToStringReturnsCorrectValues) {
-    ASSERT_EQ(explain::Verbosity_serializer(Verbosity::kQueryPlanner), "queryPlanner"_sd);
-    ASSERT_EQ(explain::Verbosity_serializer(Verbosity::kExecStats), "executionStats"_sd);
-    ASSERT_EQ(explain::Verbosity_serializer(Verbosity::kExecAllPlans), "allPlansExecution"_sd);
+    ASSERT_EQ(idl::serialize(Verbosity::kQueryPlanner), "queryPlanner"_sd);
+    ASSERT_EQ(idl::serialize(Verbosity::kExecStats), "executionStats"_sd);
+    ASSERT_EQ(idl::serialize(Verbosity::kExecAllPlans), "allPlansExecution"_sd);
 }
 
 TEST(ExplainTest, ExplainSerializeToBSONCorrectly) {

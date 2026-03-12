@@ -66,7 +66,7 @@ private:
     }
 
     StringData serializePhase(const Phase& phase) const override {
-        return UntrackUnsplittableCollectionCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     void _checkPreconditions();

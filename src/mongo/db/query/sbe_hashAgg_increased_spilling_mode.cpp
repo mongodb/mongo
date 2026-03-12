@@ -47,12 +47,12 @@ void SbeHashAggIncreasedSpillingMode::append(OperationContext*,
                                              BSONObjBuilder* b,
                                              StringData name,
                                              const boost::optional<TenantId>&) {
-    *b << name << SbeHashAggIncreasedSpillingMode_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status SbeHashAggIncreasedSpillingMode::setFromString(StringData value,
                                                       const boost::optional<TenantId>&) {
-    _data = SbeHashAggIncreasedSpillingMode_parse(
+    _data = idl::deserialize<SbeHashAggIncreasedSpillingModeEnum>(
         value, IDLParserContext("internalQuerySlotBasedExecutionHashAggIncreasedSpilling"));
     return Status::OK();
 }

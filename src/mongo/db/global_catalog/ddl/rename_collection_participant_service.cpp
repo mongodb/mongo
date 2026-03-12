@@ -216,8 +216,8 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
                 "Rename participant phase transition",
                 "fromNs"_attr = _doc.getFromNss(),
                 "toNs"_attr = _doc.getTo(),
-                "newPhase"_attr = RenameCollectionParticipantPhase_serializer(newDoc.getPhase()),
-                "oldPhase"_attr = RenameCollectionParticipantPhase_serializer(_doc.getPhase()));
+                "newPhase"_attr = idl::serialize(newDoc.getPhase()),
+                "oldPhase"_attr = idl::serialize(_doc.getPhase()));
 
     auto opCtx = makeOperationContext();
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);

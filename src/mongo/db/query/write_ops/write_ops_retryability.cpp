@@ -77,7 +77,7 @@ std::string makePreOrPostImageNotFoundErrorMessage(const repl::OplogEntry& oplog
         "has been executed but the {} is no longer available",
         oplog.getSessionId()->toBSON().toString(),
         *oplog.getTxnNumber(),
-        repl::RetryImage_serializer(*oplog.getNeedsRetryImage()));
+        idl::serialize(*oplog.getNeedsRetryImage()));
 }
 
 /**
@@ -94,7 +94,7 @@ std::string makePreOrPostImageNotFoundErrorMessage(
         "has been executed but the {} is no longer available: ",
         oplogWithCorrectLinks.getSessionId()->toBSON().toString(),
         *oplogWithCorrectLinks.getTxnNumber(),
-        repl::RetryImage_serializer(imageType),
+        idl::serialize(imageType),
         redact(request.toBSON()).toString());
 }
 
@@ -122,7 +122,7 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
             40606,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << idl::serialize(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
             request.getRemove().value_or(false));
 
@@ -137,7 +137,7 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
             40608,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << idl::serialize(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
             request.getUpsert().value_or(false));
     } else {
@@ -145,7 +145,7 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
             40609,
             str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                           << " is not compatible with previous write in the transaction of type: "
-                          << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
+                          << idl::serialize(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
             opType == repl::OpTypeEnum::kUpdate);
 
@@ -420,7 +420,7 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry,
         uasserted(40638,
                   str::stream() << "update retry request is not compatible with previous write in "
                                    "the transaction of type: "
-                                << OpType_serializer(entry.getOpType())
+                                << idl::serialize(entry.getOpType())
                                 << ", oplogTs: " << entry.getTimestamp().toString()
                                 << ", oplog: " << redact(entry.toBSONForLogging()));
     }

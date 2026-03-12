@@ -72,7 +72,7 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
     builder.append(OplogEntryBase::kTimestampFieldName, p.opTime.getTimestamp());
     builder.append(OplogEntryBase::kTermFieldName, p.opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, p.version);
-    builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(p.opType));
+    builder.append(OplogEntryBase::kOpTypeFieldName, idl::serialize(p.opType));
     if (p.nss.tenantId() && gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
@@ -130,15 +130,15 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
 
     if (p.needsRetryImage) {
         builder.append(OplogEntryBase::kNeedsRetryImageFieldName,
-                       RetryImage_serializer(p.needsRetryImage.value()));
+                       idl::serialize(p.needsRetryImage.value()));
     }
     return builder.obj();
 }
 }  // namespace
 
 CommandTypeEnum parseCommandType(const BSONObj& objectField) {
-    return CommandType_parse(objectField.firstElementFieldNameStringData(),
-                             IDLParserContext("commandString"));
+    return idl::deserialize<CommandTypeEnum>(objectField.firstElementFieldNameStringData(),
+                                             IDLParserContext("commandString"));
 }
 
 void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundle>* image) const {
@@ -915,7 +915,7 @@ StatusWith<Timestamp> OplogEntry::extractCommitTransactionTimestamp() const {
         mongo::ErrorCodes::Error(11730801),
         str::stream() << "Expected a terminal applyOps oplog entry or a commitTransaction oplog "
                          "entry but found op type "
-                      << repl::OpType_serializer(getOpType())};
+                      << idl::serialize(getOpType())};
 }
 
 mongo::Timestamp OplogEntry::getTimestampForPreImage() const {
@@ -984,8 +984,8 @@ repl::OpTypeEnum OplogEntryParserNonStrict::getOpType() const {
             str::stream() << "Invalid '" << repl::OplogEntry::kOpTypeFieldName
                           << "' field type (expected String)",
             opTypeElement.type() == BSONType::string);
-    return repl::OpType_parse(opTypeElement.checkAndGetStringData(),
-                              IDLParserContext("ChangeStreamEntry.op"));
+    return idl::deserialize<repl::OpTypeEnum>(opTypeElement.checkAndGetStringData(),
+                                              IDLParserContext("ChangeStreamEntry.op"));
 }
 
 BSONObj OplogEntryParserNonStrict::getObject() const {

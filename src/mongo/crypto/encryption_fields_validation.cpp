@@ -478,7 +478,7 @@ void validateTextSearchIndex(BSONType fieldType,
     uassert(10774915,
             "The field 'precision' is not allowed for text-based index but is present",
             !query.getPrecision().has_value());
-    auto qTypeStr = QueryType_serializer(query.getQueryType());
+    auto qTypeStr = idl::serialize(query.getQueryType());
 
     uassert(9783401,
             "Query type is not a text search query type",
@@ -571,8 +571,8 @@ void validateEncryptedField(const EncryptedField* field) {
             auto qtype2 = queryTypeConfigs.back().getQueryType();
             uassert(9783414,
                     fmt::format("Multiple query types may only include the {} and {} query types",
-                                QueryType_serializer(QueryTypeEnum::SuffixPreview),
-                                QueryType_serializer(QueryTypeEnum::PrefixPreview)),
+                                idl::serialize(QueryTypeEnum::SuffixPreview),
+                                idl::serialize(QueryTypeEnum::PrefixPreview)),
                     (qtype1 == QueryTypeEnum::SuffixPreview &&
                      qtype2 == QueryTypeEnum::PrefixPreview) ||
                         (qtype2 == QueryTypeEnum::SuffixPreview &&

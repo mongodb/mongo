@@ -168,8 +168,8 @@ public:
                                      "checkMetadataConsistency command. The router was expecting "
                                      "to receive a cluster, database or collection level "
                                      "parameter, but received "
-                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                                  << " with namespace " << nss.toStringForErrorMsg());
+                                  << idl::serialize(commandLevel) << " with namespace "
+                                  << nss.toStringForErrorMsg());
             }
         }
 
@@ -416,8 +416,8 @@ public:
                                      "checkMetadataConsistency command. The router was expecting "
                                      "to receive a cluster, database or collection level "
                                      "parameter, but received "
-                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                                  << " with namespace " << nss.toStringForErrorMsg());
+                                  << idl::serialize(commandLevel) << " with namespace "
+                                  << nss.toStringForErrorMsg());
             }
         }
     };

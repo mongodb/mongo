@@ -101,7 +101,7 @@ private:
     const BSONObj _critSecReason;
 
     StringData serializePhase(const Phase& phase) const override {
-        return DropCollectionCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     bool _mustAlwaysMakeProgress() override {

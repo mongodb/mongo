@@ -122,8 +122,8 @@ public:
                         << "Unexpected parameter during the internal execution of "
                            "checkMetadataConsistency command. The shard server was expecting to "
                            "receive a database or collection level parameter, but received "
-                        << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                        << " with namespace " << nss.toStringForErrorMsg(),
+                        << idl::serialize(commandLevel) << " with namespace "
+                        << nss.toStringForErrorMsg(),
                     commandLevel == MetadataConsistencyCommandLevelEnum::kCollectionLevel ||
                         commandLevel == MetadataConsistencyCommandLevelEnum::kDatabaseLevel);
 
@@ -244,8 +244,8 @@ public:
                             << "Unexpected parameter during the internal execution of "
                                "checkMetadataConsistency command. The shard server was expecting "
                                "to receive a database or collection level parameter, but received "
-                            << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                            << " with namespace " << nss.toStringForErrorMsg());
+                            << idl::serialize(commandLevel) << " with namespace "
+                            << nss.toStringForErrorMsg());
             }
         }
 
@@ -336,8 +336,8 @@ public:
                                          "expecting "
                                          "to receive a database or collection level parameter, but "
                                          "received "
-                                      << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                                      << " with namespace " << nss.toStringForErrorMsg());
+                                      << idl::serialize(commandLevel) << " with namespace "
+                                      << nss.toStringForErrorMsg());
                 }
             }();
 

@@ -132,7 +132,7 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
            "oplog: "
         << oplogEntry.toBSONForLogging();
     ASSERT(OpTypeEnum::kNoop == oplogEntry.getOpType())
-        << "Expected 'n' op type but found '" << OpType_serializer(oplogEntry.getOpType())
+        << "Expected 'n' op type but found '" << idl::serialize(oplogEntry.getOpType())
         << "' instead: " << oplogEntry.toBSONForLogging();
     ASSERT_BSONOBJ_EQ(msgObj, oplogEntry.getObject());
 

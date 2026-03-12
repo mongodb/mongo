@@ -139,7 +139,7 @@ std::string ActionSet::toString() const {
 
 std::vector<StringData> ActionSet::getActionsAsStringDatas() const {
     if (contains(ActionType::anyAction)) {
-        return {ActionType_serializer(ActionType::anyAction)};
+        return {idl::serialize(ActionType::anyAction)};
     }
 
     std::vector<StringData> result;

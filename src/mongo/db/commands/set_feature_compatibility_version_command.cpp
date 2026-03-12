@@ -325,7 +325,7 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
 
         ShardsvrJoinDDLCoordinators request;
         request.setDbName(DatabaseName::kAdmin);
-        request.setTypes({{DDLCoordinatorType_serializer(DDLCoordinatorTypeEnum::kDropDatabase)}});
+        request.setTypes({{idl::serialize(DDLCoordinatorTypeEnum::kDropDatabase)}});
 
         const auto response = shard->runCommand(opCtx,
                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},

@@ -836,7 +836,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     const auto mode = balancerConfig->getBalancerMode();
 
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
-    builder->append("mode", BalancerMode_serializer(mode));
+    builder->append("mode", idl::serialize(mode));
     builder->append("inBalancerRound", _inBalancerRound);
     builder->append("numBalancerRounds", _numBalancerRounds);
     builder->append("term", repl::ReplicationCoordinator::get(opCtx)->getTerm());

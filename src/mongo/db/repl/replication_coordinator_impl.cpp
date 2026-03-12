@@ -4873,9 +4873,9 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
     if (memberState.startup2() && _selfIndex != -1) {
         if (!initialSyncSourceReadPreference.empty()) {
             try {
-                readPreference =
-                    ReadPreference_parse(initialSyncSourceReadPreference,
-                                         IDLParserContext("initialSyncSourceReadPreference"));
+                readPreference = idl::deserialize<ReadPreferenceEnum>(
+                    initialSyncSourceReadPreference,
+                    IDLParserContext("initialSyncSourceReadPreference"));
                 parsedSyncSourceFromInitialSync = true;
             } catch (const DBException& e) {
                 fassertFailedWithStatus(3873100, e.toStatus());

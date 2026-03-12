@@ -551,11 +551,11 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         repl::getNextOpTime(_opCtx.get());
         wuow.commit();
 
-        std::string testDesc{
-            str::stream() << "TestCase: opType: " << OpType_serializer(testCase.opType)
-                          << " mode: " << OplogApplication::modeToString(testCase.applicationMode)
-                          << " fromMigrate: " << (testCase.fromMigrate.get_value_or(false))
-                          << " shouldRecordPreImage: " << testCase.shouldRecordPreImage};
+        std::string testDesc{str::stream()
+                             << "TestCase: opType: " << idl::serialize(testCase.opType) << " mode: "
+                             << OplogApplication::modeToString(testCase.applicationMode)
+                             << " fromMigrate: " << (testCase.fromMigrate.get_value_or(false))
+                             << " shouldRecordPreImage: " << testCase.shouldRecordPreImage};
 
         // Check if pre-image was recorded.
         if (testCase.shouldRecordPreImage) {

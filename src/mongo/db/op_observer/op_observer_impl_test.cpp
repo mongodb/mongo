@@ -1056,14 +1056,14 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 
     // Ensure that the old collection metadata was saved.
     auto o2 = oplogEntry.getObjectField("o2");
-    auto o2Expected = BSON("collectionOptions_old"
-                           << BSON("validationLevel"
-                                   << ValidationLevel_serializer(*oldCollOpts.validationLevel)
-                                   << "validationAction"
-                                   << ValidationAction_serializer(*oldCollOpts.validationAction))
-                           << "indexOptions_old"
-                           << BSON("expireAfterSeconds" << durationCount<Seconds>(
-                                       indexInfo.oldExpireAfterSeconds.value())));
+    auto o2Expected =
+        BSON("collectionOptions_old"
+             << BSON("validationLevel" << idl::serialize(*oldCollOpts.validationLevel)
+                                       << "validationAction"
+                                       << idl::serialize(*oldCollOpts.validationAction))
+             << "indexOptions_old"
+             << BSON("expireAfterSeconds"
+                     << durationCount<Seconds>(indexInfo.oldExpireAfterSeconds.value())));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
@@ -1101,11 +1101,10 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
 
     // Ensure that the old collection metadata was saved and that TTL info is not present.
     auto o2 = oplogEntry.getObjectField("o2");
-    auto o2Expected = BSON("collectionOptions_old"
-                           << BSON("validationLevel"
-                                   << ValidationLevel_serializer(*oldCollOpts.validationLevel)
-                                   << "validationAction"
-                                   << ValidationAction_serializer(*oldCollOpts.validationAction)));
+    auto o2Expected = BSON("collectionOptions_old" << BSON(
+                               "validationLevel" << idl::serialize(*oldCollOpts.validationLevel)
+                                                 << "validationAction"
+                                                 << idl::serialize(*oldCollOpts.validationAction)));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }

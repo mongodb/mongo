@@ -89,7 +89,7 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
                         2,
                         "Skip checking progress of not critical health observer",
                         "observerType"_attr = (str::stream() << observerType),
-                        "intensity"_attr = HealthObserverIntensity_serializer(observerIntensity));
+                        "intensity"_attr = idl::serialize(observerIntensity));
             continue;
         }
 

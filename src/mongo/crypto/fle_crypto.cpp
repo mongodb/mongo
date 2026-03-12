@@ -3522,7 +3522,7 @@ std::vector<PrfBlock> EDCServerCollection::getRemovedTags(
                            std::back_inserter(staleTags),
                            [](const auto& block) { return PrfBlockfromCDR(block.getView().tag); });
         } else {
-            auto typeValue = EncryptedBinDataType_serializer(encryptedTypeBinding);
+            auto typeValue = idl::serialize(encryptedTypeBinding);
             uasserted(7293204,
                       str::stream() << "Field '" << field.fieldPathName
                                     << "' is not a supported encrypted type: " << typeValue);
@@ -3724,7 +3724,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 
     uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
 
-    auto subType = EncryptedBinDataType_parse(subTypeByte, IDLParserContext("subtype"));
+    auto subType = idl::deserialize<EncryptedBinDataType>(subTypeByte, IDLParserContext("subtype"));
     return {subType, cdrc};
 }
 
@@ -3930,8 +3930,8 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
                          uassert(8574704,
                                  fmt::format("Field '{}' should be of type '{}', got '{}'",
                                              field.getPath(),
-                                             QueryType_serializer(queryType),
-                                             QueryType_serializer(query.getQueryType())),
+                                             idl::serialize(queryType),
+                                             idl::serialize(query.getQueryType())),
                                  query.getQueryType() == queryType);
                          return query;
                      },
@@ -3945,7 +3945,7 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
                              8674705,
                              fmt::format("Field '{}' should be of type '{}', but no configs match",
                                          field.getPath(),
-                                         QueryType_serializer(queryType)));
+                                         idl::serialize(queryType)));
                      }},
                  field.getQueries().get());
 }

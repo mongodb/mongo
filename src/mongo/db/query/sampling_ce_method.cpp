@@ -48,11 +48,12 @@ void CBRSamplingCEMethod::append(OperationContext*,
                                  BSONObjBuilder* b,
                                  StringData name,
                                  const boost::optional<TenantId>&) {
-    *b << name << SamplingCEMethod_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status CBRSamplingCEMethod::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = SamplingCEMethod_parse(value, IDLParserContext("internalQuerySamplingCEMethod"));
+    _data = idl::deserialize<SamplingCEMethodEnum>(
+        value, IDLParserContext("internalQuerySamplingCEMethod"));
     return Status::OK();
 }
 
@@ -60,12 +61,12 @@ void JoinSamplingCEMethod::append(OperationContext*,
                                   BSONObjBuilder* b,
                                   StringData name,
                                   const boost::optional<TenantId>&) {
-    *b << name << SamplingCEMethod_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status JoinSamplingCEMethod::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data =
-        SamplingCEMethod_parse(value, IDLParserContext("internalJoinOptimizationSamplingCEMethod"));
+    _data = idl::deserialize<SamplingCEMethodEnum>(
+        value, IDLParserContext("internalJoinOptimizationSamplingCEMethod"));
     return Status::OK();
 }
 

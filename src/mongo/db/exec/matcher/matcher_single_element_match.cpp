@@ -776,7 +776,8 @@ void MatchesSingleElementEvaluator::visit(
         return;
     }
 
-    auto fleBlobSubType = EncryptedBinDataType_parse(binData[0], IDLParserContext("subtype"));
+    auto fleBlobSubType =
+        idl::deserialize<EncryptedBinDataType>(binData[0], IDLParserContext("subtype"));
     switch (fleBlobSubType) {
         case EncryptedBinDataType::kDeterministic:
         case EncryptedBinDataType::kRandom: {

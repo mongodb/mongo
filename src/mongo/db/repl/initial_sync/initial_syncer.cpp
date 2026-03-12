@@ -928,8 +928,8 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime(
     std::shared_ptr<OnCompletionGuard> onCompletionGuard,
     const OpTime& defaultBeginFetchingOpTime) {
 
-    const auto preparedState = DurableTxnState_serializer(DurableTxnStateEnum::kPrepared);
-    const auto inProgressState = DurableTxnState_serializer(DurableTxnStateEnum::kInProgress);
+    const auto preparedState = idl::serialize(DurableTxnStateEnum::kPrepared);
+    const auto inProgressState = idl::serialize(DurableTxnStateEnum::kInProgress);
 
     // Obtain the oldest active transaction timestamp from the remote by querying their transactions
     // table. To prevent oplog holes (primary) or a stale lastAppliedSnapshot (secondary) from

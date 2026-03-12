@@ -1232,8 +1232,8 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
 
     LOGV2_INFO(5279505,
                "Transitioned resharding donor state",
-               "newState"_attr = DonorState_serializer(newState),
-               "oldState"_attr = DonorState_serializer(oldState),
+               "newState"_attr = idl::serialize(newState),
+               "oldState"_attr = idl::serialize(oldState),
                logAttrs(_metadata.getSourceNss()),
                "collectionUUID"_attr = _metadata.getSourceUUID(),
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
@@ -1328,7 +1328,7 @@ BSONObj ReshardingDonorService::DonorStateMachine::_makeQueryForCoordinatorUpdat
                 {
                     BSONArrayBuilder inBuilder(mutableStateBuilder.subarrayStart("$in"));
                     for (const auto& state : it->second) {
-                        inBuilder.append(DonorState_serializer(state));
+                        inBuilder.append(idl::serialize(state));
                     }
                 }
             }
@@ -1381,7 +1381,7 @@ void ReshardingDonorService::DonorStateMachine::commit() {
     tassert(
         ErrorCodes::ReshardCollectionInProgress,
         fmt::format("Attempted to commit the resharding operation in an incorrect donor state: {}",
-                    DonorState_serializer(_donorCtx.getState())),
+                    idl::serialize(_donorCtx.getState())),
         _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
 
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {

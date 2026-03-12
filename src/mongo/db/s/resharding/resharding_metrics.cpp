@@ -651,12 +651,11 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance_forTest(
 }
 
 StringData ReshardingMetrics::getStateString() const {
-    return visit(OverloadedVisitor{
-                     [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
-                     [](RecipientStateEnum state) { return RecipientState_serializer(state); },
-                     [](DonorStateEnum state) {
-                         return DonorState_serializer(state);
-                     }},
+    return visit(OverloadedVisitor{[](CoordinatorStateEnum state) { return idl::serialize(state); },
+                                   [](RecipientStateEnum state) { return idl::serialize(state); },
+                                   [](DonorStateEnum state) {
+                                       return idl::serialize(state);
+                                   }},
                  getState());
 }
 
@@ -671,7 +670,7 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const {
                    NamespaceStringUtil::serialize(_sourceNs, SerializationContext::stateDefault()));
     builder.append(kOriginatingCommand, _originalCommand);
     builder.append(kOpTimeElapsed, getOperationRunningTimeSecs().count());
-    builder.appendElements(BSON("provenance" << ReshardingProvenance_serializer(_provenance)));
+    builder.appendElements(BSON("provenance" << idl::serialize(_provenance)));
     switch (_role) {
         case Role::kCoordinator:
             appendOptionalMillisecondsFieldAs<Seconds>(

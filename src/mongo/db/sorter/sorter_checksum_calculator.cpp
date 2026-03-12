@@ -51,8 +51,7 @@ void SorterChecksumCalculator::addData(const char* data, size_t size) {
             return;
     }
     tasserted(7784000,
-              str::stream() << "Unknown sorter checksum version: "
-                            << SorterChecksumVersion_serializer(_version)
+              str::stream() << "Unknown sorter checksum version: " << idl::serialize(_version)
                             << ". Is it possible you are reading sorter files left from a newer "
                             << "version of MongoDB?");
 }

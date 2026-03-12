@@ -476,8 +476,7 @@ public:
                             const LogicalSessionId& lsid,
                             TxnNumber txnNumber,
                             const std::vector<StmtId>& stmtIds) {
-        ASSERT_EQ(OpType_serializer(foundOp.getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(foundOp.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
             << foundOp;
 
         ASSERT_EQ(foundOp.getSessionId(), lsid) << foundOp;

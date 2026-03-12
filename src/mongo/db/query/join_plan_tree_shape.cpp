@@ -47,11 +47,11 @@ void JoinPlanTreeShape::append(OperationContext*,
                                BSONObjBuilder* b,
                                StringData name,
                                const boost::optional<TenantId>&) {
-    *b << name << JoinPlanTreeShape_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status JoinPlanTreeShape::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = JoinPlanTreeShape_parse(value, IDLParserContext("JoinPlanTreeShape"));
+    _data = idl::deserialize<JoinPlanTreeShapeEnum>(value, IDLParserContext("JoinPlanTreeShape"));
     return Status::OK();
 }
 

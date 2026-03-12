@@ -406,8 +406,8 @@ void addErrorIfUnequal(boost::optional<ValidationLevelEnum> stored,
                        boost::optional<ValidationLevelEnum> cached,
                        StringData name,
                        ValidateResults* results) {
-    addErrorIfUnequal(ValidationLevel_serializer(validationLevelOrDefault(stored)),
-                      ValidationLevel_serializer(validationLevelOrDefault(cached)),
+    addErrorIfUnequal(idl::serialize(validationLevelOrDefault(stored)),
+                      idl::serialize(validationLevelOrDefault(cached)),
                       name,
                       results);
 }
@@ -416,8 +416,8 @@ void addErrorIfUnequal(boost::optional<ValidationActionEnum> stored,
                        boost::optional<ValidationActionEnum> cached,
                        StringData name,
                        ValidateResults* results) {
-    addErrorIfUnequal(ValidationAction_serializer(validationActionOrDefault(stored)),
-                      ValidationAction_serializer(validationActionOrDefault(cached)),
+    addErrorIfUnequal(idl::serialize(validationActionOrDefault(stored)),
+                      idl::serialize(validationActionOrDefault(cached)),
                       name,
                       results);
 }

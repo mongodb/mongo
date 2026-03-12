@@ -76,7 +76,7 @@ const BSONArray TagSet::kMatchAny = BSON_ARRAY(BSONObj());
 
 Status validateReadPreferenceMode(const std::string& prefStr, const boost::optional<TenantId>&) {
     try {
-        ReadPreference_parse(prefStr, IDLParserContext(kModeFieldName));
+        idl::deserialize<ReadPreferenceEnum>(prefStr, IDLParserContext(kModeFieldName));
     } catch (DBException& e) {
         return e.toStatus();
     }

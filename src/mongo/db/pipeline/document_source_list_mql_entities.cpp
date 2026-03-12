@@ -112,7 +112,7 @@ DocumentSourceContainer::iterator DocumentSourceListMqlEntities::optimizeAt(
 }
 
 Value DocumentSourceListMqlEntities::serialize(const SerializationOptions& opts) const {
-    return Value(DOC(kStageName << DOC(kEntityTypeFieldName << MqlEntityType_serializer(_type))));
+    return Value(DOC(kStageName << DOC(kEntityTypeFieldName << idl::serialize(_type))));
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>

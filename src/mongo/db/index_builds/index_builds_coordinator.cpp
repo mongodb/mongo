@@ -2160,7 +2160,7 @@ void IndexBuildsCoordinator::_restartIndexBuild(OperationContext* opCtx,
           "buildUUID"_attr = buildUUID,
           "collectionUUID"_attr = collUUID,
           logAttrs(nss.value()),
-          "method"_attr = IndexBuildMethod_serializer(indexBuildOptions.indexBuildMethod));
+          "method"_attr = idl::serialize(indexBuildOptions.indexBuildMethod));
 
     // Indicate that the initialization should not generate oplog entries or timestamps for the
     // first catalog write, and that the original durable catalog entries should be dropped and

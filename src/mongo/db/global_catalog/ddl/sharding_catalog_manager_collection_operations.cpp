@@ -608,8 +608,7 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
                         timeseriesParameters->getGranularity().get());
                     updateBob.append("$unset", BSON(bucketRoundingFieldName << ""));
                     bucketUp = BSON(granularityFieldName
-                                    << BucketGranularity_serializer(
-                                           timeseriesParameters->getGranularity().get())
+                                    << idl::serialize(timeseriesParameters->getGranularity().get())
                                     << bucketSpanFieldName << bucketSpan);
                 } else {
                     tassert(

@@ -344,8 +344,7 @@ public:
                             const LogicalSessionId& lsid,
                             TxnNumber txnNumber,
                             const std::vector<StmtId>& stmtIds) {
-        ASSERT_EQ(OpType_serializer(foundOp.getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(foundOp.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
             << foundOp;
 
         ASSERT_EQ(foundOp.getSessionId(), lsid) << foundOp;
@@ -380,8 +379,8 @@ public:
         ASSERT_FALSE(bool(flushImmediate));
         ASSERT_EQ(flushLater.size(), 1U);
 
-        ASSERT_EQ(OpType_serializer(flushLater[0].getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kUpdate))
+        ASSERT_EQ(idl::serialize(flushLater[0].getOpType()),
+                  idl::serialize(repl::OpTypeEnum::kUpdate))
             << flushLater[0].getEntry();
         ASSERT_BSONOBJ_BINARY_EQ(*flushLater[0].getObject2(),
                                  BSON("_id" << sessionTxnRecord.getSessionId().toBSON()));

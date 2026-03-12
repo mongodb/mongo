@@ -149,11 +149,11 @@ GetNextResult ReshardingIterateTransactionStage::doGetNext() {
 bool ReshardingIterateTransactionStage::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
     auto ctx = IDLParserContext("ReshardingEntry.op");
-    auto opType = repl::OpType_parse(op.getStringData(), ctx);
+    auto opType = idl::deserialize<repl::OpTypeEnum>(op.getStringData(), ctx);
     auto commandVal = doc["o"];
     repl::MultiOplogEntryType multiOpType = repl::MultiOplogEntryType::kLegacyMultiOpType;
     if (doc["multiOpType"].getType() == BSONType::numberInt)
-        multiOpType = repl::MultiOplogEntryType_parse(doc["multiOpType"].getInt(), ctx);
+        multiOpType = idl::deserialize<repl::MultiOplogEntryType>(doc["multiOpType"].getInt(), ctx);
 
     if (opType != repl::OpTypeEnum::kCommand || doc["txnNumber"].missing() ||
         multiOpType == repl::MultiOplogEntryType::kApplyOpsAppliedSeparately ||

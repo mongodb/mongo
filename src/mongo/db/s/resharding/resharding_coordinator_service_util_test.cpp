@@ -152,7 +152,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
             BSONArray donorShardsArray = donorShardsBuilder.arr();
             BSONObj expectedUpdate =
                 BSON("$set" << BSON("reshardingFields.state"
-                                    << CoordinatorState_serializer(state)
+                                    << idl::serialize(state)
                                     << "reshardingFields.recipientFields.approxDocumentsToCopy"
                                     << coordinatorDoc.getApproxDocumentsToCopy().value()
                                     << "reshardingFields.recipientFields.approxBytesToCopy"
@@ -196,7 +196,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 
             BSONObjBuilder expectedBSONBuilder;
             BSONObjBuilder setBuilder(expectedBSONBuilder.subobjStart("$set"));
-            setBuilder.append("reshardingFields.state", CoordinatorState_serializer(state));
+            setBuilder.append("reshardingFields.state", idl::serialize(state));
 
             if (state == CoordinatorStateEnum::kAborting && coordinatorDoc.getAbortReason()) {
                 setBuilder.append("reshardingFields.abortReason", *coordinatorDoc.getAbortReason());

@@ -94,7 +94,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                auto opCtxHolder = makeOperationContext();
                auto* opCtx = opCtxHolder.get();
 
-               const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
+               const auto coorName = idl::serialize(_coordId.getOperationType());
 
                _scopedLocks.emplace(DDLLockManager::ScopedBaseDDLLock{opCtx,
                                                                       _locker.get(),

@@ -48,12 +48,13 @@ void SamplingConfidenceInterval::append(OperationContext*,
                                         BSONObjBuilder* b,
                                         StringData name,
                                         const boost::optional<TenantId>&) {
-    *b << name << SamplingConfidenceInterval_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status SamplingConfidenceInterval::setFromString(StringData value,
                                                  const boost::optional<TenantId>&) {
-    _data = SamplingConfidenceInterval_parse(value, IDLParserContext("samplingConfidenceInterval"));
+    _data = idl::deserialize<SamplingConfidenceIntervalEnum>(
+        value, IDLParserContext("samplingConfidenceInterval"));
     return Status::OK();
 }
 

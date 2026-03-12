@@ -65,10 +65,9 @@ DocumentSourceChangeStreamAddPostImage::createFromBson(
 
 Value DocumentSourceChangeStreamAddPostImage::doSerialize(const SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
-        ? Value(Document{
-              {DocumentSourceChangeStream::kStageName,
-               Document{{"stage"_sd, kStageName},
-                        {kFullDocumentFieldName, FullDocumentMode_serializer(_fullDocumentMode)}}}})
+        ? Value(Document{{DocumentSourceChangeStream::kStageName,
+                          Document{{"stage"_sd, kStageName},
+                                   {kFullDocumentFieldName, idl::serialize(_fullDocumentMode)}}}})
         : Value(Document{{kStageName,
                           DocumentSourceChangeStreamAddPostImageSpec(_fullDocumentMode).toBSON()}});
 }

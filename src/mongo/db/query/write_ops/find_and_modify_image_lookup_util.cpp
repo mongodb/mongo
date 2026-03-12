@@ -57,7 +57,7 @@ BSONObj extractFindAndModifyIdFilter(const repl::OplogEntry& oplogEntry) {
                 uasserted(11730900,
                           str::stream()
                               << "Found a findAndModify oplog entry with an unexpected op type "
-                              << OpType_serializer(oplogEntry.getOpType()));
+                              << idl::serialize(oplogEntry.getOpType()));
         }
     }();
     uassert(11730901,

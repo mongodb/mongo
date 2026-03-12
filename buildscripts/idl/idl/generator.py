@@ -915,9 +915,17 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         enum_type_info = enum_types.get_type_info(idl_enum)
         mod_tag = make_mod_tag(idl_enum.mod_visibility)
 
-        self._writer.write_line("%s;" % (enum_type_info.get_deserializer_declaration(mod_tag)))
+        self._writer.write_line(
+            "%s;" % (enum_type_info.get_deserializer_adl_hook_declaration(mod_tag))
+        )
 
-        self._writer.write_line("%s;" % (enum_type_info.get_serializer_declaration(mod_tag)))
+        self._writer.write_line(
+            "%s;" % (enum_type_info.get_serializer_adl_hook_declaration(mod_tag))
+        )
+
+        self._writer.write_line(
+            "%s" % (enum_type_info.get_default_parser_field_name_adl_hook(mod_tag))
+        )
 
         extra_data_decl = enum_type_info.get_extra_data_declaration(mod_tag)
         if extra_data_decl is not None:
@@ -3108,10 +3116,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the definitions for an enum's supporting functions."""
         enum_type_info = enum_types.get_type_info(idl_enum)
 
-        enum_type_info.gen_deserializer_definition(self._writer)
+        enum_type_info.gen_deserializer_adl_hook_definition(self._writer)
         self._writer.write_empty_line()
 
-        enum_type_info.gen_serializer_definition(self._writer)
+        enum_type_info.gen_serializer_adl_hook_definition(self._writer)
         self._writer.write_empty_line()
 
         enum_type_info.gen_extra_data_definition(self._writer)
@@ -3282,12 +3290,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 return_type="std::unique_ptr<ServerParameter>",
                 capture_ref=True,
             ):
-                self._writer.write_line(
-                    f"""\
+                self._writer.write_line(f"""\
 auto {varname} = std::make_unique<IDLServerParameterDeprecatedAlias>({_encaps(alias)}, scp_{param_no}.get());
 {varname}->setIsDeprecated(true);
-return std::move({varname});"""
-                )
+return std::move({varname});""")
             self._writer.write_line(f"registerServerParameter(std::move({varname}));")
 
     def gen_server_parameters(self, params, header_file_name):

@@ -389,12 +389,11 @@ protected:
 
     auto pausePhaseTransition(Progress progress, Phase phase, const std::string& failpointName) {
         auto fp = globalFailPointRegistry().find(failpointName);
-        auto count =
-            fp->setMode(FailPoint::alwaysOn,
-                        0,
-                        fromjson(fmt::format("{{progress: '{}', phase: '{}'}}",
-                                             PhaseTransitionProgress_serializer(progress),
-                                             MultiUpdateCoordinatorPhase_serializer(phase))));
+        auto count = fp->setMode(FailPoint::alwaysOn,
+                                 0,
+                                 fromjson(fmt::format("{{progress: '{}', phase: '{}'}}",
+                                                      idl::serialize(progress),
+                                                      idl::serialize(phase))));
         return std::tuple{fp, count};
     }
 
@@ -435,7 +434,7 @@ protected:
         auto phaseString = std::string{
             getMetrics(instance).getObjectField("mutableFields").getStringField("phase")};
         IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhase()");
-        return MultiUpdateCoordinatorPhase_parse(phaseString, errCtx);
+        return idl::deserialize<MultiUpdateCoordinatorPhaseEnum>(phaseString, errCtx);
     }
 
     enum ResultCategory { kSuccess, kFailure };

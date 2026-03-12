@@ -109,7 +109,7 @@ public:
         }
 
         _data.resize(kAssociatedDataLength + cipherLength);
-        _data[0] = FleAlgorithmInt_serializer(algorithm);
+        _data[0] = idl::serialize(algorithm);
         auto uuidCDR = uuid.toCDR();
         invariant(uuidCDR.length() == 16);
         std::copy(
@@ -143,7 +143,7 @@ public:
     uint8_t* getCiphertextMutable() && = delete;
 
     FleAlgorithmInt getFLEAlgorithmType() {
-        return FleAlgorithmInt_parse(_data[0], IDLParserContext("root"));
+        return idl::deserialize<FleAlgorithmInt>(_data[0], IDLParserContext("root"));
     }
 
     size_t getDataLength() const {
@@ -211,7 +211,7 @@ public:
 
 private:
     FleAlgorithmInt getFLEAlgorithmType() const {
-        return FleAlgorithmInt_parse(*_data.data<uint8_t>(), IDLParserContext("root"));
+        return idl::deserialize<FleAlgorithmInt>(*_data.data<uint8_t>(), IDLParserContext("root"));
     }
 
     size_t getDataLength() const {

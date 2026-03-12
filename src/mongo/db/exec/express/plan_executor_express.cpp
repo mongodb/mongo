@@ -288,7 +288,7 @@ public:
     }
 
     boost::optional<StringData> getExecutorType() const override {
-        return CursorType_serializer(_cursorType);
+        return idl::serialize(_cursorType);
     }
 
     QueryFramework getQueryFramework() const override {

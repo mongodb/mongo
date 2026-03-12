@@ -347,7 +347,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         LOGV2(5806002,
               "Running case",
               "test"_attr = unittest::getTestName(),
-              "imageType"_attr = repl::RetryImage_serializer(imageType));
+              "imageType"_attr = idl::serialize(imageType));
         auto documentSourceImageLookup =
             DocumentSourceFindAndModifyImageLookup::create(getExpCtx());
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
@@ -393,7 +393,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(uuid, *forgedImageEntry.getUuid());
         ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().value());
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().value());
-        ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
+        ASSERT_EQUALS("n", idl::serialize(forgedImageEntry.getOpType()));
         const auto stmtIds = forgedImageEntry.getStatementIds();
         ASSERT_EQUALS(1U, stmtIds.size());
         ASSERT_EQUALS(stmtId, stmtIds.front());
@@ -431,7 +431,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         LOGV2(6344105,
               "Running case",
               "test"_attr = unittest::getTestName(),
-              "imageType"_attr = repl::RetryImage_serializer(imageType));
+              "imageType"_attr = idl::serialize(imageType));
         auto documentSourceImageLookup = DocumentSourceFindAndModifyImageLookup::create(
             getExpCtx(), true /* includeCommitTransactionTimestamp */);
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
@@ -490,7 +490,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_EQUALS(uuid, *forgedImageEntry.getUuid());
         ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().value());
         ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().value());
-        ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
+        ASSERT_EQUALS("n", idl::serialize(forgedImageEntry.getOpType()));
         const auto stmtIds = forgedImageEntry.getStatementIds();
         ASSERT_EQUALS(1U, stmtIds.size());
         ASSERT_EQUALS(stmtId, stmtIds.front());

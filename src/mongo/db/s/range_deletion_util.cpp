@@ -283,7 +283,7 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
     static const auto update =
         BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName
                             << true << RangeDeletionTask::kWhenToCleanFieldName
-                            << CleanWhen_serializer(CleanWhenEnum::kNow)));
+                            << idl::serialize(CleanWhenEnum::kNow)));
 
     try {
         store.update(
@@ -752,7 +752,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
         write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "") << "$set"
                           << BSON(RangeDeletionTask::kWhenToCleanFieldName
-                                  << CleanWhen_serializer(CleanWhenEnum::kNow)))));
+                                  << idl::serialize(CleanWhenEnum::kNow)))));
     write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
     updateEntry.setMulti(false);
     updateEntry.setUpsert(false);

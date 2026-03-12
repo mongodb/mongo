@@ -100,7 +100,7 @@ struct PrePostImageTestCase {
 
     BSONObj toBSON() const {
         BSONObjBuilder b;
-        b.append("imageType", repl::RetryImage_serializer(imageType));
+        b.append("imageType", idl::serialize(imageType));
         if (txnType) {
             b.append("txnType", *txnType == TransactionType::kPrepared ? "prepared" : "unprepared");
         }
@@ -835,7 +835,7 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
     ASSERT_BSONOBJ_EQ(preImage, nextOplogResult.oplog->getObject());
     ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().value());
     ASSERT_EQUALS(sessionId, nextOplogResult.oplog->getSessionId().value());
-    ASSERT_EQUALS("n", repl::OpType_serializer(nextOplogResult.oplog->getOpType()));
+    ASSERT_EQUALS("n", idl::serialize(nextOplogResult.oplog->getOpType()));
     ASSERT_EQ(entry.getStatementIds().size(), nextOplogResult.oplog->getStatementIds().size());
     for (size_t i = 0; i < entry.getStatementIds().size(); i++) {
         ASSERT_EQ(entry.getStatementIds()[i], nextOplogResult.oplog->getStatementIds()[i]);

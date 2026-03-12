@@ -95,8 +95,8 @@ GetNextResult ListMqlEntitiesStage::doGetNext() {
     if (_results.empty()) {
         return GetNextResult::makeEOF();
     }
-    auto res = Document(
-        BSON("name" << _results.back() << kEntityTypeFieldName << MqlEntityType_serializer(_type)));
+    auto res =
+        Document(BSON("name" << _results.back() << kEntityTypeFieldName << idl::serialize(_type)));
     _results.pop_back();
     return res;
 }

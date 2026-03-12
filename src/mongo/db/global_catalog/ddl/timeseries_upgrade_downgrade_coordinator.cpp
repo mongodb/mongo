@@ -120,8 +120,7 @@ void TimeseriesUpgradeDowngradeCoordinator::checkIfOptionsConflict(const BSONObj
 
 logv2::DynamicAttributes TimeseriesUpgradeDowngradeCoordinator::getCoordinatorLogAttrs() const {
     return logv2::DynamicAttributes{getBasicCoordinatorAttrs(),
-                                    "mode"_attr =
-                                        TimeseriesUpgradeDowngradeMode_serializer(_doc.getMode())};
+                                    "mode"_attr = idl::serialize(_doc.getMode())};
 }
 
 /**
@@ -253,8 +252,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     opCtx,
                     "upgradeDowngradeViewlessTimeseries.start",
                     originalNss(),
-                    BSON("mode" << TimeseriesUpgradeDowngradeMode_serializer(_doc.getMode())
-                                << "isTracked" << isTracked));
+                    BSON("mode" << idl::serialize(_doc.getMode()) << "isTracked" << isTracked));
                 return isTracked;
             },  // Only for tracked collections
             [this, executor = executor, anchor = shared_from_this()](auto* opCtx) {
@@ -528,8 +526,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                 opCtx,
                 "upgradeDowngradeViewlessTimeseries.end",
                 originalNss(),
-                BSON("mode" << TimeseriesUpgradeDowngradeMode_serializer(_doc.getMode())
-                            << "isTracked" << isTracked));
+                BSON("mode" << idl::serialize(_doc.getMode()) << "isTracked" << isTracked));
         })
         .onError<ErrorCodes::RequestAlreadyFulfilled>(
             [this, anchor = shared_from_this()](const Status& status) { return Status::OK(); })
@@ -568,12 +565,10 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_cleanupOnAbort(
 
             // From kCommitOnShards onwards, we've done irreversible work on the shards and must
             // always make progress. We should never enter cleanup from that point.
-            tassert(
-                11590620,
-                str::stream() << "Unexpected cleanup at phase "
-                              << TimeseriesUpgradeDowngradeCoordinatorPhase_serializer(failedPhase)
-                              << " which is >= kCommitOnShards",
-                failedPhase < Phase::kCommitOnShards);
+            tassert(11590620,
+                    str::stream() << "Unexpected cleanup at phase " << idl::serialize(failedPhase)
+                                  << " which is >= kCommitOnShards",
+                    failedPhase < Phase::kCommitOnShards);
 
             // If we failed before kFreezeMigrations, we haven't done any work that needs cleanup.
             if (failedPhase < Phase::kFreezeMigrations) {

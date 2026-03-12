@@ -785,8 +785,8 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpRemovesFromOutputCollection) 
         ASSERT_EQ(applyOpsInfo.size(), 2U);
         for (size_t i = 0; i < applyOpsInfo.size(); ++i) {
             ASSERT_EQ(applyOpsInfo[i].operations.size(), 1U);
-            ASSERT_EQ(OpType_serializer(applyOpsInfo[i].operations[0].getOpType()),
-                      OpType_serializer(repl::OpTypeEnum::kDelete));
+            ASSERT_EQ(idl::serialize(applyOpsInfo[i].operations[0].getOpType()),
+                      idl::serialize(repl::OpTypeEnum::kDelete));
             ASSERT_EQ(applyOpsInfo[i].operations[0].getNss(), outputNss());
             ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[i].operations[0].getObject()["_id"].wrap(),
                                      BSON("_id" << int32_t(i + 1)));
@@ -849,20 +849,20 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
         ASSERT_EQ(applyOpsInfo.size(), 1U);
         ASSERT_EQ(applyOpsInfo[0].operations.size(), 3U);
 
-        ASSERT_EQ(OpType_serializer(applyOpsInfo[0].operations[0].getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kDelete));
+        ASSERT_EQ(idl::serialize(applyOpsInfo[0].operations[0].getOpType()),
+                  idl::serialize(repl::OpTypeEnum::kDelete));
         ASSERT_EQ(applyOpsInfo[0].operations[0].getNss(), outputNss());
         ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[0].operations[0].getObject()["_id"].wrap(),
                                  BSON("_id" << 0));
 
-        ASSERT_EQ(OpType_serializer(applyOpsInfo[0].operations[1].getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kDelete));
+        ASSERT_EQ(idl::serialize(applyOpsInfo[0].operations[1].getOpType()),
+                  idl::serialize(repl::OpTypeEnum::kDelete));
         ASSERT_EQ(applyOpsInfo[0].operations[1].getNss(), otherStashNss());
         ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[0].operations[1].getObject()["_id"].wrap(),
                                  BSON("_id" << 0));
 
-        ASSERT_EQ(OpType_serializer(applyOpsInfo[0].operations[2].getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kInsert));
+        ASSERT_EQ(idl::serialize(applyOpsInfo[0].operations[2].getOpType()),
+                  idl::serialize(repl::OpTypeEnum::kInsert));
         ASSERT_EQ(applyOpsInfo[0].operations[2].getNss(), outputNss());
         ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[0].operations[2].getObject(),
                                  BSON("_id" << 0 << sk() << -3));

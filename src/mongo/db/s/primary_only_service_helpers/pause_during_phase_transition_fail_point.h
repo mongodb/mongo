@@ -80,7 +80,7 @@ private:
     boost::optional<PhaseTransitionProgressEnum> _readProgressArgument(const BSONObj& data) {
         auto arg = data.getStringField("progress");
         IDLParserContext ctx("PauseDuringPhaseTransitionFailPoint::readProgressArgument");
-        return PhaseTransitionProgress_parse(arg, ctx);
+        return idl::deserialize<PhaseTransitionProgressEnum>(arg, ctx);
     }
 
     boost::optional<Phase> _readPhaseArgument(const BSONObj& data) {

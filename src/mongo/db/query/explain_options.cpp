@@ -36,7 +36,7 @@ namespace mongo {
 constexpr StringData ExplainOptions::kVerbosityName;
 
 StringData ExplainOptions::verbosityString(ExplainOptions::Verbosity verbosity) {
-    return Verbosity_serializer(verbosity);
+    return idl::serialize(verbosity);
 }
 
 BSONObj ExplainOptions::toBSON(ExplainOptions::Verbosity verbosity) {

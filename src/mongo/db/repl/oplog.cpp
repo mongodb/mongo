@@ -2777,7 +2777,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
         default: {
             // Commands are processed in applyCommand_inlock().
-            invariant(false, str::stream() << "Unsupported opType " << OpType_serializer(opType));
+            invariant(false, str::stream() << "Unsupported opType " << idl::serialize(opType));
         }
     }
 
@@ -2841,8 +2841,7 @@ Status applyContainerOperation_inlock(OperationContext* opCtx,
         }
         default:
             uasserted(10704705,
-                      str::stream()
-                          << "Unsupported opType: " << OpType_serializer(op->getOpType()));
+                      str::stream() << "Unsupported opType: " << idl::serialize(op->getOpType()));
     }
 
     if (!s.isOK())

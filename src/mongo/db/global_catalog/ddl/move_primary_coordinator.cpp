@@ -147,7 +147,7 @@ logv2::DynamicAttributes MovePrimaryCoordinator::getCoordinatorLogAttrs() const 
 }
 
 StringData MovePrimaryCoordinator::serializePhase(const Phase& phase) const {
-    return MovePrimaryCoordinatorPhase_serializer(phase);
+    return idl::serialize(phase);
 }
 
 void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {

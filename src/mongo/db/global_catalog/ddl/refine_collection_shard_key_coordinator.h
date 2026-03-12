@@ -69,7 +69,7 @@ public:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return RefineCollectionShardKeyCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     bool _mustAlwaysMakeProgress() override {

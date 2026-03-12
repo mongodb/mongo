@@ -233,8 +233,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             try {
-                collectionOptions.validationAction =
-                    ValidationAction_parse(e.String(), IDLParserContext{"validationAction"});
+                collectionOptions.validationAction = idl::deserialize<ValidationActionEnum>(
+                    e.String(), IDLParserContext{"validationAction"});
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
@@ -244,8 +244,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             try {
-                collectionOptions.validationLevel =
-                    ValidationLevel_parse(e.String(), IDLParserContext{"validationLevel"});
+                collectionOptions.validationLevel = idl::deserialize<ValidationLevelEnum>(
+                    e.String(), IDLParserContext{"validationLevel"});
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
@@ -468,13 +468,12 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
     }
 
     if (validationLevel && shouldAppend(CreateCommand::kValidationLevelFieldName)) {
-        builder->append(CreateCommand::kValidationLevelFieldName,
-                        ValidationLevel_serializer(*validationLevel));
+        builder->append(CreateCommand::kValidationLevelFieldName, idl::serialize(*validationLevel));
     }
 
     if (validationAction && shouldAppend(CreateCommand::kValidationActionFieldName)) {
         builder->append(CreateCommand::kValidationActionFieldName,
-                        ValidationAction_serializer(*validationAction));
+                        idl::serialize(*validationAction));
     }
 
     if (!collation.isEmpty() && shouldAppend(CreateCommand::kCollationFieldName)) {

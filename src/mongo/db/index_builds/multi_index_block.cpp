@@ -527,7 +527,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                   "properties"_attr = *descriptor,
                   "specIndex"_attr = i,
                   "numSpecs"_attr = indexes.size(),
-                  "method"_attr = IndexBuildMethod_serializer(_method),
+                  "method"_attr = idl::serialize(_method),
                   "ident"_attr = indexCatalogEntry->getIdent(),
                   "indexBuildInfo"_attr = indexes[i].toBSON(),
                   "collectionIdent"_attr = collection->getSharedIdent()->getIdent(),
@@ -685,7 +685,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                       "collectionUUID"_attr = _collectionUUID,
                       "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                       "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
-                      "phase"_attr = IndexBuildPhase_serializer(_phase),
+                      "phase"_attr = idl::serialize(_phase),
                       "collectionScanPosition"_attr = _lastRecordIdInserted,
                       "readSource"_attr = RecoveryUnit::toString(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
@@ -787,7 +787,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "collectionUUID"_attr = _collectionUUID,
                   "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                   "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
-                  "phase"_attr = IndexBuildPhase_serializer(_phase),
+                  "phase"_attr = idl::serialize(_phase),
                   "collectionScanPosition"_attr = _lastRecordIdInserted,
                   "readSource"_attr = RecoveryUnit::toString(readSource),
                   "error"_attr = ex);
@@ -795,7 +795,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           << "collection scan stopped. totalRecords: "
                           << progress.get(WithLock::withoutLock())->hits()
                           << "; durationMillis: " << duration_cast<Milliseconds>(timer.elapsed())
-                          << "; phase: " << IndexBuildPhase_serializer(_phase)
+                          << "; phase: " << idl::serialize(_phase)
                           << "; collectionScanPosition: " << _lastRecordIdInserted
                           << "; readSource: " << RecoveryUnit::toString(readSource));
             return ex.toStatus();
@@ -852,7 +852,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     // scan phase.
     invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
                   _phase == IndexBuildPhaseEnum::kCollectionScan,
-              IndexBuildPhase_serializer(_phase));
+              idl::serialize(_phase));
     _phase = IndexBuildPhaseEnum::kCollectionScan;
 
     BSONObj objToIndex;
@@ -1038,7 +1038,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
                   _phase == IndexBuildPhaseEnum::kCollectionScan ||
                   _phase == IndexBuildPhaseEnum::kBulkLoad,
-              IndexBuildPhase_serializer(_phase));
+              idl::serialize(_phase));
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
     // Doesn't allow yielding when in a foreground index build.
@@ -1166,7 +1166,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     // already in the drain writes phase.
     invariant(_phase == IndexBuildPhaseEnum::kBulkLoad ||
                   _phase == IndexBuildPhaseEnum::kDrainWrites,
-              IndexBuildPhase_serializer(_phase));
+              idl::serialize(_phase));
     _phase = IndexBuildPhaseEnum::kDrainWrites;
 
     ReadSourceScope readSourceScope(opCtx, readSource);
@@ -1375,9 +1375,9 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod)
 }
 
 void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
-    builder->append("method", IndexBuildMethod_serializer(_method));
+    builder->append("method", idl::serialize(_method));
     builder->append("phase", static_cast<int>(_phase));
-    builder->append("phaseStr", IndexBuildPhase_serializer(_phase));
+    builder->append("phaseStr", idl::serialize(_phase));
 }
 
 void MultiIndexBlock::persistResumeState(OperationContext* opCtx,

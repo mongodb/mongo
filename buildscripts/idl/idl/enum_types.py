@@ -39,6 +39,10 @@ import bson
 
 from . import ast, common, writer
 
+_SERIALIZER_ADL_HOOK = "idlSerialize"
+_DESERIALIZER_ADL_HOOK = "idlDeserialize"
+_DEFAULT_PARSER_ADL_HOOK = "idlGetDefaultParserFieldName"
+
 
 class EnumTypeInfoBase(object, metaclass=ABCMeta):
     """Base type for enumeration type information."""
@@ -65,29 +69,17 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         """Get the BSON type names for an enum."""
         pass
 
-    def _get_enum_deserializer_name(self):
-        # type: () -> str
-        """Return the name of deserializer function without prefix."""
-        return f"{common.title_case(self._enum.name)}_parse"
-
     def get_enum_deserializer_name(self):
         # type: () -> str
-        """Return the name of deserializer function with non-method prefix."""
-        return "::" + common.qualify_cpp_name(
-            self._enum.cpp_namespace, self._get_enum_deserializer_name()
-        )
-
-    def _get_enum_serializer_name(self):
-        # type: () -> str
-        """Return the name of serializer function without prefix."""
-        return f"{common.title_case(self._enum.name)}_serializer"
+        """Return the C++ name of the public deserializer function."""
+        return f"::mongo::idl::deserialize<::{common.qualify_cpp_name(
+            self._enum.cpp_namespace, self.get_cpp_type_name())}>"
 
     def get_enum_serializer_name(self):
         # type: () -> str
-        """Return the name of serializer function with non-method prefix."""
-        return "::" + common.qualify_cpp_name(
-            self._enum.cpp_namespace, self._get_enum_serializer_name()
-        )
+        """Return the C++ name of the public serializer function."""
+        return f"::mongo::idl::serialize<::{common.qualify_cpp_name(
+            self._enum.cpp_namespace, self.get_cpp_type_name())}>"
 
     def _get_enum_extra_data_name(self):
         # type: () -> str
@@ -101,28 +93,34 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def get_deserializer_declaration(self, mod_tag):
+    def get_deserializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
-        """Get the deserializer function declaration minus trailing semicolon."""
+        """Get the deserializer ADL hook function declaration minus trailing semicolon."""
         pass
 
     @abstractmethod
-    def gen_deserializer_definition(self, indented_writer):
+    def gen_deserializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        """Generate the deserializer function definition."""
+        """Generate the deserializer ADL hook function definition."""
         pass
 
     @abstractmethod
-    def get_serializer_declaration(self, mod_tag):
+    def get_serializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
-        """Get the serializer function declaration minus trailing semicolon."""
+        """Get the serializer ADL hook function declaration minus trailing semicolon."""
         pass
 
     @abstractmethod
-    def gen_serializer_definition(self, indented_writer):
+    def gen_serializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        """Generate the serializer function definition."""
+        """Generate the serializer ADL hook function definition."""
         pass
+
+    def get_default_parser_field_name_adl_hook(self, mod_tag):
+        """Return a constexpr function returning the default fieldName for IDLParserContext.
+        The generated function is found via ADL."""
+        cpp_type = self.get_cpp_type_name()
+        return f'{mod_tag}constexpr ::mongo::StringData {_DEFAULT_PARSER_ADL_HOOK}({cpp_type}) {{ return "{cpp_type}"; }}'
 
     def _get_populated_extra_values(self):
         # type: () -> List[Union[syntax.EnumValue,ast.EnumValue]]
@@ -199,13 +197,12 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: (ast.EnumValue) -> str
         return " = %s" % (enum_value.value)
 
-    def get_deserializer_declaration(self, mod_tag):
+    def get_deserializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
-        deserializer = self._get_enum_deserializer_name()
-        return f'{mod_tag}{cpp_type} {deserializer}(std::int32_t value, const IDLParserContext& ctxt = IDLParserContext("{self.get_cpp_type_name()}"))'
+        return f"{mod_tag}void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, std::int32_t value, const IDLParserContext& ctxt)"
 
-    def gen_deserializer_definition(self, indented_writer):
+    def gen_deserializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         enum_values = sorted(cast(ast.Enum, self._enum).values, key=lambda ev: int(ev.value))
 
@@ -214,30 +211,29 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
         max_value = enum_values[-1].name
 
         cpp_type = self.get_cpp_type_name()
-        func = self._get_enum_deserializer_name()
         indented_writer._stream.write(f"""
-{cpp_type} {func}(std::int32_t value, const IDLParserContext& ctxt) {{
+void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, std::int32_t value, const IDLParserContext& ctxt) {{
     if (!(value >= static_cast<std::underlying_type<{enum_name}>::type>(
         {enum_name}::{min_value}) &&
         value <= static_cast<std::underlying_type<{enum_name}>::type>(
             {enum_name}::{max_value}))) {{
         ctxt.throwBadEnumValue(value);
     }} else {{
-        return static_cast<{enum_name}>(value);
+        en = static_cast<{enum_name}>(value);
     }}
 }}""")
 
-    def get_serializer_declaration(self, mod_tag):
+    def get_serializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
-        """Get the serializer function declaration minus trailing semicolon."""
-        return f"{mod_tag}std::int32_t {self._get_enum_serializer_name()}({self.get_cpp_type_name()} value)"
+        """Get the serializer ADL hook function declaration minus trailing semicolon."""
+        return f"{mod_tag}std::int32_t {_SERIALIZER_ADL_HOOK}({self.get_cpp_type_name()} value)"
 
-    def gen_serializer_definition(self, indented_writer):
+    def gen_serializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        """Generate the serializer function definition."""
+        """Generate the serializer ADL hook function definition."""
 
         indented_writer._stream.write(f"""
-{self.get_serializer_declaration('')} {{
+{self.get_serializer_adl_hook_declaration('')} {{
     return static_cast<std::int32_t>(value);
 }}""")
 
@@ -263,16 +259,14 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
         # type: (ast.EnumValue) -> str
         return ""
 
-    def get_deserializer_declaration(self, mod_tag):
+    def get_deserializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
         cpp_type = self.get_cpp_type_name()
-        func = self._get_enum_deserializer_name()
-        return f'{mod_tag}{cpp_type} {func}(StringData value, const IDLParserContext& ctxt = IDLParserContext("{cpp_type}"))'
+        return f"{mod_tag}void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, ::mongo::StringData value, const IDLParserContext& ctxt)"
 
-    def gen_deserializer_definition(self, indented_writer):
+    def gen_deserializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         cpp_type = self.get_cpp_type_name()
-        func = self._get_enum_deserializer_name()
         with writer.NamespaceScopeBlock(indented_writer, [""]):
             with writer.IndentedScopedBlock(
                 indented_writer, f"constexpr std::array {cpp_type}_values{{", "};"
@@ -288,15 +282,13 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
 
         with writer.IndentedScopedBlock(
             indented_writer,
-            f"{cpp_type} {func}(StringData value, const IDLParserContext& ctxt) {{",
+            f"void {_DESERIALIZER_ADL_HOOK}({cpp_type}& en, ::mongo::StringData value, const IDLParserContext& ctxt) {{",
             "}",
         ):
             indented_writer.write_line(
-                f"static constexpr auto onMatch = [](int i) {{ return {cpp_type}_values[i]; }};"
+                f"auto onMatch = [&en](int i) {{ en = {cpp_type}_values[i]; }};"
             )
-            indented_writer.write_line(
-                f"auto onFail = [&] {{ ctxt.throwBadEnumValue(value); return {cpp_type}{{}}; }};"
-            )
+            indented_writer.write_line("auto onFail = [&] { ctxt.throwBadEnumValue(value); };")
             writer.gen_string_table_find_function_block(
                 indented_writer,
                 "value",
@@ -305,20 +297,18 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
                 [e.value for e in self._enum.values],
             )
 
-    def get_serializer_declaration(self, mod_tag):
+    def get_serializer_adl_hook_declaration(self, mod_tag):
         # type: () -> str
-        """Get the serializer function declaration minus trailing semicolon."""
+        """Get the serializer ADL hook function declaration minus trailing semicolon."""
         cpp_type = self.get_cpp_type_name()
-        func = self._get_enum_serializer_name()
-        return f"{mod_tag}StringData {func}({cpp_type} value)"
+        return f"{mod_tag}::mongo::StringData {_SERIALIZER_ADL_HOOK}({cpp_type} value)"
 
-    def gen_serializer_definition(self, indented_writer):
+    def gen_serializer_adl_hook_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        """Generate the serializer function definition."""
-        func = self._get_enum_serializer_name()
+        """Generate the serializer ADL hook function definition."""
         cpp_type = self.get_cpp_type_name()
         indented_writer._stream.write(f"""
-StringData {func}({cpp_type} value) {{
+::mongo::StringData {_SERIALIZER_ADL_HOOK}({cpp_type} value) {{
     auto idx = static_cast<size_t>(value);
     invariant(idx < {cpp_type}_names.size());
     return {cpp_type}_names[idx];

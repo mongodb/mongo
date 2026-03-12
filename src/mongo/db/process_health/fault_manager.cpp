@@ -742,8 +742,7 @@ void FaultManager::appendDescription(BSONObjBuilder* result, bool appendDetails)
         }
         BSONObjBuilder sub_result;
         sub_result.append("intensity",
-                          HealthObserverIntensity_serializer(
-                              _config->getHealthObserverIntensity(observer->getType())));
+                          idl::serialize(_config->getHealthObserverIntensity(observer->getType())));
 
         HealthObserverLivenessStats stats = observer->getStats();
         sub_result.append("totalChecks", stats.completedChecksCount);

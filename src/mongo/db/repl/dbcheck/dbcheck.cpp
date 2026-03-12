@@ -1220,7 +1220,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     if (!opCtx->writesAreReplicated()) {
         opTime = entry.getOpTime();
     }
-    const auto type = OplogEntries_parse(cmd.getStringField("type"), IDLParserContext("type"));
+    const auto type =
+        idl::deserialize<OplogEntriesEnum>(cmd.getStringField("type"), IDLParserContext("type"));
     const IDLParserContext ctx("o",
                                auth::ValidatedTenancyScope::get(opCtx),
                                entry.getTid(),

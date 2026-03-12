@@ -685,6 +685,68 @@ MONGO_MOD_PUBLIC T parseCommandRequest(const OpMsgRequest& req, const IDLParserC
     }
     return cmd;
 }
-}  // namespace idl
 
+template <typename E>
+concept EnumWithStringSerializer = requires(E e) {
+    { idlSerialize(e) } -> std::same_as<StringData>;
+};
+
+template <typename E>
+concept EnumWithIntSerializer = requires(E e) {
+    { idlSerialize(e) } -> std::same_as<std::int32_t>;
+};
+
+template <typename E>
+concept EnumWithStringDeserializer = requires(E e, StringData sv, const IDLParserContext& ctxt) {
+    { idlDeserialize(e, sv, ctxt) } -> std::same_as<void>;
+};
+
+template <typename E>
+concept EnumWithIntDeserializer = requires(E e, std::int32_t i, const IDLParserContext& ctxt) {
+    { idlDeserialize(e, i, ctxt) } -> std::same_as<void>;
+};
+
+/**
+ * Serialize an IDL-defined enum of type "string".
+ */
+template <EnumWithStringSerializer E>
+MONGO_MOD_PUBLIC StringData serialize(E en) {
+    return idlSerialize(en);
+}
+
+/**
+ * Serialize an IDL-defined enum of type "int".
+ */
+template <EnumWithIntSerializer E>
+MONGO_MOD_PUBLIC std::int32_t serialize(E en) {
+    return idlSerialize(en);
+}
+
+/**
+ * Deserialize an IDL-defined enum of type "string".
+ * The default IDLParserContext is created with the type name of the enum as `fieldName`.
+ */
+template <EnumWithStringDeserializer E>
+MONGO_MOD_PUBLIC E
+deserialize(StringData sd,
+            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+    E ret;
+    idlDeserialize(ret, sd, ctxt);
+    return ret;
+}
+
+/**
+ * Deserialize an IDL-defined enum of type "int".
+ * The default IDLParserContext is created with the type name of the enum as `fieldName`.
+ */
+template <EnumWithIntDeserializer E>
+MONGO_MOD_PUBLIC E
+deserialize(std::int32_t i,
+            const IDLParserContext& ctxt = IDLParserContext(idlGetDefaultParserFieldName(E{}))) {
+    E ret;
+    idlDeserialize(ret, i, ctxt);
+    return ret;
+}
+
+}  // namespace idl
 }  // namespace mongo

@@ -150,9 +150,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
                                                                            std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Encountered unknown Sharding DDL operation type: "
-                          << DDLCoordinatorType_serializer(op.getId().getOperationType()));
+                      str::stream() << "Encountered unknown Sharding DDL operation type: "
+                                    << idl::serialize(op.getId().getOperationType()));
     }
 }
 

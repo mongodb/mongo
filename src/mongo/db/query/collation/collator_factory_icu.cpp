@@ -271,8 +271,8 @@ Status updateCollationSpecFromICUCollator(const BSONObj& spec,
         try {
             // For backwards compatibility, "strength" is parsed from any int, long, or double.
             // Check it matches an enum value.
-            CollationStrength_parse(collation->getStrength(),
-                                    IDLParserContext{"collation.strength"});
+            idl::deserialize<CollationStrength>(collation->getStrength(),
+                                                IDLParserContext{"collation.strength"});
         } catch (const DBException& exc) {
             return exc.toStatus();
         }

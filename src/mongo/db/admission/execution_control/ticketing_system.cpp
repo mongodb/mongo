@@ -214,7 +214,7 @@ Status TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactio
 
 Status TicketingSystem::validateConcurrencyAdjustmentAlgorithm(
     const std::string& name, const boost::optional<TenantId>&) try {
-    ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+    idl::deserialize<ExecutionControlConcurrencyAdjustmentAlgorithmEnum>(
         name, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
     return Status::OK();
 } catch (const DBException& ex) {
@@ -385,8 +385,9 @@ void TicketingSystem::setConcurrentTransactions(OperationContext* opCtx,
 
 void TicketingSystem::setConcurrencyAdjustmentAlgorithm(OperationContext* opCtx,
                                                         std::string algorithmName) {
-    const auto parsedAlgorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
-        algorithmName, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
+    const auto parsedAlgorithm =
+        idl::deserialize<ExecutionControlConcurrencyAdjustmentAlgorithmEnum>(
+            algorithmName, IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 
     const TicketingState oldState = _state.loadRelaxed();
 

@@ -219,7 +219,7 @@ TEST_F(ConfigureCollectionBalancingTest, SettingDefragmentCollection) {
 
     // defragmentationPhase is set to finished
     configDoc = getCollectionDocument(_nss);
-    auto storedDefragmentationPhase = DefragmentationPhase_parse(
+    auto storedDefragmentationPhase = idl::deserialize<DefragmentationPhaseEnum>(
         configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName),
         IDLParserContext("ConfigureCollectionBalancingTest"));
 

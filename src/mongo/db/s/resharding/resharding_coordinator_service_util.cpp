@@ -422,7 +422,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                 {
                     setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
                                           TypeCollectionReshardingFields::kStateFieldName,
-                                      CoordinatorState_serializer(nextState));
+                                      idl::serialize(nextState));
 
                     setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
                                           TypeCollectionReshardingFields::kDonorFieldsFieldName,
@@ -449,8 +449,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                             << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
                             << newCollectionEpoch.value() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
-                            << "reshardingFields.state"
-                            << CoordinatorState_serializer(coordinatorDoc.getState())
+                            << "reshardingFields.state" << idl::serialize(coordinatorDoc.getState())
                             << "reshardingFields.recipientFields" << recipientFields.toBSON());
             if (newCollectionTimestamp.has_value()) {
                 setFields =
@@ -479,8 +478,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             {
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
-                setBuilder.append("reshardingFields.state",
-                                  std::string{CoordinatorState_serializer(nextState)});
+                setBuilder.append("reshardingFields.state", std::string{idl::serialize(nextState)});
                 setBuilder.append("lastmod",
                                   opCtx->getServiceContext()->getPreciseClockSource()->now());
 
@@ -914,7 +912,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 
                     // Always update the state field.
                     setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                                      CoordinatorState_serializer(coordinatorDoc.getState()));
+                                      idl::serialize(coordinatorDoc.getState()));
 
                     if (auto cloneTimestamp = coordinatorDoc.getCloneTimestamp()) {
                         // If the cloneTimestamp exists, include it in the update.
@@ -1121,7 +1119,7 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
                      << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
                                                        SerializationContext::stateDefault())),
                 BSON("$set" << BSON("reshardingFields.state"
-                                    << CoordinatorState_serializer(nextState)
+                                    << idl::serialize(nextState)
                                     << "reshardingFields.recipientFields.approxDocumentsToCopy"
                                     << coordinatorDoc.getApproxDocumentsToCopy().value()
                                     << "reshardingFields.recipientFields.approxBytesToCopy"
@@ -1151,8 +1149,7 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
             {
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
-                setBuilder.append("reshardingFields.state",
-                                  std::string{CoordinatorState_serializer(nextState)});
+                setBuilder.append("reshardingFields.state", std::string{idl::serialize(nextState)});
                 setBuilder.append("lastmod",
                                   opCtx->getServiceContext()->getPreciseClockSource()->now());
 

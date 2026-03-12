@@ -255,10 +255,10 @@ struct BSONValidateArrayIndexingParam {
     ErrorCodes::Error code;
 
     friend std::ostream& operator<<(std::ostream& os, const BSONValidateArrayIndexingParam& param) {
-        os << "{name: " << param.name                                //
-           << ", obj: " << param.obj                                 //
-           << ", mode: " << BSONValidateMode_serializer(param.mode)  //
-           << ", code: " << param.code                               //
+        os << "{name: " << param.name                   //
+           << ", obj: " << param.obj                    //
+           << ", mode: " << idl::serialize(param.mode)  //
+           << ", code: " << param.code                  //
            << "}";
         return os;
     }
@@ -454,7 +454,7 @@ public:
     }
 
     static std::string generateName(const testing::TestParamInfo<ParamType>& info) {
-        return fmt::format("{}_{}", info.param.name, BSONValidateMode_serializer(info.param.mode));
+        return fmt::format("{}_{}", info.param.name, idl::serialize(info.param.mode));
     }
 };
 

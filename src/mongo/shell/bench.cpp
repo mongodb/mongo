@@ -660,7 +660,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
 
             ReadPreference mode;
             try {
-                mode = ReadPreference_parse(arg.str(), IDLParserContext("mode"));
+                mode = idl::deserialize<ReadPreferenceEnum>(arg.str(), IDLParserContext("mode"));
             } catch (DBException& e) {
                 e.addContext("benchRun(): Could not parse readPrefMode argument");
                 throw;

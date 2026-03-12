@@ -58,8 +58,7 @@ template <typename MetadataDetailsType>
 MetadataInconsistencyItem makeInconsistency(const MetadataInconsistencyTypeEnum& type,
                                             const MetadataDetailsType& details) {
     return {type,
-            std::string{MetadataInconsistencyDescription_serializer(
-                static_cast<MetadataInconsistencyDescriptionEnum>(type))},
+            std::string{idl::serialize(static_cast<MetadataInconsistencyDescriptionEnum>(type))},
             details.toBSON()};
 }
 

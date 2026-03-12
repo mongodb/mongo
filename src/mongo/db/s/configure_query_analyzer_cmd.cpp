@@ -226,13 +226,12 @@ public:
                     doc::kNsFieldName
                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
                     << doc::kModeFieldName
-                    << BSON("$ne" << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff))));
+                    << BSON("$ne" << idl::serialize(QueryAnalyzerModeEnum::kOff))));
 
                 std::vector<BSONObj> updates;
-                updates.push_back(
-                    BSON("$set" << BSON(doc::kModeFieldName
-                                        << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff)
-                                        << doc::kStopTimeFieldName << currentTime)));
+                updates.push_back(BSON("$set" << BSON(doc::kModeFieldName
+                                                      << idl::serialize(QueryAnalyzerModeEnum::kOff)
+                                                      << doc::kStopTimeFieldName << currentTime)));
                 request.setUpdate(write_ops::UpdateModification(updates));
             } else {
                 request.setUpsert(true);
@@ -252,9 +251,8 @@ public:
                     doc::kStartTimeFieldName,
                     BSON("$cond" << BSON(
                              "if" << BSON("$or" << BSON_ARRAY(
-                                              BSON("$ne" << BSON_ARRAY(
-                                                       ("$" + doc::kModeFieldName)
-                                                       << QueryAnalyzerMode_serializer(mode)))
+                                              BSON("$ne" << BSON_ARRAY(("$" + doc::kModeFieldName)
+                                                                       << idl::serialize(mode)))
                                               << BSON("$ne" << BSON_ARRAY(
                                                           ("$" + doc::kCollectionUuidFieldName)
                                                           << collUuid))))

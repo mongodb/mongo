@@ -43,13 +43,13 @@ void BuildInfoAuthModeServerParameter::append(OperationContext*,
                                               BSONObjBuilder* builder,
                                               StringData fieldName,
                                               const boost::optional<TenantId>&) {
-    builder->append(fieldName, BuildInfoAuthMode_serializer(gBuildInfoAuthMode.load()));
+    builder->append(fieldName, idl::serialize(gBuildInfoAuthMode.load()));
 }
 
 Status BuildInfoAuthModeServerParameter::setFromString(StringData strMode,
                                                        const boost::optional<TenantId>&) try {
     gBuildInfoAuthMode.store(
-        BuildInfoAuthMode_parse(strMode, IDLParserContext{"buildInfoAuthMode"}));
+        idl::deserialize<BuildInfoAuthModeEnum>(strMode, IDLParserContext{"buildInfoAuthMode"}));
     return Status::OK();
 } catch (const DBException& ex) {
     return ex.toStatus().withContext("Invalid value for Server Parameter: 'buildInfoAuthMode'");

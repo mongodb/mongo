@@ -73,7 +73,7 @@ public:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return DropDatabaseCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     bool _mustAlwaysMakeProgress() override {

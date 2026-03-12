@@ -77,10 +77,11 @@ boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           StringData cmdName) {
-    return tryGenerateSampleId(opCtx,
-                               nss,
-                               SampledCommandName_parse(adjustCmdNameCase(cmdName),
-                                                        IDLParserContext("tryGenerateSampleId")));
+    return tryGenerateSampleId(
+        opCtx,
+        nss,
+        idl::deserialize<SampledCommandNameEnum>(adjustCmdNameCase(cmdName),
+                                                 IDLParserContext("tryGenerateSampleId")));
 }
 
 boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* opCtx,
@@ -100,8 +101,8 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(OperationContext* 
     return tryGenerateTargetedSampleId(
         opCtx,
         nss,
-        SampledCommandName_parse(adjustCmdNameCase(cmdName),
-                                 IDLParserContext("tryGenerateTargetedSampleId")),
+        idl::deserialize<SampledCommandNameEnum>(adjustCmdNameCase(cmdName),
+                                                 IDLParserContext("tryGenerateTargetedSampleId")),
         shardIds);
 }
 

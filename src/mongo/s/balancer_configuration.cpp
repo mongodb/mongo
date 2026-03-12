@@ -162,7 +162,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx, BalancerM
         NamespaceString::kConfigSettingsNamespace,
         BSON("_id" << kBalancerSettingKey),
         BSON("$set" << BSON(kStopped << (mode == BalancerModeEnum::kOff) << kMode
-                                     << BalancerMode_serializer(mode))),
+                                     << idl::serialize(mode))),
         true,
         defaultMajorityWriteConcernDoNotUse());
 
@@ -172,9 +172,8 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx, BalancerM
     }
 
     if (!updateStatus.isOK() && (getBalancerMode() != mode)) {
-        return updateStatus.getStatus().withContext(str::stream()
-                                                    << "Failed to set the balancer mode to "
-                                                    << BalancerMode_serializer(mode));
+        return updateStatus.getStatus().withContext(
+            str::stream() << "Failed to set the balancer mode to " << idl::serialize(mode));
     }
 
     return Status::OK();
@@ -447,7 +446,7 @@ bool BalancerConfiguration::isTimeInBalancingWindow(OperationContext* opCtx,
 
         // Check if the current time is in any of the day-specific windows.
         for (const auto& window : *activeWindowDOW) {
-            std::string windowDayOfWeek = std::string(DayOfWeek_serializer(window.getDay()));
+            std::string windowDayOfWeek = std::string(idl::serialize(window.getDay()));
             if (windowDayOfWeek == currentDayOfWeek) {
                 boost::posix_time::ptime startTime, stopTime;
                 toPointInTime(std::string(window.getStart()), &startTime);

@@ -196,8 +196,8 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
             fmt::format("Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
                         "is not supported",
                         kStageName,
-                        MergeWhenMatchedMode_serializer(whenMatched),
-                        MergeWhenNotMatchedMode_serializer(whenNotMatched)),
+                        idl::serialize(whenMatched),
+                        idl::serialize(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
@@ -290,8 +290,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             fmt::format("Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
                         "is not supported",
                         kStageName,
-                        MergeWhenMatchedMode_serializer(whenMatched),
-                        MergeWhenNotMatchedMode_serializer(whenNotMatched)),
+                        idl::serialize(whenMatched),
+                        idl::serialize(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
 
     uassert(ErrorCodes::InvalidNamespace,
@@ -337,7 +337,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
         // Ensure the 'let' argument cannot be used with any other merge modes.
         uassert(51199,
                 fmt::format("Cannot use 'let' variables with 'whenMatched: {}' mode",
-                            MergeWhenMatchedMode_serializer(whenMatched)),
+                            idl::serialize(whenMatched)),
                 !letVariables);
     }
 

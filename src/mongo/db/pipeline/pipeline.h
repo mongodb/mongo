@@ -401,7 +401,7 @@ public:
      * Get a string representation of the pipeline type.
      */
     auto getTypeString() {
-        return CursorType_serializer(pipelineType);
+        return idl::serialize(pipelineType);
     }
 
     /**

@@ -62,28 +62,24 @@ void GlobalUserWriteBlockState::enableUserWriteBlocking(OperationContext* opCtx,
     _globalUserWritesBlockedReason.store(reason);
     _globalUserWritesBlocked.store(true);
     _globalUserWriteBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
-    LOGV2(
-        10296100, "Blocking user writes", "reason"_attr = UserWritesBlockReason_serializer(reason));
+    LOGV2(10296100, "Blocking user writes", "reason"_attr = idl::serialize(reason));
 }
 
 void GlobalUserWriteBlockState::disableUserWriteBlocking(OperationContext* opCtx) {
     _globalUserWritesBlocked.store(false);
     auto reason = _globalUserWritesBlockedReason.swap(UserWritesBlockReasonEnum::kUnspecified);
-    LOGV2(10296101,
-          "Unblocking user writes",
-          "reason"_attr = UserWritesBlockReason_serializer(reason));
+    LOGV2(10296101, "Unblocking user writes", "reason"_attr = idl::serialize(reason));
 }
 
 void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
                                                        const NamespaceString& nss) const {
     invariant(shard_role_details::getLocker(opCtx)->isLocked());
-    uassert(
-        ErrorCodes::UserWritesBlocked,
-        str::stream() << "User writes blocked, reason: "
-                      << UserWritesBlockReason_serializer(_globalUserWritesBlockedReason.load()),
-        !_globalUserWritesBlocked.load() ||
-            WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() || nss.isOnInternalDb() ||
-            nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile());
+    uassert(ErrorCodes::UserWritesBlocked,
+            str::stream() << "User writes blocked, reason: "
+                          << idl::serialize(_globalUserWritesBlockedReason.load()),
+            !_globalUserWritesBlocked.load() ||
+                WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() || nss.isOnInternalDb() ||
+                nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile());
 }
 
 bool GlobalUserWriteBlockState::isUserWriteBlockingEnabled(OperationContext* opCtx) const {
@@ -95,7 +91,7 @@ void GlobalUserWriteBlockState::appendUserWriteBlockModeCounters(BSONObjBuilder&
     BSONObjBuilder result(bob.subobjStart("userWriteBlockModeCounters"));
     for (size_t reasonIdx = 0; reasonIdx < idlEnumCount<UserWritesBlockReasonEnum>; ++reasonIdx) {
         result.appendNumber(
-            UserWritesBlockReason_serializer(static_cast<UserWritesBlockReasonEnum>(reasonIdx)),
+            idl::serialize(static_cast<UserWritesBlockReasonEnum>(reasonIdx)),
             static_cast<long long>(_globalUserWriteBlockCounters[reasonIdx].load()));
     }
 }

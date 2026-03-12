@@ -171,9 +171,8 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
             }
 
             if (notification.getProvenance().has_value()) {
-                o2Builder.append(
-                    "provenance",
-                    ReshardingProvenance_serializer(notification.getProvenance().value()));
+                o2Builder.append("provenance",
+                                 idl::serialize(notification.getProvenance().value()));
             }
 
             if (!zones.empty()) {

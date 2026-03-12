@@ -58,10 +58,8 @@ constexpr StringData kWhenNotMatchedModeFieldName =
     DocumentSourceMergeSpec::kWhenNotMatchedFieldName;
 constexpr StringData kIntoFieldName = DocumentSourceMergeSpec::kTargetNssFieldName;
 constexpr StringData kOnFieldName = DocumentSourceMergeSpec::kOnFieldName;
-const StringData kDefaultWhenMatchedMode =
-    MergeWhenMatchedMode_serializer(MergeWhenMatchedModeEnum::kMerge);
-const StringData kDefaultWhenNotMatchedMode =
-    MergeWhenNotMatchedMode_serializer(MergeWhenNotMatchedModeEnum::kInsert);
+const StringData kDefaultWhenMatchedMode = idl::serialize(MergeWhenMatchedModeEnum::kMerge);
+const StringData kDefaultWhenNotMatchedMode = idl::serialize(MergeWhenNotMatchedModeEnum::kInsert);
 
 class DocumentSourceMergeTest : public AggregationContextFixture {
 public:

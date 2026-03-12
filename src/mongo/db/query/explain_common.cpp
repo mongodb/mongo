@@ -66,7 +66,7 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                       internalQueryProhibitBlockingMergeOnMongoS.load());
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
     auto queryControl = expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
-    out->append("internalQueryFrameworkControl", QueryFrameworkControl_serializer(queryControl));
+    out->append("internalQueryFrameworkControl", idl::serialize(queryControl));
     out->appendNumber("internalQueryPlannerIgnoreIndexWithCollationForRegex",
                       internalQueryPlannerIgnoreIndexWithCollationForRegex.load());
 }

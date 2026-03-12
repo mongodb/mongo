@@ -78,11 +78,10 @@ DocumentSourceChangeStreamAddPreImage::createFromBson(
 
 Value DocumentSourceChangeStreamAddPreImage::doSerialize(const SerializationOptions& opts) const {
     return opts.isSerializingForExplain()
-        ? Value(Document{
-              {DocumentSourceChangeStream::kStageName,
-               Document{{"stage"_sd, "internalAddPreImage"_sd},
-                        {"fullDocumentBeforeChange"_sd,
-                         FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode)}}}})
+        ? Value(Document{{DocumentSourceChangeStream::kStageName,
+                          Document{{"stage"_sd, "internalAddPreImage"_sd},
+                                   {"fullDocumentBeforeChange"_sd,
+                                    idl::serialize(_fullDocumentBeforeChangeMode)}}}})
         : Value(Document{
               {kStageName,
                DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});

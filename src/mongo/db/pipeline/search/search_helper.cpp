@@ -206,8 +206,7 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         }
 
         // Add the searchFeatures field.
-        cmd.setSearchFeatures(
-            BSON(SearchFeatures_serializer(SearchFeaturesEnum::kShardedSort) << 1));
+        cmd.setSearchFeatures(BSON(idl::serialize(SearchFeaturesEnum::kShardedSort) << 1));
 
         return cmd.toBSON();
     }();

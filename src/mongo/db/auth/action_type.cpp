@@ -50,7 +50,7 @@ constexpr StringData kAction = "action"_sd;
 
 StatusWith<ActionType> parseActionFromString(StringData action) {
     try {
-        return {ActionType_parse(action, IDLParserContext(kAction))};
+        return {idl::deserialize<ActionTypeEnum>(action, IDLParserContext(kAction))};
     } catch (DBException&) {
         // ignore
     }
@@ -59,15 +59,15 @@ StatusWith<ActionType> parseActionFromString(StringData action) {
 }
 
 StringData toStringData(ActionType a) {
-    return ActionType_serializer(a);
+    return idl::serialize(a);
 }
 
 std::string toString(ActionType a) {
-    return std::string{ActionType_serializer(a)};
+    return std::string{idl::serialize(a)};
 }
 
 std::ostream& operator<<(std::ostream& os, const ActionType& a) {
-    return os << ActionType_serializer(a);
+    return os << idl::serialize(a);
 }
 
 }  // namespace mongo

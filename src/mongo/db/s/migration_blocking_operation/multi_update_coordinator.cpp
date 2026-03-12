@@ -73,7 +73,7 @@ primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoo
         [](StringData phase) {
             IDLParserContext ectx(
                 "pauseDuringMultiUpdateCoordinatorPhaseTransition::readPhaseArgument");
-            return MultiUpdateCoordinatorPhase_parse(phase, ectx);
+            return idl::deserialize<MultiUpdateCoordinatorPhaseEnum>(phase, ectx);
         }};
 
 AggregateCommandRequest makeAggregationToCheckForPendingUpdates(const NamespaceString& nss,
@@ -465,7 +465,7 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
     MultiUpdateCoordinatorPhaseEnum newPhase) {
     return _retry->untilMajorityCommitOr(
         getPhaseTransitionStopEvent(newPhase),
-        fmt::format("_transitionToPhase({})", MultiUpdateCoordinatorPhase_serializer(newPhase)),
+        fmt::format("_transitionToPhase({})", idl::serialize(newPhase)),
         [this, newPhase](const auto& factory) {
             auto oldPhase = _getCurrentPhase();
             if (oldPhase >= newPhase) {
@@ -490,8 +490,8 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
 
             LOGV2(8514200,
                   "MultiUpdateCoordinator transitioned phase",
-                  "oldPhase"_attr = MultiUpdateCoordinatorPhase_serializer(oldPhase),
-                  "newPhase"_attr = MultiUpdateCoordinatorPhase_serializer(newPhase),
+                  "oldPhase"_attr = idl::serialize(oldPhase),
+                  "newPhase"_attr = idl::serialize(newPhase),
                   "id"_attr = _metadata.getId(),
                   "command"_attr = redact(_metadata.getUpdateCommand()),
                   "namespace"_attr = _metadata.getNss());

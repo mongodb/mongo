@@ -108,7 +108,7 @@ bool identHandler(StorageEngine* engine,
               "Found unfinished index build to resume",
               "buildUUID"_attr = resumeInfo.getBuildUUID(),
               "collectionUUID"_attr = resumeInfo.getCollectionUUID(),
-              "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()));
+              "phase"_attr = idl::serialize(resumeInfo.getPhase()));
 
         // Keep the tables that are needed to rebuild this index.
         // Note: the table that stores the rebuild metadata itself (i.e. |ident|) isn't kept.

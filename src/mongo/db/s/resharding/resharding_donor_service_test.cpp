@@ -136,8 +136,8 @@ private:
 
         auto doc = client.findOne(NamespaceString::kDonorReshardingOperationsNamespace, BSONObj{});
         auto mutableState = doc.getObjectField("mutableState");
-        return DonorState_parse(mutableState.getStringField("state"),
-                                IDLParserContext{"reshardingDonorServiceTest"});
+        return idl::deserialize<DonorStateEnum>(mutableState.getStringField("state"),
+                                                IDLParserContext{"reshardingDonorServiceTest"});
     }
 
     void _maybeThrowErrorForFunction(OperationContext* opCtx, ExternalFunction func) {
@@ -594,7 +594,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     auto receivedChangeEvent = ReshardBeginChangeEventO2Field::parse(
         *op.getObject2(), IDLParserContext("ReshardBeginChangeEventO2Field"));
 
-    ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+    ASSERT_EQ(idl::serialize(op.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
         << op.getEntry();
     ASSERT_EQ(*op.getUuid(), doc.getSourceUUID()) << op.getEntry();
     ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
@@ -630,7 +630,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
     ASSERT_FALSE(cursor->more()) << "Found multiple oplog entries for source collection: "
                                  << op.getEntry() << " and " << cursor->nextSafe();
 
-    ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+    ASSERT_EQ(idl::serialize(op.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
         << op.getEntry();
     ASSERT_FALSE(op.getUuid()) << op.getEntry();
     ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
@@ -678,7 +678,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
         auto receivedChangeEvent = ReshardBlockingWritesChangeEventO2Field::parse(
             *op.getObject2(), IDLParserContext("ReshardBlockingWritesChangeEventO2Field"));
 
-        ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(op.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
             << op.getEntry();
         ASSERT_EQ(op.getUuid(), doc.getSourceUUID()) << op.getEntry();
         ASSERT_EQ(op.getDestinedRecipient(), recipientShardId) << op.getEntry();
@@ -1201,8 +1201,7 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
             ->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
             .value();
-    ASSERT_EQ(currOp.getStringField("donorState"),
-              DonorState_serializer(DonorStateEnum::kBlockingWrites));
+    ASSERT_EQ(currOp.getStringField("donorState"), idl::serialize(DonorStateEnum::kBlockingWrites));
     ASSERT_GTE(currOp.getField("totalOperationTimeElapsedSecs").Long(), opTimeDurationSecs);
 
     stateTransitionsGuard.unset(kDoneState);

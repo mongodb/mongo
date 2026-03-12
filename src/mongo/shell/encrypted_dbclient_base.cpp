@@ -429,10 +429,9 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     auto algorithmStr = mozjs::ValueWriter(cx, args.get(2)).toString();
     FleAlgorithmInt algorithm;
 
-    if (StringData(algorithmStr) == FleAlgorithm_serializer(FleAlgorithmEnum::kRandom)) {
+    if (StringData(algorithmStr) == idl::serialize(FleAlgorithmEnum::kRandom)) {
         algorithm = FleAlgorithmInt::kRandom;
-    } else if (StringData(algorithmStr) ==
-               FleAlgorithm_serializer(FleAlgorithmEnum::kDeterministic)) {
+    } else if (StringData(algorithmStr) == idl::serialize(FleAlgorithmEnum::kDeterministic)) {
         algorithm = FleAlgorithmInt::kDeterministic;
     } else {
         uasserted(ErrorCodes::BadValue, "Third parameter must be the FLE Algorithm type");

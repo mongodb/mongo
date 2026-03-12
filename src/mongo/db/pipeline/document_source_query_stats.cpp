@@ -137,13 +137,12 @@ Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) cons
         hmacKey =
             Value(BSONBinData("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 32, BinDataType::Sensitive));
     }
-    return Value{
-        Document{{kStageName,
-                  _transformIdentifiers
-                      ? Document{{"transformIdentifiers",
-                                  Document{{"algorithm", TransformAlgorithm_serializer(_algorithm)},
-                                           {"hmacKey", hmacKey}}}}
-                      : Document{}}}};
+    return Value{Document{
+        {kStageName,
+         _transformIdentifiers
+             ? Document{{"transformIdentifiers",
+                         Document{{"algorithm", idl::serialize(_algorithm)}, {"hmacKey", hmacKey}}}}
+             : Document{}}}};
 }
 
 }  // namespace mongo

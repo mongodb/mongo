@@ -135,7 +135,8 @@ GetNextResult ChangeStreamUnwindTransactionStage::doGetNext() {
 
 bool ChangeStreamUnwindTransactionStage::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
-    auto opType = repl::OpType_parse(op.getStringData(), IDLParserContext("ChangeStreamEntry.op"));
+    auto opType = idl::deserialize<repl::OpTypeEnum>(op.getStringData(),
+                                                     IDLParserContext("ChangeStreamEntry.op"));
 
     if (opType != repl::OpTypeEnum::kCommand) {
         return false;

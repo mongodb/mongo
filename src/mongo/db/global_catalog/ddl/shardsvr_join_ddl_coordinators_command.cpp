@@ -99,7 +99,8 @@ public:
                     // If the submitter specified a subset of types, only join those.
                     if (types) {
                         return std::ranges::any_of(*types, [&](StringData type) {
-                            return DDLCoordinatorType_parse(type, parserContext) == opType;
+                            return idl::deserialize<DDLCoordinatorTypeEnum>(type, parserContext) ==
+                                opType;
                         });
                     }
                     // Join all other types.

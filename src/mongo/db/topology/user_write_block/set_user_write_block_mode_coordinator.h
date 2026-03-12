@@ -74,7 +74,7 @@ private:
     const ConfigsvrCoordinatorMetadata& metadata() const override;
 
     StringData serializePhase(const Phase& phase) const override {
-        return SetUserWriteBlockModeCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 };
 

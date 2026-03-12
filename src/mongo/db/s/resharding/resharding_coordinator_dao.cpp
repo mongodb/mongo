@@ -158,7 +158,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToPreparingToD
     {
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kPreparingToDonate));
+                          idl::serialize(CoordinatorStateEnum::kPreparingToDonate));
 
         BSONArrayBuilder donorShards(
             setBuilder.subarrayStart(ReshardingCoordinatorDocument::kDonorShardsFieldName));
@@ -208,7 +208,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
 
         // Always update the state field.
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kCloning));
+                          idl::serialize(CoordinatorStateEnum::kCloning));
         setBuilder.append(ReshardingCoordinatorDocument::kCloneTimestampFieldName,
                           *doc.getCloneTimestamp());
         setBuilder.append(ReshardingCoordinatorDocument::kApproxBytesToCopyFieldName,
@@ -253,7 +253,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToBlockingWrit
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kBlockingWrites));
+                          idl::serialize(CoordinatorStateEnum::kBlockingWrites));
 
         setBuilder.append(*getTimedPhaseEndFieldFor(CoordinatorStateEnum::kApplying), now);
 
@@ -292,7 +292,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhas
 
         // Always update the state field.
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kApplying));
+                          idl::serialize(CoordinatorStateEnum::kApplying));
 
         // Update applying metrics.
         setBuilder.append(*getTimedPhaseEndFieldFor(CoordinatorStateEnum::kCloning), now);
@@ -318,7 +318,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToAbortingPhas
         BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
         setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
-                          CoordinatorState_serializer(CoordinatorStateEnum::kAborting));
+                          idl::serialize(CoordinatorStateEnum::kAborting));
 
         setBuilder.append(ReshardingCoordinatorDocument::kAbortReasonFieldName,
                           resharding::serializeAndTruncateReshardingErrorIfNeeded(abortReason));

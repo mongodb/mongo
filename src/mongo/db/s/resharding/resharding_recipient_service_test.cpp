@@ -2147,7 +2147,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         auto receivedChangeEvent = ReshardDoneCatchUpChangeEventO2Field::parse(
             *op.getObject2(), IDLParserContext("ReshardDoneCatchUpChangeEventO2Field"));
 
-        ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(op.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
             << op.getEntry();
         ASSERT_EQ(*op.getUuid(), doc.getReshardingUUID()) << op.getEntry();
         ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
@@ -2205,8 +2205,8 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
         ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
         repl::OplogEntry shardCollectionOp(cursor->next());
 
-        ASSERT_EQ(OpType_serializer(shardCollectionOp.getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(shardCollectionOp.getOpType()),
+                  idl::serialize(repl::OpTypeEnum::kNoop))
             << shardCollectionOp.getEntry();
         ASSERT_EQ(*shardCollectionOp.getUuid(), doc.getReshardingUUID())
             << shardCollectionOp.getEntry();
@@ -2608,7 +2608,7 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                               .value();
 
             ASSERT_EQ(currOp.getStringField("recipientState"),
-                      RecipientState_serializer(persistedDoc.getMutableState().getState()));
+                      idl::serialize(persistedDoc.getMutableState().getState()));
             checkRecipientMetrics(testOptions, testRecipientMetrics, persistedDoc, currOp);
 
             stepDown();

@@ -150,8 +150,8 @@ public:
                                      "checkMetadataConsistency command. The config server was "
                                      "expecting to receive a database or collection level "
                                      "parameter, but received "
-                                  << MetadataConsistencyCommandLevel_serializer(commandLevel)
-                                  << " with namespace " << nss.toStringForErrorMsg());
+                                  << idl::serialize(commandLevel) << " with namespace "
+                                  << nss.toStringForErrorMsg());
             }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(

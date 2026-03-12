@@ -48,11 +48,12 @@ void QueryFrameworkControl::append(OperationContext*,
                                    BSONObjBuilder* b,
                                    StringData name,
                                    const boost::optional<TenantId>&) {
-    *b << name << QueryFrameworkControl_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryFrameworkControl_parse(value, IDLParserContext("internalQueryFrameworkControl"));
+    _data = idl::deserialize<QueryFrameworkControlEnum>(
+        value, IDLParserContext("internalQueryFrameworkControl"));
     return Status::OK();
 }
 

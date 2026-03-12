@@ -85,7 +85,7 @@ public:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return CompactStructuredEncryptionDataPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

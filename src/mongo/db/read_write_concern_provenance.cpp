@@ -50,7 +50,7 @@ ReadWriteConcernProvenance ReadWriteConcernProvenance::parse(const IDLParserCont
 }
 
 StringData ReadWriteConcernProvenance::sourceToString(boost::optional<Source> source) {
-    return source ? ReadWriteConcernProvenanceSource_serializer(*source) : "(unset)";
+    return source ? idl::serialize(*source) : "(unset)";
 }
 
 }  // namespace mongo

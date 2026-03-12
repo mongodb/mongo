@@ -471,7 +471,7 @@ void abortInProgressTransactions(OperationContext* opCtx,
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     findRequest.setFilter(BSON(SessionTxnRecord::kStateFieldName
-                               << DurableTxnState_serializer(DurableTxnStateEnum::kInProgress)));
+                               << idl::serialize(DurableTxnStateEnum::kInProgress)));
     auto cursor = client.find(std::move(findRequest));
 
     if (cursor->more()) {

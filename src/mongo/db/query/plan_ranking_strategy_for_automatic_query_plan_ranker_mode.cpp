@@ -46,12 +46,12 @@ namespace mongo {
 
 void QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::append(
     OperationContext*, BSONObjBuilder* b, StringData name, const boost::optional<TenantId>&) {
-    *b << name << QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode::setFromString(
     StringData value, const boost::optional<TenantId>&) {
-    auto mode = QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode_parse(
+    auto mode = idl::deserialize<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>(
         value, IDLParserContext("automaticCEPlanRankingStrategy"));
     if (mode ==
             QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::

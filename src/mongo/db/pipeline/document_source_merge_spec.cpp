@@ -150,7 +150,7 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
 
     IDLParserContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
     auto value = elem.valueStringData();
-    auto mode = MergeWhenMatchedMode_parse(value, ctx);
+    auto mode = idl::deserialize<MergeWhenMatchedModeEnum>(value, ctx);
 
     // The 'kPipeline' mode cannot be specified explicitly, a custom pipeline definition must be
     // used instead.
@@ -167,7 +167,7 @@ void mergeWhenMatchedSerializeToBSON(const MergeWhenMatchedPolicy& policy,
         tassert(11282973, "Merge policy lacks the pipeline", policy.pipeline);
         bob->append(fieldName, *policy.pipeline);
     } else {
-        bob->append(fieldName, MergeWhenMatchedMode_serializer(policy.mode));
+        bob->append(fieldName, idl::serialize(policy.mode));
     }
 }
 }  // namespace mongo

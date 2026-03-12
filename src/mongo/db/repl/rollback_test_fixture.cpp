@@ -179,7 +179,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
 
     BSONObjBuilder bob;
     bob.append("ts", ts);
-    bob.append("op", OpType_serializer(opType));
+    bob.append("op", idl::serialize(opType));
     uuid.appendToBuilder(&bob, "ui");
     bob.append("ns", nss);
     bob.append("o", o);

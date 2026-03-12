@@ -1529,9 +1529,9 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     auto newState = newRecipientCtx.getState();
 
     reshardingRecipientFailInPhase.execute([&](const BSONObj& data) {
-        auto targetPhase =
-            RecipientState_parse(data.getStringField("phase"),
-                                 IDLParserContext{"reshardingRecipientFailInPhase failpoint"});
+        auto targetPhase = idl::deserialize<RecipientStateEnum>(
+            data.getStringField("phase"),
+            IDLParserContext{"reshardingRecipientFailInPhase failpoint"});
         if (oldState != targetPhase) {
             return;
         }
@@ -1555,8 +1555,8 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
 
     LOGV2_INFO(5279506,
                "Transitioned resharding recipient state",
-               "newState"_attr = RecipientState_serializer(newState),
-               "oldState"_attr = RecipientState_serializer(oldState),
+               "newState"_attr = idl::serialize(newState),
+               "oldState"_attr = idl::serialize(oldState),
                logAttrs(_metadata.getSourceNss()),
                "collectionUUID"_attr = _metadata.getSourceUUID(),
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
@@ -1663,7 +1663,7 @@ BSONObj ReshardingRecipientService::RecipientStateMachine::_makeQueryForCoordina
                 {
                     BSONArrayBuilder inBuilder(mutableStateBuilder.subarrayStart("$in"));
                     for (const auto& state : it->second) {
-                        inBuilder.append(RecipientState_serializer(state));
+                        inBuilder.append(idl::serialize(state));
                     }
                 }
             }
@@ -1727,7 +1727,7 @@ void ReshardingRecipientService::RecipientStateMachine::commit() {
     tassert(ErrorCodes::ReshardCollectionInProgress,
             fmt::format(
                 "Attempted to commit the resharding operation in an incorrect recipient state: {}",
-                RecipientState_serializer(_recipientCtx.getState())),
+                idl::serialize(_recipientCtx.getState())),
             _recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency);
 
     ensureFulfilledPromise(lk, _coordinatorHasEngagedCriticalSection);

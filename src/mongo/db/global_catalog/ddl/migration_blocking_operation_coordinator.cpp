@@ -107,7 +107,7 @@ MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
 void MigrationBlockingOperationCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {}
 
 StringData MigrationBlockingOperationCoordinator::serializePhase(const Phase& phase) const {
-    return MigrationBlockingOperationCoordinatorPhase_serializer(phase);
+    return idl::serialize(phase);
 }
 
 ExecutorFuture<void> MigrationBlockingOperationCoordinator::_runImpl(

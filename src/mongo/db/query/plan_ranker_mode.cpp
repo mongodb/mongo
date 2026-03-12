@@ -49,12 +49,12 @@ void QueryPlanRankerMode::append(OperationContext*,
                                  BSONObjBuilder* b,
                                  StringData name,
                                  const boost::optional<TenantId>&) {
-    *b << name << QueryPlanRankerMode_serializer(_data.get());
+    *b << name << idl::serialize(_data.get());
 }
 
 Status QueryPlanRankerMode::setFromString(StringData value, const boost::optional<TenantId>&) {
-    QueryPlanRankerModeEnum mode =
-        QueryPlanRankerMode_parse(value, IDLParserContext("internalQueryCBRCEMode"));
+    QueryPlanRankerModeEnum mode = idl::deserialize<QueryPlanRankerModeEnum>(
+        value, IDLParserContext("internalQueryCBRCEMode"));
     if (mode == QueryPlanRankerModeEnum::kHistogramCE && !getTestCommandsEnabled()) {
         return Status(ErrorCodes::BadValue, "histogramCE not allowed");
     }

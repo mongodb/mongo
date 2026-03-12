@@ -499,7 +499,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                                   .getDocument()
                                   .getField("version"_sd)
                                   .getStringData());
-                    ASSERT_EQ(ChangeStreamReaderVersion_parse(*version),
+                    ASSERT_EQ(idl::deserialize<ChangeStreamReaderVersionEnum>(*version),
                               getExpCtx()->getChangeStreamSpec()->getVersion());
                 } else {
                     ASSERT_EQ("v1",

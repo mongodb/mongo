@@ -48,8 +48,7 @@ TEST(SorterChecksumCalculatorTest, CollisionCheck) {
         for (size_t i = 0; i < kTestCount; ++i) {
             calculator.addData(kData.data(), kData.size());
             size_t checksum = calculator.checksum();
-            ASSERT_FALSE(seenValues.contains(checksum))
-                << "version: " << SorterChecksumVersion_serializer(version);
+            ASSERT_FALSE(seenValues.contains(checksum)) << "version: " << idl::serialize(version);
             seenValues.insert(checksum);
         }
     }
@@ -80,7 +79,7 @@ TEST(SorterChecksumCalculatorTest, RandomBitFlips) {
             SorterChecksumCalculator calculator(version);
             calculator.addData(data.data(), data.size());
             ASSERT_NE(expectedChecksum, calculator.checksum())
-                << "version: " << SorterChecksumVersion_serializer(version);
+                << "version: " << idl::serialize(version);
         }
     }
 }

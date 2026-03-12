@@ -1323,9 +1323,8 @@ BSONObj BalancerDefragmentationPolicy::reportProgressOn(const UUID& uuid) {
         return BSON(kCurrentPhase << kNoPhase);
     }
     const auto& collDefragmentationPhase = match->second;
-    return BSON(
-        kCurrentPhase << DefragmentationPhase_serializer(collDefragmentationPhase->getType())
-                      << kProgress << collDefragmentationPhase->reportProgress());
+    return BSON(kCurrentPhase << idl::serialize(collDefragmentationPhase->getType()) << kProgress
+                              << collDefragmentationPhase->reportProgress());
 }
 
 MigrateInfoVector BalancerDefragmentationPolicy::selectChunksToMove(
@@ -1543,9 +1542,8 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicy::_transition
         LOGV2(6172702,
               "Collection defragmentation transitioned to new phase",
               logAttrs(coll.getNss()),
-              "phase"_attr = nextPhaseObject
-                  ? DefragmentationPhase_serializer(nextPhaseObject->getType())
-                  : kNoPhase,
+              "phase"_attr =
+                  nextPhaseObject ? idl::serialize(nextPhaseObject->getType()) : kNoPhase,
               "details"_attr = nextPhaseObject ? nextPhaseObject->reportProgress() : BSONObj());
     } catch (const DBException& e) {
         LOGV2_ERROR(6153101,
@@ -1590,7 +1588,7 @@ void BalancerDefragmentationPolicy::_persistPhaseUpdate(OperationContext* opCtx,
         entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(CollectionType::kDefragmentationPhaseFieldName
-                                << DefragmentationPhase_serializer(phase)))));
+                                << idl::serialize(phase)))));
         return entry;
     }()});
     auto response = write_ops::checkWriteErrors(dbClient.update(updateOp));

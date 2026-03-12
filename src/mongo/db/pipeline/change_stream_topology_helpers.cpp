@@ -65,7 +65,7 @@ BSONObj replaceResumeTokenAndVersionInCommand(
 
     if (changeStreamVersion.has_value()) {
         changeStreamStage[DocumentSourceChangeStreamSpec::kVersionFieldName] =
-            Value(ChangeStreamReaderVersion_serializer(*changeStreamVersion));
+            Value(idl::serialize(*changeStreamVersion));
     }
 
     // Provide 'resumeToken' as part 'startAfter' for resuming the changeStream. 'startAfter' and

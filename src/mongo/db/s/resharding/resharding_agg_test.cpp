@@ -1534,8 +1534,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
 
     auto preImageOplog = preImageOplogStatus.getValue();
     ASSERT_BSONOBJ_EQ(preImage, preImageOplog.getObject());
-    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
-              OpType_serializer(preImageOplog.getOpType()));
+    ASSERT_EQ(idl::serialize(repl::OpTypeEnum::kNoop), idl::serialize(preImageOplog.getOpType()));
 
     auto updateOplogDoc = execPipeline->getNext();
     ASSERT_TRUE(updateOplogDoc);
@@ -1546,8 +1545,7 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     ASSERT_TRUE(updateOplog.getPreImageOpTime());
     ASSERT_FALSE(updateOplog.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *updateOplog.getPreImageOpTime());
-    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
-              OpType_serializer(updateOplog.getOpType()));
+    ASSERT_EQ(idl::serialize(repl::OpTypeEnum::kUpdate), idl::serialize(updateOplog.getOpType()));
     ASSERT_BSONOBJ_EQ(oplog.getObject(), updateOplog.getObject());
     ASSERT_TRUE(updateOplog.getObject2());
     ASSERT_BSONOBJ_EQ(*oplog.getObject2(), *updateOplog.getObject2());
@@ -1645,8 +1643,7 @@ TEST_F(ReshardingAggWithStorageTest,
     ASSERT_OK(swPreImageOplog);
     auto preImageOplog = swPreImageOplog.getValue();
     ASSERT_BSONOBJ_EQ(preImage, preImageOplog.getObject());
-    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kNoop),
-              OpType_serializer(preImageOplog.getOpType()));
+    ASSERT_EQ(idl::serialize(repl::OpTypeEnum::kNoop), idl::serialize(preImageOplog.getOpType()));
 
     auto applyOpsOplogDoc2 = execPipeline->getNext();
     ASSERT_TRUE(applyOpsOplogDoc2);
@@ -1666,8 +1663,8 @@ TEST_F(ReshardingAggWithStorageTest,
     ASSERT_TRUE(outputInnerOp2.getPreImageOpTime());
     ASSERT_FALSE(outputInnerOp2.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *outputInnerOp2.getPreImageOpTime());
-    ASSERT_EQ(OpType_serializer(repl::OpTypeEnum::kUpdate),
-              OpType_serializer(outputInnerOp2.getOpType()));
+    ASSERT_EQ(idl::serialize(repl::OpTypeEnum::kUpdate),
+              idl::serialize(outputInnerOp2.getOpType()));
     ASSERT_BSONOBJ_EQ(inputInnerOp2.getObject(), outputInnerOp2.getObject());
     ASSERT_TRUE(outputInnerOp2.getObject2());
     ASSERT_BSONOBJ_EQ(*inputInnerOp2.getObject2(), *outputInnerOp2.getObject2());

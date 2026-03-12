@@ -52,7 +52,7 @@ public:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return InitializePlacementHistoryPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;

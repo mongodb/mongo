@@ -111,7 +111,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
 }  // namespace
 
 void initializeTicketingSystem(ServiceContext* svcCtx) {
-    auto algorithm = ExecutionControlConcurrencyAdjustmentAlgorithm_parse(
+    auto algorithm = idl::deserialize<ExecutionControlConcurrencyAdjustmentAlgorithmEnum>(
         gConcurrencyAdjustmentAlgorithm,
         IDLParserContext{"executionControlConcurrencyAdjustmentAlgorithm"});
 

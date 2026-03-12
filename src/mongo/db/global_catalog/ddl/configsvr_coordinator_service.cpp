@@ -102,9 +102,8 @@ ConfigsvrCoordinatorService::constructInstance(BSONObj initialState) {
             return std::make_shared<SetClusterParameterCoordinator>(std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Encountered unknown ConfigsvrCoordinator operation type: "
-                          << ConfigsvrCoordinatorType_serializer(op.getId().getCoordinatorType()));
+                      str::stream() << "Encountered unknown ConfigsvrCoordinator operation type: "
+                                    << idl::serialize(op.getId().getCoordinatorType()));
     }
 }
 
@@ -169,7 +168,7 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
 
     uassert(ErrorCodes::AddOrRemoveShardInProgress,
             fmt::format("Cannot start {} because a topology change is in progress",
-                        ConfigsvrCoordinatorType_serializer(op.getId().getCoordinatorType())),
+                        idl::serialize(op.getId().getCoordinatorType())),
             service->areAllCoordinatorsOfTypeFinished(opCtx, DDLCoordinatorTypeEnum::kAddShard));
 }
 

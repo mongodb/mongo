@@ -142,7 +142,7 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
             BSONArrayBuilder builder;
             for (size_t i = 0; i < missingChecks.size(); i++) {
                 if (missingChecks.test(i)) {
-                    builder.append(AccessCheck_serializer(static_cast<AccessCheckEnum>(i)));
+                    builder.append(idl::serialize(static_cast<AccessCheckEnum>(i)));
                 }
             }
 
@@ -161,13 +161,13 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
                     auto at = static_cast<ActionTypeEnum>(k);
                     if (other._privilegeChecks[i].contains(at) &&
                         !_privilegeChecks[i].contains(at)) {
-                        builder.append(ActionType_serializer(at));
+                        builder.append(idl::serialize(at));
                     }
                 }
 
                 LOGV2(5452403,
                       "Missing Action Types for resource",
-                      "resource"_attr = MatchType_serializer(static_cast<MatchTypeEnum>(i)),
+                      "resource"_attr = idl::serialize(static_cast<MatchTypeEnum>(i)),
                       "actions"_attr = builder.arr());
             }
 

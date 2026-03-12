@@ -899,7 +899,7 @@ TEST(OplogEntryParserTest, ParseOpTimeFailure) {
 
 TEST(OplogEntryParserTest, ParseOpTypeSuccess) {
     auto const oplogEntry =
-        BSON(OplogEntry::kOpTypeFieldName << OpType_serializer(repl::OpTypeEnum::kDelete));
+        BSON(OplogEntry::kOpTypeFieldName << idl::serialize(repl::OpTypeEnum::kDelete));
     OplogEntryParserNonStrict parser{oplogEntry};
     ASSERT_EQ(repl::OpTypeEnum::kDelete, parser.getOpType());
 }

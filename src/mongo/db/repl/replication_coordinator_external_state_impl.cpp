@@ -1267,7 +1267,7 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     if (cmdResponse.response.hasField("defaultWriteConcernSource")) {
         // FCV is set to "5.0" or higher.
         isCWWCSet = cmdResponse.response.getField("defaultWriteConcernSource").valueStringData() ==
-            DefaultWriteConcernSource_serializer(DefaultWriteConcernSourceEnum::kGlobal);
+            idl::serialize(DefaultWriteConcernSourceEnum::kGlobal);
     } else {
         // FCV is set to lower than "5.0".
         isCWWCSet = cmdResponse.response.hasField("defaultWriteConcern");

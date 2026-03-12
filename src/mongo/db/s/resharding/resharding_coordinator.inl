@@ -203,8 +203,8 @@ void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
     _installCoordinatorDoc(doc);
 
     BSONObjBuilder bob;
-    bob.append("newState", CoordinatorState_serializer(_coordinatorDoc.getState()));
-    bob.append("oldState", CoordinatorState_serializer(previousState));
+    bob.append("newState", idl::serialize(_coordinatorDoc.getState()));
+    bob.append("oldState", idl::serialize(previousState));
     bob.append("namespace",
                NamespaceStringUtil::serialize(_coordinatorDoc.getSourceNss(),
                                               SerializationContext::stateDefault()));
@@ -213,8 +213,8 @@ void ReshardingCoordinator::installCoordinatorDocOnStateTransition(
 
     LOGV2_INFO(5343001,
                "Transitioned resharding coordinator state",
-               "newState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
-               "oldState"_attr = CoordinatorState_serializer(previousState),
+               "newState"_attr = idl::serialize(_coordinatorDoc.getState()),
+               "oldState"_attr = idl::serialize(previousState),
                logAttrs(_coordinatorDoc.getSourceNss()),
                "collectionUUID"_attr = _coordinatorDoc.getSourceUUID(),
                "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
@@ -1047,8 +1047,7 @@ void ReshardingCoordinator::_abortIfCoordinatorInAbortingOrQuiescingOrRequested(
         _ctHolder->abort(resharding::kQuiesceAbortReason);
         tassert(11400504,
                 str::stream() << "Expected resharding to have committed or aborted since it is in "
-                              << CoordinatorState_serializer(_coordinatorDoc.getState())
-                              << " state",
+                              << idl::serialize(_coordinatorDoc.getState()) << " state",
                 _originalReshardingStatus.has_value());
     } else if (abortRequest) {
         _ctHolder->abort(abortRequest->reason);
@@ -2040,7 +2039,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     }
     statsBuilder.append("ns", toStringForLogging(_coordinatorDoc.getSourceNss()));
     statsBuilder.append("provenance",
-                        ReshardingProvenance_serializer(_coordinatorDoc.getProvenance().value_or(
+                        idl::serialize(_coordinatorDoc.getProvenance().value_or(
                             ReshardingProvenanceEnum::kReshardCollection)));
     statsBuilder.append("sourceUUID", _coordinatorDoc.getSourceUUID().toBSON());
     if (success) {

@@ -573,8 +573,7 @@ protected:
                             const LogicalSessionId& lsid,
                             TxnNumber txnNumber,
                             const std::vector<StmtId>& stmtIds) {
-        ASSERT_EQ(OpType_serializer(foundOp.getOpType()),
-                  OpType_serializer(repl::OpTypeEnum::kNoop))
+        ASSERT_EQ(idl::serialize(foundOp.getOpType()), idl::serialize(repl::OpTypeEnum::kNoop))
             << foundOp;
 
         ASSERT_EQ(foundOp.getSessionId(), lsid) << foundOp;
@@ -651,7 +650,7 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasBeenUpdated(sessionId, txnNum);
     }
@@ -688,7 +687,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasBeenUpdated(sessionId, donorTxnNum);
     }
@@ -710,7 +709,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasBeenUpdated(sessionId, donorTxnNum);
     }
@@ -731,7 +730,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasBeenUpdated(sessionId, txnNum);
     }
@@ -752,7 +751,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasNotBeenUpdated(sessionId, txnNum);
     }
@@ -775,7 +774,7 @@ TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
         onCommandReturnTxns({txn.toBSON()}, {});
 
         auto status = future.getNoThrow();
-        ASSERT_OK(status) << (state ? DurableTxnState_serializer(*state) : "retryable write");
+        ASSERT_OK(status) << (state ? idl::serialize(*state) : "retryable write");
 
         checkTxnHasNotBeenUpdated(sessionId, recipientTxnNum);
     }

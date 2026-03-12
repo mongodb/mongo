@@ -170,7 +170,7 @@ protected:
 
             if (startingPhase) {
                 setObj.append(CollectionType::kDefragmentationPhaseFieldName,
-                              DefragmentationPhase_serializer(*startingPhase));
+                              idl::serialize(*startingPhase));
             }
 
             if (maxChunkSizeBytes) {
@@ -292,7 +292,7 @@ protected:
                                                    BSON(CollectionType::kUuidFieldName << uuid))
                              .getValue();
         if (expectedPhase.has_value()) {
-            auto storedDefragmentationPhase = DefragmentationPhase_parse(
+            auto storedDefragmentationPhase = idl::deserialize<DefragmentationPhaseEnum>(
                 configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName),
                 IDLParserContext("BalancerDefragmentationPolicyTest"));
             ASSERT_TRUE(storedDefragmentationPhase == *expectedPhase);

@@ -4199,7 +4199,7 @@ protected:
         BSONObjBuilder doc;
         doc.append("_id", sessionId.toBSON());
         doc.append("txnNum", txnNum);
-        doc.append("state", DurableTxnState_serializer(state));
+        doc.append("state", idl::serialize(state));
         doc.append("startOpTime", repl::OpTime(startTs, 1).toBSON());
         doc.append("lastWriteOpTime", repl::OpTime(startTs, 1).toBSON());
         doc.append("lastWriteDate", Date_t::now());

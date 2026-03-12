@@ -506,7 +506,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         parsed.numModifications++;
         parsed.collValidationLevel = *validationLevel;
         oplogEntryBuilder.append(CollMod::kValidationLevelFieldName,
-                                 ValidationLevel_serializer(*validationLevel));
+                                 idl::serialize(*validationLevel));
     }
 
     if (const auto& validationAction = cmr.getValidationAction()) {
@@ -519,7 +519,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         parsed.numModifications++;
         parsed.collValidationAction = *validationAction;
         oplogEntryBuilder.append(CollMod::kValidationActionFieldName,
-                                 ValidationAction_serializer(*validationAction));
+                                 idl::serialize(*validationAction));
     }
 
     if (auto& pipeline = cmr.getPipeline()) {

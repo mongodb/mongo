@@ -57,7 +57,7 @@ public:
 
 private:
     StringData serializePhase(const Phase& phase) const override {
-        return RemoveShardCommitCoordinatorPhase_serializer(phase);
+        return idl::serialize(phase);
     }
 
     bool _mustAlwaysMakeProgress() override {
