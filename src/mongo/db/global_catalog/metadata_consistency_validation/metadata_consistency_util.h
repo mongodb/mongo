@@ -99,7 +99,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const std::vector<CollectionType>& shardingCatalogCollections,
     std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
-    bool checkRangeDeletionIndexes);
+    bool checkRangeDeletionIndexes,
+    bool optionalCheckIndexes);
 
 /**
  * For every collection, check that all the shards currently owning chunks for that collection have

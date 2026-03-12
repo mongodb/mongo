@@ -403,7 +403,8 @@ TEST_F(MetadataConsistencyTest, CappedAndShardedCollection) {
         {configColl},
         localCatalogSnapshot,
         localCatalogCollections,
-        false /*checkRangeDeletionIndexes*/);
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
     assertCollectionOptionsMismatchInconsistencyFound(
         inconsistencies,
         BSON("capped" << true),
@@ -454,7 +455,8 @@ TEST_F(MetadataConsistencyTest, DefaultCollationMismatchBetweenLocalAndShardingC
             {configColl},
             localCatalogSnapshot,
             localCatalogCollections,
-            false /*checkRangeDeletionIndexes*/);
+            false /*checkRangeDeletionIndexes*/,
+            false /*optionalCheckIndexes*/);
 
         if (expectInconsistencies) {
             BSONObj collationLocalCatalog =
@@ -542,7 +544,8 @@ TEST_F(MetadataConsistencyTest, TimeseriesOptionsMismatchBetweenLocalAndSharding
                     {configColl},
                     localCatalogSnapshot,
                     localCatalogCollections,
-                    false /*checkRangeDeletionIndexes*/);
+                    false /*checkRangeDeletionIndexes*/,
+                    false /*optionalCheckIndexes*/);
 
             if (expectInconsistencies) {
                 const BSONObj& localCatalogBSON =
@@ -826,7 +829,8 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         {configColl},
         localCatalogSnapshot,
         localCatalogCollections,
-        false /*checkRangeDeletionIndexes*/);
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch,
         inconsistencies);
@@ -846,7 +850,8 @@ TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {
         {configColl},
         localCatalogSnapshot,
         localCatalogCollections,
-        false /*checkRangeDeletionIndexes*/);
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
     ASSERT_EQ(0, inconsistencies.size());
 }
 
@@ -895,7 +900,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         {} /* shardingCatalogCollections */,
         localCatalogSnapshot,
         localCatalogCollections,
-        false /*checkRangeDeletionIndexes*/);
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kShardCatalogCacheCollectionMetadataMismatch,
         inconsistencies);
@@ -915,7 +921,8 @@ TEST_F(MetadataConsistencyTest, ShardTrackedCollectionInconsistencyTest) {
         {} /* shardingCatalogCollections */,
         localCatalogSnapshot,
         localCatalogCollections,
-        false /*checkRangeDeletionIndexes*/);
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
     ASSERT_EQ(0, inconsistencies.size());
 }
 

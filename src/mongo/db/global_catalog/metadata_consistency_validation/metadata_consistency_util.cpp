@@ -637,6 +637,47 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     return inconsistencies;
 }
 
+std::vector<MetadataInconsistencyItem> _checkUniqueAndCollationIndexConsistency(
+    OperationContext* opCtx, const CollectionPtr& localColl, const CollectionType& catalogColl) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+    // Uniqueness constraint is not violated on clusters with only one shard.
+    if (Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size() <= 1) {
+        return inconsistencies;
+    }
+    auto& nss = localColl->ns();
+    const ShardKeyPattern shardKey(catalogColl.getKeyPattern());
+    auto indexCatalog = localColl->getIndexCatalog();
+    auto idxIter = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
+
+    while (idxIter && idxIter->more()) {
+        const IndexCatalogEntry* entry = idxIter->next();
+        const IndexDescriptor* descriptor = entry->descriptor();
+
+        if (!descriptor->prepareUnique() && !descriptor->unique()) {
+            continue;
+        }
+
+        auto collator = entry->getCollator();
+
+        if (CollatorInterface::isSimpleCollator(collator)) {
+            continue;
+        }
+
+        auto key = descriptor->keyPattern();
+        if (!shardKey.isIndexUniquenessAndCollationCompatible(key, collator->getSpec().toBSON())) {
+            auto info =
+                BSON("shardKey" << shardKey.toBSON() << "index" << descriptor->infoObj()
+                                << "incompatibility"
+                                << "Collation must be simple if the index is unique in a sharded "
+                                   "collection and the key is a prefix of the shard key");
+            inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kIncompatibleUniqueIndexOnShardedCollection,
+                InconsistentIndexDetails{nss, info}));
+        }
+    }
+    return inconsistencies;
+}
+
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCatalog(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -830,16 +871,18 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
     const std::vector<CollectionType>& shardingCatalogCollections,
     const std::shared_ptr<const CollectionCatalog> localCatalogSnapshot,
     const std::vector<CollectionPtr>& localCatalogCollections,
-    const bool checkRangeDeletionIndexes) {
+    const bool checkRangeDeletionIndexes,
+    const bool optionalCheckIndexes) {
 
     std::vector<MetadataInconsistencyItem> inconsistencies;
     auto itLocalCollections = localCatalogCollections.begin();
     auto itCatalogCollections = shardingCatalogCollections.begin();
     while (itLocalCollections != localCatalogCollections.end() &&
            itCatalogCollections != shardingCatalogCollections.end()) {
+        const auto& catalogColl = *itCatalogCollections;
         const auto& localColl = *itLocalCollections;
         const auto& localNss = localColl->ns();
-        const auto& remoteNss = itCatalogCollections->getNss();
+        const auto& remoteNss = catalogColl.getNss();
 
         const auto cmp = remoteNss.coll().compare(localNss.coll());
         const bool isCollectionOnlyOnShardingCatalog = cmp < 0;
@@ -848,22 +891,16 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
             // Case where we have found a collection in the sharding catalog that it is not in the
             // local catalog.
             if (_collectionMustExistLocallyButDoesnt(opCtx, remoteNss, shardId, primaryShardId)) {
-                inconsistencies.emplace_back(
-                    makeInconsistency(MetadataInconsistencyTypeEnum::kMissingLocalCollection,
-                                      MissingLocalCollectionDetails{
-                                          remoteNss, itCatalogCollections->getUuid(), shardId}));
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kMissingLocalCollection,
+                    MissingLocalCollectionDetails{remoteNss, catalogColl.getUuid(), shardId}));
             }
             itCatalogCollections++;
         } else if (isCollectionOnBothCatalogs) {
             // Case where we have found same collection in the catalog client than in the local
             // catalog.
-            auto inconsistenciesBetweenBothCatalogs =
-                _checkInconsistenciesBetweenBothCatalogs(opCtx,
-                                                         localNss,
-                                                         shardId,
-                                                         *itCatalogCollections,
-                                                         localColl,
-                                                         checkRangeDeletionIndexes);
+            auto inconsistenciesBetweenBothCatalogs = _checkInconsistenciesBetweenBothCatalogs(
+                opCtx, localNss, shardId, catalogColl, localColl, checkRangeDeletionIndexes);
             inconsistencies.insert(
                 inconsistencies.end(),
                 std::make_move_iterator(inconsistenciesBetweenBothCatalogs.begin()),
@@ -878,6 +915,16 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
                                                   localColl,
                                                   primaryShardId == shardId /* isPrimaryShard */,
                                                   inconsistencies);
+            // Only check on primary shard to prevent checking the same inconsistency more than
+            // once.
+            if (optionalCheckIndexes && shardId == primaryShardId) {
+                auto indexesInconsistencies =
+                    _checkUniqueAndCollationIndexConsistency(opCtx, localColl, catalogColl);
+
+                inconsistencies.insert(inconsistencies.end(),
+                                       std::make_move_iterator(indexesInconsistencies.begin()),
+                                       std::make_move_iterator(indexesInconsistencies.end()));
+            }
         } else {
             // Case where we have found a local collection that is not in the sharding catalog.
             const auto& nss = localNss;
@@ -1011,7 +1058,6 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
     }
     return indexIncons;
 }
-
 
 std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossShards(
     OperationContext* opCtx, const std::vector<CollectionType>& collections) {

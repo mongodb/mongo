@@ -66,6 +66,7 @@ enums:
             kMisplacedDatabaseMetadataInShardCatalog: "MisplacedDatabaseMetadataInShardCatalog"
             kShardCatalogCacheCollectionMetadataMismatch: "ShardCatalogCacheCollectionMetadataMismatch"
             kMalformedTimeseriesBucketsCollection: "MalformedTimeseriesBucketsCollection"
+            kIncompatibleUniqueIndexOnShardedCollection: "IncompatibleUniqueIndexOnShardedCollection"
 
     MetadataInconsistencyDescription:
         description: "Description of each metadata inconsistency."
@@ -98,6 +99,7 @@ enums:
             kMisplacedDatabaseMetadataInShardCatalog: "Found some database metadata in the shard catalog that is not owned by this shard"
             kShardCatalogCacheCollectionMetadataMismatch: "Found inconsistencies between collection information in the global catalog and the shard catalog cache"
             kMalformedTimeseriesBucketsCollection: "Found malformed timeseries collection"
+            kIncompatibleUniqueIndexOnShardedCollection: "Found incompatible index options with uniqueness in a sharded collection"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
