@@ -75,13 +75,18 @@ makeFileSorterSpiller(const SortOptions& opts,
 
     if (storageIdentifier.empty()) {
         return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
-            *opts.tempDir, fileStats, /*dbName=*/boost::none, checksumVersion);
+            *opts.tempDir,
+            fileStats,
+            /*dbName=*/boost::none,
+            checksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     }
     return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
         std::make_shared<SorterFile>(*opts.tempDir / storageIdentifier, fileStats),
         *opts.tempDir,
         /*dbName=*/boost::none,
-        checksumVersion);
+        checksumVersion,
+        testSpillingMinAvailableDiskSpaceBytes);
 }
 
 template <typename Traits>
@@ -226,7 +231,8 @@ struct ContainerTraits {
                                _containerStats,
                                _collPtr->ns().dbName(),
                                checksumVersion,
-                               insertionBatchSize),
+                               insertionBatchSize,
+                               testSpillingMinAvailableDiskSpaceBytes),
         });
         return std::shared_ptr<SorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
             owner, &owner->spiller);

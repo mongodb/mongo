@@ -574,7 +574,8 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         ns.dbName(),
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam()};
+        /*batchSize=*/GetParam(),
+        testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
     std::span span{data};
@@ -621,7 +622,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         containerStats,
         ns.dbName(),
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam()};
+        /*batchSize=*/GetParam(),
+        testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{
         {50, {}}, {100, {}}, {75, {}}, {125, {}}, {25, {}}};
@@ -693,7 +695,8 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         containerStats,
         ns.dbName(),
         sorter::kLatestChecksumVersion,
-        /*batchSize=*/GetParam()};
+        /*batchSize=*/GetParam(),
+        testSpillingMinAvailableDiskSpaceBytes};
 
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}},
                                                        {100, {}},

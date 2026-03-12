@@ -622,8 +622,10 @@ public:
     typedef std::pair<Key, Value> Data;
     using Settings = SorterSpiller<Key, Value, Comparator>::Settings;
 
-    explicit SorterSpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage)
-        : _storage(std::move(storage)) {}
+    SorterSpillerBase(std::unique_ptr<SorterStorage<Key, Value>> storage,
+                      int64_t minAvailableDiskBytesToSpill)
+        : _storage(std::move(storage)),
+          _minAvailableDiskBytesToSpill(minAvailableDiskBytesToSpill) {}
 
     std::shared_ptr<Iterator> spill(const SortOptions& opts,
                                     const Settings& settings,
@@ -659,6 +661,7 @@ public:
 
 protected:
     std::unique_ptr<SorterStorage<Key, Value>> _storage;
+    int64_t _minAvailableDiskBytesToSpill;
 
 private:
     virtual std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(

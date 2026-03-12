@@ -42,6 +42,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::sorter {
+static constexpr int64_t testSpillingMinAvailableDiskSpaceBytes = 500 * 1024 * 1024;
 //
 // Sorter framework testing utilities
 //

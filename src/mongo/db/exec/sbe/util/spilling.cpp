@@ -86,7 +86,9 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
 SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
     auto lk = acquireLock(opCtx);
     _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(
-        opCtx, format, internalQuerySpillingMinAvailableDiskSpaceBytes.load());
+        opCtx,
+        format,
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 }
 
 SpillingStore::~SpillingStore() {}

@@ -125,7 +125,8 @@ void SpillableDeque::spillToDisk() {
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+        storageGlobalParams.dbpath,
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
     // If we've freed things from cache before writing to disk, we need to update
     // '_diskWrittenIndex' to be the actual index of the document we're going to write.

@@ -468,7 +468,8 @@ void TextOrStage::initSorter() {
             *opts.tempDir,
             _sorterStats.get(),
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion),
+            sorter::kLatestChecksumVersion,
+            static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())),
         /*settings=*/{});
 }
 

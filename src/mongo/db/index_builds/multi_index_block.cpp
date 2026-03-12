@@ -209,7 +209,8 @@ makeSpiller(OperationContext* opCtx,
             containerStats,
             dbName,
             sorter::kLatestChecksumVersion,
-            primaryDrivenIndexBuildSorterInsertionBatchSize.load());
+            primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
+            static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
 
     using FileBasedSpiller = sorter::
@@ -221,9 +222,14 @@ makeSpiller(OperationContext* opCtx,
               std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
               tmpPath,
               dbName,
-              sorter::kLatestChecksumVersion)
+              sorter::kLatestChecksumVersion,
+              static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()))
         : std::make_shared<FileBasedSpiller>(
-              tmpPath, &fileStats, dbName, sorter::kLatestChecksumVersion);
+              tmpPath,
+              &fileStats,
+              dbName,
+              sorter::kLatestChecksumVersion,
+              static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
 }
 
 }  // namespace

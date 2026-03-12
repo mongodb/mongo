@@ -405,7 +405,8 @@ auto makeSorter(const ExpressionContext& expCtx,
                   expCtx.getTempDir(),
                   ds._sortExecutor->getSorterFileStats(),
                   /*dbName=*/boost::none,
-                  sorter::kLatestChecksumVersion)
+                  sorter::kLatestChecksumVersion,
+                  static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
             : nullptr);
 };
 

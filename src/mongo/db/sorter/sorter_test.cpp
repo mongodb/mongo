@@ -136,7 +136,8 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
             tempDir.path(),
             &sorterFileStats,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
 
     auto expectedIterator = makeInMemIterator(data, spiller);
     auto iteratorToSpill = makeInMemIterator(data, spiller);
@@ -914,7 +915,8 @@ TEST_F(BoundedSorterTest, SpillSorted) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
@@ -941,7 +943,8 @@ TEST_F(BoundedSorterTest, SpillSortedExceptOne) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
@@ -970,7 +973,8 @@ TEST_F(BoundedSorterTest, SpillAlmostSorted) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort({
@@ -1014,7 +1018,8 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     // Disable input order checking so we can see what happens.
     sorter = makeAsc(options, std::move(spiller1), /*checkInput=*/false);
     auto output = sort(input);
@@ -1036,7 +1041,8 @@ TEST_F(BoundedSorterTest, SpillWrongInput) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     // Test that by default, bad input like this would be detected.
     sorter = makeAsc(options, std::move(spiller2));
     ASSERT(sorter->checkInput());
@@ -1087,7 +1093,8 @@ TEST_F(BoundedSorterTest, LimitSpill) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
 
     auto output = sort(
@@ -1127,7 +1134,8 @@ TEST_F(BoundedSorterTest, ForceSpill) {
             tempDir.path(),
             &fileStats,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
     // Sorter stores pointers to sorterTracker and fileStats, it has to be destroyed before them.
     ScopeGuard sorterReset{[&]() {
@@ -1430,7 +1438,8 @@ TEST_F(BoundedSorterTest, CompoundSpill) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAsc(options, std::move(spiller));
 
     // When each partition is small enough, we don't spill.
@@ -1485,7 +1494,8 @@ TEST_F(BoundedSorterTest, LargeSpill) {
             tempDir.path(),
             /*fileStats=*/nullptr,
             /*dbName=*/boost::none,
-            sorter::kLatestChecksumVersion);
+            sorter::kLatestChecksumVersion,
+            testSpillingMinAvailableDiskSpaceBytes);
     sorter = makeAscNoBound(options, std::move(spiller));
 
     std::vector<Doc> input;

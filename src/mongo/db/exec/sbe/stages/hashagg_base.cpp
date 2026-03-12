@@ -183,7 +183,8 @@ void HashAggBaseStage<Derived>::spill() {
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+        storageGlobalParams.dbpath,
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
     if (!_recordStore) {
         makeTemporaryRecordStore();

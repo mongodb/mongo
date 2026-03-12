@@ -188,7 +188,8 @@ public:
                 _spiller != nullptr);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            *opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            *opts.tempDir,
+            static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
         auto iterator = _spiller->spillUnique(opts, settings, _data, _index);
 
@@ -732,7 +733,7 @@ private:
         // Ensure there is sufficient disk space for spilling
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
             *(this->_spiller->getStorage().getSpillDirPath()),
-            internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
         sort();
 

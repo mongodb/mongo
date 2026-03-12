@@ -110,3 +110,14 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    indexBuildSpillingMinAvailableDiskSpaceBytes:
+        description: "Minimum disk space that should be available before spilling for an index build"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<long long>
+        cpp_varname: indexBuildSpillingMinAvailableDiskSpaceBytes
+        default:
+            expr: 500 * 1024 * 1024 # 500 MB
+        validator:
+            gte: 0
+        redact: false

@@ -265,7 +265,8 @@ private:
                       *opts.tempDir,
                       _sorterFileStats.get(),
                       /*dbName=*/boost::none,
-                      sorter::kLatestChecksumVersion)
+                      sorter::kLatestChecksumVersion,
+                      static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
                 : nullptr,
             {});
         _outputIt.reset();

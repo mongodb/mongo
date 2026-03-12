@@ -64,7 +64,8 @@ NearStage::NearStage(ExpressionContext* expCtx,
                     expCtx->getTempDir(),
                     &_sorterFileStats,
                     /*dbName=*/boost::none,
-                    sorter::kLatestChecksumVersion)
+                    sorter::kLatestChecksumVersion,
+                    static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
               : nullptr,
           /*settings=*/{}),
       _stageType(type),

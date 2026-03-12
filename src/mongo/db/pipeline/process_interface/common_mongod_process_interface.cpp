@@ -1255,7 +1255,7 @@ std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
     return expCtx->getOperationContext()->getServiceContext()->getStorageEngine()->makeSpillTable(
         expCtx->getOperationContext(),
         keyFormat,
-        internalQuerySpillingMinAvailableDiskSpaceBytes.load());
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 }
 
 Document CommonMongodProcessInterface::readRecordFromSpillTable(

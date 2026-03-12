@@ -41,12 +41,14 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     return Sorter<Value, T>::template make<Comparator>(
         opts,
         Comparator(_sortPattern),
-        (opts.tempDir) ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T, Comparator>>(
-                             *opts.tempDir,
-                             _sorterFileStats.get(),
-                             /*dbName=*/boost::none,
-                             sorter::kLatestChecksumVersion)
-                       : nullptr,
+        (opts.tempDir)
+            ? std::make_shared<sorter::FileBasedSorterSpiller<Value, T, Comparator>>(
+                  *opts.tempDir,
+                  _sorterFileStats.get(),
+                  /*dbName=*/boost::none,
+                  sorter::kLatestChecksumVersion,
+                  static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
+            : nullptr,
         /*settings=*/{});
 }
 template class SortExecutor<Document>;

@@ -244,7 +244,8 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     // Ensure there is sufficient disk space for spilling
     if (shouldCheckDiskSpace()) {
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            storageGlobalParams.dbpath,
+            static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
     }
 
     RecordId rid = getValueRecordId(bufferIdx);
@@ -314,7 +315,8 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     // Ensure there is sufficient disk space for spilling
     if (shouldCheckDiskSpace()) {
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+            storageGlobalParams.dbpath,
+            static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
     }
 
     auto keyColl = normalizeStringIfCollator(key);

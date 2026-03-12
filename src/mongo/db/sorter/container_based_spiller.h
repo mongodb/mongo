@@ -371,10 +371,12 @@ public:
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
-                          int64_t batchSize)
+                          int64_t batchSize,
+                          int64_t minAvailableDiskBytesToSpill)
         : SorterSpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
-                  opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)),
+                  opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion),
+              minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
           _batchSize(batchSize) {}
 

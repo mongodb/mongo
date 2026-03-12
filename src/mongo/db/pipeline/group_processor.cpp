@@ -214,7 +214,8 @@ void GroupProcessor::spill() {
 
     // Ensure there is sufficient disk space for spilling
     uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        _expCtx->getTempDir(), internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+        _expCtx->getTempDir(),
+        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load())));
 
     std::vector<const GroupProcessorBase::GroupsMap::value_type*>
         ptrs;  // using pointers to speed sorting
