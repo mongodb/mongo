@@ -114,3 +114,13 @@ server_parameters:
         validator:
             gte: 1
         redact: false
+
+    ttlMonitorBackgroundOperation:
+        description:
+            "Switches the TTL monitor from being non-deprioritizable to a background task when the
+            server is overloaded. Should only be used if config.system.sessions is small."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: ttlMonitorBackgroundOperation
+        default: false
+        redact: false

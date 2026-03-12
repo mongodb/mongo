@@ -104,6 +104,9 @@
 namespace mongo {
 
 namespace {
+using TTLTaskType = std::variant<admission::execution_control::ScopedTaskTypeBackground,
+                                 admission::execution_control::ScopedTaskTypeNonDeprioritizable>;
+
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorWithLock);
 MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 
@@ -374,7 +377,15 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
-    admission::execution_control::ScopedTaskTypeBackground backgroundTask(opCtx);
+    TTLTaskType task = [&]() -> TTLTaskType {
+        if (ttlMonitorBackgroundOperation.load()) {
+            return TTLTaskType{
+                std::in_place_type<admission::execution_control::ScopedTaskTypeBackground>, opCtx};
+        }
+        return TTLTaskType{
+            std::in_place_type<admission::execution_control::ScopedTaskTypeNonDeprioritizable>,
+            opCtx};
+    }();
 
     // Don't do work if we are a secondary (TTL will be handled by primary)
     auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);

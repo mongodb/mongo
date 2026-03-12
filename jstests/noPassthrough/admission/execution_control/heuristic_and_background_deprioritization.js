@@ -294,6 +294,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         executionControlDeprioritizationGate: true,
                         executionControlHeuristicDeprioritization: false,
                         internalQueryExecYieldIterations: 1,
+                        ttlMonitorBackgroundOperation: true,
                     },
                 },
             });
