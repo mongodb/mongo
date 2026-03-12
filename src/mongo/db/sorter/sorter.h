@@ -554,16 +554,16 @@ template <typename Key, typename Value>
 inline int64_t validateMergeSpillRanges(
     std::span<std::shared_ptr<sorter::Iterator<Key, Value>>> spillsToMerge) {
     invariant(!spillsToMerge.empty());
-    int64_t expectedRangeStart = spillsToMerge.front()->getRange().getStartOffset();
+    int64_t expectedRangeStart = spillsToMerge.front()->getRange().getStart();
     for (const auto& it : spillsToMerge) {
         auto range = it->getRange();
         uassert(12017000,
                 "Merge range end offset must be greater than or equal to start offset",
-                range.getEndOffset() >= range.getStartOffset());
+                range.getEnd() >= range.getStart());
         uassert(12017001,
                 "Merge ranges in batch must be adjacent",
-                range.getStartOffset() == expectedRangeStart);
-        expectedRangeStart = range.getEndOffset();
+                range.getStart() == expectedRangeStart);
+        expectedRangeStart = range.getEnd();
     }
     return expectedRangeStart;
 }

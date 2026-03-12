@@ -396,7 +396,7 @@ public:
                 auto mergeIterator = sorter::merge<Key, Value>(spillsToMerge, opts, comp);
                 auto writer = this->_storage->makeWriter(opts, settings);
 
-                int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStartOffset();
+                int64_t deleteRangeStart = spillsToMerge.front()->getRange().getStart();
                 int64_t deleteRangeEnd = validateMergeSpillRanges<Key, Value>(spillsToMerge);
                 const int64_t numSourceRows = deleteRangeEnd - deleteRangeStart;
 

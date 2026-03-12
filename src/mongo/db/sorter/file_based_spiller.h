@@ -469,8 +469,8 @@ std::shared_ptr<sorter::Iterator<Key, Value>> FileBasedSorterStorage<Key, Value>
     const SorterRange& range, const Settings& settings) {
     return std::make_shared<sorter::FileIterator<Key, Value>>(
         this->_file,
-        range.getStartOffset(),
-        range.getEndOffset(),
+        range.getStart(),
+        range.getEnd(),
         settings,
         this->getDbName(),
         range.getChecksum(),
@@ -591,8 +591,7 @@ void FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
             // available disk space
             int64_t minRequiredDiskSpace = 0;
             for (auto&& it : spillsToMerge) {
-                minRequiredDiskSpace +=
-                    it->getRange().getEndOffset() - it->getRange().getStartOffset();
+                minRequiredDiskSpace += it->getRange().getEnd() - it->getRange().getStart();
             }
             minRequiredDiskSpace =
                 std::max(minRequiredDiskSpace, this->_minAvailableDiskBytesToSpill);
