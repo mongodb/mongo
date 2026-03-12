@@ -159,7 +159,6 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
                 }
 
                 try {
-                    // TODO(SERVER-98707): Don't skip the catalog consistency check
                     assertCatalogListOperationsConsistencyForDb(conn.getDB(dbName), tenant);
                 } catch (e) {
                     return {
