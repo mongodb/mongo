@@ -70,15 +70,21 @@ public:
           _pipeline(pipeline) {}
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> lower() {
-        tassert(11974304, "Expected 0 or 1 query solutions", _rankingResult.solutions.size() <= 1);
         if (_rankingResult.usedIdhack) {
             // Idhack always uses the classic engine.
             tassert(11974305,
                     "Expected no query solution for idhack queries.",
                     _rankingResult.solutions.empty());
             return makeClassicExecutor(nullptr /* solution */);
+        } else {
+            tassert(11974304,
+                    "Expected 1 query solutions for non-idhack queries",
+                    _rankingResult.solutions.size() == 1);
         }
         auto solution = std::move(_rankingResult.solutions[0]);
+        if (solution->root()->getType() == STAGE_EOF) {
+            return makeClassicExecutor(std::move(solution));
+        }
         const auto engine = attachPipelineStagesAndSelectEngine(solution);
         return engine == EngineChoice::kClassic ? makeClassicExecutor(std::move(solution))
                                                 : makeSbePlanExecutor(std::move(solution));
