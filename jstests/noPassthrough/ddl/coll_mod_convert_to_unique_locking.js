@@ -44,7 +44,9 @@ awaitCollMod = assertCommandFailedWithCodeInParallelShell(
 failPoint.wait();
 
 // Invalidates the index being converted to unique to fail the command.
-assert.commandWorked(testDB.runCommand({collMod: collName, index: {keyPattern: {a: 1}, hidden: true}}));
+// TODO(SERVER-120790): Test with an index with prepareUnique=true with duplicates for "a" field.
+assert.commandWorked(coll.createIndex({a: 1}, {name: "a_1_other", unique: true, hidden: true}));
+assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: "a_1"}));
 
 failPoint.off();
 awaitCollMod();

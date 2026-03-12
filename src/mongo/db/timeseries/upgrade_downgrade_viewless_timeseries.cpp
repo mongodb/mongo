@@ -32,6 +32,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
@@ -470,8 +471,6 @@ void forEachTimeseriesCollectionFromDb(OperationContext* opCtx,
             continue;
         }
 
-        boost::optional<UpgradeDowngradeTimeseriesLocks> locks;
-
         while (true) {
             // Release any snapshot we may have open from previous acquisition attempts.
             // This ensures we refresh the collection catalog to latest while following a rename.
@@ -479,36 +478,31 @@ void forEachTimeseriesCollectionFromDb(OperationContext* opCtx,
 
             auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
             if (!nss) {
+                // The NSS couldn't be resolved from the uuid, so the collection was dropped.
                 break;
             }
 
             // Lock both the buckets and main namespaces.
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, {*nss}, "upgradeDowngradeViewlessTimeseries", {.acquireDDLLocks = true});
             auto mainNs =
                 nss->isTimeseriesBucketsCollection() ? nss->getTimeseriesViewNamespace() : *nss;
-            locks.emplace(acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs));
+            auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs);
             const auto& acquiredColl =
-                nss->isTimeseriesBucketsCollection() ? locks->bucketsAcq : locks->mainAcq;
+                nss->isTimeseriesBucketsCollection() ? locks.bucketsAcq : locks.mainAcq;
 
             if (acquiredColl.collectionExists() && acquiredColl.getCollection().uuid() == uuid) {
                 // Success: locked the namespace and the UUID still maps to it.
+                callback(std::move(locks));
                 break;
             }
             // Failed: collection got renamed before locking it, so unlock and try again.
-            locks.reset();
         }
-
-        // The NamespaceString couldn't be resolved from the uuid, so the collection was dropped.
-        if (!locks.has_value())
-            continue;
-
-        callback(std::move(*locks));
     }
 }
 
 void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
-
         forEachTimeseriesCollectionFromDb(
             opCtx, dbName, false /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::upgradeToViewlessTimeseries(
@@ -519,8 +513,6 @@ void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
 
 void downgradeAllTimeseriesFromViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
-
         forEachTimeseriesCollectionFromDb(
             opCtx, dbName, true /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::downgradeFromViewlessTimeseries(opCtx,

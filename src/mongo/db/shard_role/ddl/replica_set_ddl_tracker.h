@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
@@ -45,6 +46,13 @@ public:
     virtual StringData getName() const = 0;
     virtual void onBeginDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
     virtual void onEndDDL(OperationContext* opCtx, const std::vector<NamespaceString>& nss) = 0;
+};
+
+struct MONGO_MOD_PUBLIC ReplicaSetDDLOptions {
+    // If true, acquire DDL locks in X mode for all affected namespaces.
+    // DDL locks are only acquired in replica sets (not shard direct commands). In sharded
+    // clusters, DDL coordinators are responsible for acquiring the DDL lock in the DB primary.
+    bool acquireDDLLocks = false;
 };
 
 class MONGO_MOD_PUBLIC ReplicaSetDDLTracker {
@@ -73,13 +81,18 @@ public:
     class ScopedReplicaSetDDL {
     public:
         ScopedReplicaSetDDL(OperationContext* opCtx,
-                            const std::vector<NamespaceString>& namespaces);
+                            const std::vector<NamespaceString>& namespaces,
+                            StringData ddlName = "",
+                            const ReplicaSetDDLOptions& options = {});
         ~ScopedReplicaSetDDL();
 
     private:
+        void acquireDDLLocks(OperationContext* opCtx, StringData reason);
+
         const ReplicaSetDDLTracker* const _ddlTracker;
         OperationContext* const _opCtx;
         const std::vector<NamespaceString> _namespaces;
+        std::vector<DDLLockManager::ScopedBaseDDLLock> _ddlLocks;
     };
 
     /**

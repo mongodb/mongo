@@ -29,32 +29,6 @@
       # when executed concurrently with FCV upgrade/downgrade
       - jstests/core/timeseries/query/timeseries_view_aggregate.js
 
-- name: replicaset_exclude_files
-  value:
-    exclude_files:
-      # TODO SERVER-105925 collMod is racy with timeseries upgrade/downgrade
-      - jstests/core/catalog/list_collections_correctness.js
-      - jstests/core/query/change_streams_pre_and_post_images_in_create_and_collmod.js
-      - jstests/core/timeseries/ddl/bucket_granularity.js
-      - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
-      - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
-      - jstests/core/timeseries/ddl/timeseries_collmod.js
-      - jstests/core/timeseries/ddl/timeseries_collmod_timeseries_options.js
-      - jstests/core/timeseries/ddl/timeseries_expire_collmod.js
-      - jstests/core/timeseries/ddl/timeseries_index.js
-      - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
-      - jstests/core/timeseries/pbt/timeseries_add_fields_pbt.js
-      - jstests/core/timeseries/pbt/timeseries_agg_stages_basic_behavior_pbt.js
-      - jstests/core/timeseries/pbt/timeseries_cache_usage_pbt.js
-      - jstests/core/timeseries/pbt/timeseries_match_pbt.js
-      - jstests/core/timeseries/pbt/timeseries_project_pbt.js
-      - jstests/core/timeseries/query/bucket_unpacking_group_reorder_fixed_buckets.js
-      - jstests/core/timeseries/query/bucket_unpacking_with_match_fixed_buckets.js
-      - jstests/core/timeseries/query/timeseries_mixed_bucket_schema.js
-      - jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
-      - jstests/core/timeseries/write/timeseries_update_mixed_schema_bucket.js
-      - jstests/core/timeseries/write/timeseries_viewless_oplog_entries.js
-
 - name: exclude_tags
   value:
     exclude_with_any_tags:

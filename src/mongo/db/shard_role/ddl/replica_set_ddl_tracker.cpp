@@ -29,7 +29,10 @@
 
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/topology/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -67,18 +70,62 @@ ReplicaSetDDLHook* ReplicaSetDDLTracker::lookupHookByName(const StringData hookN
 }
 
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::ScopedReplicaSetDDL(
-    OperationContext* opCtx, const std::vector<NamespaceString>& namespaces)
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& namespaces,
+    StringData ddlName,
+    const ReplicaSetDDLOptions& options)
     : _ddlTracker(ReplicaSetDDLTracker::get(opCtx->getServiceContext())),
       _opCtx(opCtx),
       _namespaces(namespaces) {
+    // During promotion to sharded, this check can race with the one for direct shard commands in
+    // DirectConnectionDDLHook. Prefer checking _before_ the DirectConnectionDDLHook, which may lead
+    // to a direct shard command taking the DDL lock (unnecessary but correct), rather than _after_
+    // the DirectConnectionDDLHook, which may lead to a replica set DDL not taking the DDL lock.
+    bool shardingEnabled = ShardingState::get(opCtx)->enabled();
+
     if (_ddlTracker) {
         _ddlTracker->onBeginDDL(_opCtx, _namespaces);
+    }
+
+    if (options.acquireDDLLocks && !shardingEnabled) {
+        acquireDDLLocks(opCtx, ddlName);
     }
 }
 
 ReplicaSetDDLTracker::ScopedReplicaSetDDL::~ScopedReplicaSetDDL() {
     if (_ddlTracker) {
         _ddlTracker->onEndDDL(_opCtx, _namespaces);
+    }
+}
+
+void ReplicaSetDDLTracker::ScopedReplicaSetDDL::acquireDDLLocks(OperationContext* opCtx,
+                                                                StringData reason) {
+    // (Ignore FCV check): DDL locks are currently only acquired to serialize timeseries DDLs,
+    // so don't acquire them if viewless timeseries is not enabled to minimize risk before release.
+    if (!gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledAndIgnoreFCVUnsafe()) {
+        return;
+    }
+
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+    // Sort the locks (via std::set's ordering) to avoid deadlock
+    std::set<NamespaceString> _sortedNamespaces;
+    for (const auto& nss : _namespaces) {
+        _sortedNamespaces.insert(
+            nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss);
+    }
+
+    auto locker = shard_role_details::getLocker(opCtx);
+    constexpr bool waitForRecovery = false;
+    for (const auto& nss : _sortedNamespaces) {
+        if (nss.isDbOnly()) {
+            _ddlLocks.emplace_back(
+                opCtx, locker, nss.dbName(), reason, LockMode::MODE_X, waitForRecovery);
+        } else {
+            _ddlLocks.emplace_back(
+                opCtx, locker, nss.dbName(), reason, LockMode::MODE_IX, waitForRecovery);
+            _ddlLocks.emplace_back(opCtx, locker, nss, reason, LockMode::MODE_X, waitForRecovery);
+        }
     }
 }
 

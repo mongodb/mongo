@@ -351,8 +351,10 @@ protected:
     void _unregisterResourceNameIfNoLongerNeeded(ResourceId resId, StringData resName);
 
 
+    // TODO(SERVER-121488): Encapsulate ScopedBaseDDLLock and remove those friend declarations.
     friend class DDLLockManagerTest;
     friend class ShardingCatalogManager;
+    friend class ReplicaSetDDLTracker;
     friend class ShardingDDLCoordinator;
     friend class ShardingDDLCoordinatorService;
     friend class ShardingDDLCoordinatorServiceTest;

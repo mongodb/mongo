@@ -326,15 +326,6 @@ export var TimeseriesTest = class {
     // index over the buckets.
     static checkHint(coll, indexName, numDocsExpected) {
         const db = coll.getDB();
-        // collMod is not safe to run concurrently with timeseries transformation performed as part of FCV upgrade/downgrade
-        // TODO SERVER-105925 remove this early exit when collmod will be always safe to run during FCV upgrade/downgrade.
-        if (
-            !isStableFCVSuite() &&
-            !FixtureHelpers.isMongos(db) &&
-            FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections", true /* ignoreFCV */)
-        ) {
-            return;
-        }
 
         // Tests hint() using the index name.
         assert.eq(
