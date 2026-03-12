@@ -801,8 +801,14 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             print(f"Could not find mappings file for {suite_name}")
             return None
 
+        # Convert absolute path to relative path from RESMOKE_ROOT
         # This path needs to output the same text on both windows and linux/mac
         mapping_path = pathlib.PurePath(mapping_path)
+        try:
+            mapping_path = mapping_path.relative_to(_config.RESMOKE_ROOT)
+        except ValueError:
+            # If mapping_path is not under RESMOKE_ROOT, keep it as-is
+            pass
         yml = yaml.safe_dump(matrix_suite)
         comments = [
             "##########################################################",
