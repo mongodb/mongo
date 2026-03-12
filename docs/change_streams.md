@@ -172,14 +172,13 @@ To open a change stream at a specific point in time instead of using the current
 `startAtOperationTime` can be set in the initial change stream request. The `startAtOperationTime`
 parameter is specified as a logical timestamp.
 
-### Resume Tokens
+### Resuming Change Streams
 
 Change streams allow the consumer to resume the change stream after an error occurred.
-To support resumability, change streams report a resume token in the `_id` field of every emitted
-event.
+To support resumability, change streams report a "resume token" inside the `_id` field of every
+emitted event.
 To resume a change stream after an error occurred, the resume token of a previously consumed event
-can be passed in one of the parameters `resumeAfter` or `startAfter` when opening a new change
-stream.
+can be passed in one of the parameters `resumeAfter` or `startAfter` when opening a change stream.
 
 The `resumeAfter` parameter cannot be used with resume tokens that were emitted by an "invalidate"
 event. The `startAfter` parameter can be used even with invalidate events.
@@ -187,6 +186,8 @@ event. The `startAfter` parameter can be used even with invalidate events.
 When specifying an explicit start point for a change stream, only one of the parameters
 `resumeAfter`, `startAfter` and `startAtOperationTime` can be used. Using more than one of them when
 opening a change stream will return an error.
+
+#### Resume Tokens
 
 Resume tokens are not "portable" in the sense that they can only be used to resume a change stream
 that is opened with the same settings and pipeline stages as the change stream that produced the
@@ -205,17 +206,44 @@ The internal resume token data contains
 - the type of the token (event token or high watermark token).
 - the internal position inside the transaction, if the event was part of a transaction.
 - a flag stating if the resume token is for an "invalidate" event.
-- the collection UUID.
-- an event identifier / event description.
-
-Resume tokens are serialized and deserialized by the [ResumeToken](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L147)
-class. The resume token internal data is stored in [ResumeTokenData](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L50).
+- the collection UUID (optional).
+- an event identifier / event description (optional).
 
 Resume tokens are versioned. Currently only version 2 is supported.
 
 Future versions may introduce new resume token versions. Client applications should treat resume
 tokens as opaque identifiers and should not make any assumptions about the format or internals
 or resume tokens, nor should they rely on the internal implementation details of resume tokens.
+
+Resume tokens are serialized and deserialized by the [ResumeToken](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L147)
+class. The resume token internal data is stored in [ResumeTokenData](https://github.com/mongodb/mongo/blob/6d182bc73acdf2270320eba611538f6619b627bc/src/mongo/db/pipeline/resume_token.h#L50).
+
+#### Decoding Resume Tokens
+
+An example encoded resume token looks as follows:
+
+```js
+{ "_data" : "8269B03187000000022B0429296E1404" }
+```
+
+To destructure a resume token into its internal constituent parts, there is the function
+`decodeResumeToken()` available in the _mongo_ shell.
+
+Invoking it on the example resume token above, it will produce:
+
+```js
+{
+  clusterTime: Timestamp(1773154695, 2),
+  tokenData: 0,
+  version: 2,
+  txnOpIndex: NumberLong(0),
+  tokenType: 0,
+  fromInvalidate: false
+}
+```
+
+This can be very helpful to extract the cluster time (i.e. the resume timepoint) from a resume
+token.
 
 ### Change Stream Cursors
 
@@ -371,8 +399,6 @@ close the change stream cursor in specific situations:
 Issuing of change stream invalidate events is implemented in the `ChangeStreamCheckInvalidateStage`
 [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_check_invalidate_stage.cpp#L134).
 
-## Resuming Change Streams
-
 ## Change Stream Parameters
 
 The behavior of change streams can be controlled via various parameters that can be passed with the
@@ -499,6 +525,34 @@ The default is `false`. In this case, emitted change stream "update" events will
 The `allowToRunOnConfigDB` flag is an internal flag that can be used to open a change stream on the
 config server in a sharded cluster. It is used internally by `mongos` to open a cursor on the config
 server to keep track of shard additions and removals in the deployment.
+
+#### `$_passthroughToShard` (internal)
+
+In sharded cluster deployments, all change streams are supposed to be opened on _mongos_. _mongos_
+will open the required cursors to the data shards and the config server on the consumer's behalf.
+If the consumer only wants to target a specific shard of the cluster, they can use the `$_passthroughToShard`
+aggregation parameter to limit the change stream to a single shard.
+
+For example, to open a collection-level change stream targeting only one of the cluster's shards
+(identified by the value in `shardId`), the following example code can be used:
+
+```js
+db.getSiblingDB("testDB").runCommand({
+  aggregate: "testCollection",
+  pipeline: [
+    {
+      $changeStream: {},
+    },
+  ],
+  $_passthroughToShard: {shard: shardId},
+  cursor: {},
+});
+```
+
+Using `$_passthroughToShard` will bypass the regular cluster shard targeting for change streams
+and open a replica set change stream pipeline (only) on the targeted shard. The change events that
+mongos retrieves from the single shard will be returned as is, without using a merge pipeline on
+_mongos_.
 
 ## Differences Between Replica Set and Sharded Cluster Change Streams
 
@@ -725,4 +779,3 @@ The `ChangeStreamHandleTopologyChangeStage` code can be found [here](https://git
 
 - How are user-defined match expressions are handled, rewritten and pushed down.
 - Changes to pipeline building and behavior due to SPM-1941.
-- Mention `$_passthroughToShard` and how it works.
