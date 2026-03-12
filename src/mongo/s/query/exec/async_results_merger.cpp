@@ -64,8 +64,6 @@
 
 namespace mongo {
 
-const BSONObj kNoHighWaterMark;
-
 const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
 
@@ -452,43 +450,31 @@ void AsyncResultsMerger::disableUndoNextReadyMode() {
     _stateForNextReadyCallUndo.reset();
 }
 
-void AsyncResultsMerger::undoNextReady(BSONObj highWaterMark) {
+void AsyncResultsMerger::undoNextReady() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     tassert(11057500,
             "expecting undo mode to be enabled when calling 'undoNextReady()'",
             _undoModeEnabled);
 
-    // Check if buffered undo information is available.
-    if (_stateForNextReadyCallUndo.has_value()) {
-        // Buffered undo information is available. This is the case if the previous 'nextReady()'
-        // call returned a document while the undo mode was enabled.
-        ClusterQueryResult& result = std::get<ClusterQueryResult>(*_stateForNextReadyCallUndo);
-        RemoteCursorPtr& remote = std::get<RemoteCursorPtr>(*_stateForNextReadyCallUndo);
+    tassert(11937600,
+            "nextReady() was not invoked or returned EOF",
+            _stateForNextReadyCallUndo.has_value());
 
-        tassert(11057502,
-                "expecting remote cursor for undone result to be still open",
-                std::find(_remotes.begin(), _remotes.end(), remote) != _remotes.end());
+    ClusterQueryResult& result = std::get<ClusterQueryResult>(*_stateForNextReadyCallUndo);
+    RemoteCursorPtr& remote = std::get<RemoteCursorPtr>(*_stateForNextReadyCallUndo);
 
-        // Push document back to the beginning of the remote's document queue, so it will be popped
-        // off next.
-        remote->docBuffer.push_front(*result.getResult());
+    tassert(11057502,
+            "expecting remote cursor for undone result to be still open",
+            std::find(_remotes.begin(), _remotes.end(), remote) != _remotes.end());
 
-        if (_params.getSort()) {
-            // Rebuild merge queue from the remaining remotes. A full rebuild is necessary here
-            // because the remote may have a different document in the merge queue already.
-            _rebuildMergeQueueFromRemainingRemotes(lk);
-            if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
-                // Restore previous high water mark.
-                _highWaterMark = std::move(std::get<BSONObj>(*_stateForNextReadyCallUndo));
-            }
-        }
-    } else {
-        // No buffered undo information is available. This is the case if the previous 'nextReady()'
-        // call returned no document but EOF, or the BlockingResultsMerger did not even call
-        // 'nextReady()' in the first place.
-        if (_params.getSort() && _tailableMode == TailableModeEnum::kTailableAndAwaitData) {
-            _highWaterMark = std::move(highWaterMark);
-        }
+    // Push document back to the beginning of the remote's document queue, so it will be popped
+    // off next.
+    remote->docBuffer.push_front(*result.getResult());
+
+    if (_params.getSort()) {
+        // Rebuild merge queue from the remaining remotes. A full rebuild is necessary here
+        // because the remote may have a different document in the merge queue already.
+        _rebuildMergeQueueFromRemainingRemotes(lk);
     }
 
     _stateForNextReadyCallUndo.reset();
@@ -855,8 +841,7 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLoc
     }
 
     NextReadyResult result{ClusterQueryResult{std::move(front), smallestRemote->shardId},
-                           smallestRemote,
-                           _undoModeEnabled ? _highWaterMark : kNoHighWaterMark};
+                           smallestRemote};
 
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
@@ -887,8 +872,7 @@ AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadyUnsorted(WithL
 
             // There is no high water mark for unsorted results merging, so the BSONObj high water
             // mark part is always empty here.
-            return NextReadyResult{
-                ClusterQueryResult{std::move(front), remote->shardId}, remote, kNoHighWaterMark};
+            return NextReadyResult{ClusterQueryResult{std::move(front), remote->shardId}, remote};
         }
 
         // Nothing from the current remote so move on to the next one.

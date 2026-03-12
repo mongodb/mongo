@@ -256,13 +256,15 @@ public:
         _mergeCursors->disableUndoNextMode();
     }
 
-    void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) override {
-        // The high water mark token created here is only used in case the 'AsyncResultsMerger' has
-        // nothing to undo.
-        _mergeCursors->undoNext(ResumeToken::makeHighWaterMarkToken(
-                                    highWaterMark, ResumeTokenData::kDefaultTokenVersion)
-                                    .toDocument()
-                                    .toBson());
+    void undoGetNext() override {
+        _mergeCursors->undoNext();
+    }
+
+    void setHighWaterMark(Timestamp highWaterMark) override {
+        _mergeCursors->setHighWaterMark(ResumeToken::makeHighWaterMarkToken(
+                                            highWaterMark, ResumeTokenData::kDefaultTokenVersion)
+                                            .toDocument()
+                                            .toBson());
     }
 
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
@@ -1488,26 +1490,11 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
         }
     });
 
-    // Callback to clear the undo buffer of the underlying 'AsyncResultsMerger' instance. Note that
-    // there is no specific API to flush the undo buffer, but effectively it can be cleared by
-    // disabling and then re-enabling undo mode.
-    // The undo mode is always enabled when we enter this method. This is guaranteed by the state
-    // machine.
-    auto clearUndoBuffer = [&]() {
-        _params->cursorManager->disableUndoNextMode();
-        _params->cursorManager->enableUndoNextMode();
-    };
-
     // Fetch next result from the predecessor $mergeCursors stage. The $mergeCursors stage itself
     // will fetch the result from its 'BlockingResultsMerger' instance. The 'BlockingResultsMerger'
     // can either retrieve a result from its underlying 'AsyncResultsMerger' if a result is ready,
     // or return an ad-hoc "EOF" event in case the 'AsyncResultsMerger' is not ready to return a
     // result.
-    // Because the 'getNext()' call here may not actually translate to a 'nextReady()' call in the
-    // underlying 'AsyncResultsMerger', we need to flush the 'AsyncResultsMerger's undo buffer
-    // first, so that a potential undo in case we reached the end of the change stream segment does
-    // not undo an already returned event.
-    clearUndoBuffer();
     auto input = pSource->getNext();
 
     Timestamp eventTimestamp = [&]() {
@@ -1518,7 +1505,18 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
         }
 
         // Extract the cluster time from the current high-water mark of the 'AsyncResultsMerger'.
-        return _params->cursorManager->getTimestampFromCurrentHighWaterMark();
+        const auto currentHighWaterMark =
+            _params->cursorManager->getTimestampFromCurrentHighWaterMark();
+
+        // If the change event was retrieved and the event was the last in the queue of
+        // 'AsyncResultsMerger', then it is possible that the high water-mark returned from
+        // 'AsyncResultsMerger' may be advanced beyond the high water-mark associated with the
+        // change event. In this case, retrieve the timestamp from the document. A check to see if
+        // 'currentHighWaterMark' is beyond the end of the segment is a performance optimization.
+        if (input.isAdvanced() && (currentHighWaterMark >= *_segmentEndTimestamp)) {
+            return extractTimestampFromDocument(input.getDocument());
+        }
+        return currentHighWaterMark;
     }();
 
     if (eventTimestamp >= *_segmentEndTimestamp) {
@@ -1531,27 +1529,15 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
         _shardNotFoundFailuresInARow = 0;
         _setState(State::kFetchingStartingChangeStreamSegment);
 
-        // Undo the effects of fetching the last event in the underlying results merger.
-        // In case the above 'getNext()' call did not actually fetch a result from the
-        // 'AsyncResultsMerger', this will only reset the 'AsyncResultsMerger's high watermark. In
-        // case the above 'getNext()' pulled a proper result from the 'AsyncResultsMerger', the
-        // result will be put back into the 'AsyncResultsMerger' and the high watermark token will
-        // be reset to the previous value.
-        _params->cursorManager->undoGetNextAndSetHighWaterMark(*_segmentStartTimestamp);
+        if (!input.isEOF() && !input.isPaused()) {
+            _params->cursorManager->undoGetNext();
+        }
+        _params->cursorManager->setHighWaterMark(*_segmentStartTimestamp);
 
         // Return here without returning the event we just pulled, because we have already stashed
-        // it back into the underlying results merger. Returning the event from here as well would
-        // lead to the event being returned twice: once here, and once we when pull the next result
-        // from the underlying results merger (as this would return the "undone" result).
-        // The event just stashed will be handled by follow-up operations of the state machine,
-        // which will pull it from the merger again.
+        // it back into the underlying results merger.
         return boost::none;
     }
-
-    // Whenever we get here, the fetched event will be returned to consumers, so we will not be able
-    // to undo it. Clear the undo buffer here so that if it was buffered, we cannot undo it by
-    // mistake.
-    clearUndoBuffer();
 
     if (!input.isAdvancedControlDocument()) {
         return input;

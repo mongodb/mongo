@@ -62,7 +62,6 @@
 #include <deque>
 #include <memory>
 #include <queue>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -382,21 +381,13 @@ public:
      * Partially "undoes" the effects of the last 'nextReady()' call, by putting the last result
      * returned by 'nextReady()' into the 'AsyncResultMerger's document buffer for the shard it was
      * originally pulled from. For sorted mergers, it will also put back the result back into the
-     * merge queue and restore the high water mark.
+     * merge queue.
      *
      * The exact behavior of this method is as follows:
-     * - If a previous call to 'nextReady()' produced a document, this document will be put back
-     *   into the document buffer the original shard it came from, and the high watermark will be
-     *   updated to the original buffered high watermark value. The 'highWaterMark' parameter will
-     *   be ignored in this case.
-     * - If a previous call to 'nextReady()' produced EOF, then no document will be put back into
-     *   any document buffer, and for sorted mergers the high watermark will be reset to the value
-     *   of the 'highWaterMark' parameter.
-     * - If no previous call to 'nextReady()' was made, then also no document will be put back into
-     *   any document buffer, and for sorted mergers the high watermark will be reset to the value
-     *   of the 'highWaterMark' parameter. This scenario is possible if the 'BlockingResultsMerger'
-     *   did not even call 'nextReady()' in undo mode, but returned an empty 'ClusterQueryResult'
-     *   right away.
+     * - The document produced by the previous call to 'nextReady()' will be put back into the
+     *   document buffer of the original shard it came from.
+     * - If no previous call to 'nextReady()' was made, or if the previous call returned EOF, then
+     *   this method will tassert.
      *
      * Calling this method will not restore the following properties of the 'AsyncResultsMerger' to
      * their state during the last call to 'nextReady()':
@@ -413,7 +404,7 @@ public:
      *
      * This method can only be called if the undo mode is enabled.
      */
-    void undoNextReady(BSONObj highWaterMark);
+    void undoNextReady();
 
     /**
      * Returns if this 'AsyncResultsMerger' compares the whole sort key, based on the initial setup
@@ -592,9 +583,9 @@ private:
      * The type that is returned by the internal helper functions for 'nextReady()'.
      * In case the undo mode is disabled, only the 'ClusterQueryResult' part will be populated. In
      * case undo mode is enabled, the 'RemoteCursorPtr' part contains the remote from which the
-     * result was fetched, and the BSONObj contains the high water mark.
+     * result was fetched.
      */
-    using NextReadyResult = std::tuple<ClusterQueryResult, RemoteCursorPtr, BSONObj>;
+    using NextReadyResult = std::pair<ClusterQueryResult, RemoteCursorPtr>;
 
     class MergingComparator {
     public:

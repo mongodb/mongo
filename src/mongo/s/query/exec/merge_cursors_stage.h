@@ -85,11 +85,10 @@ public:
 
     /**
      * Undoes the effect of fetching the last returned result via 'next()' from the underlying
-     * results merger. Uses the 'highWaterMark' parameter to restore the results merger's high
-     * watermark only when the last returned result was an EOF.
+     * results merger.
      * This method is used by v2 change stream readers in ignoreRemovedShards mode.
      */
-    void undoNext(BSONObj highWaterMark);
+    void undoNext();
 
     /**
      * Adds the specified, already opened cursors for remote shards or the config server.

@@ -196,10 +196,16 @@ public:
 
         /**
          * Undoes the effects of the previous 'next()' call in the underlying results merger of the
+         * mergeCursors stage.
+         */
+        virtual void undoGetNext() = 0;
+
+        /**
+         * Undoes the effects of the previous 'next()' call in the underlying results merger of the
          * mergeCursors stage and sets its high water mark to the value specified in
          * 'highWaterMark', using a high water mark token.
          */
-        virtual void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) = 0;
+        virtual void setHighWaterMark(Timestamp highWaterMark) = 0;
     };
 
     /**

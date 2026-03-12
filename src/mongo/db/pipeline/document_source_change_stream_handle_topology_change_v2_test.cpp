@@ -179,18 +179,14 @@ public:
         _undoNextMode.emplace(false);
     }
 
-    void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) override {
+    void undoGetNext() override {
+        _undoGetNextCalled = true;
         invariant(_stageForUndo);
         (*_stageForUndo)->undo();
-        _undoNextHighWaterMark.emplace(highWaterMark);
     }
 
-    boost::optional<bool> getUndoNextMode() const {
-        return _undoNextMode;
-    }
-
-    boost::optional<Timestamp> getUndoGetNextHighWaterMark() const {
-        return _undoNextHighWaterMark;
+    void setHighWaterMark(Timestamp highWaterMark) override {
+        _restoredHighWaterMark.emplace(highWaterMark);
     }
 
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
@@ -198,6 +194,18 @@ public:
                 "expecting high watermark timestamp to be set in test",
                 _highWaterMarkTimestamp.has_value());
         return *_highWaterMarkTimestamp;
+    }
+
+    bool undoGetNextCalled() const {
+        return _undoGetNextCalled;
+    }
+
+    boost::optional<bool> getUndoNextMode() const {
+        return _undoNextMode;
+    }
+
+    boost::optional<Timestamp> getRestoredHighWaterMark() const {
+        return _restoredHighWaterMark;
     }
 
     void setTimestampForCurrentHighWaterMark(Timestamp ts) {
@@ -255,6 +263,12 @@ private:
     // Will be set to true if a request was made to open a cursor on the config server.
     bool _cursorOpenedOnConfigServer = false;
 
+    // If set, any attempt to open a cursor will throw a 'ShardNotFound' exception.
+    bool _throwShardNotFoundException = false;
+
+    // Will be set to true if 'undoGetNext()' was called.
+    bool _undoGetNextCalled = false;
+
     // Resume token used when initializing the 'CursorManager'.
     boost::optional<ResumeToken> _resumeToken;
 
@@ -263,8 +277,9 @@ private:
     // Calls to enable/disable undo mode will be recorded here.
     boost::optional<bool> _undoNextMode;
 
-    // The timestamp used in a call to 'undoGetNextAndSetHighWaterMark()' will be recorded here.
-    boost::optional<Timestamp> _undoNextHighWaterMark;
+    // The timestamp used in a call to 'setHighWaterMark()' will be recorded here after overfetching
+    // in degraded mode.
+    boost::optional<Timestamp> _restoredHighWaterMark;
 
     // The aggregation stage that is used as input for the v2 stage. Necessary here so we can
     // perform an "undo" operation it if necessary.
@@ -2147,12 +2162,18 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     // Test that the stage returns all inputs as they are.
-    const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar" << "_id"
-                                              << buildHighWaterMarkToken(Timestamp(23, 1)));
-    const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value" << "_id"
-                                              << buildHighWaterMarkToken(Timestamp(42, 1)));
-    const BSONObj doc3 = BSON("operationType" << "test3" << "test" << "value" << "_id"
-                                              << buildHighWaterMarkToken(Timestamp(43, 1)));
+    const BSONObj doc1 =
+        BSON("operationType" << "test1" << "foo" << "bar" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(23, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(23, 1))));
+    const BSONObj doc2 =
+        BSON("operationType" << "test2" << "test" << "value" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(42, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(42, 1))));
+    const BSONObj doc3 =
+        BSON("operationType" << "test3" << "test" << "value" << "_id"
+                             << buildHighWaterMarkToken(Timestamp(43, 1)) << "$sortKey"
+                             << BSON_ARRAY(buildHighWaterMarkToken(Timestamp(43, 1))));
 
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makePauseExecution(),
@@ -2192,7 +2213,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isAdvanced());
-    ASSERT_BSONOBJ_EQ(doc1, result->getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(Document::fromBsonWithMetaData(doc1).toBson(),
+                      result->getDocument().toBson());
     ASSERT_EQ(V2Stage::State::kFetchingDegradedGettingChangeEvent, docSource->getState_forTest());
     ASSERT_EQ(ts, *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(segmentEndTimestamp, *docSource->getSegmentEndTimestamp_forTest());
@@ -2219,7 +2241,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isAdvanced());
-    ASSERT_BSONOBJ_EQ(doc2, result->getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(Document::fromBsonWithMetaData(doc2).toBson(),
+                      result->getDocument().toBson());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
 
     // Segment start timestamp should change here.
@@ -2227,7 +2250,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     // 'undoNextReady()' should have been called on the 'CursorManager' for this transition.
-    ASSERT_EQ(Timestamp(42, 1), *getCursorManagerMock(params)->getUndoGetNextHighWaterMark());
+    ASSERT_TRUE(getCursorManagerMock(params)->undoGetNextCalled());
+    ASSERT_EQ(Timestamp(42, 1), *getCursorManagerMock(params)->getRestoredHighWaterMark());
 
     // Undo mode must have been turned off when exiting the degraded fetching state.
     ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());
@@ -2235,7 +2259,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     // Check return value 5 (doc3).
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
-    ASSERT_BSONOBJ_EQ(doc3, result->getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(Document::fromBsonWithMetaData(doc3).toBson(),
+                      result->getDocument().toBson());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
     ASSERT_EQ(Timestamp(42, 1), *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
@@ -2278,6 +2303,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makePauseExecution(),
         DocumentSource::GetNextResult::makeEOF(),
+        DocumentSource::GetNextResult::makePauseExecution(),
+        DocumentSource::GetNextResult::makeEOF(),
     };
 
     auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
@@ -2291,14 +2318,50 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
 
+    // Must enable undo mode when entering the degraded fetching mode.
+    getCursorManagerMock(params)->enableUndoNextMode();
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
                                 false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
+    getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 0));
+
     // Check return value 1 (pause).
-    getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 1));
     auto result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isPaused());
+    ASSERT_EQ(V2Stage::State::kFetchingDegradedGettingChangeEvent, docSource->getState_forTest());
+
+    // Undo mode must have been turned on while still in the degraded fetching state.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
+
+    ASSERT_EQ(ts, *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(segmentEndTimestamp, docSource->getSegmentEndTimestamp_forTest());
+
+    // 'undoNextReady()' should not have been called on the 'CursorManager' for pause events.
+    ASSERT_FALSE(getCursorManagerMock(params)->undoGetNextCalled());
+
+    // Check return value 2 (EOF).
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isEOF());
+    ASSERT_EQ(V2Stage::State::kFetchingDegradedGettingChangeEvent, docSource->getState_forTest());
+
+    // Undo mode must have been turned on while still in the degraded fetching state.
+    ASSERT_TRUE(*getCursorManagerMock(params)->getUndoNextMode());
+
+    ASSERT_EQ(ts, *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(segmentEndTimestamp, docSource->getSegmentEndTimestamp_forTest());
+
+    // 'undoNextReady()' should not have been called on the 'CursorManager' for EOF events.
+    ASSERT_FALSE(getCursorManagerMock(params)->undoGetNextCalled());
+
+    // Move high water mark forward.
+    getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 1));
+
+    // Consume pause event (it is not undone).
+    result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
 
@@ -2306,8 +2369,9 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
 
-    // 'undoNextReady()' should have been called on the 'CursorManager' for this transition.
-    ASSERT_EQ(Timestamp(23, 1), getCursorManagerMock(params)->getUndoGetNextHighWaterMark());
+    // 'undoNextReady()' should not have been called.
+    ASSERT_FALSE(getCursorManagerMock(params)->undoGetNextCalled());
+    ASSERT_EQ(Timestamp(23, 1), getCursorManagerMock(params)->getRestoredHighWaterMark());
 
     // Undo mode must have been turned off when exiting the degraded fetching state.
     ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());
@@ -2315,20 +2379,16 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
-
-    result = docSource->runGetNextStateMachine_forTest();
-    ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->isPaused());
-    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
     ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
-    // Check return value 2 (eof).
+    // Check return value 4 (EOF).
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isEOF());
-
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+    ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     // No more results.
     result = docSource->runGetNextStateMachine_forTest();
@@ -2420,7 +2480,8 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
     ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     // 'undoNextReady()' should have been called on the 'CursorManager' for this transition.
-    ASSERT_EQ(Timestamp(23, 99), *getCursorManagerMock(params)->getUndoGetNextHighWaterMark());
+    ASSERT_TRUE(getCursorManagerMock(params)->undoGetNextCalled());
+    ASSERT_EQ(Timestamp(23, 99), *getCursorManagerMock(params)->getRestoredHighWaterMark());
 
     // Undo mode must have been turned off when exiting the degraded fetching state.
     ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());

@@ -136,8 +136,8 @@ void MergeCursorsStage::disableUndoNextMode() {
     _blockingResultsMerger->disableUndoNextMode();
 }
 
-void MergeCursorsStage::undoNext(BSONObj highWaterMark) {
-    _blockingResultsMerger->undoNext(std::move(highWaterMark));
+void MergeCursorsStage::undoNext() {
+    _blockingResultsMerger->undoNext();
 }
 
 void MergeCursorsStage::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,

@@ -128,8 +128,8 @@ public:
      * For a more detailed description refer to the code comments for
      * 'AsyncResultsMerger::undoNextReady()'.
      */
-    void undoNext(BSONObj highWaterMark) {
-        _arm->undoNextReady(std::move(highWaterMark));
+    void undoNext() {
+        _arm->undoNextReady();
     }
 
     /**

@@ -3905,7 +3905,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
     auto arm = makeARMFromExistingCursors(std::move(cursors));
     arm->disableUndoNextReadyMode();
 
-    ASSERT_THROWS_CODE(arm->undoNextReady(BSONObj()), AssertionException, 11057500);
+    ASSERT_THROWS_CODE(arm->undoNextReady(), AssertionException, 11057500);
 }
 
 // Test that calling 'undoNextReady()' does not return results if the ARM has a non-OK status code.
@@ -3941,7 +3941,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyFetchingUndoneFailsIfStatusContainsA
         Status(ErrorCodes::BadValue, "bad thing happened")));
     ASSERT_TRUE(executor()->waitForEvent(operationContext(), readyEvent).isOK());
 
-    arm->undoNextReady(BSONObj());
+    arm->undoNextReady();
 
     ASSERT_EQ(ErrorCodes::BadValue, arm->nextReady().getStatus().code());
 }
@@ -3981,7 +3981,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyUnsorted) {
         // Undo last 'nextReady()' call. This won't reset the high water mark as the
         // AsyncResultsMerger does not run in sorted-tailable mode.
         BSONObj hwm = arm->getHighWaterMark();
-        arm->undoNextReady(BSONObj());
+        arm->undoNextReady();
         ASSERT_BSONOBJ_EQ(hwm, arm->getHighWaterMark());
 
         // Refetch result that was previously "undone".
@@ -4026,7 +4026,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
     arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
 
     // ARM throws because undo was done for a closed cursor.
-    ASSERT_THROWS_CODE(arm->undoNextReady(BSONObj()), AssertionException, 11057502);
+    ASSERT_THROWS_CODE(arm->undoNextReady(), AssertionException, 11057502);
 }
 
 // Test 'undoNextReady()' for sorted results merging.
@@ -4067,7 +4067,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySorted) {
         // Undo last 'nextReady()' call. This won't reset the high water mark as the
         // AsyncResultsMerger does not run in sorted-tailable mode.
         BSONObj hwm = arm->getHighWaterMark();
-        arm->undoNextReady(BSONObj());
+        arm->undoNextReady();
         ASSERT_BSONOBJ_EQ(hwm, arm->getHighWaterMark());
 
         // Refetch result that was previously "undone".
@@ -4137,21 +4137,16 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedTailable) {
     for (int i = 0; i <= n * 2 + 1; ++i) {
         ASSERT_TRUE(arm->ready());
 
-        const auto originalHWM = arm->getHighWaterMark();
-
         const BSONObj doc = buildDocument(i);
 
         ASSERT_BSONOBJ_EQ(doc, *unittest::assertGet(arm->nextReady()).getResult());
-        const auto hwm = arm->getHighWaterMark();
 
-        // Undo last 'nextReady()' call. This resets the high water mark.
-        arm->undoNextReady(originalHWM);
-        ASSERT_BSONOBJ_EQ(originalHWM, arm->getHighWaterMark());
+        // Undo last 'nextReady()' call.
+        arm->undoNextReady();
 
         // Refetch result that was previously "undone". This also moves the high water mark forward.
         ASSERT_TRUE(arm->ready());
         ASSERT_BSONOBJ_EQ(doc, *unittest::assertGet(arm->nextReady()).getResult());
-        ASSERT_BSONOBJ_EQ(hwm, arm->getHighWaterMark());
     }
 
     // No more data to fetch, and the remotes are exhausted because the cursors are closed.
@@ -4219,8 +4214,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back first result and fetch it again.
     ASSERT_BSONOBJ_EQ(pbrt1, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt0);
-    ASSERT_BSONOBJ_EQ(pbrt0, arm->getHighWaterMark());
+    arm->undoNextReady();
 
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc1, *unittest::assertGet(arm->nextReady()).getResult());
@@ -4232,8 +4226,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back second result and fetch it again.
     ASSERT_BSONOBJ_EQ(pbrt2, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt1);
-    ASSERT_BSONOBJ_EQ(pbrt1, arm->getHighWaterMark());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc2, *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4244,8 +4237,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back third result and fetch it again.
     ASSERT_BSONOBJ_EQ(pbrt3, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt2);
-    ASSERT_BSONOBJ_EQ(pbrt2, arm->getHighWaterMark());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc3, *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4256,8 +4248,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back fourth result and fetch it again.
     ASSERT_BSONOBJ_EQ(pbrt4, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt3);
-    ASSERT_BSONOBJ_EQ(pbrt3, arm->getHighWaterMark());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc4, *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4275,8 +4266,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back fourth result again and fetch it one more time.
     ASSERT_BSONOBJ_EQ(pbrt4, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt3);
-    ASSERT_BSONOBJ_EQ(pbrt3, arm->getHighWaterMark());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc4, *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4299,8 +4289,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
 
     // Push back fifth result again and fetch it one more time.
     ASSERT_BSONOBJ_EQ(pbrt5, arm->getHighWaterMark());
-    arm->undoNextReady(pbrt4);
-    ASSERT_BSONOBJ_EQ(pbrt4, arm->getHighWaterMark());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(doc5, *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4335,12 +4324,12 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndos) {
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Refetch first value.
-    arm->undoNextReady(BSONObj());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Refetch first value again.
-    arm->undoNextReady(BSONObj());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4349,12 +4338,12 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndos) {
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Refetch second value.
-    arm->undoNextReady(BSONObj());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Refetch second value again.
-    arm->undoNextReady(BSONObj());
+    arm->undoNextReady();
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *unittest::assertGet(arm->nextReady()).getResult());
 
@@ -4362,7 +4351,9 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndos) {
 }
 
 // Test multiple undoNextReady calls for the same result.
-TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndosForSameResult) {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
+                   UndoNextReadyMultipleUndosForSameResult,
+                   "Tripwire assertion.*11937600") {
     std::vector<RemoteCursor> cursors;
     cursors.push_back(
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
@@ -4384,20 +4375,14 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyMultipleUndosForSameResult) {
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *unittest::assertGet(arm->nextReady()).getResult());
 
     // Undo the same value twice.
-    arm->undoNextReady(BSONObj());
-    arm->undoNextReady(BSONObj());
-
-    ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), *unittest::assertGet(arm->nextReady()).getResult());
-
-    ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *unittest::assertGet(arm->nextReady()).getResult());
-
-    ASSERT_FALSE(arm->ready());
+    arm->undoNextReady();
+    ASSERT_THROWS_CODE(arm->undoNextReady(), AssertionException, 11937600);
 }
 
 // Test calling 'undoNextReady()' after an EOF was returned.
-TEST_F(AsyncResultsMergerTest, UndoNextReadyWithEOF) {
+DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
+                   UndoNextReadyWithEOF,
+                   "Tripwire assertion.*11937600") {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     std::vector<RemoteCursor> cursors;
@@ -4420,11 +4405,8 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyWithEOF) {
 
     ASSERT_FALSE(arm->ready());
 
-    // Undo the EOF.
-    arm->undoNextReady(BSONObj());
-
-    // ARM is still not ready.
-    ASSERT_FALSE(arm->ready());
+    // Try to undo the EOF. This will fail because EOFs cannot be undone.
+    ASSERT_THROWS_CODE(arm->undoNextReady(), AssertionException, 11937600);
 }
 
 TEST(SimpleAsyncResultsMergerTest, CheckHighWaterMarkTokensAreMonotonicallyIncreasing) {
