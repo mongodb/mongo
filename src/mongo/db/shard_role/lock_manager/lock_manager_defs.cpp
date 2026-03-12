@@ -29,6 +29,7 @@
 
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/shard_role/lock_manager/resource_catalog.h"
@@ -98,12 +99,12 @@ std::string ResourceId::toStringForErrorMessage() const {
 }
 
 namespace {
-static const std::array<std::byte, 16> kHashingSaltForResourceId = [] {
+static std::array<std::byte, 16> kHashingSaltForResourceId;
+
+MONGO_INITIALIZER(HashingSaltInitialization)(InitializerContext*) {
     SecureRandom entropy;
-    std::array<std::byte, 16> result;
-    entropy.fill(result.data(), result.size());
-    return result;
-}();
+    entropy.fill(kHashingSaltForResourceId.data(), kHashingSaltForResourceId.size());
+}
 
 }  // namespace
 
