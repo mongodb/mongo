@@ -2550,51 +2550,47 @@ tasks:
   #         suite: disagg_retryable_writes_jscore_passthrough
   #         use_large_distro: "true"
 
-  # TODO (SERVER-120729) Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_concurrency_replication_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_repl",
-  #       "default",
-  #       "large",
-  #       "clustered_collections",
-  #       "requires_extra_system_deps",
-  #       "incompatible_mac",
-  #       "incompatible_ppc",
-  #       "incompatible_s390x",
-  #       "concurrency",
-  #       "common",
-  #       "repl",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         resmoke_jobs_max: 1
+  - <<: *gen_task_template
+    name: disagg_concurrency_replication_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "concurrency",
+        "common",
+        "repl",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          resmoke_jobs_max: 1
 
-  # TODO (SERVER-120803) Reenable suite with only passing tests.
-  # Disabling to complete SERVER-119891. Exclude all failing DSC tests/suites to force master patch builds to be green to enable autoreverter.
-  # - <<: *gen_task_template
-  #   name: disagg_concurrency_replication_multi_stmt_txn_gen
-  #   tags:
-  #     [
-  #       "assigned_to_jira_team_server_repl",
-  #       "default",
-  #       "large",
-  #       "clustered_collections",
-  #       "requires_extra_system_deps",
-  #       "incompatible_mac",
-  #       "incompatible_ppc",
-  #       "incompatible_s390x",
-  #       "incompatible_debug_mode",
-  #       "concurrency",
-  #       "common",
-  #       "repl",
-  #       "txn",
-  #     ]
-  #   commands:
-  #     - func: "generate resmoke tasks"
-  #       vars:
-  #         suite: disagg_concurrency_replication_multi_stmt_txn
-  #         use_large_distro: "true"
+  - <<: *gen_task_template
+    name: disagg_concurrency_replication_multi_stmt_txn_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "concurrency",
+        "common",
+        "repl",
+        "txn",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_concurrency_replication_multi_stmt_txn
+          use_large_distro: "true"
