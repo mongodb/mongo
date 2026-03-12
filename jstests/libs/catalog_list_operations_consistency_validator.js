@@ -662,6 +662,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
     let consistencyCheckAttempts = 0;
     assert.soon(() => {
         let collInfo, catalogInfo, collIndexes;
+        // When featureFlagBlockDirectSystemBucketsAccess is enabled, listIndexes on
+        // system.buckets.* namespaces is blocked. This can happen on restored backups
+        // where legacy system.buckets collections survive because _finalizeUpgrade
+        // (upgradeAllTimeseriesToViewless) was never replayed.
+        // TODO SERVER-106164: Remove this condition once this ticket is done.
+        const skipLegacyBucketsForListIndexes = FeatureFlagUtil.isPresentAndEnabled(
+            db,
+            "BlockDirectSystemBucketsAccess",
+        );
         try {
             let filter = undefined; /* Consider everything (collections, views, timeseries) */
             if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
@@ -687,13 +696,15 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
                 TestData.hideImplicitlyCreatedIndexesFromListIndexes;
             try {
                 TestData.hideImplicitlyCreatedIndexesFromListIndexes = false;
+                let collInfoForIndexes = collInfo.filter((e) => !isViewListCollectionsEntry(e));
+                if (skipLegacyBucketsForListIndexes) {
+                    collInfoForIndexes = collInfoForIndexes.filter((e) => !e.name.startsWith("system.buckets."));
+                }
                 collIndexes = !isMongos
-                    ? collInfo
-                          .filter((e) => !isViewListCollectionsEntry(e))
-                          .map((coll) => ({
-                              name: coll.name,
-                              indexes: db.getCollection(coll.name).getIndexes(getRawOperationSpec(db)),
-                          }))
+                    ? collInfoForIndexes.map((coll) => ({
+                          name: coll.name,
+                          indexes: db.getCollection(coll.name).getIndexes(getRawOperationSpec(db)),
+                      }))
                     : null;
             } finally {
                 TestData.hideImplicitlyCreatedIndexesFromListIndexes =
@@ -776,9 +787,13 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             jsTest.log.info("$listCatalog/listCollections consistency check failed, retrying...");
             return false;
         }
+        let catalogInfoForIndexes = catalogInfo;
+        if (skipLegacyBucketsForListIndexes) {
+            catalogInfoForIndexes = catalogInfo.filter((c) => !c.name.startsWith("system.buckets."));
+        }
         if (
             collIndexes !== null &&
-            !validateListCatalogToListIndexesConsistency(catalogInfo, collIndexes, shouldAssert)
+            !validateListCatalogToListIndexesConsistency(catalogInfoForIndexes, collIndexes, shouldAssert)
         ) {
             jsTest.log.info("$listCatalog/listIndexes consistency check failed, retrying...");
             return false;
