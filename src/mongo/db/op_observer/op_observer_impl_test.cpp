@@ -5923,8 +5923,81 @@ TEST_F(OpObserverTest, OnStartIndexBuildIncludesIndexIdent) {
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto indexIdentUniqueTag =
         storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
-    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
+    EXPECT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
     ASSERT_FALSE(entry2.getObject2());
+}
+
+TEST_F(OpObserverTest, OnStartIndexBuildIncludesInternalIdents) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto indexes = makeSpecs(opCtx.get(), {"a"});
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    // Wait until after the WUOW is constructed to enable the feature flag. Otherwise,
+    // this top-level WUOW will be created in grouped-oplog mode, but onStartIndexBuild logs a
+    // direct command oplog entry first, so onBatchedWriteCommit starts with non-empty
+    // reservedOpTimes and trips the ReservedTimes invariant.
+    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    opObserver.onStartIndexBuild(opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
+    wunit.commit();
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
+    ASSERT_TRUE(entry.getObject2());
+    auto indexesElemVec = entry.getObject2()->getField("indexes").Array();
+    ASSERT_EQ(indexesElemVec.size(), 1);
+
+    auto indexElemObj = indexesElemVec[0].Obj();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexIdentUniqueTag =
+        storageEngine->getIndexIdentUniqueTag(indexes[0].indexIdent, nss.dbName());
+    ASSERT_EQ(indexElemObj.getField("indexIdent").str(), indexIdentUniqueTag);
+
+    ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
+                      BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
+                                         << *indexes[0].sideWritesIdent
+                                         << "skippedRecordsTrackerIdent"
+                                         << *indexes[0].skippedRecordsTrackerIdent));
+}
+
+TEST_F(OpObserverTest, OnStartIndexBuildIncludesConstraintViolationsTrackerIdentForUniqueIndexes) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<IndexBuildInfo> indexes;
+    indexes.emplace_back(BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "unique" << true),
+                         "index-1",
+                         *storageEngine);
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    RAIIServerParameterControllerForTest primaryDrivenIndexBuildsEnabled(
+        "featureFlagPrimaryDrivenIndexBuilds", true);
+    RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+        "featureFlagReplicateLocalCatalogIdentifiers", true);
+    opObserver.onStartIndexBuild(opCtx.get(), nss, UUID::gen(), UUID::gen(), {indexes[0]}, false);
+    wunit.commit();
+
+    auto entry = assertGet(OplogEntry::parse(getNOplogEntries(opCtx.get(), 1)[0]));
+    ASSERT_TRUE(entry.getObject2());
+    auto indexesElemVec = entry.getObject2()->getField("indexes").Array();
+    ASSERT_EQ(indexesElemVec.size(), 1);
+
+    auto indexElemObj = indexesElemVec[0].Obj();
+    ASSERT_BSONOBJ_EQ(indexElemObj.getObjectField("internalIdents"),
+                      BSON("sorterIdent" << *indexes[0].sorterIdent << "sideWritesIdent"
+                                         << *indexes[0].sideWritesIdent
+                                         << "skippedRecordsTrackerIdent"
+                                         << *indexes[0].skippedRecordsTrackerIdent
+                                         << "constraintViolationsTrackerIdent"
+                                         << *indexes[0].constraintViolationsTrackerIdent));
 }
 
 TEST_F(OpObserverTest, OnContainerInsert) {

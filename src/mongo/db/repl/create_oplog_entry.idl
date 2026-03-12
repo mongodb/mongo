@@ -55,6 +55,23 @@ structs:
             indexIdent:
                 description: "The unique tag of the ident where the index's table is stored."
                 type: string
+    InternalIdents:
+        description: "The internal idents assigned for an index build."
+        strict: false
+        fields:
+            sorterIdent:
+                description: "The ident used for the sorter temp table."
+                type: string
+            sideWritesIdent:
+                description: "The ident used for the side writes temp table."
+                type: string
+            skippedRecordsTrackerIdent:
+                description: "The ident used for the skipped records tracker temp table."
+                type: string
+            constraintViolationsTrackerIdent:
+                description: "The ident used for the duplicate key tracker temp table, when one is created."
+                type: string
+                optional: true
     IndexIdents:
         description: "The idents used for an index build."
         strict: false
@@ -62,6 +79,10 @@ structs:
             indexIdent:
                 description: "The unique tag of the ident where the table of the index being built is stored."
                 type: string
+            internalIdents:
+                description: "The internal idents assigned for this index build."
+                type: InternalIdents
+                optional: true
     StartIndexBuildOplogEntryO2:
         description: "In a 'startIndexBuild' oplog entry, defines the fields expected in the 'o2' subobject."
         strict: false

@@ -48,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -409,8 +410,6 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
         return;
     }
 
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
     BSONObjBuilder oplogEntryBuilder;
     oplogEntryBuilder.append("startIndexBuild", nss.coll());
 
@@ -422,11 +421,33 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     }
     oIndexesArr.done();
 
-    BSONArrayBuilder o2IndexesArr;
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<repl::IndexIdents> o2Indexes;
+    o2Indexes.reserve(indexes.size());
     for (const auto& indexBuildInfo : indexes) {
         auto indexIdentUniqueTag =
             storageEngine->getIndexIdentUniqueTag(indexBuildInfo.indexIdent, nss.dbName());
-        o2IndexesArr.append(BSON("indexIdent" << indexIdentUniqueTag));
+        repl::IndexIdents indexIdents;
+        indexIdents.setIndexIdent(std::string{indexIdentUniqueTag});
+
+        if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+            invariant(indexBuildInfo.sorterIdent);
+            invariant(indexBuildInfo.sideWritesIdent);
+            invariant(indexBuildInfo.skippedRecordsTrackerIdent);
+
+            repl::InternalIdents internalIdents;
+            internalIdents.setSorterIdent(*indexBuildInfo.sorterIdent);
+            internalIdents.setSideWritesIdent(*indexBuildInfo.sideWritesIdent);
+            internalIdents.setSkippedRecordsTrackerIdent(
+                *indexBuildInfo.skippedRecordsTrackerIdent);
+            if (indexBuildInfo.constraintViolationsTrackerIdent) {
+                internalIdents.setConstraintViolationsTrackerIdent(
+                    *indexBuildInfo.constraintViolationsTrackerIdent);
+            }
+            indexIdents.setInternalIdents(std::move(internalIdents));
+        }
+
+        o2Indexes.push_back(std::move(indexIdents));
     }
 
     MutableOplogEntry oplogEntry;
@@ -443,7 +464,9 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
     oplogEntry.setObject(oplogEntryBuilder.done());
     if (shouldReplicateLocalCatalogIdentifiers(
             rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider())) {
-        oplogEntry.setObject2(BSON("indexes" << o2IndexesArr.arr()));
+        repl::StartIndexBuildOplogEntryO2 o2;
+        o2.setIndexes(std::move(o2Indexes));
+        oplogEntry.setObject2(o2.toBSON());
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());

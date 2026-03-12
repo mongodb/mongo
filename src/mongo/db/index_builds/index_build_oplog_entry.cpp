@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/create_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/storage/ident.h"
@@ -100,9 +101,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     }
 
     IndexBuildMethodEnum indexBuildMethod{IndexBuildMethodEnum::kHybrid};
-    if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
-        indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
-    }
 
     auto buildUUIDElem = obj.getField("indexBuildUUID");
     if (buildUUIDElem.eoo()) {
@@ -190,7 +188,6 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
     invariant(collUUID, str::stream() << redact(entry.toBSONForLogging()));
 
     if (auto o2 = entry.getObject2(); o2 && parseO2) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto parsedO2 = repl::StartIndexBuildOplogEntryO2::parse(
             *o2, IDLParserContext("startIndexBuildOplogEntryO2"));
         auto indexes = parsedO2.getIndexes();
@@ -203,7 +200,62 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(OperationContext* o
                             indexes.size())};
         }
 
+        const auto validateInternalIdent = [](StringData ident) -> Status {
+            if (mongo::ident::isValidIdent(ident)) {
+                return Status::OK();
+            }
+            return {ErrorCodes::BadValue, fmt::format("Internal ident '{}' is not valid", ident)};
+        };
+
+        const bool o2HasInternalIdents =
+            !indexes.empty() && static_cast<bool>(indexes.front().getInternalIdents());
+        for (const auto& indexIdents : indexes) {
+            if (static_cast<bool>(indexIdents.getInternalIdents()) != o2HasInternalIdents) {
+                return {ErrorCodes::BadValue,
+                        "All indexes in 'o2.indexes' must either include or omit "
+                        "'internalIdents'"};
+            }
+        }
+
+        if (o2HasInternalIdents &&
+            !isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
+            return {ErrorCodes::BadValue,
+                    "'internalIdents' may only appear when primary-driven index builds are "
+                    "enabled"};
+        }
+
+        if (o2HasInternalIdents) {
+            indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
+        }
+
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         for (size_t i = 0; i < indexes.size(); ++i) {
+            if (o2HasInternalIdents) {
+                const auto& internalIdents = *indexes[i].getInternalIdents();
+                for (const auto ident : {internalIdents.getSorterIdent(),
+                                         internalIdents.getSideWritesIdent(),
+                                         internalIdents.getSkippedRecordsTrackerIdent()}) {
+                    if (auto status = validateInternalIdent(ident); !status.isOK()) {
+                        return status;
+                    }
+                }
+                if (const auto& constraintViolationsTrackerIdent =
+                        internalIdents.getConstraintViolationsTrackerIdent()) {
+                    if (auto status = validateInternalIdent(*constraintViolationsTrackerIdent);
+                        !status.isOK()) {
+                        return status;
+                    }
+                }
+                indexesVec[i].setInternalIdents(
+                    std::string{internalIdents.getSorterIdent()},
+                    std::string{internalIdents.getSideWritesIdent()},
+                    std::string{internalIdents.getSkippedRecordsTrackerIdent()},
+                    internalIdents.getConstraintViolationsTrackerIdent()
+                        ? boost::make_optional(
+                              std::string{*internalIdents.getConstraintViolationsTrackerIdent()})
+                        : boost::none);
+            }
+
             auto indexIdentUniqueTag = indexes[i].getIndexIdent();
             if (!ident::validateTag(indexIdentUniqueTag)) {
                 return {ErrorCodes::BadValue,

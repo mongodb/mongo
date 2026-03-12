@@ -30,10 +30,22 @@
 #include "mongo/db/index_builds/index_builds_common.h"
 
 #include "mongo/db/database_name.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 static constexpr StringData kIndexNameFieldName = "name"_sd;
+static constexpr StringData kUniqueFieldName = "unique"_sd;
+static constexpr StringData kKeyFieldName = "key"_sd;
+
+namespace {
+
+bool usesConstraintViolationsTracker(const BSONObj& spec) {
+    return spec[kUniqueFieldName].trueValue() ||
+        IndexDescriptor::isIdIndexPattern(spec.getObjectField(kKeyFieldName));
+}
+
+}  // namespace
 
 IndexBuildInfo::IndexBuildInfo(BSONObj specObj, boost::optional<std::string> idxIdent)
     : spec(std::move(specObj)), indexIdent(idxIdent.value_or("")) {}
@@ -59,7 +71,10 @@ void IndexBuildInfo::setInternalIdents(StorageEngine& storageEngine) {
         storageEngine.generateNewInternalIndexBuildIdent("sorter", indexIdent),
         storageEngine.generateNewInternalIndexBuildIdent("sideWrites", indexIdent),
         storageEngine.generateNewInternalIndexBuildIdent("skippedRecordsTracker", indexIdent),
-        storageEngine.generateNewInternalIndexBuildIdent("constraintViolations", indexIdent));
+        usesConstraintViolationsTracker(spec)
+            ? boost::make_optional(storageEngine.generateNewInternalIndexBuildIdent(
+                  "constraintViolations", indexIdent))
+            : boost::none);
 }
 
 void IndexBuildInfo::setInternalIdents(
