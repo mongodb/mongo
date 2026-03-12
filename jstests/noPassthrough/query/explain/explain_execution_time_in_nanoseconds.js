@@ -56,6 +56,8 @@ for (let executionStage of executionStages) {
         // Verify that "queryPlanner" has "optimizationTimeMillis".
         assert(executionStage["$cursor"].hasOwnProperty("queryPlanner"), executionStage);
         assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"), executionStage);
+        assert(!executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMicros"), executionStage);
+        assert(!executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeNanos"), executionStage);
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];
         verifyStages(stages, false);
     }
@@ -70,6 +72,11 @@ db = conn.getDB("test");
 coll = db.explain_execution_time_in_microseconds;
 
 explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
+assert(explainResult.hasOwnProperty("queryPlanner"), explainResult);
+// due to the short query time, optimizationTimeMillis can be 0.xx thus only asserting for its existence
+assert(explainResult.queryPlanner.hasOwnProperty("optimizationTimeMillis"), explainResult.queryPlanner);
+assert.gt(explainResult.queryPlanner.optimizationTimeMicros, 0, explainResult.queryPlanner);
+assert.gt(explainResult.queryPlanner.optimizationTimeNanos, 0, explainResult.queryPlanner);
 executionStages = explainResult.executionStats.executionStages;
 assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
 verifyStages(executionStages, true);
@@ -86,6 +93,11 @@ for (let executionStage of executionStages) {
     assert(executionStage.hasOwnProperty("executionTimeNanos"), executionStage);
 
     if (executionStage.hasOwnProperty("$cursor")) {
+        assert(executionStage["$cursor"].hasOwnProperty("queryPlanner"), executionStage);
+        // due to the short query time, optimizationTimeMillis can be 0.xx thus only asserting for its existence
+        assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"));
+        assert.gt(executionStage["$cursor"]["queryPlanner"].optimizationTimeMicros, 0, executionStage);
+        assert.gt(executionStage["$cursor"]["queryPlanner"].optimizationTimeNanos, 0, executionStage);
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];
         verifyStages(stages, true);
     }
