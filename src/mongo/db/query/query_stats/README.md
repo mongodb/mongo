@@ -133,6 +133,56 @@ queries to other (foreign) shards. In such cases, the local shard forwards the
 `includeQueryStatsMetrics` field to the foreign shard(s). The local shard then aggregates the
 metrics it receives into those it includes in its response.
 
+### Metrics Reference
+
+The following table summarizes all query stats metrics. Some metrics computed on the router are rolled up from the shards, and some are computed locally. The "Router Notes" column clarifies how the metric is computed.
+
+| Metric                              | Description                                                                | Router Notes                                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **General Metrics**                 |                                                                            |                                                                                                           |
+| `firstSeenTimestamp`                | Timestamp for when this query shape was added to the store                 | First seen timestamp on router                                                                            |
+| `latestSeenTimestamp`               | Timestamp for the latest time this query shape was seen                    | Latest seen timestamp on router                                                                           |
+| `lastExecutionMicros`               | Last execution time in microseconds                                        | Execution time on router; for writes, sum of execution time of all ops in client batch                    |
+| `execCount`                         | Number of query executions                                                 | Number of executions on router                                                                            |
+| `totalExecMicros`                   | Total execution time (including getMores)                                  | Router-only (from local `executionTime`); for writes, sum of execution time of all ops in client batch    |
+| `workingTimeMillis`                 | Active execution time (not blocked)                                        | Summed from shards and router (`clusterWorkingTime`)                                                      |
+| `cpuNanos`                          | CPU time consumed                                                          | Summed from shards and router                                                                             |
+| **Cursor Metrics**                  |                                                                            |                                                                                                           |
+| `firstResponseExecMicros`           | Execution time for first batch only                                        | Router-only (local `executionTime` at first batch; writes always produce just one "batch")                |
+| **Query Execution Metrics**         |                                                                            |                                                                                                           |
+| `docsReturned`                      | Number of documents returned (including getMores)                          | Router-only (`nreturned` from local OpDebug); for writes, this is always zero                             |
+| `keysExamined`                      | Number of index keys examined                                              | Summed from shards via `DataBearingNodeMetrics`                                                           |
+| `docsExamined`                      | Number of documents examined                                               | Summed from shards via `DataBearingNodeMetrics`                                                           |
+| `bytesRead`                         | Number of bytes read from storage                                          | Summed from shards via `DataBearingNodeMetrics`                                                           |
+| `readTimeMicros`                    | Time spent reading from storage                                            | Summed from shards via `DataBearingNodeMetrics`; same for writes (relevant for updates/deletes that read) |
+| `delinquentAcquisitions`            | Slow lock acquisitions count                                               | Summed from shards and router                                                                             |
+| `totalAcquisitionDelinquencyMillis` | Total time waiting for slow acquisitions                                   | Summed from shards and router                                                                             |
+| `maxAcquisitionDelinquencyMillis`   | Max time waiting for a slow acquisition                                    | Max across shards and router                                                                              |
+| `totalTimeQueuedMicros`             | Time spent queued for execution control                                    | Summed from shards and router                                                                             |
+| `totalAdmissions`                   | Number of admission control events                                         | Summed from shards and router                                                                             |
+| `wasLoadShed`                       | Whether query was load shed                                                | ORed across shards                                                                                        |
+| `wasDeprioritized`                  | Whether query was deprioritized                                            | ORed across shards                                                                                        |
+| `numInterruptChecksPerSec`          | Interrupt check frequency                                                  | Summed from shards and router                                                                             |
+| `overdueInterruptApproxMaxMillis`   | Max overdue interrupt time                                                 | Max across shards and router                                                                              |
+| **Query Planner Metrics**           |                                                                            |                                                                                                           |
+| `hasSortStage`                      | Whether query used a sort stage                                            | ORed across shards                                                                                        |
+| `usedDisk`                          | Whether query spilled to disk                                              | ORed across shards                                                                                        |
+| `fromMultiPlanner`                  | Whether multi-planner was used                                             | ORed across shards                                                                                        |
+| `fromPlanCache`                     | Whether plan came from cache                                               | ANDed across shards (any miss = false)                                                                    |
+| `planningTimeMicros`                | Time spent in query planning                                               | Summed from shards and router                                                                             |
+| **Cost-Based Ranker Metrics**       |                                                                            |                                                                                                           |
+| `cardinalityEstimationMethods`      | CE methods used (histogram/sampling/heuristics/mixed/metadata/code counts) | Summed from shards                                                                                        |
+| `nDocsSampled`                      | Documents sampled for CE                                                   | Summed from shards                                                                                        |
+| **Write Metrics**                   |                                                                            |                                                                                                           |
+| `nMatched`                          | Documents matched by update                                                | Zero for reads; for writes, summed from shards                                                            |
+| `nUpserted`                         | Documents inserted by upsert                                               | Zero for reads; for writes, summed from shards                                                            |
+| `nModified`                         | Existing documents modified                                                | Zero for reads; for writes, summed from shards                                                            |
+| `nDeleted`                          | Documents deleted                                                          | Zero for reads; for writes, summed from shards                                                            |
+| `nInserted`                         | Documents inserted (non-upsert)                                            | Zero for reads; for writes, summed from shards                                                            |
+| `nUpdateOps`                        | Number of update operations in request                                     | Zero for reads; for writes, number of update ops in client batch                                          |
+| **Supplemental Metrics**            |                                                                            |                                                                                                           |
+| Engine type (Bonsai/SBE/Classic)    | Which query engine was used                                                | Always taken from local OpDebug                                                                           |
+
 ### Rate Limiting
 
 Whether or not query stats will be recorded for a specific query execution depends on a Rate
