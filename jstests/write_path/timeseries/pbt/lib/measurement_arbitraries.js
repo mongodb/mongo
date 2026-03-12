@@ -2,7 +2,7 @@
  * Arbitraries for generating timeseries measurement documents and streams of measurements.
  */
 
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 import {
     makeMetricArb,

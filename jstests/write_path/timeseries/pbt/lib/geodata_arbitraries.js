@@ -2,7 +2,7 @@
  * Arbitraries for generating GeoJSON metrics.
  */
 
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 const defaultLatitudeMin = -90.0;
 const defaultLatitudeMax = 90.0;

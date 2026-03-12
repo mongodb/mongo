@@ -6,7 +6,7 @@
  * test harness to run against both time-series and control collections.
  */
 
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 import {makeMetricArb} from "jstests/write_path/timeseries/pbt/lib/metric_arbitraries.js";
 
 /**

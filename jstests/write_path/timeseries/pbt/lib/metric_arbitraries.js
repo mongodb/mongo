@@ -2,7 +2,7 @@
  * Arbitraries for generating timeseries metrics.
  */
 
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 export const allBsonMetricTypes = Object.freeze([
     // basic
@@ -28,6 +28,18 @@ export const allBsonMetricTypes = Object.freeze([
     "javascriptWithScope",
     "dbPointer",
 ]);
+
+/** Shim for hexa migration, see https://fast-check.dev/docs/migration-guide/from-3.x-to-4.x/#hexa-or-hexastring
+ *
+ * @returns fc.Arbitrary<string>
+ */
+function hexa() {
+    const items = "0123456789abcdef";
+    return fc.integer({min: 0, max: 15}).map(
+        (n) => items[n],
+        (c) => items.indexOf(c),
+    );
+}
 
 function _defaultDateRange(dateRange) {
     const defaultDateMin = new Date("1970-01-01T00:00:00.000Z");
@@ -151,7 +163,7 @@ export function makeMetricArb(types, ranges = {}) {
         bsonPrimitiveMetricTypes.push(fc.uuid());
     }
     if (typeList.includes("objectId")) {
-        bsonPrimitiveMetricTypes.push(fc.hexaString({minLength: 24, maxLength: 24}).map(ObjectId));
+        bsonPrimitiveMetricTypes.push(fc.string({minLength: 24, maxLength: 24, unit: hexa()}).map(ObjectId));
     }
     if (typeList.includes("binData")) {
         // Keep sizes small and hex-based.
@@ -161,7 +173,7 @@ export function makeMetricArb(types, ranges = {}) {
                     // TODO: SERVER-121129 Remove filter for 7
                     // Filter 7 as this is a special format and inserts will be rejected.
                     fc.integer({min: 0, max: 255}).filter((x) => x != 7),
-                    fc.hexaString({minLength: 24, maxLength: 24}),
+                    fc.string({minLength: 24, maxLength: 24, unit: hexa()}),
                 )
                 .map(([subtype, hex]) => HexData(subtype, hex)),
         );
@@ -189,7 +201,7 @@ export function makeMetricArb(types, ranges = {}) {
             fc
                 .tuple(
                     fc.string({minLength: 1, maxLength: 16}),
-                    fc.hexaString({minLength: 24, maxLength: 24}).map(ObjectId),
+                    fc.string({minLength: 24, maxLength: 24, unit: hexa()}).map(ObjectId),
                 )
                 .map(([ns, oid]) => DBPointer(ns, oid)),
         );

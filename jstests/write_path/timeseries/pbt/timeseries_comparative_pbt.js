@@ -13,7 +13,7 @@
  */
 
 import {describe, it} from "jstests/libs/mochalite.js";
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 import {makeEmptyModel} from "jstests/write_path/timeseries/pbt/lib/command_grammar.js";
 import {makeTimeseriesCommandSequenceArb} from "jstests/write_path/timeseries/pbt/lib/command_arbitraries.js";

@@ -2,7 +2,7 @@
  * Arbitraries for generating timeseries commands for property testing.
  */
 
-import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {fc} from "jstests/third_party/fast_check/fc-4.6.0.js";
 
 import {
     makeMeasurementDocArb,
